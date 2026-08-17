@@ -19,6 +19,7 @@ htmlcov/
 */.venv
 */*/.venv
 worktrees/
+.worktrees/
 results/
 queue/
 
