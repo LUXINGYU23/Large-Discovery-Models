@@ -73,7 +73,8 @@
         "evaluations-per-round": 1,
         "proposal-mode": "openai",
         "dataset-id": "buchwald_hartwig",
-        "acquisition-beta": 1.0
+        "acquisition-beta": 1.0,
+        "qualification-input": "tasks/iron_mind/resources/qualification_input.json"
       }
     }
   }

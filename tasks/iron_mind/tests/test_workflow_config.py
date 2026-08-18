@@ -36,6 +36,11 @@ def test_real_tiny_config_matches_the_locked_experiment_profile() -> None:
     assert config["args"]["reservoir-size"] == 4
     assert config["args"]["evaluations-per-round"] == 1
     assert config["args"]["acquisition-beta"] == 1.0
+    assert (
+        config["args"]["qualification-input"]
+        == "tasks/iron_mind/resources/qualification_input.json"
+    )
+    assert config["env"] == {"LDM_DATA_COLLECTION_ENABLED": "1"}
     assert "LDM_LLM_API_KEY" not in json.dumps(config)
 
 

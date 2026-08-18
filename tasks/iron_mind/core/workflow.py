@@ -13,7 +13,7 @@ from typing import Any
 
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine import LDMEngineConfig, LDMEngineState
+from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
 from ldm_tts.optimization.gp import RBFGPUCBSelector
 from ldm_tts.registration.experiment import (
@@ -35,7 +35,14 @@ from tasks.iron_mind.core.factory import (
 from tasks.iron_mind.core.proposals import build_deepseek_reaction_client
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
+from tasks.iron_mind.core.seed_evaluation import load_tracked_qualification_seed_prior
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
+from tasks.iron_mind.core.workflow_support import (
+    derived_budget,
+    jsonable_args,
+    load_campaign_state,
+    record_seed_prior,
+)
 
 TASK_ID = "iron_mind"
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -89,9 +96,19 @@ def main(argv: list[str] | None = None) -> int:
     return _run_campaign(args, task_spec, contract, profile_name, payload)
 
 def _run_campaign(args, task_spec, contract, profile_name: str, payload: dict[str, Any]) -> int:
-    runtime = _open_runtime(args, task_spec, contract, profile_name)
     schema = _schema_for(args.dataset_id)
     table = _load_table(args, schema)
+    seed_prior = (
+        None
+        if args.mock
+        else load_tracked_qualification_seed_prior(
+            input_path=args.qualification_input,
+            table=table,
+        )
+    )
+    runtime = _open_runtime(args, task_spec, contract, profile_name)
+    if seed_prior is not None:
+        record_seed_prior(runtime, seed_prior)
     try:
         client = _proposal_client(args, table)
     except KeyError:
@@ -114,17 +131,30 @@ def _run_campaign(args, task_spec, contract, profile_name: str, payload: dict[st
             table=table,
             sink=sink,
             runtime=runtime,
+            seed_priors=() if seed_prior is None else (seed_prior.observation,),
+            blocked_canonical_keys=() if seed_prior is None else seed_prior.blocked_canonical_keys,
             before_request=before_request,
             acquisition_beta=args.acquisition_beta,
         )
     )
-    return _finish_campaign(args, components, runtime, payload)
+    seed_keys = () if seed_prior is None else seed_prior.blocked_canonical_keys
+    return _finish_campaign(args, components, runtime, payload, seed_keys)
 
-def _finish_campaign(args, components, runtime: CampaignRuntime, payload: dict[str, Any]) -> int:
-    state = _load_state(runtime, args.resume_from is not None)
+def _finish_campaign(
+    args,
+    components,
+    runtime: CampaignRuntime,
+    payload: dict[str, Any],
+    seed_keys: tuple[str, ...],
+) -> int:
+    state = load_campaign_state(runtime, args.resume_from is not None)
     try:
         config = LDMEngineConfig(args.iterations, args.reservoir_size, args.evaluations_per_round)
-        result = components.engine.run(config, state=state)
+        result = components.engine.run(
+            config,
+            state=state,
+            context={"do_not_repeat_keys": seed_keys},
+        )
     except EndpointRequestError as exc:
         _pause_endpoint(
             runtime,
@@ -138,7 +168,6 @@ def _finish_campaign(args, components, runtime: CampaignRuntime, payload: dict[s
     payload.update(engine_summary=result.summary, run_dir=str(runtime.run_dir.resolve()))
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if result.summary["successful_evaluation_count"] else 1
-
 def _validate_args(args: argparse.Namespace) -> None:
     if args.iterations < 0:
         raise SystemExit("--iterations must be non-negative")
@@ -154,12 +183,12 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Non-mock Iron Mind campaigns require --proposal-mode=openai")
     if not args.mock and args.data_dir is None:
         raise SystemExit("Non-mock Iron Mind campaigns require --data-dir")
-    if args.qualification_input is not None:
-        raise SystemExit("--qualification-input is not available before the seed stage")
+    if args.mock and args.qualification_input is not None:
+        raise SystemExit("--qualification-input is only supported by non-mock campaigns")
+    if not args.mock and args.qualification_input is None:
+        raise SystemExit("Non-mock Iron Mind campaigns require --qualification-input")
 
-def _run_payload(
-    args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha256: str, profile_name: str
-) -> dict[str, Any]:
+def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha256: str, profile_name: str) -> dict[str, Any]:
     return {
         "task": TASK_ID,
         "mode": "mock" if args.mock else "real",
@@ -172,16 +201,14 @@ def _run_payload(
     }
 
 def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRuntime:
-    run_dir = args.resume_from.resolve() if args.resume_from else unique_run_dir(
-        args.out_dir / (args.run_name or "mock")
-    )
+    run_dir = args.resume_from.resolve() if args.resume_from else unique_run_dir(args.out_dir / (args.run_name or "mock"))
     profile = contract.profile(profile_name) if profile_name else None
     runtime = CampaignRuntime.open(
         run_dir,
         task=TASK_ID,
-        config=_jsonable_args(args),
+        config=jsonable_args(args),
         task_spec=task_spec,
-        budget_limits=dict(profile.budget) if profile else _derived_budget(args),
+        budget_limits=dict(profile.budget) if profile else derived_budget(args),
         contract_snapshot=contract.to_dict(),
         contract_sha256=contract.digest,
         contract_profile=profile_name,
@@ -210,6 +237,7 @@ def _load_table(args: argparse.Namespace, schema: ReactionDatasetSchema) -> Froz
         return _load_mock_table(schema)
     assert args.data_dir is not None
     return load_pinned_reaction_table(dataset_id=schema.dataset_id, data_root=args.data_dir)
+
 
 def _mock_row(
     schema: ReactionDatasetSchema, row_id: int, raw: dict[str, str]
@@ -270,31 +298,3 @@ def _mock_response(table: FrozenReactionTable) -> str:
         for row in table.rows
     ]
     return json.dumps({"candidates": candidates}, separators=(",", ":"))
-
-def _load_state(runtime: CampaignRuntime, resume: bool) -> LDMEngineState:
-    if not resume:
-        return LDMEngineState()
-    checkpoint = runtime.load_checkpoint()
-    return LDMEngineState() if checkpoint is None else LDMEngineState.from_checkpoint(checkpoint)
-
-def _derived_budget(args: argparse.Namespace) -> dict[str, int]:
-    selected = args.iterations * args.evaluations_per_round
-    return {
-        "outer_iterations": args.iterations,
-        "llm_requests": args.iterations if args.proposal_mode == "openai" else 0,
-        "proposal_attempts": args.iterations,
-        "valid_search_candidates": args.iterations * args.reservoir_size,
-        "selected_candidates": selected,
-        "external_evaluations": selected,
-        "expensive_evaluation_attempts": selected,
-        "successful_evaluations": selected,
-        "benchmark_jobs": selected,
-    }
-
-
-def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
-    return {
-        key: str(value) if isinstance(value, Path) else value
-        for key, value in vars(args).items()
-        if key != "api_key"
-    }
