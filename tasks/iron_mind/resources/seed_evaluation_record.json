@@ -1,0 +1,28 @@
+{
+  "candidate": {
+    "candidate_id": "iron-mind-564f3fb765e8e10760de3cd13b8a0e0a39dfa78c9663eaeecdaf6cd087624c26",
+    "canonical_key": "564f3fb765e8e10760de3cd13b8a0e0a39dfa78c9663eaeecdaf6cd087624c26"
+  },
+  "data_sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd",
+  "dataset_id": "buchwald_hartwig",
+  "evaluation": {
+    "benchmark_jobs": 1,
+    "reaction_score": 33.30841773
+  },
+  "excluded_from_campaign_budget": true,
+  "experiment_contract_at_evaluation": {
+    "path": "tasks/iron_mind/experiment.json",
+    "sha256": "40f715a6d9f573e67ef5d9ceee4cb099259b34d5fa01d2fc9fc349e5253d9a67"
+  },
+  "qualification_input": {
+    "path": "tasks/iron_mind/resources/qualification_input.json",
+    "sha256": "62e6817707d202b0373ddae0c7755577453de8d828b8084d16a720f36de55f06"
+  },
+  "raw_row_sha256": "02ea6de881c060bca141455bc737b35b859bc3c9922d8171761f75d0f248edd6",
+  "record_type": "seed_evaluation",
+  "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8",
+  "schema_version": 1,
+  "source_row_id": 2217,
+  "status": "passed",
+  "task": "iron_mind"
+}
