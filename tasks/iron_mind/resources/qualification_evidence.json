@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "task_id": "iron_mind",
-  "stage": "scaffolded",
-  "benchmark_commit": "unqualified",
+  "stage": "contract_verified",
+  "benchmark_commit": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
   "contract_profile": "",
   "gates": {
     "scaffolded": {
@@ -13,16 +13,25 @@
       ]
     },
     "registered": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/registered_record.json"
+      ],
+      "description": "Registered task and experiment contract digests were verified."
     },
     "mock_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/mock_verification_record.json"
+      ],
+      "description": "One exact mock campaign completed with four collected candidates and one evaluation."
     },
     "contract_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/contract_verification_record.json"
+      ],
+      "description": "Pinned Buchwald-Hartwig and Chan-Lam artifacts, schemas, and formula vector were verified."
     },
     "seed_evaluated": {
       "status": "pending",
