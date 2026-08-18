@@ -1,0 +1,19 @@
+{
+  "canonical_payload_sha256": "564f3fb765e8e10760de3cd13b8a0e0a39dfa78c9663eaeecdaf6cd087624c26",
+  "data_sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd",
+  "dataset_id": "buchwald_hartwig",
+  "payload": {
+    "conditions": {
+      "additive": "3,5-dimethylisoxazole",
+      "aryl_halide": "1-bromo-4-(trifluoromethyl)benzene",
+      "base": "BTMG",
+      "ligand": "AdBrettPhos"
+    },
+    "dataset_id": "buchwald_hartwig"
+  },
+  "raw_row_sha256": "02ea6de881c060bca141455bc737b35b859bc3c9922d8171761f75d0f248edd6",
+  "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8",
+  "schema_version": 1,
+  "source_row_id": 2217,
+  "task": "iron_mind"
+}
