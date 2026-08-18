@@ -103,6 +103,7 @@ def build_reaction_proposal_request(
     ]
     observations = _proposal_observations(request.observations)
     do_not_repeat = _do_not_repeat_keys(request)
+    envelope_example = _candidate_envelope_example(schema)
     content = "\n".join(
         (
             "Task: propose source-valid categorical reaction conditions.",
@@ -113,6 +114,10 @@ def build_reaction_proposal_request(
             "Do-not-repeat canonical keys: " + _json_text(do_not_repeat),
             "Return exactly four distinct candidates as one complete JSON object.",
             "The JSON root must contain only the candidates array.",
+            "Required JSON envelope example (one candidate shown; return exactly four): "
+            + _json_text(envelope_example),
+            "Replace the placeholders with allowed categories; each candidate must contain only dataset_id and conditions.",
+            "Every factor must appear only inside conditions.",
             "Do not return markdown, prose, scores, ids, or any extra fields.",
         )
     )
@@ -184,6 +189,19 @@ def _admit_payload(
 def _require_fixed_candidate_count(request: ExpansionRequest) -> None:
     if request.reservoir_size != REQUIRED_CANDIDATE_COUNT:
         raise ValueError("Iron Mind proposal expansion requires exactly four candidates.")
+
+
+def _candidate_envelope_example(schema: ReactionDatasetSchema) -> dict[str, Any]:
+    return {
+        "candidates": [
+            {
+                "dataset_id": schema.dataset_id,
+                "conditions": {
+                    factor.name: f"<allowed {factor.name} category>" for factor in schema.factors
+                },
+            }
+        ]
+    }
 
 
 def _proposal_observations(observations: Sequence[Any]) -> list[dict[str, Any]]:

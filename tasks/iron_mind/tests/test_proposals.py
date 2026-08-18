@@ -217,6 +217,19 @@ def test_request_contains_the_schema_observations_and_do_not_repeat_keys() -> No
     assert "seed-key" in content
     assert "JSON" in content
     assert "exactly four" in content
+    envelope_example = {
+        "candidates": [
+            {
+                "dataset_id": _schema().dataset_id,
+                "conditions": {
+                    factor.name: f"<allowed {factor.name} category>"
+                    for factor in _schema().factors
+                },
+            }
+        ]
+    }
+    assert json.dumps(envelope_example, ensure_ascii=False, separators=(",", ":")) in content
+    assert "placeholders" in content
     for factor in _schema().factors:
         for category in factor.categories:
             assert category in content
