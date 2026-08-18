@@ -97,9 +97,13 @@ _EXPORT_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
                 "EndpointRequestError",
                 "OpenAICompatibleProposalClient",
                 "call_with_circuit_breaker",
+                "chat_completions_url",
+                "models_url",
                 "preflight_openai_chat",
+                "preflight_openai_endpoint",
                 "request_openai_chat",
                 "request_openai_chat_response",
+                "request_openai_models",
             }
         ),
     ),
