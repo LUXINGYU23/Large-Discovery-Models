@@ -130,6 +130,24 @@ def test_loader_rejects_artifact_mismatch_before_table_construction(tmp_path: Pa
         )
 
 
+def test_loader_rejects_artifact_byte_size_mismatch_before_table_construction(
+    tmp_path: Path,
+) -> None:
+    schema = load_reaction_schemas(SCHEMA_PATH)["buchwald_hartwig"]
+    rows = [("P2Et", "XPhos", "None", "None", "26.8886154")]
+    config_path, data_path = _write_fixture(tmp_path, schema, rows)
+    contract = _artifact_contract(config_path, data_path, row_count=1)
+    contract["artifacts"]["config"]["bytes"] += 1
+
+    with pytest.raises(ValueError, match="config artifact byte size mismatch"):
+        load_frozen_reaction_table(
+            schema=schema,
+            config_path=config_path,
+            data_path=data_path,
+            artifact_contract=contract,
+        )
+
+
 def test_loader_rejects_config_schema_drift(tmp_path: Path) -> None:
     schema = load_reaction_schemas(SCHEMA_PATH)["buchwald_hartwig"]
     rows = [("P2Et", "XPhos", "None", "None", "26.8886154")]
