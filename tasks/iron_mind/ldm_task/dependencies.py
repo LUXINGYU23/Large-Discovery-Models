@@ -13,5 +13,11 @@ def check_dependencies(
 ) -> list[DependencyCheck]:
     task, args, env, cwd, mode = plan_check_context(plan)
     return check_task_dependencies(
-        task, args, env, cwd, mode=mode, include_optional=include_optional
+        task,
+        args,
+        env,
+        cwd,
+        mode=mode,
+        include_optional=include_optional,
+        contract_profile=str(plan.get("contract_profile", "")),
     )
