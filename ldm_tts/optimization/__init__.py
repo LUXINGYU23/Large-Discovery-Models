@@ -10,6 +10,7 @@ from ldm_tts.optimization.records import (
     SurrogateEncoder,
     SurrogateVector,
 )
+from ldm_tts.optimization.warm_start import WarmStartAcquisitionSelector
 
 __all__ = [
     "AcquisitionSelector",
@@ -20,4 +21,5 @@ __all__ = [
     "FeatureVector",
     "SurrogateEncoder",
     "SurrogateVector",
+    "WarmStartAcquisitionSelector",
 ]
