@@ -7,11 +7,9 @@ import json
 from pathlib import Path
 from types import MappingProxyType
 
-from ldm_tts.contracts import Candidate
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.optimization import BOObservation, WarmStartAcquisitionSelector
 from ldm_tts.optimization.gp import RBFGPUCBSelector
 from ldm_tts.transport import CallableProposalClient
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
@@ -24,7 +22,6 @@ from tasks.iron_mind.core.schema import (
     load_reaction_schemas,
     schema_sha256,
 )
-from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.ldm_task.dependencies import check_dependencies
 
 
@@ -92,14 +89,19 @@ def _write_dependency_assets(tmp_path: Path, digest: str) -> tuple[Path, Path, P
     _write_json(
         contract_path,
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "sources": {
                 "iron_mind_public": {"revision": IRON_MIND_REVISION},
                 "olympus": {"revision": OLYMPUS_REVISION},
             },
+            "suites": {
+                "paper_v2": ["buchwald_hartwig"],
+                "public_union": ["buchwald_hartwig"],
+            },
             "datasets": {
                 "buchwald_hartwig": {
                     "row_count": 1,
+                    "observation_policy": "single_row",
                     "schema_sha256": digest,
                     "artifacts": artifacts,
                 }
@@ -141,7 +143,7 @@ def _real_checks(
     resources: DependencyResources,
     data_root: Path,
     *,
-    profile: str = "real_tiny",
+    profile: str = "ldm_official_smoke",
 ) -> list:
     return check_task_dependencies(
         "iron_mind",
@@ -179,7 +181,7 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path:
 
     statuses = {check.name: check.status for check in checks}
     assert statuses == {
-        "M0-M2 source gate": "ok",
+        "official source gate": "ok",
         "source revisions": "ok",
         "buchwald_hartwig frozen table": "ok",
     }
@@ -190,14 +192,14 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path:
     assert "SHA-256" in table_check.message
 
 
-def test_unsupported_all_six_datasets_profile_fails_before_data_access(tmp_path: Path) -> None:
+def test_unsupported_profile_fails_before_data_access(tmp_path: Path) -> None:
     resources, data_root, _data_path = _dependency_fixture(tmp_path)
 
     checks = _real_checks(resources, data_root, profile="all_six_datasets")
 
-    assert [(check.name, check.status) for check in checks] == [("M0-M2 source gate", "fail")]
+    assert [(check.name, check.status) for check in checks] == [("official source gate", "fail")]
     assert "all_six_datasets" in checks[0].message
-    assert "not supported" in checks[0].message
+    assert "Unsupported" in checks[0].message
 
 
 def test_dependency_adapter_forwards_the_contract_profile(tmp_path: Path) -> None:
@@ -212,7 +214,7 @@ def test_dependency_adapter_forwards_the_contract_profile(tmp_path: Path) -> Non
 
     checks = check_dependencies(plan, include_optional=False)
 
-    assert [(check.name, check.status) for check in checks] == [("M0-M2 source gate", "fail")]
+    assert [(check.name, check.status) for check in checks] == [("official source gate", "fail")]
     assert "all_six_datasets" in checks[0].message
 
 
@@ -241,7 +243,6 @@ def _factory_options(
     table: FrozenReactionTable,
     *,
     run_name: str,
-    seed_priors: tuple[BOObservation, ...] = (),
 ) -> CampaignComponentOptions:
     runtime = CampaignRuntime.open(tmp_path / run_name, task="iron_mind")
     return CampaignComponentOptions(
@@ -250,7 +251,6 @@ def _factory_options(
         table=table,
         sink=DataCollectionSink.disabled(),
         runtime=runtime,
-        seed_priors=seed_priors,
     )
 
 
@@ -272,29 +272,3 @@ def test_factory_assembles_one_shared_engine_shape_for_mock_and_real(tmp_path: P
     assert mock.task_spec.surrogate == mock.encoder.describe()
     assert mock.task_spec.acquisition == mock.selector.describe()
     assert mock.evaluator.table is not real.evaluator.table
-
-
-def test_factory_wraps_the_shared_selector_when_seed_priors_are_supplied(tmp_path: Path) -> None:
-    schema = _factory_schema()
-    table = _factory_table(schema, yield_value=1.0)
-    conditions = {factor.name: factor.categories[0] for factor in schema.factors}
-    candidate = Candidate(
-        candidate_id="seed",
-        payload={"dataset_id": schema.dataset_id, "conditions": conditions},
-        canonical_key="seed",
-    )
-    encoder = ReactionOneHotEncoder(schema)
-    prior = BOObservation.scalar(
-        candidate.candidate_id,
-        1.0,
-        encoder.encode(candidate).values,
-        feature_version=encoder.version,
-    )
-
-    components = build_campaign_components(
-        _factory_options(tmp_path, schema, table, run_name="seeded", seed_priors=(prior,))
-    )
-
-    assert isinstance(components.selector, WarmStartAcquisitionSelector)
-    assert isinstance(components.selector.delegate, RBFGPUCBSelector)
-    assert components.selector.priors == (prior,)

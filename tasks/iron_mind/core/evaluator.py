@@ -12,8 +12,15 @@ from tasks.iron_mind.core.candidate import CandidatePayloadError, normalize_cand
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 
 
-BUCHWALD_HARTWIG_DATASET = "buchwald_hartwig"
 CHAN_LAM_DATASET = "chan_lam_full"
+RAW_MEASUREMENT_BY_DATASET = {
+    "alkylation_deprotection": "yield",
+    "amide_coupling_hte": "yield",
+    "buchwald_hartwig": "yield",
+    "reductive_amination": "percent_conversion",
+    "suzuki_cernak": "conversion",
+    "suzuki_doyle": "yield",
+}
 
 
 @dataclass(frozen=True)
@@ -61,10 +68,11 @@ def _score_rows(
     rows: tuple[ReactionRow, ...], table: FrozenReactionTable
 ) -> tuple[float, list[float]]:
     dataset_id = table.schema.dataset_id
-    if dataset_id == BUCHWALD_HARTWIG_DATASET:
+    measurement = RAW_MEASUREMENT_BY_DATASET.get(dataset_id)
+    if measurement is not None:
         if len(rows) != 1:
-            raise ValueError("Buchwald-Hartwig candidates must map to exactly one frozen row.")
-        score = _finite_measurement(rows[0], "yield")
+            raise ValueError("Single-row Iron Mind candidates must map to exactly one frozen row.")
+        score = _finite_measurement(rows[0], measurement)
         return score, [score]
     if dataset_id == CHAN_LAM_DATASET:
         scores = [chan_lam_row_score(row) for row in rows]

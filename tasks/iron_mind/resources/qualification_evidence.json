@@ -15,37 +15,37 @@
     "registered": {
       "status": "passed",
       "evidence": [
-        "tasks/iron_mind/resources/registered_record.json"
-      ],
-      "description": "Registered task and experiment contract digests were verified."
+        "tasks/iron_mind/ldm_task/procedure.py",
+        "tasks/iron_mind/task.json"
+      ]
     },
     "mock_verified": {
       "status": "passed",
       "evidence": [
-        "tasks/iron_mind/resources/mock_verification_record.json"
-      ],
-      "description": "One exact mock campaign completed with four collected candidates and one evaluation."
+        "config/iron_mind/mock.yaml",
+        "tasks/iron_mind/tests/test_workflow.py"
+      ]
     },
     "contract_verified": {
       "status": "passed",
       "evidence": [
-        "tasks/iron_mind/resources/contract_verification_record.json"
-      ],
-      "description": "Pinned Buchwald-Hartwig and Chan-Lam artifacts, schemas, and formula vector were verified."
+        "tasks/iron_mind/resources/upstream_contract.json",
+        "tasks/iron_mind/tests/test_schema_and_data.py"
+      ]
     },
     "seed_evaluated": {
       "status": "passed",
       "evidence": [
-        "tasks/iron_mind/resources/seed_evaluation_record.json"
+        "tasks/iron_mind/resources/verification_record.json"
       ],
-      "description": "One source-pinned seed was evaluated outside campaign budget."
+      "description": "A source-pinned evaluator probe outside campaign budget succeeded."
     },
     "tiny_campaign_verified": {
       "status": "passed",
       "evidence": [
-        "tasks/iron_mind/resources/tiny_campaign_record.json"
+        "tasks/iron_mind/resources/verification_record.json"
       ],
-      "description": "One source-pinned real tiny campaign admitted four candidates and completed one frozen-table evaluation."
+      "description": "One real LDM-selected endpoint campaign completed one frozen-table evaluation."
     },
     "campaign_qualified": {
       "status": "pending",

@@ -137,7 +137,7 @@ def test_parser_enforces_envelope_and_preserves_untrusted_payloads() -> None:
     assert list(parsed[0]["conditions"]) == list(reversed_conditions)
 
     candidates[0]["conditions"]["base"] = "btmg"
-    with pytest.raises(ValueError, match="candidate 1 rejected: unknown_category"):
+    with pytest.raises(ValueError, match="candidate 1 rejected: unknown_option"):
         parse_reaction_candidates(_response_text(candidates), domain=_domain())
 
 
@@ -194,7 +194,7 @@ def test_before_request_is_consumed_once_only_by_the_injected_endpoint_path() ->
     assert calls == ["llm_request"]
 
 
-def test_request_contains_the_schema_observations_and_do_not_repeat_keys() -> None:
+def test_request_contains_the_schema_observations_and_evaluated_keys() -> None:
     domain = _domain()
     candidate = domain.admit(RawProposal(_candidate_payloads()[0], "seed"))
     assert isinstance(candidate, Candidate)
@@ -207,14 +207,14 @@ def test_request_contains_the_schema_observations_and_do_not_repeat_keys() -> No
         ),
     )
     request = build_reaction_proposal_request(
-        _request(observations=(observation,), context={"do_not_repeat_keys": ["seed-key"]}),
+        _request(observations=(observation,)),
         _schema(),
     )
     content = "\n".join(message["content"] for message in request.messages)
 
     assert _schema().schema_sha256 in content
     assert "reaction_score" in content
-    assert "seed-key" in content
+    assert candidate.canonical_key in content
     assert "JSON" in content
     assert "exactly four" in content
     envelope_example = {
@@ -222,14 +222,14 @@ def test_request_contains_the_schema_observations_and_do_not_repeat_keys() -> No
             {
                 "dataset_id": _schema().dataset_id,
                 "conditions": {
-                    factor.name: f"<allowed {factor.name} category>"
+                    factor.name: factor.options[0]
                     for factor in _schema().factors
                 },
             }
         ]
     }
     assert json.dumps(envelope_example, ensure_ascii=False, separators=(",", ":")) in content
-    assert "placeholders" in content
+    assert "exact typed options" in content
     for factor in _schema().factors:
         for category in factor.categories:
             assert category in content

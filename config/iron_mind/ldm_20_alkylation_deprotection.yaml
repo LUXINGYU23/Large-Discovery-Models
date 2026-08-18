@@ -1,0 +1,23 @@
+name: iron_mind_alkylation_deprotection_ldm_20
+task: iron_mind
+algorithm: ucb
+mode: real
+description: Our LDM method on the official alkylation_deprotection oracle with 20 evaluations.
+contract_profile: ldm_official_20
+args:
+  proposal-mode: openai
+  dataset-id: alkylation_deprotection
+  iterations: 20
+  reservoir-size: 4
+  evaluations-per-round: 1
+  acquisition-beta: 1.0
+  campaign-index: 0
+  data-dir: ${IRON_MIND_DATA_ROOT}
+  llm-url: https://api.deepseek.com
+  llm-model-name: deepseek-v4-flash
+  llm-timeout: 120.0
+  llm-max-tokens: 2048
+  llm-temperature: 0.7
+  out-dir: ${IRON_MIND_RUNS_ROOT}/official_complete
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

@@ -43,19 +43,3 @@ def load_campaign_state(runtime: CampaignRuntime, resume: bool) -> LDMEngineStat
         return LDMEngineState()
     checkpoint = runtime.load_checkpoint()
     return LDMEngineState() if checkpoint is None else LDMEngineState.from_checkpoint(checkpoint)
-
-
-def record_seed_prior(runtime: CampaignRuntime, seed_prior: Any) -> None:
-    """Persist non-budget seed provenance before a real endpoint request."""
-
-    keys = seed_prior.blocked_canonical_keys
-    if len(keys) != 1:
-        raise ValueError("Iron Mind real campaigns require exactly one blocked seed key.")
-    runtime.record(
-        "qualification_seed_prior_loaded",
-        {
-            "candidate_id": seed_prior.observation.candidate_id,
-            "canonical_key": keys[0],
-            "excluded_from_campaign_budget": True,
-        },
-    )

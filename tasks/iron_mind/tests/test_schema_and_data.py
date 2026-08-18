@@ -10,7 +10,13 @@ from typing import Any
 import pytest
 
 from tasks.iron_mind.core.data import load_frozen_reaction_table
-from tasks.iron_mind.core.schema import load_reaction_schemas
+from tasks.iron_mind.core.schema import (
+    canonical_schema_payload,
+    load_reaction_schema_from_config,
+    load_reaction_schemas,
+    parse_config_factors,
+    schema_sha256,
+)
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +52,7 @@ def test_tracked_schemas_match_the_frozen_scientific_contract() -> None:
     assert chan_lam.schema_sha256 == CHAN_LAM_SCHEMA_SHA256
 
 
-def test_upstream_contract_pins_the_four_runtime_assets() -> None:
+def test_upstream_contract_pins_the_complete_official_suite() -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 
     assert contract["sources"]["iron_mind_public"]["revision"] == (
@@ -57,11 +63,15 @@ def test_upstream_contract_pins_the_four_runtime_assets() -> None:
     )
     assert contract["datasets"]["buchwald_hartwig"]["row_count"] == 4599
     assert contract["datasets"]["chan_lam_full"]["row_count"] == 5684
+    assert contract["schema_version"] == 2
+    assert len(contract["suites"]["paper_v2"]) == 6
+    assert len(contract["suites"]["public_union"]) == 7
+    assert set(contract["datasets"]) == set(contract["suites"]["public_union"])
     assert contract["datasets"]["buchwald_hartwig"]["artifacts"]["data"]["sha256"] == (
-        "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd"
+        "96fe0d476224774229a754197014332109ddd2f0627f722be4745abb7e420627"
     )
     assert contract["datasets"]["chan_lam_full"]["artifacts"]["data"]["sha256"] == (
-        "58945ee6c495abad30e665ee9e060f522ab526739a7d6d8d8eeb16f351802d00"
+        "7149bcf78c6e089460e26614ebd6ec7c6fa32b7f3114b1a9d59be9b0b1b0e8be"
     )
 
 
@@ -94,7 +104,7 @@ def test_loader_binds_headerless_columns_in_config_order(tmp_path: Path) -> None
     ("row", "error"),
     [
         (("P2Et", "XPhos", "None", "26.8886154"), "column count"),
-        (("UNKNOWN", "XPhos", "None", "None", "26.8886154"), "Unknown category"),
+        (("UNKNOWN", "XPhos", "None", "None", "26.8886154"), "Unknown option"),
         (("P2Et", "XPhos", "None", "None", "nan"), "Non-finite measurement"),
         (("P2Et", "XPhos", "None", "None", "inf"), "Non-finite measurement"),
     ],
@@ -201,6 +211,46 @@ def test_chan_lam_keeps_replicates_and_stable_raw_row_identity(tmp_path: Path) -
         _sha256_text(",".join(rows[1])),
     ]
     assert table.rows_for_conditions(table.rows[0].conditions) == table.rows
+
+
+def test_reductive_amination_keeps_discrete_options_numeric(tmp_path: Path) -> None:
+    config = {
+        "parameters": [
+            {"name": "substrate", "type": "categorical", "options": ["S1"]},
+            {"name": "AcOH_equiv", "type": "discrete", "options": [1.0, 3.0, 5.0]},
+        ],
+        "measurements": [{"name": "percent_conversion", "type": "continuous"}],
+    }
+    config_path = tmp_path / "config.json"
+    data_path = tmp_path / "data.csv"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    data_path.write_text("S1,3.0,81.25\n", encoding="utf-8")
+    factors = parse_config_factors(config["parameters"])
+    digest = schema_sha256(canonical_schema_payload(
+        dataset_id="reductive_amination",
+        factors=factors,
+        measurements=("percent_conversion",),
+        objective="reaction_score",
+        direction="maximize",
+        observation_policy="single_row",
+    ))
+    schema = load_reaction_schema_from_config(
+        config_path,
+        dataset_id="reductive_amination",
+        observation_policy="single_row",
+        expected_sha256=digest,
+    )
+
+    table = load_frozen_reaction_table(
+        schema=schema,
+        config_path=config_path,
+        data_path=data_path,
+        artifact_contract=_artifact_contract(config_path, data_path, row_count=1),
+    )
+
+    assert schema.factors[1].parameter_type == "discrete"
+    assert schema.factors[1].options == (1.0, 3.0, 5.0)
+    assert table.rows[0].conditions == {"substrate": "S1", "AcOH_equiv": 3.0}
 
 
 def _write_fixture(

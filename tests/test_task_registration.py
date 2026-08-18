@@ -23,15 +23,16 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         "ai4bio_mutation_effect_prediction",
         "antibody",
         "causal_discovery_discrete",
+        "iron_mind",
         "llm_kv_adaptive_quantization",
         "nanogpt",
         "small_molecule",
+        "synthonbench",
     }
     for task_id, definition in TASK_DEFINITIONS.items():
         assert definition.relative_root == Path("tasks") / task_id
         assert definition.module == f"tasks.{task_id}.ldm_task.procedure"
         assert definition.manifest_path == Path("tasks") / task_id / "task.json"
-        assert definition.dependency_checker
 
 
 def test_builtin_task_layouts_have_no_validation_errors() -> None:

@@ -1,4 +1,4 @@
-"""Lightweight dependency checks for source-pinned Iron Mind campaigns."""
+"""Dependency checks for source-pinned complete Iron Mind campaigns."""
 
 from __future__ import annotations
 
@@ -16,19 +16,22 @@ from ldm_tts.registration.dependencies import (
     resolve_task_path,
 )
 from tasks.iron_mind.core.data import FrozenReactionTable, load_frozen_reaction_table
-from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
+from tasks.iron_mind.core.schema import (
+    ReactionDatasetSchema,
+    load_reaction_schema_from_config,
+    load_reaction_schemas,
+)
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
-M0_M2_PROFILES = {
-    "real_tiny": "buchwald_hartwig",
-    "chan_lam_contract_validation": "chan_lam_full",
-}
+SUPPORTED_REAL_PROFILES = frozenset(
+    {"ldm_official_smoke", "ldm_official_20"}
+)
 
 
 @dataclass(frozen=True)
 class DependencyResources:
-    """Tracked resource paths, injectable only for focused preflight tests."""
+    """Tracked resource paths, injectable for focused preflight tests."""
 
     schema_path: Path
     contract_path: Path
@@ -53,7 +56,7 @@ def check_task_dependencies(
     contract_profile: str = "",
     resources: DependencyResources = DEFAULT_RESOURCES,
 ) -> list[DependencyCheck]:
-    """Check only assets needed by the selected mock or real campaign boundary."""
+    """Check only assets needed by the selected mock or real campaign."""
 
     del env, include_optional
     if mode == "mock" or bool(args.get("mock")):
@@ -77,53 +80,41 @@ def _real_checks(
     contract_profile: str,
     resources: DependencyResources,
 ) -> list[DependencyCheck]:
-    gate, dataset_id = _source_gate(task, args, contract_profile)
-    if gate.status == "fail":
-        return [gate]
     try:
         contract = _read_json_object(resources.contract_path, "upstream contract")
-        schema = load_reaction_schemas(resources.schema_path)[dataset_id]
-        dataset_contract = _dataset_contract(contract, dataset_id)
-    except (KeyError, OSError, ValueError) as exc:
-        return [gate, fail(task, "tracked resources", str(exc))]
+    except (OSError, ValueError) as exc:
+        return [fail(task, "tracked resources", str(exc))]
+    gate, dataset_id = _source_gate(task, args, contract_profile, contract)
+    if gate.status == "fail":
+        return [gate]
     data_root = resolve_task_path(arg_value(args, "data-dir"), cwd)
     if data_root is None:
         return [gate, fail(task, "frozen data root", "Set --data-dir to pinned Iron Mind data.")]
+    try:
+        dataset_contract = _dataset_contract(contract, dataset_id)
+    except (KeyError, ValueError) as exc:
+        return [gate, fail(task, "tracked resources", str(exc))]
     return [
         gate,
         _source_revision_check(task, data_root, contract),
-        _frozen_table_check(task, data_root, schema, dataset_contract),
+        _frozen_table_check(task, data_root, dataset_id, dataset_contract),
     ]
 
 
 def _source_gate(
-    task: str, args: Mapping[str, Any], contract_profile: str
+    task: str,
+    args: Mapping[str, Any],
+    contract_profile: str,
+    contract: Mapping[str, Any],
 ) -> tuple[DependencyCheck, str]:
     profile = contract_profile.strip()
-    dataset_id = M0_M2_PROFILES.get(profile)
-    if dataset_id is None:
-        return (
-            fail(
-                task,
-                "M0-M2 source gate",
-                f"Contract profile {profile!r} is not supported by the M0-M2 source contract.",
-            ),
-            "",
-        )
-    requested = arg_value(dict(args), "dataset-id")
-    if requested != dataset_id:
-        return (
-            fail(
-                task,
-                "M0-M2 source gate",
-                f"Profile {profile!r} requires dataset_id {dataset_id!r}.",
-            ),
-            "",
-        )
-    return (
-        ok(task, "M0-M2 source gate", "Profile and dataset match the supported source contract."),
-        dataset_id,
-    )
+    if profile not in SUPPORTED_REAL_PROFILES:
+        return fail(task, "official source gate", f"Unsupported contract profile {profile!r}."), ""
+    dataset_id = str(arg_value(dict(args), "dataset-id") or "")
+    allowed = _suite_dataset_ids(contract, "public_union")
+    if dataset_id not in allowed:
+        return fail(task, "official source gate", f"Unknown official dataset_id {dataset_id!r}."), ""
+    return ok(task, "official source gate", "Profile and dataset match the official contract."), dataset_id
 
 
 def _source_revision_check(
@@ -133,9 +124,7 @@ def _source_revision_check(
         manifest = _read_json_object(data_root / "revision_manifest.json", "revision manifest")
         expected = _expected_revisions(contract)
         actual = _manifest_revisions(manifest)
-        mismatches = [
-            name for name, revision in expected.items() if actual.get(name) != revision
-        ]
+        mismatches = [name for name, revision in expected.items() if actual.get(name) != revision]
         if mismatches:
             raise ValueError("Source revision mismatch: " + ", ".join(sorted(mismatches)) + ".")
     except (KeyError, OSError, ValueError) as exc:
@@ -146,12 +135,12 @@ def _source_revision_check(
 def _frozen_table_check(
     task: str,
     data_root: Path,
-    schema: ReactionDatasetSchema,
+    dataset_id: str,
     dataset_contract: Mapping[str, Any],
 ) -> DependencyCheck:
-    name = f"{schema.dataset_id} frozen table"
+    name = f"{dataset_id} frozen table"
     try:
-        _load_contract_table(data_root, schema, dataset_contract)
+        _load_contract_table(data_root, dataset_id, dataset_contract)
     except (OSError, ValueError) as exc:
         return fail(task, name, str(exc), str(data_root))
     return ok(task, name, "Config, data, row count, and schema digest match.", str(data_root))
@@ -163,25 +152,34 @@ def load_pinned_reaction_table(
     data_root: Path,
     resources: DependencyResources = DEFAULT_RESOURCES,
 ) -> FrozenReactionTable:
-    """Load one tracked dataset through the same artifact contract as preflight."""
+    """Load one official dataset through the same artifact contract as preflight."""
 
     contract = _read_json_object(resources.contract_path, "upstream contract")
-    schema = load_reaction_schemas(resources.schema_path)[dataset_id]
-    dataset_contract = _dataset_contract(contract, dataset_id)
-    return _load_contract_table(Path(data_root), schema, dataset_contract)
+    if dataset_id not in _suite_dataset_ids(contract, "public_union"):
+        raise ValueError(f"Unknown official Iron Mind dataset: {dataset_id!r}.")
+    return _load_contract_table(
+        Path(data_root), dataset_id, _dataset_contract(contract, dataset_id)
+    )
 
 
 def _load_contract_table(
     data_root: Path,
-    schema: ReactionDatasetSchema,
+    dataset_id: str,
     dataset_contract: Mapping[str, Any],
 ) -> FrozenReactionTable:
-    expected_digest = _required_string(dataset_contract.get("schema_sha256"), "schema SHA-256")
-    if schema.schema_sha256 != expected_digest:
-        raise ValueError("Tracked schema SHA-256 does not match the dataset contract.")
     artifacts = _required_mapping(dataset_contract.get("artifacts"), "dataset artifacts")
     config_path = _artifact_path(data_root, artifacts.get("config"), "config")
     data_path = _artifact_path(data_root, artifacts.get("data"), "data")
+    schema = load_reaction_schema_from_config(
+        config_path,
+        dataset_id=dataset_id,
+        observation_policy=_required_string(
+            dataset_contract.get("observation_policy"), "observation policy"
+        ),
+        expected_sha256=_required_string(
+            dataset_contract.get("schema_sha256"), "schema SHA-256"
+        ),
+    )
     return load_frozen_reaction_table(
         schema=schema,
         config_path=config_path,
@@ -199,10 +197,8 @@ def _validate_mock_oracle(path: Path, schema: ReactionDatasetSchema) -> None:
         if tuple(reader.fieldnames or ()) != expected:
             raise ValueError("Mock oracle header does not match the tracked Buchwald schema.")
         rows = list(reader)
-    if not rows:
-        raise ValueError("Mock oracle must contain at least one row.")
-    if any(row["dataset_id"] != schema.dataset_id for row in rows):
-        raise ValueError("Mock oracle contains a row for an unexpected dataset.")
+    if not rows or any(row["dataset_id"] != schema.dataset_id for row in rows):
+        raise ValueError("Mock oracle contains no valid Buchwald rows.")
 
 
 def _read_json_object(path: Path, label: str) -> dict[str, Any]:
@@ -220,20 +216,25 @@ def _dataset_contract(contract: Mapping[str, Any], dataset_id: str) -> Mapping[s
     return _required_mapping(datasets.get(dataset_id), f"dataset contract {dataset_id!r}")
 
 
+def _suite_dataset_ids(contract: Mapping[str, Any], suite: str) -> tuple[str, ...]:
+    suites = _required_mapping(contract.get("suites"), "upstream contract suites")
+    values = suites.get(suite)
+    if not isinstance(values, list) or not all(isinstance(item, str) and item for item in values):
+        raise ValueError(f"Upstream contract suite {suite!r} must be a dataset ID array.")
+    return tuple(values)
+
+
 def _expected_revisions(contract: Mapping[str, Any]) -> dict[str, str]:
     sources = _required_mapping(contract.get("sources"), "upstream contract sources")
     return {
-        "iron-mind-public": _required_string(
-            _required_mapping(sources.get("iron_mind_public"), "iron-mind-public source").get(
-                "revision"
-            ),
-            "iron-mind-public revision",
-        ),
-        "olympus": _required_string(
-            _required_mapping(sources.get("olympus"), "olympus source").get("revision"),
-            "olympus revision",
-        ),
+        "iron-mind-public": _source_revision(sources, "iron_mind_public"),
+        "olympus": _source_revision(sources, "olympus"),
     }
+
+
+def _source_revision(sources: Mapping[str, Any], name: str) -> str:
+    source = _required_mapping(sources.get(name), f"{name} source")
+    return _required_string(source.get("revision"), f"{name} revision")
 
 
 def _manifest_revisions(manifest: Mapping[str, Any]) -> dict[str, str]:
@@ -243,8 +244,9 @@ def _manifest_revisions(manifest: Mapping[str, Any]) -> dict[str, str]:
     revisions = {}
     for source in sources:
         entry = _required_mapping(source, "revision manifest source")
-        name = _required_string(entry.get("name"), "revision manifest source name")
-        revisions[name] = _required_string(entry.get("revision"), "revision manifest revision")
+        revisions[_required_string(entry.get("name"), "source name")] = _required_string(
+            entry.get("revision"), "source revision"
+        )
     return revisions
 
 
@@ -268,8 +270,4 @@ def _required_string(value: Any, label: str) -> str:
     return value
 
 
-__all__ = [
-    "DependencyResources",
-    "check_task_dependencies",
-    "load_pinned_reaction_table",
-]
+__all__ = ["DependencyResources", "check_task_dependencies", "load_pinned_reaction_table"]

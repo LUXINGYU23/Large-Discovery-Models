@@ -113,7 +113,7 @@ def test_expansion_endpoint_error_preserves_request_budget_and_can_resume(
 
 
 @pytest.mark.parametrize("case", ("fewer", "more", "duplicate", "invalid"))
-def test_nonconforming_endpoint_responses_cannot_promote_a_tiny_campaign(
+def test_nonconforming_endpoint_responses_never_reach_the_evaluator(
     case: str, tmp_path: Path, monkeypatch, capsys
 ) -> None:
     class StaticEndpoint:
@@ -144,7 +144,6 @@ def test_nonconforming_endpoint_responses_cannot_promote_a_tiny_campaign(
     assert counters["selected_candidates"] == 0
     assert counters["external_evaluations"] == 0
     assert "candidate_evaluated" not in events
-    assert not (run_dir / "tiny_campaign_record.json").exists()
 
 
 def _endpoint_args(tmp_path: Path, run_name: str) -> list[str]:

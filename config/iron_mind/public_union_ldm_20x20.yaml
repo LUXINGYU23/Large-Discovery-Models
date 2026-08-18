@@ -1,0 +1,702 @@
+description: Our LDM method on all seven public Iron Mind datasets, 20 campaigns per dataset.
+experiments:
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_00
+      - args.campaign-index=0
+      - args.run-name=alkylation_deprotection-campaign-00
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_01
+      - args.campaign-index=1
+      - args.run-name=alkylation_deprotection-campaign-01
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_02
+      - args.campaign-index=2
+      - args.run-name=alkylation_deprotection-campaign-02
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_03
+      - args.campaign-index=3
+      - args.run-name=alkylation_deprotection-campaign-03
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_04
+      - args.campaign-index=4
+      - args.run-name=alkylation_deprotection-campaign-04
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_05
+      - args.campaign-index=5
+      - args.run-name=alkylation_deprotection-campaign-05
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_06
+      - args.campaign-index=6
+      - args.run-name=alkylation_deprotection-campaign-06
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_07
+      - args.campaign-index=7
+      - args.run-name=alkylation_deprotection-campaign-07
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_08
+      - args.campaign-index=8
+      - args.run-name=alkylation_deprotection-campaign-08
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_09
+      - args.campaign-index=9
+      - args.run-name=alkylation_deprotection-campaign-09
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_10
+      - args.campaign-index=10
+      - args.run-name=alkylation_deprotection-campaign-10
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_11
+      - args.campaign-index=11
+      - args.run-name=alkylation_deprotection-campaign-11
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_12
+      - args.campaign-index=12
+      - args.run-name=alkylation_deprotection-campaign-12
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_13
+      - args.campaign-index=13
+      - args.run-name=alkylation_deprotection-campaign-13
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_14
+      - args.campaign-index=14
+      - args.run-name=alkylation_deprotection-campaign-14
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_15
+      - args.campaign-index=15
+      - args.run-name=alkylation_deprotection-campaign-15
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_16
+      - args.campaign-index=16
+      - args.run-name=alkylation_deprotection-campaign-16
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_17
+      - args.campaign-index=17
+      - args.run-name=alkylation_deprotection-campaign-17
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_18
+      - args.campaign-index=18
+      - args.run-name=alkylation_deprotection-campaign-18
+  - config: ldm_20_alkylation_deprotection.yaml
+    set:
+      - name=iron_mind_alkylation_deprotection_campaign_19
+      - args.campaign-index=19
+      - args.run-name=alkylation_deprotection-campaign-19
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_00
+      - args.campaign-index=0
+      - args.run-name=amide_coupling_hte-campaign-00
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_01
+      - args.campaign-index=1
+      - args.run-name=amide_coupling_hte-campaign-01
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_02
+      - args.campaign-index=2
+      - args.run-name=amide_coupling_hte-campaign-02
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_03
+      - args.campaign-index=3
+      - args.run-name=amide_coupling_hte-campaign-03
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_04
+      - args.campaign-index=4
+      - args.run-name=amide_coupling_hte-campaign-04
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_05
+      - args.campaign-index=5
+      - args.run-name=amide_coupling_hte-campaign-05
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_06
+      - args.campaign-index=6
+      - args.run-name=amide_coupling_hte-campaign-06
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_07
+      - args.campaign-index=7
+      - args.run-name=amide_coupling_hte-campaign-07
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_08
+      - args.campaign-index=8
+      - args.run-name=amide_coupling_hte-campaign-08
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_09
+      - args.campaign-index=9
+      - args.run-name=amide_coupling_hte-campaign-09
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_10
+      - args.campaign-index=10
+      - args.run-name=amide_coupling_hte-campaign-10
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_11
+      - args.campaign-index=11
+      - args.run-name=amide_coupling_hte-campaign-11
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_12
+      - args.campaign-index=12
+      - args.run-name=amide_coupling_hte-campaign-12
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_13
+      - args.campaign-index=13
+      - args.run-name=amide_coupling_hte-campaign-13
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_14
+      - args.campaign-index=14
+      - args.run-name=amide_coupling_hte-campaign-14
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_15
+      - args.campaign-index=15
+      - args.run-name=amide_coupling_hte-campaign-15
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_16
+      - args.campaign-index=16
+      - args.run-name=amide_coupling_hte-campaign-16
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_17
+      - args.campaign-index=17
+      - args.run-name=amide_coupling_hte-campaign-17
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_18
+      - args.campaign-index=18
+      - args.run-name=amide_coupling_hte-campaign-18
+  - config: ldm_20_amide_coupling_hte.yaml
+    set:
+      - name=iron_mind_amide_coupling_hte_campaign_19
+      - args.campaign-index=19
+      - args.run-name=amide_coupling_hte-campaign-19
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_00
+      - args.campaign-index=0
+      - args.run-name=buchwald_hartwig-campaign-00
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_01
+      - args.campaign-index=1
+      - args.run-name=buchwald_hartwig-campaign-01
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_02
+      - args.campaign-index=2
+      - args.run-name=buchwald_hartwig-campaign-02
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_03
+      - args.campaign-index=3
+      - args.run-name=buchwald_hartwig-campaign-03
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_04
+      - args.campaign-index=4
+      - args.run-name=buchwald_hartwig-campaign-04
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_05
+      - args.campaign-index=5
+      - args.run-name=buchwald_hartwig-campaign-05
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_06
+      - args.campaign-index=6
+      - args.run-name=buchwald_hartwig-campaign-06
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_07
+      - args.campaign-index=7
+      - args.run-name=buchwald_hartwig-campaign-07
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_08
+      - args.campaign-index=8
+      - args.run-name=buchwald_hartwig-campaign-08
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_09
+      - args.campaign-index=9
+      - args.run-name=buchwald_hartwig-campaign-09
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_10
+      - args.campaign-index=10
+      - args.run-name=buchwald_hartwig-campaign-10
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_11
+      - args.campaign-index=11
+      - args.run-name=buchwald_hartwig-campaign-11
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_12
+      - args.campaign-index=12
+      - args.run-name=buchwald_hartwig-campaign-12
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_13
+      - args.campaign-index=13
+      - args.run-name=buchwald_hartwig-campaign-13
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_14
+      - args.campaign-index=14
+      - args.run-name=buchwald_hartwig-campaign-14
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_15
+      - args.campaign-index=15
+      - args.run-name=buchwald_hartwig-campaign-15
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_16
+      - args.campaign-index=16
+      - args.run-name=buchwald_hartwig-campaign-16
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_17
+      - args.campaign-index=17
+      - args.run-name=buchwald_hartwig-campaign-17
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_18
+      - args.campaign-index=18
+      - args.run-name=buchwald_hartwig-campaign-18
+  - config: ldm_20_buchwald_hartwig.yaml
+    set:
+      - name=iron_mind_buchwald_hartwig_campaign_19
+      - args.campaign-index=19
+      - args.run-name=buchwald_hartwig-campaign-19
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_00
+      - args.campaign-index=0
+      - args.run-name=chan_lam_full-campaign-00
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_01
+      - args.campaign-index=1
+      - args.run-name=chan_lam_full-campaign-01
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_02
+      - args.campaign-index=2
+      - args.run-name=chan_lam_full-campaign-02
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_03
+      - args.campaign-index=3
+      - args.run-name=chan_lam_full-campaign-03
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_04
+      - args.campaign-index=4
+      - args.run-name=chan_lam_full-campaign-04
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_05
+      - args.campaign-index=5
+      - args.run-name=chan_lam_full-campaign-05
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_06
+      - args.campaign-index=6
+      - args.run-name=chan_lam_full-campaign-06
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_07
+      - args.campaign-index=7
+      - args.run-name=chan_lam_full-campaign-07
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_08
+      - args.campaign-index=8
+      - args.run-name=chan_lam_full-campaign-08
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_09
+      - args.campaign-index=9
+      - args.run-name=chan_lam_full-campaign-09
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_10
+      - args.campaign-index=10
+      - args.run-name=chan_lam_full-campaign-10
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_11
+      - args.campaign-index=11
+      - args.run-name=chan_lam_full-campaign-11
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_12
+      - args.campaign-index=12
+      - args.run-name=chan_lam_full-campaign-12
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_13
+      - args.campaign-index=13
+      - args.run-name=chan_lam_full-campaign-13
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_14
+      - args.campaign-index=14
+      - args.run-name=chan_lam_full-campaign-14
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_15
+      - args.campaign-index=15
+      - args.run-name=chan_lam_full-campaign-15
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_16
+      - args.campaign-index=16
+      - args.run-name=chan_lam_full-campaign-16
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_17
+      - args.campaign-index=17
+      - args.run-name=chan_lam_full-campaign-17
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_18
+      - args.campaign-index=18
+      - args.run-name=chan_lam_full-campaign-18
+  - config: ldm_20_chan_lam_full.yaml
+    set:
+      - name=iron_mind_chan_lam_full_campaign_19
+      - args.campaign-index=19
+      - args.run-name=chan_lam_full-campaign-19
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_00
+      - args.campaign-index=0
+      - args.run-name=reductive_amination-campaign-00
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_01
+      - args.campaign-index=1
+      - args.run-name=reductive_amination-campaign-01
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_02
+      - args.campaign-index=2
+      - args.run-name=reductive_amination-campaign-02
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_03
+      - args.campaign-index=3
+      - args.run-name=reductive_amination-campaign-03
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_04
+      - args.campaign-index=4
+      - args.run-name=reductive_amination-campaign-04
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_05
+      - args.campaign-index=5
+      - args.run-name=reductive_amination-campaign-05
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_06
+      - args.campaign-index=6
+      - args.run-name=reductive_amination-campaign-06
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_07
+      - args.campaign-index=7
+      - args.run-name=reductive_amination-campaign-07
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_08
+      - args.campaign-index=8
+      - args.run-name=reductive_amination-campaign-08
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_09
+      - args.campaign-index=9
+      - args.run-name=reductive_amination-campaign-09
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_10
+      - args.campaign-index=10
+      - args.run-name=reductive_amination-campaign-10
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_11
+      - args.campaign-index=11
+      - args.run-name=reductive_amination-campaign-11
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_12
+      - args.campaign-index=12
+      - args.run-name=reductive_amination-campaign-12
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_13
+      - args.campaign-index=13
+      - args.run-name=reductive_amination-campaign-13
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_14
+      - args.campaign-index=14
+      - args.run-name=reductive_amination-campaign-14
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_15
+      - args.campaign-index=15
+      - args.run-name=reductive_amination-campaign-15
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_16
+      - args.campaign-index=16
+      - args.run-name=reductive_amination-campaign-16
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_17
+      - args.campaign-index=17
+      - args.run-name=reductive_amination-campaign-17
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_18
+      - args.campaign-index=18
+      - args.run-name=reductive_amination-campaign-18
+  - config: ldm_20_reductive_amination.yaml
+    set:
+      - name=iron_mind_reductive_amination_campaign_19
+      - args.campaign-index=19
+      - args.run-name=reductive_amination-campaign-19
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_00
+      - args.campaign-index=0
+      - args.run-name=suzuki_cernak-campaign-00
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_01
+      - args.campaign-index=1
+      - args.run-name=suzuki_cernak-campaign-01
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_02
+      - args.campaign-index=2
+      - args.run-name=suzuki_cernak-campaign-02
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_03
+      - args.campaign-index=3
+      - args.run-name=suzuki_cernak-campaign-03
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_04
+      - args.campaign-index=4
+      - args.run-name=suzuki_cernak-campaign-04
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_05
+      - args.campaign-index=5
+      - args.run-name=suzuki_cernak-campaign-05
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_06
+      - args.campaign-index=6
+      - args.run-name=suzuki_cernak-campaign-06
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_07
+      - args.campaign-index=7
+      - args.run-name=suzuki_cernak-campaign-07
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_08
+      - args.campaign-index=8
+      - args.run-name=suzuki_cernak-campaign-08
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_09
+      - args.campaign-index=9
+      - args.run-name=suzuki_cernak-campaign-09
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_10
+      - args.campaign-index=10
+      - args.run-name=suzuki_cernak-campaign-10
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_11
+      - args.campaign-index=11
+      - args.run-name=suzuki_cernak-campaign-11
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_12
+      - args.campaign-index=12
+      - args.run-name=suzuki_cernak-campaign-12
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_13
+      - args.campaign-index=13
+      - args.run-name=suzuki_cernak-campaign-13
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_14
+      - args.campaign-index=14
+      - args.run-name=suzuki_cernak-campaign-14
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_15
+      - args.campaign-index=15
+      - args.run-name=suzuki_cernak-campaign-15
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_16
+      - args.campaign-index=16
+      - args.run-name=suzuki_cernak-campaign-16
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_17
+      - args.campaign-index=17
+      - args.run-name=suzuki_cernak-campaign-17
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_18
+      - args.campaign-index=18
+      - args.run-name=suzuki_cernak-campaign-18
+  - config: ldm_20_suzuki_cernak.yaml
+    set:
+      - name=iron_mind_suzuki_cernak_campaign_19
+      - args.campaign-index=19
+      - args.run-name=suzuki_cernak-campaign-19
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_00
+      - args.campaign-index=0
+      - args.run-name=suzuki_doyle-campaign-00
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_01
+      - args.campaign-index=1
+      - args.run-name=suzuki_doyle-campaign-01
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_02
+      - args.campaign-index=2
+      - args.run-name=suzuki_doyle-campaign-02
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_03
+      - args.campaign-index=3
+      - args.run-name=suzuki_doyle-campaign-03
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_04
+      - args.campaign-index=4
+      - args.run-name=suzuki_doyle-campaign-04
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_05
+      - args.campaign-index=5
+      - args.run-name=suzuki_doyle-campaign-05
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_06
+      - args.campaign-index=6
+      - args.run-name=suzuki_doyle-campaign-06
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_07
+      - args.campaign-index=7
+      - args.run-name=suzuki_doyle-campaign-07
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_08
+      - args.campaign-index=8
+      - args.run-name=suzuki_doyle-campaign-08
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_09
+      - args.campaign-index=9
+      - args.run-name=suzuki_doyle-campaign-09
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_10
+      - args.campaign-index=10
+      - args.run-name=suzuki_doyle-campaign-10
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_11
+      - args.campaign-index=11
+      - args.run-name=suzuki_doyle-campaign-11
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_12
+      - args.campaign-index=12
+      - args.run-name=suzuki_doyle-campaign-12
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_13
+      - args.campaign-index=13
+      - args.run-name=suzuki_doyle-campaign-13
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_14
+      - args.campaign-index=14
+      - args.run-name=suzuki_doyle-campaign-14
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_15
+      - args.campaign-index=15
+      - args.run-name=suzuki_doyle-campaign-15
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_16
+      - args.campaign-index=16
+      - args.run-name=suzuki_doyle-campaign-16
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_17
+      - args.campaign-index=17
+      - args.run-name=suzuki_doyle-campaign-17
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_18
+      - args.campaign-index=18
+      - args.run-name=suzuki_doyle-campaign-18
+  - config: ldm_20_suzuki_doyle.yaml
+    set:
+      - name=iron_mind_suzuki_doyle_campaign_19
+      - args.campaign-index=19
+      - args.run-name=suzuki_doyle-campaign-19

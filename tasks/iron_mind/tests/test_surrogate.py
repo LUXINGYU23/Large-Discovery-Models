@@ -17,41 +17,13 @@ from ldm_tts.contracts import (
     ReservoirSpec,
     ResponseSpaceSpec,
 )
-from ldm_tts.optimization import BOObservation, BOSelectionResult, SurrogateVector, WarmStartAcquisitionSelector
+from ldm_tts.optimization import SurrogateVector
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder, reaction_surrogate_space
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
-
-
-class RecordingSelector:
-    """A test-only shared-selector delegate that records fit input."""
-
-    def __init__(self) -> None:
-        self.fit_history: tuple[BOObservation, ...] = ()
-
-    def describe(self) -> AcquisitionSpec:
-        return AcquisitionSpec(
-            name="recording",
-            objective_names=("reaction_score",),
-            score_direction="maximize",
-            selection_rule="recorded",
-        )
-
-    def fit(self, history: tuple[BOObservation, ...]) -> None:
-        self.fit_history = tuple(history)
-
-    def select(
-        self,
-        candidates: tuple[Candidate, ...],
-        representations: dict[str, SurrogateVector],
-        *,
-        count: int = 1,
-    ) -> BOSelectionResult:
-        del candidates, representations, count
-        raise AssertionError("select is not used by the warm-start fit boundary test")
 
 
 def _schema(dataset_id: str) -> ReactionDatasetSchema:
@@ -160,25 +132,3 @@ def test_surrogate_space_is_the_single_task_spec_source_of_truth() -> None:
     assert description.dimension == schema.one_hot_dimension == 47
     assert description.version == encoder.version
     assert task_spec.surrogate == description
-
-
-def test_seed_prior_fits_only_through_shared_warm_start_selector() -> None:
-    schema = _schema("buchwald_hartwig")
-    encoder = ReactionOneHotEncoder(schema)
-    seed_candidate = _candidate(schema)
-    seed_prior = BOObservation.scalar(
-        seed_candidate.candidate_id,
-        45.92980056,
-        encoder.encode(seed_candidate).values,
-        feature_version=encoder.version,
-    )
-    delegate = RecordingSelector()
-    selector = WarmStartAcquisitionSelector(delegate, (seed_prior,))
-    engine_state = {"observations": []}
-    trajectory_fixture: list[object] = []
-
-    selector.fit(())
-
-    assert delegate.fit_history == (seed_prior,)
-    assert engine_state == {"observations": []}
-    assert trajectory_fixture == []

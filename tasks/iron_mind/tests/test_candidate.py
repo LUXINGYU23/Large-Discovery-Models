@@ -15,9 +15,14 @@ from tasks.iron_mind.core.candidate import (
     IronMindCandidateDomain,
     canonical_candidate_bytes,
     canonical_candidate_key,
+    normalize_candidate_payload,
 )
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
-from tasks.iron_mind.core.schema import load_reaction_schemas
+from tasks.iron_mind.core.schema import (
+    ReactionDatasetSchema,
+    ReactionFactor,
+    load_reaction_schemas,
+)
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +63,26 @@ def test_canonical_identity_ignores_input_mapping_order() -> None:
     }
 
 
+def test_discrete_conditions_remain_numeric_in_the_canonical_payload() -> None:
+    schema = ReactionDatasetSchema(
+        "reductive_amination",
+        (ReactionFactor("AcOH_equiv", (1.0, 3.0, 5.0), "discrete"),),
+        ("percent_conversion",),
+        "reaction_score",
+        "maximize",
+        "single_row",
+        "0" * 64,
+    )
+
+    payload = normalize_candidate_payload(
+        {"dataset_id": "reductive_amination", "conditions": {"AcOH_equiv": 3}},
+        schema,
+    )
+
+    assert payload["conditions"] == {"AcOH_equiv": 3.0}
+    assert canonical_candidate_bytes(payload).endswith(b'{"AcOH_equiv":3.0}}')
+
+
 @pytest.mark.parametrize(
     ("payload", "reason"),
     [
@@ -66,8 +91,8 @@ def test_canonical_identity_ignores_input_mapping_order() -> None:
         ({"dataset_id": "buchwald_hartwig", "conditions": VALID_CONDITIONS, "extra": 1}, "unexpected_payload_fields"),
         (_payload({key: value for key, value in VALID_CONDITIONS.items() if key != "additive"}), "missing_condition_fields"),
         (_payload({**VALID_CONDITIONS, "extra": "value"}), "unexpected_condition_fields"),
-        (_payload({**VALID_CONDITIONS, "ligand": "xphos"}), "unknown_category"),
-        (_payload({**VALID_CONDITIONS, "base": "not-tracked"}), "unknown_category"),
+        (_payload({**VALID_CONDITIONS, "ligand": "xphos"}), "unknown_option"),
+        (_payload({**VALID_CONDITIONS, "base": "not-tracked"}), "unknown_option"),
         (_payload({**VALID_CONDITIONS, "base": "BTMG"}), "off_table_conditions"),
     ],
 )
@@ -79,18 +104,6 @@ def test_invalid_payloads_have_stable_rejection_reasons(
     assert isinstance(admitted, CandidateRejection)
     assert admitted.reason == reason
     assert admitted.message.isascii()
-
-
-def test_blocked_seed_or_resume_key_is_rejected_before_collection(tmp_path: Path) -> None:
-    sink = DataCollectionSink(tmp_path / "collection")
-    blocked_key = canonical_candidate_key(_payload())
-    domain = _domain(sink=sink, blocked_canonical_keys={blocked_key})
-
-    admitted = domain.admit(RawProposal(_payload(), "test", {"collectable": True}))
-
-    assert isinstance(admitted, CandidateRejection)
-    assert admitted.reason == "blocked_canonical_key"
-    assert not (tmp_path / "collection" / "ldm_ir.jsonl").exists()
 
 
 def test_collection_records_only_admitted_canonical_proposals(tmp_path: Path) -> None:
@@ -125,14 +138,12 @@ def test_collection_records_only_admitted_canonical_proposals(tmp_path: Path) ->
 def _domain(
     *,
     sink: DataCollectionSink | None = None,
-    blocked_canonical_keys: set[str] | None = None,
 ) -> IronMindCandidateDomain:
     schema = _schema()
     return IronMindCandidateDomain(
         schema,
         _table(schema),
         sink or DataCollectionSink.disabled(),
-        blocked_canonical_keys=blocked_canonical_keys or set(),
     )
 
 

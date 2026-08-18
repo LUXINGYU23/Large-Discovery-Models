@@ -1,0 +1,23 @@
+name: iron_mind_real_smoke
+task: iron_mind
+algorithm: ucb
+mode: real
+description: One real LDM evaluation against an official Iron Mind dataset adapter.
+contract_profile: ldm_official_smoke
+args:
+  proposal-mode: openai
+  dataset-id: reductive_amination
+  iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  acquisition-beta: 1.0
+  campaign-index: 0
+  data-dir: ${IRON_MIND_DATA_ROOT}
+  llm-url: https://api.deepseek.com
+  llm-model-name: deepseek-v4-flash
+  llm-timeout: 120.0
+  llm-max-tokens: 2048
+  llm-temperature: 0.7
+  out-dir: ${IRON_MIND_RUNS_ROOT}/smoke
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

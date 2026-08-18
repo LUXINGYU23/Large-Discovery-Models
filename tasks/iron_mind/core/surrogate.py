@@ -10,7 +10,7 @@ from ldm_tts.contracts import Candidate, SurrogateSpaceSpec
 from ldm_tts.optimization import SurrogateVector
 
 from tasks.iron_mind.core.candidate import CandidatePayloadError, normalize_candidate_payload
-from tasks.iron_mind.core.schema import ReactionDatasetSchema
+from tasks.iron_mind.core.schema import ReactionDatasetSchema, ReactionValue
 
 
 ENCODER_ALGORITHM = "reaction_one_hot_v1"
@@ -90,7 +90,7 @@ def reaction_encoder_version(schema: ReactionDatasetSchema) -> str:
 
 def _schema_ordered_conditions(
     payload: Any, schema: ReactionDatasetSchema
-) -> dict[str, str]:
+) -> dict[str, ReactionValue]:
     try:
         normalized = normalize_candidate_payload(payload, schema)
     except CandidatePayloadError as exc:
@@ -99,10 +99,10 @@ def _schema_ordered_conditions(
 
 
 def _one_hot_values(
-    conditions: Mapping[str, str], schema: ReactionDatasetSchema
+    conditions: Mapping[str, ReactionValue], schema: ReactionDatasetSchema
 ) -> tuple[float, ...]:
     values = []
     for factor in schema.factors:
         selected = conditions[factor.name]
-        values.extend(float(category == selected) for category in factor.categories)
+        values.extend(float(option == selected) for option in factor.options)
     return tuple(values)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,7 +12,7 @@ from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from ldm_tts.data import DataCollectionSink, make_complete_design_ir
 
 from tasks.iron_mind.core.data import FrozenReactionTable
-from tasks.iron_mind.core.schema import ReactionDatasetSchema
+from tasks.iron_mind.core.schema import ReactionDatasetSchema, ReactionValue
 
 
 CANONICAL_JSON_SEPARATORS = (",", ":")
@@ -34,15 +34,10 @@ class IronMindCandidateDomain:
     schema: ReactionDatasetSchema
     table: FrozenReactionTable
     sink: DataCollectionSink = field(default_factory=DataCollectionSink.disabled)
-    blocked_canonical_keys: Iterable[str] = ()
 
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
             raise ValueError("Candidate domain table schema does not match the supplied schema.")
-        keys = frozenset(self.blocked_canonical_keys)
-        if any(not isinstance(key, str) or not key for key in keys):
-            raise ValueError("Blocked canonical keys must be non-empty strings.")
-        object.__setattr__(self, "blocked_canonical_keys", keys)
 
     def admit(self, proposal: RawProposal) -> Candidate | CandidateRejection:
         """Return a candidate only after exact schema and table admission checks."""
@@ -53,13 +48,6 @@ class IronMindCandidateDomain:
             return CandidateRejection(exc.reason, str(exc), proposal.source)
 
         key = canonical_candidate_key(payload)
-        if key in self.blocked_canonical_keys:
-            return CandidateRejection(
-                "blocked_canonical_key",
-                "Candidate canonical identity is reserved by seed or resume state.",
-                proposal.source,
-                {"canonical_key": key},
-            )
         if not self.table.rows_for_conditions(payload["conditions"]):
             return CandidateRejection(
                 "off_table_conditions",
@@ -84,8 +72,8 @@ class IronMindCandidateDomain:
             task_id="iron_mind",
             domain="source-pinned categorical reaction conditions",
             task_description=(
-                "Propose an exact categorical reaction-condition combination from a "
-                "source-pinned Buchwald-Hartwig or Chan-Lam reaction table."
+                "Propose an exact finite reaction-condition combination from a "
+                "source-pinned Iron Mind reaction table."
             ),
             objectives=[
                 {
@@ -95,7 +83,7 @@ class IronMindCandidateDomain:
                 }
             ],
             design_space_description=(
-                "Every factor must use one tracked category, and the complete "
+                "Every factor must use one tracked option, and the complete "
                 "combination must exist in the frozen reaction table."
             ),
             observations=[],
@@ -176,16 +164,17 @@ def _require_exact_fields(
 
 def _normalize_conditions(
     conditions: Mapping[str, Any], schema: ReactionDatasetSchema
-) -> dict[str, str]:
+) -> dict[str, ReactionValue]:
     normalized = {}
     for factor in schema.factors:
         value = conditions[factor.name]
-        if value not in factor.categories:
+        try:
+            normalized[factor.name] = factor.admit(value)
+        except ValueError as exc:
             raise CandidatePayloadError(
-                "unknown_category",
-                f"Candidate condition has an unknown category for factor {factor.name!r}.",
-            )
-        normalized[factor.name] = value
+                "unknown_option",
+                f"Candidate condition has an invalid option for factor {factor.name!r}.",
+            ) from exc
     return normalized
 
 
@@ -203,8 +192,8 @@ def _active_parameters(schema: ReactionDatasetSchema) -> list[dict[str, Any]]:
     return [
         {
             "name": factor.name,
-            "type": "categorical",
-            "options": list(factor.categories),
+            "type": factor.parameter_type,
+            "options": list(factor.options),
         }
         for factor in schema.factors
     ]

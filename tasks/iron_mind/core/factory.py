@@ -19,7 +19,6 @@ from ldm_tts.contracts import (
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.optimization import BOObservation, WarmStartAcquisitionSelector
 from ldm_tts.optimization.gp import RBFGPUCBSelector
 from ldm_tts.transport import ProposalClient
 
@@ -47,8 +46,6 @@ class CampaignComponentOptions:
     table: FrozenReactionTable
     sink: DataCollectionSink
     runtime: CampaignRuntime
-    seed_priors: tuple[BOObservation, ...] = ()
-    blocked_canonical_keys: tuple[str, ...] = ()
     before_request: Callable[[], None] | None = None
     acquisition_beta: float = 1.0
 
@@ -67,7 +64,7 @@ class CampaignComponents:
     domain: IronMindCandidateDomain
     expander: IronMindProposalExpander
     encoder: ReactionOneHotEncoder
-    selector: RBFGPUCBSelector | WarmStartAcquisitionSelector
+    selector: RBFGPUCBSelector
     evaluator: FrozenReactionEvaluator
     engine: LDMEngine
 
@@ -76,13 +73,16 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     """Assemble one engine without reading credentials, files, or global task state."""
 
     encoder = ReactionOneHotEncoder(options.schema)
-    selector = _build_selector(options, encoder)
+    selector = RBFGPUCBSelector(
+        objective_name=OBJECTIVE_NAME,
+        beta=options.acquisition_beta,
+        feature_version=encoder.version,
+    )
     task_spec = build_reaction_task_spec(options.schema, selector.describe())
     domain = IronMindCandidateDomain(
         options.schema,
         options.table,
         sink=options.sink,
-        blocked_canonical_keys=options.blocked_canonical_keys,
     )
     expander = IronMindProposalExpander(
         options.client,
@@ -136,10 +136,10 @@ def build_reaction_task_spec(
 
 def _candidate_domain_spec(schema: ReactionDatasetSchema) -> CandidateDomainSpec:
     return CandidateDomainSpec(
-        name="Source-pinned categorical reaction conditions",
-        kind="categorical_reaction_conditions",
+        name="Source-pinned finite reaction conditions",
+        kind="finite_reaction_conditions",
         dimension=len(schema.factors),
-        representation="One exact category per tracked reaction factor.",
+        representation="One exact typed option per tracked reaction factor.",
         constraints={"dataset_id": schema.dataset_id, "factor_order": list(schema.factor_names)},
     )
 
@@ -150,7 +150,7 @@ def _reaction_response_space() -> ResponseSpaceSpec:
         output_kind="json_object",
         schema=_reaction_response_schema(),
         parser="tasks.iron_mind.core.proposals:parse_reaction_candidates",
-        description="Exactly four source-valid categorical reaction candidates.",
+        description="Exactly four source-valid finite reaction candidates.",
     )
 
 
@@ -170,19 +170,6 @@ def _reaction_reservoir_spec() -> ReservoirSpec:
         deduplication_key="SHA-256 canonical reaction payload",
         max_size=REQUIRED_CANDIDATE_COUNT,
     )
-
-
-def _build_selector(
-    options: CampaignComponentOptions, encoder: ReactionOneHotEncoder
-) -> RBFGPUCBSelector | WarmStartAcquisitionSelector:
-    selector = RBFGPUCBSelector(
-        objective_name=OBJECTIVE_NAME,
-        beta=options.acquisition_beta,
-        feature_version=encoder.version,
-    )
-    if not options.seed_priors:
-        return selector
-    return WarmStartAcquisitionSelector(selector, options.seed_priors)
 
 
 def _reaction_response_schema() -> dict[str, object]:

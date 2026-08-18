@@ -1,4 +1,4 @@
-"""Configuration-level contracts for Iron Mind workflow entry points."""
+"""Configuration contracts for the public Iron Mind entry points."""
 
 from __future__ import annotations
 
@@ -10,42 +10,66 @@ from ldm_tts.registration.experiment import load_experiment_contract
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_ROOT = TASK_ROOT.parents[1] / "config" / "iron_mind"
 
 
-def test_real_tiny_config_matches_the_locked_experiment_profile() -> None:
-    config_path = TASK_ROOT.parents[1] / "config" / "iron_mind" / "real_tiny.yaml"
+def test_real_smoke_config_is_portable_and_profile_locked(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = tmp_path / "data"
+    runs_root = tmp_path / "runs"
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(data_root))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(runs_root))
+    config_path = CONFIG_ROOT / "real_smoke.yaml"
     config = load_config(config_path)
     plan = build_plan(config, config_path)
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
-    profile = contract.profile("real_tiny")
+    profile = contract.profile("ldm_official_smoke")
 
-    assert plan["contract_profile"] == "real_tiny"
-    assert profile.budget == {
-        "outer_iterations": 1,
-        "llm_requests": 1,
-        "proposal_attempts": 1,
-        "valid_search_candidates": 4,
-        "selected_candidates": 1,
-        "external_evaluations": 1,
-        "expensive_evaluation_attempts": 1,
-        "successful_evaluations": 1,
-        "benchmark_jobs": 1,
-    }
+    assert contract.qualification == "qualified"
+    assert plan["contract_profile"] == "ldm_official_smoke"
+    assert profile.budget["external_evaluations"] == 1
     assert config["args"]["proposal-mode"] == "openai"
-    assert config["args"]["dataset-id"] == "buchwald_hartwig"
     assert config["args"]["reservoir-size"] == 4
     assert config["args"]["evaluations-per-round"] == 1
-    assert config["args"]["acquisition-beta"] == 1.0
-    assert (
-        config["args"]["qualification-input"]
-        == "tasks/iron_mind/resources/qualification_input.json"
-    )
-    assert config["env"] == {"LDM_DATA_COLLECTION_ENABLED": "1"}
+    assert config["args"]["llm-temperature"] == 0.7
+    assert str(data_root) in plan["argv"]
+    assert str(runs_root / "smoke") in plan["argv"]
     assert "LDM_LLM_API_KEY" not in json.dumps(config)
 
 
+def test_complete_ldm_profile_and_suites_lock_the_official_budget(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+    profile = contract.profile("ldm_official_20")
+    paper = load_config(CONFIG_ROOT / "paper_v2_ldm_20x20.yaml")
+    public = load_config(CONFIG_ROOT / "public_union_ldm_20x20.yaml")
+
+    assert profile.budget["external_evaluations"] == 20
+    assert profile.budget["llm_requests"] == 20
+    assert profile.budget["valid_search_candidates"] == 80
+    assert len(paper["experiments"]) == 6 * 20
+    assert len(public["experiments"]) == 7 * 20
+    assert all(entry["config"].startswith("ldm_20_") for entry in public["experiments"])
+
+    dataset_configs = sorted(CONFIG_ROOT.glob("ldm_20_*.yaml"))
+    assert len(dataset_configs) == 7
+    for config_path in dataset_configs:
+        config = load_config(config_path)
+        plan = build_plan(config, config_path)
+        serialized = json.dumps(config)
+        assert plan["contract_profile"] == "ldm_official_20"
+        assert config["args"]["iterations"] == 20
+        assert config["args"]["evaluations-per-round"] == 1
+        assert "LDM_LLM_API_KEY" not in serialized
+        assert "/mnt/data1/" not in serialized
+
+
 def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
-    config_path = TASK_ROOT.parents[1] / "config" / "iron_mind" / "mock.yaml"
+    config_path = CONFIG_ROOT / "mock.yaml"
     config = load_config(config_path)
     plan = build_plan(config, config_path)
 

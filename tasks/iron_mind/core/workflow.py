@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import csv
-import hashlib
 import json
+import math
 import os
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any
 
 from ldm_tts.contracts import LDMTaskSpec
@@ -24,7 +22,7 @@ from ldm_tts.registration.experiment import (
 from ldm_tts.transport import CallableProposalClient, ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
 
-from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
+from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.dependencies import load_pinned_reaction_table
 from tasks.iron_mind.core.factory import (
     OBJECTIVE_NAME,
@@ -32,16 +30,16 @@ from tasks.iron_mind.core.factory import (
     build_campaign_components,
     build_reaction_task_spec,
 )
+from tasks.iron_mind.core.mock import load_mock_table
+from tasks.iron_mind.core.mock import mock_response as _mock_response
 from tasks.iron_mind.core.proposals import build_deepseek_reaction_client
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
-from tasks.iron_mind.core.seed_evaluation import load_tracked_qualification_seed_prior
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.workflow_support import (
     derived_budget,
     jsonable_args,
     load_campaign_state,
-    record_seed_prior,
 )
 
 TASK_ID = "iron_mind"
@@ -66,14 +64,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-model-name", default=os.environ.get("LDM_LLM_MODEL", ""))
     parser.add_argument("--llm-timeout", type=float, default=120.0)
     parser.add_argument("--llm-max-tokens", type=int, default=2048)
-    parser.add_argument("--qualification-input", type=Path)
+    parser.add_argument("--llm-temperature", type=float, default=0.7)
+    parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
     """Describe the fixed-schema reaction task before campaign assembly."""
 
-    schema = _schema_for(args.dataset_id)
+    schema = _load_table(args).schema if not args.mock else _schema_for(args.dataset_id)
+    return _task_spec(args, schema)
+
+def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTaskSpec:
     encoder = ReactionOneHotEncoder(schema)
     selector = RBFGPUCBSelector(
         objective_name=OBJECTIVE_NAME,
@@ -85,7 +87,8 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     _validate_args(args)
-    task_spec = describe_ldm_task(args)
+    table = _load_table(args)
+    task_spec = _task_spec(args, table.schema)
     contract, profile_name = load_active_experiment_contract()
     if contract is None:
         contract = load_experiment_contract(TASK_ROOT / "experiment.json")
@@ -93,22 +96,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
-    return _run_campaign(args, task_spec, contract, profile_name, payload)
+    return _run_campaign(args, table, task_spec, contract, profile_name, payload)
 
-def _run_campaign(args, task_spec, contract, profile_name: str, payload: dict[str, Any]) -> int:
-    schema = _schema_for(args.dataset_id)
-    table = _load_table(args, schema)
-    seed_prior = (
-        None
-        if args.mock
-        else load_tracked_qualification_seed_prior(
-            input_path=args.qualification_input,
-            table=table,
-        )
-    )
+def _run_campaign(
+    args, table, task_spec, contract, profile_name: str, payload: dict[str, Any]
+) -> int:
+    schema = table.schema
     runtime = _open_runtime(args, task_spec, contract, profile_name)
-    if seed_prior is not None:
-        record_seed_prior(runtime, seed_prior)
     try:
         client = _proposal_client(args, table)
     except KeyError:
@@ -131,21 +125,17 @@ def _run_campaign(args, task_spec, contract, profile_name: str, payload: dict[st
             table=table,
             sink=sink,
             runtime=runtime,
-            seed_priors=() if seed_prior is None else (seed_prior.observation,),
-            blocked_canonical_keys=() if seed_prior is None else seed_prior.blocked_canonical_keys,
             before_request=before_request,
             acquisition_beta=args.acquisition_beta,
         )
     )
-    seed_keys = () if seed_prior is None else seed_prior.blocked_canonical_keys
-    return _finish_campaign(args, components, runtime, payload, seed_keys)
+    return _finish_campaign(args, components, runtime, payload)
 
 def _finish_campaign(
     args,
     components,
     runtime: CampaignRuntime,
     payload: dict[str, Any],
-    seed_keys: tuple[str, ...],
 ) -> int:
     state = load_campaign_state(runtime, args.resume_from is not None)
     try:
@@ -153,7 +143,6 @@ def _finish_campaign(
         result = components.engine.run(
             config,
             state=state,
-            context={"do_not_repeat_keys": seed_keys},
         )
     except EndpointRequestError as exc:
         _pause_endpoint(
@@ -177,16 +166,16 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
     if args.acquisition_beta < 0:
         raise SystemExit("--acquisition-beta must be non-negative")
+    if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
+        raise SystemExit("--llm-temperature must be finite and between 0 and 2")
+    if args.campaign_index < 0:
+        raise SystemExit("--campaign-index must be non-negative")
     if args.mock and args.dataset_id != "buchwald_hartwig":
         raise SystemExit("Mock campaigns require --dataset-id=buchwald_hartwig")
     if not args.mock and args.proposal_mode != "openai":
         raise SystemExit("Non-mock Iron Mind campaigns require --proposal-mode=openai")
     if not args.mock and args.data_dir is None:
         raise SystemExit("Non-mock Iron Mind campaigns require --data-dir")
-    if args.mock and args.qualification_input is not None:
-        raise SystemExit("--qualification-input is only supported by non-mock campaigns")
-    if not args.mock and args.qualification_input is None:
-        raise SystemExit("Non-mock Iron Mind campaigns require --qualification-input")
 
 def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha256: str, profile_name: str) -> dict[str, Any]:
     return {
@@ -201,7 +190,10 @@ def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha2
     }
 
 def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRuntime:
-    run_dir = args.resume_from.resolve() if args.resume_from else unique_run_dir(args.out_dir / (args.run_name or "mock"))
+    default_name = (
+        "mock" if args.mock else f"{args.dataset_id}-campaign-{args.campaign_index:02d}"
+    )
+    run_dir = args.resume_from.resolve() if args.resume_from else unique_run_dir(args.out_dir / (args.run_name or default_name))
     profile = contract.profile(profile_name) if profile_name else None
     runtime = CampaignRuntime.open(
         run_dir,
@@ -225,30 +217,13 @@ def _schema_for(dataset_id: str) -> ReactionDatasetSchema:
         raise SystemExit(f"Unknown --dataset-id: {dataset_id}") from exc
 
 def _load_mock_table(schema: ReactionDatasetSchema) -> FrozenReactionTable:
-    with MOCK_ORACLE_PATH.open("r", encoding="utf-8", newline="") as handle:
-        rows = tuple(_mock_row(schema, index, row) for index, row in enumerate(csv.DictReader(handle), 1))
-    if len(rows) != 4:
-        raise ValueError("Mock oracle must contain exactly four rows.")
-    indexed = {tuple(row.conditions[name] for name in schema.factor_names): (row,) for row in rows}
-    return FrozenReactionTable(schema, rows, MappingProxyType(indexed))
+    return load_mock_table(schema, MOCK_ORACLE_PATH)
 
-def _load_table(args: argparse.Namespace, schema: ReactionDatasetSchema) -> FrozenReactionTable:
+def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
     if args.mock:
-        return _load_mock_table(schema)
+        return _load_mock_table(_schema_for(args.dataset_id))
     assert args.data_dir is not None
-    return load_pinned_reaction_table(dataset_id=schema.dataset_id, data_root=args.data_dir)
-
-
-def _mock_row(
-    schema: ReactionDatasetSchema, row_id: int, raw: dict[str, str]
-) -> ReactionRow:
-    expected = {"dataset_id", *schema.factor_names, "reaction_score"}
-    if set(raw) != expected or raw["dataset_id"] != schema.dataset_id:
-        raise ValueError("Mock oracle row does not match the tracked Buchwald schema.")
-    conditions = {name: raw[name] for name in schema.factor_names}
-    score = float(raw["reaction_score"])
-    digest = hashlib.sha256(json.dumps(raw, sort_keys=True).encode("utf-8")).hexdigest()
-    return ReactionRow(row_id, MappingProxyType(conditions), MappingProxyType({"yield": score}), digest)
+    return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
 
 def _proposal_client(args: argparse.Namespace, table: FrozenReactionTable) -> ProposalClient:
     if args.proposal_mode == "callable":
@@ -259,6 +234,7 @@ def _proposal_client(args: argparse.Namespace, table: FrozenReactionTable) -> Pr
         api_key=os.environ["LDM_LLM_API_KEY"],
         timeout_seconds=args.llm_timeout,
         max_tokens=args.llm_max_tokens,
+        temperature=args.llm_temperature,
     )
 
 def _preflight_endpoint(
@@ -291,10 +267,3 @@ def _pause_endpoint(
     payload.update(run_dir=str(runtime.run_dir.resolve()), status="paused_endpoint_unavailable")
     print(json.dumps(payload, indent=2, sort_keys=True))
     return False
-
-def _mock_response(table: FrozenReactionTable) -> str:
-    candidates = [
-        {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)}
-        for row in table.rows
-    ]
-    return json.dumps({"candidates": candidates}, separators=(",", ":"))

@@ -12,7 +12,11 @@ import pytest
 from ldm_tts.contracts import Candidate
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator, chan_lam_row_score
-from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
+from tasks.iron_mind.core.schema import (
+    ReactionDatasetSchema,
+    ReactionFactor,
+    load_reaction_schemas,
+)
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +76,41 @@ def test_buchwald_returns_the_raw_yield_without_normalization() -> None:
     assert result.status == "succeeded"
     assert result.metrics == {"reaction_score": 26.8886154}
     assert result.resource_usage == {"benchmark_jobs": 1.0}
+
+
+@pytest.mark.parametrize(
+    ("dataset_id", "measurement"),
+    [
+        ("alkylation_deprotection", "yield"),
+        ("amide_coupling_hte", "yield"),
+        ("buchwald_hartwig", "yield"),
+        ("reductive_amination", "percent_conversion"),
+        ("suzuki_cernak", "conversion"),
+        ("suzuki_doyle", "yield"),
+    ],
+)
+def test_all_single_row_official_datasets_report_the_raw_measurement(
+    dataset_id: str, measurement: str
+) -> None:
+    schema = ReactionDatasetSchema(
+        dataset_id=dataset_id,
+        factors=(ReactionFactor("condition", ("A",)),),
+        measurements=(measurement,),
+        objective="reaction_score",
+        direction="maximize",
+        observation_policy="single_row",
+        schema_sha256="0" * 64,
+    )
+    conditions = {"condition": "A"}
+    row = _row(1, conditions, {measurement: 42.5})
+
+    result = FrozenReactionEvaluator(_table(schema, (row,))).evaluate(
+        _candidate(schema, conditions)
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics == {"reaction_score": 42.5}
+    assert result.metadata["raw_measurements"] == [{"row_id": 1, measurement: 42.5}]
 
 
 def test_chan_lam_scores_single_zero_denominator_and_replicates_exactly() -> None:

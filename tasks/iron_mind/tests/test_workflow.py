@@ -20,7 +20,7 @@ def test_describe_ldm_task_matches_the_fixed_reaction_contract() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
 
     assert task_spec.task == "iron_mind"
-    assert task_spec.candidate_domain.kind == "categorical_reaction_conditions"
+    assert task_spec.candidate_domain.kind == "finite_reaction_conditions"
     assert task_spec.response_spaces[0].schema["properties"]["candidates"] == {
         "type": "array",
         "minItems": 4,

@@ -14,8 +14,10 @@ from typing import Any, Mapping
 
 from tasks.iron_mind.core.schema import (
     ReactionDatasetSchema,
-    ReactionFactor,
+    ReactionValue,
     canonical_schema_payload,
+    parse_config_factors,
+    parse_config_measurements,
     schema_sha256,
 )
 
@@ -28,7 +30,7 @@ class ReactionRow:
     """One source row with stable one-based identity and raw-row digest."""
 
     row_id: int
-    conditions: Mapping[str, str]
+    conditions: Mapping[str, ReactionValue]
     measurements: Mapping[str, float]
     raw_row_sha256: str
 
@@ -39,15 +41,16 @@ class FrozenReactionTable:
 
     schema: ReactionDatasetSchema
     rows: tuple[ReactionRow, ...]
-    rows_by_conditions: Mapping[tuple[str, ...], tuple[ReactionRow, ...]]
+    rows_by_conditions: Mapping[tuple[ReactionValue, ...], tuple[ReactionRow, ...]]
 
-    def rows_for_conditions(self, conditions: Mapping[str, str]) -> tuple[ReactionRow, ...]:
+    def rows_for_conditions(
+        self, conditions: Mapping[str, ReactionValue]
+    ) -> tuple[ReactionRow, ...]:
         if set(conditions) != set(self.schema.factor_names):
             raise ValueError("Conditions do not match the tracked reaction schema.")
         key = tuple(conditions[name] for name in self.schema.factor_names)
         for factor, value in zip(self.schema.factors, key, strict=True):
-            if value not in factor.categories:
-                raise ValueError(f"Unknown category {value!r} for factor {factor.name!r}.")
+            factor.admit(value)
         return self.rows_by_conditions.get(key, ())
 
 
@@ -119,8 +122,8 @@ def _read_json_object(path: Path) -> dict[str, Any]:
 
 
 def _validate_config_schema(config: Mapping[str, Any], schema: ReactionDatasetSchema) -> None:
-    factors = _config_factors(config.get("parameters"))
-    measurements = _config_measurements(config.get("measurements"))
+    factors = parse_config_factors(config.get("parameters"))
+    measurements = parse_config_measurements(config.get("measurements"))
     payload = canonical_schema_payload(
         dataset_id=schema.dataset_id,
         factors=factors,
@@ -131,45 +134,6 @@ def _validate_config_schema(config: Mapping[str, Any], schema: ReactionDatasetSc
     )
     if schema_sha256(payload) != schema.schema_sha256:
         raise ValueError(f"Config schema digest mismatch for dataset {schema.dataset_id!r}.")
-
-
-def _config_factors(raw_parameters: Any) -> tuple[ReactionFactor, ...]:
-    if not isinstance(raw_parameters, list) or not raw_parameters:
-        raise ValueError("Reaction config parameters must be a non-empty list.")
-    factors = []
-    for raw_parameter in raw_parameters:
-        if not isinstance(raw_parameter, Mapping):
-            raise ValueError("Reaction config parameter must be an object.")
-        if raw_parameter.get("type") != "categorical":
-            raise ValueError("Reaction config parameter type must be categorical.")
-        name = raw_parameter.get("name")
-        options = raw_parameter.get("options")
-        if not isinstance(name, str) or not name:
-            raise ValueError("Reaction config parameter name must be a non-empty string.")
-        if not isinstance(options, list) or not all(isinstance(item, str) and item for item in options):
-            raise ValueError("Reaction config parameter options must be non-empty strings.")
-        if len(options) != len(set(options)):
-            raise ValueError("Reaction config parameter options must not repeat.")
-        factors.append(ReactionFactor(name=name, categories=tuple(options)))
-    return tuple(factors)
-
-
-def _config_measurements(raw_measurements: Any) -> tuple[str, ...]:
-    if not isinstance(raw_measurements, list) or not raw_measurements:
-        raise ValueError("Reaction config measurements must be a non-empty list.")
-    names = []
-    for raw_measurement in raw_measurements:
-        if not isinstance(raw_measurement, Mapping):
-            raise ValueError("Reaction config measurement must be an object.")
-        if raw_measurement.get("type") != "continuous":
-            raise ValueError("Reaction config measurement type must be continuous.")
-        name = raw_measurement.get("name")
-        if not isinstance(name, str) or not name:
-            raise ValueError("Reaction config measurement name must be a non-empty string.")
-        names.append(name)
-    if len(names) != len(set(names)):
-        raise ValueError("Reaction config measurements must not repeat.")
-    return tuple(names)
 
 
 def _read_rows(data_path: Path, schema: ReactionDatasetSchema) -> tuple[ReactionRow, ...]:
@@ -218,12 +182,15 @@ def _parse_csv_line(raw_line: bytes, row_id: int) -> list[str]:
 
 def _row_conditions(
     fields: list[str], schema: ReactionDatasetSchema, row_id: int
-) -> dict[str, str]:
+) -> dict[str, ReactionValue]:
     conditions = {}
-    for factor, value in zip(schema.factors, fields, strict=True):
-        if value not in factor.categories:
-            raise ValueError(f"Unknown category {value!r} for factor {factor.name!r} at row {row_id}.")
-        conditions[factor.name] = value
+    for factor, raw_value in zip(schema.factors, fields, strict=True):
+        try:
+            conditions[factor.name] = factor.parse_csv(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Unknown option {raw_value!r} for factor {factor.name!r} at row {row_id}."
+            ) from exc
     return conditions
 
 
@@ -244,8 +211,8 @@ def _row_measurements(
 
 def _index_rows(
     rows: tuple[ReactionRow, ...], schema: ReactionDatasetSchema
-) -> Mapping[tuple[str, ...], tuple[ReactionRow, ...]]:
-    grouped: dict[tuple[str, ...], list[ReactionRow]] = defaultdict(list)
+) -> Mapping[tuple[ReactionValue, ...], tuple[ReactionRow, ...]]:
+    grouped: dict[tuple[ReactionValue, ...], list[ReactionRow]] = defaultdict(list)
     for row in rows:
         key = tuple(row.conditions[name] for name in schema.factor_names)
         grouped[key].append(row)

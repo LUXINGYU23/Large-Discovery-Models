@@ -76,6 +76,7 @@ def build_deepseek_reaction_client(
     api_key: str,
     timeout_seconds: float,
     max_tokens: int,
+    temperature: float = 0.7,
 ) -> OpenAICompatibleProposalClient:
     """Build the real proposal transport without placing credentials in requests."""
 
@@ -85,6 +86,7 @@ def build_deepseek_reaction_client(
         api_key=api_key,
         timeout_seconds=timeout_seconds,
         max_tokens=max_tokens,
+        temperature=temperature,
         max_retries=0,
         extra_body=DEEPSEEK_REACTION_EXTRA_BODY,
         require_models_preflight=True,
@@ -98,7 +100,11 @@ def build_reaction_proposal_request(
 
     _require_fixed_candidate_count(request)
     factors = [
-        {"name": factor.name, "categories": list(factor.categories)}
+        {
+            "name": factor.name,
+            "type": factor.parameter_type,
+            "options": list(factor.options),
+        }
         for factor in schema.factors
     ]
     observations = _proposal_observations(request.observations)
@@ -106,17 +112,17 @@ def build_reaction_proposal_request(
     envelope_example = _candidate_envelope_example(schema)
     content = "\n".join(
         (
-            "Task: propose source-valid categorical reaction conditions.",
+            "Task: propose source-valid finite reaction conditions.",
             f"Dataset ID: {schema.dataset_id}",
             f"Schema SHA-256: {schema.schema_sha256}",
-            "Allowed categorical factors: " + _json_text(factors),
+            "Allowed factors and exact options: " + _json_text(factors),
             "Observed evaluations: " + _json_text(observations),
             "Do-not-repeat canonical keys: " + _json_text(do_not_repeat),
             "Return exactly four distinct candidates as one complete JSON object.",
             "The JSON root must contain only the candidates array.",
             "Required JSON envelope example (one candidate shown; return exactly four): "
             + _json_text(envelope_example),
-            "Replace the placeholders with allowed categories; each candidate must contain only dataset_id and conditions.",
+            "Use only the exact typed options shown above; each candidate must contain only dataset_id and conditions.",
             "Every factor must appear only inside conditions.",
             "Do not return markdown, prose, scores, ids, or any extra fields.",
         )
@@ -197,7 +203,7 @@ def _candidate_envelope_example(schema: ReactionDatasetSchema) -> dict[str, Any]
             {
                 "dataset_id": schema.dataset_id,
                 "conditions": {
-                    factor.name: f"<allowed {factor.name} category>" for factor in schema.factors
+                    factor.name: factor.options[0] for factor in schema.factors
                 },
             }
         ]
@@ -215,12 +221,7 @@ def _proposal_observations(observations: Sequence[Any]) -> list[dict[str, Any]]:
 
 
 def _do_not_repeat_keys(request: ExpansionRequest) -> list[str]:
-    raw_keys = request.context.get("do_not_repeat_keys", ())
-    if isinstance(raw_keys, str) or not isinstance(raw_keys, Sequence):
-        raise ValueError("do_not_repeat_keys must be a sequence of strings.")
-    if any(not isinstance(key, str) or not key for key in raw_keys):
-        raise ValueError("do_not_repeat_keys must contain non-empty strings.")
-    return sorted({*raw_keys, *(item.canonical_key for item in request.observations)})
+    return sorted(item.canonical_key for item in request.observations)
 
 
 def _json_text(value: Any) -> str:

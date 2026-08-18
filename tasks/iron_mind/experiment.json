@@ -17,45 +17,69 @@
       {
         "name": "reaction_score",
         "direction": "maximize",
-        "description": "Raw frozen-table reaction score; higher is better."
+        "description": "Official frozen-table score: raw yield/conversion, or the Chan-Lam lower-bound weighted selectivity score."
       }
     ],
     "optimized": [
       {
         "name": "reaction_score",
         "direction": "maximize",
-        "description": "The sole shared GP-UCB objective for Iron Mind campaigns."
+        "description": "The sole shared RBF GP-UCB objective for the LDM method."
       }
     ],
-    "diagnostic": []
+    "diagnostic": [
+      {
+        "name": "desired_yield",
+        "direction": "maximize",
+        "description": "Raw desired Chan-Lam product yield retained in evaluation metadata."
+      },
+      {
+        "name": "replicate_scores",
+        "direction": "maximize",
+        "description": "Per-replicate Chan-Lam weighted selectivity scores."
+      },
+      {
+        "name": "undesired_yield",
+        "direction": "minimize",
+        "description": "Raw undesired Chan-Lam product yield retained in evaluation metadata."
+      }
+    ]
   },
   "evaluation": {
     "datasets": [
+      "alkylation_deprotection",
+      "amide_coupling_hte",
       "buchwald_hartwig",
-      "chan_lam_full"
+      "chan_lam_full",
+      "reductive_amination",
+      "suzuki_cernak",
+      "suzuki_doyle"
     ],
     "settings": {
       "oracle": "source-pinned Olympus reaction tables",
-      "proposal_contract": "exact four-candidate JSON object"
+      "paper_v2_suite": "six datasets used by the published paper figures",
+      "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
+      "proposal_contract": "exact four-candidate JSON object",
+      "method": "LDM finite-reservoir proposal plus shared RBF GP-UCB selection"
     },
     "per_candidate_limits": {
       "benchmark_jobs": 1
     }
   },
   "budget": {
-    "outer_iterations": 1,
-    "llm_requests": 1,
-    "proposal_attempts": 1,
-    "valid_search_candidates": 4,
-    "selected_candidates": 1,
-    "external_evaluations": 1,
-    "expensive_evaluation_attempts": 1,
-    "successful_evaluations": 1,
-    "benchmark_jobs": 1
+    "outer_iterations": 20,
+    "llm_requests": 20,
+    "proposal_attempts": 20,
+    "valid_search_candidates": 80,
+    "selected_candidates": 20,
+    "external_evaluations": 20,
+    "expensive_evaluation_attempts": 20,
+    "successful_evaluations": 20,
+    "benchmark_jobs": 20
   },
   "profiles": {
-    "real_tiny": {
-      "description": "One endpoint proposal, four exact candidates, one shared GP-UCB selection, and one frozen-table evaluation.",
+    "ldm_official_smoke": {
+      "description": "One real LDM evaluation used to verify any official dataset adapter.",
       "budget": {
         "outer_iterations": 1,
         "llm_requests": 1,
@@ -72,9 +96,30 @@
         "reservoir-size": 4,
         "evaluations-per-round": 1,
         "proposal-mode": "openai",
-        "dataset-id": "buchwald_hartwig",
         "acquisition-beta": 1.0,
-        "qualification-input": "tasks/iron_mind/resources/qualification_input.json"
+        "llm-temperature": 0.7
+      }
+    },
+    "ldm_official_20": {
+      "description": "Our LDM method under the official 20-evaluation per-campaign budget.",
+      "budget": {
+        "outer_iterations": 20,
+        "llm_requests": 20,
+        "proposal_attempts": 20,
+        "valid_search_candidates": 80,
+        "selected_candidates": 20,
+        "external_evaluations": 20,
+        "expensive_evaluation_attempts": 20,
+        "successful_evaluations": 20,
+        "benchmark_jobs": 20
+      },
+      "locked_args": {
+        "iterations": 20,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "openai",
+        "acquisition-beta": 1.0,
+        "llm-temperature": 0.7
       }
     }
   }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sources": {
     "iron_mind_public": {
       "url": "https://github.com/gomesgroup/iron-mind-public",
@@ -12,42 +12,185 @@
       "revision": "7b4bb35c04eb31dc57a8e46cc79a9cab71dee06d",
       "license": "MIT",
       "verification": "git_bundle_commit"
+    },
+    "iron_mind_data": {
+      "url": "https://huggingface.co/datasets/gomesgroup/iron-mind-data",
+      "revision": "5aa238c177516dd5bdd7519c0b48ae083ef73322",
+      "license": "CC-BY-SA-4.0",
+      "usage": "reference_results_only"
     }
   },
+  "suites": {
+    "paper_v2": [
+      "buchwald_hartwig",
+      "suzuki_doyle",
+      "suzuki_cernak",
+      "reductive_amination",
+      "amide_coupling_hte",
+      "chan_lam_full"
+    ],
+    "public_union": [
+      "alkylation_deprotection",
+      "amide_coupling_hte",
+      "buchwald_hartwig",
+      "chan_lam_full",
+      "reductive_amination",
+      "suzuki_cernak",
+      "suzuki_doyle"
+    ]
+  },
   "datasets": {
+    "alkylation_deprotection": {
+      "display_name": "N-Alkylation / Deprotection",
+      "row_count": 96,
+      "observation_policy": "single_row",
+      "reported_measurement": "yield",
+      "score_transform": "identity",
+      "schema_sha256": "7dc430fbf01bf022d430cca4dd3af836db3f31bde5767f053f9b86bc1ee5692b",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Alkylation_Deprotection/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Alkylation_Deprotection/config.json",
+          "bytes": 6889,
+          "sha256": "5dcbee10a7f18d75ebb9013d2001980440ae2c14ceecf79a7c92e37a38cc9240"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Alkylation_Deprotection/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Alkylation_Deprotection/data.csv",
+          "bytes": 11584,
+          "sha256": "b976cd88dfbb1733c2f70f4e230d0fe4008cb57ac8a7b1b86108453df2640e81"
+        }
+      }
+    },
+    "amide_coupling_hte": {
+      "display_name": "Amide Coupling HTE",
+      "row_count": 648,
+      "observation_policy": "single_row",
+      "reported_measurement": "yield",
+      "score_transform": "identity",
+      "schema_sha256": "e4be6b2b4368e3fed05bd351dfb3ad05e0042f1eec73f1c70afe4e5ae5a825bc",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_amide_coupling_hte/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_amide_coupling_hte/config.json",
+          "bytes": 72699,
+          "sha256": "e1f3d6d393ba7dc7040ffe140586d3fdac52ec5ab5b1c0cac7af191cb79c9698"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_amide_coupling_hte/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_amide_coupling_hte/data.csv",
+          "bytes": 38410,
+          "sha256": "595601d5dd43784ae86c260f7e9b03020ac4618446268d8f5df3fe51e10d4200"
+        }
+      }
+    },
     "buchwald_hartwig": {
+      "display_name": "Buchwald-Hartwig",
       "row_count": 4599,
+      "observation_policy": "single_row",
+      "reported_measurement": "yield",
+      "score_transform": "identity",
       "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8",
       "artifacts": {
         "config": {
           "path": "olympus/src/olympus/datasets/dataset_Buchwald_Hartwig/config.json",
           "upstream_path": "src/olympus/datasets/dataset_Buchwald_Hartwig/config.json",
-          "bytes": 17247,
-          "sha256": "82963c16cbd3a869f565374bc08496201fd4f853beb323e9dd46d7c364aa1ed3"
+          "bytes": 16589,
+          "sha256": "3bcdb4aeda6d4b40d2a5cb6536c6764d5f3a60a36235aafa8ecdc710586a786c"
         },
         "data": {
           "path": "olympus/src/olympus/datasets/dataset_Buchwald_Hartwig/data.csv",
           "upstream_path": "src/olympus/datasets/dataset_Buchwald_Hartwig/data.csv",
-          "bytes": 358536,
-          "sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd"
+          "bytes": 353937,
+          "sha256": "96fe0d476224774229a754197014332109ddd2f0627f722be4745abb7e420627"
         }
       }
     },
     "chan_lam_full": {
+      "display_name": "Chan-Lam Full",
       "row_count": 5684,
+      "observation_policy": "replicated_rows",
+      "reported_measurement": "weighted_selectivity_lower_bound",
+      "score_transform": "min_replicate_desired_selectivity_weighted_yield",
       "schema_sha256": "0b4c963fe7cf2a9d1c10088ef8963db6a730dff22ca4d7f3d765cc8ae25849b6",
       "artifacts": {
         "config": {
           "path": "olympus/src/olympus/datasets/dataset_Chan_Lam_Full/config.json",
           "upstream_path": "src/olympus/datasets/dataset_Chan_Lam_Full/config.json",
-          "bytes": 10445,
-          "sha256": "f180912b0d9f2c6b56dffed091307b5709ba7b34d582bcff405eb83f258bc86b"
+          "bytes": 10045,
+          "sha256": "9d6fc68bd96d9c23a0d775b554415d03df9edf459390faa86730d206de4d48e8"
         },
         "data": {
           "path": "olympus/src/olympus/datasets/dataset_Chan_Lam_Full/data.csv",
           "upstream_path": "src/olympus/datasets/dataset_Chan_Lam_Full/data.csv",
-          "bytes": 771999,
-          "sha256": "58945ee6c495abad30e665ee9e060f522ab526739a7d6d8d8eeb16f351802d00"
+          "bytes": 766316,
+          "sha256": "7149bcf78c6e089460e26614ebd6ec7c6fa32b7f3114b1a9d59be9b0b1b0e8be"
+        }
+      }
+    },
+    "reductive_amination": {
+      "display_name": "Reductive Amination",
+      "row_count": 768,
+      "observation_policy": "single_row",
+      "reported_measurement": "percent_conversion",
+      "score_transform": "identity",
+      "schema_sha256": "e7f1105b8ecb40b57a452f598bd0973f50b0f41e246a2e1acfbafd6688fa4273",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Reductive_Amination/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Reductive_Amination/config.json",
+          "bytes": 7416,
+          "sha256": "42dbef4f844bd1446c4260b17c292f91713b836ca6b512267a0d6d0e043f3b04"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Reductive_Amination/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Reductive_Amination/data.csv",
+          "bytes": 38784,
+          "sha256": "16f59c2fce37790cfaa36c3bbe7965a2bc76457bd1174aba03bba42c10c29614"
+        }
+      }
+    },
+    "suzuki_cernak": {
+      "display_name": "Suzuki-Cernak",
+      "row_count": 960,
+      "observation_policy": "single_row",
+      "reported_measurement": "conversion",
+      "score_transform": "identity",
+      "schema_sha256": "31632fd1b8e58d2251165b69fd800fe40ec4d94ff6d683284ee233bb12864761",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Suzuki_Cernak/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Suzuki_Cernak/config.json",
+          "bytes": 12200,
+          "sha256": "f567c4b51508198aebc3b98b46dd11324da03ef1b1a07b99372b27e80228f8ed"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Suzuki_Cernak/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Suzuki_Cernak/data.csv",
+          "bytes": 228608,
+          "sha256": "b936f8a32dad520f89052e647ab07a08be0c6e72ac80d972de812c00ca78b481"
+        }
+      }
+    },
+    "suzuki_doyle": {
+      "display_name": "Suzuki-Doyle",
+      "row_count": 3696,
+      "observation_policy": "single_row",
+      "reported_measurement": "yield",
+      "score_transform": "identity",
+      "schema_sha256": "44156d33ed220a2e5353533aae50d6413e2c5c5f93372640453a375b7adbc608",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Suzuki_Doyle/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Suzuki_Doyle/config.json",
+          "bytes": 11144,
+          "sha256": "221669c80838481849365ea7186717cfd27d8c478c24628efce9e30daf4b682e"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Suzuki_Doyle/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Suzuki_Doyle/data.csv",
+          "bytes": 565245,
+          "sha256": "0aefcd2d26b35b6388e69e8d5f00438a209f09157280c264fc9d98597fad8b48"
         }
       }
     }
