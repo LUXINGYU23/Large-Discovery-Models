@@ -7,10 +7,10 @@ GP-UCB selector, frozen-table evaluator, and `LDMEngine` campaign lifecycle.
 
 ## Status
 
-The task remains `draft` until the later seed and real tiny qualification gates
-write their tracked evidence. The current workflow is suitable for deterministic
-mock execution and endpoint-free contract testing; it does not claim an
-all-dataset Iron Mind reproduction.
+The task is `qualified` through the `tiny_campaign_verified` evidence gate: one
+source-pinned `real_tiny` campaign admitted four candidates and completed one
+frozen-table evaluation. It does not claim an all-dataset Iron Mind reproduction
+or `campaign_qualified` status.
 
 ## Run locations
 
