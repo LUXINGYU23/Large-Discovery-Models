@@ -39,7 +39,7 @@ class ExpansionResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if not self.proposals and self.schema_update is None:
+        if not self.proposals and self.schema_update is None and not self.attempts:
             raise ValueError("expansion must emit proposals or update the expansion schema")
 
 
