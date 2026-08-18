@@ -15,7 +15,7 @@ from ldm_tts.registration.dependencies import (
     ok,
     resolve_task_path,
 )
-from tasks.iron_mind.core.data import load_frozen_reaction_table
+from tasks.iron_mind.core.data import FrozenReactionTable, load_frozen_reaction_table
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 
 
@@ -151,21 +151,43 @@ def _frozen_table_check(
 ) -> DependencyCheck:
     name = f"{schema.dataset_id} frozen table"
     try:
-        expected_digest = _required_string(dataset_contract.get("schema_sha256"), "schema SHA-256")
-        if schema.schema_sha256 != expected_digest:
-            raise ValueError("Tracked schema SHA-256 does not match the dataset contract.")
-        artifacts = _required_mapping(dataset_contract.get("artifacts"), "dataset artifacts")
-        config_path = _artifact_path(data_root, artifacts.get("config"), "config")
-        data_path = _artifact_path(data_root, artifacts.get("data"), "data")
-        load_frozen_reaction_table(
-            schema=schema,
-            config_path=config_path,
-            data_path=data_path,
-            artifact_contract=dataset_contract,
-        )
+        _load_contract_table(data_root, schema, dataset_contract)
     except (OSError, ValueError) as exc:
         return fail(task, name, str(exc), str(data_root))
     return ok(task, name, "Config, data, row count, and schema digest match.", str(data_root))
+
+
+def load_pinned_reaction_table(
+    *,
+    dataset_id: str,
+    data_root: Path,
+    resources: DependencyResources = DEFAULT_RESOURCES,
+) -> FrozenReactionTable:
+    """Load one tracked dataset through the same artifact contract as preflight."""
+
+    contract = _read_json_object(resources.contract_path, "upstream contract")
+    schema = load_reaction_schemas(resources.schema_path)[dataset_id]
+    dataset_contract = _dataset_contract(contract, dataset_id)
+    return _load_contract_table(Path(data_root), schema, dataset_contract)
+
+
+def _load_contract_table(
+    data_root: Path,
+    schema: ReactionDatasetSchema,
+    dataset_contract: Mapping[str, Any],
+) -> FrozenReactionTable:
+    expected_digest = _required_string(dataset_contract.get("schema_sha256"), "schema SHA-256")
+    if schema.schema_sha256 != expected_digest:
+        raise ValueError("Tracked schema SHA-256 does not match the dataset contract.")
+    artifacts = _required_mapping(dataset_contract.get("artifacts"), "dataset artifacts")
+    config_path = _artifact_path(data_root, artifacts.get("config"), "config")
+    data_path = _artifact_path(data_root, artifacts.get("data"), "data")
+    return load_frozen_reaction_table(
+        schema=schema,
+        config_path=config_path,
+        data_path=data_path,
+        artifact_contract=dataset_contract,
+    )
 
 
 def _validate_mock_oracle(path: Path, schema: ReactionDatasetSchema) -> None:
@@ -246,4 +268,8 @@ def _required_string(value: Any, label: str) -> str:
     return value
 
 
-__all__ = ["DependencyResources", "check_task_dependencies"]
+__all__ = [
+    "DependencyResources",
+    "check_task_dependencies",
+    "load_pinned_reaction_table",
+]

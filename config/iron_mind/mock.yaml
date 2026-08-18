@@ -1,8 +1,14 @@
 name: iron_mind_mock
 task: iron_mind
-algorithm: mean
+algorithm: ucb
 mode: mock
-description: Local contract smoke test for iron_mind.
 args:
   mock: true
+  proposal-mode: callable
+  dataset-id: buchwald_hartwig
   iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  acquisition-beta: 1.0
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

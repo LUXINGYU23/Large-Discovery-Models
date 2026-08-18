@@ -3,36 +3,78 @@
   "task_id": "iron_mind",
   "qualification": "draft",
   "benchmark": {
-    "source_url": "local://unqualified",
-    "source_commit": "unqualified"
+    "source_url": "https://github.com/gomesgroup/iron-mind-public",
+    "source_commit": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
+    "task_path": "tasks/iron_mind"
   },
   "proposal_provider": {
-    "kind": "unspecified",
-    "requires_endpoint_preflight": false,
-    "supports_collection": false
+    "kind": "model_endpoint",
+    "requires_endpoint_preflight": true,
+    "supports_collection": true
   },
   "metrics": {
     "reported": [
       {
-        "name": "objective",
-        "direction": "maximize"
+        "name": "reaction_score",
+        "direction": "maximize",
+        "description": "Raw frozen-table reaction score; higher is better."
       }
     ],
     "optimized": [
       {
-        "name": "objective",
-        "direction": "maximize"
+        "name": "reaction_score",
+        "direction": "maximize",
+        "description": "The sole shared GP-UCB objective for Iron Mind campaigns."
       }
     ],
     "diagnostic": []
   },
   "evaluation": {
     "datasets": [
-      "mock"
+      "buchwald_hartwig",
+      "chan_lam_full"
     ],
-    "settings": {},
-    "per_candidate_limits": {}
+    "settings": {
+      "oracle": "source-pinned Olympus reaction tables",
+      "proposal_contract": "exact four-candidate JSON object"
+    },
+    "per_candidate_limits": {
+      "benchmark_jobs": 1
+    }
   },
-  "budget": {},
-  "profiles": {}
+  "budget": {
+    "outer_iterations": 1,
+    "llm_requests": 1,
+    "proposal_attempts": 1,
+    "valid_search_candidates": 4,
+    "selected_candidates": 1,
+    "external_evaluations": 1,
+    "expensive_evaluation_attempts": 1,
+    "successful_evaluations": 1,
+    "benchmark_jobs": 1
+  },
+  "profiles": {
+    "real_tiny": {
+      "description": "One endpoint proposal, four exact candidates, one shared GP-UCB selection, and one frozen-table evaluation.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 1,
+        "proposal_attempts": 1,
+        "valid_search_candidates": 4,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 1
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "openai",
+        "dataset-id": "buchwald_hartwig",
+        "acquisition-beta": 1.0
+      }
+    }
+  }
 }

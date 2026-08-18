@@ -1,0 +1,19 @@
+name: iron_mind_real_tiny
+task: iron_mind
+algorithm: ucb
+mode: real
+description: One source-pinned Buchwald-Hartwig endpoint proposal and frozen-table evaluation.
+contract_profile: real_tiny
+args:
+  proposal-mode: openai
+  dataset-id: buchwald_hartwig
+  iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  acquisition-beta: 1.0
+  data-dir: /mnt/data1/ldm-for-sci/data/iron_mind/pinned/olympus-7b4bb35c04eb31dc57a8e46cc79a9cab71dee06d
+  llm-url: https://api.deepseek.com
+  llm-model-name: deepseek-v4-flash
+  llm-timeout: 120.0
+  llm-max-tokens: 2048
+  out-dir: /mnt/data1/ldm-for-sci/runs/iron_mind
