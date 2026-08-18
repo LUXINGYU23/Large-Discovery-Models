@@ -157,7 +157,6 @@ def preflight_openai_endpoint(
     extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify visible model identity and one minimal chat response."""
-
     started = time.monotonic()
     model_ids = _model_ids(
         request_openai_models(
@@ -168,11 +167,14 @@ def preflight_openai_endpoint(
     )
     if model not in model_ids:
         raise EndpointRequestError("Requested model is not visible from models endpoint")
+    prompt = "Reply with exactly OK."
+    if extra_body and "response_format" in extra_body:
+        prompt = "Reply with one non-empty JSON object."
     response = request_openai_chat_response(
         url=url,
         model=model,
         api_key=api_key,
-        messages=[{"role": "user", "content": "Reply with exactly OK."}],
+        messages=[{"role": "user", "content": prompt}],
         timeout_seconds=timeout_seconds,
         max_tokens=8,
         temperature=0.0,

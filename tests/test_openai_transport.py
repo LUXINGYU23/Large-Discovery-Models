@@ -229,25 +229,25 @@ def test_combined_preflight_returns_sanitized_model_artifact(
     assert ldm_tts.preflight_openai_endpoint is preflight_openai_endpoint
 
 
-def test_combined_preflight_forwards_endpoint_specific_body_to_chat(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_endpoint_preflight_json_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[urllib.request.Request, float]] = []
     monkeypatch.setattr(
         urllib.request,
         "urlopen",
         recording_urlopen([models_payload(MODEL), chat_payload()], calls),
     )
-
     preflight_openai_endpoint(
         url="https://host/v1",
         model=MODEL,
         api_key=TOKEN,
         timeout_seconds=5.0,
-        extra_body={"thinking": {"type": "disabled"}},
+        extra_body={"thinking": {"type": "disabled"}, "response_format": {"type": "json_object"}},
     )
 
-    assert json.loads(calls[1][0].data or b"{}")["thinking"] == {"type": "disabled"}
+    body = json.loads(calls[1][0].data or b"{}")
+    assert body["thinking"] == {"type": "disabled"}
+    assert body["response_format"] == {"type": "json_object"}
+    assert body["messages"][0]["content"] == "Reply with one non-empty JSON object."
 
 
 def test_http_and_json_errors_do_not_include_authorization_value(
