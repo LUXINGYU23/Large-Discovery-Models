@@ -229,6 +229,27 @@ def test_combined_preflight_returns_sanitized_model_artifact(
     assert ldm_tts.preflight_openai_endpoint is preflight_openai_endpoint
 
 
+def test_combined_preflight_forwards_endpoint_specific_body_to_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[urllib.request.Request, float]] = []
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        recording_urlopen([models_payload(MODEL), chat_payload()], calls),
+    )
+
+    preflight_openai_endpoint(
+        url="https://host/v1",
+        model=MODEL,
+        api_key=TOKEN,
+        timeout_seconds=5.0,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+
+    assert json.loads(calls[1][0].data or b"{}")["thinking"] == {"type": "disabled"}
+
+
 def test_http_and_json_errors_do_not_include_authorization_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -264,15 +285,16 @@ def test_client_uses_combined_preflight_only_when_required(
 ) -> None:
     chat_artifact = {"status": "chat"}
     endpoint_artifact = {"status": "endpoint"}
+    endpoint_kwargs: dict[str, Any] = {}
     monkeypatch.setattr(openai, "preflight_openai_chat", lambda **_: chat_artifact)
-    monkeypatch.setattr(openai, "preflight_openai_endpoint", lambda **_: endpoint_artifact)
+    monkeypatch.setattr(openai, "preflight_openai_endpoint", lambda **kwargs: endpoint_kwargs.update(kwargs) or endpoint_artifact)
 
     default_client = OpenAICompatibleProposalClient(url="https://host", model=MODEL)
     models_client = OpenAICompatibleProposalClient(
         url="https://host",
         model=MODEL,
-        require_models_preflight=True,
+        require_models_preflight=True, extra_body={"thinking": {"type": "disabled"}},
     )
 
     assert default_client.preflight() is chat_artifact
-    assert models_client.preflight() is endpoint_artifact
+    assert (models_client.preflight(), endpoint_kwargs["extra_body"]) == (endpoint_artifact, {"thinking": {"type": "disabled"}})

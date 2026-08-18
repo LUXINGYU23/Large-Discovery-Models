@@ -143,16 +143,20 @@ class OpenAICompatibleProposalClient:
         self.sleep = sleep
 
     def preflight(self) -> dict[str, Any]:
-        preflight = (
-            preflight_openai_endpoint
-            if self.require_models_preflight
-            else preflight_openai_chat
-        )
-        return preflight(
+        timeout_seconds = min(self.timeout_seconds, 30.0)
+        if self.require_models_preflight:
+            return preflight_openai_endpoint(
+                url=self.url,
+                model=self.model,
+                api_key=self.api_key,
+                timeout_seconds=timeout_seconds,
+                extra_body=self.extra_body,
+            )
+        return preflight_openai_chat(
             url=self.url,
             model=self.model,
             api_key=self.api_key,
-            timeout_seconds=min(self.timeout_seconds, 30.0),
+            timeout_seconds=timeout_seconds,
         )
 
     def propose(self, request: ProposalRequest) -> ProposalResponse:

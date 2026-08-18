@@ -154,6 +154,7 @@ def preflight_openai_endpoint(
     model: str,
     api_key: str,
     timeout_seconds: float = 30.0,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify visible model identity and one minimal chat response."""
 
@@ -175,6 +176,7 @@ def preflight_openai_endpoint(
         timeout_seconds=timeout_seconds,
         max_tokens=8,
         temperature=0.0,
+        extra_body=extra_body,
     )
     response_model = response.get("model")
     if not isinstance(response_model, str) or response_model != model:
