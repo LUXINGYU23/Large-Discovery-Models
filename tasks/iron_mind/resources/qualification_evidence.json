@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task_id": "iron_mind",
-  "stage": "seed_evaluated",
+  "stage": "tiny_campaign_verified",
   "benchmark_commit": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
   "contract_profile": "",
   "gates": {
@@ -41,8 +41,11 @@
       "description": "One source-pinned seed was evaluated outside campaign budget."
     },
     "tiny_campaign_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/tiny_campaign_record.json"
+      ],
+      "description": "One source-pinned real tiny campaign admitted four candidates and completed one frozen-table evaluation."
     },
     "campaign_qualified": {
       "status": "pending",

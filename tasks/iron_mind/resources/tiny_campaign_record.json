@@ -1,0 +1,96 @@
+{
+  "artifacts": {
+    "budget.json": "8d0dd7022b051a233f7586ca4c5d51f9d2bb9efd6b0115d14b3cfeb94ee34d89",
+    "campaign.json": "2ab0e2848fa54adc033be2b841f6287474d028917fcc79577f3d357241d124e8",
+    "checkpoint.json": "4801a80fd0857f4f7d8f3040f287a78deffe6581b6704ab3d35559493a3036ce",
+    "config.json": "7659c671896eaed47cf57eef6c8b1a0bdccd2ddad1b84dec6c263e3d704b2096",
+    "evaluation_manifest.json": "e83238a391edbc4521ed166eb65b3cf0fd6b8aeb6db51d9c88dd4f8f70d1b3e0",
+    "events.jsonl": "32f8b1a9b305eb7978e2c105ee5f1d9a70fcc6ce152d1bb5b9980f4cee3390c9",
+    "experiment_contract.json": "43444f77041cf2756ff8fb3d35d0850f1fdd294a8d968f38a056e41a53766cfe",
+    "ldm_data/dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+    "ldm_data/ldm_ir.jsonl": "ef252a274c52619e38d81583d53ec093217d008bf77ad52aa03f79bf920943ba",
+    "ldm_data/ldm_sft.jsonl": "3d4b40a66ccd825ce5a9892c719a2ed767b388a2c9e90ca4539d51f3ac06f2e0",
+    "ldm_task_spec.json": "acae8c46aa25094feb03568eafa5b82708c9b41b28d568faf028564cc9f3c8a0",
+    "result.json": "335fa8a5f3151d651f4c24b6ae396709a4f87812c60f0c659ce3296a6833fbd4",
+    "search_manifest.json": "62033b8adcdd79940cec044875763cd599362c8c0a2b48f195abda0e2d34f8c5",
+    "selection_record.json": "89465317e4d2467164eddf0e248c2906c785b1506db4c2b1bd6cb93949baaaed",
+    "status.json": "8d101a18579e5f17eeab7815a4cff6545aa44e6000919364b5cc6e7501efcad4",
+    "summary.json": "b42980d5f871764d2b7964a227c8d2aff3b27e0eb92ea5040d5ac6f477bb10ea",
+    "trajectory.csv": "8484bc7872a072f8c13d72f40d5fa9abb5be9a5cbe313372e207031f2346d9e6"
+  },
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 1,
+      "expensive_evaluation_attempts": 1,
+      "external_evaluations": 1,
+      "llm_requests": 1,
+      "outer_iterations": 1,
+      "proposal_attempts": 1,
+      "selected_candidates": 1,
+      "successful_evaluations": 1,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 1,
+      "expensive_evaluation_attempts": 1,
+      "external_evaluations": 1,
+      "llm_requests": 1,
+      "outer_iterations": 1,
+      "proposal_attempts": 1,
+      "selected_candidates": 1,
+      "successful_evaluations": 1,
+      "valid_search_candidates": 4
+    }
+  },
+  "candidate_canonical_keys": [
+    "84e4fc7dea652da88122eb9fe8a625c2c66cddcfa80c18ba4d47dd5d709e591b",
+    "01bbbe1ba046aa2054a36d93f2c880df08d1d323cfa91013532d4a1604c8f68c",
+    "7c90f075804c03b50374667b91e4c23af8c6119427cad944388810b5b5dad049",
+    "8cfe951dee35d7f5c2def53e208fdc45c8b955f1edc784b9870b41085910d9b1"
+  ],
+  "collection": {
+    "ir_rows": 4,
+    "sft_rows": 4
+  },
+  "config": {
+    "path": "config/iron_mind/real_tiny.yaml",
+    "sha256": "7b25dbe41dbb0d33cb0e04f237687c3bf073f85150186bad5c728eaa72a93a49"
+  },
+  "contract_profile": "real_tiny",
+  "dataset": {
+    "data_sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd",
+    "id": "buchwald_hartwig",
+    "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8"
+  },
+  "evaluation": {
+    "benchmark_jobs": 1,
+    "reaction_score": 44.07099157
+  },
+  "experiment_contract": {
+    "path": "tasks/iron_mind/experiment.json",
+    "sha256": "b785f9fedb0113a727d788aaddc77c52d2b8075c81557db9e5e68a832a9bba18"
+  },
+  "mode": "real",
+  "provider": {
+    "base_url": "https://api.deepseek.com",
+    "kind": "openai_compatible",
+    "model": "deepseek-v4-flash"
+  },
+  "record_type": "tiny_campaign",
+  "schema_version": 1,
+  "seed": {
+    "candidate_id": "iron-mind-564f3fb765e8e10760de3cd13b8a0e0a39dfa78c9663eaeecdaf6cd087624c26",
+    "canonical_key": "564f3fb765e8e10760de3cd13b8a0e0a39dfa78c9663eaeecdaf6cd087624c26",
+    "data_sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd",
+    "dataset_id": "buchwald_hartwig",
+    "evaluation_record": {
+      "path": "tasks/iron_mind/resources/seed_evaluation_record.json",
+      "sha256": "f81a4d9c4007875c618d4d4c7240f4a2bd2510ad8ec7351b543b9f2a2c367eb1"
+    },
+    "excluded_from_campaign_budget": true,
+    "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8"
+  },
+  "selected_canonical_key": "8cfe951dee35d7f5c2def53e208fdc45c8b955f1edc784b9870b41085910d9b1",
+  "status": "passed",
+  "task": "iron_mind"
+}
