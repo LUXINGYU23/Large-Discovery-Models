@@ -1,5 +1,8 @@
-# iron_mind Resources
+# Iron Mind Resources
 
-Store versioned, non-generated task inputs here: schemas, prompts, seed
-programs, small reference datasets, or redistributable model artifacts.
-Runtime outputs belong under `../runs/` and must not be committed.
+This directory contains versioned source contracts and reaction schemas required
+by the task. The pinned Olympus data stays under `/mnt/data1/ldm-for-sci/data/`
+and is verified against `upstream_contract.json` before loading.
+
+Do not commit runtime outputs, downloaded datasets, model checkpoints, or
+credentials to this directory.

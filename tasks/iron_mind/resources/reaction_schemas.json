@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "datasets": {
+    "buchwald_hartwig": {
+      "schema_version": 1,
+      "dataset_id": "buchwald_hartwig",
+      "factors": [
+        {
+          "name": "base",
+          "categories": ["MTBD", "P2Et", "BTMG"]
+        },
+        {
+          "name": "ligand",
+          "categories": ["XPhos", "AdBrettPhos", "t-BuBrettPhos", "t-BuXPhos"]
+        },
+        {
+          "name": "aryl_halide",
+          "categories": [
+            "1-iodo-4-(trifluoromethyl)benzene",
+            "1-chloro-4-ethylbenzene",
+            "1-chloro-4-(trifluoromethyl)benzene",
+            "2-iodopyridine",
+            "None",
+            "1-chloro-4-methoxybenzene",
+            "1-bromo-4-(trifluoromethyl)benzene",
+            "2-bromopyridine",
+            "3-chloropyridine",
+            "2-chloropyridine",
+            "3-iodopyridine",
+            "1-ethyl-4-iodobenzene",
+            "1-bromo-4-ethylbenzene",
+            "1-bromo-4-methoxybenzene",
+            "3-bromopyridine",
+            "1-iodo-4-methoxybenzene"
+          ]
+        },
+        {
+          "name": "additive",
+          "categories": [
+            "5-methyl-3-(1H-pyrrol-1-yl)isoxazole",
+            "ethyl-3-methoxyisoxazole-5-carboxylate",
+            "methyl-5-(thiophen-2-yl)isoxazole-3-carboxylate",
+            "5-(2,6-difluorophenyl)isoxazole",
+            "None",
+            "N,N-dibenzylisoxazol-5-amine",
+            "5-phenylisoxazole",
+            "3-methylisoxazole",
+            "4-phenylisoxazole",
+            "3,5-dimethylisoxazole",
+            "benzo[c]isoxazole",
+            "ethyl-5-methylisoxazole-4-carboxylate",
+            "ethyl-isoxazole-4-carboxylate",
+            "ethyl-5-methylisoxazole-3-carboxylate",
+            "benzo[d]isoxazole",
+            "ethyl-isoxazole-3-carboxylate",
+            "5-methylisoxazole",
+            "N,N-dibenzylisoxazol-3-amine",
+            "5-Phenyl-1,2,4-oxadiazole",
+            "3-methyl-5-phenylisoxazole",
+            "3-phenylisoxazole",
+            "ethyl-3-methylisoxazole-5-carboxylate",
+            "methyl-5-(furan-2-yl)isoxazole-3-carboxylate",
+            "methyl-isoxazole-5-carboxylate"
+          ]
+        }
+      ],
+      "measurements": ["yield"],
+      "objective": {
+        "name": "reaction_score",
+        "direction": "maximize"
+      },
+      "observation_policy": "single_row",
+      "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8"
+    },
+    "chan_lam_full": {
+      "schema_version": 1,
+      "dataset_id": "chan_lam_full",
+      "factors": [
+        {
+          "name": "boronic_acid_reactant",
+          "categories": ["OB(O)C1=CC=C(C(F)(F)F)C=C1", "OB(O)C1=CC=C(OC)C=C1"]
+        },
+        {
+          "name": "sulfonamide_reactant",
+          "categories": [
+            "BrC1=CC(S(=O)(N)=O)=CC(C(OC)=O)=C1",
+            "CC1=C(OC(S(=O)(N)=O)=C1)C(OC)=O",
+            "CC1=CC(CS(=O)(N)=O)=NO1",
+            "COCCOC1=CC=CC=C1S(=O)(N)=O",
+            "FC1=NC(S(=O)(N)=O)=CC=C1",
+            "IC1=CC=CC=C1S(=O)(N)=O",
+            "O=S(C1=CC=C(N2N=C(C(F)(F)F)C=C2C3=CC=C(C)C=C3)C=C1)(N)=O",
+            "O=S(C1=CC=CC=C1C(OCC)=O)(N)=O",
+            "O=S(CCCC#N)(N)=O",
+            "O=S(CCN(C)C)(N)=O"
+          ]
+        },
+        {
+          "name": "catalyst_catalyst",
+          "categories": [
+            "CN(C)CCN(C)C.CN(C)CCN(C)C.[Cl-].[Cl-].[Cu+2].[Cu+2].[OH-].[OH-]",
+            "CC#N.CC#N.CC#N.CC#N.F[P-](F)(F)(F)(F)F.[Cu+]",
+            "CC(=O)[O-].CC(=O)[O-].[Cu+2]",
+            "O=S(=O)([O-])C(F)(F)F.O=S(=O)([O-])C(F)(F)F.[Cu+2]"
+          ]
+        },
+        {
+          "name": "base_reagent",
+          "categories": [
+            "[O-]P([O-])([O-])=O.[K+].[K+].[K+]",
+            "CC(C)N(CC)C(C)C",
+            "CCN(CC)CC",
+            "CN(C)C1=CC=NC=C1",
+            "O=C([O-])[O-].[K+].[K+]",
+            "NO_BASE"
+          ]
+        },
+        {
+          "name": "solvent",
+          "categories": ["ClCCCl", "CC#N", "CCOC(C)=O", "CO"]
+        }
+      ],
+      "measurements": ["desired_yield", "undesired_yield"],
+      "objective": {
+        "name": "reaction_score",
+        "direction": "maximize"
+      },
+      "observation_policy": "replicated_rows",
+      "schema_sha256": "0b4c963fe7cf2a9d1c10088ef8963db6a730dff22ca4d7f3d765cc8ae25849b6"
+    }
+  }
+}

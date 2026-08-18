@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "iron_mind_public": {
+      "url": "https://github.com/gomesgroup/iron-mind-public",
+      "revision": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
+      "license": "MIT",
+      "verification": "git_bundle_commit"
+    },
+    "olympus": {
+      "url": "https://github.com/gomesgroup/olympus",
+      "revision": "7b4bb35c04eb31dc57a8e46cc79a9cab71dee06d",
+      "license": "MIT",
+      "verification": "git_bundle_commit"
+    }
+  },
+  "datasets": {
+    "buchwald_hartwig": {
+      "row_count": 4599,
+      "schema_sha256": "9c25bd7cab474077bece3915866471a6d00a785a7ba2cb6c9dc35b6428466dc8",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Buchwald_Hartwig/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Buchwald_Hartwig/config.json",
+          "bytes": 17247,
+          "sha256": "82963c16cbd3a869f565374bc08496201fd4f853beb323e9dd46d7c364aa1ed3"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Buchwald_Hartwig/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Buchwald_Hartwig/data.csv",
+          "bytes": 358536,
+          "sha256": "5cfeb90fecdedc6eeab1fa4aba01654a2813ec45785d5bd61bb79e3afdef7bdd"
+        }
+      }
+    },
+    "chan_lam_full": {
+      "row_count": 5684,
+      "schema_sha256": "0b4c963fe7cf2a9d1c10088ef8963db6a730dff22ca4d7f3d765cc8ae25849b6",
+      "artifacts": {
+        "config": {
+          "path": "olympus/src/olympus/datasets/dataset_Chan_Lam_Full/config.json",
+          "upstream_path": "src/olympus/datasets/dataset_Chan_Lam_Full/config.json",
+          "bytes": 10445,
+          "sha256": "f180912b0d9f2c6b56dffed091307b5709ba7b34d582bcff405eb83f258bc86b"
+        },
+        "data": {
+          "path": "olympus/src/olympus/datasets/dataset_Chan_Lam_Full/data.csv",
+          "upstream_path": "src/olympus/datasets/dataset_Chan_Lam_Full/data.csv",
+          "bytes": 771999,
+          "sha256": "58945ee6c495abad30e665ee9e060f522ab526739a7d6d8d8eeb16f351802d00"
+        }
+      }
+    }
+  }
+}
