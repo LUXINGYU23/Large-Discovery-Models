@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "task_id": "synthonbench",
+  "stage": "scaffolded",
+  "benchmark_commit": "unqualified",
+  "contract_profile": "",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/synthonbench/task.json",
+        "tasks/synthonbench/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "pending",
+      "evidence": []
+    },
+    "mock_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "contract_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "seed_evaluated": {
+      "status": "pending",
+      "evidence": []
+    },
+    "tiny_campaign_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "campaign_qualified": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[project]
+name = "ldm-tts-synthonbench"
+version = "0.1.0"
+description = "Closed-loop optimization over a source-pinned synthon space and score tables."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.uv]
+package = false

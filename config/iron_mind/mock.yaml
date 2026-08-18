@@ -1,0 +1,8 @@
+name: iron_mind_mock
+task: iron_mind
+algorithm: mean
+mode: mock
+description: Local contract smoke test for iron_mind.
+args:
+  mock: true
+  iterations: 1

@@ -1,0 +1,8 @@
+name: synthonbench_mock
+task: synthonbench
+algorithm: mean
+mode: mock
+description: Local contract smoke test for synthonbench.
+args:
+  mock: true
+  iterations: 1

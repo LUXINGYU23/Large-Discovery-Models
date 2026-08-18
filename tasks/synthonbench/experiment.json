@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "task_id": "synthonbench",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "local://unqualified",
+    "source_commit": "unqualified"
+  },
+  "proposal_provider": {
+    "kind": "unspecified",
+    "requires_endpoint_preflight": false,
+    "supports_collection": false
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "objective",
+        "direction": "maximize"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "objective",
+        "direction": "maximize"
+      }
+    ],
+    "diagnostic": []
+  },
+  "evaluation": {
+    "datasets": [
+      "mock"
+    ],
+    "settings": {},
+    "per_candidate_limits": {}
+  },
+  "budget": {},
+  "profiles": {}
+}

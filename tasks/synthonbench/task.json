@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "task_id": "synthonbench",
+  "description": "Closed-loop optimization over a source-pinned synthon space and score tables."
+}

@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "task_id": "iron_mind",
+  "description": "Closed-loop optimization over source-pinned reaction-condition tables."
+}
