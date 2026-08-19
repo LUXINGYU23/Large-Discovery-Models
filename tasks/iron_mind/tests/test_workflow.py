@@ -30,7 +30,11 @@ def test_describe_ldm_task_matches_the_fixed_reaction_contract() -> None:
     assert task_spec.proposal_search.breadth == 4
     assert task_spec.surrogate.dimension == 47
     assert task_spec.acquisition.objective_names == ("reaction_score",)
-    assert task_spec.acquisition.parameters == {"beta": 1.0}
+    assert task_spec.acquisition.parameters == {
+        "base_beta": 1.0,
+        "confidence_delta": 0.1,
+        "kernel": "factor_ard_categorical_rbf",
+    }
     assert contract.proposal_provider == {
         "kind": "model_endpoint",
         "requires_endpoint_preflight": True,

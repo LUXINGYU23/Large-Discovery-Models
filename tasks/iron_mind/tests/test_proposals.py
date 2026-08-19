@@ -19,9 +19,8 @@ from ldm_tts.transport import CallableProposalClient, ProposalRequest, ProposalR
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.proposals import (
-    DEEPSEEK_REACTION_EXTRA_BODY,
     IronMindProposalExpander,
-    build_deepseek_reaction_client,
+    build_openai_reaction_client,
     build_reaction_proposal_request,
     parse_reaction_candidates,
 )
@@ -236,18 +235,15 @@ def test_request_contains_the_schema_observations_and_evaluated_keys() -> None:
     assert "api_key" not in request.metadata
 
 
-def test_deepseek_client_contract_enforces_json_output_without_request_secrets() -> None:
-    client = build_deepseek_reaction_client(
-        base_url="https://api.deepseek.com",
-        model="deepseek-v4-flash",
+def test_openai_client_uses_the_standard_chat_completion_contract() -> None:
+    client = build_openai_reaction_client(
+        base_url="https://example.invalid/v1",
+        model="test-model",
         api_key="",
         timeout_seconds=10.0,
         max_tokens=256,
     )
 
     assert client.max_retries == 0
-    assert client.require_models_preflight is True
-    assert client.extra_body == DEEPSEEK_REACTION_EXTRA_BODY == {
-        "response_format": {"type": "json_object"},
-        "thinking": {"type": "disabled"},
-    }
+    assert client.require_models_preflight is False
+    assert client.extra_body == {}

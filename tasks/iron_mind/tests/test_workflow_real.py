@@ -61,8 +61,8 @@ def test_real_mode_connects_pinned_data_endpoint_and_shared_engine(
     assert code == 0
     assert calls["dataset_id"] == "buchwald_hartwig"
     assert calls["data_root"] == data_root
-    assert calls["client"]["base_url"] == "https://api.deepseek.com"
-    assert calls["client"]["model"] == "deepseek-v4-flash"
+    assert calls["client"]["base_url"] == "https://example.invalid/v1"
+    assert calls["client"]["model"] == "test-model"
     assert payload["engine_summary"]["successful_evaluation_count"] == 1
     assert campaign["contract_profile"] == "ldm_official_smoke"
     assert snapshot["snapshot"]["profile"] == "ldm_official_smoke"
@@ -113,6 +113,8 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
             "https://example.invalid/v1",
             "--llm-model-name",
             "test-model",
+            "--api-key",
+            "test-api-key",
             "--llm-timeout",
             "12.5",
             "--llm-max-tokens",
@@ -129,6 +131,7 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
 
     assert args.mock is True
     assert args.campaign_index == 3
+    assert args.api_key == "test-api-key"
     assert args.dry_run is True
 
 
@@ -142,10 +145,12 @@ def _install_real_fakes(monkeypatch, table, calls: dict[str, object]) -> None:
         calls["client"] = kwargs
         return StaticEndpoint(table, calls)
 
-    monkeypatch.setenv("LDM_LLM_API_KEY", "test-workflow-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.invalid/v1")
+    monkeypatch.setenv("LLM_MODEL_NAME", "test-model")
+    monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     monkeypatch.setattr(workflow, "load_pinned_reaction_table", load_table)
-    monkeypatch.setattr(workflow, "build_deepseek_reaction_client", build_client)
+    monkeypatch.setattr(workflow, "build_openai_reaction_client", build_client)
 
 
 def _activate_smoke_profile(monkeypatch) -> None:
@@ -161,10 +166,6 @@ def _real_args(tmp_path: Path, data_root: Path) -> list[str]:
         "buchwald_hartwig",
         "--data-dir",
         str(data_root),
-        "--llm-url",
-        "https://api.deepseek.com",
-        "--llm-model-name",
-        "deepseek-v4-flash",
         "--out-dir",
         str(tmp_path),
         "--run-name",

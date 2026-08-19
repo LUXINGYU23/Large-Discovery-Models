@@ -23,10 +23,10 @@ def test_endpoint_preflight_pause_keeps_all_counters_zero_and_redacts_key(
         def preflight(self):
             raise EndpointRequestError("endpoint offline")
 
-    monkeypatch.setenv("LDM_LLM_API_KEY", test_key)
+    monkeypatch.setenv("LLM_API_KEY", test_key)
     monkeypatch.setattr(
         workflow,
-        "build_deepseek_reaction_client",
+        "build_openai_reaction_client",
         lambda **_kwargs: OfflineEndpoint(),
         raising=False,
     )
@@ -53,10 +53,10 @@ def test_preflight_programming_error_is_not_silently_paused(tmp_path: Path, monk
         def preflight(self):
             raise ValueError("broken endpoint fixture")
 
-    monkeypatch.setenv("LDM_LLM_API_KEY", "test-workflow-key")
+    monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_deepseek_reaction_client",
+        "build_openai_reaction_client",
         lambda **_kwargs: BrokenEndpoint(),
         raising=False,
     )
@@ -66,7 +66,8 @@ def test_preflight_programming_error_is_not_silently_paused(tmp_path: Path, monk
 
 
 def test_missing_endpoint_key_pauses_before_the_engine(tmp_path: Path, monkeypatch, capsys) -> None:
-    monkeypatch.delenv("LDM_LLM_API_KEY", raising=False)
+    for name in ("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
 
     code = main(_endpoint_args(tmp_path, "missing-key"))
 
@@ -89,10 +90,10 @@ def test_expansion_endpoint_error_preserves_request_budget_and_can_resume(
         def propose(self, _request):
             raise EndpointRequestError("endpoint circuit is open")
 
-    monkeypatch.setenv("LDM_LLM_API_KEY", "test-workflow-key")
+    monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_deepseek_reaction_client",
+        "build_openai_reaction_client",
         lambda **_kwargs: CircuitOpenClient(),
         raising=False,
     )
@@ -123,10 +124,10 @@ def test_nonconforming_endpoint_responses_never_reach_the_evaluator(
         def propose(self, _request):
             return ProposalResponse(text=_malformed_response(case))
 
-    monkeypatch.setenv("LDM_LLM_API_KEY", "test-workflow-key")
+    monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_deepseek_reaction_client",
+        "build_openai_reaction_client",
         lambda **_kwargs: StaticEndpoint(),
         raising=False,
     )

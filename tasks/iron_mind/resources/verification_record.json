@@ -5,7 +5,12 @@
   "verified_on": "2026-08-19",
   "task_tests": {
     "status": "passed",
-    "passed": 73,
+    "passed": 80,
+    "timeout_seconds": 60
+  },
+  "shared_transport_tests": {
+    "status": "passed",
+    "passed": 19,
     "timeout_seconds": 60
   },
   "data_contract": {
@@ -36,13 +41,15 @@
   "real_smoke": {
     "status": "succeeded",
     "contract_profile": "ldm_official_smoke",
-    "contract_sha256": "60bf4461185e55976feba8b06b12cd05f244323a6aac5207dc6378b795fead2d",
+    "contract_sha256": "970757af58eec539556199d741df8aab53bc402550d81a2102da1be97a8ec459",
     "dataset_id": "reductive_amination",
     "model": "deepseek-v4-flash",
     "endpoint_preflight": "passed",
+    "selector": "reaction_categorical_ard_gp",
+    "effective_beta": 2.8936412205332855,
     "valid_search_candidates": 4,
-    "selected_canonical_key": "b939d9838b7a20b3f719a1eaec507f1c66163c3e75569581c1aecc77892a8194",
-    "reaction_score": 11.0,
+    "selected_canonical_key": "c56472f4f20c738ab540424ce9b1d39844f5bd507e2b17fbad05e81a506214e1",
+    "reaction_score": 27.0,
     "budget": {
       "outer_iterations": 1,
       "llm_requests": 1,
@@ -56,10 +63,10 @@
     },
     "secret_scan": "passed",
     "artifact_sha256": {
-      "experiment_contract.json": "a8fb5db7fc81dcfa00694c205da4b658a072caf8a75ec6f14a58d602f8104809",
-      "budget.json": "e58b0b8120c8bd762008aafe575cac17be93493133a4a7a614cdb1fbc60533f6",
-      "result.json": "c7f1cbf5bb515470eb3d57da4d4d96d52ae9a8127e2a4f6914bfb32781411dbe",
-      "selection_record.json": "0eb75ccd712b8c64559562f51979b024efb1af24cc1ae4cede41f8beed86f8cc"
+      "experiment_contract.json": "44d9d5b59d8ab674b8c2e40f17e5cfeddc919e0f268be74b46a143fbc1d405de",
+      "budget.json": "9a6657ecb87f46f0214cc86651b32f02363d9df964943099e53dc07a3136ab32",
+      "result.json": "387c764e8a7c34aea8a343dfc39d7922ff7b3ff43fafb511d5cb18c2210ae217",
+      "selection_record.json": "d9b52ee62752089dc7044dba2c8eaa83cf58183a3a69fa24ab4516ba0dc9b605"
     }
   },
   "suite_dry_runs": {

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
-from ldm_tts.optimization.gp import RBFGPUCBSelector
+from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -32,7 +31,12 @@ from tasks.iron_mind.core.factory import (
 )
 from tasks.iron_mind.core.mock import load_mock_table
 from tasks.iron_mind.core.mock import mock_response as _mock_response
-from tasks.iron_mind.core.proposals import build_deepseek_reaction_client
+from tasks.iron_mind.core.proposals import build_openai_reaction_client
+from tasks.iron_mind.core.provider import (
+    OpenAIProviderSettings,
+    resolve_openai_provider_settings,
+)
+from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
@@ -60,8 +64,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--run-name", default="")
     parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--data-dir", type=Path)
-    parser.add_argument("--llm-url", default=os.environ.get("LDM_LLM_URL", ""))
-    parser.add_argument("--llm-model-name", default=os.environ.get("LDM_LLM_MODEL", ""))
+    parser.add_argument("--llm-url")
+    parser.add_argument("--llm-model-name")
+    parser.add_argument("--api-key")
     parser.add_argument("--llm-timeout", type=float, default=120.0)
     parser.add_argument("--llm-max-tokens", type=int, default=2048)
     parser.add_argument("--llm-temperature", type=float, default=0.7)
@@ -77,7 +82,8 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
 
 def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTaskSpec:
     encoder = ReactionOneHotEncoder(schema)
-    selector = RBFGPUCBSelector(
+    selector = ReactionCategoricalGPUCBSelector(
+        schema=schema,
         objective_name=OBJECTIVE_NAME,
         beta=args.acquisition_beta,
         feature_version=encoder.version,
@@ -102,19 +108,15 @@ def _run_campaign(
     args, table, task_spec, contract, profile_name: str, payload: dict[str, Any]
 ) -> int:
     schema = table.schema
+    provider = _provider_settings(args) if args.proposal_mode == "openai" else None
+    if provider is not None:
+        args.llm_url = provider.base_url
+        args.llm_model_name = provider.model
     runtime = _open_runtime(args, task_spec, contract, profile_name)
-    try:
-        client = _proposal_client(args, table)
-    except KeyError:
-        _pause_endpoint(
-            runtime,
-            args,
-            payload,
-            "LDM_LLM_API_KEY is required for OpenAI proposal mode.",
-        )
-        return 2
+    client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
-        if not _preflight_endpoint(client, runtime, args, payload):
+        assert provider is not None
+        if not _preflight_endpoint(client, runtime, args, payload, provider):
             return 2
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_request = None if args.proposal_mode == "callable" else lambda: runtime.consume("llm_requests")
@@ -225,23 +227,34 @@ def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
     assert args.data_dir is not None
     return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
 
-def _proposal_client(args: argparse.Namespace, table: FrozenReactionTable) -> ProposalClient:
+def _proposal_client(
+    args: argparse.Namespace,
+    table: FrozenReactionTable,
+    provider: OpenAIProviderSettings | None,
+) -> ProposalClient:
     if args.proposal_mode == "callable":
         return CallableProposalClient(lambda _request: _mock_response(table))
-    return build_deepseek_reaction_client(
-        base_url=args.llm_url,
-        model=args.llm_model_name,
-        api_key=os.environ["LDM_LLM_API_KEY"],
+    assert provider is not None
+    return build_openai_reaction_client(
+        base_url=provider.base_url,
+        model=provider.model,
+        api_key=provider.api_key,
         timeout_seconds=args.llm_timeout,
         max_tokens=args.llm_max_tokens,
         temperature=args.llm_temperature,
     )
 
 def _preflight_endpoint(
-    client: ProposalClient, runtime: CampaignRuntime, args: argparse.Namespace, payload: dict[str, Any]
+    client: ProposalClient,
+    runtime: CampaignRuntime,
+    args: argparse.Namespace,
+    payload: dict[str, Any],
+    provider: OpenAIProviderSettings,
 ) -> bool:
-    if not args.llm_url or not args.llm_model_name:
-        return _pause_endpoint(runtime, args, payload, "OpenAI proposal mode requires an endpoint URL and model name.")
+    if not provider.base_url or not provider.model:
+        return _pause_endpoint(runtime, args, payload, "Set LLM_BASE_URL and LLM_MODEL_NAME for OpenAI proposal mode.")
+    if not provider.api_key and not is_local_url(provider.base_url):
+        return _pause_endpoint(runtime, args, payload, "Set LLM_API_KEY for a non-local OpenAI-compatible endpoint.")
     try:
         preflight = client.preflight()  # type: ignore[attr-defined]
     except EndpointRequestError as exc:
@@ -249,6 +262,14 @@ def _preflight_endpoint(
     runtime.record("endpoint_preflight_succeeded", preflight)
     payload["endpoint_preflight"] = preflight
     return True
+
+
+def _provider_settings(args: argparse.Namespace) -> OpenAIProviderSettings:
+    return resolve_openai_provider_settings(
+        base_url=args.llm_url,
+        model=args.llm_model_name,
+        api_key=args.api_key,
+    )
 
 def _pause_endpoint(
     runtime: CampaignRuntime,

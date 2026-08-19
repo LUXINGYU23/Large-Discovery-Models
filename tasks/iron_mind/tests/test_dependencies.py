@@ -10,11 +10,11 @@ from types import MappingProxyType
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.optimization.gp import RBFGPUCBSelector
 from ldm_tts.transport import CallableProposalClient
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.dependencies import DependencyResources, check_task_dependencies
 from tasks.iron_mind.core.factory import CampaignComponentOptions, build_campaign_components
+from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.schema import (
     ReactionDatasetSchema,
     ReactionFactor,
@@ -148,7 +148,11 @@ def _real_checks(
     return check_task_dependencies(
         "iron_mind",
         {"data-dir": str(data_root), "dataset-id": "buchwald_hartwig"},
-        {},
+        {
+            "LLM_BASE_URL": "https://example.invalid/v1",
+            "LLM_MODEL_NAME": "test-model",
+            "LLM_API_KEY": "test-key",
+        },
         data_root,
         mode="real",
         include_optional=False,
@@ -182,6 +186,9 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path:
     statuses = {check.name: check.status for check in checks}
     assert statuses == {
         "official source gate": "ok",
+        "LLM URL": "ok",
+        "LLM model": "ok",
+        "LLM API key": "ok",
         "source revisions": "ok",
         "buchwald_hartwig frozen table": "ok",
     }
@@ -266,7 +273,7 @@ def test_factory_assembles_one_shared_engine_shape_for_mock_and_real(tmp_path: P
     for name in ("domain", "expander", "encoder", "selector", "engine"):
         assert type(getattr(mock, name)) is type(getattr(real, name))
     assert isinstance(mock.engine, LDMEngine)
-    assert isinstance(mock.selector, RBFGPUCBSelector)
+    assert isinstance(mock.selector, ReactionCategoricalGPUCBSelector)
     assert mock.expander.domain is mock.domain
     assert mock.engine.task_spec == mock.task_spec
     assert mock.task_spec.surrogate == mock.encoder.describe()

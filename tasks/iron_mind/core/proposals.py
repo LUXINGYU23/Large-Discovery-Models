@@ -17,12 +17,6 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 REQUIRED_CANDIDATE_COUNT = 4
 PROPOSAL_SOURCE = "iron_mind_reaction_proposal"
-DEEPSEEK_REACTION_EXTRA_BODY = {
-    "response_format": {"type": "json_object"},
-    "thinking": {"type": "disabled"},
-}
-
-
 class IronMindProposalExpander:
     """Expand one proposal client response through the strict reaction parser."""
 
@@ -69,7 +63,7 @@ class IronMindProposalExpander:
         )
 
 
-def build_deepseek_reaction_client(
+def build_openai_reaction_client(
     *,
     base_url: str,
     model: str,
@@ -78,7 +72,7 @@ def build_deepseek_reaction_client(
     max_tokens: int,
     temperature: float = 0.7,
 ) -> OpenAICompatibleProposalClient:
-    """Build the real proposal transport without placing credentials in requests."""
+    """Build a standard OpenAI-compatible proposal transport for a real campaign."""
 
     return OpenAICompatibleProposalClient(
         url=base_url,
@@ -88,8 +82,7 @@ def build_deepseek_reaction_client(
         max_tokens=max_tokens,
         temperature=temperature,
         max_retries=0,
-        extra_body=DEEPSEEK_REACTION_EXTRA_BODY,
-        require_models_preflight=True,
+        require_models_preflight=False,
     )
 
 

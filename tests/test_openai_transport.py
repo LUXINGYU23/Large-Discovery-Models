@@ -10,6 +10,7 @@ import pytest
 
 import ldm_tts
 from ldm_tts import compat
+from ldm_tts.transport.openai_http import PREFLIGHT_MAX_TOKENS
 from ldm_tts.transport.openai import (
     EndpointRequestError,
     OpenAICompatibleProposalClient,
@@ -248,6 +249,7 @@ def test_endpoint_preflight_json_prompt(monkeypatch: pytest.MonkeyPatch) -> None
     assert body["thinking"] == {"type": "disabled"}
     assert body["response_format"] == {"type": "json_object"}
     assert body["messages"][0]["content"] == "Reply with one non-empty JSON object."
+    assert body["max_tokens"] == PREFLIGHT_MAX_TOKENS
 
 
 def test_http_and_json_errors_do_not_include_authorization_value(

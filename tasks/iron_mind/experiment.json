@@ -24,7 +24,7 @@
       {
         "name": "reaction_score",
         "direction": "maximize",
-        "description": "The sole shared RBF GP-UCB objective for the LDM method."
+        "description": "The sole factor-aware categorical ARD GP-UCB objective for the LDM method."
       }
     ],
     "diagnostic": [
@@ -60,7 +60,7 @@
       "paper_v2_suite": "six datasets used by the published paper figures",
       "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
       "proposal_contract": "exact four-candidate JSON object",
-      "method": "LDM finite-reservoir proposal plus shared RBF GP-UCB selection"
+      "method": "LDM finite-reservoir proposal plus factor-aware categorical ARD GP-UCB selection"
     },
     "per_candidate_limits": {
       "benchmark_jobs": 1

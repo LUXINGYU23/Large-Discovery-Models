@@ -60,7 +60,7 @@ def reaction_surrogate_space(schema: ReactionDatasetSchema) -> SurrogateSpaceSpe
 
     return SurrogateSpaceSpec(
         kind="vector",
-        representation="Schema-ordered categorical reaction-condition one-hot vector.",
+        representation="Schema-ordered finite reaction-condition one-hot vector.",
         dimension_policy="fixed",
         dimension=schema.one_hot_dimension,
         encoder=ENCODER_PATH,

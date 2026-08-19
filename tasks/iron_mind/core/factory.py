@@ -19,7 +19,6 @@ from ldm_tts.contracts import (
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.optimization.gp import RBFGPUCBSelector
 from ldm_tts.transport import ProposalClient
 
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
@@ -29,6 +28,7 @@ from tasks.iron_mind.core.proposals import (
     REQUIRED_CANDIDATE_COUNT,
     IronMindProposalExpander,
 )
+from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 
@@ -64,7 +64,7 @@ class CampaignComponents:
     domain: IronMindCandidateDomain
     expander: IronMindProposalExpander
     encoder: ReactionOneHotEncoder
-    selector: RBFGPUCBSelector
+    selector: ReactionCategoricalGPUCBSelector
     evaluator: FrozenReactionEvaluator
     engine: LDMEngine
 
@@ -73,7 +73,8 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     """Assemble one engine without reading credentials, files, or global task state."""
 
     encoder = ReactionOneHotEncoder(options.schema)
-    selector = RBFGPUCBSelector(
+    selector = ReactionCategoricalGPUCBSelector(
+        schema=options.schema,
         objective_name=OBJECTIVE_NAME,
         beta=options.acquisition_beta,
         feature_version=encoder.version,

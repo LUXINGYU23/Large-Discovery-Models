@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from ldm_tts.registration.dependencies import (
     DependencyCheck,
     arg_value,
+    check_llm_settings,
     fail,
     ok,
     resolve_task_path,
@@ -58,10 +59,10 @@ def check_task_dependencies(
 ) -> list[DependencyCheck]:
     """Check only assets needed by the selected mock or real campaign."""
 
-    del env, include_optional
+    del include_optional
     if mode == "mock" or bool(args.get("mock")):
         return _mock_checks(task, resources)
-    return _real_checks(task, args, cwd, contract_profile, resources)
+    return _real_checks(task, args, env, cwd, contract_profile, resources)
 
 
 def _mock_checks(task: str, resources: DependencyResources) -> list[DependencyCheck]:
@@ -76,6 +77,7 @@ def _mock_checks(task: str, resources: DependencyResources) -> list[DependencyCh
 def _real_checks(
     task: str,
     args: dict[str, Any],
+    env: dict[str, str],
     cwd: Path,
     contract_profile: str,
     resources: DependencyResources,
@@ -96,6 +98,18 @@ def _real_checks(
         return [gate, fail(task, "tracked resources", str(exc))]
     return [
         gate,
+        *check_llm_settings(
+            task,
+            args,
+            env,
+            url_arg="llm-url",
+            model_arg="llm-model-name",
+            api_arg="api-key",
+            url_env=("LLM_BASE_URL", "TTS_LLM_URL", "LDM_LLM_URL"),
+            model_env=("LLM_MODEL_NAME", "TTS_LLM_MODEL", "LDM_LLM_MODEL"),
+            api_env=("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"),
+            required=True,
+        ),
         _source_revision_check(task, data_root, contract),
         _frozen_table_check(task, data_root, dataset_id, dataset_contract),
     ]

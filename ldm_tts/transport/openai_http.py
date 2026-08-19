@@ -9,10 +9,10 @@ import urllib.request
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+PREFLIGHT_MAX_TOKENS = 64
 
 class EndpointRequestError(RuntimeError):
     """Raised when an endpoint request fails or returns an invalid response."""
-
 
 def chat_completions_url(raw: str) -> str:
     """Normalize a base URL or complete OpenAI-compatible endpoint to chat."""
@@ -26,7 +26,6 @@ def chat_completions_url(raw: str) -> str:
         return base + "/chat/completions"
     return base + "/v1/chat/completions"
 
-
 def models_url(raw: str) -> str:
     """Normalize a base URL or complete OpenAI-compatible endpoint to models."""
 
@@ -38,7 +37,6 @@ def models_url(raw: str) -> str:
     if base.endswith("/v1"):
         return base + "/models"
     return base + "/models"
-
 
 def request_openai_models(
     *,
@@ -57,7 +55,6 @@ def request_openai_models(
     )
     _model_ids(result)
     return result
-
 
 def request_openai_chat(
     *,
@@ -137,7 +134,7 @@ def preflight_openai_chat(
         api_key=api_key,
         messages=[{"role": "user", "content": "Reply with exactly OK."}],
         timeout_seconds=timeout_seconds,
-        max_tokens=8,
+        max_tokens=PREFLIGHT_MAX_TOKENS,
         temperature=0.0,
     )
     return {
@@ -176,7 +173,7 @@ def preflight_openai_endpoint(
         api_key=api_key,
         messages=[{"role": "user", "content": prompt}],
         timeout_seconds=timeout_seconds,
-        max_tokens=8,
+        max_tokens=PREFLIGHT_MAX_TOKENS,
         temperature=0.0,
         extra_body=extra_body,
     )

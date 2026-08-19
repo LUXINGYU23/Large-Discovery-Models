@@ -35,7 +35,10 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert config["args"]["llm-temperature"] == 0.7
     assert str(data_root) in plan["argv"]
     assert str(runs_root / "smoke") in plan["argv"]
-    assert "LDM_LLM_API_KEY" not in json.dumps(config)
+    assert config["args"]["llm-url"] is None
+    assert config["args"]["llm-model-name"] is None
+    assert config["args"]["api-key"] is None
+    assert "--api-key" not in plan["argv"]
 
 
 def test_complete_ldm_profile_and_suites_lock_the_official_budget(
@@ -64,7 +67,10 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert plan["contract_profile"] == "ldm_official_20"
         assert config["args"]["iterations"] == 20
         assert config["args"]["evaluations-per-round"] == 1
-        assert "LDM_LLM_API_KEY" not in serialized
+        assert config["args"]["llm-url"] is None
+        assert config["args"]["llm-model-name"] is None
+        assert config["args"]["api-key"] is None
+        assert "LLM_API_KEY" not in serialized
         assert "/mnt/data1/" not in serialized
 
 
