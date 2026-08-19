@@ -15,10 +15,11 @@ from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 
-REQUIRED_CANDIDATE_COUNT = 4
 PROPOSAL_SOURCE = "iron_mind_reaction_proposal"
+
+
 class IronMindProposalExpander:
-    """Expand one proposal client response through the strict reaction parser."""
+    """Expand one batch proposal response through the strict reaction parser."""
 
     def __init__(
         self,
@@ -32,14 +33,18 @@ class IronMindProposalExpander:
         self.before_request = before_request
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
-        """Return four raw proposals or one attempt-only parse failure result."""
+        """Return the requested proposal reservoir or one parse-failure result."""
 
         proposal_request = build_reaction_proposal_request(request, self.domain.schema)
         if self.before_request is not None:
             self.before_request()
         response = self.client.propose(proposal_request)
         try:
-            payloads = parse_reaction_candidates(response.text, domain=self.domain)
+            payloads = parse_reaction_candidates(
+                response.text,
+                domain=self.domain,
+                candidate_count=request.reservoir_size,
+            )
         except ValueError as exc:
             return ExpansionResult(
                 attempts=(response,),
@@ -91,7 +96,7 @@ def build_reaction_proposal_request(
 ) -> ProposalRequest:
     """Build the exact English prompt used by both mock and endpoint clients."""
 
-    _require_fixed_candidate_count(request)
+    candidate_count = _candidate_count(request.reservoir_size)
     factors = [
         {
             "name": factor.name,
@@ -111,9 +116,9 @@ def build_reaction_proposal_request(
             "Allowed factors and exact options: " + _json_text(factors),
             "Observed evaluations: " + _json_text(observations),
             "Do-not-repeat canonical keys: " + _json_text(do_not_repeat),
-            "Return exactly four distinct candidates as one complete JSON object.",
+            f"Return exactly {candidate_count} distinct candidates as one complete JSON object.",
             "The JSON root must contain only the candidates array.",
-            "Required JSON envelope example (one candidate shown; return exactly four): "
+            f"Required JSON envelope example (one candidate shown; return exactly {candidate_count}): "
             + _json_text(envelope_example),
             "Use only the exact typed options shown above; each candidate must contain only dataset_id and conditions.",
             "Every factor must appear only inside conditions.",
@@ -132,22 +137,28 @@ def build_reaction_proposal_request(
             "round_idx": request.round_idx,
             "dataset_id": schema.dataset_id,
             "schema_sha256": schema.schema_sha256,
-            "candidate_count": REQUIRED_CANDIDATE_COUNT,
+            "candidate_count": candidate_count,
         },
     )
 
 
 def parse_reaction_candidates(
-    text: str, *, domain: CandidateDomainAdapter
+    text: str,
+    *,
+    domain: CandidateDomainAdapter,
+    candidate_count: int,
 ) -> tuple[dict[str, Any], ...]:
-    """Parse exactly four unique, task-admitted payloads without rewriting them."""
+    """Parse exactly the requested number of task-admitted payloads."""
 
+    candidate_count = _candidate_count(candidate_count)
     response = _load_complete_json_object(text)
     if set(response) != {"candidates"}:
         raise ValueError("proposal response must contain only the candidates field.")
     candidates = response["candidates"]
-    if not isinstance(candidates, list) or len(candidates) != REQUIRED_CANDIDATE_COUNT:
-        raise ValueError("proposal response must contain exactly four candidates.")
+    if not isinstance(candidates, list) or len(candidates) != candidate_count:
+        raise ValueError(
+            f"proposal response must contain exactly {candidate_count} candidates."
+        )
 
     payloads = []
     canonical_keys = set()
@@ -185,9 +196,10 @@ def _admit_payload(
     return admitted
 
 
-def _require_fixed_candidate_count(request: ExpansionRequest) -> None:
-    if request.reservoir_size != REQUIRED_CANDIDATE_COUNT:
-        raise ValueError("Iron Mind proposal expansion requires exactly four candidates.")
+def _candidate_count(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("candidate count must be a positive integer.")
+    return value
 
 
 def _candidate_envelope_example(schema: ReactionDatasetSchema) -> dict[str, Any]:

@@ -164,6 +164,8 @@ def _real_args(tmp_path: Path, data_root: Path) -> list[str]:
         "openai",
         "--dataset-id",
         "buchwald_hartwig",
+        "--reservoir-size",
+        "4",
         "--data-dir",
         str(data_root),
         "--out-dir",

@@ -258,6 +258,7 @@ def _factory_options(
         table=table,
         sink=DataCollectionSink.disabled(),
         runtime=runtime,
+        reservoir_size=4,
     )
 
 

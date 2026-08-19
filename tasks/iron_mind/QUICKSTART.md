@@ -68,10 +68,12 @@ uv run --locked --project tasks/iron_mind python \
 ```
 
 A successful run writes a timestamped directory below
-`$IRON_MIND_RUNS_ROOT/smoke/`. The released profile produces four internal
-proposals, ranks them with the task GP selector, and evaluates one reaction
-condition. That one external evaluation is the Iron Mind-compatible batch
-size.
+`$IRON_MIND_RUNS_ROOT/smoke/`. The released profile produces 64 internal
+proposals in one structured model response, ranks them with the task GP
+selector, and evaluates one reaction condition. That one external evaluation
+is the Iron Mind-compatible batch size.
 
 After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
-campaign or a suite configuration for the full benchmark.
+campaign or a suite configuration for the full benchmark. Set
+`--set args.reservoir-size=<N>` when running the shared runner to change the
+internal proposal count without changing the number of evaluated reactions.

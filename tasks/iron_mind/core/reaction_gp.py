@@ -46,7 +46,7 @@ class ReactionGPUCBConfig:
 
 
 class ReactionCategoricalGPUCBSelector:
-    """Rank a four-candidate LDM reservoir with a schema-aware categorical GP."""
+    """Rank an LDM reaction reservoir with a schema-aware categorical GP."""
 
     def __init__(
         self,

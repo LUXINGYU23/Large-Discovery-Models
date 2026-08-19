@@ -29,7 +29,7 @@ from tasks.iron_mind.core.factory import (
     build_campaign_components,
     build_reaction_task_spec,
 )
-from tasks.iron_mind.core.mock import load_mock_table
+from tasks.iron_mind.core.mock import MOCK_SEED_ROW_COUNT, load_mock_table
 from tasks.iron_mind.core.mock import mock_response as _mock_response
 from tasks.iron_mind.core.proposals import build_openai_reaction_client
 from tasks.iron_mind.core.provider import (
@@ -41,7 +41,7 @@ from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.workflow_support import (
-    derived_budget,
+    campaign_budget,
     jsonable_args,
     load_campaign_state,
 )
@@ -50,6 +50,9 @@ TASK_ID = "iron_mind"
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
+DEFAULT_RESERVOIR_SIZE = 64
+DEFAULT_LLM_MAX_TOKENS = 16_384
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
@@ -57,7 +60,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--proposal-mode", choices=("callable", "openai"), default="callable")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
     parser.add_argument("--iterations", type=int, default=1)
-    parser.add_argument("--reservoir-size", type=int, default=4)
+    parser.add_argument("--reservoir-size", type=int, default=DEFAULT_RESERVOIR_SIZE)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
@@ -68,14 +71,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-model-name")
     parser.add_argument("--api-key")
     parser.add_argument("--llm-timeout", type=float, default=120.0)
-    parser.add_argument("--llm-max-tokens", type=int, default=2048)
+    parser.add_argument("--llm-max-tokens", type=int, default=DEFAULT_LLM_MAX_TOKENS)
     parser.add_argument("--llm-temperature", type=float, default=0.7)
     parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
-    """Describe the fixed-schema reaction task before campaign assembly."""
+    """Describe the configured reaction task before campaign assembly."""
 
     schema = _load_table(args).schema if not args.mock else _schema_for(args.dataset_id)
     return _task_spec(args, schema)
@@ -88,7 +91,11 @@ def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTa
         beta=args.acquisition_beta,
         feature_version=encoder.version,
     )
-    return build_reaction_task_spec(schema, selector.describe())
+    return build_reaction_task_spec(
+        schema,
+        selector.describe(),
+        args.reservoir_size,
+    )
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
@@ -127,6 +134,7 @@ def _run_campaign(
             table=table,
             sink=sink,
             runtime=runtime,
+            reservoir_size=args.reservoir_size,
             before_request=before_request,
             acquisition_beta=args.acquisition_beta,
         )
@@ -162,8 +170,8 @@ def _finish_campaign(
 def _validate_args(args: argparse.Namespace) -> None:
     if args.iterations < 0:
         raise SystemExit("--iterations must be non-negative")
-    if args.reservoir_size != 4:
-        raise SystemExit("Iron Mind requires --reservoir-size=4")
+    if args.reservoir_size < 1:
+        raise SystemExit("--reservoir-size must be positive")
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
     if args.acquisition_beta < 0:
@@ -202,7 +210,10 @@ def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRunti
         task=TASK_ID,
         config=jsonable_args(args),
         task_spec=task_spec,
-        budget_limits=dict(profile.budget) if profile else derived_budget(args),
+        budget_limits=campaign_budget(
+            args,
+            None if profile is None else profile.budget,
+        ),
         contract_snapshot=contract.to_dict(),
         contract_sha256=contract.digest,
         contract_profile=profile_name,
@@ -218,12 +229,22 @@ def _schema_for(dataset_id: str) -> ReactionDatasetSchema:
     except KeyError as exc:
         raise SystemExit(f"Unknown --dataset-id: {dataset_id}") from exc
 
-def _load_mock_table(schema: ReactionDatasetSchema) -> FrozenReactionTable:
-    return load_mock_table(schema, MOCK_ORACLE_PATH)
+def _load_mock_table(
+    schema: ReactionDatasetSchema,
+    candidate_count: int = MOCK_SEED_ROW_COUNT,
+) -> FrozenReactionTable:
+    return load_mock_table(
+        schema,
+        MOCK_ORACLE_PATH,
+        candidate_count=candidate_count,
+    )
 
 def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
     if args.mock:
-        return _load_mock_table(_schema_for(args.dataset_id))
+        return _load_mock_table(
+            _schema_for(args.dataset_id),
+            candidate_count=args.reservoir_size,
+        )
     assert args.data_dir is not None
     return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
 
@@ -233,7 +254,12 @@ def _proposal_client(
     provider: OpenAIProviderSettings | None,
 ) -> ProposalClient:
     if args.proposal_mode == "callable":
-        return CallableProposalClient(lambda _request: _mock_response(table))
+        return CallableProposalClient(
+            lambda _request: _mock_response(
+                table,
+                candidate_count=args.reservoir_size,
+            )
+        )
     assert provider is not None
     return build_openai_reaction_client(
         base_url=provider.base_url,

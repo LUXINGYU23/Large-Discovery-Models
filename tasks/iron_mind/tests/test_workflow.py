@@ -13,7 +13,7 @@ from tasks.iron_mind.core.workflow import describe_ldm_task, main, parse_args
 TASK_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_describe_ldm_task_matches_the_fixed_reaction_contract() -> None:
+def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
     args = parse_args(["--mock"])
 
     task_spec = describe_ldm_task(args)
@@ -23,11 +23,12 @@ def test_describe_ldm_task_matches_the_fixed_reaction_contract() -> None:
     assert task_spec.candidate_domain.kind == "finite_reaction_conditions"
     assert task_spec.response_spaces[0].schema["properties"]["candidates"] == {
         "type": "array",
-        "minItems": 4,
-        "maxItems": 4,
+        "minItems": 64,
+        "maxItems": 64,
     }
-    assert task_spec.reservoir.max_size == 4
-    assert task_spec.proposal_search.breadth == 4
+    assert task_spec.reservoir.max_size == 64
+    assert task_spec.proposal_search.breadth == 64
+    assert task_spec.metadata["reservoir_size"] == 64
     assert task_spec.surrogate.dimension == 47
     assert task_spec.acquisition.objective_names == ("reaction_score",)
     assert task_spec.acquisition.parameters == {
@@ -75,7 +76,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
         "proposal_attempts": 1,
         "selected_candidates": 1,
         "successful_evaluations": 1,
-        "valid_search_candidates": 4,
+        "valid_search_candidates": 64,
     }
     for name in (
         "ldm_data/ldm_ir.jsonl",
@@ -92,4 +93,18 @@ def test_mock_campaign_runs_one_shared_engine_round(
     assert evaluation_manifest["artifacts"] == {
         "result": "result.json",
         "trajectory": "trajectory.csv",
+    }
+
+
+def test_describe_ldm_task_accepts_a_custom_reservoir_size() -> None:
+    args = parse_args(["--mock", "--reservoir-size", "7"])
+
+    task_spec = describe_ldm_task(args)
+
+    assert task_spec.reservoir.max_size == 7
+    assert task_spec.proposal_search.breadth == 7
+    assert task_spec.response_spaces[0].schema["properties"]["candidates"] == {
+        "type": "array",
+        "minItems": 7,
+        "maxItems": 7,
     }

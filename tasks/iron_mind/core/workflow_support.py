@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from ldm_tts.engine import LDMEngineState
 from ldm_tts.engine.run_store import CampaignRuntime
@@ -24,6 +24,15 @@ def derived_budget(args: Any) -> dict[str, int]:
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
+
+
+def campaign_budget(
+    args: Any,
+    profile_budget: Mapping[str, int | float] | None,
+) -> dict[str, int | float]:
+    """Combine dynamic reservoir accounting with fixed profile limits."""
+
+    return {**derived_budget(args), **dict(profile_budget or {})}
 
 
 def jsonable_args(args: Any) -> dict[str, Any]:

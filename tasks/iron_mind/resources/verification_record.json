@@ -5,7 +5,7 @@
   "verified_on": "2026-08-19",
   "task_tests": {
     "status": "passed",
-    "passed": 80,
+    "passed": 83,
     "timeout_seconds": 60
   },
   "shared_transport_tests": {
@@ -41,20 +41,22 @@
   "real_smoke": {
     "status": "succeeded",
     "contract_profile": "ldm_official_smoke",
-    "contract_sha256": "970757af58eec539556199d741df8aab53bc402550d81a2102da1be97a8ec459",
+    "contract_sha256": "5e5f57bafed9838cb6a40d386ecfb05c89116ff22723c371cf86aba9c1c2dad1",
     "dataset_id": "reductive_amination",
     "model": "deepseek-v4-flash",
     "endpoint_preflight": "passed",
     "selector": "reaction_categorical_ard_gp",
-    "effective_beta": 2.8936412205332855,
-    "valid_search_candidates": 4,
-    "selected_canonical_key": "c56472f4f20c738ab540424ce9b1d39844f5bd507e2b17fbad05e81a506214e1",
-    "reaction_score": 27.0,
+    "proposal_strategy": "single_turn_batch_reservoir",
+    "reservoir_size": 64,
+    "effective_beta": 3.7307287435096277,
+    "valid_search_candidates": 64,
+    "selected_canonical_key": "fb79e663518c9bec6c200881acdbfe40a2bf918a277604485a8cca115ec680da",
+    "reaction_score": 0.0,
     "budget": {
       "outer_iterations": 1,
       "llm_requests": 1,
       "proposal_attempts": 1,
-      "valid_search_candidates": 4,
+      "valid_search_candidates": 64,
       "selected_candidates": 1,
       "external_evaluations": 1,
       "expensive_evaluation_attempts": 1,
@@ -63,10 +65,10 @@
     },
     "secret_scan": "passed",
     "artifact_sha256": {
-      "experiment_contract.json": "44d9d5b59d8ab674b8c2e40f17e5cfeddc919e0f268be74b46a143fbc1d405de",
-      "budget.json": "9a6657ecb87f46f0214cc86651b32f02363d9df964943099e53dc07a3136ab32",
-      "result.json": "387c764e8a7c34aea8a343dfc39d7922ff7b3ff43fafb511d5cb18c2210ae217",
-      "selection_record.json": "d9b52ee62752089dc7044dba2c8eaa83cf58183a3a69fa24ab4516ba0dc9b605"
+      "experiment_contract.json": "f0c6cbfeca5c7e91a899d2e68ed4b8c40f8bfda70613f04fcbf446d0fbc5bc75",
+      "budget.json": "aa803bd6b2c857551a2b0a3fa0adefbfc89c447901945a133a718bceb7030b0f",
+      "result.json": "4c2d914e4f78fa5189e20428dfa719d7f7bf097b737356d5478367d1af889dd0",
+      "selection_record.json": "704b8fa02deebd66bd3dd45061932ebc826bfcbba4463c982ccc8db6a13f8d37"
     }
   },
   "suite_dry_runs": {

@@ -25,7 +25,6 @@ from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.proposals import (
-    REQUIRED_CANDIDATE_COUNT,
     IronMindProposalExpander,
 )
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
@@ -46,12 +45,15 @@ class CampaignComponentOptions:
     table: FrozenReactionTable
     sink: DataCollectionSink
     runtime: CampaignRuntime
+    reservoir_size: int
     before_request: Callable[[], None] | None = None
     acquisition_beta: float = 1.0
 
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
             raise ValueError("Campaign table schema does not match the supplied schema.")
+        if self.reservoir_size < 1:
+            raise ValueError("Reservoir size must be positive.")
         if not math.isfinite(self.acquisition_beta) or self.acquisition_beta < 0:
             raise ValueError("Acquisition beta must be finite and non-negative.")
 
@@ -79,7 +81,11 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         beta=options.acquisition_beta,
         feature_version=encoder.version,
     )
-    task_spec = build_reaction_task_spec(options.schema, selector.describe())
+    task_spec = build_reaction_task_spec(
+        options.schema,
+        selector.describe(),
+        options.reservoir_size,
+    )
     domain = IronMindCandidateDomain(
         options.schema,
         options.table,
@@ -104,9 +110,14 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
 
 
 def build_reaction_task_spec(
-    schema: ReactionDatasetSchema, acquisition: AcquisitionSpec
+    schema: ReactionDatasetSchema,
+    acquisition: AcquisitionSpec,
+    reservoir_size: int,
 ) -> LDMTaskSpec:
-    """Describe the exact fixed-schema reaction search assembled by the factory."""
+    """Describe one fixed-schema reaction search with a configurable reservoir."""
+
+    if reservoir_size < 1:
+        raise ValueError("Reservoir size must be positive.")
 
     return LDMTaskSpec(
         task=TASK_ID,
@@ -118,19 +129,19 @@ def build_reaction_task_spec(
                 "Frozen-table reaction score; higher is better.",
             ),
         ),
-        response_spaces=(_reaction_response_space(),),
+        response_spaces=(_reaction_response_space(reservoir_size),),
         acquisition=acquisition,
-        reservoir=_reaction_reservoir_spec(),
+        reservoir=_reaction_reservoir_spec(reservoir_size),
         surrogate=ReactionOneHotEncoder(schema).describe(),
         proposal_search=ProposalSearchSpec(
-            name="single_turn_fixed_reservoir",
-            breadth=REQUIRED_CANDIDATE_COUNT,
+            name="single_turn_batch_reservoir",
+            breadth=reservoir_size,
             evaluation_policy="acquisition_selected",
         ),
         metadata={
             "dataset_id": schema.dataset_id,
             "schema_sha256": schema.schema_sha256,
-            "required_candidate_count": REQUIRED_CANDIDATE_COUNT,
+            "reservoir_size": reservoir_size,
         },
     )
 
@@ -145,17 +156,17 @@ def _candidate_domain_spec(schema: ReactionDatasetSchema) -> CandidateDomainSpec
     )
 
 
-def _reaction_response_space() -> ResponseSpaceSpec:
+def _reaction_response_space(candidate_count: int) -> ResponseSpaceSpec:
     return ResponseSpaceSpec(
         name="reaction_candidates_json",
         output_kind="json_object",
-        schema=_reaction_response_schema(),
+        schema=_reaction_response_schema(candidate_count),
         parser="tasks.iron_mind.core.proposals:parse_reaction_candidates",
-        description="Exactly four source-valid finite reaction candidates.",
+        description=f"Exactly {candidate_count} source-valid finite reaction candidates.",
     )
 
 
-def _reaction_reservoir_spec() -> ReservoirSpec:
+def _reaction_reservoir_spec(candidate_count: int) -> ReservoirSpec:
     return ReservoirSpec(
         name="reaction_condition_reservoir",
         expansions=(
@@ -164,16 +175,16 @@ def _reaction_reservoir_spec() -> ReservoirSpec:
                 action_kind="emit_candidate",
                 response_space="reaction_candidates_json",
                 produces_candidates=True,
-                description="Emit four strict reaction-condition candidates.",
+                description=f"Emit {candidate_count} strict reaction-condition candidates.",
             ),
         ),
         candidate_validator="tasks.iron_mind.core.candidate:IronMindCandidateDomain",
         deduplication_key="SHA-256 canonical reaction payload",
-        max_size=REQUIRED_CANDIDATE_COUNT,
+        max_size=candidate_count,
     )
 
 
-def _reaction_response_schema() -> dict[str, object]:
+def _reaction_response_schema(candidate_count: int) -> dict[str, object]:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -181,8 +192,8 @@ def _reaction_response_schema() -> dict[str, object]:
         "properties": {
             "candidates": {
                 "type": "array",
-                "minItems": REQUIRED_CANDIDATE_COUNT,
-                "maxItems": REQUIRED_CANDIDATE_COUNT,
+                "minItems": candidate_count,
+                "maxItems": candidate_count,
             }
         },
     }

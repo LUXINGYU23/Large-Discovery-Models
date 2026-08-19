@@ -30,7 +30,7 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_sch
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
-REQUIRED_CANDIDATE_COUNT = 4
+TEST_CANDIDATE_COUNT = 4
 
 
 class StaticProposalClient:
@@ -102,7 +102,7 @@ def _response_text(candidates: list[dict[str, Any]] | None = None) -> str:
 
 
 def _request(**overrides: Any) -> ExpansionRequest:
-    values = {"round_idx": 0, "reservoir_size": REQUIRED_CANDIDATE_COUNT}
+    values = {"round_idx": 0, "reservoir_size": TEST_CANDIDATE_COUNT}
     values.update(overrides)
     return ExpansionRequest(**values)
 
@@ -113,7 +113,11 @@ def test_parser_accepts_only_one_complete_json_object() -> None:
 
     for text in invalid_responses:
         with pytest.raises(ValueError, match="complete JSON object"):
-            parse_reaction_candidates(text, domain=_domain())
+            parse_reaction_candidates(
+                text,
+                domain=_domain(),
+                candidate_count=TEST_CANDIDATE_COUNT,
+            )
 
 
 def test_parser_enforces_envelope_and_preserves_untrusted_payloads() -> None:
@@ -122,22 +126,34 @@ def test_parser_enforces_envelope_and_preserves_untrusted_payloads() -> None:
         {"other": candidates},
         {"candidates": candidates, "extra": True},
         {"candidates": candidates[:3]},
-        {"candidates": ["not-an-object"] * REQUIRED_CANDIDATE_COUNT},
+        {"candidates": ["not-an-object"] * TEST_CANDIDATE_COUNT},
     )
 
     for payload in invalid_envelopes:
         with pytest.raises(ValueError):
-            parse_reaction_candidates(json.dumps(payload), domain=_domain())
+            parse_reaction_candidates(
+                json.dumps(payload),
+                domain=_domain(),
+                candidate_count=TEST_CANDIDATE_COUNT,
+            )
 
     reversed_conditions = dict(reversed(tuple(candidates[0]["conditions"].items())))
     candidates[0] = {"dataset_id": "buchwald_hartwig", "conditions": reversed_conditions}
-    parsed = parse_reaction_candidates(_response_text(candidates), domain=_domain())
+    parsed = parse_reaction_candidates(
+        _response_text(candidates),
+        domain=_domain(),
+        candidate_count=TEST_CANDIDATE_COUNT,
+    )
     assert parsed[0] == candidates[0]
     assert list(parsed[0]["conditions"]) == list(reversed_conditions)
 
     candidates[0]["conditions"]["base"] = "btmg"
     with pytest.raises(ValueError, match="candidate 1 rejected: unknown_option"):
-        parse_reaction_candidates(_response_text(candidates), domain=_domain())
+        parse_reaction_candidates(
+            _response_text(candidates),
+            domain=_domain(),
+            candidate_count=TEST_CANDIDATE_COUNT,
+        )
 
 
 def test_parser_rejects_semantic_duplicates_before_collection(tmp_path: Path) -> None:
@@ -150,7 +166,11 @@ def test_parser_rejects_semantic_duplicates_before_collection(tmp_path: Path) ->
     domain = _domain(DataCollectionSink(collection_dir))
 
     with pytest.raises(ValueError, match="candidates must be distinct"):
-        parse_reaction_candidates(_response_text(candidates), domain=domain)
+        parse_reaction_candidates(
+            _response_text(candidates),
+            domain=domain,
+            candidate_count=TEST_CANDIDATE_COUNT,
+        )
 
     assert not (collection_dir / "ldm_ir.jsonl").exists()
 
@@ -215,7 +235,7 @@ def test_request_contains_the_schema_observations_and_evaluated_keys() -> None:
     assert "reaction_score" in content
     assert candidate.canonical_key in content
     assert "JSON" in content
-    assert "exactly four" in content
+    assert f"exactly {TEST_CANDIDATE_COUNT}" in content
     envelope_example = {
         "candidates": [
             {
@@ -233,6 +253,17 @@ def test_request_contains_the_schema_observations_and_evaluated_keys() -> None:
         for category in factor.categories:
             assert category in content
     assert "api_key" not in request.metadata
+
+
+def test_request_uses_the_runtime_reservoir_size() -> None:
+    request = build_reaction_proposal_request(
+        _request(reservoir_size=64),
+        _schema(),
+    )
+    content = "\n".join(message["content"] for message in request.messages)
+
+    assert request.metadata["candidate_count"] == 64
+    assert "exactly 64" in content
 
 
 def test_openai_client_uses_the_standard_chat_completion_contract() -> None:

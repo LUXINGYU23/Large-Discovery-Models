@@ -30,7 +30,7 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert plan["contract_profile"] == "ldm_official_smoke"
     assert profile.budget["external_evaluations"] == 1
     assert config["args"]["proposal-mode"] == "openai"
-    assert config["args"]["reservoir-size"] == 4
+    assert config["args"]["reservoir-size"] == 64
     assert config["args"]["evaluations-per-round"] == 1
     assert config["args"]["llm-temperature"] == 0.7
     assert str(data_root) in plan["argv"]
@@ -53,7 +53,8 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
 
     assert profile.budget["external_evaluations"] == 20
     assert profile.budget["llm_requests"] == 20
-    assert profile.budget["valid_search_candidates"] == 80
+    assert "valid_search_candidates" not in profile.budget
+    assert contract.budget["valid_search_candidates"] == 1280
     assert len(paper["experiments"]) == 6 * 20
     assert len(public["experiments"]) == 7 * 20
     assert all(entry["config"].startswith("ldm_20_") for entry in public["experiments"])
@@ -86,10 +87,26 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "proposal-mode": "callable",
         "dataset-id": "buchwald_hartwig",
         "iterations": 1,
-        "reservoir-size": 4,
+        "reservoir-size": 64,
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
     }
     assert config["env"] == {"LDM_DATA_COLLECTION_ENABLED": "1"}
     assert "--mock" in plan["argv"]
     assert "--proposal-mode" in plan["argv"]
+
+
+def test_profile_allows_a_custom_internal_reservoir_size(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    config_path = CONFIG_ROOT / "real_smoke.yaml"
+    config = load_config(config_path)
+    config["args"] = {**config["args"], "reservoir-size": 7}
+
+    plan = build_plan(config, config_path)
+
+    assert plan["contract_profile"] == "ldm_official_smoke"
+    assert "--reservoir-size" in plan["argv"]
+    assert "7" in plan["argv"]
