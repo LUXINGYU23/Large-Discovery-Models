@@ -1,9 +1,12 @@
-# Iron Mind：首次运行指南
+# Iron Mind: First Run Guide
 
-本指南从一个干净 checkout 开始，依次完成 mock、冻结数据准备、端点配置和一次真实
-smoke。所有命令从仓库根目录执行。
+This guide starts from a clean checkout and verifies the task in the same
+order used for a reproducible release: local mock campaign, official data
+preparation, endpoint configuration, and one real smoke run.
 
-## 1. 安装并验证 mock
+Run every command from the repository root.
+
+## 1. Install and Verify the Mock Campaign
 
 ```bash
 uv sync --locked --project tasks/iron_mind
@@ -13,11 +16,11 @@ uv run --locked --project tasks/iron_mind \
   python scripts/run_ldm_tts.py config/iron_mind/mock.yaml
 ```
 
-mock 不需要外部数据、GPU 或模型端点。
+The mock path needs no external data, GPU, or model endpoint.
 
-## 2. 配置模型服务
+## 2. Configure a Model Endpoint
 
-真实运行需要一个 OpenAI-compatible Chat Completions 服务：
+Real runs require an OpenAI-compatible Chat Completions endpoint:
 
 ```bash
 export LLM_BASE_URL=https://your-model-host.example/v1
@@ -25,10 +28,12 @@ export LLM_MODEL_NAME=your-served-model
 export LLM_API_KEY=your-api-key
 ```
 
-本地服务如不要求鉴权，可省略 `LLM_API_KEY`。服务地址和模型名会写入运行配置，密钥
-不会写入 YAML 或运行产物。
+The task accepts any compatible provider. The committed configuration files
+leave these values unset, so users can select a provider through their own
+environment. For a local endpoint without authentication, omit
+`LLM_API_KEY`.
 
-## 3. 准备数据
+## 3. Prepare the Source-Pinned Data
 
 ```bash
 export IRON_MIND_WORK_ROOT=/absolute/path/to/iron-mind-work
@@ -52,7 +57,7 @@ uv run --locked --project tasks/iron_mind python \
   --output "$IRON_MIND_DATA_ROOT"
 ```
 
-## 4. 运行 smoke
+## 4. Run One Real Round
 
 ```bash
 uv run --locked --project tasks/iron_mind python \
@@ -62,5 +67,11 @@ uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/real_smoke.yaml
 ```
 
-成功后，结果位于 `$IRON_MIND_RUNS_ROOT/smoke/` 下的带时间戳目录。确认端点可用后，
-再运行 `config/iron_mind/ldm_20_<dataset>.yaml` 或 suite 配置。
+A successful run writes a timestamped directory below
+`$IRON_MIND_RUNS_ROOT/smoke/`. The released profile produces four internal
+proposals, ranks them with the task GP selector, and evaluates one reaction
+condition. That one external evaluation is the Iron Mind-compatible batch
+size.
+
+After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
+campaign or a suite configuration for the full benchmark.
