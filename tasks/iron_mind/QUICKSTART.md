@@ -75,6 +75,33 @@ That one external evaluation is the Iron Mind-compatible batch size.
 Malformed or duplicate responses are recorded and can reduce the admitted
 reservoir.
 
+The default `portfolio_v1` prompt assigns a distinct factor focus to every
+request and records the policy, slot role, focus, and prompt digest in the run
+events. To run the frozen earlier unallocated prompt as an ablation, use:
+
+```bash
+uv run --locked python scripts/run_ldm_tts.py config/iron_mind/prompt_baseline_smoke.yaml
+```
+
+For a full baseline campaign, override both the contract profile and policy on
+an `ldm_20_<dataset>.yaml` configuration:
+
+```bash
+--set contract_profile=ldm_prompt_baseline_20 --set args.prompt-policy=baseline_v1
+```
+
+If a provider supports OpenAI-compatible JSON mode, add
+`--set args.llm-json-mode=true`; this is an optional formatting aid, not a
+provider requirement. Provider-specific request fields can be supplied without
+editing a tracked config, for example:
+
+```bash
+--set 'args.llm-extra-body-json={"thinking":{"type":"disabled"}}'
+```
+
+This example disables DeepSeek V4 thinking for proposal-only generation; other
+OpenAI-compatible providers can use their own documented request object.
+
 After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
 campaign or a suite configuration for the full benchmark. Set
 `--set args.reservoir-size=<N>` when running the shared runner to change the

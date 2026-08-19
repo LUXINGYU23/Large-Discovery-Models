@@ -26,7 +26,12 @@ from tasks.iron_mind.core.schema import (
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SUPPORTED_REAL_PROFILES = frozenset(
-    {"ldm_official_smoke", "ldm_official_20"}
+    {
+        "ldm_official_smoke",
+        "ldm_official_20",
+        "ldm_prompt_baseline_smoke",
+        "ldm_prompt_baseline_20",
+    }
 )
 
 

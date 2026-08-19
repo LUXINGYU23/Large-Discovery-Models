@@ -38,6 +38,8 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
     assert task_spec.metadata["proposal_max_workers"] == 64
     assert task_spec.metadata["proposal_transport"] == "openai_chat_completions_single_choice"
     assert task_spec.metadata["sampling_mode"] == "local_concurrent_independent_requests"
+    assert task_spec.metadata["prompt_policy"] == "portfolio_v1"
+    assert task_spec.metadata["prompt_version"] == "portfolio_v1"
     assert task_spec.surrogate.dimension == 47
     assert task_spec.acquisition.objective_names == ("reaction_score",)
     assert task_spec.acquisition.parameters == {
@@ -103,6 +105,8 @@ def test_mock_campaign_runs_one_shared_engine_round(
         "result": "result.json",
         "trajectory": "trajectory.csv",
     }
+    events = (run_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert '"prompt_policy": "portfolio_v1"' in events
 
 
 def test_describe_ldm_task_accepts_a_custom_reservoir_size() -> None:

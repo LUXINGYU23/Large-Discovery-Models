@@ -62,6 +62,32 @@ Responses are processed independently. The task records malformed responses,
 and the shared reservoir builder performs source validation and duplicate
 removal, so the admitted reservoir can be smaller than requested.
 
+## Proposal Prompt Policy
+
+Released configurations use `portfolio_v1`. It gives every independently
+issued request a deterministic, distinct focus over enough high-cardinality
+reaction factors to cover the configured reservoir. The model must preserve its
+assigned focus, then uses chemical knowledge and the observed history to choose
+the remaining factors under one of four roles: evidence exploitation,
+counterfactual probing, underexplored coverage, or mechanistic divergence.
+
+The policy only shapes the internal candidate reservoir. The factor-aware
+categorical GP-UCB remains the only ranker, and the frozen table remains the
+only evaluator. `baseline_v1` is the frozen earlier unallocated one-candidate
+prompt, available through `config/iron_mind/prompt_baseline_smoke.yaml` and the
+`ldm_prompt_baseline_20` contract profile. Campaign artifacts record the policy,
+per-request role and focus, and a digest of the rendered prompt.
+
+For a 20-evaluation baseline ablation, keep a dataset configuration unchanged
+except for the paired profile and policy override:
+
+```bash
+uv run --locked python scripts/run_ldm_tts.py \
+  config/iron_mind/ldm_20_reductive_amination.yaml \
+  --set contract_profile=ldm_prompt_baseline_20 \
+  --set args.prompt-policy=baseline_v1
+```
+
 ## Quick Start
 
 Run these commands from the repository root:
@@ -95,10 +121,18 @@ override the environment. `LLM_API_KEY` may be omitted for a local endpoint
 that does not require authentication. The provider settings are recorded
 without persisting the API key.
 
-The default `--llm-max-tokens` is 512, sized for a one-candidate completion.
-Raise it only when a selected model needs more room to produce the required JSON.
+The default `--llm-max-tokens` is 512, sized for a one-candidate non-thinking
+completion. Raise it only when a selected model needs more room to produce the
+required JSON.
 Set `--proposal-max-workers` to the endpoint's supported client-side
 concurrency when needed; it does not change the number of candidates requested.
+Use `--llm-json-mode` only when the selected OpenAI-compatible provider supports
+`response_format={"type":"json_object"}`. It is optional and does not change
+the proposal policy or benchmark budget. For provider-specific request fields,
+pass a JSON object through `--llm-extra-body-json`; it is merged into the
+OpenAI-compatible request body without changing the committed configuration. For
+example, a DeepSeek V4 proposal-only run can disable its default thinking mode
+with `--llm-extra-body-json='{"thinking":{"type":"disabled"}}'`.
 
 ## Prepare the Official Data
 

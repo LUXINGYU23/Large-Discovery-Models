@@ -19,6 +19,7 @@ from ldm_tts.transport import CallableProposalClient, ProposalRequest, ProposalR
 from tasks.iron_mind.core import proposals
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
+from tasks.iron_mind.core.prompting import BASELINE_PROMPT_POLICY
 from tasks.iron_mind.core.proposals import (
     IronMindProposalExpander,
     build_openai_reaction_client,
@@ -171,8 +172,16 @@ def test_callable_and_endpoint_clients_share_the_same_strict_parser() -> None:
         lambda request: _response(payloads[int(request.metadata["proposal_index"])])
     )
     endpoint_client = IndexedProposalClient(payloads)
-    callable_result = IronMindProposalExpander(callable_client, _domain()).expand(_request())
-    endpoint_result = IronMindProposalExpander(endpoint_client, _domain()).expand(_request())
+    callable_result = IronMindProposalExpander(
+        callable_client,
+        _domain(),
+        prompt_policy=BASELINE_PROMPT_POLICY,
+    ).expand(_request())
+    endpoint_result = IronMindProposalExpander(
+        endpoint_client,
+        _domain(),
+        prompt_policy=BASELINE_PROMPT_POLICY,
+    ).expand(_request())
 
     assert [proposal.payload for proposal in callable_result.proposals] == [
         proposal.payload for proposal in endpoint_result.proposals
@@ -187,7 +196,12 @@ def test_openai_path_executes_independent_requests_with_local_workers(
     client = BarrierProposalClient(_candidate_payloads())
     monkeypatch.setattr(proposals, "_can_parallelize", lambda _client: True)
 
-    result = IronMindProposalExpander(client, _domain(), max_workers=2).expand(_request())
+    result = IronMindProposalExpander(
+        client,
+        _domain(),
+        max_workers=2,
+        prompt_policy=BASELINE_PROMPT_POLICY,
+    ).expand(_request())
 
     assert len(result.proposals) == TEST_CANDIDATE_COUNT
     assert len(result.attempts) == TEST_CANDIDATE_COUNT
@@ -225,6 +239,7 @@ def test_before_requests_is_consumed_once_with_the_full_request_count() -> None:
         IndexedProposalClient(_candidate_payloads()),
         _domain(),
         before_requests=calls.append,
+        prompt_policy=BASELINE_PROMPT_POLICY,
     )
     mock = IronMindProposalExpander(
         CallableProposalClient(
@@ -233,6 +248,7 @@ def test_before_requests_is_consumed_once_with_the_full_request_count() -> None:
             )
         ),
         _domain(),
+        prompt_policy=BASELINE_PROMPT_POLICY,
     )
 
     endpoint.expand(_request())
@@ -264,10 +280,15 @@ def test_request_contains_schema_observations_and_independent_slot() -> None:
     assert "reaction_score" in content
     assert candidate.canonical_key in content
     assert "Independent proposal slot: 3 of 4" in content
+    assert '"direction":"maximize"' in content
+    assert "Proposal policy: portfolio_v1." in content
+    assert "Required slot focus (hard allocation):" in content
     assert "Return exactly one" in content
-    assert json.dumps(_candidate_payloads()[0], ensure_ascii=False, separators=(",", ":")) in content
     assert request.metadata["sampling_mode"] == "local_concurrent_independent_requests"
     assert request.metadata["proposal_index"] == 2
+    assert request.metadata["prompt_policy"] == "portfolio_v1"
+    assert request.metadata["proposal_role"] == "underexplored_coverage"
+    assert len(request.metadata["prompt_sha256"]) == 64
     assert "api_key" not in request.metadata
 
 
@@ -280,6 +301,7 @@ def test_request_uses_the_runtime_reservoir_size() -> None:
     content = "\n".join(message["content"] for message in request.messages)
 
     assert request.metadata["proposal_count"] == 64
+    assert request.metadata["slot_focus_capacity"] >= 64
     assert "Independent proposal slot: 64 of 64" in content
 
 
@@ -295,3 +317,28 @@ def test_openai_client_uses_the_standard_chat_completion_contract() -> None:
     assert client.max_retries == 0
     assert client.require_models_preflight is False
     assert client.extra_body == {}
+
+    json_client = build_openai_reaction_client(
+        base_url="https://example.invalid/v1",
+        model="test-model",
+        api_key="",
+        timeout_seconds=10.0,
+        max_tokens=256,
+        json_mode=True,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+
+    assert json_client.extra_body == {
+        "thinking": {"type": "disabled"},
+        "response_format": {"type": "json_object"},
+    }
+    with pytest.raises(ValueError, match="cannot be combined"):
+        build_openai_reaction_client(
+            base_url="https://example.invalid/v1",
+            model="test-model",
+            api_key="",
+            timeout_seconds=10.0,
+            max_tokens=256,
+            json_mode=True,
+            extra_body={"response_format": {"type": "text"}},
+        )

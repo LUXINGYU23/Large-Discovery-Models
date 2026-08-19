@@ -35,6 +35,7 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert config["args"]["evaluations-per-round"] == 1
     assert config["args"]["llm-temperature"] == 0.7
     assert config["args"]["llm-max-tokens"] == 512
+    assert config["args"]["prompt-policy"] == "portfolio_v1"
     assert str(data_root) in plan["argv"]
     assert str(runs_root / "smoke") in plan["argv"]
     assert config["args"]["llm-url"] is None
@@ -75,6 +76,7 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
         assert config["args"]["llm-max-tokens"] == 512
+        assert config["args"]["prompt-policy"] == "portfolio_v1"
         assert config["args"]["llm-url"] is None
         assert config["args"]["llm-model-name"] is None
         assert config["args"]["api-key"] is None
@@ -98,10 +100,28 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "proposal-max-workers": 64,
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
+        "prompt-policy": "portfolio_v1",
     }
     assert config["env"] == {"LDM_DATA_COLLECTION_ENABLED": "1"}
     assert "--mock" in plan["argv"]
     assert "--proposal-mode" in plan["argv"]
+
+
+def test_prompt_baseline_smoke_has_its_own_locked_ablation_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    config_path = CONFIG_ROOT / "prompt_baseline_smoke.yaml"
+    config = load_config(config_path)
+    plan = build_plan(config, config_path)
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+    profile = contract.profile("ldm_prompt_baseline_smoke")
+
+    assert plan["contract_profile"] == "ldm_prompt_baseline_smoke"
+    assert profile.budget["external_evaluations"] == 1
+    assert config["args"]["prompt-policy"] == "baseline_v1"
+    assert "baseline_v1" in plan["argv"]
 
 
 def test_profile_allows_a_custom_internal_reservoir_size(

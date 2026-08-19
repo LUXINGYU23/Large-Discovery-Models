@@ -164,7 +164,7 @@ def test_duplicate_endpoint_responses_are_deduplicated_by_the_shared_reservoir(
         lambda **_kwargs: StaticEndpoint(),
         raising=False,
     )
-    code = main(_endpoint_args(tmp_path, "duplicates"))
+    code = main(_endpoint_args(tmp_path, "duplicates", prompt_policy="baseline_v1"))
 
     payload = json.loads(capsys.readouterr().out)
     run_dir = Path(payload["run_dir"])
@@ -180,7 +180,12 @@ def test_duplicate_endpoint_responses_are_deduplicated_by_the_shared_reservoir(
     assert '"duplicate"' in events
 
 
-def _endpoint_args(tmp_path: Path, run_name: str) -> list[str]:
+def _endpoint_args(
+    tmp_path: Path,
+    run_name: str,
+    *,
+    prompt_policy: str = "portfolio_v1",
+) -> list[str]:
     return [
         "--mock",
         "--proposal-mode",
@@ -193,6 +198,8 @@ def _endpoint_args(tmp_path: Path, run_name: str) -> list[str]:
         str(tmp_path),
         "--run-name",
         run_name,
+        "--prompt-policy",
+        prompt_policy,
     ]
 
 

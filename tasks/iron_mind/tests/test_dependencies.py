@@ -199,6 +199,16 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path:
     assert "SHA-256" in table_check.message
 
 
+def test_prompt_baseline_profiles_use_the_same_official_source_gate(tmp_path: Path) -> None:
+    resources, data_root, _data_path = _dependency_fixture(tmp_path)
+
+    for profile in ("ldm_prompt_baseline_smoke", "ldm_prompt_baseline_20"):
+        checks = _real_checks(resources, data_root, profile=profile)
+
+        assert checks[0].name == "official source gate"
+        assert checks[0].status == "ok"
+
+
 def test_unsupported_profile_fails_before_data_access(tmp_path: Path) -> None:
     resources, data_root, _data_path = _dependency_fixture(tmp_path)
 

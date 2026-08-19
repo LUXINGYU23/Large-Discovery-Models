@@ -24,6 +24,7 @@ from ldm_tts.transport import ProposalClient
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
+from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
 from tasks.iron_mind.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
     IronMindProposalExpander,
@@ -50,6 +51,7 @@ class CampaignComponentOptions:
     proposal_max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS
     before_requests: Callable[[int], None] | None = None
     acquisition_beta: float = 1.0
+    prompt_policy: str = DEFAULT_PROMPT_POLICY
 
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
@@ -60,6 +62,7 @@ class CampaignComponentOptions:
             raise ValueError("Proposal max workers must be positive.")
         if not math.isfinite(self.acquisition_beta) or self.acquisition_beta < 0:
             raise ValueError("Acquisition beta must be finite and non-negative.")
+        validate_prompt_policy(self.prompt_policy)
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         selector.describe(),
         options.reservoir_size,
         options.proposal_max_workers,
+        options.prompt_policy,
     )
     domain = IronMindCandidateDomain(
         options.schema,
@@ -101,6 +105,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         domain,
         before_requests=options.before_requests,
         max_workers=options.proposal_max_workers,
+        prompt_policy=options.prompt_policy,
     )
     evaluator = FrozenReactionEvaluator(options.table)
     engine = LDMEngine(
@@ -120,6 +125,7 @@ def build_reaction_task_spec(
     acquisition: AcquisitionSpec,
     reservoir_size: int,
     proposal_max_workers: int,
+    prompt_policy: str = DEFAULT_PROMPT_POLICY,
 ) -> LDMTaskSpec:
     """Describe one fixed-schema reaction search with a configurable reservoir."""
 
@@ -127,6 +133,7 @@ def build_reaction_task_spec(
         raise ValueError("Reservoir size must be positive.")
     if proposal_max_workers < 1:
         raise ValueError("Proposal max workers must be positive.")
+    prompt_policy = validate_prompt_policy(prompt_policy)
 
     return LDMTaskSpec(
         task=TASK_ID,
@@ -155,6 +162,8 @@ def build_reaction_task_spec(
             "proposal_max_workers": proposal_max_workers,
             "proposal_transport": "openai_chat_completions_single_choice",
             "sampling_mode": "local_concurrent_independent_requests",
+            "prompt_policy": prompt_policy,
+            "prompt_version": prompt_policy,
         },
     )
 

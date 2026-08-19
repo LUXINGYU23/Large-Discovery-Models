@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 from pathlib import Path
 from typing import Any
 
@@ -35,11 +34,11 @@ from tasks.iron_mind.core.mock import (
     mock_proposal_response,
 )
 from tasks.iron_mind.core.proposals import (
-    DEFAULT_PROPOSAL_MAX_WORKERS,
     build_openai_reaction_client,
 )
 from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
+    parse_openai_extra_body_json,
     resolve_openai_provider_settings,
 )
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
@@ -51,43 +50,12 @@ from tasks.iron_mind.core.workflow_support import (
     jsonable_args,
     load_campaign_state,
 )
+from tasks.iron_mind.core.workflow_args import parse_args, validate_args
 
 TASK_ID = "iron_mind"
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
-DEFAULT_RESERVOIR_SIZE = 64
-DEFAULT_LLM_MAX_TOKENS = 512
-
-
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
-    parser.add_argument("--mock", action="store_true")
-    parser.add_argument("--proposal-mode", choices=("callable", "openai"), default="callable")
-    parser.add_argument("--dataset-id", default="buchwald_hartwig")
-    parser.add_argument("--iterations", type=int, default=1)
-    parser.add_argument("--reservoir-size", type=int, default=DEFAULT_RESERVOIR_SIZE)
-    parser.add_argument(
-        "--proposal-max-workers",
-        type=int,
-        default=DEFAULT_PROPOSAL_MAX_WORKERS,
-    )
-    parser.add_argument("--evaluations-per-round", type=int, default=1)
-    parser.add_argument("--acquisition-beta", type=float, default=1.0)
-    parser.add_argument("--out-dir", type=Path, default=Path("runs"))
-    parser.add_argument("--run-name", default="")
-    parser.add_argument("--resume-from", type=Path)
-    parser.add_argument("--data-dir", type=Path)
-    parser.add_argument("--llm-url")
-    parser.add_argument("--llm-model-name")
-    parser.add_argument("--api-key")
-    parser.add_argument("--llm-timeout", type=float, default=120.0)
-    parser.add_argument("--llm-max-tokens", type=int, default=DEFAULT_LLM_MAX_TOKENS)
-    parser.add_argument("--llm-temperature", type=float, default=0.7)
-    parser.add_argument("--campaign-index", type=int, default=0)
-    parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args(argv)
-
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
     """Describe the configured reaction task before campaign assembly."""
 
@@ -107,11 +75,12 @@ def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTa
         selector.describe(),
         args.reservoir_size,
         args.proposal_max_workers,
+        args.prompt_policy,
     )
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    _validate_args(args)
+    validate_args(args)
     table = _load_table(args)
     task_spec = _task_spec(args, table.schema)
     contract, profile_name = load_active_experiment_contract()
@@ -154,6 +123,7 @@ def _run_campaign(
             proposal_max_workers=args.proposal_max_workers,
             before_requests=before_requests,
             acquisition_beta=args.acquisition_beta,
+            prompt_policy=args.prompt_policy,
         )
     )
     return _finish_campaign(args, components, runtime, payload)
@@ -184,27 +154,7 @@ def _finish_campaign(
     payload.update(engine_summary=result.summary, run_dir=str(runtime.run_dir.resolve()))
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if result.summary["successful_evaluation_count"] else 1
-def _validate_args(args: argparse.Namespace) -> None:
-    if args.iterations < 0:
-        raise SystemExit("--iterations must be non-negative")
-    if args.reservoir_size < 1:
-        raise SystemExit("--reservoir-size must be positive")
-    if args.proposal_max_workers < 1:
-        raise SystemExit("--proposal-max-workers must be positive")
-    if args.evaluations_per_round != 1:
-        raise SystemExit("Iron Mind requires --evaluations-per-round=1")
-    if args.acquisition_beta < 0:
-        raise SystemExit("--acquisition-beta must be non-negative")
-    if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
-        raise SystemExit("--llm-temperature must be finite and between 0 and 2")
-    if args.campaign_index < 0:
-        raise SystemExit("--campaign-index must be non-negative")
-    if args.mock and args.dataset_id != "buchwald_hartwig":
-        raise SystemExit("Mock campaigns require --dataset-id=buchwald_hartwig")
-    if not args.mock and args.proposal_mode != "openai":
-        raise SystemExit("Non-mock Iron Mind campaigns require --proposal-mode=openai")
-    if not args.mock and args.data_dir is None:
-        raise SystemExit("Non-mock Iron Mind campaigns require --data-dir")
+_validate_args = validate_args
 
 def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha256: str, profile_name: str) -> dict[str, Any]:
     return {
@@ -287,6 +237,8 @@ def _proposal_client(
         timeout_seconds=args.llm_timeout,
         max_tokens=args.llm_max_tokens,
         temperature=args.llm_temperature,
+        json_mode=args.llm_json_mode,
+        extra_body=parse_openai_extra_body_json(args.llm_extra_body_json),
     )
 
 def _preflight_endpoint(

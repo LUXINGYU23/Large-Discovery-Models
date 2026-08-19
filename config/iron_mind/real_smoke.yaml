@@ -20,6 +20,7 @@ args:
   llm-timeout: 120.0
   llm-max-tokens: 512
   llm-temperature: 0.7
+  prompt-policy: portfolio_v1
   out-dir: ${IRON_MIND_RUNS_ROOT}/smoke
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

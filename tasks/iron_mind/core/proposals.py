@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -14,6 +14,15 @@ from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
+from tasks.iron_mind.core.prompting import (
+    DEFAULT_PROMPT_POLICY,
+    ProposalSlotPlan,
+    build_reaction_prompt_messages,
+    build_slot_plan,
+    prompt_sha256,
+    validate_prompt_policy,
+    validate_slot_focus,
+)
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 
@@ -26,6 +35,7 @@ DEFAULT_PROPOSAL_MAX_WORKERS = 64
 class ParsedReactionProposal:
     proposal_index: int
     payload: dict[str, Any]
+    slot_plan: ProposalSlotPlan | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +63,7 @@ class IronMindProposalExpander:
         *,
         before_requests: Callable[[int], None] | None = None,
         max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
+        prompt_policy: str = DEFAULT_PROMPT_POLICY,
     ) -> None:
         if max_workers < 1:
             raise ValueError("proposal max_workers must be positive")
@@ -60,15 +71,26 @@ class IronMindProposalExpander:
         self.domain = domain
         self.before_requests = before_requests
         self.max_workers = max_workers
+        self.prompt_policy = validate_prompt_policy(prompt_policy)
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         """Launch one request per candidate and return a strict reservoir."""
 
+        slot_plans = tuple(
+            build_slot_plan(
+                request,
+                self.domain.schema,
+                proposal_index=index,
+                policy=self.prompt_policy,
+            )
+            for index in range(request.reservoir_size)
+        )
         proposal_requests = tuple(
             build_reaction_proposal_request(
                 request,
                 self.domain.schema,
                 proposal_index=index,
+                slot_plan=slot_plans[index],
             )
             for index in range(request.reservoir_size)
         )
@@ -78,6 +100,7 @@ class IronMindProposalExpander:
         parsed = parse_reaction_responses(
             responses,
             candidate_count=request.reservoir_size,
+            slot_plans=slot_plans,
         )
         return ExpansionResult(
             proposals=tuple(
@@ -89,6 +112,10 @@ class IronMindProposalExpander:
                         "round_idx": request.round_idx,
                         "proposal_index": item.proposal_index,
                         "sampling_mode": SAMPLING_MODE,
+                        **_slot_plan_metadata(item.slot_plan),
+                        "prompt_sha256": proposal_requests[item.proposal_index].metadata[
+                            "prompt_sha256"
+                        ],
                     },
                 )
                 for item in parsed.proposals
@@ -99,6 +126,8 @@ class IronMindProposalExpander:
                 responses,
                 self.max_workers,
                 parsed.errors,
+                self.prompt_policy,
+                slot_plans,
             ),
         )
 
@@ -121,6 +150,8 @@ def build_openai_reaction_client(
     timeout_seconds: float,
     max_tokens: int,
     temperature: float = 0.7,
+    json_mode: bool = False,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> OpenAICompatibleProposalClient:
     """Build the shared OpenAI-compatible transport for a real campaign."""
 
@@ -132,6 +163,7 @@ def build_openai_reaction_client(
         max_tokens=max_tokens,
         temperature=temperature,
         max_retries=0,
+        extra_body=_request_extra_body(json_mode, extra_body),
         require_models_preflight=False,
     )
 
@@ -141,44 +173,28 @@ def build_reaction_proposal_request(
     schema: ReactionDatasetSchema,
     *,
     proposal_index: int,
+    prompt_policy: str = DEFAULT_PROMPT_POLICY,
+    slot_plan: ProposalSlotPlan | None = None,
 ) -> ProposalRequest:
     """Build one independent one-candidate proposal request."""
 
     proposal_count = _candidate_count(request.reservoir_size)
     if proposal_index < 0 or proposal_index >= proposal_count:
         raise ValueError("proposal index must be inside the requested reservoir")
-    factors = [
-        {
-            "name": factor.name,
-            "type": factor.parameter_type,
-            "options": list(factor.options),
-        }
-        for factor in schema.factors
-    ]
-    content = "\n".join(
-        (
-            "Task: propose one source-valid finite reaction condition.",
-            f"Dataset ID: {schema.dataset_id}",
-            f"Schema SHA-256: {schema.schema_sha256}",
-            f"Independent proposal slot: {proposal_index + 1} of {proposal_count}.",
-            "Allowed factors and exact options: " + _json_text(factors),
-            "Observed evaluations: " + _json_text(_proposal_observations(request.observations)),
-            "Do-not-repeat canonical keys: " + _json_text(_do_not_repeat_keys(request)),
-            "Return exactly one source-valid candidate as one complete JSON object.",
-            "The JSON root must contain only dataset_id and conditions.",
-            "Required JSON object: " + _json_text(_candidate_example(schema)),
-            "Use only the exact typed options shown above; every factor must appear only inside conditions.",
-            "Do not return markdown, prose, scores, ids, or extra fields.",
-        )
+    plan = slot_plan or build_slot_plan(
+        request,
+        schema,
+        proposal_index=proposal_index,
+        policy=prompt_policy,
+    )
+    messages = build_reaction_prompt_messages(
+        request,
+        schema,
+        plan,
+        proposal_index=proposal_index,
     )
     return ProposalRequest(
-        messages=(
-            {
-                "role": "system",
-                "content": "You propose reaction conditions under an exact source-pinned schema.",
-            },
-            {"role": "user", "content": content},
-        ),
+        messages=messages,
         metadata={
             "round_idx": request.round_idx,
             "dataset_id": schema.dataset_id,
@@ -186,6 +202,8 @@ def build_reaction_proposal_request(
             "proposal_index": proposal_index,
             "proposal_count": proposal_count,
             "sampling_mode": SAMPLING_MODE,
+            "prompt_sha256": prompt_sha256(messages),
+            **plan.metadata(),
         },
     )
 
@@ -194,6 +212,7 @@ def parse_reaction_responses(
     responses: Sequence[ProposalResponse],
     *,
     candidate_count: int,
+    slot_plans: Sequence[ProposalSlotPlan] | None = None,
 ) -> ParsedReactionResponses:
     """Parse each independent response without discarding valid peers."""
 
@@ -202,15 +221,20 @@ def parse_reaction_responses(
         raise ValueError(
             f"proposal expansion must return exactly {candidate_count} responses."
         )
+    if slot_plans is not None and len(slot_plans) != candidate_count:
+        raise ValueError("proposal slot plans must match the requested candidate count.")
     proposals = []
     errors = []
     for index, response in enumerate(responses, start=1):
         try:
             payload = parse_reaction_response(response.text, index=index)
+            slot_plan = None if slot_plans is None else slot_plans[index - 1]
+            if slot_plan is not None:
+                validate_slot_focus(payload, slot_plan)
         except ValueError as exc:
             errors.append(ResponseParseError(index - 1, str(exc)))
             continue
-        proposals.append(ParsedReactionProposal(index - 1, payload))
+        proposals.append(ParsedReactionProposal(index - 1, payload, slot_plan))
     return ParsedReactionResponses(tuple(proposals), tuple(errors))
 
 
@@ -236,6 +260,8 @@ def _expansion_metadata(
     responses: Sequence[ProposalResponse],
     max_workers: int,
     parse_errors: Sequence[ResponseParseError] = (),
+    prompt_policy: str = DEFAULT_PROMPT_POLICY,
+    slot_plans: Sequence[ProposalSlotPlan] = (),
 ) -> dict[str, Any]:
     metadata = {
         "mode": "proposal_client",
@@ -244,6 +270,8 @@ def _expansion_metadata(
         "request_count": request.reservoir_size,
         "response_count": len(responses),
         "max_workers": min(max_workers, request.reservoir_size),
+        "prompt_policy": prompt_policy,
+        "proposal_role_counts": _slot_role_counts(slot_plans),
     }
     if parse_errors:
         metadata["invalid_response_count"] = len(parse_errors)
@@ -253,6 +281,32 @@ def _expansion_metadata(
 
 def _can_parallelize(client: ProposalClient) -> bool:
     return isinstance(client, OpenAICompatibleProposalClient)
+
+
+def _request_extra_body(
+    json_mode: bool,
+    extra_body: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    body = dict(extra_body or {})
+    if not json_mode:
+        return body
+    if "response_format" in body:
+        raise ValueError(
+            "--llm-json-mode cannot be combined with response_format in --llm-extra-body-json."
+        )
+    body["response_format"] = {"type": "json_object"}
+    return body
+
+
+def _slot_plan_metadata(plan: ProposalSlotPlan | None) -> dict[str, Any]:
+    return {} if plan is None else plan.metadata()
+
+
+def _slot_role_counts(slot_plans: Sequence[ProposalSlotPlan]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for plan in slot_plans:
+        counts[plan.role] = counts.get(plan.role, 0) + 1
+    return counts
 
 
 def _load_complete_json_object(text: str) -> dict[str, Any]:
@@ -271,28 +325,3 @@ def _candidate_count(value: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("candidate count must be a positive integer.")
     return value
-
-
-def _candidate_example(schema: ReactionDatasetSchema) -> dict[str, Any]:
-    return {
-        "dataset_id": schema.dataset_id,
-        "conditions": {factor.name: factor.options[0] for factor in schema.factors},
-    }
-
-
-def _proposal_observations(observations: Sequence[Any]) -> list[dict[str, Any]]:
-    return [
-        {
-            "candidate": observation.candidate.payload,
-            "metrics": dict(observation.metrics),
-        }
-        for observation in observations
-    ]
-
-
-def _do_not_repeat_keys(request: ExpansionRequest) -> list[str]:
-    return sorted(item.canonical_key for item in request.observations)
-
-
-def _json_text(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))

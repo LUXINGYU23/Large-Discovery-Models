@@ -9,9 +9,11 @@ from itertools import product
 from pathlib import Path
 from types import MappingProxyType
 
+from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.transport import ProposalResponse
 
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
+from tasks.iron_mind.core.prompting import build_slot_plan
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 
@@ -54,10 +56,18 @@ def _expand_mock_rows(
     seed_rows: tuple[ReactionRow, ...],
     candidate_count: int,
 ) -> tuple[ReactionRow, ...]:
-    rows = list(seed_rows[:candidate_count])
-    known = {
-        tuple(row.conditions[name] for name in schema.factor_names) for row in rows
+    request = ExpansionRequest(round_idx=0, reservoir_size=candidate_count)
+    by_conditions = {
+        tuple(row.conditions[name] for name in schema.factor_names): row for row in seed_rows
     }
+    rows = []
+    known = set()
+    for index in range(candidate_count):
+        values = _portfolio_values(schema, request, index)
+        if values in known:
+            continue
+        rows.append(by_conditions.get(values) or _synthetic_mock_row(schema, len(rows) + 1, values))
+        known.add(values)
     for values in product(*(factor.options for factor in schema.factors)):
         if len(rows) == candidate_count:
             break
@@ -68,6 +78,16 @@ def _expand_mock_rows(
     if len(rows) != candidate_count:
         raise ValueError("Mock reservoir size exceeds the finite reaction domain.")
     return tuple(rows)
+
+
+def _portfolio_values(
+    schema: ReactionDatasetSchema,
+    request: ExpansionRequest,
+    proposal_index: int,
+) -> tuple[object, ...]:
+    plan = build_slot_plan(request, schema, proposal_index=proposal_index)
+    focus = plan.focus_payload()
+    return tuple(focus.get(factor.name, factor.options[0]) for factor in schema.factors)
 
 
 def mock_proposal_response(

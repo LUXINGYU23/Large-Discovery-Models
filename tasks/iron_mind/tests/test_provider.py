@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from tasks.iron_mind.core.provider import resolve_openai_provider_settings
+import pytest
+
+from tasks.iron_mind.core.provider import (
+    parse_openai_extra_body_json,
+    resolve_openai_provider_settings,
+)
 
 
 def test_primary_environment_names_precede_legacy_aliases() -> None:
@@ -40,3 +45,14 @@ def test_explicit_cli_provider_values_override_environment() -> None:
     assert settings.base_url == "https://cli.example/v1"
     assert settings.model == "cli-model"
     assert settings.api_key == "cli-key"
+
+
+def test_provider_extra_body_requires_a_json_object() -> None:
+    assert parse_openai_extra_body_json('{"thinking":{"type":"disabled"}}') == {
+        "thinking": {"type": "disabled"}
+    }
+
+    with pytest.raises(ValueError, match="not valid JSON"):
+        parse_openai_extra_body_json("{")
+    with pytest.raises(ValueError, match="JSON object"):
+        parse_openai_extra_body_json("[]")

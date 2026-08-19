@@ -67,13 +67,17 @@ def test_real_mode_connects_pinned_data_endpoint_and_shared_engine(
     assert calls["data_root"] == data_root
     assert calls["client"]["base_url"] == "https://example.invalid/v1"
     assert calls["client"]["model"] == "test-model"
+    assert calls["client"]["json_mode"] is False
+    assert calls["client"]["extra_body"] == {"thinking": {"type": "disabled"}}
     assert payload["engine_summary"]["successful_evaluation_count"] == 1
     assert campaign["contract_profile"] == "ldm_official_smoke"
     assert snapshot["snapshot"]["profile"] == "ldm_official_smoke"
     assert len(checkpoint["state"]["observations"]) == 1
     prompt = calls["proposal_request"].messages[1]["content"]
     assert "Do-not-repeat canonical keys: []" in prompt
+    assert "Required slot focus (hard allocation):" in prompt
     assert calls["proposal_request"].metadata["proposal_index"] == 3
+    assert calls["proposal_request"].metadata["prompt_policy"] == "portfolio_v1"
 
 
 def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
@@ -128,6 +132,11 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
             "512",
             "--llm-temperature",
             "0.7",
+            "--llm-json-mode",
+            "--llm-extra-body-json",
+            '{"thinking":{"type":"disabled"}}',
+            "--prompt-policy",
+            "baseline_v1",
             "--campaign-index",
             "3",
             "--acquisition-beta",
@@ -141,6 +150,9 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
     assert args.proposal_max_workers == 3
     assert args.api_key == "test-api-key"
     assert args.dry_run is True
+    assert args.llm_json_mode is True
+    assert args.llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
+    assert args.prompt_policy == "baseline_v1"
 
 
 def _install_real_fakes(monkeypatch, table, calls: dict[str, object]) -> None:
@@ -180,4 +192,6 @@ def _real_args(tmp_path: Path, data_root: Path) -> list[str]:
         str(tmp_path),
         "--run-name",
         "real-wiring",
+        "--llm-extra-body-json",
+        '{"thinking":{"type":"disabled"}}',
     ]

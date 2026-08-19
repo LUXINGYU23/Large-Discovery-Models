@@ -1,0 +1,87 @@
+"""CLI parsing and validation for the Iron Mind workflow."""
+
+from __future__ import annotations
+
+import argparse
+import math
+from pathlib import Path
+
+from tasks.iron_mind.core.prompting import (
+    DEFAULT_PROMPT_POLICY,
+    PROMPT_POLICIES,
+    validate_prompt_policy,
+)
+from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
+from tasks.iron_mind.core.provider import parse_openai_extra_body_json
+
+
+DEFAULT_RESERVOIR_SIZE = 64
+DEFAULT_LLM_MAX_TOKENS = 512
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse one public Iron Mind campaign invocation."""
+
+    parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
+    parser.add_argument("--mock", action="store_true")
+    parser.add_argument("--proposal-mode", choices=("callable", "openai"), default="callable")
+    parser.add_argument("--dataset-id", default="buchwald_hartwig")
+    parser.add_argument("--iterations", type=int, default=1)
+    parser.add_argument("--reservoir-size", type=int, default=DEFAULT_RESERVOIR_SIZE)
+    parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
+    parser.add_argument("--evaluations-per-round", type=int, default=1)
+    parser.add_argument("--acquisition-beta", type=float, default=1.0)
+    parser.add_argument("--out-dir", type=Path, default=Path("runs"))
+    parser.add_argument("--run-name", default="")
+    parser.add_argument("--resume-from", type=Path)
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--llm-url")
+    parser.add_argument("--llm-model-name")
+    parser.add_argument("--api-key")
+    parser.add_argument("--llm-timeout", type=float, default=120.0)
+    parser.add_argument("--llm-max-tokens", type=int, default=DEFAULT_LLM_MAX_TOKENS)
+    parser.add_argument("--llm-temperature", type=float, default=0.7)
+    parser.add_argument("--llm-json-mode", action="store_true")
+    parser.add_argument(
+        "--llm-extra-body-json",
+        default="",
+        help="Provider-specific JSON object merged into the OpenAI-compatible request body.",
+    )
+    parser.add_argument(
+        "--prompt-policy",
+        choices=tuple(sorted(PROMPT_POLICIES)),
+        default=DEFAULT_PROMPT_POLICY,
+    )
+    parser.add_argument("--campaign-index", type=int, default=0)
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args(argv)
+
+
+def validate_args(args: argparse.Namespace) -> None:
+    """Reject campaign options that violate the public task contract."""
+
+    if args.iterations < 0:
+        raise SystemExit("--iterations must be non-negative")
+    if args.reservoir_size < 1:
+        raise SystemExit("--reservoir-size must be positive")
+    if args.proposal_max_workers < 1:
+        raise SystemExit("--proposal-max-workers must be positive")
+    if args.evaluations_per_round != 1:
+        raise SystemExit("Iron Mind requires --evaluations-per-round=1")
+    if args.acquisition_beta < 0:
+        raise SystemExit("--acquisition-beta must be non-negative")
+    if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
+        raise SystemExit("--llm-temperature must be finite and between 0 and 2")
+    try:
+        validate_prompt_policy(args.prompt_policy)
+        parse_openai_extra_body_json(args.llm_extra_body_json)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.campaign_index < 0:
+        raise SystemExit("--campaign-index must be non-negative")
+    if args.mock and args.dataset_id != "buchwald_hartwig":
+        raise SystemExit("Mock campaigns require --dataset-id=buchwald_hartwig")
+    if not args.mock and args.proposal_mode != "openai":
+        raise SystemExit("Non-mock Iron Mind campaigns require --proposal-mode=openai")
+    if not args.mock and args.data_dir is None:
+        raise SystemExit("Non-mock Iron Mind campaigns require --data-dir")

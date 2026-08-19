@@ -11,5 +11,6 @@ args:
   proposal-max-workers: 64
   evaluations-per-round: 1
   acquisition-beta: 1.0
+  prompt-policy: portfolio_v1
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"
