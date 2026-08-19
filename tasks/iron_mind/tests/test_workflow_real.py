@@ -13,6 +13,7 @@ from ldm_tts.registration.experiment import (
 from ldm_tts.transport import ProposalResponse
 
 from tasks.iron_mind.core import workflow
+from tasks.iron_mind.core.mock import mock_proposal_response
 from tasks.iron_mind.core.workflow import main, parse_args
 
 
@@ -37,7 +38,10 @@ class StaticEndpoint:
 
     def propose(self, request) -> ProposalResponse:
         self.calls["proposal_request"] = request
-        return ProposalResponse(text=workflow._mock_response(self.table))
+        return mock_proposal_response(
+            self.table,
+            proposal_index=int(request.metadata["proposal_index"]),
+        )
 
 
 def test_real_mode_connects_pinned_data_endpoint_and_shared_engine(
@@ -69,6 +73,7 @@ def test_real_mode_connects_pinned_data_endpoint_and_shared_engine(
     assert len(checkpoint["state"]["observations"]) == 1
     prompt = calls["proposal_request"].messages[1]["content"]
     assert "Do-not-repeat canonical keys: []" in prompt
+    assert calls["proposal_request"].metadata["proposal_index"] == 3
 
 
 def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
@@ -99,6 +104,8 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
             "1",
             "--reservoir-size",
             "4",
+            "--proposal-max-workers",
+            "3",
             "--evaluations-per-round",
             "1",
             "--out-dir",
@@ -131,6 +138,7 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
 
     assert args.mock is True
     assert args.campaign_index == 3
+    assert args.proposal_max_workers == 3
     assert args.api_key == "test-api-key"
     assert args.dry_run is True
 

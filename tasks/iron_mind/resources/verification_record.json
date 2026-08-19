@@ -5,7 +5,7 @@
   "verified_on": "2026-08-19",
   "task_tests": {
     "status": "passed",
-    "passed": 83,
+    "passed": 86,
     "timeout_seconds": 60
   },
   "shared_transport_tests": {
@@ -38,38 +38,44 @@
     "reaction_score": 7.0,
     "benchmark_jobs": 1
   },
-  "real_smoke": {
+  "mock_campaign": {
     "status": "succeeded",
-    "contract_profile": "ldm_official_smoke",
-    "contract_sha256": "5e5f57bafed9838cb6a40d386ecfb05c89116ff22723c371cf86aba9c1c2dad1",
+    "proposal_strategy": "local_concurrent_independent_requests",
+    "reservoir_size": 64,
+    "proposal_max_workers": 64,
+    "proposal_attempts": 64,
+    "valid_search_candidates": 64,
+    "selected_candidates": 1,
+    "external_evaluations": 1
+  },
+  "provider_capability_probe": {
+    "status": "unsupported",
+    "feature": "OpenAI-compatible Chat Completions n > 1",
     "dataset_id": "reductive_amination",
     "model": "deepseek-v4-flash",
     "endpoint_preflight": "passed",
-    "selector": "reaction_categorical_ard_gp",
-    "proposal_strategy": "single_turn_batch_reservoir",
-    "reservoir_size": 64,
-    "effective_beta": 3.7307287435096277,
-    "valid_search_candidates": 64,
-    "selected_canonical_key": "fb79e663518c9bec6c200881acdbfe40a2bf918a277604485a8cca115ec680da",
-    "reaction_score": 0.0,
-    "budget": {
-      "outer_iterations": 1,
-      "llm_requests": 1,
-      "proposal_attempts": 1,
-      "valid_search_candidates": 64,
-      "selected_candidates": 1,
-      "external_evaluations": 1,
-      "expensive_evaluation_attempts": 1,
-      "successful_evaluations": 1,
-      "benchmark_jobs": 1
+    "requested_choice_count": 64,
+    "error": "HTTP 400 from OpenAI-compatible endpoint: Invalid n value (currently only n = 1 is supported)",
+    "selected_runtime_transport": "local_concurrent_independent_requests"
+  },
+  "local_concurrency_endpoint_smoke": {
+    "status": "succeeded",
+    "dataset_id": "reductive_amination",
+    "model": "deepseek-v4-flash",
+    "endpoint_preflight": "passed",
+    "reservoir_size": 4,
+    "proposal_max_workers": 4,
+    "llm_requests": 4,
+    "proposal_attempts": 4,
+    "valid_search_candidates": 1,
+    "reservoir_drop_counts": {
+      "duplicate": 3
     },
-    "secret_scan": "passed",
-    "artifact_sha256": {
-      "experiment_contract.json": "f0c6cbfeca5c7e91a899d2e68ed4b8c40f8bfda70613f04fcbf446d0fbc5bc75",
-      "budget.json": "aa803bd6b2c857551a2b0a3fa0adefbfc89c447901945a133a718bceb7030b0f",
-      "result.json": "4c2d914e4f78fa5189e20428dfa719d7f7bf097b737356d5478367d1af889dd0",
-      "selection_record.json": "704b8fa02deebd66bd3dd45061932ebc826bfcbba4463c982ccc8db6a13f8d37"
-    }
+    "selected_candidates": 1,
+    "external_evaluations": 1,
+    "successful_evaluations": 1,
+    "source_row_id": 1,
+    "reaction_score": 11.0
   },
   "suite_dry_runs": {
     "paper_v2_campaigns": 120,

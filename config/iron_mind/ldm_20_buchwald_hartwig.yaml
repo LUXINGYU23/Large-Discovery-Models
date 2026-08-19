@@ -9,6 +9,7 @@ args:
   dataset-id: buchwald_hartwig
   iterations: 20
   reservoir-size: 64
+  proposal-max-workers: 64
   evaluations-per-round: 1
   acquisition-beta: 1.0
   campaign-index: 0
@@ -17,7 +18,7 @@ args:
   llm-model-name: null
   api-key: null
   llm-timeout: 120.0
-  llm-max-tokens: 16384
+  llm-max-tokens: 512
   llm-temperature: 0.7
   out-dir: ${IRON_MIND_RUNS_ROOT}/official_complete
 env:

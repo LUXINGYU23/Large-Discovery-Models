@@ -8,6 +8,7 @@ args:
   dataset-id: buchwald_hartwig
   iterations: 1
   reservoir-size: 64
+  proposal-max-workers: 64
   evaluations-per-round: 1
   acquisition-beta: 1.0
 env:

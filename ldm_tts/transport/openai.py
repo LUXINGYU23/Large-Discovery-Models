@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, TypeVar
 
 from ldm_tts.transport import ProposalRequest, ProposalResponse
@@ -33,6 +34,12 @@ class EndpointCircuitBreaker:
     state: str = "closed"
     opened_at: float | None = None
     last_error: str = ""
+    _state_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         if self.failure_threshold < 1:
@@ -41,39 +48,43 @@ class EndpointCircuitBreaker:
             raise ValueError("recovery_timeout_seconds must be non-negative")
 
     def before_request(self, now: float | None = None) -> None:
-        now = time.monotonic() if now is None else float(now)
-        if self.state != "open":
-            return
-        opened_at = now if self.opened_at is None else self.opened_at
-        elapsed = now - float(opened_at)
-        if elapsed < self.recovery_timeout_seconds:
-            raise EndpointCircuitOpen(
-                f"Endpoint circuit is open after {self.consecutive_failures} failures: "
-                f"{self.last_error}"
-            )
-        self.state = "half_open"
+        with self._state_lock:
+            now = time.monotonic() if now is None else float(now)
+            if self.state != "open":
+                return
+            opened_at = now if self.opened_at is None else self.opened_at
+            elapsed = now - float(opened_at)
+            if elapsed < self.recovery_timeout_seconds:
+                raise EndpointCircuitOpen(
+                    f"Endpoint circuit is open after {self.consecutive_failures} failures: "
+                    f"{self.last_error}"
+                )
+            self.state = "half_open"
 
     def record_success(self) -> None:
-        self.consecutive_failures = 0
-        self.state = "closed"
-        self.opened_at = None
-        self.last_error = ""
+        with self._state_lock:
+            self.consecutive_failures = 0
+            self.state = "closed"
+            self.opened_at = None
+            self.last_error = ""
 
     def record_failure(self, error: BaseException, now: float | None = None) -> None:
-        self.consecutive_failures += 1
-        self.last_error = str(error)
-        if self.consecutive_failures >= self.failure_threshold:
-            self.state = "open"
-            self.opened_at = time.monotonic() if now is None else float(now)
+        with self._state_lock:
+            self.consecutive_failures += 1
+            self.last_error = str(error)
+            if self.consecutive_failures >= self.failure_threshold:
+                self.state = "open"
+                self.opened_at = time.monotonic() if now is None else float(now)
 
     def snapshot(self) -> dict[str, Any]:
-        return {
-            "state": self.state,
-            "failure_threshold": self.failure_threshold,
-            "recovery_timeout_seconds": self.recovery_timeout_seconds,
-            "consecutive_failures": self.consecutive_failures,
-            "last_error": self.last_error,
-        }
+        with self._state_lock:
+            return {
+                "state": self.state,
+                "failure_threshold": self.failure_threshold,
+                "recovery_timeout_seconds": self.recovery_timeout_seconds,
+                "consecutive_failures": self.consecutive_failures,
+                "last_error": self.last_error,
+            }
 
 
 ResultT = TypeVar("ResultT")

@@ -31,8 +31,10 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert profile.budget["external_evaluations"] == 1
     assert config["args"]["proposal-mode"] == "openai"
     assert config["args"]["reservoir-size"] == 64
+    assert config["args"]["proposal-max-workers"] == 64
     assert config["args"]["evaluations-per-round"] == 1
     assert config["args"]["llm-temperature"] == 0.7
+    assert config["args"]["llm-max-tokens"] == 512
     assert str(data_root) in plan["argv"]
     assert str(runs_root / "smoke") in plan["argv"]
     assert config["args"]["llm-url"] is None
@@ -52,7 +54,10 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
     public = load_config(CONFIG_ROOT / "public_union_ldm_20x20.yaml")
 
     assert profile.budget["external_evaluations"] == 20
-    assert profile.budget["llm_requests"] == 20
+    assert "llm_requests" not in profile.budget
+    assert "proposal_attempts" not in profile.budget
+    assert contract.budget["llm_requests"] == 1280
+    assert contract.budget["proposal_attempts"] == 1280
     assert "valid_search_candidates" not in profile.budget
     assert contract.budget["valid_search_candidates"] == 1280
     assert len(paper["experiments"]) == 6 * 20
@@ -67,7 +72,9 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         serialized = json.dumps(config)
         assert plan["contract_profile"] == "ldm_official_20"
         assert config["args"]["iterations"] == 20
+        assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
+        assert config["args"]["llm-max-tokens"] == 512
         assert config["args"]["llm-url"] is None
         assert config["args"]["llm-model-name"] is None
         assert config["args"]["api-key"] is None
@@ -88,6 +95,7 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "dataset-id": "buchwald_hartwig",
         "iterations": 1,
         "reservoir-size": 64,
+        "proposal-max-workers": 64,
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
     }

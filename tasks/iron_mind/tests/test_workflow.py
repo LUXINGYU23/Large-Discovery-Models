@@ -21,14 +21,23 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
 
     assert task_spec.task == "iron_mind"
     assert task_spec.candidate_domain.kind == "finite_reaction_conditions"
-    assert task_spec.response_spaces[0].schema["properties"]["candidates"] == {
-        "type": "array",
-        "minItems": 64,
-        "maxItems": 64,
+    assert task_spec.response_spaces[0].schema == {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["dataset_id", "conditions"],
+        "properties": {
+            "dataset_id": {"type": "string"},
+            "conditions": {"type": "object"},
+        },
     }
     assert task_spec.reservoir.max_size == 64
     assert task_spec.proposal_search.breadth == 64
+    assert task_spec.proposal_search.name == "parallel_independent_requests"
+    assert task_spec.proposal_search.parameters == {"max_workers": 64}
     assert task_spec.metadata["reservoir_size"] == 64
+    assert task_spec.metadata["proposal_max_workers"] == 64
+    assert task_spec.metadata["proposal_transport"] == "openai_chat_completions_single_choice"
+    assert task_spec.metadata["sampling_mode"] == "local_concurrent_independent_requests"
     assert task_spec.surrogate.dimension == 47
     assert task_spec.acquisition.objective_names == ("reaction_score",)
     assert task_spec.acquisition.parameters == {
@@ -73,7 +82,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
         "external_evaluations": 1,
         "llm_requests": 0,
         "outer_iterations": 1,
-        "proposal_attempts": 1,
+        "proposal_attempts": 64,
         "selected_candidates": 1,
         "successful_evaluations": 1,
         "valid_search_candidates": 64,
@@ -103,8 +112,8 @@ def test_describe_ldm_task_accepts_a_custom_reservoir_size() -> None:
 
     assert task_spec.reservoir.max_size == 7
     assert task_spec.proposal_search.breadth == 7
-    assert task_spec.response_spaces[0].schema["properties"]["candidates"] == {
-        "type": "array",
-        "minItems": 7,
-        "maxItems": 7,
-    }
+    assert task_spec.proposal_search.parameters == {"max_workers": 64}
+    assert task_spec.response_spaces[0].schema["required"] == [
+        "dataset_id",
+        "conditions",
+    ]

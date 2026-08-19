@@ -25,6 +25,7 @@ from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.proposals import (
+    DEFAULT_PROPOSAL_MAX_WORKERS,
     IronMindProposalExpander,
 )
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
@@ -46,7 +47,8 @@ class CampaignComponentOptions:
     sink: DataCollectionSink
     runtime: CampaignRuntime
     reservoir_size: int
-    before_request: Callable[[], None] | None = None
+    proposal_max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS
+    before_requests: Callable[[int], None] | None = None
     acquisition_beta: float = 1.0
 
     def __post_init__(self) -> None:
@@ -54,6 +56,8 @@ class CampaignComponentOptions:
             raise ValueError("Campaign table schema does not match the supplied schema.")
         if self.reservoir_size < 1:
             raise ValueError("Reservoir size must be positive.")
+        if self.proposal_max_workers < 1:
+            raise ValueError("Proposal max workers must be positive.")
         if not math.isfinite(self.acquisition_beta) or self.acquisition_beta < 0:
             raise ValueError("Acquisition beta must be finite and non-negative.")
 
@@ -85,6 +89,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         options.schema,
         selector.describe(),
         options.reservoir_size,
+        options.proposal_max_workers,
     )
     domain = IronMindCandidateDomain(
         options.schema,
@@ -94,7 +99,8 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     expander = IronMindProposalExpander(
         options.client,
         domain,
-        before_request=options.before_request,
+        before_requests=options.before_requests,
+        max_workers=options.proposal_max_workers,
     )
     evaluator = FrozenReactionEvaluator(options.table)
     engine = LDMEngine(
@@ -113,11 +119,14 @@ def build_reaction_task_spec(
     schema: ReactionDatasetSchema,
     acquisition: AcquisitionSpec,
     reservoir_size: int,
+    proposal_max_workers: int,
 ) -> LDMTaskSpec:
     """Describe one fixed-schema reaction search with a configurable reservoir."""
 
     if reservoir_size < 1:
         raise ValueError("Reservoir size must be positive.")
+    if proposal_max_workers < 1:
+        raise ValueError("Proposal max workers must be positive.")
 
     return LDMTaskSpec(
         task=TASK_ID,
@@ -129,19 +138,23 @@ def build_reaction_task_spec(
                 "Frozen-table reaction score; higher is better.",
             ),
         ),
-        response_spaces=(_reaction_response_space(reservoir_size),),
+        response_spaces=(_reaction_response_space(),),
         acquisition=acquisition,
-        reservoir=_reaction_reservoir_spec(reservoir_size),
+        reservoir=_reaction_reservoir_spec(reservoir_size, proposal_max_workers),
         surrogate=ReactionOneHotEncoder(schema).describe(),
         proposal_search=ProposalSearchSpec(
-            name="single_turn_batch_reservoir",
+            name="parallel_independent_requests",
             breadth=reservoir_size,
             evaluation_policy="acquisition_selected",
+            parameters={"max_workers": proposal_max_workers},
         ),
         metadata={
             "dataset_id": schema.dataset_id,
             "schema_sha256": schema.schema_sha256,
             "reservoir_size": reservoir_size,
+            "proposal_max_workers": proposal_max_workers,
+            "proposal_transport": "openai_chat_completions_single_choice",
+            "sampling_mode": "local_concurrent_independent_requests",
         },
     )
 
@@ -156,26 +169,29 @@ def _candidate_domain_spec(schema: ReactionDatasetSchema) -> CandidateDomainSpec
     )
 
 
-def _reaction_response_space(candidate_count: int) -> ResponseSpaceSpec:
+def _reaction_response_space() -> ResponseSpaceSpec:
     return ResponseSpaceSpec(
-        name="reaction_candidates_json",
+        name="reaction_candidate_json",
         output_kind="json_object",
-        schema=_reaction_response_schema(candidate_count),
-        parser="tasks.iron_mind.core.proposals:parse_reaction_candidates",
-        description=f"Exactly {candidate_count} source-valid finite reaction candidates.",
+        schema=_reaction_response_schema(),
+        parser="tasks.iron_mind.core.proposals:parse_reaction_response",
+        description="One source-valid finite reaction candidate per independent request.",
     )
 
 
-def _reaction_reservoir_spec(candidate_count: int) -> ReservoirSpec:
+def _reaction_reservoir_spec(candidate_count: int, max_workers: int) -> ReservoirSpec:
     return ReservoirSpec(
         name="reaction_condition_reservoir",
         expansions=(
             ReservoirExpansionSpec(
                 name="reaction_condition_proposal",
                 action_kind="emit_candidate",
-                response_space="reaction_candidates_json",
+                response_space="reaction_candidate_json",
                 produces_candidates=True,
-                description=f"Emit {candidate_count} strict reaction-condition candidates.",
+                description=(
+                    f"Launch {candidate_count} independent requests with at most {max_workers} "
+                    "workers; every request emits one strict reaction-condition candidate."
+                ),
             ),
         ),
         candidate_validator="tasks.iron_mind.core.candidate:IronMindCandidateDomain",
@@ -184,17 +200,14 @@ def _reaction_reservoir_spec(candidate_count: int) -> ReservoirSpec:
     )
 
 
-def _reaction_response_schema(candidate_count: int) -> dict[str, object]:
+def _reaction_response_schema() -> dict[str, object]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["candidates"],
+        "required": ["dataset_id", "conditions"],
         "properties": {
-            "candidates": {
-                "type": "array",
-                "minItems": candidate_count,
-                "maxItems": candidate_count,
-            }
+            "dataset_id": {"type": "string"},
+            "conditions": {"type": "object"},
         },
     }
 

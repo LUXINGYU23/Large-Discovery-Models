@@ -106,15 +106,15 @@ def test_expansion_endpoint_error_preserves_request_budget_and_can_resume(
     resumed = CampaignRuntime.open(run_dir, task="iron_mind", resume=True)
     assert code == 2
     assert status["status"] == "paused_endpoint_unavailable"
-    assert counters["llm_requests"] == 1
+    assert counters["llm_requests"] == 64
     assert counters["proposal_attempts"] == 0
     assert counters["selected_candidates"] == 0
     assert counters["external_evaluations"] == 0
     assert resumed.run_dir == run_dir
 
 
-@pytest.mark.parametrize("case", ("fewer", "more", "duplicate", "invalid"))
-def test_nonconforming_endpoint_responses_never_reach_the_evaluator(
+@pytest.mark.parametrize("case", ("invalid", "non_json", "extra"))
+def test_invalid_endpoint_responses_never_reach_the_evaluator(
     case: str, tmp_path: Path, monkeypatch, capsys
 ) -> None:
     class StaticEndpoint:
@@ -122,7 +122,7 @@ def test_nonconforming_endpoint_responses_never_reach_the_evaluator(
             return {"model": "test-model"}
 
         def propose(self, _request):
-            return ProposalResponse(text=_malformed_response(case))
+            return _malformed_response(case)
 
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
@@ -139,12 +139,45 @@ def test_nonconforming_endpoint_responses_never_reach_the_evaluator(
     events = (run_dir / "events.jsonl").read_text(encoding="utf-8")
     assert code == 1
     assert payload["engine_summary"]["successful_evaluation_count"] == 0
-    assert counters["llm_requests"] == 1
-    assert counters["proposal_attempts"] == 1
+    assert counters["llm_requests"] == 64
+    assert counters["proposal_attempts"] == 64
     assert counters["valid_search_candidates"] == 0
     assert counters["selected_candidates"] == 0
     assert counters["external_evaluations"] == 0
     assert "candidate_evaluated" not in events
+
+
+def test_duplicate_endpoint_responses_are_deduplicated_by_the_shared_reservoir(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    class StaticEndpoint:
+        def preflight(self):
+            return {"model": "test-model"}
+
+        def propose(self, _request):
+            return _valid_response()
+
+    monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
+    monkeypatch.setattr(
+        workflow,
+        "build_openai_reaction_client",
+        lambda **_kwargs: StaticEndpoint(),
+        raising=False,
+    )
+    code = main(_endpoint_args(tmp_path, "duplicates"))
+
+    payload = json.loads(capsys.readouterr().out)
+    run_dir = Path(payload["run_dir"])
+    counters = json.loads((run_dir / "budget.json").read_text(encoding="utf-8"))["counters"]
+    events = (run_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert code == 0
+    assert payload["engine_summary"]["successful_evaluation_count"] == 1
+    assert counters["llm_requests"] == 64
+    assert counters["proposal_attempts"] == 64
+    assert counters["valid_search_candidates"] == 1
+    assert counters["selected_candidates"] == 1
+    assert counters["external_evaluations"] == 1
+    assert '"duplicate"' in events
 
 
 def _endpoint_args(tmp_path: Path, run_name: str) -> list[str]:
@@ -177,23 +210,28 @@ def _zero_counters() -> dict[str, int]:
     }
 
 
-def _malformed_response(case: str) -> str:
-    table = workflow._load_mock_table(workflow._schema_for("buchwald_hartwig"))
-    candidates = [
-        {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)}
-        for row in table.rows
-    ]
-    if case == "fewer":
-        candidates = candidates[:3]
-    elif case == "more":
-        candidates = candidates + [candidates[0]]
-    elif case == "duplicate":
-        candidates[-1] = candidates[0]
-    elif case == "invalid":
-        candidates[-1] = {
-            "dataset_id": table.schema.dataset_id,
-            "conditions": {**candidates[-1]["conditions"], "base": "unknown"},
+def _valid_response() -> ProposalResponse:
+    table = workflow._load_mock_table(
+        workflow._schema_for("buchwald_hartwig"),
+        candidate_count=64,
+    )
+    row = table.rows[0]
+    return ProposalResponse(
+        text=json.dumps({"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)})
+    )
+
+
+def _malformed_response(case: str) -> ProposalResponse:
+    payload = json.loads(_valid_response().text)
+    if case == "invalid":
+        payload = {
+            "dataset_id": payload["dataset_id"],
+            "conditions": {**payload["conditions"], "base": "unknown"},
         }
-    else:
+    elif case == "non_json":
+        return ProposalResponse(text="not JSON")
+    elif case == "extra":
+        payload = {**payload, "extra": True}
+    elif case not in {"invalid", "non_json", "extra"}:
         raise AssertionError(f"Unexpected malformed response case: {case}")
-    return json.dumps({"candidates": candidates})
+    return ProposalResponse(text=json.dumps(payload))

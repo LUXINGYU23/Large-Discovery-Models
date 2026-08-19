@@ -59,8 +59,8 @@
       "oracle": "source-pinned Olympus reaction tables",
       "paper_v2_suite": "six datasets used by the published paper figures",
       "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
-      "proposal_contract": "one structured JSON response with a configurable distinct-candidate array",
-      "proposal_sampling": "one proposal-generation request per round; default internal reservoir size is 64",
+      "proposal_contract": "one strict candidate JSON object per independently issued OpenAI-compatible request; the shared reservoir validates source membership and removes duplicates",
+      "proposal_sampling": "one request per internal candidate; local worker concurrency and reservoir size both default to 64, without refill requests",
       "method": "LDM finite-reservoir proposal plus factor-aware categorical ARD GP-UCB selection"
     },
     "per_candidate_limits": {
@@ -69,8 +69,8 @@
   },
   "budget": {
     "outer_iterations": 20,
-    "llm_requests": 20,
-    "proposal_attempts": 20,
+    "llm_requests": 1280,
+    "proposal_attempts": 1280,
     "valid_search_candidates": 1280,
     "selected_candidates": 20,
     "external_evaluations": 20,
@@ -83,8 +83,6 @@
       "description": "One real LDM evaluation under the Iron Mind external evaluation protocol.",
       "budget": {
         "outer_iterations": 1,
-        "llm_requests": 1,
-        "proposal_attempts": 1,
         "selected_candidates": 1,
         "external_evaluations": 1,
         "expensive_evaluation_attempts": 1,
@@ -103,8 +101,6 @@
       "description": "Our LDM method under the official 20-evaluation per-campaign budget.",
       "budget": {
         "outer_iterations": 20,
-        "llm_requests": 20,
-        "proposal_attempts": 20,
         "selected_candidates": 20,
         "external_evaluations": 20,
         "expensive_evaluation_attempts": 20,

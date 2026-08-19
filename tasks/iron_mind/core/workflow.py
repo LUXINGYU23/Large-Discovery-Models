@@ -29,9 +29,15 @@ from tasks.iron_mind.core.factory import (
     build_campaign_components,
     build_reaction_task_spec,
 )
-from tasks.iron_mind.core.mock import MOCK_SEED_ROW_COUNT, load_mock_table
-from tasks.iron_mind.core.mock import mock_response as _mock_response
-from tasks.iron_mind.core.proposals import build_openai_reaction_client
+from tasks.iron_mind.core.mock import (
+    MOCK_SEED_ROW_COUNT,
+    load_mock_table,
+    mock_proposal_response,
+)
+from tasks.iron_mind.core.proposals import (
+    DEFAULT_PROPOSAL_MAX_WORKERS,
+    build_openai_reaction_client,
+)
 from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
@@ -51,7 +57,7 @@ TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
 DEFAULT_RESERVOIR_SIZE = 64
-DEFAULT_LLM_MAX_TOKENS = 16_384
+DEFAULT_LLM_MAX_TOKENS = 512
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -61,6 +67,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--reservoir-size", type=int, default=DEFAULT_RESERVOIR_SIZE)
+    parser.add_argument(
+        "--proposal-max-workers",
+        type=int,
+        default=DEFAULT_PROPOSAL_MAX_WORKERS,
+    )
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
@@ -95,6 +106,7 @@ def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTa
         schema,
         selector.describe(),
         args.reservoir_size,
+        args.proposal_max_workers,
     )
 
 def main(argv: list[str] | None = None) -> int:
@@ -126,7 +138,11 @@ def _run_campaign(
         if not _preflight_endpoint(client, runtime, args, payload, provider):
             return 2
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
-    before_request = None if args.proposal_mode == "callable" else lambda: runtime.consume("llm_requests")
+    before_requests = (
+        None
+        if args.proposal_mode == "callable"
+        else lambda count: runtime.consume("llm_requests", count)
+    )
     components = build_campaign_components(
         CampaignComponentOptions(
             client=client,
@@ -135,7 +151,8 @@ def _run_campaign(
             sink=sink,
             runtime=runtime,
             reservoir_size=args.reservoir_size,
-            before_request=before_request,
+            proposal_max_workers=args.proposal_max_workers,
+            before_requests=before_requests,
             acquisition_beta=args.acquisition_beta,
         )
     )
@@ -172,6 +189,8 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--iterations must be non-negative")
     if args.reservoir_size < 1:
         raise SystemExit("--reservoir-size must be positive")
+    if args.proposal_max_workers < 1:
+        raise SystemExit("--proposal-max-workers must be positive")
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
     if args.acquisition_beta < 0:
@@ -255,9 +274,9 @@ def _proposal_client(
 ) -> ProposalClient:
     if args.proposal_mode == "callable":
         return CallableProposalClient(
-            lambda _request: _mock_response(
+            lambda request: mock_proposal_response(
                 table,
-                candidate_count=args.reservoir_size,
+                proposal_index=int(request.metadata["proposal_index"]),
             )
         )
     assert provider is not None

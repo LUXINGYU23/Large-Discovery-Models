@@ -253,7 +253,7 @@ def _factory_options(
 ) -> CampaignComponentOptions:
     runtime = CampaignRuntime.open(tmp_path / run_name, task="iron_mind")
     return CampaignComponentOptions(
-        client=CallableProposalClient(lambda _request: '{"candidates":[]}'),
+        client=CallableProposalClient(lambda _request: "{}"),
         schema=schema,
         table=table,
         sink=DataCollectionSink.disabled(),

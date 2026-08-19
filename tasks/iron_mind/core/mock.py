@@ -9,6 +9,8 @@ from itertools import product
 from pathlib import Path
 from types import MappingProxyType
 
+from ldm_tts.transport import ProposalResponse
+
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
@@ -68,20 +70,22 @@ def _expand_mock_rows(
     return tuple(rows)
 
 
-def mock_response(
-    table: FrozenReactionTable, *, candidate_count: int | None = None
-) -> str:
-    """Return one JSON candidate array with the requested mock reservoir size."""
+def mock_proposal_response(
+    table: FrozenReactionTable, *, proposal_index: int
+) -> ProposalResponse:
+    """Return one deterministic response for one independent proposal request."""
 
-    count = len(table.rows) if candidate_count is None else candidate_count
-    _validate_candidate_count(count)
-    if count > len(table.rows):
-        raise ValueError("Mock response requests more candidates than the mock table contains.")
-    candidates = [
-        {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)}
-        for row in table.rows[:count]
-    ]
-    return json.dumps({"candidates": candidates}, separators=(",", ":"))
+    if proposal_index < 0 or proposal_index >= len(table.rows):
+        raise ValueError("Mock proposal index is outside the mock table.")
+    row = table.rows[proposal_index]
+    text = json.dumps(
+        {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)},
+        separators=(",", ":"),
+    )
+    return ProposalResponse(
+        text=text,
+        metadata={"provider": "mock", "proposal_index": proposal_index},
+    )
 
 
 def _mock_row(
@@ -126,4 +130,4 @@ def _validate_candidate_count(candidate_count: int) -> None:
         raise ValueError("Mock candidate count must be a positive integer.")
 
 
-__all__ = ["MOCK_SEED_ROW_COUNT", "load_mock_table", "mock_response"]
+__all__ = ["MOCK_SEED_ROW_COUNT", "load_mock_table", "mock_proposal_response"]
