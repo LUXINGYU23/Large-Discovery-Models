@@ -10,9 +10,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 PREFLIGHT_MAX_TOKENS = 64
+HTTP_ERROR_DETAIL_MAX_CHARS = 500
+
 
 class EndpointRequestError(RuntimeError):
     """Raised when an endpoint request fails or returns an invalid response."""
+
 
 def chat_completions_url(raw: str) -> str:
     """Normalize a base URL or complete OpenAI-compatible endpoint to chat."""
@@ -26,6 +29,7 @@ def chat_completions_url(raw: str) -> str:
         return base + "/chat/completions"
     return base + "/v1/chat/completions"
 
+
 def models_url(raw: str) -> str:
     """Normalize a base URL or complete OpenAI-compatible endpoint to models."""
 
@@ -37,6 +41,7 @@ def models_url(raw: str) -> str:
     if base.endswith("/v1"):
         return base + "/models"
     return base + "/models"
+
 
 def request_openai_models(
     *,
@@ -56,6 +61,7 @@ def request_openai_models(
     _model_ids(result)
     return result
 
+
 def request_openai_chat(
     *,
     url: str,
@@ -65,6 +71,7 @@ def request_openai_chat(
     timeout_seconds: float,
     max_tokens: int,
     temperature: float,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> str:
     """Return text from one validated OpenAI-compatible chat response."""
 
@@ -76,6 +83,7 @@ def request_openai_chat(
         timeout_seconds=timeout_seconds,
         max_tokens=max_tokens,
         temperature=temperature,
+        extra_body=extra_body,
     )
     content = result["choices"][0]["message"].get("content")
     if not isinstance(content, str) or not content.strip():
@@ -124,6 +132,7 @@ def preflight_openai_chat(
     model: str,
     api_key: str,
     timeout_seconds: float = 30.0,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Probe one minimal chat response while preserving the legacy artifact."""
 
@@ -136,6 +145,7 @@ def preflight_openai_chat(
         timeout_seconds=timeout_seconds,
         max_tokens=PREFLIGHT_MAX_TOKENS,
         temperature=0.0,
+        extra_body=extra_body,
     )
     return {
         "status": "ok",
@@ -243,11 +253,31 @@ def _request_json(
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise EndpointRequestError(f"HTTP {exc.code} from OpenAI-compatible endpoint") from exc
+        detail = _http_error_detail(exc)
+        message = f"HTTP {exc.code} from OpenAI-compatible endpoint"
+        if detail:
+            message = f"{message}: {detail}"
+        raise EndpointRequestError(message) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise EndpointRequestError(
             f"OpenAI-compatible endpoint request failed: {type(exc).__name__}"
         ) from exc
+
+
+def _http_error_detail(exc: urllib.error.HTTPError) -> str:
+    """Return a bounded, human-readable excerpt from an HTTP error body."""
+
+    try:
+        raw = exc.read()
+    except OSError:
+        return ""
+    body = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    body = body.strip()
+    if not body:
+        return ""
+    if len(body) <= HTTP_ERROR_DETAIL_MAX_CHARS:
+        return body
+    return body[:HTTP_ERROR_DETAIL_MAX_CHARS] + "..."
 
 
 def _model_ids(result: Any) -> tuple[str, ...]:

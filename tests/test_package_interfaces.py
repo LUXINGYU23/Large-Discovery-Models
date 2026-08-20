@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from ldm_tts.contracts import (
     AcquisitionSpec,
     Candidate,
@@ -139,3 +141,39 @@ def test_historical_candidate_space_name_resolves_to_canonical_contract() -> Non
     from ldm_tts import CandidateSpaceSpec
 
     assert CandidateSpaceSpec is CandidateDomainSpec
+
+
+def test_nanogpt_internals_are_not_reexported_from_package_root() -> None:
+    import ldm_tts
+
+    for name in ("OperationSchema", "OperationParameter", "operation_feature_dim"):
+        with pytest.raises(AttributeError):
+            getattr(ldm_tts, name)
+
+
+def test_package_root_import_does_not_load_task_modules() -> None:
+    script = """
+import builtins
+import sys
+
+blocked = {"tasks", "tasks.nanogpt", "numpy", "torch", "openai"}
+original_import = builtins.__import__
+
+def guarded_import(name, *args, **kwargs):
+    if name.split(".", 1)[0] in blocked:
+        raise AssertionError(f"task/optional dependency imported: {name}")
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+import ldm_tts
+from ldm_tts import CampaignRuntime, Candidate, LDMTaskSpec
+
+assert not blocked.intersection(sys.modules)
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )

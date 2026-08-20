@@ -7,7 +7,7 @@ campaign, or use an existing run as a reference for registering a new LDM task.
 
 ## What is Delta-Infra?
 
-[Delta-Infra](https://delta-infra-dashboard-test.yangtzeailab.com/) is the
+[Delta-Infra](https://delta-infra-dashboard.yangtzeailab.com/) is the
 infrastructure layer used by these examples. It gives local AI agents access
 to isolated cloud CPU/GPU sandboxes, shared data, model endpoints, and
 scientific tools without requiring those resources to run on the local
@@ -24,7 +24,7 @@ The examples use the infrastructure in two complementary ways:
 
 ## Install Delta-Infra
 
-The [Delta-Infra quickstart](https://delta-infra-dashboard-test.yangtzeailab.com/docs/quickstart)
+The [Delta-Infra quickstart](https://delta-infra-dashboard.yangtzeailab.com/docs/quickstart/account)
 recommends the interactive installer below. It installs the CLI globally,
 deploys the `delta-*` AI-agent skills, initializes configuration, and guides
 you through authentication:
@@ -127,7 +127,7 @@ unchanged.
 
 ## Further Reading
 
-- [Delta-Infra documentation](https://delta-infra-dashboard-test.yangtzeailab.com/docs)
-- [Delta-Infra CLI reference](https://delta-infra-dashboard-test.yangtzeailab.com/docs/cli)
-- [Delta-Infra agent integration](https://delta-infra-dashboard-test.yangtzeailab.com/docs/agents)
+- [Delta-Infra documentation](https://delta-infra-dashboard.yangtzeailab.com/docs/quickstart/account)
+- [Delta-Infra CLI reference](https://delta-infra-dashboard.yangtzeailab.com/docs/cli)
+- [Delta-Infra agent integration](https://delta-infra-dashboard.yangtzeailab.com/docs/agents)
 - [Main LDM README](../README.md)

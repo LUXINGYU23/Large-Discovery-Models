@@ -7,6 +7,7 @@ import pytest
 
 import ldm_tts.registration.registry as task_registry
 import scripts.validate_tasks as validate_tasks_script
+from ldm_tts.registration.qualification import load_qualification_evidence
 from ldm_tts.registration.registry import (
     TASK_DEFINITIONS,
     TaskRegistrationError,
@@ -15,7 +16,9 @@ from ldm_tts.registration.registry import (
     validate_task_layout,
 )
 from ldm_tts.registration.scaffold import TaskScaffoldError, scaffold_task
-from ldm_tts.registration.qualification import load_qualification_evidence
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_builtin_tasks_are_discovered_from_manifests() -> None:
@@ -33,6 +36,50 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         assert definition.relative_root == Path("tasks") / task_id
         assert definition.module == f"tasks.{task_id}.ldm_task.procedure"
         assert definition.manifest_path == Path("tasks") / task_id / "task.json"
+
+
+def test_non_scaffolded_builtin_tasks_define_dependency_checkers() -> None:
+    for task_id, definition in TASK_DEFINITIONS.items():
+        evidence_path = (
+            REPOSITORY_ROOT
+            / definition.relative_root
+            / "resources"
+            / "qualification_evidence.json"
+        )
+        if not evidence_path.is_file():
+            continue
+        evidence = load_qualification_evidence(
+            evidence_path,
+            repository_root=REPOSITORY_ROOT,
+            expected_task_id=task_id,
+        )
+        if evidence.stage != "scaffolded":
+            assert definition.dependency_checker
+
+
+def test_builtin_qualification_evidence_avoids_ignored_runtime_directories() -> None:
+    forbidden_parts = {"runs", "ldm_runs", "generated"}
+    for task_id, definition in TASK_DEFINITIONS.items():
+        evidence_path = (
+            REPOSITORY_ROOT
+            / definition.relative_root
+            / "resources"
+            / "qualification_evidence.json"
+        )
+        if not evidence_path.is_file():
+            continue
+        evidence = load_qualification_evidence(
+            evidence_path,
+            repository_root=REPOSITORY_ROOT,
+            expected_task_id=task_id,
+        )
+        ignored_references = [
+            reference
+            for gate in evidence.gates.values()
+            for reference in gate.evidence
+            if forbidden_parts.intersection(Path(reference).parts)
+        ]
+        assert ignored_references == []
 
 
 def test_builtin_task_layouts_have_no_validation_errors() -> None:
@@ -181,21 +228,31 @@ def test_manifest_rejects_unknown_fields_and_directory_mismatch(tmp_path: Path) 
     manifest_dir = tmp_path / "tasks" / "wrong_directory"
     manifest_dir.mkdir(parents=True)
     manifest = manifest_dir / "task.json"
-    manifest.write_text(json.dumps({
-        "schema_version": 1,
-        "task_id": "different",
-        "description": "Mismatch.",
-        "extra": True,
-    }), encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "task_id": "different",
+                "description": "Mismatch.",
+                "extra": True,
+            }
+        ),
+        encoding="utf-8",
+    )
 
     with pytest.raises(TaskRegistrationError, match="Unknown task manifest"):
         load_task_manifest(manifest, repository_root=tmp_path)
 
-    manifest.write_text(json.dumps({
-        "schema_version": 1,
-        "task_id": "different",
-        "description": "Mismatch.",
-    }), encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "task_id": "different",
+                "description": "Mismatch.",
+            }
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(TaskRegistrationError, match="directory name"):
         load_task_manifest(manifest, repository_root=tmp_path)
 
@@ -204,12 +261,17 @@ def test_manifest_rejects_invalid_dependency_hook(tmp_path: Path) -> None:
     manifest_dir = tmp_path / "tasks" / "custom"
     manifest_dir.mkdir(parents=True)
     manifest = manifest_dir / "task.json"
-    manifest.write_text(json.dumps({
-        "schema_version": 1,
-        "task_id": "custom",
-        "description": "Custom.",
-        "dependency_checker": "not a hook",
-    }), encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "task_id": "custom",
+                "description": "Custom.",
+                "dependency_checker": "not a hook",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     with pytest.raises(TaskRegistrationError, match="dependency_checker"):
         load_task_manifest(manifest, repository_root=tmp_path)

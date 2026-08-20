@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import time
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, TypeVar
 
@@ -163,11 +163,17 @@ class OpenAICompatibleProposalClient:
                 timeout_seconds=timeout_seconds,
                 extra_body=self.extra_body,
             )
+        preflight_body = {
+            name: value
+            for name, value in self.extra_body.items()
+            if name != "response_format"
+        }
         return preflight_openai_chat(
             url=self.url,
             model=self.model,
             api_key=self.api_key,
             timeout_seconds=timeout_seconds,
+            extra_body=preflight_body,
         )
 
     def propose(self, request: ProposalRequest) -> ProposalResponse:
@@ -208,7 +214,7 @@ class OpenAICompatibleProposalClient:
                 )
             except EndpointRequestError as exc:
                 last_error = exc
-                if attempt > self.max_retries:
+                if isinstance(exc, EndpointCircuitOpen) or attempt > self.max_retries:
                     break
                 if self.retry_backoff_seconds:
                     self.sleep(self.retry_backoff_seconds * attempt)

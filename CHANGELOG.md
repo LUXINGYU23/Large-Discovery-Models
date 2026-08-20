@@ -29,4 +29,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   dependencies are ready.
 - Corrected stale module paths and local-only artifact metadata.
 
+### Removed
+
+- Dropped the package-root compatibility aliases for
+  `tasks.nanogpt.core.expansion_schema` symbols (e.g. `OperationSchema`,
+  `operation_feature_dim`). Import them directly from
+  `tasks.nanogpt.core.expansion_schema` instead. These aliases could never work
+  from the built wheel, which ships only the `ldm_tts` package, and they coupled
+  the shared package to one task's internals.
+
 [Unreleased]: https://github.com/yzailab/Large-Discovery-Models/commits/ldm_engine

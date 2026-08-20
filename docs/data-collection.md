@@ -1,7 +1,8 @@
 # Unified LDM Data Collection
 
-This document explains how to collect fine-tuning data across the three current
-LDM tasks using the shared `ldm-2.0` intermediate representation:
+This document explains how to collect fine-tuning data across the three tasks
+that currently emit fine-tuning data, using the shared `ldm-2.0` intermediate
+representation:
 
 - `nanogpt`: training-program search over `train.py` parameter edits.
 - `small_molecule`: small-molecule design over SMILES candidates.
@@ -110,15 +111,15 @@ accepted action. Use `--sft-output` to regenerate Alpaca data from the augmented
 IR in the same run:
 
 ```bash
-export LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
-export LLM_API_KEY=...
-export LLM_MODEL_NAME=DeepSeek-V4-Flash
+export LLM_BASE_URL=https://your-model-host.example/v1
+export LLM_MODEL_NAME=your-served-model
+export LLM_API_KEY=your-secret
 
 python data/augment.py \
   --input data/generated/my_campaign/ldm_ir.jsonl \
   --output data/generated/my_campaign/ldm_ir_augmented.jsonl \
-  --sft-output data/generated/my_campaign/ldm_sft_augmented.jsonl \
-  --workers 8
+  --checkpoint data/generated/my_campaign/augmentation.checkpoint.jsonl \
+  --sft-output data/generated/my_campaign/ldm_sft_augmented.jsonl
 ```
 
 The input is always read-only. Successful responses are appended to

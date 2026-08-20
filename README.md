@@ -4,17 +4,12 @@
 </h1>
 
 <p align="center">
-  <img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square">
-  <a href="https://huggingface.co/Yangtze-ailab" title="View our models on Hugging Face">
-    <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?style=flat-square">
-  </a>
-  <a href="https://largediscovery.net/en/" title="Visit the Large Discovery website">
-    <img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square">
-  </a>
-  <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square">
-  <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
-    <img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white">
-  </a>
+  <a href="https://arxiv.org/abs/2608.15669" title="Read the arXiv paper"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square" /></a>
+  <a href="https://huggingface.co/Yangtze-ailab" title="View our models on Hugging Face"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?style=flat-square" /></a>
+  <a href="https://largediscovery.net/" title="Visit the Large Discovery website"><img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square" /></a>
+  <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square" />
+  <a href="assets/wechat_group_invitation.JPG" title="Join our WeChat group"><img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white" /></a>
+  <a href="https://delta-infra-dashboard.yangtzeailab.com/" title="Delta-CLI | Compute"><img alt="Delta-CLI | Compute" src="assets/delta-cli-badge.png" height="20" /></a>
 </p>
 
 <p align="center">
@@ -148,7 +143,7 @@ labeled 20-iteration extended-budget campaign; discrete causal discovery reports
 official MLS-Bench scores from 20 five-network evaluations under its separately
 labeled extended-budget profile.
 
-| [Adaptive KV-cache quantization](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md): GP-UCB, 20 diagnostic evaluations | [AI4Bio mutation-effect prediction](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md): GP-UCB, 20 official evaluations | [Discrete causal discovery](tasks/causal_discovery_discrete/README.md): GP-UCB, 20 official evaluations |
+| [Adaptive KV-cache quantization](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md): GP-UCB, 20 diagnostic evaluations | [AI4Bio mutation-effect prediction](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md): GP-UCB, 20 official evaluations | [Discrete causal discovery](ready2run_examples/run_customized_causal_discovery_discrete/): GP-UCB, 20 official evaluations |
 | --- | --- | --- |
 | [![Adaptive KV-cache quantization objective progress](ready2run_examples/run_customized_llm_kv_adaptive_quantization/progress.png)](ready2run_examples/run_customized_llm_kv_adaptive_quantization/progress.png) | [![AI4Bio mutation-effect prediction campaign progress](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/progress.png)](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/progress.png) | [![Discrete causal-discovery campaign progress](ready2run_examples/run_customized_causal_discovery_discrete/progress.png)](ready2run_examples/run_customized_causal_discovery_discrete/progress.png) |
 | Twenty Qwen-generated four-candidate reservoirs and 20 successful one-example HotpotQA evaluations. Best non-official selection score: `0.4979345`. | Twenty deterministic four-candidate reservoirs and 20 successful three-assay ProteinGym evaluations. Best official score: `0.4872663032443121` at iteration 14. | Twenty deterministic four-candidate reservoirs and 20 successful five-network evaluations, totaling 100 benchmark jobs. Best official score: `0.02766568667561009`, first reached at iteration 6. |
@@ -156,16 +151,14 @@ labeled extended-budget profile.
 Use the [agent execution guide](docs/agent-execution.md) for the machine-oriented execution,
 validation, resume, plotting, and safety checklist. Use
 [`scripts/plot_campaigns.py`](scripts/plot_campaigns.py) to regenerate the
-three original trajectory views from persisted artifacts, and use
-[`scripts/plot_causal_discovery_campaign.py`](scripts/plot_causal_discovery_campaign.py)
-to regenerate the discrete causal-discovery view.
+three original trajectory views from persisted artifacts.
 
 ## Run a demo with Delta-Infra: Hassle-Free and Ready-to-Run
 
 For a cloud-backed path that does not require configuring GPUs, model servers,
 and scientific evaluators on the local machine, start with the
 [ready-to-run examples](ready2run_examples/README.md). They use
-[Delta-Infra](https://delta-infra-dashboard-test.yangtzeailab.com/) to give
+[Delta-Infra](https://delta-infra-dashboard.yangtzeailab.com/) to give
 local AI agents access to isolated CPU/GPU sandboxes, shared model endpoints,
 and managed scientific tools through `delta-cli`.
 

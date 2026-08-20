@@ -20,7 +20,16 @@ technical and operational contracts.
 - [nanoGPT](../tasks/nanogpt/README.md)
 - [Small molecule](../tasks/small_molecule/README.md)
 - [Antibody](../tasks/antibody/README.md)
+- [Adaptive KV-cache quantization](../tasks/llm_kv_adaptive_quantization/README.md)
+- [AI4Bio mutation-effect prediction](../tasks/ai4bio_mutation_effect_prediction/README.md)
+- [Discrete causal discovery](../tasks/causal_discovery_discrete/README.md)
 - [Task registration](../tasks/README.md)
+
+## Runbooks And Agent Skills
+
+- [Ready-to-run Delta-Infra examples](../ready2run_examples/README.md)
+- [Agent skills](../skills/README.md): `collect-ldm-data`, `register-ldm-task`,
+  and `run-ldm-task`.
 
 ## Project Policies
 

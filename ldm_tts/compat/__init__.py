@@ -1,4 +1,13 @@
-"""Lazy resolution of historical package-root imports during migration."""
+"""Lazy resolution of historical package-root imports during migration.
+
+Every group below targets an ``ldm_tts.*`` module so the compatibility layer
+keeps working from the built wheel, which ships only the ``ldm_tts`` package.
+Do not add ``tasks.*`` modules here: task-specific symbols (for example
+``tasks.nanogpt.core.expansion_schema``) are intentionally not re-exported from
+the package root, because ``tasks`` is not part of the wheel and the shared
+package must not depend on one task's internals. Import such symbols directly
+from their owning task module instead.
+"""
 
 from __future__ import annotations
 
@@ -162,35 +171,6 @@ _EXPORT_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
         ),
     ),
     ("ldm_tts.contracts.evaluation", frozenset({"ObjectiveSet"})),
-    (
-        "tasks.nanogpt.core.expansion_schema",
-        frozenset(
-            {
-                "OperationParameter",
-                "OperationSchema",
-                "ValidatedOperation",
-                "canonical_name",
-                "choice_values_equal",
-                "initial_active_operation_schema",
-                "initial_operation_feature_names",
-                "initial_operation_parameter_names",
-                "load_operation_schema",
-                "normalize_operation_numeric",
-                "normalize_operation_parameter",
-                "operation_feature_dim",
-                "operation_feature_version",
-                "operation_representation_dimension",
-                "operation_representation_version",
-                "operation_parameter_from_payload",
-                "operation_parameter_to_json",
-                "operation_schema_signature",
-                "operation_schema_to_json",
-                "replace_operation_schema",
-                "validate_operation_payload",
-                "validate_operation_value",
-            }
-        ),
-    ),
     (
         "ldm_tts.transport.parsing",
         frozenset(

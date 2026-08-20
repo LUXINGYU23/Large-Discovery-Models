@@ -134,7 +134,7 @@ candidate was evaluated, and the run selected a finite best result.
 env -u LLM_BASE_URL -u LLM_API_KEY -u LLM_MODEL_NAME -u LLM_MODEL \
   -u TTS_LLM_URL -u TTS_LLM_API_KEY -u TTS_LLM_MODEL \
   CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/nanogpt \
-  pytest -q tests/test_nanogpt_search.py \
+  pytest -q tasks/nanogpt/tests/test_search.py \
     tests/test_openai_api_configuration.py \
     tests/test_ldm_tts_core.py \
     tests/test_shared_coverage.py \
