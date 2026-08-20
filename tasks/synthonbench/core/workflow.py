@@ -1,0 +1,242 @@
+"""Canonical shared-runner workflow for the SynthonBench LDM task."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from ldm_tts.contracts import LDMTaskSpec
+from ldm_tts.data import DataCollectionSink
+from ldm_tts.engine import LDMEngineConfig
+from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
+from ldm_tts.registration.experiment import (
+    load_active_experiment_contract,
+    load_experiment_contract,
+    snapshot_experiment_contract,
+)
+from ldm_tts.transport import CallableProposalClient, ProposalClient
+from ldm_tts.transport.openai_http import EndpointRequestError
+from tasks.synthonbench.core.data import (
+    LoadedSynthonBenchmark,
+    load_mock_benchmark,
+    load_official_benchmark,
+)
+from tasks.synthonbench.core.factory import (
+    CampaignComponentOptions,
+    build_campaign_components,
+    build_synthon_selector,
+    build_synthon_task_spec,
+)
+from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
+from tasks.synthonbench.core.mock import mock_proposal_response
+from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
+from tasks.synthonbench.core.provider import parse_openai_extra_body_json
+from tasks.synthonbench.core.reporting import write_campaign_reports
+from tasks.synthonbench.core.workflow_args import parse_args, validate_args
+from tasks.synthonbench.core.workflow_support import (
+    campaign_budget,
+    jsonable_args,
+    load_campaign_state,
+    pause_endpoint,
+    preflight_endpoint,
+    provider_settings,
+)
+
+TASK_ID = "synthonbench"
+TASK_ROOT = Path(__file__).resolve().parents[1]
+
+
+def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmark | None = None) -> LDMTaskSpec:
+    """Build the declared task semantics using the same encoder and selector as runs."""
+
+    benchmark = _load_benchmark(args) if benchmark is None else benchmark
+    encoder = SynthonNystromEncoder(
+        benchmark.task.space,
+        benchmark.task.allowed_reactions,
+        landmark_count=args.gp_landmarks,
+        seed=args.campaign_index,
+        fingerprint_bits=args.fingerprint_bits,
+        kernel_jitter=args.gp_kernel_jitter,
+        reaction_weight=args.gp_reaction_weight,
+    )
+    selector = build_synthon_selector(
+        encoder=encoder,
+        selection_seed=args.campaign_index,
+        gp_signal_std=args.gp_signal_std,
+        gp_mean_std=args.gp_mean_std,
+        gp_observation_noise_std=args.gp_observation_noise_std,
+        acquisition_beta=args.acquisition_beta,
+        alpha=args.alpha,
+        eta=args.eta,
+        z_clip=args.z_clip,
+        bo_pool_size=args.bo_pool_size,
+        proposal_samples=args.proposal_samples,
+    )
+    return build_synthon_task_spec(
+        encoder=encoder,
+        acquisition=selector.describe(),
+        proposal_samples=args.proposal_samples,
+        bo_pool_size=args.bo_pool_size,
+        proposal_max_workers=args.proposal_max_workers,
+        slate_size=args.slate_size,
+        reaction_allocation=args.reaction_allocation,
+        prompt_policy=args.prompt_policy,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    validate_args(args)
+    benchmark = _load_benchmark(args)
+    task_spec = describe_ldm_task(args, benchmark)
+    contract, profile_name = _load_contract()
+    payload = _run_payload(args, benchmark, task_spec, contract.digest, profile_name)
+    if args.dry_run:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+    return _run_campaign(args, benchmark, task_spec, contract, profile_name, payload)
+
+
+def _load_benchmark(args: argparse.Namespace) -> LoadedSynthonBenchmark:
+    budget = args.iterations * args.evaluations_per_round
+    if args.mock:
+        return load_mock_benchmark(budget=budget, seed=args.campaign_index)
+    assert args.data_dir is not None and args.source_dir is not None
+    return load_official_benchmark(
+        data_dir=args.data_dir.resolve(),
+        source_dir=args.source_dir.resolve(),
+        scale=args.scale,
+        target=args.target,
+        oracle_kind=args.oracle_kind,
+        budget=budget,
+        seed=args.campaign_index,
+    )
+
+
+def _load_contract():
+    contract, profile_name = load_active_experiment_contract()
+    return (load_experiment_contract(TASK_ROOT / "experiment.json"), profile_name) if contract is None else (contract, profile_name)
+
+
+def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
+                  payload: dict[str, Any]) -> int:
+    provider = provider_settings(args) if args.proposal_mode == "openai" else None
+    if provider is not None:
+        args.llm_url, args.llm_model_name = provider.base_url, provider.model
+    runtime = _open_runtime(args, task_spec, contract, profile_name)
+    client = _proposal_client(args, provider)
+    if provider is not None and not preflight_endpoint(client, runtime, args, payload, provider):
+        return 2
+    components = _components(args, benchmark, runtime, client)
+    return _finish_campaign(args, benchmark, components, runtime, payload)
+
+
+def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRuntime:
+    profile = contract.profile(profile_name) if profile_name else None
+    run_dir = _run_dir(args)
+    runtime = CampaignRuntime.open(
+        run_dir,
+        task=TASK_ID,
+        config=jsonable_args(args),
+        task_spec=task_spec,
+        budget_limits=campaign_budget(args, None if profile is None else profile.budget),
+        contract_snapshot=contract.to_dict(),
+        contract_sha256=contract.digest,
+        contract_profile=profile_name,
+        resume=args.resume_from is not None,
+    )
+    if args.resume_from is None:
+        snapshot_experiment_contract(contract, run_dir, profile=profile_name)
+    return runtime
+
+
+def _run_dir(args: argparse.Namespace) -> Path:
+    if args.resume_from is not None:
+        return args.resume_from.resolve()
+    default = "official_example" if args.mock else f"{args.oracle_kind}_{args.scale}_{args.target}_s{args.campaign_index}"
+    return unique_run_dir(args.out_dir / (args.run_name or default))
+
+
+def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient:
+    if args.proposal_mode == "callable":
+        return CallableProposalClient(mock_proposal_response)
+    assert provider is not None
+    return build_openai_synthon_client(
+        base_url=provider.base_url,
+        model=provider.model,
+        api_key=provider.api_key,
+        timeout_seconds=args.llm_timeout,
+        max_tokens=args.llm_max_tokens,
+        temperature=args.llm_temperature,
+        json_mode=args.llm_json_mode,
+        extra_body=parse_openai_extra_body_json(args.llm_extra_body_json),
+    )
+
+
+def _components(args, benchmark, runtime, client):
+    sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
+    before_requests = None if args.proposal_mode == "callable" else lambda count: runtime.consume("llm_requests", count)
+    return build_campaign_components(CampaignComponentOptions(
+        client=client,
+        official_task=benchmark.task,
+        runtime=runtime,
+        sink=sink,
+        target=benchmark.target,
+        proposal_samples=args.proposal_samples,
+        bo_pool_size=args.bo_pool_size,
+        proposal_max_workers=args.proposal_max_workers,
+        slate_size=args.slate_size,
+        reaction_allocation=args.reaction_allocation,
+        selection_seed=args.campaign_index,
+        fingerprint_bits=args.fingerprint_bits,
+        gp_landmarks=args.gp_landmarks,
+        gp_kernel_jitter=args.gp_kernel_jitter,
+        gp_signal_std=args.gp_signal_std,
+        gp_mean_std=args.gp_mean_std,
+        gp_observation_noise_std=args.gp_observation_noise_std,
+        gp_reaction_weight=args.gp_reaction_weight,
+        acquisition_beta=args.acquisition_beta,
+        alpha=args.alpha,
+        eta=args.eta,
+        z_clip=args.z_clip,
+        prompt_policy=args.prompt_policy,
+        before_requests=before_requests,
+    ))
+
+
+def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,
+                     payload: dict[str, Any]) -> int:
+    state = load_campaign_state(runtime, args.resume_from is not None)
+    components.evaluator.restore_observations(state.observations)
+    try:
+        result = components.engine.run(
+            LDMEngineConfig(args.iterations, args.proposal_samples, args.evaluations_per_round),
+            state=state,
+        )
+    except EndpointRequestError as exc:
+        pause_endpoint(runtime, args, payload, str(exc), phase="reservoir_expansion")
+        return 2
+    report = write_campaign_reports(runtime, result, components.evaluator, benchmark,
+                                    audit_timeout_seconds=args.audit_timeout)
+    payload.update(engine_summary=result.summary, result=report, run_dir=str(runtime.run_dir.resolve()))
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if result.summary["successful_evaluation_count"] else 1
+
+
+def _run_payload(args, benchmark, task_spec, contract_sha256: str, profile_name: str) -> dict[str, Any]:
+    return {
+        "task": TASK_ID,
+        "mode": benchmark.mode,
+        "scale": benchmark.scale,
+        "target": benchmark.target,
+        "oracle_kind": benchmark.oracle_kind,
+        "proposal_mode": args.proposal_mode,
+        "contract_profile": profile_name,
+        "contract_sha256": contract_sha256,
+        "ldm_task_spec": task_spec.to_dict(),
+    }
+
+
+__all__ = ["describe_ldm_task", "main", "parse_args"]

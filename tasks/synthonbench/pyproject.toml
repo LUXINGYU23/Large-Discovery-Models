@@ -1,11 +1,16 @@
 [project]
 name = "ldm-tts-synthonbench"
 version = "0.1.0"
-description = "Closed-loop optimization over a source-pinned synthon space and score tables."
+description = "Source-pinned LDM task adapter for SynthonBench."
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.24",
+    "numpy>=1.24,<3",
     "pyyaml>=6.0",
+    "pandas>=2.0",
+    "pyarrow>=14",
+    "rdkit>=2023.3",
+    "huggingface_hub>=0.24",
+    "synthonbench @ git+https://github.com/mireklzicar/synthonbench.git@4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
 ]
 
 [dependency-groups]

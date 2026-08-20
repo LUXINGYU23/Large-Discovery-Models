@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "task_id": "synthonbench",
-  "stage": "scaffolded",
-  "benchmark_commit": "unqualified",
-  "contract_profile": "",
+  "stage": "tiny_campaign_verified",
+  "benchmark_commit": "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
+  "contract_profile": "surrogate_1m_qualification",
   "gates": {
     "scaffolded": {
       "status": "passed",
@@ -13,24 +13,43 @@
       ]
     },
     "registered": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/synthonbench/ldm_task/procedure.py",
+        "tasks/synthonbench/ldm_task/dependencies.py"
+      ]
     },
     "mock_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "config/synthonbench/mock.yaml",
+        "tasks/synthonbench/tests/test_procedure.py",
+        "tasks/synthonbench/resources/verification_record.json"
+      ]
     },
     "contract_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/synthonbench/resources/upstream_contract.json",
+        "tasks/synthonbench/tests/test_tanimoto_surrogate.py",
+        "tasks/synthonbench/resources/verification_record.json"
+      ]
     },
     "seed_evaluated": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/synthonbench/resources/verification_record.json"
+      ],
+      "description": "A source-pinned 1M surrogate-oracle query was selected through the shared LDMEngine."
     },
     "tiny_campaign_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "config/synthonbench/surrogate_1m_qualification.yaml",
+        "config/synthonbench/glide_1m_qualification.yaml",
+        "tasks/synthonbench/resources/verification_record.json"
+      ],
+      "description": "One generated reservoir, one acquisition-selected tuple, and one unchanged official audit completed for each released 1M oracle track."
     },
     "campaign_qualified": {
       "status": "pending",

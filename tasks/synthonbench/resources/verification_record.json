@@ -1,0 +1,83 @@
+{
+  "schema_version": 2,
+  "record_type": "synthonbench_delivery_verification",
+  "task_id": "synthonbench",
+  "verified_on": "2026-08-20",
+  "method": {
+    "algorithm": "ldm_tilted_synthon_tanimoto_gp_ucb",
+    "surrogate": "online_nystrom_fitc_count_tanimoto_gaussian_process",
+    "product_proxy": "raw_connector_count_morgan_r2_2048bit_achiral_v1",
+    "landmark_count": 256,
+    "reaction_weight": 0.0,
+    "proposal_request_defaults": {
+      "llm_max_tokens": 256,
+      "llm_extra_body_json": "{\"thinking\":{\"type\":\"disabled\"}}"
+    }
+  },
+  "task_tests": {
+    "status": "passed",
+    "passed": 23,
+    "timeout_seconds": 60
+  },
+  "source_and_data_contract": {
+    "status": "passed",
+    "source_commit": "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
+    "dataset_revision": "19f7bb669032f60b306139318d3f71a26f60134a",
+    "source_checkout_clean": true,
+    "prepared_1m_tracks": [
+      "surrogate_1M",
+      "glide_1M"
+    ],
+    "official_audit": "source-pinned scripts/score_submission.py"
+  },
+  "official_example_campaign": {
+    "status": "succeeded",
+    "official_task": "make_example_task with PairwiseSynthonOracle",
+    "proposal_samples_requested_per_round": 64,
+    "bo_pool_size": 32,
+    "outer_iterations": 2,
+    "proposal_attempts": 128,
+    "official_calls": 2
+  },
+  "surrogate_1m_qualification": {
+    "status": "succeeded",
+    "profile": "surrogate_1m_qualification",
+    "provider": "OpenAI-compatible endpoint",
+    "model": "deepseek-v4-flash",
+    "endpoint_preflight": "passed",
+    "thinking": "disabled",
+    "proposal_samples_requested": 64,
+    "proposal_attempts": 64,
+    "valid_search_candidates": 63,
+    "bo_pool_size": 32,
+    "selected_candidates": 1,
+    "official_calls": 1,
+    "official_audit": {
+      "status": "passed",
+      "submitted_unique": 1,
+      "top1000_recall": 0.0,
+      "call_reduction_factor_top1000": 0.0
+    }
+  },
+  "glide_1m_qualification": {
+    "status": "succeeded",
+    "profile": "glide_1m_qualification",
+    "provider": "OpenAI-compatible endpoint",
+    "model": "deepseek-v4-flash",
+    "endpoint_preflight": "passed",
+    "thinking": "disabled",
+    "proposal_samples_requested": 64,
+    "proposal_attempts": 64,
+    "valid_search_candidates": 64,
+    "bo_pool_size": 32,
+    "selected_candidates": 1,
+    "official_calls": 1,
+    "official_audit": {
+      "status": "passed",
+      "submitted_unique": 1,
+      "top1000_recall": 0.0,
+      "call_reduction_factor_top1000": 0.0
+    }
+  },
+  "qualification_boundary": "These source-pinned campaigns verify one LDM-selected official query per track. They do not claim 10000-call benchmark performance."
+}

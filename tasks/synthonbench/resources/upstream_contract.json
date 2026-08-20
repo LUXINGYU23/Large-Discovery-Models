@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "source": {
+    "url": "https://github.com/mireklzicar/synthonbench",
+    "revision": "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
+    "package_version": "0.2.0",
+    "license": "MIT"
+  },
+  "dataset": {
+    "repository": "mireklzicar/synthonbench",
+    "revision": "19f7bb669032f60b306139318d3f71a26f60134a",
+    "license": "CC-BY-4.0"
+  },
+  "tracks": {
+    "official_example": "bundled official example space with PairwiseSynthonOracle",
+    "surrogate_oracle": "released surrogate score tables at 1M, 10M, and 100M",
+    "glide_ligand_efficiency": "released Glide ligand-efficiency table at 1M"
+  },
+  "official_protocol": {
+    "primary_budget": 10000,
+    "minimum_seeds": [0, 1, 2],
+    "reported_seeds": [0, 1, 2, 3, 4],
+    "top_k_by_scale": {
+      "1M": 1000,
+      "10M": 10000,
+      "100M": 100000
+    },
+    "audit_script": "scripts/score_submission.py"
+  }
+}

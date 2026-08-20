@@ -1,0 +1,34 @@
+"""Source pins and task-wide constants for SynthonBench."""
+
+from __future__ import annotations
+
+TASK_ID = "synthonbench"
+OBJECTIVE_NAME = "synthon_utility"
+
+OFFICIAL_SOURCE_URL = "https://github.com/mireklzicar/synthonbench"
+OFFICIAL_SOURCE_COMMIT = "4e89d72a19ebc5f9e59513bb57771ea8e8db4336"
+OFFICIAL_PACKAGE_VERSION = "0.2.0"
+OFFICIAL_DATASET_REPOSITORY = "mireklzicar/synthonbench"
+OFFICIAL_DATASET_REVISION = "19f7bb669032f60b306139318d3f71a26f60134a"
+
+SCALES = ("1M", "10M", "100M")
+TARGETS = ("kif11", "pyrd", "tgfr1")
+ORACLE_KINDS = ("surrogate", "glide")
+TOP_K_BY_SCALE = {"1M": 1_000, "10M": 10_000, "100M": 100_000}
+
+DEFAULT_PROPOSAL_SAMPLES = 64
+DEFAULT_BO_POOL_SIZE = 32
+DEFAULT_PROPOSAL_MAX_WORKERS = 64
+DEFAULT_SLATE_SIZE = 24
+DEFAULT_FINGERPRINT_BITS = 2048
+DEFAULT_GP_LANDMARKS = 256
+DEFAULT_GP_KERNEL_JITTER = 1.0e-8
+DEFAULT_GP_SIGNAL_STD = 1.0
+DEFAULT_GP_MEAN_STD = 1.0
+DEFAULT_GP_OBSERVATION_NOISE_STD = 1.0
+DEFAULT_GP_REACTION_WEIGHT = 0.0
+DEFAULT_LLM_MAX_TOKENS = 256
+DEFAULT_LLM_EXTRA_BODY_JSON = '{"thinking":{"type":"disabled"}}'
+
+Q0_METADATA_KEY = "synthonbench_empirical_q0"
+DATA_MANIFEST_NAME = "synthonbench_manifest.json"
