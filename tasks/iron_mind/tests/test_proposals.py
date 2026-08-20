@@ -12,21 +12,27 @@ from typing import Any
 
 import pytest
 
-from ldm_tts.contracts import Candidate, RawProposal
+from ldm_tts.contracts import Candidate, RawProposal, ReservoirBuilder
 from ldm_tts.contracts.evaluation import EvaluationResult, Observation
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.transport import CallableProposalClient, ProposalRequest, ProposalResponse
 from tasks.iron_mind.core import proposals
-from tasks.iron_mind.core.candidate import IronMindCandidateDomain
+from tasks.iron_mind.core.candidate import (
+    IRON_MIND_Q0_METADATA_KEY,
+    IronMindCandidateDomain,
+)
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.prompting import BASELINE_PROMPT_POLICY
-from tasks.iron_mind.core.proposals import (
-    IronMindProposalExpander,
-    build_openai_reaction_client,
-    build_reaction_proposal_request,
+from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
+from tasks.iron_mind.core.proposal_parsing import (
     parse_reaction_response,
     parse_reaction_responses,
 )
+from tasks.iron_mind.core.proposals import (
+    IronMindProposalExpander,
+    build_reaction_proposal_request,
+)
+from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -159,6 +165,31 @@ def test_parser_preserves_semantic_duplicates_for_the_reservoir_builder() -> Non
     assert parsed.errors == ()
 
 
+def test_task_expander_estimates_q0_before_shared_reservoir_deduplication() -> None:
+    payloads = _candidate_payloads()
+    raw = (
+        RawProposal(payloads[0], "llm"),
+        RawProposal(payloads[0], "llm"),
+        RawProposal(payloads[1], "llm"),
+    )
+    domain = _domain()
+
+    annotated = attach_empirical_base_measure(raw, _request(reservoir_size=3), domain)
+    reservoir = ReservoirBuilder(domain).build(annotated)
+    by_id = {candidate.candidate_id: candidate for candidate in reservoir.candidates}
+    first = domain.admit(raw[0])
+    second = domain.admit(raw[2])
+    assert isinstance(first, Candidate)
+    assert isinstance(second, Candidate)
+
+    assert annotated[0].metadata[IRON_MIND_Q0_METADATA_KEY]["occurrence_count"] == 2
+    assert annotated[1].metadata[IRON_MIND_Q0_METADATA_KEY]["probability"] == pytest.approx(2 / 3)
+    assert annotated[2].metadata[IRON_MIND_Q0_METADATA_KEY]["probability"] == pytest.approx(1 / 3)
+    assert by_id[first.candidate_id].metadata[IRON_MIND_Q0_METADATA_KEY]["occurrence_count"] == 2
+    assert by_id[second.candidate_id].metadata[IRON_MIND_Q0_METADATA_KEY]["occurrence_count"] == 1
+    assert reservoir.drop_counts == {"duplicate": 1}
+
+
 def test_parser_requires_exact_response_count() -> None:
     responses = tuple(_response(candidate) for candidate in _candidate_payloads()[:3])
 
@@ -194,7 +225,7 @@ def test_openai_path_executes_independent_requests_with_local_workers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = BarrierProposalClient(_candidate_payloads())
-    monkeypatch.setattr(proposals, "_can_parallelize", lambda _client: True)
+    monkeypatch.setattr(proposals, "supports_local_concurrency", lambda _client: True)
 
     result = IronMindProposalExpander(
         client,

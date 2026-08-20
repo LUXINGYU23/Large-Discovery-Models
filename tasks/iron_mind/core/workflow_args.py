@@ -15,7 +15,8 @@ from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
 from tasks.iron_mind.core.provider import parse_openai_extra_body_json
 
 
-DEFAULT_RESERVOIR_SIZE = 64
+DEFAULT_PROPOSAL_SAMPLES = 64
+DEFAULT_BO_POOL_SIZE = 32
 DEFAULT_LLM_MAX_TOKENS = 512
 
 
@@ -27,10 +28,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--proposal-mode", choices=("callable", "openai"), default="callable")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
     parser.add_argument("--iterations", type=int, default=1)
-    parser.add_argument("--reservoir-size", type=int, default=DEFAULT_RESERVOIR_SIZE)
+    parser.add_argument("--proposal-samples", type=int, default=DEFAULT_PROPOSAL_SAMPLES)
+    parser.add_argument("--bo-pool-size", type=int, default=DEFAULT_BO_POOL_SIZE)
     parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
+    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--eta", type=float, default=3.0)
+    parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
     parser.add_argument("--run-name", default="")
     parser.add_argument("--resume-from", type=Path)
@@ -62,14 +67,21 @@ def validate_args(args: argparse.Namespace) -> None:
 
     if args.iterations < 0:
         raise SystemExit("--iterations must be non-negative")
-    if args.reservoir_size < 1:
-        raise SystemExit("--reservoir-size must be positive")
+    if args.proposal_samples < 1:
+        raise SystemExit("--proposal-samples must be positive")
+    if args.bo_pool_size < 1:
+        raise SystemExit("--bo-pool-size must be positive")
+    if args.proposal_samples <= args.bo_pool_size:
+        raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.proposal_max_workers < 1:
         raise SystemExit("--proposal-max-workers must be positive")
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
-    if args.acquisition_beta < 0:
-        raise SystemExit("--acquisition-beta must be non-negative")
+    _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
+    _validate_non_negative(args.alpha, "--alpha")
+    _validate_non_negative(args.eta, "--eta")
+    if not math.isfinite(args.z_clip) or args.z_clip <= 0:
+        raise SystemExit("--z-clip must be finite and positive")
     if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
         raise SystemExit("--llm-temperature must be finite and between 0 and 2")
     try:
@@ -85,3 +97,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Non-mock Iron Mind campaigns require --proposal-mode=openai")
     if not args.mock and args.data_dir is None:
         raise SystemExit("Non-mock Iron Mind campaigns require --data-dir")
+
+
+def _validate_non_negative(value: float, option: str) -> None:
+    if not math.isfinite(value) or value < 0:
+        raise SystemExit(f"{option} must be finite and non-negative")

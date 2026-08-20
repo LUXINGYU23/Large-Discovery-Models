@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = {
         "schema_version": 1,
         "task": "iron_mind",
-        "method": "ldm_rbf_gp_ucb",
+        "method": "ldm_tilted_ucb",
         "suite": args.suite,
         "expected_campaigns_per_dataset": args.expected_campaigns,
         "expected_evaluations_per_campaign": args.expected_evaluations,

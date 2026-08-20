@@ -30,7 +30,8 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert plan["contract_profile"] == "ldm_official_smoke"
     assert profile.budget["external_evaluations"] == 1
     assert config["args"]["proposal-mode"] == "openai"
-    assert config["args"]["reservoir-size"] == 64
+    assert config["args"]["proposal-samples"] == 64
+    assert config["args"]["bo-pool-size"] == 32
     assert config["args"]["proposal-max-workers"] == 64
     assert config["args"]["evaluations-per-round"] == 1
     assert config["args"]["llm-temperature"] == 0.7
@@ -73,6 +74,10 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         serialized = json.dumps(config)
         assert plan["contract_profile"] == "ldm_official_20"
         assert config["args"]["iterations"] == 20
+        assert config["args"]["proposal-samples"] == 64
+        assert config["args"]["bo-pool-size"] == 32
+        assert config["args"]["alpha"] == 1.0
+        assert config["args"]["eta"] == 3.0
         assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
         assert config["args"]["llm-max-tokens"] == 512
@@ -89,17 +94,21 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
     config = load_config(config_path)
     plan = build_plan(config, config_path)
 
-    assert config["algorithm"] == "ucb"
+    assert config["algorithm"] == "ldm_tilted_ucb"
     assert config["mode"] == "mock"
     assert config["args"] == {
         "mock": True,
         "proposal-mode": "callable",
         "dataset-id": "buchwald_hartwig",
         "iterations": 1,
-        "reservoir-size": 64,
+        "proposal-samples": 64,
+        "bo-pool-size": 32,
         "proposal-max-workers": 64,
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
         "prompt-policy": "portfolio_v1",
     }
     assert config["env"] == {"LDM_DATA_COLLECTION_ENABLED": "1"}
@@ -124,17 +133,21 @@ def test_prompt_baseline_smoke_has_its_own_locked_ablation_profile(
     assert "baseline_v1" in plan["argv"]
 
 
-def test_profile_allows_a_custom_internal_reservoir_size(
+def test_profile_allows_custom_proposal_and_bo_pool_sizes(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
     monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
     config_path = CONFIG_ROOT / "real_smoke.yaml"
     config = load_config(config_path)
-    config["args"] = {**config["args"], "reservoir-size": 7}
+    config["args"] = {
+        **config["args"],
+        "proposal-samples": 8,
+        "bo-pool-size": 4,
+    }
 
     plan = build_plan(config, config_path)
 
     assert plan["contract_profile"] == "ldm_official_smoke"
-    assert "--reservoir-size" in plan["argv"]
-    assert "7" in plan["argv"]
+    assert "--proposal-samples" in plan["argv"]
+    assert "--bo-pool-size" in plan["argv"]

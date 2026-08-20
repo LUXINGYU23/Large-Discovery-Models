@@ -2,15 +2,15 @@
   "schema_version": 1,
   "record_type": "iron_mind_delivery_verification",
   "task_id": "iron_mind",
-  "verified_on": "2026-08-19",
+  "verified_on": "2026-08-20",
   "task_tests": {
     "status": "passed",
-    "passed": 86,
+    "passed": 102,
     "timeout_seconds": 60
   },
-  "shared_transport_tests": {
+  "shared_interface_regression_tests": {
     "status": "passed",
-    "passed": 19,
+    "passed": 46,
     "timeout_seconds": 60
   },
   "data_contract": {
@@ -41,41 +41,59 @@
   "mock_campaign": {
     "status": "succeeded",
     "proposal_strategy": "local_concurrent_independent_requests",
-    "reservoir_size": 64,
+    "proposal_samples_requested": 64,
     "proposal_max_workers": 64,
     "proposal_attempts": 64,
+    "valid_proposal_occurrences": 64,
+    "unique_candidates_admitted": 64,
+    "proposal_q0_sum": 1.0,
+    "bo_pool_size": 32,
+    "bo_prediction_count": 32,
+    "selection_probability_sum": 1.0,
+    "pool_maintenance": "q0_gumbel_top_k_without_replacement",
     "valid_search_candidates": 64,
     "selected_candidates": 1,
     "external_evaluations": 1
   },
-  "provider_capability_probe": {
-    "status": "unsupported",
-    "feature": "OpenAI-compatible Chat Completions n > 1",
-    "dataset_id": "reductive_amination",
-    "model": "deepseek-v4-flash",
-    "endpoint_preflight": "passed",
-    "requested_choice_count": 64,
-    "error": "HTTP 400 from OpenAI-compatible endpoint: Invalid n value (currently only n = 1 is supported)",
-    "selected_runtime_transport": "local_concurrent_independent_requests"
+  "two_round_mock_campaign": {
+    "status": "succeeded",
+    "round_0_gp_fit": "prior",
+    "round_0_history_size": 0,
+    "round_1_gp_fit": "fitted_default_hyperparameters",
+    "round_1_history_size": 1,
+    "round_1_valid_proposal_occurrences": 63,
+    "round_1_unique_candidates_admitted": 63,
+    "round_1_bo_pool_size": 32
   },
   "local_concurrency_endpoint_smoke": {
     "status": "succeeded",
     "dataset_id": "reductive_amination",
     "model": "deepseek-v4-flash",
     "endpoint_preflight": "passed",
-    "reservoir_size": 4,
+    "proposal_samples_requested": 4,
     "proposal_max_workers": 4,
     "llm_requests": 4,
     "proposal_attempts": 4,
-    "valid_search_candidates": 1,
-    "reservoir_drop_counts": {
-      "duplicate": 3
-    },
+    "valid_proposal_occurrences": 4,
+    "unique_candidates_admitted": 4,
+    "proposal_q0_sum": 1.0,
+    "bo_pool_size": 2,
+    "bo_prediction_count": 2,
+    "selection_probability_sum": 1.0,
+    "pool_maintenance": "q0_gumbel_top_k_without_replacement",
+    "valid_search_candidates": 4,
     "selected_candidates": 1,
     "external_evaluations": 1,
     "successful_evaluations": 1,
-    "source_row_id": 1,
-    "reaction_score": 11.0
+    "candidate_id": "iron-mind-741fc1f1de74f5763def26b75c7622bc708a5b2a5409839764efb5f8d77b4be4",
+    "source_row_id": 145,
+    "reaction_score": 2.0
+  },
+  "task_isolation": {
+    "status": "passed",
+    "algorithm_root": "tasks/iron_mind/core",
+    "imports_from_other_tasks": 0,
+    "shared_or_other_task_files_changed_in_this_revision": 0
   },
   "suite_dry_runs": {
     "paper_v2_campaigns": 120,

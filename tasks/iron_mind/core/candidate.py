@@ -17,14 +17,30 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema, ReactionValue
 
 CANONICAL_JSON_SEPARATORS = (",", ":")
 PAYLOAD_FIELDS = ("dataset_id", "conditions")
+IRON_MIND_Q0_METADATA_KEY = "iron_mind_empirical_q0"
 
 
 class CandidatePayloadError(ValueError):
     """A user-facing candidate payload error with a stable rejection reason."""
 
-    def __init__(self, reason: str, message: str) -> None:
+    def __init__(
+        self,
+        reason: str,
+        message: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
+        self.metadata = dict(metadata or {})
+
+
+@dataclass(frozen=True)
+class PreparedCandidatePayload:
+    """One normalized, table-backed payload and its canonical identity."""
+
+    payload: dict[str, Any]
+    canonical_key: str
 
 
 @dataclass(frozen=True)
@@ -43,25 +59,16 @@ class IronMindCandidateDomain:
         """Return a candidate only after exact schema and table admission checks."""
 
         try:
-            payload = normalize_candidate_payload(proposal.payload, self.schema)
+            prepared = prepare_candidate_payload(proposal.payload, self.schema, self.table)
         except CandidatePayloadError as exc:
-            return CandidateRejection(exc.reason, str(exc), proposal.source)
-
-        key = canonical_candidate_key(payload)
-        if not self.table.rows_for_conditions(payload["conditions"]):
-            return CandidateRejection(
-                "off_table_conditions",
-                "Candidate conditions are not present in the frozen reaction table.",
-                proposal.source,
-                {"canonical_key": key},
-            )
+            return CandidateRejection(exc.reason, str(exc), proposal.source, exc.metadata)
 
         candidate = Candidate(
-            candidate_id=f"iron-mind-{key}",
-            payload=payload,
-            canonical_key=key,
+            candidate_id=f"iron-mind-{prepared.canonical_key}",
+            payload=prepared.payload,
+            canonical_key=prepared.canonical_key,
             source=proposal.source,
-            metadata=_candidate_metadata(self.schema, self.table),
+            metadata=_candidate_metadata(self.schema, self.table, proposal.metadata),
         )
         if bool(proposal.metadata.get("collectable")):
             self._collect(candidate, proposal.source)
@@ -127,6 +134,24 @@ def normalize_candidate_payload(
     }
 
 
+def prepare_candidate_payload(
+    payload: Any,
+    schema: ReactionDatasetSchema,
+    table: FrozenReactionTable,
+) -> PreparedCandidatePayload:
+    """Normalize one payload and require an exact frozen-table match."""
+
+    normalized = normalize_candidate_payload(payload, schema)
+    key = canonical_candidate_key(normalized)
+    if not table.rows_for_conditions(normalized["conditions"]):
+        raise CandidatePayloadError(
+            "off_table_conditions",
+            "Candidate conditions are not present in the frozen reaction table.",
+            metadata={"canonical_key": key},
+        )
+    return PreparedCandidatePayload(normalized, key)
+
+
 def canonical_candidate_bytes(payload: Mapping[str, Any]) -> bytes:
     """Serialize one normalized payload into its identity-defining UTF-8 bytes."""
 
@@ -179,13 +204,21 @@ def _normalize_conditions(
 
 
 def _candidate_metadata(
-    schema: ReactionDatasetSchema, table: FrozenReactionTable
+    schema: ReactionDatasetSchema,
+    table: FrozenReactionTable,
+    proposal_metadata: Mapping[str, Any],
 ) -> dict[str, Any]:
-    return {
+    metadata = {
         "dataset_id": schema.dataset_id,
         "schema_sha256": schema.schema_sha256,
         "oracle_row_count": len(table.rows),
     }
+    q0 = proposal_metadata.get(IRON_MIND_Q0_METADATA_KEY)
+    if q0 is not None:
+        if not isinstance(q0, Mapping):
+            raise TypeError("Iron Mind empirical q0 metadata must be a mapping")
+        metadata[IRON_MIND_Q0_METADATA_KEY] = dict(q0)
+    return metadata
 
 
 def _active_parameters(schema: ReactionDatasetSchema) -> list[dict[str, Any]]:

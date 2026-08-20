@@ -96,6 +96,15 @@ def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
         workflow._validate_args(args)
 
 
+def test_proposal_oversampling_must_exceed_the_bo_pool() -> None:
+    args = parse_args(
+        ["--mock", "--proposal-samples", "4", "--bo-pool-size", "4"]
+    )
+
+    with pytest.raises(SystemExit, match="must exceed"):
+        workflow._validate_args(args)
+
+
 def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
     args = parse_args(
         [
@@ -106,8 +115,10 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
             "buchwald_hartwig",
             "--iterations",
             "1",
-            "--reservoir-size",
+            "--proposal-samples",
             "4",
+            "--bo-pool-size",
+            "2",
             "--proposal-max-workers",
             "3",
             "--evaluations-per-round",
@@ -141,6 +152,10 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
             "3",
             "--acquisition-beta",
             "1.0",
+            "--alpha",
+            "1.0",
+            "--eta",
+            "3.0",
             "--dry-run",
         ]
     )
@@ -148,6 +163,10 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
     assert args.mock is True
     assert args.campaign_index == 3
     assert args.proposal_max_workers == 3
+    assert args.proposal_samples == 4
+    assert args.bo_pool_size == 2
+    assert args.alpha == 1.0
+    assert args.eta == 3.0
     assert args.api_key == "test-api-key"
     assert args.dry_run is True
     assert args.llm_json_mode is True
@@ -184,8 +203,10 @@ def _real_args(tmp_path: Path, data_root: Path) -> list[str]:
         "openai",
         "--dataset-id",
         "buchwald_hartwig",
-        "--reservoir-size",
+        "--proposal-samples",
         "4",
+        "--bo-pool-size",
+        "2",
         "--data-dir",
         str(data_root),
         "--out-dir",

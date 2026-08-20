@@ -11,7 +11,6 @@ from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
-from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -26,6 +25,7 @@ from tasks.iron_mind.core.factory import (
     OBJECTIVE_NAME,
     CampaignComponentOptions,
     build_campaign_components,
+    build_reaction_selector,
     build_reaction_task_spec,
 )
 from tasks.iron_mind.core.mock import (
@@ -33,15 +33,11 @@ from tasks.iron_mind.core.mock import (
     load_mock_table,
     mock_proposal_response,
 )
-from tasks.iron_mind.core.proposals import (
-    build_openai_reaction_client,
-)
+from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
     parse_openai_extra_body_json,
-    resolve_openai_provider_settings,
 )
-from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
@@ -49,6 +45,9 @@ from tasks.iron_mind.core.workflow_support import (
     campaign_budget,
     jsonable_args,
     load_campaign_state,
+    pause_endpoint,
+    preflight_endpoint,
+    provider_settings,
 )
 from tasks.iron_mind.core.workflow_args import parse_args, validate_args
 
@@ -56,27 +55,37 @@ TASK_ID = "iron_mind"
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
+
+
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
     """Describe the configured reaction task before campaign assembly."""
 
     schema = _load_table(args).schema if not args.mock else _schema_for(args.dataset_id)
     return _task_spec(args, schema)
 
+
 def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTaskSpec:
     encoder = ReactionOneHotEncoder(schema)
-    selector = ReactionCategoricalGPUCBSelector(
+    selector = build_reaction_selector(
         schema=schema,
-        objective_name=OBJECTIVE_NAME,
         beta=args.acquisition_beta,
+        alpha=args.alpha,
+        eta=args.eta,
+        z_clip=args.z_clip,
+        seed=args.campaign_index,
+        pool_size=args.bo_pool_size,
+        proposal_sample_count=args.proposal_samples,
         feature_version=encoder.version,
     )
     return build_reaction_task_spec(
         schema,
         selector.describe(),
-        args.reservoir_size,
-        args.proposal_max_workers,
-        args.prompt_policy,
+        proposal_samples=args.proposal_samples,
+        bo_pool_size=args.bo_pool_size,
+        proposal_max_workers=args.proposal_max_workers,
+        prompt_policy=args.prompt_policy,
     )
+
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
@@ -92,11 +101,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     return _run_campaign(args, table, task_spec, contract, profile_name, payload)
 
+
 def _run_campaign(
     args, table, task_spec, contract, profile_name: str, payload: dict[str, Any]
 ) -> int:
     schema = table.schema
-    provider = _provider_settings(args) if args.proposal_mode == "openai" else None
+    provider = provider_settings(args) if args.proposal_mode == "openai" else None
     if provider is not None:
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
@@ -104,7 +114,7 @@ def _run_campaign(
     client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
         assert provider is not None
-        if not _preflight_endpoint(client, runtime, args, payload, provider):
+        if not preflight_endpoint(client, runtime, args, payload, provider):
             return 2
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
@@ -119,14 +129,20 @@ def _run_campaign(
             table=table,
             sink=sink,
             runtime=runtime,
-            reservoir_size=args.reservoir_size,
+            proposal_samples=args.proposal_samples,
+            bo_pool_size=args.bo_pool_size,
             proposal_max_workers=args.proposal_max_workers,
             before_requests=before_requests,
             acquisition_beta=args.acquisition_beta,
+            acquisition_alpha=args.alpha,
+            acquisition_eta=args.eta,
+            acquisition_z_clip=args.z_clip,
+            selection_seed=args.campaign_index,
             prompt_policy=args.prompt_policy,
         )
     )
     return _finish_campaign(args, components, runtime, payload)
+
 
 def _finish_campaign(
     args,
@@ -136,13 +152,13 @@ def _finish_campaign(
 ) -> int:
     state = load_campaign_state(runtime, args.resume_from is not None)
     try:
-        config = LDMEngineConfig(args.iterations, args.reservoir_size, args.evaluations_per_round)
+        config = LDMEngineConfig(args.iterations, args.proposal_samples, args.evaluations_per_round)
         result = components.engine.run(
             config,
             state=state,
         )
     except EndpointRequestError as exc:
-        _pause_endpoint(
+        pause_endpoint(
             runtime,
             args,
             payload,
@@ -154,9 +170,17 @@ def _finish_campaign(
     payload.update(engine_summary=result.summary, run_dir=str(runtime.run_dir.resolve()))
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if result.summary["successful_evaluation_count"] else 1
+
+
 _validate_args = validate_args
 
-def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha256: str, profile_name: str) -> dict[str, Any]:
+
+def _run_payload(
+    args: argparse.Namespace,
+    task_spec: LDMTaskSpec,
+    contract_sha256: str,
+    profile_name: str,
+) -> dict[str, Any]:
     return {
         "task": TASK_ID,
         "mode": "mock" if args.mock else "real",
@@ -167,6 +191,7 @@ def _run_payload(args: argparse.Namespace, task_spec: LDMTaskSpec, contract_sha2
         "contract_sha256": contract_sha256,
         "ldm_task_spec": task_spec.to_dict(),
     }
+
 
 def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRuntime:
     default_name = (
@@ -192,11 +217,13 @@ def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRunti
         snapshot_experiment_contract(contract, run_dir, profile=profile_name)
     return runtime
 
+
 def _schema_for(dataset_id: str) -> ReactionDatasetSchema:
     try:
         return load_reaction_schemas(SCHEMA_PATH)[dataset_id]
     except KeyError as exc:
         raise SystemExit(f"Unknown --dataset-id: {dataset_id}") from exc
+
 
 def _load_mock_table(
     schema: ReactionDatasetSchema,
@@ -208,14 +235,16 @@ def _load_mock_table(
         candidate_count=candidate_count,
     )
 
+
 def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
     if args.mock:
         return _load_mock_table(
             _schema_for(args.dataset_id),
-            candidate_count=args.reservoir_size,
+            candidate_count=args.proposal_samples,
         )
     assert args.data_dir is not None
     return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
+
 
 def _proposal_client(
     args: argparse.Namespace,
@@ -240,48 +269,3 @@ def _proposal_client(
         json_mode=args.llm_json_mode,
         extra_body=parse_openai_extra_body_json(args.llm_extra_body_json),
     )
-
-def _preflight_endpoint(
-    client: ProposalClient,
-    runtime: CampaignRuntime,
-    args: argparse.Namespace,
-    payload: dict[str, Any],
-    provider: OpenAIProviderSettings,
-) -> bool:
-    if not provider.base_url or not provider.model:
-        return _pause_endpoint(runtime, args, payload, "Set LLM_BASE_URL and LLM_MODEL_NAME for OpenAI proposal mode.")
-    if not provider.api_key and not is_local_url(provider.base_url):
-        return _pause_endpoint(runtime, args, payload, "Set LLM_API_KEY for a non-local OpenAI-compatible endpoint.")
-    try:
-        preflight = client.preflight()  # type: ignore[attr-defined]
-    except EndpointRequestError as exc:
-        return _pause_endpoint(runtime, args, payload, str(exc))
-    runtime.record("endpoint_preflight_succeeded", preflight)
-    payload["endpoint_preflight"] = preflight
-    return True
-
-
-def _provider_settings(args: argparse.Namespace) -> OpenAIProviderSettings:
-    return resolve_openai_provider_settings(
-        base_url=args.llm_url,
-        model=args.llm_model_name,
-        api_key=args.api_key,
-    )
-
-def _pause_endpoint(
-    runtime: CampaignRuntime,
-    args: argparse.Namespace,
-    payload: dict[str, Any],
-    message: str,
-    *,
-    phase: str = "endpoint_preflight",
-) -> bool:
-    runtime.pause(
-        "paused_endpoint_unavailable",
-        phase=phase,
-        message=message,
-        details={"model": args.llm_model_name},
-    )
-    payload.update(run_dir=str(runtime.run_dir.resolve()), status="paused_endpoint_unavailable")
-    print(json.dumps(payload, indent=2, sort_keys=True))
-    return False

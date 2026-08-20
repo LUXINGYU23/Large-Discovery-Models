@@ -14,6 +14,7 @@ from ldm_tts.transport import CallableProposalClient
 from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
 from tasks.iron_mind.core.dependencies import DependencyResources, check_task_dependencies
 from tasks.iron_mind.core.factory import CampaignComponentOptions, build_campaign_components
+from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.schema import (
     ReactionDatasetSchema,
@@ -268,7 +269,8 @@ def _factory_options(
         table=table,
         sink=DataCollectionSink.disabled(),
         runtime=runtime,
-        reservoir_size=4,
+        proposal_samples=4,
+        bo_pool_size=2,
     )
 
 
@@ -284,7 +286,8 @@ def test_factory_assembles_one_shared_engine_shape_for_mock_and_real(tmp_path: P
     for name in ("domain", "expander", "encoder", "selector", "engine"):
         assert type(getattr(mock, name)) is type(getattr(real, name))
     assert isinstance(mock.engine, LDMEngine)
-    assert isinstance(mock.selector, ReactionCategoricalGPUCBSelector)
+    assert isinstance(mock.selector, AcquisitionTiltedSelector)
+    assert isinstance(mock.selector.base_selector, ReactionCategoricalGPUCBSelector)
     assert mock.expander.domain is mock.domain
     assert mock.engine.task_spec == mock.task_spec
     assert mock.task_spec.surrogate == mock.encoder.describe()

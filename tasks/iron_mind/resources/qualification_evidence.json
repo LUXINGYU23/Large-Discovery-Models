@@ -3,7 +3,7 @@
   "task_id": "iron_mind",
   "stage": "tiny_campaign_verified",
   "benchmark_commit": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
-  "contract_profile": "",
+  "contract_profile": "ldm_official_smoke",
   "gates": {
     "scaffolded": {
       "status": "passed",

@@ -69,8 +69,9 @@ uv run --locked --project tasks/iron_mind python \
 
 A successful run writes a timestamped directory below
 `$IRON_MIND_RUNS_ROOT/smoke/`. The released profile sends 64 independent
-one-candidate requests with up to 64 local workers, ranks the returned
-candidates with the task GP selector, and evaluates one reaction condition.
+one-candidate requests with up to 64 local workers, estimates empirical `q0`,
+maintains a 32-candidate BO pool, and samples one reaction condition from the
+GP-UCB-tilted LDM policy.
 That one external evaluation is the Iron Mind-compatible batch size.
 Malformed or duplicate responses are recorded and can reduce the admitted
 reservoir.
@@ -103,6 +104,7 @@ This example disables DeepSeek V4 thinking for proposal-only generation; other
 OpenAI-compatible providers can use their own documented request object.
 
 After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
-campaign or a suite configuration for the full benchmark. Set
-`--set args.reservoir-size=<N>` when running the shared runner to change the
-internal proposal count without changing the number of evaluated reactions.
+campaign or a suite configuration for the full benchmark. Set both
+`--set args.proposal-samples=<M>` and `--set args.bo-pool-size=<K>` to change
+the internal search, with `M > K`, without changing the number of evaluated
+reactions.

@@ -30,6 +30,7 @@ def test_aggregator_emits_summary_and_incumbent_trajectory(tmp_path: Path) -> No
     rows = list(csv.DictReader((output / "aggregate_trajectory.csv").open(encoding="utf-8")))
     buchwald = next(item for item in summary["datasets"] if item["dataset_id"] == "buchwald_hartwig")
     assert code == 0
+    assert summary["method"] == "ldm_tilted_ucb"
     assert buchwald["campaign_count"] == 2
     assert buchwald["mean_best_reaction_score"] == 2.75
     assert [row["mean_best_reaction_score"] for row in rows[:2]] == ["1.5", "2.75"]

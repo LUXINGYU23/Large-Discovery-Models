@@ -1,6 +1,6 @@
 name: iron_mind_alkylation_deprotection_ldm_20
 task: iron_mind
-algorithm: ucb
+algorithm: ldm_tilted_ucb
 mode: real
 description: Our LDM method on the official alkylation_deprotection oracle with 20 evaluations.
 contract_profile: ldm_official_20
@@ -8,10 +8,14 @@ args:
   proposal-mode: openai
   dataset-id: alkylation_deprotection
   iterations: 20
-  reservoir-size: 64
+  proposal-samples: 64
+  bo-pool-size: 32
   proposal-max-workers: 64
   evaluations-per-round: 1
   acquisition-beta: 1.0
+  alpha: 1.0
+  eta: 3.0
+  z-clip: 5.0
   campaign-index: 0
   data-dir: ${IRON_MIND_DATA_ROOT}
   llm-url: null
