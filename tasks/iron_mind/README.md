@@ -84,7 +84,9 @@ pool, the task first samples the maintained pool without replacement from
 `q0` using Gumbel top-k.
 
 The factor-aware categorical GP then predicts the reaction score on the
-maintained pool. Its acquisition score is GP-UCB,
+maintained pool. A small model-mismatch variance regularizes the exact GP so
+that early categorical ARD fits do not interpolate sparse observations as if
+the kernel were exact. Its acquisition score is GP-UCB,
 
 ```math
 a_t(x) = \mu_t(x) + \beta \sigma_t(x).
@@ -100,7 +102,9 @@ The evaluated condition is sampled without replacement from
 `--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
 different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=1`. `--z-clip` defaults to 5. The campaign index seeds task-side pool
+`eta=1` for the official 20-evaluation protocol; the fixed quick-comparison
+profiles use the calibrated values documented below. `--z-clip` defaults to 5.
+The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
 
 ## Proposal Prompt Policy
@@ -267,7 +271,8 @@ data-starved six-evaluation comparison changes after additional GP feedback;
 it does not replace the fixed six-evaluation early-stop screen.
 
 The LDM method retains the 64 independent proposals, empirical `q0`,
-32-candidate maintained pool, and acquisition tilt described above. Pure BO
+48-candidate maintained pool, `beta=2`, and `eta=3` acquisition tilt locked by
+the quick-comparison profiles. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted

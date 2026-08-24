@@ -96,6 +96,7 @@ def test_selector_records_calibrated_ucb_and_ard_fit_summary() -> None:
 
     summary = result.metadata["surrogate"]
     assert result.metadata["effective_beta"] == result.metadata["base_beta"] == 1.0
+    assert selector.describe().parameters["model_mismatch_variance"] == pytest.approx(0.04)
     assert summary["fit_status"] == "fitted_ard_marginal_likelihood"
     assert set(summary["kernel"]["factor_weights"]) == {"base", "solvent"}
     assert all(item.metadata["surrogate"] == "reaction_categorical_ard_gp" for item in result.predictions)

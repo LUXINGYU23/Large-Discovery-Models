@@ -52,10 +52,11 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
     assert task_spec.acquisition.parameters == {
         "base_acquisition": "ucb",
         "base_acquisition_parameters": {
-            "base_beta": 1.0,
-            "beta_schedule": "constant",
-            "kernel": "factor_ard_categorical_rbf",
-        },
+                "base_beta": 1.0,
+                "beta_schedule": "constant",
+                "kernel": "factor_ard_categorical_rbf",
+                "model_mismatch_variance": 0.04,
+            },
         "base_measure": "empirical_proposal_frequency",
         "alpha_base_measure": 1.0,
         "eta_acquisition_tilt": 1.0,

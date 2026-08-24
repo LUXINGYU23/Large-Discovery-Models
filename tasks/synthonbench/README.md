@@ -40,15 +40,19 @@ Each outer round uses the following task-local realization of the shared LDM
 lifecycle:
 
 1. Draw `M=64` independent reaction-conditioned public slates. Reactions are
-   allocated in proportion to their official product-space sizes by default.
+   allocated in proportion to their official product-space sizes by default,
+   and a deterministic unique anchor synthon keeps the 64 proposal slots
+   distinct within each round while leaving the remaining slots open to the
+   model. Anchors from evaluated history are excluded in later rounds.
 2. Issue one independent OpenAI-compatible request per slate. Each request may
    return exactly one tuple selected from its listed source-valid IDs.
 3. Parse and validate every response against both its slate and the full
    official `SynthonSpace`. There are no replacement or refill requests.
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
-5. If more than `K=32` unique candidates survive, retain a `q0`-weighted
-   Gumbel sample of size `K`. Only this maintained BO pool is scored.
+5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
+   sample of size `K`. The full-budget and qualification profiles use `K=32`;
+   quick-comparison profiles use `K=48`. Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -63,7 +67,9 @@ The public slate is necessary because full reaction slot catalogs contain
 thousands of synthons and cannot be faithfully serialized into one LLM prompt.
 It contains only released IDs and SMILES, never score-table values, top-k lists,
 or unqueried oracle outcomes. Previous charged outcomes are the only feedback
-shown in a prompt.
+shown in a prompt. History records include the exact component SMILES alongside
+their IDs and measured utility, so the model can transfer structural evidence
+instead of trying to infer chemistry from opaque identifiers.
 
 All reaction IDs, slot positions, and synthon IDs are canonically ordered before
 any seeded sampling. A fixed campaign seed therefore defines the same shared
@@ -212,8 +218,8 @@ seed, and candidate-budget settings but uses eleven optimization batches
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
 LDM retains the current 64 independent public-slate requests, empirical `q0`,
-32-candidate maintained pool, and task-local reaction-aware Nyström
-count-Tanimoto GP over standardized utilities.
+48-candidate maintained pool, `beta=0.5`, `eta=3`, and task-local
+reaction-aware Nyström count-Tanimoto GP over standardized utilities.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent one-tuple requests per optimization batch and evaluates

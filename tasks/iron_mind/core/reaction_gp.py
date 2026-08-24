@@ -23,6 +23,7 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 MIN_HISTORY_FOR_ARD = 3
 TARGET_STD_FLOOR = 1.0
+DEFAULT_MODEL_MISMATCH_VARIANCE = 0.04
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,7 @@ class ReactionGPUCBConfig:
     """Fixed, campaign-local settings for categorical GP-UCB selection."""
 
     base_beta: float = 1.0
-    noise: float = 1.0e-6
+    noise: float = DEFAULT_MODEL_MISMATCH_VARIANCE
     target_std_floor: float = TARGET_STD_FLOOR
 
     def __post_init__(self) -> None:
@@ -72,6 +73,7 @@ class ReactionCategoricalGPUCBSelector:
                 "base_beta": self.config.base_beta,
                 "beta_schedule": "constant",
                 "kernel": "factor_ard_categorical_rbf",
+                "model_mismatch_variance": self.config.noise,
             },
         )
 

@@ -57,14 +57,15 @@ def test_catalog_is_deterministic_and_reaction_slot_specific() -> None:
     assert all(option.smiles for slot in first.slot_options for option in slot)
 
 
-def test_direct_catalog_assigns_distinct_fixed_anchors() -> None:
+def test_unique_anchor_catalog_assigns_distinct_fixed_anchors_within_a_round() -> None:
     catalog = SynthonProposalCatalog(
         _space(),
         allowed_reactions=("r1",),
         slate_size=2,
         seed=7,
-        direct_unique=True,
-        direct_proposal_count=2,
+        unique_anchors=True,
+        proposals_per_round=2,
+        restrict_to_complete_tuples=True,
     )
     first = catalog.build_plan(round_idx=0, proposal_index=0)
     second = catalog.build_plan(round_idx=0, proposal_index=1)
@@ -76,18 +77,35 @@ def test_direct_catalog_assigns_distinct_fixed_anchors() -> None:
     second_anchor = next(slot for slot in second.slot_options if slot[0].position == anchor)
     assert len(first_anchor) == len(second_anchor) == 1
     assert first_anchor[0].synthon_id != second_anchor[0].synthon_id
-    assert first.direct_tuple_options
-    assert first.direct_tuple_options[0][0] == first_anchor[0].synthon_id
+    assert first.complete_tuple_options
+    assert first.complete_tuple_options[0][0] == first_anchor[0].synthon_id
 
 
-def test_direct_catalog_excludes_history_anchor_ids() -> None:
+def test_unobserved_anchors_remain_available_in_later_rounds() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r1",),
+        slate_size=2,
+        seed=7,
+        unique_anchors=True,
+        proposals_per_round=2,
+    )
+
+    first_round = [catalog.build_plan(round_idx=0, proposal_index=index) for index in range(2)]
+    second_round = [catalog.build_plan(round_idx=1, proposal_index=index) for index in range(2)]
+
+    assert {plan.uniqueness_anchor_id for plan in first_round} == {1, 2}
+    assert {plan.uniqueness_anchor_id for plan in second_round} == {1, 2}
+
+
+def test_unique_anchor_catalog_excludes_history_anchor_ids() -> None:
     catalog = SynthonProposalCatalog(
         _space(),
         allowed_reactions=("r2",),
         slate_size=2,
         seed=7,
-        direct_unique=True,
-        direct_proposal_count=1,
+        unique_anchors=True,
+        proposals_per_round=1,
     )
     baseline = catalog.build_plan(round_idx=0, proposal_index=0)
     anchor_id = baseline.uniqueness_anchor_id
@@ -105,14 +123,14 @@ def test_direct_catalog_excludes_history_anchor_ids() -> None:
 def test_direct_catalog_requires_one_complete_tuple_option() -> None:
     catalog = SynthonProposalCatalog(
         _space(), allowed_reactions=("r1",), slate_size=2, seed=7,
-        direct_unique=True, direct_proposal_count=1,
+        unique_anchors=True, proposals_per_round=1, restrict_to_complete_tuples=True,
     )
     plan = catalog.build_plan(round_idx=0, proposal_index=0)
-    valid = {"reaction_id": "r1", "synthon_ids": list(plan.direct_tuple_options[0])}
-    invalid = {"reaction_id": "r1", "synthon_ids": [plan.direct_tuple_options[0][0], 999]}
+    valid = {"reaction_id": "r1", "synthon_ids": list(plan.complete_tuple_options[0])}
+    invalid = {"reaction_id": "r1", "synthon_ids": [plan.complete_tuple_options[0][0], 999]}
 
     assert parse_synthon_response(json.dumps(valid), plan) == valid
-    with pytest.raises(ValueError, match="direct candidate option"):
+    with pytest.raises(ValueError, match="complete candidate option"):
         parse_synthon_response(json.dumps(invalid), plan)
 
 

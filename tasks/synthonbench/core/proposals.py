@@ -62,8 +62,16 @@ class SynthonBenchProposalExpander:
             )
             for index in range(request.reservoir_size)
         )
-        proposal_requests = tuple(_proposal_request(request, plan, self.target, self.prompt_policy)
-                                  for plan in plans)
+        proposal_requests = tuple(
+            _proposal_request(
+                request,
+                plan,
+                space=self.catalog.space,
+                target=self.target,
+                prompt_policy=self.prompt_policy,
+            )
+            for plan in plans
+        )
         if self.before_requests is not None:
             self.before_requests(len(proposal_requests))
         responses = self._propose_all(proposal_requests)
@@ -95,9 +103,20 @@ class SynthonBenchProposalExpander:
 
 
 def _proposal_request(
-    request: ExpansionRequest, plan, target: str, prompt_policy: str
+    request: ExpansionRequest,
+    plan,
+    *,
+    space: object,
+    target: str,
+    prompt_policy: str,
 ) -> ProposalRequest:
-    messages = build_synthon_prompt_messages(request, plan, target=target, prompt_policy=prompt_policy)
+    messages = build_synthon_prompt_messages(
+        request,
+        plan,
+        target=target,
+        space=space,
+        prompt_policy=prompt_policy,
+    )
     return ProposalRequest(
         messages=messages,
         metadata={
@@ -154,7 +173,7 @@ def _role_counts(plans) -> dict[str, int]:
 
 
 def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCatalog) -> dict[str, set[int]]:
-    if not catalog.direct_unique:
+    if not catalog.unique_anchors:
         return {}
     excluded: dict[str, set[int]] = {}
     for observation in request.observations:
@@ -166,7 +185,7 @@ def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCata
         if not isinstance(reaction_id, str) or not isinstance(synthon_ids, list):
             raise TypeError("SynthonBench observations must retain reaction_id and synthon_ids")
         positions = ordered_positions(catalog.space, reaction_id)
-        anchor = catalog.direct_anchor_position(reaction_id)
+        anchor = catalog.anchor_position(reaction_id)
         anchor_index = positions.index(anchor)
         anchor_id = synthon_ids[anchor_index]
         if isinstance(anchor_id, bool) or not isinstance(anchor_id, int):
