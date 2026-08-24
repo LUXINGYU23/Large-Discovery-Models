@@ -52,8 +52,15 @@ class SynthonBenchProposalExpander:
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         """Construct one slate and one endpoint call for every requested proposal."""
 
-        plans = tuple(self.catalog.build_plan(round_idx=request.round_idx, proposal_index=index)
-                      for index in range(request.reservoir_size))
+        excluded = _excluded_anchor_ids(request, self.catalog)
+        plans = tuple(
+            self.catalog.build_plan(
+                round_idx=request.round_idx,
+                proposal_index=index,
+                excluded_anchor_ids=excluded,
+            )
+            for index in range(request.reservoir_size)
+        )
         proposal_requests = tuple(_proposal_request(request, plan, self.target, self.prompt_policy)
                                   for plan in plans)
         if self.before_requests is not None:
@@ -143,6 +150,26 @@ def _role_counts(plans) -> dict[str, int]:
     for plan in plans:
         counts[plan.role] = counts.get(plan.role, 0) + 1
     return counts
+
+
+def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCatalog) -> dict[str, set[int]]:
+    if not catalog.direct_unique:
+        return {}
+    excluded: dict[str, set[int]] = {}
+    for observation in request.observations:
+        payload = observation.candidate.payload
+        reaction_id = payload.get("reaction_id") if isinstance(payload, dict) else None
+        synthon_ids = payload.get("synthon_ids") if isinstance(payload, dict) else None
+        if not isinstance(reaction_id, str) or not isinstance(synthon_ids, list):
+            raise TypeError("SynthonBench observations must retain reaction_id and synthon_ids")
+        positions = tuple(catalog.space.positions(reaction_id))
+        anchor = catalog.direct_anchor_position(reaction_id)
+        anchor_index = positions.index(anchor)
+        anchor_id = synthon_ids[anchor_index]
+        if isinstance(anchor_id, bool) or not isinstance(anchor_id, int):
+            raise TypeError("SynthonBench observation anchor must be an integer")
+        excluded.setdefault(reaction_id, set()).add(anchor_id)
+    return excluded
 
 
 __all__ = ["SynthonBenchProposalExpander"]

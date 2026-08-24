@@ -77,6 +77,28 @@ def test_direct_catalog_assigns_distinct_fixed_anchors() -> None:
     assert first_anchor[0].synthon_id != second_anchor[0].synthon_id
 
 
+def test_direct_catalog_excludes_history_anchor_ids() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r2",),
+        slate_size=2,
+        seed=7,
+        direct_unique=True,
+        direct_proposal_count=1,
+    )
+    baseline = catalog.build_plan(round_idx=0, proposal_index=0)
+    anchor_id = baseline.uniqueness_anchor_id
+    assert anchor_id is not None
+
+    plan = catalog.build_plan(
+        round_idx=0,
+        proposal_index=0,
+        excluded_anchor_ids={"r2": {anchor_id}},
+    )
+
+    assert plan.uniqueness_anchor_id != anchor_id
+
+
 def test_parser_rejects_any_tuple_outside_the_assigned_slate() -> None:
     plan = _catalog(seed=0).build_plan(round_idx=0, proposal_index=0)
     valid = {
