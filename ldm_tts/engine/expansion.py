@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
 from ldm_tts.contracts import Candidate, Observation, RawProposal
@@ -61,6 +61,37 @@ class CallableReservoirExpander:
         return self.operation(request)
 
 
+class InitialRoundReservoirExpander:
+    """Use a deterministic initializer once, then delegate to the active search expander."""
+
+    def __init__(
+        self,
+        *,
+        initializer: ReservoirExpander,
+        search_expander: ReservoirExpander,
+        initial_reservoir_size: int,
+    ) -> None:
+        if initial_reservoir_size < 1:
+            raise ValueError("initial reservoir size must be positive")
+        self.initializer = initializer
+        self.search_expander = search_expander
+        self.initial_reservoir_size = initial_reservoir_size
+
+    def expand(self, request: ExpansionRequest) -> ExpansionResult:
+        if request.round_idx == 0:
+            result = self.initializer.expand(
+                replace(request, reservoir_size=self.initial_reservoir_size)
+            )
+            metadata = {"phase": "shared_initialization", **result.metadata}
+            return ExpansionResult(
+                proposals=result.proposals,
+                schema_update=result.schema_update,
+                attempts=result.attempts,
+                metadata=metadata,
+            )
+        return self.search_expander.expand(request)
+
+
 class DirectEmissionExpander:
     """Use one proposal client turn to emit raw candidate payloads directly."""
 
@@ -97,5 +128,6 @@ __all__ = [
     "DirectEmissionExpander",
     "ExpansionRequest",
     "ExpansionResult",
+    "InitialRoundReservoirExpander",
     "ReservoirExpander",
 ]

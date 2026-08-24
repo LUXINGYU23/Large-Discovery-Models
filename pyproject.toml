@@ -26,6 +26,7 @@ dev = [
     "pandas>=2",
     "pytest>=8,<9",
     "pytest-cov>=4",
+    "matplotlib>=3.8",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -193,6 +193,33 @@ Each completed run writes:
 - `result.json`: LDM summary, best utility, and official metrics.
 - shared `status.json`, `budget.json`, events, and checkpoint artifacts.
 
+## Fixed-Budget Quick Comparison
+
+`config/quick_compare/synthonbench.yaml` runs a three-seed comparison on the
+official 1M KIF11 surrogate track. One product-uniform shared initialization
+batch and five optimization batches make six batches of 16 official calls
+(96 calls per campaign).
+
+LDM retains the current 64 independent public-slate requests, empirical `q0`,
+32-candidate maintained pool, and task-local Nyström count-Tanimoto GP.
+Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
+official tuples per batch and makes no model requests. Direct LLM sampling
+issues 16 independent one-tuple requests per optimization batch and evaluates
+the admitted tuples directly.
+
+```bash
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+```
+
+The result directory contains standard child artifacts plus a portable matrix
+manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
+plot. Endpoint settings remain user-defined OpenAI-compatible environment
+variables; the BO children do not require them.
+
 ## Qualification Status
 
 The current Nyström/FITC method is qualified through the source-pinned

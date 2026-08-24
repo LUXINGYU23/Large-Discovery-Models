@@ -8,8 +8,8 @@
     "task_path": "tasks/synthonbench"
   },
   "proposal_provider": {
-    "kind": "model_endpoint",
-    "requires_endpoint_preflight": true,
+    "kind": "hybrid",
+    "requires_endpoint_preflight": false,
     "supports_collection": true
   },
   "metrics": {
@@ -70,7 +70,12 @@
       "oracle_contract": "Every selected unseen tuple is scored by official GlobalSynthonTask; duplicate tuples are excluded before evaluation.",
       "proposal_contract": "64 independent local-concurrent one-candidate OpenAI-compatible requests by default, each restricted to a deterministic public reaction-conditioned slate.",
       "method": "Empirical q0 from valid unseen proposal occurrences, q0-weighted Gumbel maintenance of a 32-candidate BO pool, task-local Nystr\u00f6m/FITC count-Tanimoto GP-UCB scoring over raw-connector synthon product proxies, and q0^alpha exp(eta z(UCB)) Gumbel sampling.",
-      "audit": "The source-pinned scripts/score_submission.py is executed unchanged for released 1M, 10M, and 100M score tables."
+      "audit": "The source-pinned scripts/score_submission.py is executed unchanged for released 1M, 10M, and 100M score tables.",
+      "method_providers": {
+        "ldm": "model_endpoint",
+        "llm": "model_endpoint",
+        "bo": "dataset_or_deterministic_search"
+      }
     },
     "per_candidate_limits": {
       "benchmark_jobs": 1
@@ -88,6 +93,46 @@
     "benchmark_jobs": 10000
   },
   "profiles": {
+    "quick_compare": {
+      "description": "Six-round fixed-budget comparison on the official 1M surrogate track.",
+      "budget": {
+        "outer_iterations": 6,
+        "selected_candidates": 96,
+        "external_evaluations": 96,
+        "expensive_evaluation_attempts": 96,
+        "successful_evaluations": 96,
+        "benchmark_jobs": 96
+      },
+      "locked_args": {
+        "scale": "1M",
+        "target": "kif11",
+        "oracle-kind": "surrogate",
+        "iterations": 6,
+        "evaluations-per-round": 16,
+        "proposal-samples": 64,
+        "bo-pool-size": 32,
+        "bo-search-samples": 64,
+        "proposal-max-workers": 64,
+        "slate-size": 24,
+        "reaction-allocation": "product_weighted",
+        "fingerprint-bits": 2048,
+        "gp-landmarks": 256,
+        "gp-kernel-jitter": 1.0e-8,
+        "gp-signal-std": 1.0,
+        "gp-mean-std": 1.0,
+        "gp-observation-noise-std": 1.0,
+        "gp-reaction-weight": 0.0,
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
+        "initialization-mode": "shared_random",
+        "prompt-policy": "policy_v1",
+        "llm-max-tokens": 256,
+        "llm-temperature": 0.7,
+        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+      }
+    },
     "surrogate_1m_qualification": {
       "description": "One real LDM-selected qualification query against the official 1M surrogate oracle.",
       "budget": {

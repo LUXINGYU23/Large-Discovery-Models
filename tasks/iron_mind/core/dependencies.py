@@ -31,6 +31,7 @@ SUPPORTED_REAL_PROFILES = frozenset(
         "ldm_official_20",
         "ldm_prompt_baseline_smoke",
         "ldm_prompt_baseline_20",
+        "quick_compare",
     }
 )
 
@@ -101,23 +102,32 @@ def _real_checks(
         dataset_contract = _dataset_contract(contract, dataset_id)
     except (KeyError, ValueError) as exc:
         return [gate, fail(task, "tracked resources", str(exc))]
+    provider_checks = _provider_checks(task, args, env)
     return [
         gate,
-        *check_llm_settings(
-            task,
-            args,
-            env,
-            url_arg="llm-url",
-            model_arg="llm-model-name",
-            api_arg="api-key",
-            url_env=("LLM_BASE_URL", "TTS_LLM_URL", "LDM_LLM_URL"),
-            model_env=("LLM_MODEL_NAME", "TTS_LLM_MODEL", "LDM_LLM_MODEL"),
-            api_env=("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"),
-            required=True,
-        ),
+        *provider_checks,
         _source_revision_check(task, data_root, contract),
         _frozen_table_check(task, data_root, dataset_id, dataset_contract),
     ]
+
+
+def _provider_checks(
+    task: str, args: Mapping[str, Any], env: Mapping[str, str]
+) -> list[DependencyCheck]:
+    if arg_value(dict(args), "search-method", default="ldm") == "bo":
+        return [ok(task, "proposal provider", "Pure BO does not use a model endpoint.")]
+    return check_llm_settings(
+        task,
+        dict(args),
+        dict(env),
+        url_arg="llm-url",
+        model_arg="llm-model-name",
+        api_arg="api-key",
+        url_env=("LLM_BASE_URL", "TTS_LLM_URL", "LDM_LLM_URL"),
+        model_env=("LLM_MODEL_NAME", "TTS_LLM_MODEL", "LDM_LLM_MODEL"),
+        api_env=("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"),
+        required=True,
+    )
 
 
 def _source_gate(

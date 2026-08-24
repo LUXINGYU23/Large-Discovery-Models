@@ -43,6 +43,12 @@ def test_proposal_defaults_disable_thinking() -> None:
     assert args.llm_max_tokens == 256
 
 
+def test_quick_compare_arguments_expose_a_task_local_bo_pool_size() -> None:
+    args = parse_args(["--mock", "--search-method", "bo", "--proposal-mode", "none"])
+
+    assert args.bo_search_samples == 64
+
+
 def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
@@ -88,7 +94,8 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
 
     for profile in contract.profiles.values():
         assert required <= set(profile.locked_args)
-        config_path = REPO_ROOT / "config" / "synthonbench" / f"{profile.name}.yaml"
+        filename = "quick_compare_base.yaml" if profile.name == "quick_compare" else f"{profile.name}.yaml"
+        config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
 

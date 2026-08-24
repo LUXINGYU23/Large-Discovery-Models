@@ -24,9 +24,12 @@ from tasks.iron_mind.core.dependencies import load_pinned_reaction_table
 from tasks.iron_mind.core.factory import (
     OBJECTIVE_NAME,
     CampaignComponentOptions,
+    build_base_reaction_selector,
     build_campaign_components,
+    build_direct_acquisition,
     build_reaction_selector,
     build_reaction_task_spec,
+    disabled_surrogate,
 )
 from tasks.iron_mind.core.mock import (
     MOCK_SEED_ROW_COUNT,
@@ -41,6 +44,7 @@ from tasks.iron_mind.core.provider import (
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
+from tasks.iron_mind.core.search import finite_domain_size
 from tasks.iron_mind.core.workflow_support import (
     campaign_budget,
     jsonable_args,
@@ -60,30 +64,24 @@ MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
     """Describe the configured reaction task before campaign assembly."""
 
-    schema = _load_table(args).schema if not args.mock else _schema_for(args.dataset_id)
-    return _task_spec(args, schema)
+    return _task_spec(args, _load_table(args))
 
 
-def _task_spec(args: argparse.Namespace, schema: ReactionDatasetSchema) -> LDMTaskSpec:
-    encoder = ReactionOneHotEncoder(schema)
-    selector = build_reaction_selector(
-        schema=schema,
-        beta=args.acquisition_beta,
-        alpha=args.alpha,
-        eta=args.eta,
-        z_clip=args.z_clip,
-        seed=args.campaign_index,
-        pool_size=args.bo_pool_size,
-        proposal_sample_count=args.proposal_samples,
-        feature_version=encoder.version,
-    )
+def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskSpec:
+    schema = table.schema
+    encoder = ReactionOneHotEncoder(schema) if args.search_method != "llm" else None
+    selector = _selector(args, schema, encoder)
     return build_reaction_task_spec(
         schema,
-        selector.describe(),
+        selector.describe() if selector is not None else build_direct_acquisition(),
         proposal_samples=args.proposal_samples,
         bo_pool_size=args.bo_pool_size,
         proposal_max_workers=args.proposal_max_workers,
         prompt_policy=args.prompt_policy,
+        search_method=args.search_method,
+        initialization_mode=args.initialization_mode,
+        surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
+        domain_size=finite_domain_size(table),
     )
 
 
@@ -91,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     validate_args(args)
     table = _load_table(args)
-    task_spec = _task_spec(args, table.schema)
+    task_spec = _task_spec(args, table)
     contract, profile_name = load_active_experiment_contract()
     if contract is None:
         contract = load_experiment_contract(TASK_ROOT / "experiment.json")
@@ -110,7 +108,7 @@ def _run_campaign(
     if provider is not None:
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
-    runtime = _open_runtime(args, task_spec, contract, profile_name)
+    runtime = _open_runtime(args, table, task_spec, contract, profile_name)
     client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
         assert provider is not None
@@ -118,9 +116,9 @@ def _run_campaign(
             return 2
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
-        None
-        if args.proposal_mode == "callable"
-        else lambda count: runtime.consume("llm_requests", count)
+        (lambda count: runtime.consume("llm_requests", count))
+        if args.proposal_mode == "openai"
+        else None
     )
     components = build_campaign_components(
         CampaignComponentOptions(
@@ -131,6 +129,8 @@ def _run_campaign(
             runtime=runtime,
             proposal_samples=args.proposal_samples,
             bo_pool_size=args.bo_pool_size,
+            search_method=args.search_method,
+            initialization_mode=args.initialization_mode,
             proposal_max_workers=args.proposal_max_workers,
             before_requests=before_requests,
             acquisition_beta=args.acquisition_beta,
@@ -152,7 +152,11 @@ def _finish_campaign(
 ) -> int:
     state = load_campaign_state(runtime, args.resume_from is not None)
     try:
-        config = LDMEngineConfig(args.iterations, args.proposal_samples, args.evaluations_per_round)
+        config = LDMEngineConfig(
+            args.iterations,
+            _reservoir_size(args, components),
+            args.evaluations_per_round,
+        )
         result = components.engine.run(
             config,
             state=state,
@@ -184,6 +188,8 @@ def _run_payload(
     return {
         "task": TASK_ID,
         "mode": "mock" if args.mock else "real",
+        "search_method": args.search_method,
+        "initialization_mode": args.initialization_mode,
         "proposal_mode": args.proposal_mode,
         "dataset_id": args.dataset_id,
         "objective": OBJECTIVE_NAME,
@@ -193,7 +199,7 @@ def _run_payload(
     }
 
 
-def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRuntime:
+def _open_runtime(args, table, task_spec, contract, profile_name: str) -> CampaignRuntime:
     default_name = (
         "mock" if args.mock else f"{args.dataset_id}-campaign-{args.campaign_index:02d}"
     )
@@ -207,6 +213,7 @@ def _open_runtime(args, task_spec, contract, profile_name: str) -> CampaignRunti
         budget_limits=campaign_budget(
             args,
             None if profile is None else profile.budget,
+            domain_size=finite_domain_size(table),
         ),
         contract_snapshot=contract.to_dict(),
         contract_sha256=contract.digest,
@@ -250,7 +257,7 @@ def _proposal_client(
     args: argparse.Namespace,
     table: FrozenReactionTable,
     provider: OpenAIProviderSettings | None,
-) -> ProposalClient:
+) -> ProposalClient | None:
     if args.proposal_mode == "callable":
         return CallableProposalClient(
             lambda request: mock_proposal_response(
@@ -258,6 +265,8 @@ def _proposal_client(
                 proposal_index=int(request.metadata["proposal_index"]),
             )
         )
+    if args.proposal_mode == "none":
+        return None
     assert provider is not None
     return build_openai_reaction_client(
         base_url=provider.base_url,
@@ -269,3 +278,34 @@ def _proposal_client(
         json_mode=args.llm_json_mode,
         extra_body=parse_openai_extra_body_json(args.llm_extra_body_json),
     )
+
+
+def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncoder | None):
+    if args.search_method == "llm":
+        return None
+    assert encoder is not None
+    if args.search_method == "bo":
+        return build_base_reaction_selector(
+            schema=schema,
+            beta=args.acquisition_beta,
+            feature_version=encoder.version,
+        )
+    return build_reaction_selector(
+        schema=schema,
+        beta=args.acquisition_beta,
+        alpha=args.alpha,
+        eta=args.eta,
+        z_clip=args.z_clip,
+        seed=args.campaign_index,
+        pool_size=args.bo_pool_size,
+        proposal_sample_count=args.proposal_samples,
+        feature_version=encoder.version,
+    )
+
+
+def _reservoir_size(args, components) -> int:
+    if args.search_method == "ldm":
+        return args.proposal_samples
+    if args.search_method == "llm":
+        return args.evaluations_per_round
+    return components.task_spec.reservoir.max_size or args.proposal_samples

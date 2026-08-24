@@ -9,6 +9,7 @@ from pathlib import Path
 from tasks.synthonbench.core.catalog import REACTION_ALLOCATIONS
 from tasks.synthonbench.core.constants import (
     DEFAULT_BO_POOL_SIZE,
+    DEFAULT_BO_SEARCH_SAMPLES,
     DEFAULT_FINGERPRINT_BITS,
     DEFAULT_GP_KERNEL_JITTER,
     DEFAULT_GP_LANDMARKS,
@@ -27,6 +28,7 @@ from tasks.synthonbench.core.constants import (
 )
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, PROMPT_POLICIES
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
+from tasks.synthonbench.core.search import INITIALIZATION_MODES, SEARCH_METHODS
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -62,7 +64,10 @@ def _add_benchmark_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--proposal-samples", type=int, default=DEFAULT_PROPOSAL_SAMPLES)
+    parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
+    parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--bo-pool-size", type=int, default=DEFAULT_BO_POOL_SIZE)
+    parser.add_argument("--bo-search-samples", type=int, default=DEFAULT_BO_SEARCH_SAMPLES)
     parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--slate-size", type=int, default=DEFAULT_SLATE_SIZE)
@@ -82,7 +87,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--proposal-mode", choices=("callable", "openai"), default="callable")
+    parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
     parser.add_argument("--llm-url")
     parser.add_argument("--llm-model-name")
     parser.add_argument("--api-key")
@@ -108,13 +113,13 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 def _validate_counts(args: argparse.Namespace) -> None:
     if args.iterations < 0 or args.campaign_index < 0:
         raise SystemExit("--iterations and --campaign-index must be non-negative")
-    positive = ("proposal_samples", "bo_pool_size", "proposal_max_workers", "evaluations_per_round",
+    positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_max_workers", "evaluations_per_round",
                 "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
-    if args.proposal_samples <= args.bo_pool_size:
+    if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
-    if args.evaluations_per_round > args.bo_pool_size:
+    if args.search_method != "llm" and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
 
 
@@ -144,10 +149,15 @@ def _validate_provider_options(args: argparse.Namespace) -> None:
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
-    if args.mock and args.proposal_mode != "callable":
-        raise SystemExit("mock SynthonBench campaigns require --proposal-mode=callable")
-    if not args.mock and args.proposal_mode != "openai":
-        raise SystemExit("real SynthonBench campaigns require --proposal-mode=openai")
+    model_method = args.search_method in {"ldm", "llm"}
+    if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:
+        raise SystemExit("mock model methods require --proposal-mode=callable or openai")
+    if args.mock and not model_method and args.proposal_mode != "none":
+        raise SystemExit("mock BO requires --proposal-mode=none")
+    if not args.mock and model_method and args.proposal_mode != "openai":
+        raise SystemExit("real model methods require --proposal-mode=openai")
+    if not args.mock and not model_method and args.proposal_mode != "none":
+        raise SystemExit("real BO requires --proposal-mode=none")
     if not args.mock and (args.data_dir is None or args.source_dir is None):
         raise SystemExit("real SynthonBench campaigns require --data-dir and --source-dir")
     if args.oracle_kind == "glide" and args.scale != "1M":

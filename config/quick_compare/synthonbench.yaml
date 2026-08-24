@@ -1,0 +1,24 @@
+schema_version: 1
+name: synthonbench_quick_compare
+task: synthonbench
+base_config: ../synthonbench/quick_compare_base.yaml
+cases:
+  - id: surrogate_1m_kif11
+    overrides:
+      - args.scale="1M"
+      - args.target="kif11"
+      - args.oracle-kind="surrogate"
+methods: [ldm, bo, llm]
+seeds: [0, 1, 2]
+optimization_rounds: 5
+initialization_mode: shared_random
+output_root: ${SYNTHONBENCH_RUNS_ROOT}/quick_compare
+trajectory:
+  step_column: call_idx
+  step_kind: evaluation_index
+  objective_column: utility
+  direction: maximize
+result_fields:
+  top_k_recall: official_metrics.top1000_recall
+  call_reduction_factor_top_k: official_metrics.call_reduction_factor_top1000
+  best_found_utility: best_found_utility

@@ -38,7 +38,8 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert config["args"]["llm-max-tokens"] == 512
     assert config["args"]["prompt-policy"] == "portfolio_v1"
     assert str(data_root) in plan["argv"]
-    assert str(runs_root / "smoke") in plan["argv"]
+    out_dir = Path(plan["argv"][plan["argv"].index("--out-dir") + 1])
+    assert out_dir == runs_root / "smoke"
     assert config["args"]["llm-url"] is None
     assert config["args"]["llm-model-name"] is None
     assert config["args"]["api-key"] is None

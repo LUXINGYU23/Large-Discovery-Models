@@ -8,8 +8,8 @@
     "task_path": "tasks/iron_mind"
   },
   "proposal_provider": {
-    "kind": "model_endpoint",
-    "requires_endpoint_preflight": true,
+    "kind": "hybrid",
+    "requires_endpoint_preflight": false,
     "supports_collection": true
   },
   "metrics": {
@@ -61,7 +61,12 @@
       "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
       "proposal_contract": "one strict candidate JSON object per independently issued OpenAI-compatible request; the portfolio prompt assigns each request a distinct factor focus, and the shared reservoir validates source membership and removes duplicates",
       "proposal_sampling": "64 independent one-candidate requests by default; portfolio_v1 uses deterministic focus allocations plus task-specific roles, and the local worker limit defaults to 64 without refill requests",
-      "method": "empirical-q0 LDM proposal distribution, q0-weighted maintenance of a 32-candidate BO pool, factor-aware categorical ARD GP-UCB scoring, and acquisition-tilted sampling"
+      "method": "empirical-q0 LDM proposal distribution, q0-weighted maintenance of a 32-candidate BO pool, factor-aware categorical ARD GP-UCB scoring, and acquisition-tilted sampling",
+      "method_providers": {
+        "ldm": "model_endpoint",
+        "llm": "model_endpoint",
+        "bo": "dataset_or_deterministic_search"
+      }
     },
     "per_candidate_limits": {
       "benchmark_jobs": 1
@@ -79,6 +84,31 @@
     "benchmark_jobs": 20
   },
   "profiles": {
+    "quick_compare": {
+      "description": "Six-round fixed-budget comparison of LDM, pure BO, and direct LLM methods.",
+      "budget": {
+        "outer_iterations": 6,
+        "selected_candidates": 6,
+        "external_evaluations": 6,
+        "expensive_evaluation_attempts": 6,
+        "successful_evaluations": 6,
+        "benchmark_jobs": 6
+      },
+      "locked_args": {
+        "iterations": 6,
+        "evaluations-per-round": 1,
+        "proposal-samples": 64,
+        "bo-pool-size": 32,
+        "proposal-max-workers": 64,
+        "initialization-mode": "shared_random",
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
+        "llm-temperature": 0.7,
+        "prompt-policy": "portfolio_v1"
+      }
+    },
     "ldm_official_smoke": {
       "description": "One real LDM evaluation under the Iron Mind external evaluation protocol.",
       "budget": {

@@ -1,0 +1,22 @@
+schema_version: 1
+name: iron_mind_quick_compare
+task: iron_mind
+base_config: ../iron_mind/quick_compare_base.yaml
+cases:
+  - id: reductive_amination
+    overrides:
+      - args.dataset-id="reductive_amination"
+  - id: buchwald_hartwig
+    overrides:
+      - args.dataset-id="buchwald_hartwig"
+methods: [ldm, bo, llm]
+seeds: [0, 1, 2]
+optimization_rounds: 5
+initialization_mode: shared_random
+output_root: ${IRON_MIND_RUNS_ROOT}/quick_compare
+trajectory:
+  step_column: round
+  step_kind: round
+  objective_column: reaction_score
+  direction: maximize
+result_fields: {}

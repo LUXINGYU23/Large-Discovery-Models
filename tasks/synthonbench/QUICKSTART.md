@@ -68,3 +68,20 @@ uv run --locked --project tasks/synthonbench \
 Replace the config with `glide_1m_qualification.yaml` for the Glide
 ligand-efficiency track. The full batch-16 10,000-call profiles are documented
 in `README.md`.
+
+## 5. Run the Quick Three-Method Comparison
+
+With the 1M surrogate data prepared, run:
+
+```bash
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+```
+
+The matrix runs LDM, offline task-local BO, and direct LLM sampling on three
+seeds with the same initial 16 official calls. Output is written under
+`$SYNTHONBENCH_RUNS_ROOT/quick_compare/`. Use `--resume` only with the same
+repository revision and configuration files.

@@ -249,6 +249,35 @@ uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/public_union_ldm_20x20.yaml
 ```
 
+## Fixed-Budget Quick Comparison
+
+`config/quick_compare/iron_mind.yaml` compares the repository's LDM method,
+plain task-local GP-UCB BO, and direct LLM sampling on two source-pinned
+datasets. Each case uses three seeds, one shared random initialization round,
+and five optimization rounds. Every campaign therefore makes six official
+evaluations.
+
+The LDM method retains the 64 independent proposals, empirical `q0`,
+32-candidate maintained pool, and acquisition tilt described above. Pure BO
+does not call a model endpoint: it scores every unseen condition in the finite
+reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
+one independent request per optimization round and evaluates its admitted
+candidate directly.
+
+```bash
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+```
+
+The matrix needs `IRON_MIND_DATA_ROOT`, `IRON_MIND_RUNS_ROOT`, and model
+endpoint variables only for the LDM and direct-LLM children. It writes a
+portable manifest, per-campaign standard artifacts, round-level trajectories,
+and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/quick_compare/`.
+Use `--resume` only for the same repository revision and unchanged configs.
+
 ## Outputs
 
 Each campaign creates `campaign.json`, `budget.json`, `checkpoint.json`,

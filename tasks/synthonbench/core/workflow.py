@@ -25,9 +25,12 @@ from tasks.synthonbench.core.data import (
 )
 from tasks.synthonbench.core.factory import (
     CampaignComponentOptions,
+    build_base_synthon_selector,
     build_campaign_components,
+    build_direct_acquisition,
     build_synthon_selector,
     build_synthon_task_spec,
+    disabled_surrogate,
 )
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
@@ -52,37 +55,20 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
     """Build the declared task semantics using the same encoder and selector as runs."""
 
     benchmark = _load_benchmark(args) if benchmark is None else benchmark
-    encoder = SynthonNystromEncoder(
-        benchmark.task.space,
-        benchmark.task.allowed_reactions,
-        landmark_count=args.gp_landmarks,
-        seed=args.campaign_index,
-        fingerprint_bits=args.fingerprint_bits,
-        kernel_jitter=args.gp_kernel_jitter,
-        reaction_weight=args.gp_reaction_weight,
-    )
-    selector = build_synthon_selector(
-        encoder=encoder,
-        selection_seed=args.campaign_index,
-        gp_signal_std=args.gp_signal_std,
-        gp_mean_std=args.gp_mean_std,
-        gp_observation_noise_std=args.gp_observation_noise_std,
-        acquisition_beta=args.acquisition_beta,
-        alpha=args.alpha,
-        eta=args.eta,
-        z_clip=args.z_clip,
-        bo_pool_size=args.bo_pool_size,
-        proposal_samples=args.proposal_samples,
-    )
+    encoder = _encoder(args, benchmark)
+    selector = _selector(args, encoder)
     return build_synthon_task_spec(
         encoder=encoder,
-        acquisition=selector.describe(),
+        acquisition=selector.describe() if selector is not None else build_direct_acquisition(),
         proposal_samples=args.proposal_samples,
         bo_pool_size=args.bo_pool_size,
+        bo_search_samples=args.bo_search_samples,
         proposal_max_workers=args.proposal_max_workers,
         slate_size=args.slate_size,
         reaction_allocation=args.reaction_allocation,
         prompt_policy=args.prompt_policy,
+        search_method=args.search_method,
+        initialization_mode=args.initialization_mode,
     )
 
 
@@ -159,9 +145,11 @@ def _run_dir(args: argparse.Namespace) -> Path:
     return unique_run_dir(args.out_dir / (args.run_name or default))
 
 
-def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient:
+def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient | None:
     if args.proposal_mode == "callable":
         return CallableProposalClient(mock_proposal_response)
+    if args.proposal_mode == "none":
+        return None
     assert provider is not None
     return build_openai_synthon_client(
         base_url=provider.base_url,
@@ -175,9 +163,59 @@ def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient:
     )
 
 
+def _encoder(args, benchmark) -> SynthonNystromEncoder | None:
+    if args.search_method == "llm":
+        return None
+    return SynthonNystromEncoder(
+        benchmark.task.space,
+        benchmark.task.allowed_reactions,
+        landmark_count=args.gp_landmarks,
+        seed=args.campaign_index,
+        fingerprint_bits=args.fingerprint_bits,
+        kernel_jitter=args.gp_kernel_jitter,
+        reaction_weight=args.gp_reaction_weight,
+    )
+
+
+def _selector(args, encoder: SynthonNystromEncoder | None):
+    if encoder is None:
+        return None
+    if args.search_method == "bo":
+        return build_base_synthon_selector(
+            encoder=encoder,
+            gp_signal_std=args.gp_signal_std,
+            gp_mean_std=args.gp_mean_std,
+            gp_observation_noise_std=args.gp_observation_noise_std,
+            acquisition_beta=args.acquisition_beta,
+        )
+    return build_synthon_selector(
+        encoder=encoder,
+        selection_seed=args.campaign_index,
+        gp_signal_std=args.gp_signal_std,
+        gp_mean_std=args.gp_mean_std,
+        gp_observation_noise_std=args.gp_observation_noise_std,
+        acquisition_beta=args.acquisition_beta,
+        alpha=args.alpha,
+        eta=args.eta,
+        z_clip=args.z_clip,
+        bo_pool_size=args.bo_pool_size,
+        proposal_samples=args.proposal_samples,
+    )
+
+
+def _reservoir_size(args) -> int:
+    if args.search_method == "llm":
+        return args.evaluations_per_round
+    return args.bo_search_samples if args.search_method == "bo" else args.proposal_samples
+
+
 def _components(args, benchmark, runtime, client):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
-    before_requests = None if args.proposal_mode == "callable" else lambda count: runtime.consume("llm_requests", count)
+    before_requests = (
+        (lambda count: runtime.consume("llm_requests", count))
+        if args.proposal_mode == "openai"
+        else None
+    )
     return build_campaign_components(CampaignComponentOptions(
         client=client,
         official_task=benchmark.task,
@@ -186,6 +224,10 @@ def _components(args, benchmark, runtime, client):
         target=benchmark.target,
         proposal_samples=args.proposal_samples,
         bo_pool_size=args.bo_pool_size,
+        bo_search_samples=args.bo_search_samples,
+        evaluations_per_round=args.evaluations_per_round,
+        search_method=args.search_method,
+        initialization_mode=args.initialization_mode,
         proposal_max_workers=args.proposal_max_workers,
         slate_size=args.slate_size,
         reaction_allocation=args.reaction_allocation,
@@ -212,7 +254,11 @@ def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,
     components.evaluator.restore_observations(state.observations)
     try:
         result = components.engine.run(
-            LDMEngineConfig(args.iterations, args.proposal_samples, args.evaluations_per_round),
+            LDMEngineConfig(
+                args.iterations,
+                _reservoir_size(args),
+                args.evaluations_per_round,
+            ),
             state=state,
         )
     except EndpointRequestError as exc:
@@ -233,6 +279,8 @@ def _run_payload(args, benchmark, task_spec, contract_sha256: str, profile_name:
         "target": benchmark.target,
         "oracle_kind": benchmark.oracle_kind,
         "proposal_mode": args.proposal_mode,
+        "search_method": args.search_method,
+        "initialization_mode": args.initialization_mode,
         "contract_profile": profile_name,
         "contract_sha256": contract_sha256,
         "ldm_task_spec": task_spec.to_dict(),

@@ -18,13 +18,16 @@ from tasks.synthonbench.core.provider import (
 
 
 def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None) -> dict[str, int | float]:
+    initial_rounds = int(args.initialization_mode == "shared_random" and args.iterations > 0)
+    initial = initial_rounds * args.evaluations_per_round
+    search_rounds = args.iterations - initial_rounds
     selected = args.iterations * args.evaluations_per_round
-    proposals = args.iterations * args.proposal_samples
+    proposals = _proposal_count(args, search_rounds)
     dynamic = {
         "outer_iterations": args.iterations,
         "llm_requests": proposals if args.proposal_mode == "openai" else 0,
         "proposal_attempts": proposals,
-        "valid_search_candidates": proposals,
+        "valid_search_candidates": _valid_candidate_count(args, initial, search_rounds),
         "selected_candidates": selected,
         "external_evaluations": selected,
         "expensive_evaluation_attempts": selected,
@@ -32,6 +35,21 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
         "benchmark_jobs": selected,
     }
     return {**dynamic, **dict(profile_budget or {})}
+
+
+def _proposal_count(args: Any, search_rounds: int) -> int:
+    if args.search_method == "bo":
+        return 0
+    per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
+    return search_rounds * per_round
+
+
+def _valid_candidate_count(args: Any, initial: int, search_rounds: int) -> int:
+    if args.search_method == "ldm":
+        return initial + search_rounds * args.proposal_samples
+    if args.search_method == "llm":
+        return initial + search_rounds * args.evaluations_per_round
+    return initial + search_rounds * args.proposal_samples
 
 
 def jsonable_args(args: Any) -> dict[str, Any]:

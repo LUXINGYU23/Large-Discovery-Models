@@ -18,16 +18,20 @@ from tasks.iron_mind.core.provider import (
 )
 
 
-def derived_budget(args: Any) -> dict[str, int]:
-    """Build the task budget only when no contract profile is active."""
+def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
+    """Account for initialization and method-specific candidate generation exactly."""
 
+    initial_rounds = int(args.initialization_mode == "shared_random" and args.iterations > 0)
+    initial_evaluations = initial_rounds * args.evaluations_per_round
+    search_rounds = args.iterations - initial_rounds
     selected = args.iterations * args.evaluations_per_round
-    proposal_requests = args.iterations * args.proposal_samples
+    proposal_requests = _proposal_requests(args, search_rounds)
+    valid = _valid_candidates(args, domain_size, initial_evaluations, search_rounds)
     return {
         "outer_iterations": args.iterations,
         "llm_requests": proposal_requests if args.proposal_mode == "openai" else 0,
         "proposal_attempts": proposal_requests,
-        "valid_search_candidates": args.iterations * args.proposal_samples,
+        "valid_search_candidates": valid,
         "selected_candidates": selected,
         "external_evaluations": selected,
         "expensive_evaluation_attempts": selected,
@@ -39,10 +43,31 @@ def derived_budget(args: Any) -> dict[str, int]:
 def campaign_budget(
     args: Any,
     profile_budget: Mapping[str, int | float] | None,
+    *,
+    domain_size: int,
 ) -> dict[str, int | float]:
     """Combine dynamic reservoir accounting with fixed profile limits."""
 
-    return {**derived_budget(args), **dict(profile_budget or {})}
+    return {**derived_budget(args, domain_size=domain_size), **dict(profile_budget or {})}
+
+
+def _proposal_requests(args: Any, search_rounds: int) -> int:
+    if args.search_method == "bo":
+        return 0
+    per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
+    return search_rounds * per_round
+
+
+def _valid_candidates(args: Any, domain_size: int, initial: int, search_rounds: int) -> int:
+    if args.search_method == "ldm":
+        return initial + search_rounds * args.proposal_samples
+    if args.search_method == "llm":
+        return initial + search_rounds * args.evaluations_per_round
+    remaining = max(0, domain_size - initial)
+    return initial + sum(
+        max(0, remaining - index * args.evaluations_per_round)
+        for index in range(search_rounds)
+    )
 
 
 def jsonable_args(args: Any) -> dict[str, Any]:

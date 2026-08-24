@@ -7,6 +7,7 @@ from ldm_tts.engine.runtime import (
     LDMEngineState,
     ParentSelector,
 )
+from ldm_tts.engine.expansion import InitialRoundReservoirExpander
 
 __all__ = [
     "LDMEngine",
@@ -14,4 +15,5 @@ __all__ = [
     "LDMEngineResult",
     "LDMEngineState",
     "ParentSelector",
+    "InitialRoundReservoirExpander",
 ]
