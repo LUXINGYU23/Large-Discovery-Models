@@ -10,6 +10,9 @@ from ldm_tts.contracts import Candidate, Observation, RawProposal
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
 
 
+SELECTION_MODES = ("acquisition", "reservoir_order")
+
+
 @dataclass(frozen=True)
 class ExpansionRequest:
     """Task-neutral context supplied to one reservoir expansion step."""
@@ -37,10 +40,13 @@ class ExpansionResult:
     schema_update: dict[str, Any] | None = None
     attempts: tuple[ProposalResponse, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    selection_mode: str = "acquisition"
 
     def __post_init__(self) -> None:
         if not self.proposals and self.schema_update is None and not self.attempts:
             raise ValueError("expansion must emit proposals or update the expansion schema")
+        if self.selection_mode not in SELECTION_MODES:
+            raise ValueError(f"unknown expansion selection mode: {self.selection_mode!r}")
 
 
 @runtime_checkable
@@ -62,7 +68,7 @@ class CallableReservoirExpander:
 
 
 class InitialRoundReservoirExpander:
-    """Use a deterministic initializer once, then delegate to the active search expander."""
+    """Evaluate one deterministic initial design before delegating to active search."""
 
     def __init__(
         self,
@@ -88,6 +94,7 @@ class InitialRoundReservoirExpander:
                 schema_update=result.schema_update,
                 attempts=result.attempts,
                 metadata=metadata,
+                selection_mode="reservoir_order",
             )
         return self.search_expander.expand(request)
 
@@ -130,4 +137,5 @@ __all__ = [
     "ExpansionResult",
     "InitialRoundReservoirExpander",
     "ReservoirExpander",
+    "SELECTION_MODES",
 ]

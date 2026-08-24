@@ -445,6 +445,31 @@ def test_ldm_engine_enforces_task_contract_and_runs_encoded_selection(tmp_path: 
         )
 
 
+def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path: Path) -> None:
+    spec = replace(integer_task_spec(), surrogate=IntegerEncoder().describe())
+    runtime = CampaignRuntime.open(tmp_path / "initial-design", task="integer_search")
+    engine = LDMEngine(
+        task_spec=spec,
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(
+                proposals=(RawProposal(1, "initial"), RawProposal(2, "initial")),
+                selection_mode="reservoir_order",
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": float(candidate.payload)}),
+        runtime=runtime,
+        selector=RBFGPUCBSelector(objective_name="score", feature_version="integer-v1"),
+        surrogate_encoder=IntegerEncoder(),
+    )
+
+    result = engine.run(LDMEngineConfig(iterations=1, reservoir_size=2))
+
+    assert result.state.observations[0].candidate.payload == 1
+    event = next(item for item in runtime.events() if item["event_type"] == "candidates_selected")
+    assert event["payload"]["metadata"]["selection_source"] == "expander"
+
+
 def test_ldm_engine_resumes_from_shared_checkpoint(tmp_path: Path) -> None:
     run_dir = tmp_path / "resumable-engine"
     spec = integer_task_spec()

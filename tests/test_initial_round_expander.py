@@ -35,4 +35,5 @@ def test_initial_round_expander_uses_the_explicit_initial_size_once() -> None:
     assert initializer.requests[0].reservoir_size == 3
     assert search.requests[0].reservoir_size == 64
     assert initial.metadata["phase"] == "shared_initialization"
+    assert initial.selection_mode == "reservoir_order"
     assert later.proposals[0].source == "search"

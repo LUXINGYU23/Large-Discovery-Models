@@ -68,6 +68,8 @@ shown in a prompt.
 All reaction IDs, slot positions, and synthon IDs are canonically ordered before
 any seeded sampling. A fixed campaign seed therefore defines the same shared
 initial design and task-local GP basis across independently launched methods.
+The shared design is evaluated in its generated order before any method-specific
+acquisition step.
 
 ## Surrogate Representation
 

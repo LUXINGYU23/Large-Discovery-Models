@@ -60,6 +60,8 @@ def test_expansion_result_accepts_attempts_without_candidates() -> None:
     assert ExpansionResult(attempts=(attempt,)).attempts == (attempt,)
     with pytest.raises(ValueError, match="expansion must emit"):
         ExpansionResult()
+    with pytest.raises(ValueError, match="selection mode"):
+        ExpansionResult(attempts=(attempt,), selection_mode="unknown")
 
 
 def test_engine_counts_attempt_only_expansion_without_selection_or_evaluation(

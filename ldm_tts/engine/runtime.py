@@ -277,6 +277,7 @@ class LDMEngine:
                     active.observations,
                     reservoir.candidates,
                     config.evaluations_per_round,
+                    use_reservoir_order=expansion.selection_mode == "reservoir_order",
                 )
                 selected = self._resolve_selection(reservoir.candidates, selection)
                 self.runtime.record(
@@ -350,11 +351,16 @@ class LDMEngine:
         observations: Sequence[Observation],
         candidates: Sequence[Candidate],
         count: int,
+        *,
+        use_reservoir_order: bool = False,
     ) -> BOSelectionResult:
-        if self.selector is None or self.surrogate_encoder is None:
+        if use_reservoir_order or self.selector is None or self.surrogate_encoder is None:
             return BOSelectionResult(
                 selected_candidate_ids=tuple(item.candidate_id for item in candidates[:count]),
-                metadata={"mode": "reservoir_order"},
+                metadata={
+                    "mode": "reservoir_order",
+                    "selection_source": "expander" if use_reservoir_order else "engine",
+                },
             )
         history = [
             BOObservation.from_observation(
