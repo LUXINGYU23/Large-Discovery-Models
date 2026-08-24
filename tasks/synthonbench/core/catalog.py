@@ -36,6 +36,7 @@ class ProposalSlotPlan:
     role: str
     reaction_probability: float
     slot_options: tuple[tuple[SynthonOption, ...], ...]
+    uniqueness_anchor_position: int | None = None
 
     def allowed_ids(self) -> tuple[tuple[int, ...], ...]:
         return tuple(tuple(option.synthon_id for option in slot) for slot in self.slot_options)
@@ -48,6 +49,7 @@ class ProposalSlotPlan:
             "proposal_role": self.role,
             "reaction_probability": self.reaction_probability,
             "slot_synthon_ids": [list(ids) for ids in self.allowed_ids()],
+            "uniqueness_anchor_position": self.uniqueness_anchor_position,
         }
 
 
@@ -62,6 +64,8 @@ class SynthonProposalCatalog:
         slate_size: int,
         seed: int,
         reaction_allocation: str = "product_weighted",
+        direct_unique: bool = False,
+        direct_proposal_count: int | None = None,
     ) -> None:
         if slate_size < 1:
             raise ValueError("slate_size must be positive")
@@ -69,6 +73,8 @@ class SynthonProposalCatalog:
             raise ValueError("catalog seed must be non-negative")
         if reaction_allocation not in REACTION_ALLOCATIONS:
             raise ValueError(f"unknown reaction allocation: {reaction_allocation!r}")
+        if direct_unique and (direct_proposal_count is None or direct_proposal_count < 1):
+            raise ValueError("direct_unique catalog requires a positive direct_proposal_count")
         self.space = space
         self.reactions = tuple(str(item) for item in allowed_reactions)
         if not self.reactions:
@@ -76,6 +82,8 @@ class SynthonProposalCatalog:
         self.slate_size = int(slate_size)
         self.seed = int(seed)
         self.reaction_allocation = reaction_allocation
+        self.direct_unique = bool(direct_unique)
+        self.direct_proposal_count = direct_proposal_count
         self._reaction_probabilities = _reaction_probabilities(space, self.reactions, reaction_allocation)
 
     def build_plan(self, *, round_idx: int, proposal_index: int) -> ProposalSlotPlan:
@@ -84,8 +92,14 @@ class SynthonProposalCatalog:
         rng = np.random.default_rng(_slot_seed(self.seed, round_idx, proposal_index))
         reaction_index = int(rng.choice(len(self.reactions), p=self._reaction_probabilities))
         reaction_id = self.reactions[reaction_index]
-        options = tuple(_sample_slot(self.space, reaction_id, position, self.slate_size, rng)
-                        for position in self.space.positions(reaction_id))
+        if self.direct_unique:
+            options, anchor_position = self._direct_options(round_idx, proposal_index, reaction_id, rng)
+        else:
+            options = tuple(
+                _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
+                for position in self.space.positions(reaction_id)
+            )
+            anchor_position = None
         return ProposalSlotPlan(
             round_idx=round_idx,
             proposal_index=proposal_index,
@@ -93,7 +107,40 @@ class SynthonProposalCatalog:
             role=ROLE_CYCLE[(round_idx + proposal_index) % len(ROLE_CYCLE)],
             reaction_probability=float(self._reaction_probabilities[reaction_index]),
             slot_options=options,
+            uniqueness_anchor_position=anchor_position,
         )
+
+    def _direct_options(self, round_idx: int, proposal_index: int, reaction_id: str, rng) -> tuple[tuple[tuple[SynthonOption, ...], ...], int]:
+        positions = tuple(self.space.positions(reaction_id))
+        anchor = max(positions, key=lambda position: len(tuple(self.space.synthon_ids(reaction_id, position))))
+        ordinal = self._direct_reaction_ordinal(round_idx, proposal_index, reaction_id)
+        anchor_ids = tuple(int(item) for item in self.space.synthon_ids(reaction_id, anchor))
+        if ordinal >= len(anchor_ids):
+            raise ValueError(f"direct LLM slate cannot assign a unique anchor for reaction {reaction_id!r}")
+        anchor_rng = np.random.default_rng(_anchor_seed(self.seed, reaction_id, anchor))
+        anchor_id = int(anchor_rng.permutation(anchor_ids)[ordinal])
+        options = tuple(
+            (_option(self.space, reaction_id, position, anchor_id),)
+            if position == anchor
+            else _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
+            for position in positions
+        )
+        return options, anchor
+
+    def _direct_reaction_ordinal(self, round_idx: int, proposal_index: int, reaction_id: str) -> int:
+        assert self.direct_proposal_count is not None
+        previous = (
+            self._reaction_id(previous_round, previous_index)
+            for previous_round in range(round_idx + 1)
+            for previous_index in range(self.direct_proposal_count)
+            if previous_round < round_idx or previous_index < proposal_index
+        )
+        return sum(item == reaction_id for item in previous)
+
+    def _reaction_id(self, round_idx: int, proposal_index: int) -> str:
+        rng = np.random.default_rng(_slot_seed(self.seed, round_idx, proposal_index))
+        index = int(rng.choice(len(self.reactions), p=self._reaction_probabilities))
+        return self.reactions[index]
 
 
 def validate_payload_against_plan(payload: dict[str, object], plan: ProposalSlotPlan) -> None:
@@ -136,6 +183,11 @@ def _option(space: Any, reaction_id: str, position: int, synthon_id: int) -> Syn
 
 def _slot_seed(seed: int, round_idx: int, proposal_index: int) -> int:
     payload = json.dumps([seed, round_idx, proposal_index], separators=(",", ":")).encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+
+
+def _anchor_seed(seed: int, reaction_id: str, position: int) -> int:
+    payload = json.dumps([seed, reaction_id, position], separators=(",", ":")).encode("utf-8")
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
 
 

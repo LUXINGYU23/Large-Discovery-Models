@@ -263,6 +263,8 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         catalog = SynthonProposalCatalog(
             options.official_task.space, allowed_reactions=reactions, slate_size=options.slate_size,
             seed=options.selection_seed, reaction_allocation=options.reaction_allocation,
+            direct_unique=options.search_method == "llm",
+            direct_proposal_count=options.evaluations_per_round if options.search_method == "llm" else None,
         )
         search = SynthonBenchProposalExpander(
             options.client, domain, catalog, target=options.target, before_requests=options.before_requests,
