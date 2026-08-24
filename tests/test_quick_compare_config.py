@@ -20,6 +20,10 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
     assert len(spec.cases) == 2
     assert spec.seeds == (0, 1, 2)
     assert spec.iterations == 6
+    assert spec.method_overrides["llm"] == (
+        'contract_profile="quick_compare_direct_llm"',
+        'args.prompt-policy="direct_v1"',
+    )
 
 
 def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_path) -> None:

@@ -133,6 +133,46 @@
         "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
       }
     },
+    "quick_compare_direct_llm": {
+      "description": "Six-round fixed-budget direct-LLM comparator on the official 1M surrogate track.",
+      "budget": {
+        "outer_iterations": 6,
+        "selected_candidates": 96,
+        "external_evaluations": 96,
+        "expensive_evaluation_attempts": 96,
+        "successful_evaluations": 96,
+        "benchmark_jobs": 96
+      },
+      "locked_args": {
+        "scale": "1M",
+        "target": "kif11",
+        "oracle-kind": "surrogate",
+        "iterations": 6,
+        "evaluations-per-round": 16,
+        "proposal-samples": 64,
+        "bo-pool-size": 32,
+        "bo-search-samples": 64,
+        "proposal-max-workers": 64,
+        "slate-size": 24,
+        "reaction-allocation": "product_weighted",
+        "fingerprint-bits": 2048,
+        "gp-landmarks": 256,
+        "gp-kernel-jitter": 1.0e-8,
+        "gp-signal-std": 1.0,
+        "gp-mean-std": 1.0,
+        "gp-observation-noise-std": 1.0,
+        "gp-reaction-weight": 0.0,
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
+        "initialization-mode": "shared_random",
+        "prompt-policy": "direct_v1",
+        "llm-max-tokens": 256,
+        "llm-temperature": 0.7,
+        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+      }
+    },
     "surrogate_1m_qualification": {
       "description": "One real LDM-selected qualification query against the official 1M surrogate oracle.",
       "budget": {

@@ -10,6 +10,7 @@ from ldm_tts.engine.expansion import ExpansionRequest
 
 from tasks.iron_mind.core.prompting import (
     BASELINE_PROMPT_POLICY,
+    DIRECT_PROMPT_POLICY,
     PORTFOLIO_PROMPT_POLICY,
     build_reaction_prompt_messages,
     build_slot_plan,
@@ -112,6 +113,19 @@ def test_baseline_prompt_has_no_focus_constraint() -> None:
     assert "Objective:" not in messages[1]["content"]
     assert "Required slot focus" not in messages[1]["content"]
     validate_slot_focus(payload, plan)
+
+
+def test_direct_prompt_uses_round_rotated_focus_without_gp_language() -> None:
+    schema = _schema()
+    first = build_slot_plan(_request(reservoir_size=1), schema, proposal_index=0, policy=DIRECT_PROMPT_POLICY)
+    later_request = ExpansionRequest(round_idx=3, reservoir_size=1, observations=())
+    later = build_slot_plan(later_request, schema, proposal_index=0, policy=DIRECT_PROMPT_POLICY)
+    messages = build_reaction_prompt_messages(later_request, schema, later, proposal_index=0)
+
+    assert first.focus != later.focus
+    assert later.role == "direct_search"
+    assert "without a GP selector" in messages[0]["content"]
+    assert "this candidate is evaluated immediately" in messages[1]["content"]
 
 
 def test_prompt_digests_are_slot_specific_and_policy_names_are_validated() -> None:

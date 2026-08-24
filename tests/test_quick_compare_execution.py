@@ -70,6 +70,7 @@ def _quick_config(base_path: Path, output_root: Path) -> dict[str, object]:
         "base_config": str(base_path),
         "cases": [{"id": "mock", "overrides": []}],
         "methods": ["ldm", "bo", "llm"], "seeds": [0, 1, 2],
+        "method_overrides": {"ldm": [], "bo": [], "llm": []},
         "optimization_rounds": 1, "initialization_mode": "shared_random",
         "output_root": str(output_root),
         "trajectory": {

@@ -205,7 +205,8 @@ LDM retains the current 64 independent public-slate requests, empirical `q0`,
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent one-tuple requests per optimization batch and evaluates
-the admitted tuples directly.
+the admitted tuples directly. Its `direct_v1` prompt is recorded under the
+separate direct-LLM contract profile and does not invoke a GP selector.
 
 ```bash
 uv run --locked --project tasks/synthonbench python \

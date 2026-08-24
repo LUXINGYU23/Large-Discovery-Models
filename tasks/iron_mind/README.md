@@ -263,7 +263,9 @@ The LDM method retains the 64 independent proposals, empirical `q0`,
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted
-candidate directly.
+candidate directly. Its explicit `direct_v1` prompt removes GP language and
+rotates a hard condition focus across rounds to preserve the one-request,
+one-evaluation baseline.
 
 ```bash
 uv run --locked --project tasks/iron_mind python \

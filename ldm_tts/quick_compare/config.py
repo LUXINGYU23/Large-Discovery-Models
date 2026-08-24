@@ -43,6 +43,7 @@ class QuickCompareSpec:
     name: str
     base_config: Path
     cases: tuple[ComparisonCase, ...]
+    method_overrides: dict[str, tuple[str, ...]]
     seeds: tuple[int, ...]
     optimization_rounds: int
     initialization_mode: str
@@ -66,6 +67,7 @@ class QuickCompareSpec:
             "base_config": str(self.base_config),
             "cases": [{"id": item.case_id, "overrides": list(item.overrides)} for item in self.cases],
             "methods": list(METHODS),
+            "method_overrides": {name: list(values) for name, values in self.method_overrides.items()},
             "seeds": list(self.seeds),
             "optimization_rounds": self.optimization_rounds,
             "initialization_mode": self.initialization_mode,
@@ -87,6 +89,7 @@ def load_quick_compare_spec(path: Path) -> QuickCompareSpec:
         name=_required_string(raw, "name"),
         base_config=_resolve_base_config(resolved, raw),
         cases=_cases(raw.get("cases")),
+        method_overrides=_method_overrides(raw.get("method_overrides")),
         seeds=_seeds(raw.get("seeds")),
         optimization_rounds=_positive_int(raw.get("optimization_rounds"), "optimization_rounds"),
         initialization_mode=_required_string(raw, "initialization_mode"),
@@ -98,7 +101,7 @@ def load_quick_compare_spec(path: Path) -> QuickCompareSpec:
 
 def _require_exact_keys(raw: dict[str, Any]) -> None:
     expected = {
-        "schema_version", "name", "task", "base_config", "cases", "methods", "seeds",
+        "schema_version", "name", "task", "base_config", "cases", "methods", "method_overrides", "seeds",
         "optimization_rounds", "initialization_mode", "output_root", "trajectory", "result_fields",
     }
     if set(raw) != expected or raw.get("schema_version") != 1:
@@ -139,6 +142,20 @@ def _seeds(value: Any) -> tuple[int, ...]:
     if len(set(value)) != len(value):
         raise ValueError("quick comparison seeds must be unique")
     return tuple(value)
+
+
+def _method_overrides(value: Any) -> dict[str, tuple[str, ...]]:
+    if not isinstance(value, dict) or set(value) != set(METHODS):
+        raise ValueError("method_overrides must define ldm, bo, and llm")
+    result: dict[str, tuple[str, ...]] = {}
+    for method in METHODS:
+        overrides = value[method]
+        if not isinstance(overrides, list) or not all(
+            isinstance(item, str) and "=" in item for item in overrides
+        ):
+            raise ValueError("method overrides must be PATH=VALUE strings")
+        result[method] = tuple(overrides)
+    return result
 
 
 def _trajectory(value: Any) -> TrajectorySpec:

@@ -9,15 +9,22 @@ from tasks.iron_mind.core.schema import ReactionValue
 
 
 BASELINE_PROMPT_POLICY = "baseline_v1"
+DIRECT_PROMPT_POLICY = "direct_v1"
 PORTFOLIO_PROMPT_POLICY = "portfolio_v1"
 DEFAULT_PROMPT_POLICY = PORTFOLIO_PROMPT_POLICY
-PROMPT_POLICIES = frozenset({BASELINE_PROMPT_POLICY, PORTFOLIO_PROMPT_POLICY})
+PROMPT_POLICIES = frozenset({BASELINE_PROMPT_POLICY, DIRECT_PROMPT_POLICY, PORTFOLIO_PROMPT_POLICY})
 
 SYSTEM_PROMPT = (
     "You are the proposal component of a closed-loop reaction-condition optimizer. "
     "Use chemical knowledge and supplied experimental evidence to form a private hypothesis. "
     "A separate GP-UCB selector ranks the candidate reservoir and a frozen oracle evaluates it. "
     "Do not predict scores, rank candidates, or explain your reasoning. Return JSON only."
+)
+
+DIRECT_SYSTEM_PROMPT = (
+    "You are the direct proposal component of a closed-loop reaction-condition search. "
+    "Your one source-valid condition will be evaluated immediately without a GP selector. "
+    "Choose an unevaluated condition and return JSON only."
 )
 
 INITIAL_ROLE_INSTRUCTIONS = (

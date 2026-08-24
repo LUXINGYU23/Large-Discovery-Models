@@ -122,6 +122,8 @@ def _child_plan(spec, base, run: ComparisonRun, *, resume: bool) -> dict[str, An
     case = next(item for item in spec.cases if item.case_id == run.case_id)
     for override in case.overrides:
         apply_override(config, override)
+    for override in spec.method_overrides[run.method]:
+        apply_override(config, override)
     _set(config, "args.search-method", run.method)
     _set(config, "args.proposal-mode", _proposal_mode(config, run.method))
     _set(config, "args.initialization-mode", spec.initialization_mode)

@@ -13,6 +13,7 @@ from tasks.iron_mind.core.prompt_baseline import build_baseline_messages
 from tasks.iron_mind.core.prompt_policy import (
     BASELINE_PROMPT_POLICY,
     DEFAULT_PROMPT_POLICY,
+    DIRECT_PROMPT_POLICY,
     EVIDENCE_ROLE_INSTRUCTIONS,
     INITIAL_ROLE_INSTRUCTIONS,
     PORTFOLIO_PROMPT_POLICY,
@@ -46,6 +47,20 @@ def build_slot_plan(
     policy = validate_prompt_policy(policy)
     if policy == BASELINE_PROMPT_POLICY:
         return ProposalSlotPlan(policy, "baseline", "Propose one novel condition from the schema.")
+    if policy == DIRECT_PROMPT_POLICY:
+        focus, capacity = _slot_focus(
+            schema,
+            request.reservoir_size,
+            proposal_index,
+            round_offset=request.round_idx,
+        )
+        return ProposalSlotPlan(
+            policy,
+            "direct_search",
+            "Choose an unevaluated condition in the assigned focus without using a GP ranking.",
+            focus,
+            capacity,
+        )
     role, instruction = _role_instruction(request.observations, proposal_index)
     focus, capacity = _slot_focus(schema, request.reservoir_size, proposal_index)
     return ProposalSlotPlan(policy, role, instruction, focus, capacity)
@@ -99,9 +114,11 @@ def _slot_focus(
     schema: ReactionDatasetSchema,
     reservoir_size: int,
     proposal_index: int,
+    *,
+    round_offset: int = 0,
 ) -> tuple[tuple[tuple[str, ReactionValue], ...], int]:
     factors, capacity = _focus_factors(schema, reservoir_size)
-    position = proposal_index % capacity
+    position = (proposal_index + round_offset) % capacity
     focus = []
     for factor in factors:
         option_index = position % len(factor.options)
@@ -133,6 +150,7 @@ def _validate_slot_index(reservoir_size: int, proposal_index: int) -> None:
 __all__ = [
     "BASELINE_PROMPT_POLICY",
     "DEFAULT_PROMPT_POLICY",
+    "DIRECT_PROMPT_POLICY",
     "PORTFOLIO_PROMPT_POLICY",
     "PROMPT_POLICIES",
     "ProposalSlotPlan",
