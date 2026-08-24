@@ -68,6 +68,7 @@ class SynthonProposalCatalog:
         reaction_allocation: str = "product_weighted",
         direct_unique: bool = False,
         direct_proposal_count: int | None = None,
+        direct_start_round: int = 0,
     ) -> None:
         if slate_size < 1:
             raise ValueError("slate_size must be positive")
@@ -77,6 +78,8 @@ class SynthonProposalCatalog:
             raise ValueError(f"unknown reaction allocation: {reaction_allocation!r}")
         if direct_unique and (direct_proposal_count is None or direct_proposal_count < 1):
             raise ValueError("direct_unique catalog requires a positive direct_proposal_count")
+        if direct_start_round < 0:
+            raise ValueError("direct_start_round must be non-negative")
         self.space = space
         self.reactions = tuple(str(item) for item in allowed_reactions)
         if not self.reactions:
@@ -86,6 +89,7 @@ class SynthonProposalCatalog:
         self.reaction_allocation = reaction_allocation
         self.direct_unique = bool(direct_unique)
         self.direct_proposal_count = direct_proposal_count
+        self.direct_start_round = int(direct_start_round)
         self._reaction_probabilities = _reaction_probabilities(space, self.reactions, reaction_allocation)
 
     def build_plan(
@@ -98,17 +102,24 @@ class SynthonProposalCatalog:
         if round_idx < 0 or proposal_index < 0:
             raise ValueError("round_idx and proposal_index must be non-negative")
         rng = np.random.default_rng(_slot_seed(self.seed, round_idx, proposal_index))
-        reaction_index = int(rng.choice(len(self.reactions), p=self._reaction_probabilities))
-        reaction_id = self.reactions[reaction_index]
         if self.direct_unique:
+            reaction_id, ordinal = self._direct_assignment(
+                round_idx,
+                proposal_index,
+                excluded_anchor_ids or {},
+            )
+            reaction_index = self.reactions.index(reaction_id)
             options, anchor_position, anchor_id = self._direct_options(
                 round_idx,
                 proposal_index,
                 reaction_id,
                 rng,
                 set((excluded_anchor_ids or {}).get(reaction_id, set())),
+                ordinal,
             )
         else:
+            reaction_index = int(rng.choice(len(self.reactions), p=self._reaction_probabilities))
+            reaction_id = self.reactions[reaction_index]
             options = tuple(
                 _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
                 for position in self.space.positions(reaction_id)
@@ -131,10 +142,9 @@ class SynthonProposalCatalog:
         return max(positions, key=lambda position: len(tuple(self.space.synthon_ids(reaction_id, position))))
 
     def _direct_options(self, round_idx: int, proposal_index: int, reaction_id: str, rng,
-                        excluded_anchor_ids: set[int]) -> tuple[tuple[tuple[SynthonOption, ...], ...], int, int]:
+                        excluded_anchor_ids: set[int], ordinal: int) -> tuple[tuple[tuple[SynthonOption, ...], ...], int, int]:
         positions = tuple(self.space.positions(reaction_id))
         anchor = self.direct_anchor_position(reaction_id)
-        ordinal = self._direct_reaction_ordinal(round_idx, proposal_index, reaction_id)
         anchor_ids = tuple(int(item) for item in self.space.synthon_ids(reaction_id, anchor))
         available_anchor_ids = tuple(item for item in anchor_ids if item not in excluded_anchor_ids)
         if ordinal >= len(available_anchor_ids):
@@ -150,20 +160,36 @@ class SynthonProposalCatalog:
         )
         return options, anchor, anchor_id
 
-    def _direct_reaction_ordinal(self, round_idx: int, proposal_index: int, reaction_id: str) -> int:
+    def _direct_assignment(self, round_idx: int, proposal_index: int,
+                           excluded_anchor_ids: Mapping[str, set[int]]) -> tuple[str, int]:
         assert self.direct_proposal_count is not None
-        previous = (
-            self._reaction_id(previous_round, previous_index)
-            for previous_round in range(round_idx + 1)
-            for previous_index in range(self.direct_proposal_count)
-            if previous_round < round_idx or previous_index < proposal_index
-        )
-        return sum(item == reaction_id for item in previous)
+        remaining = {
+            reaction: self._available_anchor_count(reaction, excluded_anchor_ids)
+            for reaction in self.reactions
+        }
+        assigned = {reaction: 0 for reaction in self.reactions}
+        for current_round in range(self.direct_start_round, round_idx + 1):
+            for current_index in range(self.direct_proposal_count):
+                weights = np.asarray(
+                    [probability if remaining[reaction] else 0.0
+                     for reaction, probability in zip(self.reactions, self._reaction_probabilities, strict=True)],
+                    dtype=float,
+                )
+                if not float(weights.sum()):
+                    raise ValueError("direct LLM slate has no remaining unique public anchors")
+                rng = np.random.default_rng(_slot_seed(self.seed, current_round, current_index))
+                reaction = self.reactions[int(rng.choice(len(self.reactions), p=weights / weights.sum()))]
+                if current_round == round_idx and current_index == proposal_index:
+                    return reaction, assigned[reaction]
+                remaining[reaction] -= 1
+                assigned[reaction] += 1
+        raise RuntimeError("direct LLM reaction assignment did not reach the requested proposal")
 
-    def _reaction_id(self, round_idx: int, proposal_index: int) -> str:
-        rng = np.random.default_rng(_slot_seed(self.seed, round_idx, proposal_index))
-        index = int(rng.choice(len(self.reactions), p=self._reaction_probabilities))
-        return self.reactions[index]
+    def _available_anchor_count(self, reaction_id: str,
+                                excluded_anchor_ids: Mapping[str, set[int]]) -> int:
+        anchor = self.direct_anchor_position(reaction_id)
+        ids = {int(item) for item in self.space.synthon_ids(reaction_id, anchor)}
+        return len(ids - set(excluded_anchor_ids.get(reaction_id, set())))
 
 
 def validate_payload_against_plan(payload: dict[str, object], plan: ProposalSlotPlan) -> None:

@@ -157,6 +157,8 @@ def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCata
         return {}
     excluded: dict[str, set[int]] = {}
     for observation in request.observations:
+        if observation.candidate.source == PROPOSAL_SOURCE:
+            continue
         payload = observation.candidate.payload
         reaction_id = payload.get("reaction_id") if isinstance(payload, dict) else None
         synthon_ids = payload.get("synthon_ids") if isinstance(payload, dict) else None
