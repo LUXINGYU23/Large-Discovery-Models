@@ -258,6 +258,12 @@ datasets. Each case uses three seeds, one shared random initialization round,
 and five optimization rounds. Every campaign therefore makes six official
 evaluations.
 
+`config/quick_compare/iron_mind_extended.yaml` preserves every method and
+seed-setting choice but uses eleven optimization rounds (twelve evaluations
+per campaign). It is the confirmation profile for checking whether a
+data-starved six-evaluation comparison changes after additional GP feedback;
+it does not replace the fixed six-evaluation early-stop screen.
+
 The LDM method retains the 64 independent proposals, empirical `q0`,
 32-candidate maintained pool, and acquisition tilt described above. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
@@ -273,6 +279,9 @@ uv run --locked --project tasks/iron_mind python \
 
 uv run --locked --project tasks/iron_mind python \
   scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind_extended.yaml
 ```
 
 The matrix needs `IRON_MIND_DATA_ROOT`, `IRON_MIND_RUNS_ROOT`, and model

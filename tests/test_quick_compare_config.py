@@ -33,3 +33,15 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
 
     assert spec.trajectory.step_kind == "evaluation_index"
     assert spec.result_fields["best_found_utility"] == "best_found_utility"
+
+
+def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "iron_runs"))
+    monkeypatch.setenv("SYNTHONBENCH_RUNS_ROOT", str(tmp_path / "syn_runs"))
+
+    iron = load_quick_compare_spec(REPO_ROOT / "config" / "quick_compare" / "iron_mind_extended.yaml")
+    synthon = load_quick_compare_spec(REPO_ROOT / "config" / "quick_compare" / "synthonbench_extended.yaml")
+
+    assert iron.iterations == synthon.iterations == 12
+    assert iron.method_overrides["llm"][0] == 'contract_profile="extended_compare_direct_llm"'
+    assert synthon.method_overrides["llm"][0] == 'contract_profile="extended_compare_direct_llm"'

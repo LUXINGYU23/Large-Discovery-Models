@@ -206,6 +206,11 @@ official 1M KIF11 surrogate track. One product-uniform shared initialization
 batch and five optimization batches make six batches of 16 official calls
 (96 calls per campaign).
 
+`config/quick_compare/synthonbench_extended.yaml` preserves the same method,
+seed, and candidate-budget settings but uses eleven optimization batches
+(192 official calls per campaign). It is a separate confirmation profile for
+posterior-convergence checks, not a replacement for the fixed six-batch screen.
+
 LDM retains the current 64 independent public-slate requests, empirical `q0`,
 32-candidate maintained pool, and task-local Nyström count-Tanimoto GP.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
@@ -222,6 +227,9 @@ uv run --locked --project tasks/synthonbench python \
 
 uv run --locked --project tasks/synthonbench python \
   scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench_extended.yaml
 ```
 
 The result directory contains standard child artifacts plus a portable matrix
