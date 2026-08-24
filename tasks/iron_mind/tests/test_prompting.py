@@ -54,12 +54,35 @@ def test_portfolio_allocates_unique_focuses_for_a_64_candidate_reservoir() -> No
     assert {plan.policy for plan in plans} == {PORTFOLIO_PROMPT_POLICY}
     assert len({plan.focus for plan in plans}) == request.reservoir_size
     assert all(plan.focus_capacity >= request.reservoir_size for plan in plans)
+    assert len({plan.focus_payload()["additive"] for plan in plans}) == 24
+    assert len({plan.focus_payload()["aryl_halide"] for plan in plans}) == 16
     assert {plan.role for plan in plans} == {
         "chemical_prior",
         "coverage_prior",
         "interaction_prior",
         "operational_contrast",
     }
+
+
+def test_portfolio_rotates_to_a_disjoint_focus_batch_across_rounds_and_seeds() -> None:
+    schema = _schema()
+    first_request = ExpansionRequest(round_idx=0, reservoir_size=64, observations=())
+    next_request = ExpansionRequest(round_idx=1, reservoir_size=64, observations=())
+    first = {
+        build_slot_plan(first_request, schema, proposal_index=index).focus
+        for index in range(first_request.reservoir_size)
+    }
+    next_round = {
+        build_slot_plan(next_request, schema, proposal_index=index).focus
+        for index in range(next_request.reservoir_size)
+    }
+    next_seed = {
+        build_slot_plan(first_request, schema, proposal_index=index, slot_seed=1).focus
+        for index in range(first_request.reservoir_size)
+    }
+
+    assert first.isdisjoint(next_round)
+    assert next_seed == next_round
 
 
 def test_portfolio_prompt_includes_objective_history_role_and_focus() -> None:

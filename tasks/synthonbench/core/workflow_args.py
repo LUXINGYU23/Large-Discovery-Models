@@ -8,6 +8,7 @@ from pathlib import Path
 
 from tasks.synthonbench.core.catalog import REACTION_ALLOCATIONS
 from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ETA,
     DEFAULT_BO_POOL_SIZE,
     DEFAULT_BO_SEARCH_SAMPLES,
     DEFAULT_FINGERPRINT_BITS,
@@ -81,7 +82,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--gp-reaction-weight", type=float, default=DEFAULT_GP_REACTION_WEIGHT)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
     parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument("--eta", type=float, default=3.0)
+    parser.add_argument("--eta", type=float, default=DEFAULT_ACQUISITION_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--prompt-policy", choices=PROMPT_POLICIES, default=DEFAULT_PROMPT_POLICY)
 

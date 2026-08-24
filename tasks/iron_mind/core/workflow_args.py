@@ -11,6 +11,7 @@ from tasks.iron_mind.core.prompting import (
     PROMPT_POLICIES,
     validate_prompt_policy,
 )
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
 from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
 from tasks.iron_mind.core.provider import parse_openai_extra_body_json
 from tasks.iron_mind.core.search import INITIALIZATION_MODES, SEARCH_METHODS
@@ -38,7 +39,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
     parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument("--eta", type=float, default=3.0)
+    parser.add_argument("--eta", type=float, default=DEFAULT_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
     parser.add_argument("--run-name", default="")

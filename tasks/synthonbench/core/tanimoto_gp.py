@@ -14,6 +14,7 @@ from ldm_tts.optimization.acquisition import make_acquisition
 
 
 MIN_VARIANCE_TOLERANCE = 1.0e-10
+TARGET_STD_FLOOR = 0.1
 
 
 @dataclass(frozen=True)
@@ -21,15 +22,11 @@ class TanimotoGPUCBConfig:
     """Numerical settings for the task-local sparse Tanimoto GP posterior."""
 
     beta: float = 1.0
-    confidence_delta: float = 0.1
     signal_std: float = 1.0
     mean_std: float = 1.0
     observation_noise_std: float = 1.0
 
     def __post_init__(self) -> None:
-        _positive("confidence_delta", self.confidence_delta)
-        if self.confidence_delta >= 1.0:
-            raise ValueError("confidence_delta must be smaller than one")
         _positive("signal_std", self.signal_std)
         _nonnegative("mean_std", self.mean_std)
         _positive("observation_noise_std", self.observation_noise_std)
@@ -55,6 +52,8 @@ class SynthonTanimotoGPUCBSelector:
         self.config = config
         self._posterior = _OnlinePosterior(self.feature_dimension)
         self._signature: tuple[tuple[str, float], ...] = ()
+        self._target_mean = 0.0
+        self._target_scale = 1.0
 
     def describe(self) -> AcquisitionSpec:
         return AcquisitionSpec(
@@ -64,7 +63,7 @@ class SynthonTanimotoGPUCBSelector:
             selection_rule="highest task-local Nyström/FITC count-Tanimoto GP upper confidence bound",
             parameters={
                 "base_beta": self.config.beta,
-                "confidence_delta": self.config.confidence_delta,
+                "beta_schedule": "constant",
                 "surrogate": "online_nystrom_fitc_count_tanimoto_gaussian_process",
                 "signal_std": self.config.signal_std,
                 "mean_std": self.config.mean_std,
@@ -75,12 +74,15 @@ class SynthonTanimotoGPUCBSelector:
     def fit(self, history: Sequence[BOObservation]) -> None:
         _validate_history(history, self.feature_dimension, self.feature_version)
         signature = tuple((item.candidate_id, item.scalar_score) for item in history)
-        if signature[: len(self._signature)] != self._signature:
-            self._posterior = _OnlinePosterior(self.feature_dimension)
-            self._signature = ()
-        for observation in history[len(self._signature) :]:
+        if signature == self._signature:
+            return
+        self._posterior = _OnlinePosterior(self.feature_dimension)
+        scores = np.asarray([item.scalar_score for item in history], dtype=float)
+        self._target_mean, self._target_scale = _target_transform(scores)
+        for observation in history:
             feature, residual = self._latent_feature(observation.feature_vector)
-            self._posterior.update(feature, observation.scalar_score, self._observation_variance(residual))
+            target = (observation.scalar_score - self._target_mean) / self._target_scale
+            self._posterior.update(feature, target, self._observation_variance(residual))
         self._signature = signature
 
     def select(
@@ -99,8 +101,9 @@ class SynthonTanimotoGPUCBSelector:
             selected_candidate_ids=tuple(item.candidate_id for item in ranked[:count]),
             predictions=predictions,
             metadata={
-                "surrogate": self._posterior.summary(),
-                "effective_beta": self._effective_beta(len(candidates)),
+                "surrogate": self._summary(),
+                "effective_beta": self.config.beta,
+                "beta_schedule": "constant",
             },
         )
 
@@ -114,11 +117,12 @@ class SynthonTanimotoGPUCBSelector:
         features_and_residuals = [self._latent_feature(representations[item.candidate_id].values) for item in candidates]
         features = np.asarray([item[0] for item in features_and_residuals], dtype=float)
         residuals = np.asarray([item[1] for item in features_and_residuals], dtype=float)
-        means, variances = self._posterior.predict(features)
-        total_variances = variances + self.config.signal_std**2 * residuals
+        normalized_means, normalized_variances = self._posterior.predict(features)
+        total_variances = normalized_variances + self.config.signal_std**2 * residuals
         _validate_variances(total_variances)
-        stds = np.sqrt(np.maximum(total_variances, 0.0))
-        beta = self._effective_beta(len(candidates))
+        means = self._target_mean + self._target_scale * normalized_means
+        stds = self._target_scale * np.sqrt(np.maximum(total_variances, 0.0))
+        beta = self.config.beta
         acquisition = make_acquisition("ucb", minimize=(False,), beta=beta)
         return tuple(
             BOPrediction.scalar(
@@ -147,12 +151,13 @@ class SynthonTanimotoGPUCBSelector:
     def _observation_variance(self, residual: float) -> float:
         return self.config.observation_noise_std**2 + self.config.signal_std**2 * residual
 
-    def _effective_beta(self, candidate_count: int) -> float:
-        if self.config.beta == 0.0:
-            return 0.0
-        step = max(1, len(self._signature) + 1)
-        argument = max(1.0, candidate_count * math.pi**2 * step**2 / (6.0 * self.config.confidence_delta))
-        return self.config.beta * math.sqrt(2.0 * math.log(argument))
+    def _summary(self) -> dict[str, object]:
+        return {
+            **self._posterior.summary(),
+            "target_standardization": "z_score",
+            "target_mean": self._target_mean,
+            "target_scale": self._target_scale,
+        }
 
 
 class _OnlinePosterior:
@@ -221,6 +226,12 @@ def _validate_vector(vector: SurrogateVector, dimension: int, version: str) -> N
 def _validate_variances(variances: np.ndarray) -> None:
     if not np.all(np.isfinite(variances)) or np.any(variances < -MIN_VARIANCE_TOLERANCE):
         raise ValueError("Tanimoto GP predictive variance must be finite and non-negative")
+
+
+def _target_transform(scores: np.ndarray) -> tuple[float, float]:
+    if not len(scores):
+        return 0.0, 1.0
+    return float(scores.mean()), max(float(scores.std()), TARGET_STD_FLOOR)
 
 
 def _rank_key(prediction: BOPrediction) -> tuple[float, str]:

@@ -31,6 +31,8 @@ def test_task_spec_declares_independent_oversampled_proposals() -> None:
     assert spec.surrogate.dimension == 257
     assert spec.surrogate.metadata["kernel"] == "count_tanimoto"
     assert spec.surrogate.metadata["landmark_count"] == 256
+    assert spec.surrogate.metadata["reaction_weight"] == 1.0
+    assert spec.acquisition.parameters["eta_acquisition_tilt"] == 1.0
     assert spec.acquisition.parameters["base_acquisition_parameters"]["surrogate"] == (
         "online_nystrom_fitc_count_tanimoto_gaussian_process"
     )

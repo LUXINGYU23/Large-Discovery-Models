@@ -53,12 +53,12 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
         "base_acquisition": "ucb",
         "base_acquisition_parameters": {
             "base_beta": 1.0,
-            "confidence_delta": 0.1,
+            "beta_schedule": "constant",
             "kernel": "factor_ard_categorical_rbf",
         },
         "base_measure": "empirical_proposal_frequency",
         "alpha_base_measure": 1.0,
-        "eta_acquisition_tilt": 3.0,
+        "eta_acquisition_tilt": 1.0,
         "normalization": "robust_z",
         "z_clip": 5.0,
         "sampling": "gumbel_top_k_without_replacement",
@@ -135,6 +135,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
     assert selection_metadata["valid_proposal_occurrences"] == 64
     assert selection_metadata["unique_candidates_admitted"] == 64
     assert selection_metadata["bo_pool_size"] == 32
+    assert selection_metadata["pool_maintenance"] == "q0_gumbel_top_k_without_replacement"
     assert len(selection_metadata["proposal_base_measure"]) == 64
     assert sum(
         item["proposal_q0_base_mass"]

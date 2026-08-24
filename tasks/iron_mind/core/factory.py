@@ -28,6 +28,7 @@ from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
 from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
 from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS, IronMindProposalExpander
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
@@ -63,7 +64,7 @@ class CampaignComponentOptions:
     before_requests: Callable[[int], None] | None = None
     acquisition_beta: float = 1.0
     acquisition_alpha: float = 1.0
-    acquisition_eta: float = 3.0
+    acquisition_eta: float = DEFAULT_ETA
     acquisition_z_clip: float = 5.0
     selection_seed: int = 0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
@@ -248,6 +249,7 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
             before_requests=options.before_requests,
             max_workers=options.proposal_max_workers,
             prompt_policy=options.prompt_policy,
+            slot_seed=options.selection_seed,
         )
     if options.initialization_mode == "none":
         return search

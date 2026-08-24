@@ -2,13 +2,15 @@
   "schema_version": 2,
   "record_type": "synthonbench_delivery_verification",
   "task_id": "synthonbench",
-  "verified_on": "2026-08-20",
+  "verified_on": "2026-08-24",
   "method": {
     "algorithm": "ldm_tilted_synthon_tanimoto_gp_ucb",
     "surrogate": "online_nystrom_fitc_count_tanimoto_gaussian_process",
     "product_proxy": "raw_connector_count_morgan_r2_2048bit_achiral_v1",
     "landmark_count": 256,
-    "reaction_weight": 0.0,
+    "reaction_weight": 1.0,
+    "target_standardization": "z_score_with_raw_unit_posterior_output",
+    "beta_schedule": "constant",
     "proposal_request_defaults": {
       "llm_max_tokens": 256,
       "llm_extra_body_json": "{\"thinking\":{\"type\":\"disabled\"}}"
@@ -16,7 +18,7 @@
   },
   "task_tests": {
     "status": "passed",
-    "passed": 23,
+    "passed": 28,
     "timeout_seconds": 60
   },
   "source_and_data_contract": {
@@ -48,8 +50,9 @@
     "thinking": "disabled",
     "proposal_samples_requested": 64,
     "proposal_attempts": 64,
-    "valid_search_candidates": 63,
+    "valid_search_candidates": 64,
     "bo_pool_size": 32,
+    "pool_maintenance": "q0_gumbel_top_k_without_replacement",
     "selected_candidates": 1,
     "official_calls": 1,
     "official_audit": {
@@ -70,6 +73,7 @@
     "proposal_attempts": 64,
     "valid_search_candidates": 64,
     "bo_pool_size": 32,
+    "pool_maintenance": "q0_gumbel_top_k_without_replacement",
     "selected_candidates": 1,
     "official_calls": 1,
     "official_audit": {

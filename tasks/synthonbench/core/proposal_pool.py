@@ -34,7 +34,7 @@ def maintain_empirical_pool(candidates: tuple[Candidate, ...], config: Acquisiti
     _validate_totals(candidates, occurrences, config)
     limit = config.pool_size or len(candidates)
     if len(candidates) <= limit:
-        return EmpiricalPool(candidates, candidates, occurrences, None, "none")
+        return EmpiricalPool(candidates, candidates, occurrences, None, "all_unique_candidates")
     seed = candidate_set_seed(config.seed, history_size, candidates, phase="bo_pool_maintenance")
     indices = gumbel_top_k(empirical_base_masses(candidates), limit, np.random.default_rng(seed))
     maintained = tuple(sorted((candidates[index] for index in indices), key=lambda item: item.candidate_id))

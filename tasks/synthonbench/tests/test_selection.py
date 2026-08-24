@@ -101,9 +101,9 @@ def test_selector_preserves_duplicate_frequency_in_the_empirical_base_measure() 
     assert metadata["b"]["selection_probability"] == pytest.approx(0.25)
 
 
-def test_tanimoto_gp_rejects_an_invalid_confidence_probability() -> None:
-    with pytest.raises(ValueError, match="smaller than one"):
-        TanimotoGPUCBConfig(confidence_delta=1.0)
+def test_tanimoto_gp_rejects_negative_beta() -> None:
+    with pytest.raises(ValueError, match="beta"):
+        TanimotoGPUCBConfig(beta=-1.0)
 
 
 def _selector_config(alpha: float, eta: float) -> AcquisitionTiltedSelector:

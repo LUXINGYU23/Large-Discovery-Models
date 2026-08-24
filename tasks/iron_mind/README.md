@@ -87,7 +87,7 @@ The factor-aware categorical GP then predicts the reaction score on the
 maintained pool. Its acquisition score is GP-UCB,
 
 ```math
-a_t(x) = \mu_t(x) + \beta_t \sigma_t(x).
+a_t(x) = \mu_t(x) + \beta \sigma_t(x).
 ```
 
 The evaluated condition is sampled without replacement from
@@ -97,17 +97,19 @@ The evaluated condition is sampled without replacement from
 \exp\!\left\{\eta\,\operatorname{robust-z}(a_t(x_i))\right\}.
 ```
 
-`--acquisition-beta` controls exploration inside UCB. `--alpha` controls the
+`--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
 different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=3`. `--z-clip` defaults to 5. The campaign index seeds task-side pool
+`eta=1`. `--z-clip` defaults to 5. The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
 
 ## Proposal Prompt Policy
 
 Released configurations use `portfolio_v1`. It gives every independently
-issued request a deterministic, distinct focus over enough high-cardinality
-reaction factors to cover the configured reservoir. The model must preserve its
+issued request a deterministic, distinct focus from a seed- and round-rotated
+permutation of the complete focus space. Every focused factor is covered within
+each batch when the reservoir is large enough, and consecutive batches visit
+new focus combinations before cycling. The model must preserve its
 assigned focus, then uses chemical knowledge and the observed history to choose
 the remaining factors under one of four roles: evidence exploitation,
 counterfactual probing, underexplored coverage, or mechanistic divergence.

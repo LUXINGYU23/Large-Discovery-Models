@@ -75,6 +75,7 @@ class ProposalSlotPlan:
     role_instruction: str
     focus: tuple[tuple[str, ReactionValue], ...] = ()
     focus_capacity: int = 1
+    focus_position: int = 0
 
     def focus_payload(self) -> dict[str, ReactionValue]:
         return dict(self.focus)
@@ -86,4 +87,5 @@ class ProposalSlotPlan:
             "proposal_role": self.role,
             "slot_focus": self.focus_payload(),
             "slot_focus_capacity": self.focus_capacity,
+            "slot_focus_position": self.focus_position,
         }

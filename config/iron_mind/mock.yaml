@@ -13,7 +13,7 @@ args:
   evaluations-per-round: 1
   acquisition-beta: 1.0
   alpha: 1.0
-  eta: 3.0
+  eta: 1.0
   z-clip: 5.0
   prompt-policy: portfolio_v1
 env:

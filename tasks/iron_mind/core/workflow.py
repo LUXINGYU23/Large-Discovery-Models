@@ -235,11 +235,15 @@ def _schema_for(dataset_id: str) -> ReactionDatasetSchema:
 def _load_mock_table(
     schema: ReactionDatasetSchema,
     candidate_count: int = MOCK_SEED_ROW_COUNT,
+    round_count: int = 1,
+    slot_seed: int = 0,
 ) -> FrozenReactionTable:
     return load_mock_table(
         schema,
         MOCK_ORACLE_PATH,
         candidate_count=candidate_count,
+        round_count=round_count,
+        slot_seed=slot_seed,
     )
 
 
@@ -247,7 +251,9 @@ def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
     if args.mock:
         return _load_mock_table(
             _schema_for(args.dataset_id),
-            candidate_count=args.proposal_samples,
+            candidate_count=args.proposal_samples * max(1, args.iterations),
+            round_count=max(1, args.iterations),
+            slot_seed=args.campaign_index,
         )
     assert args.data_dir is not None
     return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
@@ -263,6 +269,7 @@ def _proposal_client(
             lambda request: mock_proposal_response(
                 table,
                 proposal_index=int(request.metadata["proposal_index"]),
+                slot_focus=request.metadata.get("slot_focus"),
             )
         )
     if args.proposal_mode == "none":

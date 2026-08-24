@@ -16,7 +16,7 @@ args:
   evaluations-per-round: 1
   acquisition-beta: 1.0
   alpha: 1.0
-  eta: 3.0
+  eta: 1.0
   z-clip: 5.0
   campaign-index: 0
   data-dir: ${IRON_MIND_DATA_ROOT}

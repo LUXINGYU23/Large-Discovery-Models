@@ -78,7 +78,7 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert config["args"]["proposal-samples"] == 64
         assert config["args"]["bo-pool-size"] == 32
         assert config["args"]["alpha"] == 1.0
-        assert config["args"]["eta"] == 3.0
+        assert config["args"]["eta"] == 1.0
         assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
         assert config["args"]["llm-max-tokens"] == 512
@@ -108,7 +108,7 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
+        "eta": 1.0,
         "z-clip": 5.0,
         "prompt-policy": "portfolio_v1",
     }

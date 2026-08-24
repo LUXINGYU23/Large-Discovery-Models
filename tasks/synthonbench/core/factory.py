@@ -26,7 +26,12 @@ from ldm_tts.transport import ProposalClient
 
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
-from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ETA,
+    DEFAULT_GP_REACTION_WEIGHT,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
 from tasks.synthonbench.core.evaluator import OfficialSynthonEvaluator
 from tasks.synthonbench.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
@@ -67,10 +72,10 @@ class CampaignComponentOptions:
     gp_signal_std: float = 1.0
     gp_mean_std: float = 1.0
     gp_observation_noise_std: float = 1.0
-    gp_reaction_weight: float = 0.0
+    gp_reaction_weight: float = DEFAULT_GP_REACTION_WEIGHT
     acquisition_beta: float = 1.0
     alpha: float = 1.0
-    eta: float = 3.0
+    eta: float = DEFAULT_ACQUISITION_ETA
     z_clip: float = 5.0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
     before_requests: Callable[[int], None] | None = None

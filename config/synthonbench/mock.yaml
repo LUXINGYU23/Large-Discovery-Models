@@ -19,10 +19,10 @@ args:
   gp-signal-std: 1.0
   gp-mean-std: 1.0
   gp-observation-noise-std: 1.0
-  gp-reaction-weight: 0.0
+  gp-reaction-weight: 1.0
   acquisition-beta: 1.0
   alpha: 1.0
-  eta: 3.0
+  eta: 1.0
   z-clip: 5.0
   prompt-policy: policy_v1
   out-dir: runs

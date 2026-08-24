@@ -82,14 +82,14 @@ count-Tanimoto similarity
 k_0(x,x') = T_{\min/\max}(c(x), c(x')).
 \]
 
-`--gp-reaction-weight` declares an optional reaction-delta ablation,
+`--gp-reaction-weight` adds a reaction-template delta term,
 \((k_0+\lambda_r\mathbf{1}[r=r'])/(1+\lambda_r)\); its committed value is
-`0.0`. At startup, `--gp-landmarks` fixed public tuples are sampled with a
+`1.0`. At startup, `--gp-landmarks` fixed public tuples are sampled with a
 reaction-balanced seed. With `K_{ZZ}=LL^T`, each candidate is encoded as
 `[L^-1 k(Z, x), 1 - k(x, Z) K_ZZ^-1 k(Z, x)]`. The final coordinate is the
-FITC diagonal residual. The online posterior treats it as candidate-specific
-noise and stores only the resulting fixed-size vector in the shared LDM
-checkpoint path.
+FITC diagonal residual. The online posterior standardizes observed utilities,
+treats the residual as candidate-specific noise, and stores only the resulting
+fixed-size vector in the shared LDM checkpoint path.
 
 The default representation uses 2,048 Count-Morgan bins, 256 landmarks, a
 `1e-8` kernel jitter, and a unit signal, mean, and observation-noise scale.
@@ -212,7 +212,8 @@ seed, and candidate-budget settings but uses eleven optimization batches
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
 LDM retains the current 64 independent public-slate requests, empirical `q0`,
-32-candidate maintained pool, and task-local Nyström count-Tanimoto GP.
+32-candidate maintained pool, and task-local reaction-aware Nyström
+count-Tanimoto GP over standardized utilities.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent one-tuple requests per optimization batch and evaluates

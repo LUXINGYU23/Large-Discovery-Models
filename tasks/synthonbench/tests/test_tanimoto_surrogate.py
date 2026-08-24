@@ -134,15 +134,25 @@ def test_online_posterior_matches_closed_form_bayesian_linear_update() -> None:
     prediction = selector.select((candidate,), {candidate.candidate_id: query}).predictions[0]
 
     design = np.asarray(((0.2, 0.4), (0.6, -0.1)))
-    target = np.asarray((1.0, -0.5))
+    target_mean = 0.25
+    target_scale = 0.75
+    target = np.asarray((1.0, -1.0))
     noise_variance = 0.25
     precision = np.eye(2) + design.T @ design / noise_variance
     covariance = np.linalg.inv(precision)
     mean = covariance @ design.T @ target / noise_variance
     query_feature = np.asarray((0.3, 0.5))
 
-    assert prediction.scalar_mean == pytest.approx(float(query_feature @ mean))
-    assert prediction.scalar_std == pytest.approx(float(np.sqrt(query_feature @ covariance @ query_feature)))
+    assert prediction.scalar_mean == pytest.approx(
+        target_mean + target_scale * float(query_feature @ mean)
+    )
+    assert prediction.scalar_std == pytest.approx(
+        target_scale * float(np.sqrt(query_feature @ covariance @ query_feature))
+    )
+    result = selector.select((candidate,), {candidate.candidate_id: query})
+    assert result.metadata["effective_beta"] == 1.0
+    assert result.metadata["surrogate"]["target_mean"] == pytest.approx(target_mean)
+    assert result.metadata["surrogate"]["target_scale"] == pytest.approx(target_scale)
 
 
 def test_selector_rejects_negative_observation_noise() -> None:
