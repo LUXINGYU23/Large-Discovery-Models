@@ -210,6 +210,16 @@ def test_prompt_baseline_profiles_use_the_same_official_source_gate(tmp_path: Pa
         assert checks[0].status == "ok"
 
 
+def test_extended_compare_profiles_use_the_same_official_source_gate(tmp_path: Path) -> None:
+    resources, data_root, _data_path = _dependency_fixture(tmp_path)
+
+    for profile in ("extended_compare", "extended_compare_direct_llm"):
+        checks = _real_checks(resources, data_root, profile=profile)
+
+        assert checks[0].name == "official source gate"
+        assert checks[0].status == "ok"
+
+
 def test_unsupported_profile_fails_before_data_access(tmp_path: Path) -> None:
     resources, data_root, _data_path = _dependency_fixture(tmp_path)
 

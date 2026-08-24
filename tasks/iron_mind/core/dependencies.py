@@ -33,6 +33,8 @@ SUPPORTED_REAL_PROFILES = frozenset(
         "ldm_prompt_baseline_20",
         "quick_compare",
         "quick_compare_direct_llm",
+        "extended_compare",
+        "extended_compare_direct_llm",
     }
 )
 
