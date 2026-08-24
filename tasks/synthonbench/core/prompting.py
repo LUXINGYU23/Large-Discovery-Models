@@ -71,7 +71,7 @@ def _user_prompt(plan: ProposalSlotPlan, *, target: str, policy: str,
         "observed_history": history,
         "reaction_id": plan.reaction_id,
         "proposal_role": plan.role,
-        "slot_options": _slot_payload(plan),
+        **_candidate_options(plan, policy),
         "output": {"reaction_id": plan.reaction_id, "synthon_ids": ["one ID per slot"]},
     }
     instruction = _policy_instruction(policy, plan.role)
@@ -88,7 +88,7 @@ def _policy_instruction(policy: str, role: str) -> str:
     if policy == "baseline_v1":
         return "Choose a chemically sensible valid combination from the shown options."
     if policy == "direct_v1":
-        return "Use the observed outcomes and structures to choose a promising valid combination."
+        return "Choose exactly one complete tuple from candidate_options; copy its IDs without mixing options."
     return ROLE_INSTRUCTIONS[role]
 
 
@@ -100,6 +100,12 @@ def _slot_payload(plan: ProposalSlotPlan) -> list[dict[str, object]]:
         }
         for options in plan.slot_options
     ]
+
+
+def _candidate_options(plan: ProposalSlotPlan, policy: str) -> dict[str, object]:
+    if policy == "direct_v1" and plan.direct_tuple_options:
+        return {"candidate_options": [{"synthon_ids": list(item)} for item in plan.direct_tuple_options]}
+    return {"slot_options": _slot_payload(plan)}
 
 
 def _history_summary(observations: Sequence[Observation]) -> list[dict[str, object]]:

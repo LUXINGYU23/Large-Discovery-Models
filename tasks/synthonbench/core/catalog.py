@@ -12,6 +12,7 @@ import numpy as np
 
 ROLE_CYCLE = ("explore", "exploit", "diversify", "scaffold_shift")
 REACTION_ALLOCATIONS = ("product_weighted", "uniform")
+DIRECT_TUPLE_OPTION_COUNT = 8
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class ProposalSlotPlan:
     slot_options: tuple[tuple[SynthonOption, ...], ...]
     uniqueness_anchor_position: int | None = None
     uniqueness_anchor_id: int | None = None
+    direct_tuple_options: tuple[tuple[int, ...], ...] = ()
 
     def allowed_ids(self) -> tuple[tuple[int, ...], ...]:
         return tuple(tuple(option.synthon_id for option in slot) for slot in self.slot_options)
@@ -52,6 +54,7 @@ class ProposalSlotPlan:
             "slot_synthon_ids": [list(ids) for ids in self.allowed_ids()],
             "uniqueness_anchor_position": self.uniqueness_anchor_position,
             "uniqueness_anchor_id": self.uniqueness_anchor_id,
+            "direct_tuple_options": [list(item) for item in self.direct_tuple_options],
         }
 
 
@@ -109,7 +112,7 @@ class SynthonProposalCatalog:
                 excluded_anchor_ids or {},
             )
             reaction_index = self.reactions.index(reaction_id)
-            options, anchor_position, anchor_id = self._direct_options(
+            options, anchor_position, anchor_id, direct_tuple_options = self._direct_options(
                 round_idx,
                 proposal_index,
                 reaction_id,
@@ -126,6 +129,7 @@ class SynthonProposalCatalog:
             )
             anchor_position = None
             anchor_id = None
+            direct_tuple_options = ()
         return ProposalSlotPlan(
             round_idx=round_idx,
             proposal_index=proposal_index,
@@ -135,6 +139,7 @@ class SynthonProposalCatalog:
             slot_options=options,
             uniqueness_anchor_position=anchor_position,
             uniqueness_anchor_id=anchor_id,
+            direct_tuple_options=direct_tuple_options,
         )
 
     def direct_anchor_position(self, reaction_id: str) -> int:
@@ -142,7 +147,7 @@ class SynthonProposalCatalog:
         return max(positions, key=lambda position: len(tuple(self.space.synthon_ids(reaction_id, position))))
 
     def _direct_options(self, round_idx: int, proposal_index: int, reaction_id: str, rng,
-                        excluded_anchor_ids: set[int], ordinal: int) -> tuple[tuple[tuple[SynthonOption, ...], ...], int, int]:
+                        excluded_anchor_ids: set[int], ordinal: int) -> tuple[tuple[tuple[SynthonOption, ...], ...], int, int, tuple[tuple[int, ...], ...]]:
         positions = tuple(self.space.positions(reaction_id))
         anchor = self.direct_anchor_position(reaction_id)
         anchor_ids = tuple(int(item) for item in self.space.synthon_ids(reaction_id, anchor))
@@ -158,7 +163,7 @@ class SynthonProposalCatalog:
             else _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
             for position in positions
         )
-        return options, anchor, anchor_id
+        return options, anchor, anchor_id, _direct_tuple_options(options)
 
     def _direct_assignment(self, round_idx: int, proposal_index: int,
                            excluded_anchor_ids: Mapping[str, set[int]]) -> tuple[str, int]:
@@ -200,6 +205,8 @@ def validate_payload_against_plan(payload: dict[str, object], plan: ProposalSlot
     raw_ids = payload.get("synthon_ids")
     if not isinstance(raw_ids, list) or len(raw_ids) != len(plan.slot_options):
         raise ValueError("proposal synthon_ids do not match the assigned reaction arity")
+    if plan.direct_tuple_options and tuple(raw_ids) not in plan.direct_tuple_options:
+        raise ValueError("synthon_ids must exactly match one supplied direct candidate option")
     for index, (raw_id, allowed_ids) in enumerate(zip(raw_ids, plan.allowed_ids(), strict=True)):
         if isinstance(raw_id, bool) or not isinstance(raw_id, int) or raw_id not in allowed_ids:
             raise ValueError(f"synthon_ids[{index}] is not present in the supplied slate")
@@ -238,6 +245,21 @@ def _slot_seed(seed: int, round_idx: int, proposal_index: int) -> int:
 def _anchor_seed(seed: int, reaction_id: str, position: int) -> int:
     payload = json.dumps([seed, reaction_id, position], separators=(",", ":")).encode("utf-8")
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+
+
+def _direct_tuple_options(
+    slots: tuple[tuple[SynthonOption, ...], ...],
+) -> tuple[tuple[int, ...], ...]:
+    count = min(DIRECT_TUPLE_OPTION_COUNT, int(np.prod([len(slot) for slot in slots])))
+    return tuple(_tuple_at_index(slots, index) for index in range(count))
+
+
+def _tuple_at_index(slots: tuple[tuple[SynthonOption, ...], ...], index: int) -> tuple[int, ...]:
+    selected = []
+    for slot in slots:
+        selected.append(slot[index % len(slot)].synthon_id)
+        index //= len(slot)
+    return tuple(selected)
 
 
 __all__ = [
