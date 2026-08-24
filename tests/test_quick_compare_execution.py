@@ -32,6 +32,25 @@ def test_mock_matrix_runs_all_three_methods_and_writes_reports(tmp_path: Path) -
     assert (output_root / "best_so_far.png").is_file()
 
 
+def test_partial_matrix_can_resume_without_publishing_reports(tmp_path: Path) -> None:
+    base_path = tmp_path / "base.yaml"
+    quick_path = tmp_path / "quick.yaml"
+    output_root = tmp_path / "comparison"
+    _write_yaml(base_path, _base_config())
+    _write_yaml(quick_path, _quick_config(base_path, output_root))
+    spec = load_quick_compare_spec(quick_path)
+
+    assert run_comparison(spec, resume=False, dry_run=False, methods=("bo",)) == 0
+
+    manifest = _json(output_root / "comparison_manifest.json")
+    assert manifest["state"] == "partial"
+    assert set(manifest["runs"]) == {"mock/bo/seed_0", "mock/bo/seed_1", "mock/bo/seed_2"}
+    assert not (output_root / "summary.json").exists()
+
+    assert run_comparison(spec, resume=True, dry_run=False) == 0
+    assert _json(output_root / "comparison_manifest.json")["state"] == "completed"
+
+
 def _base_config() -> dict[str, object]:
     return {
         "name": "quick_mock", "task": "iron_mind", "algorithm": "test", "mode": "mock",

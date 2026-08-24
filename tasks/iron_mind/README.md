@@ -277,6 +277,9 @@ endpoint variables only for the LDM and direct-LLM children. It writes a
 portable manifest, per-campaign standard artifacts, round-level trajectories,
 and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/quick_compare/`.
 Use `--resume` only for the same repository revision and unchanged configs.
+For a source archive rather than a Git checkout, set
+`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+explicit provenance.
 
 ## Outputs
 

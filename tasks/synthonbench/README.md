@@ -219,6 +219,9 @@ The result directory contains standard child artifacts plus a portable matrix
 manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
 plot. Endpoint settings remain user-defined OpenAI-compatible environment
 variables; the BO children do not require them.
+For a source archive rather than a Git checkout, set
+`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+explicit provenance.
 
 ## Qualification Status
 

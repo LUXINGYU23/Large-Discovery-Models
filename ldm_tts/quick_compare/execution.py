@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -53,7 +54,11 @@ def run_comparison(
         return 0
     for item, plan in zip(selected, plans, strict=True):
         _run_child(manifest, spec, item, plan, resume=resume)
-    write_comparison_reports(spec, manifest)
+    if _matrix_complete(spec, manifest):
+        write_comparison_reports(spec, manifest)
+    else:
+        manifest["state"] = "partial"
+        _write_manifest(spec, manifest)
     return 0
 
 
@@ -159,6 +164,18 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
         raise RuntimeError(f"quick comparison child failed: {run.key}")
 
 
+def _matrix_complete(spec: QuickCompareSpec, manifest: dict[str, Any]) -> bool:
+    expected = {
+        f"{case.case_id}/{method}/seed_{seed}"
+        for case in spec.cases
+        for method in METHODS
+        for seed in spec.seeds
+    }
+    return set(manifest["runs"]) == expected and all(
+        item.get("status") == "completed" for item in manifest["runs"].values()
+    )
+
+
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
     if method == "bo":
         return "none"
@@ -190,9 +207,18 @@ def _fingerprint(spec: QuickCompareSpec, base: dict[str, Any]) -> str:
 
 def _repository_state() -> dict[str, Any]:
     root = Path(__file__).resolve().parents[2]
-    commit = _git(root, "rev-parse", "HEAD")
-    dirty = bool(_git(root, "status", "--porcelain"))
-    return {"commit": commit, "dirty": dirty}
+    try:
+        commit = _git(root, "rev-parse", "HEAD")
+        dirty = bool(_git(root, "status", "--porcelain"))
+    except (OSError, subprocess.CalledProcessError) as error:
+        commit = os.environ.get("LDM_QUICK_COMPARE_COMMIT", "").strip()
+        if not commit:
+            raise RuntimeError(
+                "quick comparison requires Git metadata or an explicit "
+                "LDM_QUICK_COMPARE_COMMIT for an archived release"
+            ) from error
+        return {"commit": commit, "dirty": False, "source": "environment"}
+    return {"commit": commit, "dirty": dirty, "source": "git"}
 
 
 def _git(root: Path, *args: str) -> str:
