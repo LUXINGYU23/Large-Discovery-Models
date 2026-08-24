@@ -100,8 +100,9 @@ editing a tracked config, for example:
 --set 'args.llm-extra-body-json={"thinking":{"type":"disabled"}}'
 ```
 
-This example disables DeepSeek V4 thinking for proposal-only generation; other
-OpenAI-compatible providers can use their own documented request object.
+Thinking is disabled by default for proposal-only generation. Use this override
+only to replace the default request object for a different OpenAI-compatible
+provider.
 
 After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
 campaign or a suite configuration for the full benchmark. Set both

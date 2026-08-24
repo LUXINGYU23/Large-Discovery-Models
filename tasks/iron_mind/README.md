@@ -173,9 +173,10 @@ Use `--llm-json-mode` only when the selected OpenAI-compatible provider supports
 `response_format={"type":"json_object"}`. It is optional and does not change
 the proposal policy or benchmark budget. For provider-specific request fields,
 pass a JSON object through `--llm-extra-body-json`; it is merged into the
-OpenAI-compatible request body without changing the committed configuration. For
-example, a DeepSeek V4 proposal-only run can disable its default thinking mode
-with `--llm-extra-body-json='{"thinking":{"type":"disabled"}}'`.
+OpenAI-compatible request body without changing the committed configuration.
+The default request body disables optional thinking for the short single-JSON
+proposal. Providers that do not support this extension can use
+`--llm-extra-body-json '{}'` or their documented request object.
 
 ## Prepare the Official Data
 

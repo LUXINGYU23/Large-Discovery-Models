@@ -19,6 +19,7 @@ from tasks.iron_mind.core.search import INITIALIZATION_MODES, SEARCH_METHODS
 DEFAULT_PROPOSAL_SAMPLES = 64
 DEFAULT_BO_POOL_SIZE = 32
 DEFAULT_LLM_MAX_TOKENS = 512
+DEFAULT_LLM_EXTRA_BODY_JSON = '{"thinking":{"type":"disabled"}}'
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -52,7 +53,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-json-mode", action="store_true")
     parser.add_argument(
         "--llm-extra-body-json",
-        default="",
+        default=DEFAULT_LLM_EXTRA_BODY_JSON,
         help="Provider-specific JSON object merged into the OpenAI-compatible request body.",
     )
     parser.add_argument(

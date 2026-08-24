@@ -174,6 +174,10 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
     assert args.prompt_policy == "baseline_v1"
 
 
+def test_default_request_body_disables_optional_thinking() -> None:
+    assert parse_args([]).llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
+
+
 def _install_real_fakes(monkeypatch, table, calls: dict[str, object]) -> None:
     def load_table(*, dataset_id: str, data_root: Path):
         calls["dataset_id"] = dataset_id
