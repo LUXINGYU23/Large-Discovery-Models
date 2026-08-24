@@ -11,6 +11,11 @@ from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 
 from tasks.synthonbench.core.constants import Q0_METADATA_KEY
+from tasks.synthonbench.core.space_order import (
+    ordered_positions,
+    ordered_reactions,
+    ordered_synthon_ids,
+)
 
 
 INITIALIZATION_MODES = ("none", "shared_random")
@@ -96,7 +101,7 @@ def sample_unique_products(
 
 
 def _reaction_distribution(space: Any, reactions: Sequence[str]) -> tuple[tuple[str, ...], tuple[int, ...]]:
-    ids = tuple(str(item) for item in reactions)
+    ids = ordered_reactions(reactions)
     if not ids:
         raise ValueError("at least one allowed reaction is required")
     counts = tuple(int(space.product_count_estimate(item)) for item in ids)
@@ -115,8 +120,8 @@ def _sample_product(space: Any, reactions: Sequence[str], cumulative: Sequence[i
     reaction_index = next(index for index, bound in enumerate(cumulative) if draw < bound)
     reaction_id = reactions[reaction_index]
     synthons = [
-        int(rng.choice(tuple(space.synthon_ids(reaction_id, position))))
-        for position in space.positions(reaction_id)
+        rng.choice(ordered_synthon_ids(space, reaction_id, position))
+        for position in ordered_positions(space, reaction_id)
     ]
     return {"reaction_id": reaction_id, "synthon_ids": synthons}
 

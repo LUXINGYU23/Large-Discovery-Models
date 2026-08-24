@@ -9,6 +9,7 @@ from typing import Any
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from ldm_tts.data import DataCollectionSink, make_complete_design_ir
 from tasks.synthonbench.core.constants import OBJECTIVE_NAME, Q0_METADATA_KEY, TASK_ID
+from tasks.synthonbench.core.space_order import ordered_positions, ordered_synthon_ids
 
 
 class CandidatePayloadError(ValueError):
@@ -88,7 +89,7 @@ def prepare_candidate_payload(
 def _normalize_synthon_ids(raw: Any, space: Any, reaction_id: str) -> tuple[int, ...]:
     if not isinstance(raw, list):
         raise CandidatePayloadError("synthon_ids must be a JSON array")
-    positions = tuple(int(item) for item in space.positions(reaction_id))
+    positions = ordered_positions(space, reaction_id)
     if len(raw) != len(positions):
         raise CandidatePayloadError("synthon_ids length does not match the reaction slot count")
     normalized = tuple(_valid_slot_id(value, space, reaction_id, position)
@@ -100,7 +101,7 @@ def _valid_slot_id(value: Any, space: Any, reaction_id: str, position: int) -> i
     if isinstance(value, bool) or not isinstance(value, int):
         raise CandidatePayloadError("synthon IDs must be integer values")
     synthon_id = int(value)
-    allowed = {int(item) for item in space.synthon_ids(reaction_id, position)}
+    allowed = set(ordered_synthon_ids(space, reaction_id, position))
     if synthon_id not in allowed:
         raise CandidatePayloadError(
             f"synthon ID {synthon_id} is invalid for reaction {reaction_id!r} slot {position}"

@@ -22,6 +22,7 @@ from tasks.synthonbench.core.proposal_parsing import (
     parse_synthon_responses,
 )
 from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
+from tasks.synthonbench.core.search import SynthonInitializationExpander
 
 REQUEST_SIZE = 4
 
@@ -174,6 +175,19 @@ def test_q0_counts_valid_occurrences_before_shared_reservoir_deduplication() -> 
     assert by_key["r1|2_11"].metadata[Q0_METADATA_KEY]["probability"] == pytest.approx(1 / 3)
 
 
+def test_shared_initialization_is_invariant_to_official_collection_order() -> None:
+    space = _UnorderedSpace()
+    request = _request(reservoir_size=3)
+    first = SynthonInitializationExpander(
+        space, ("r2", "r1"), seed=17, attach_q0=False,
+    ).expand(request)
+    second = SynthonInitializationExpander(
+        space, ("r1", "r2"), seed=17, attach_q0=False,
+    ).expand(request)
+
+    assert [item.payload for item in first.proposals] == [item.payload for item in second.proposals]
+
+
 def _space() -> SynthonSpace:
     return SynthonSpace([
         Synthon(1, 1, "r1", "CC"),
@@ -183,6 +197,20 @@ def _space() -> SynthonSpace:
         Synthon(21, 1, "r2", "c1ccccc1"),
         Synthon(22, 1, "r2", "CCN"),
     ])
+
+
+class _UnorderedSpace:
+    def __init__(self) -> None:
+        self._space = _space()
+
+    def positions(self, reaction_id: str):
+        return set(self._space.positions(reaction_id))
+
+    def synthon_ids(self, reaction_id: str, position: int):
+        return set(self._space.synthon_ids(reaction_id, position))
+
+    def product_count_estimate(self, reaction_id: str) -> int:
+        return self._space.product_count_estimate(reaction_id)
 
 
 def _domain() -> SynthonCandidateDomain:

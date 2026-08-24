@@ -8,6 +8,11 @@ from typing import Any
 import numpy as np
 
 from ldm_tts.contracts import Candidate
+from tasks.synthonbench.core.space_order import (
+    ordered_positions,
+    ordered_reactions,
+    ordered_synthon_ids,
+)
 
 
 DEFAULT_MORGAN_RADIUS = 2
@@ -34,7 +39,7 @@ class SynthonProductProxy:
         if fingerprint_bits < 1 or radius < 1:
             raise ValueError("fingerprint_bits and radius must be positive")
         self.space = space
-        self.reactions = tuple(str(item) for item in allowed_reactions)
+        self.reactions = ordered_reactions(allowed_reactions)
         if not self.reactions:
             raise ValueError("product proxy requires at least one allowed reaction")
         self._reaction_set = frozenset(self.reactions)
@@ -86,7 +91,7 @@ class SynthonProductProxy:
     def _positions(self, reaction_id: str) -> tuple[int, ...]:
         if reaction_id not in self._reaction_set:
             raise ValueError(f"reaction {reaction_id!r} is outside the configured SynthonBench space")
-        positions = tuple(int(item) for item in self.space.positions(reaction_id))
+        positions = ordered_positions(self.space, reaction_id)
         if not positions:
             raise ValueError(f"reaction {reaction_id!r} has no synthon positions")
         return positions
@@ -94,7 +99,7 @@ class SynthonProductProxy:
     def _validate_synthon_key(self, reaction_id: str, position: int, synthon_id: int) -> None:
         if position not in self._positions(reaction_id):
             raise ValueError(f"position {position} is invalid for reaction {reaction_id!r}")
-        valid_ids = {int(item) for item in self.space.synthon_ids(reaction_id, position)}
+        valid_ids = set(ordered_synthon_ids(self.space, reaction_id, position))
         if synthon_id not in valid_ids:
             raise ValueError(
                 f"synthon ID {synthon_id} is invalid for reaction {reaction_id!r} position {position}"

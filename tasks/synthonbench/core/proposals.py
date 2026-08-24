@@ -11,6 +11,7 @@ from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
+from tasks.synthonbench.core.space_order import ordered_positions
 from tasks.synthonbench.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     build_synthon_prompt_messages,
@@ -164,7 +165,7 @@ def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCata
         synthon_ids = payload.get("synthon_ids") if isinstance(payload, dict) else None
         if not isinstance(reaction_id, str) or not isinstance(synthon_ids, list):
             raise TypeError("SynthonBench observations must retain reaction_id and synthon_ids")
-        positions = tuple(catalog.space.positions(reaction_id))
+        positions = ordered_positions(catalog.space, reaction_id)
         anchor = catalog.direct_anchor_position(reaction_id)
         anchor_index = positions.index(anchor)
         anchor_id = synthon_ids[anchor_index]

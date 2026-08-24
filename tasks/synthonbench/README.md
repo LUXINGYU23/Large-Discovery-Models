@@ -65,6 +65,10 @@ It contains only released IDs and SMILES, never score-table values, top-k lists,
 or unqueried oracle outcomes. Previous charged outcomes are the only feedback
 shown in a prompt.
 
+All reaction IDs, slot positions, and synthon IDs are canonically ordered before
+any seeded sampling. A fixed campaign seed therefore defines the same shared
+initial design and task-local GP basis across independently launched methods.
+
 ## Surrogate Representation
 
 For a valid tuple \(x=(r,s_1,\ldots,s_k)\), the task computes

@@ -19,6 +19,11 @@ from tasks.synthonbench.core.tanimoto_kernel import (
     composite_count_tanimoto_matrix,
     composite_count_tanimoto_to_many,
 )
+from tasks.synthonbench.core.space_order import (
+    ordered_positions,
+    ordered_reactions,
+    ordered_synthon_ids,
+)
 
 
 DEFAULT_KERNEL_JITTER = 1.0e-8
@@ -61,7 +66,7 @@ class SynthonNystromEncoder:
         if not math.isfinite(reaction_weight) or reaction_weight < 0.0:
             raise ValueError("reaction_weight must be finite and non-negative")
         self.space = space
-        self.reactions = tuple(str(item) for item in allowed_reactions)
+        self.reactions = ordered_reactions(allowed_reactions)
         if not self.reactions:
             raise ValueError("Nyström encoder requires at least one allowed reaction")
         self.landmark_count = int(landmark_count)
@@ -198,8 +203,8 @@ def _sample_reaction_tuples(space: Any, reaction_id: str, count: int, *, seed: i
     if count == 0:
         return ()
     slot_ids = tuple(
-        tuple(int(item) for item in space.synthon_ids(reaction_id, int(position)))
-        for position in space.positions(reaction_id)
+        ordered_synthon_ids(space, reaction_id, position)
+        for position in ordered_positions(space, reaction_id)
     )
     if not slot_ids or any(not ids for ids in slot_ids):
         raise ValueError(f"reaction {reaction_id!r} has an empty public synthon slot")

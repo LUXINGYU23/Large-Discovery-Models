@@ -38,6 +38,7 @@ from tasks.synthonbench.core.search import (
     SEARCH_METHODS,
     SynthonInitializationExpander,
 )
+from tasks.synthonbench.core.space_order import ordered_reactions
 from tasks.synthonbench.core.tanimoto_gp import TanimotoGPUCBConfig, SynthonTanimotoGPUCBSelector
 
 
@@ -108,7 +109,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     """Assemble a task-local method without reading credentials or global state."""
 
     official_task = options.official_task
-    reactions = tuple(official_task.allowed_reactions)
+    reactions = ordered_reactions(official_task.allowed_reactions)
     encoder, selector = _search_components(options, reactions)
     task_spec = build_synthon_task_spec(
         encoder=encoder,

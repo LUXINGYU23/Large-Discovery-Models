@@ -10,6 +10,12 @@ from typing import Any
 
 import numpy as np
 
+from tasks.synthonbench.core.space_order import (
+    ordered_positions,
+    ordered_reactions,
+    ordered_synthon_ids,
+)
+
 ROLE_CYCLE = ("explore", "exploit", "diversify", "scaffold_shift")
 REACTION_ALLOCATIONS = ("product_weighted", "uniform")
 DIRECT_TUPLE_OPTION_COUNT = 8
@@ -84,7 +90,7 @@ class SynthonProposalCatalog:
         if direct_start_round < 0:
             raise ValueError("direct_start_round must be non-negative")
         self.space = space
-        self.reactions = tuple(str(item) for item in allowed_reactions)
+        self.reactions = ordered_reactions(allowed_reactions)
         if not self.reactions:
             raise ValueError("proposal catalog requires at least one reaction")
         self.slate_size = int(slate_size)
@@ -125,7 +131,7 @@ class SynthonProposalCatalog:
             reaction_id = self.reactions[reaction_index]
             options = tuple(
                 _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
-                for position in self.space.positions(reaction_id)
+                for position in ordered_positions(self.space, reaction_id)
             )
             anchor_position = None
             anchor_id = None
@@ -143,14 +149,17 @@ class SynthonProposalCatalog:
         )
 
     def direct_anchor_position(self, reaction_id: str) -> int:
-        positions = tuple(self.space.positions(reaction_id))
-        return max(positions, key=lambda position: len(tuple(self.space.synthon_ids(reaction_id, position))))
+        positions = ordered_positions(self.space, reaction_id)
+        return max(
+            positions,
+            key=lambda position: len(ordered_synthon_ids(self.space, reaction_id, position)),
+        )
 
     def _direct_options(self, round_idx: int, proposal_index: int, reaction_id: str, rng,
                         excluded_anchor_ids: set[int], ordinal: int) -> tuple[tuple[tuple[SynthonOption, ...], ...], int, int, tuple[tuple[int, ...], ...]]:
-        positions = tuple(self.space.positions(reaction_id))
+        positions = ordered_positions(self.space, reaction_id)
         anchor = self.direct_anchor_position(reaction_id)
-        anchor_ids = tuple(int(item) for item in self.space.synthon_ids(reaction_id, anchor))
+        anchor_ids = ordered_synthon_ids(self.space, reaction_id, anchor)
         available_anchor_ids = tuple(item for item in anchor_ids if item not in excluded_anchor_ids)
         if ordinal >= len(available_anchor_ids):
             raise ValueError(f"direct LLM slate cannot assign a unique anchor for reaction {reaction_id!r}")
@@ -193,7 +202,7 @@ class SynthonProposalCatalog:
     def _available_anchor_count(self, reaction_id: str,
                                 excluded_anchor_ids: Mapping[str, set[int]]) -> int:
         anchor = self.direct_anchor_position(reaction_id)
-        ids = {int(item) for item in self.space.synthon_ids(reaction_id, anchor)}
+        ids = set(ordered_synthon_ids(self.space, reaction_id, anchor))
         return len(ids - set(excluded_anchor_ids.get(reaction_id, set())))
 
 
@@ -223,7 +232,7 @@ def _reaction_probabilities(space: Any, reactions: Sequence[str], allocation: st
 
 def _sample_slot(space: Any, reaction_id: str, position: int, slate_size: int,
                  rng: np.random.Generator) -> tuple[SynthonOption, ...]:
-    ids = tuple(int(item) for item in space.synthon_ids(reaction_id, position))
+    ids = ordered_synthon_ids(space, reaction_id, position)
     if not ids:
         raise ValueError(f"reaction {reaction_id!r} position {position} has no synthons")
     selected = rng.choice(ids, size=min(slate_size, len(ids)), replace=False)
