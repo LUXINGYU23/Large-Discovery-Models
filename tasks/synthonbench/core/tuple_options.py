@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import prod
 from typing import Protocol
 
 import numpy as np
@@ -16,9 +17,14 @@ class _SynthonOption(Protocol):
 
 def complete_tuple_options(
     slots: Sequence[Sequence[_SynthonOption]],
+    rng: np.random.Generator,
 ) -> tuple[tuple[int, ...], ...]:
-    count = min(COMPLETE_TUPLE_OPTION_COUNT, int(np.prod([len(slot) for slot in slots])))
-    return tuple(_tuple_at_index(slots, index) for index in range(count))
+    """Sample complete tuples uniformly without enumerating the Cartesian space."""
+
+    total = prod(len(slot) for slot in slots)
+    count = min(COMPLETE_TUPLE_OPTION_COUNT, total)
+    flat_indices = rng.choice(total, size=count, replace=False)
+    return tuple(_tuple_at_index(slots, int(index)) for index in flat_indices)
 
 
 def _tuple_at_index(

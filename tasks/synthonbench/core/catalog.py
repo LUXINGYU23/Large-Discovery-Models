@@ -187,7 +187,7 @@ class SynthonProposalCatalog:
             else _sample_slot(self.space, reaction_id, position, self.slate_size, rng)
             for position in positions
         )
-        tuples = complete_tuple_options(options) if self.restrict_to_complete_tuples else ()
+        tuples = complete_tuple_options(options, rng) if self.restrict_to_complete_tuples else ()
         return options, anchor, anchor_id, tuples
 
     def _unique_assignment(

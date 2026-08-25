@@ -222,11 +222,14 @@ LDM retains the current 64 independent public-slate requests, empirical `q0`,
 reaction-aware Nyström count-Tanimoto GP over standardized utilities.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
-issues 16 independent one-tuple requests per optimization batch and evaluates
-the admitted tuples directly. Its `direct_v1` prompt is recorded under the
-separate direct-LLM contract profile and does not invoke a GP selector. Each
-direct request has one deterministic, source-valid anchor synthon so the 16
-independent responses map to 16 distinct official product tuples.
+issues 16 independent finite-choice requests per optimization batch and
+evaluates the returned tuples directly. Each request lists up to eight uniformly
+sampled, complete source-valid tuple objects with component IDs and SMILES. The
+model returns the selected official `reaction_id + synthon_ids` tuple itself;
+the parser rejects invented IDs and combinations that mix different options.
+Its `direct_v1` prompt is recorded under the separate direct-LLM contract
+profile and does not invoke a GP selector. A deterministic anchor synthon keeps
+the 16 requests distinct, and anchors from evaluated history are excluded.
 
 ```bash
 uv run --locked --project tasks/synthonbench python \

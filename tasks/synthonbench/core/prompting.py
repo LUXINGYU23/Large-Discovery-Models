@@ -75,7 +75,10 @@ def _user_prompt(plan: ProposalSlotPlan, *, target: str, policy: str,
         "reaction_id": plan.reaction_id,
         "proposal_role": plan.role,
         **_candidate_options(plan, policy),
-        "output": {"reaction_id": plan.reaction_id, "synthon_ids": ["one ID per slot"]},
+        "output_contract": {
+            "reaction_id": plan.reaction_id,
+            "synthon_ids": "copy one complete integer array from the supplied options",
+        },
     }
     instruction = _policy_instruction(policy, plan.role)
     return (
@@ -83,7 +86,8 @@ def _user_prompt(plan: ProposalSlotPlan, *, target: str, policy: str,
         "The history contains only previous charged measurements; it contains no hidden scores. "
         f"{instruction}\n\n"
         + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        + "\n\nReturn exactly {\"reaction_id\":\"...\",\"synthon_ids\":[...]} with integer IDs."
+        + "\n\nReturn exactly one JSON object containing only reaction_id and synthon_ids. "
+        "Copy the complete tuple unchanged; do not return an option number or explanatory text."
     )
 
 
@@ -91,7 +95,10 @@ def _policy_instruction(policy: str, role: str) -> str:
     if policy == "baseline_v1":
         return "Choose a chemically sensible valid combination from the shown options."
     if policy == "direct_v1":
-        return "Choose exactly one complete tuple from candidate_options; copy its IDs without mixing options."
+        return (
+            "Choose exactly one complete object from candidate_options. Copy its reaction_id "
+            "and entire synthon_ids array without mixing components from different objects."
+        )
     return ROLE_INSTRUCTIONS[role]
 
 
@@ -123,7 +130,11 @@ def _direct_candidate_option(
     for slot, synthon_id in zip(plan.slot_options, synthon_ids, strict=True):
         option = next(item for item in slot if item.synthon_id == synthon_id)
         components.append(option.to_dict())
-    return {"synthon_ids": list(synthon_ids), "components": components}
+    return {
+        "reaction_id": plan.reaction_id,
+        "synthon_ids": list(synthon_ids),
+        "components": components,
+    }
 
 
 def _history_summary(

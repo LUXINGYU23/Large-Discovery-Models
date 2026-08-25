@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from ldm_tts.quick_compare.config import load_quick_compare_spec
@@ -49,6 +50,18 @@ def test_partial_matrix_can_resume_without_publishing_reports(tmp_path: Path) ->
 
     assert run_comparison(spec, resume=True, dry_run=False) == 0
     assert _json(output_root / "comparison_manifest.json")["state"] == "completed"
+
+
+def test_matrix_rejects_a_task_label_that_differs_from_its_base_config(tmp_path: Path) -> None:
+    base_path = tmp_path / "base.yaml"
+    quick_path = tmp_path / "quick.yaml"
+    _write_yaml(base_path, _base_config())
+    payload = _quick_config(base_path, tmp_path / "comparison")
+    payload["task"] = "synthonbench"
+    _write_yaml(quick_path, payload)
+
+    with pytest.raises(ValueError, match="must match base config task"):
+        run_comparison(load_quick_compare_spec(quick_path), resume=False, dry_run=True)
 
 
 def _base_config() -> dict[str, object]:

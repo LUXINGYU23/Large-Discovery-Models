@@ -271,7 +271,7 @@ data-starved six-evaluation comparison changes after additional GP feedback;
 it does not replace the fixed six-evaluation early-stop screen.
 
 The LDM method retains the 64 independent proposals, empirical `q0`,
-48-candidate maintained pool, `beta=2`, and `eta=3` acquisition tilt locked by
+63-candidate maintained pool, `beta=1`, and `eta=3` acquisition tilt locked by
 the quick-comparison profiles. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes

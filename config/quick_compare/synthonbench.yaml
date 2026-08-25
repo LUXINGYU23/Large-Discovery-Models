@@ -15,6 +15,8 @@ method_overrides:
   llm:
     - contract_profile="quick_compare_direct_llm"
     - args.prompt-policy="direct_v1"
+    - args.proposal-samples=16
+    - args.proposal-max-workers=16
 seeds: [0, 1, 2]
 optimization_rounds: 5
 initialization_mode: shared_random

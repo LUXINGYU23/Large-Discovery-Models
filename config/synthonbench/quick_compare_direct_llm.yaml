@@ -12,10 +12,10 @@ args:
   target: kif11
   oracle-kind: surrogate
   iterations: 6
-  proposal-samples: 64
+  proposal-samples: 16
   bo-pool-size: 48
   bo-search-samples: 64
-  proposal-max-workers: 64
+  proposal-max-workers: 16
   evaluations-per-round: 16
   slate-size: 24
   reaction-allocation: product_weighted

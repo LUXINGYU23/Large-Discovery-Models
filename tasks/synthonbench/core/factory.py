@@ -6,17 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Callable
 
-from ldm_tts.contracts import (
-    AcquisitionSpec,
-    CandidateDomainSpec,
-    LDMTaskSpec,
-    ObjectiveSpec,
-    ProposalSearchSpec,
-    ReservoirExpansionSpec,
-    ReservoirSpec,
-    ResponseSpaceSpec,
-    SurrogateSpaceSpec,
-)
+from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
@@ -30,7 +20,6 @@ from tasks.synthonbench.core.constants import (
     DEFAULT_ACQUISITION_ETA,
     DEFAULT_GP_REACTION_WEIGHT,
     OBJECTIVE_NAME,
-    TASK_ID,
 )
 from tasks.synthonbench.core.evaluator import OfficialSynthonEvaluator
 from tasks.synthonbench.core.ldm_selector import AcquisitionTiltedSelector
@@ -45,6 +34,11 @@ from tasks.synthonbench.core.search import (
 )
 from tasks.synthonbench.core.space_order import ordered_reactions
 from tasks.synthonbench.core.tanimoto_gp import TanimotoGPUCBConfig, SynthonTanimotoGPUCBSelector
+from tasks.synthonbench.core.task_spec import (
+    build_direct_acquisition,
+    build_synthon_task_spec,
+    disabled_surrogate,
+)
 
 
 @dataclass(frozen=True)
@@ -120,6 +114,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         encoder=encoder,
         acquisition=selector.describe() if selector is not None else build_direct_acquisition(),
         proposal_samples=options.proposal_samples,
+        evaluations_per_round=options.evaluations_per_round,
         bo_pool_size=options.bo_pool_size,
         bo_search_samples=options.bo_search_samples,
         proposal_max_workers=options.proposal_max_workers,
@@ -142,54 +137,6 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         surrogate_encoder=encoder,
     )
     return CampaignComponents(task_spec, domain, expander, encoder, selector, evaluator, engine)
-
-
-def build_synthon_task_spec(
-    *,
-    encoder: SynthonNystromEncoder | None,
-    acquisition: AcquisitionSpec,
-    proposal_samples: int,
-    bo_pool_size: int,
-    bo_search_samples: int = 64,
-    proposal_max_workers: int,
-    slate_size: int,
-    reaction_allocation: str,
-    prompt_policy: str,
-    search_method: str = "ldm",
-    initialization_mode: str = "none",
-) -> LDMTaskSpec:
-    """Describe finite tuple, response, and method-specific acquisition semantics."""
-
-    if encoder is None and search_method != "llm":
-        raise ValueError("BO-based SynthonBench methods require a surrogate encoder")
-    return LDMTaskSpec(
-        task=TASK_ID,
-        candidate_domain=CandidateDomainSpec(
-            name="Source-pinned synthon tuples", kind="reaction_synthon_tuple", dimension=None,
-            representation="One reaction ID and one ordered valid synthon ID per official reaction slot.",
-        ),
-        objectives=(ObjectiveSpec(OBJECTIVE_NAME, "maximize", "Official fixed-oracle SynthonBench utility."),),
-        response_spaces=(_response_space(),),
-        acquisition=acquisition,
-        reservoir=_reservoir_spec(
-            bo_search_samples if search_method == "bo" else proposal_samples,
-            proposal_max_workers,
-            search_method,
-            initialization_mode,
-        ),
-        surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
-        proposal_search=_proposal_search(search_method, proposal_samples, proposal_max_workers),
-        metadata={
-            "search_method": search_method,
-            "initialization_mode": initialization_mode,
-            "proposal_samples": proposal_samples,
-            "bo_pool_size": bo_pool_size,
-            "bo_search_samples": bo_search_samples,
-            "slate_size": slate_size,
-            "reaction_allocation": reaction_allocation,
-            "prompt_policy": prompt_policy,
-        },
-    )
 
 
 def build_synthon_selector(
@@ -224,17 +171,6 @@ def build_base_synthon_selector(
             observation_noise_std=gp_observation_noise_std,
         ),
     )
-
-
-def build_direct_acquisition() -> AcquisitionSpec:
-    return AcquisitionSpec(
-        name="direct_llm_reservoir_order", objective_names=(OBJECTIVE_NAME,), score_direction="maximize",
-        selection_rule="evaluate every admitted direct LLM candidate in reservoir order",
-    )
-
-
-def disabled_surrogate() -> SurrogateSpaceSpec:
-    return SurrogateSpaceSpec(kind="none", representation="No surrogate for direct LLM baseline.", dimension_policy="none")
 
 
 def _search_components(options: CampaignComponentOptions, reactions):
@@ -291,58 +227,6 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         ),
         search_expander=search,
         initial_reservoir_size=options.evaluations_per_round,
-    )
-
-
-def _reservoir_spec(samples, workers, method, initialization) -> ReservoirSpec:
-    expansions = []
-    if initialization == "shared_random":
-        expansions.append(ReservoirExpansionSpec(
-            name="shared_random_initialization", action_kind="emit_candidate",
-            response_space="synthon_tuple_json", produces_candidates=True,
-            description="Deterministic product-uniform initial sample from the official space.",
-        ))
-    description = "Score-blind random unseen product pool for base GP-UCB." if method == "bo" else (
-        f"Launch {samples} independent one-candidate requests with at most {workers} workers."
-    )
-    expansions.append(ReservoirExpansionSpec(
-        name=f"{method}_search_expansion", action_kind="emit_candidate",
-        response_space="synthon_tuple_json", produces_candidates=True, description=description,
-    ))
-    return ReservoirSpec(
-        name="synthon_tuple_reservoir", expansions=tuple(expansions),
-        candidate_validator="tasks.synthonbench.core.candidate:SynthonCandidateDomain",
-        deduplication_key="official SynthonBench product_id", max_size=samples,
-    )
-
-
-def _proposal_search(method: str, samples: int, workers: int) -> ProposalSearchSpec:
-    if method == "bo":
-        return ProposalSearchSpec(
-            name="score_blind_random_pool_bo", breadth=samples,
-            evaluation_policy="nystrom_tanimoto_gp_ucb", parameters={"model_requests": 0},
-        )
-    if method == "llm":
-        return ProposalSearchSpec(
-            name="parallel_independent_direct_llm", breadth=samples,
-            evaluation_policy="reservoir_order_direct_evaluation",
-            parameters={"max_workers": workers, "one_candidate_per_request": True},
-        )
-    return ProposalSearchSpec(
-        name="parallel_independent_requests", breadth=samples,
-        evaluation_policy="empirical_q0_maintained_acquisition_tilted",
-        parameters={"max_workers": workers, "one_candidate_per_request": True},
-    )
-
-
-def _response_space() -> ResponseSpaceSpec:
-    return ResponseSpaceSpec(
-        name="synthon_tuple_json", output_kind="json_object",
-        parser="tasks.synthonbench.core.proposal_parsing:parse_synthon_response",
-        description="One source-valid tuple chosen only from a supplied finite public synthon slate.",
-        schema={"type": "object", "additionalProperties": False,
-                "required": ["reaction_id", "synthon_ids"],
-                "properties": {"reaction_id": {"type": "string"}, "synthon_ids": {"type": "array"}}},
     )
 
 

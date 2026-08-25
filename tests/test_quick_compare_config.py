@@ -33,6 +33,10 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
 
     assert spec.trajectory.step_kind == "evaluation_index"
     assert spec.result_fields["best_found_utility"] == "best_found_utility"
+    assert spec.method_overrides["llm"][-2:] == (
+        "args.proposal-samples=16",
+        "args.proposal-max-workers=16",
+    )
 
 
 def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, tmp_path) -> None:

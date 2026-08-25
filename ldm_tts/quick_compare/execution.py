@@ -46,6 +46,7 @@ def run_comparison(
     """Run a fresh or provenance-checked resumed comparison matrix."""
 
     base = load_config(spec.base_config)
+    _require_task_match(spec, base)
     selected = _select_runs(spec, cases=cases, methods=methods, seeds=seeds)
     manifest = _open_manifest(spec, base, resume=resume, dry_run=dry_run)
     plans = [_child_plan(spec, base, item, resume=resume) for item in selected]
@@ -60,6 +61,15 @@ def run_comparison(
         manifest["state"] = "partial"
         _write_manifest(spec, manifest)
     return 0
+
+
+def _require_task_match(spec: QuickCompareSpec, base: dict[str, Any]) -> None:
+    task = base.get("task")
+    if task != spec.task:
+        raise ValueError(
+            "quick comparison task must match base config task: "
+            f"{spec.task!r} != {task!r}"
+        )
 
 
 def _select_runs(spec, *, cases, methods, seeds) -> tuple[ComparisonRun, ...]:

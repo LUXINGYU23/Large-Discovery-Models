@@ -61,6 +61,7 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
         encoder=encoder,
         acquisition=selector.describe() if selector is not None else build_direct_acquisition(),
         proposal_samples=args.proposal_samples,
+        evaluations_per_round=args.evaluations_per_round,
         bo_pool_size=args.bo_pool_size,
         bo_search_samples=args.bo_search_samples,
         proposal_max_workers=args.proposal_max_workers,

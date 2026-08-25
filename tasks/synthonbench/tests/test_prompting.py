@@ -65,6 +65,9 @@ def test_prompt_exposes_structures_for_history_and_complete_options() -> None:
 
     user = messages[1]["content"]
     assert '"components"' in user
+    assert '"reaction_id":"r1"' in user
+    assert '"synthon_ids":[' in user
+    assert "option_index" not in user
     assert '"smiles":"CC"' in user
     assert '"smiles":"N"' in user
 
