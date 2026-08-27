@@ -21,15 +21,12 @@ from ldm_tts.transport.openai_http import EndpointRequestError
 
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.dependencies import load_pinned_reaction_table
+from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
 from tasks.iron_mind.core.factory import (
-    OBJECTIVE_NAME,
     CampaignComponentOptions,
     build_base_reaction_selector,
     build_campaign_components,
-    build_direct_acquisition,
     build_reaction_selector,
-    build_reaction_task_spec,
-    disabled_surrogate,
 )
 from tasks.iron_mind.core.mock import (
     MOCK_SEED_ROW_COUNT,
@@ -45,6 +42,11 @@ from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.search import finite_domain_size
+from tasks.iron_mind.core.task_spec import (
+    build_direct_acquisition,
+    build_reaction_task_spec,
+    disabled_surrogate,
+)
 from tasks.iron_mind.core.workflow_support import (
     campaign_budget,
     jsonable_args,
@@ -55,7 +57,6 @@ from tasks.iron_mind.core.workflow_support import (
 )
 from tasks.iron_mind.core.workflow_args import parse_args, validate_args
 
-TASK_ID = "iron_mind"
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"

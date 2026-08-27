@@ -23,20 +23,22 @@ from tasks.synthonbench.core.data import (
     load_mock_benchmark,
     load_official_benchmark,
 )
+from tasks.synthonbench.core.constants import TASK_ID
 from tasks.synthonbench.core.factory import (
     CampaignComponentOptions,
     build_base_synthon_selector,
     build_campaign_components,
-    build_direct_acquisition,
     build_synthon_selector,
-    build_synthon_task_spec,
-    disabled_surrogate,
 )
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
 from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.reporting import write_campaign_reports
+from tasks.synthonbench.core.task_spec import (
+    build_direct_acquisition,
+    build_synthon_task_spec,
+)
 from tasks.synthonbench.core.workflow_args import parse_args, validate_args
 from tasks.synthonbench.core.workflow_support import (
     campaign_budget,
@@ -47,7 +49,6 @@ from tasks.synthonbench.core.workflow_support import (
     provider_settings,
 )
 
-TASK_ID = "synthonbench"
 TASK_ROOT = Path(__file__).resolve().parents[1]
 
 

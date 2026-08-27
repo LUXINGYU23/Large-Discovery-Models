@@ -63,10 +63,20 @@ def test_proposal_defaults_disable_thinking() -> None:
     assert args.llm_max_tokens == 256
 
 
-def test_quick_compare_arguments_expose_a_task_local_bo_pool_size() -> None:
-    args = parse_args(["--mock", "--search-method", "bo", "--proposal-mode", "none"])
+def test_bo_task_spec_uses_the_configured_task_local_search_breadth() -> None:
+    args = parse_args([
+        "--mock",
+        "--search-method", "bo",
+        "--proposal-mode", "none",
+        "--proposal-samples", "16",
+        "--bo-search-samples", "23",
+    ])
 
-    assert args.bo_search_samples == 64
+    spec = describe_ldm_task(args)
+
+    assert spec.reservoir.max_size == 23
+    assert spec.proposal_search.breadth == 23
+    assert spec.metadata["search_breadth"] == 23
 
 
 def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -74,7 +84,7 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
 
     assert main([
         "--mock",
-        "--iterations", "1",
+        "--iterations", "2",
         "--proposal-samples", "8",
         "--bo-pool-size", "4",
         "--slate-size", "4",
@@ -88,10 +98,10 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
     budget = json.loads((run_dir / "budget.json").read_text(encoding="utf-8"))
 
     assert result["mode"] == "mock"
-    assert result["official_calls"] == 1
-    assert result["official_metrics"]["submitted_calls"] == 1.0
-    assert budget["counters"]["proposal_attempts"] == 8
-    assert budget["counters"]["benchmark_jobs"] == 1
+    assert result["official_calls"] == 2
+    assert result["official_metrics"]["submitted_calls"] == 2.0
+    assert budget["counters"]["proposal_attempts"] == 16
+    assert budget["counters"]["benchmark_jobs"] == 2
     for filename in (
         "submission.csv",
         "trajectory.csv",

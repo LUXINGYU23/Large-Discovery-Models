@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,7 +36,6 @@ class TrajectorySpec:
 class QuickCompareSpec:
     """Validated matrix specification with no task-specific control flow."""
 
-    path: Path
     task: str
     name: str
     base_config: Path
@@ -54,11 +51,6 @@ class QuickCompareSpec:
     @property
     def iterations(self) -> int:
         return self.optimization_rounds + 1
-
-    @property
-    def digest(self) -> str:
-        payload = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -84,15 +76,16 @@ def load_quick_compare_spec(path: Path) -> QuickCompareSpec:
     raw = load_config(resolved)
     _require_exact_keys(raw)
     return QuickCompareSpec(
-        path=resolved,
-        task=_required_string(raw, "task"),
-        name=_required_string(raw, "name"),
+        task=_required_string(raw.get("task"), "task"),
+        name=_required_string(raw.get("name"), "name"),
         base_config=_resolve_base_config(resolved, raw),
         cases=_cases(raw.get("cases")),
         method_overrides=_method_overrides(raw.get("method_overrides")),
         seeds=_seeds(raw.get("seeds")),
         optimization_rounds=_positive_int(raw.get("optimization_rounds"), "optimization_rounds"),
-        initialization_mode=_required_string(raw, "initialization_mode"),
+        initialization_mode=_required_string(
+            raw.get("initialization_mode"), "initialization_mode"
+        ),
         output_root=_output_root(raw.get("output_root")),
         trajectory=_trajectory(raw.get("trajectory")),
         result_fields=_result_fields(raw.get("result_fields")),
@@ -111,7 +104,7 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
 
 
 def _resolve_base_config(path: Path, raw: dict[str, Any]) -> Path:
-    candidate = Path(_required_string(raw, "base_config"))
+    candidate = Path(_required_string(raw.get("base_config"), "base_config"))
     resolved = (path.parent / candidate).resolve() if not candidate.is_absolute() else candidate
     if not resolved.is_file():
         raise ValueError(f"quick comparison base config does not exist: {resolved}")
@@ -128,7 +121,7 @@ def _cases(value: Any) -> tuple[ComparisonCase, ...]:
         overrides = item["overrides"]
         if not isinstance(overrides, list) or not all(isinstance(entry, str) and "=" in entry for entry in overrides):
             raise ValueError("case overrides must be PATH=VALUE strings")
-        cases.append(ComparisonCase(_required_string(item, "id"), tuple(overrides)))
+        cases.append(ComparisonCase(_required_string(item.get("id"), "id"), tuple(overrides)))
     if len({item.case_id for item in cases}) != len(cases):
         raise ValueError("quick comparison case IDs must be unique")
     return tuple(cases)
@@ -161,7 +154,9 @@ def _method_overrides(value: Any) -> dict[str, tuple[str, ...]]:
 def _trajectory(value: Any) -> TrajectorySpec:
     if not isinstance(value, dict) or set(value) != {"step_column", "step_kind", "objective_column", "direction"}:
         raise ValueError("trajectory requires step_column, step_kind, objective_column, and direction")
-    result = TrajectorySpec(**{key: _required_string(value, key) for key in value})
+    result = TrajectorySpec(
+        **{key: _required_string(value.get(key), key) for key in value}
+    )
     if result.step_kind not in STEP_KINDS or result.direction not in {"maximize", "minimize"}:
         raise ValueError("trajectory step_kind or direction is invalid")
     return result
@@ -177,14 +172,13 @@ def _result_fields(value: Any) -> dict[str, str]:
 
 
 def _output_root(value: Any) -> Path:
-    raw = os.path.expandvars(_required_string({"output_root": value}, "output_root"))
+    raw = os.path.expandvars(_required_string(value, "output_root"))
     if "$" in raw:
         raise ValueError("quick comparison output_root contains an unresolved environment variable")
     return Path(raw).resolve()
 
 
-def _required_string(raw: dict[str, Any], key: str) -> str:
-    value = raw.get(key)
+def _required_string(value: Any, key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"quick comparison {key} must be a non-empty string")
     return value.strip()
@@ -196,4 +190,4 @@ def _positive_int(value: Any, name: str) -> int:
     return value
 
 
-__all__ = ["ComparisonCase", "METHODS", "QuickCompareSpec", "TrajectorySpec", "load_quick_compare_spec"]
+__all__ = ["METHODS", "QuickCompareSpec", "load_quick_compare_spec"]

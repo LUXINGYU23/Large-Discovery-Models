@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import subprocess
@@ -13,15 +14,15 @@ from typing import Any, Iterable
 
 from ldm_tts.cli.runner import apply_override, build_plan, load_config, preflight_plan, run_plan
 from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.quick_compare.config import METHODS, ComparisonCase, QuickCompareSpec
+from ldm_tts.quick_compare.config import METHODS, QuickCompareSpec
 from ldm_tts.quick_compare.reporting import write_comparison_reports
 
 
-MANIFEST_NAME = "comparison_manifest.json"
+_MANIFEST_NAME = "comparison_manifest.json"
 
 
 @dataclass(frozen=True)
-class ComparisonRun:
+class _ComparisonRun:
     """One reproducible case/method/seed child campaign."""
 
     case_id: str
@@ -46,12 +47,16 @@ def run_comparison(
     """Run a fresh or provenance-checked resumed comparison matrix."""
 
     base = load_config(spec.base_config)
-    _require_task_match(spec, base)
+    if base.get("task") != spec.task:
+        raise ValueError(
+            "quick comparison task must match base config task: "
+            f"{spec.task!r} != {base.get('task')!r}"
+        )
     selected = _select_runs(spec, cases=cases, methods=methods, seeds=seeds)
     manifest = _open_manifest(spec, base, resume=resume, dry_run=dry_run)
     plans = [_child_plan(spec, base, item, resume=resume) for item in selected]
     if dry_run:
-        print(json.dumps({"manifest": manifest, "plans": [item for item in plans]}, indent=2, sort_keys=True))
+        print(json.dumps({"manifest": manifest, "plans": plans}, indent=2, sort_keys=True))
         return 0
     for item, plan in zip(selected, plans, strict=True):
         _run_child(manifest, spec, item, plan, resume=resume)
@@ -63,16 +68,7 @@ def run_comparison(
     return 0
 
 
-def _require_task_match(spec: QuickCompareSpec, base: dict[str, Any]) -> None:
-    task = base.get("task")
-    if task != spec.task:
-        raise ValueError(
-            "quick comparison task must match base config task: "
-            f"{spec.task!r} != {task!r}"
-        )
-
-
-def _select_runs(spec, *, cases, methods, seeds) -> tuple[ComparisonRun, ...]:
+def _select_runs(spec, *, cases, methods, seeds) -> tuple[_ComparisonRun, ...]:
     case_ids = _selected_values(cases, (item.case_id for item in spec.cases), "case")
     method_ids = _selected_values(methods, METHODS, "method")
     seed_ids = _selected_values(seeds, spec.seeds, "seed")
@@ -81,7 +77,8 @@ def _select_runs(spec, *, cases, methods, seeds) -> tuple[ComparisonRun, ...]:
         for method in METHODS:
             for seed in spec.seeds:
                 if case.case_id in case_ids and method in method_ids and seed in seed_ids:
-                    runs.append(ComparisonRun(case.case_id, method, seed, _run_dir(spec, case.case_id, method, seed)))
+                    run_dir = spec.output_root / "campaigns" / case.case_id / method / f"seed_{seed}"
+                    runs.append(_ComparisonRun(case.case_id, method, seed, run_dir))
     return tuple(runs)
 
 
@@ -95,8 +92,11 @@ def _selected_values(requested, available, label: str) -> set:
 
 
 def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]:
-    path = spec.output_root / MANIFEST_NAME
-    fingerprint = _fingerprint(spec, base)
+    path = spec.output_root / _MANIFEST_NAME
+    repository = _repository_state()
+    fingerprint = _sha256_json(
+        {"spec": spec.to_dict(), "base": base, "repository": repository}
+    )
     if resume:
         if not path.is_file():
             raise FileNotFoundError(f"quick comparison manifest does not exist: {path}")
@@ -106,7 +106,7 @@ def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]
         return manifest
     if spec.output_root.exists():
         raise FileExistsError(f"quick comparison output already exists: {spec.output_root}; use --resume")
-    if not dry_run and base.get("mode") == "real" and _repository_state()["dirty"]:
+    if not dry_run and base.get("mode") == "real" and repository["dirty"]:
         raise RuntimeError("real quick comparison requires a clean repository")
     manifest = {
         "schema_version": 1,
@@ -116,10 +116,9 @@ def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]
         "created_at_unix": time.time(),
         "fingerprint": fingerprint,
         "spec": spec.to_dict(),
-        "repository": _repository_state(),
+        "repository": repository,
         "base_config_sha256": _sha256_json(base),
         "runs": {},
-        "resume_history": [],
     }
     if not dry_run:
         spec.output_root.mkdir(parents=True)
@@ -127,7 +126,7 @@ def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]
     return manifest
 
 
-def _child_plan(spec, base, run: ComparisonRun, *, resume: bool) -> dict[str, Any]:
+def _child_plan(spec, base, run: _ComparisonRun, *, resume: bool) -> dict[str, Any]:
     config = copy.deepcopy(base)
     case = next(item for item in spec.cases if item.case_id == run.case_id)
     for override in case.overrides:
@@ -194,16 +193,8 @@ def _proposal_mode(config: dict[str, Any], method: str) -> str:
     return "callable" if config.get("mode") == "mock" else "openai"
 
 
-def _set(config: dict[str, Any], override: str, value: Any = None) -> None:
-    if value is None:
-        apply_override(config, override)
-        return
-    encoded = json.dumps(value)
-    apply_override(config, f"{override}={encoded}")
-
-
-def _run_dir(spec: QuickCompareSpec, case: str, method: str, seed: int) -> Path:
-    return spec.output_root / "campaigns" / case / method / f"seed_{seed}"
+def _set(config: dict[str, Any], override: str, value: Any) -> None:
+    apply_override(config, f"{override}={json.dumps(value)}")
 
 
 def _child_complete(path: Path) -> bool:
@@ -211,10 +202,6 @@ def _child_complete(path: Path) -> bool:
         return False
     status = _read_json(path / "status.json")
     return status.get("status") == "completed"
-
-
-def _fingerprint(spec: QuickCompareSpec, base: dict[str, Any]) -> str:
-    return _sha256_json({"spec": spec.to_dict(), "base": base, "repository": _repository_state()})
 
 
 def _repository_state() -> dict[str, Any]:
@@ -240,7 +227,7 @@ def _git(root: Path, *args: str) -> str:
 
 def _sha256_json(value: Any) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-    return __import__("hashlib").sha256(raw).hexdigest()
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -251,7 +238,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_manifest(spec: QuickCompareSpec, manifest: dict[str, Any]) -> None:
-    atomic_json_write(spec.output_root / MANIFEST_NAME, manifest)
+    atomic_json_write(spec.output_root / _MANIFEST_NAME, manifest)
 
 
-__all__ = ["ComparisonRun", "MANIFEST_NAME", "run_comparison"]
+__all__ = ["run_comparison"]

@@ -14,6 +14,7 @@ from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
 
+from tasks.synthonbench.core import task_spec as task_contracts
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
 from tasks.synthonbench.core.constants import (
@@ -34,11 +35,6 @@ from tasks.synthonbench.core.search import (
 )
 from tasks.synthonbench.core.space_order import ordered_reactions
 from tasks.synthonbench.core.tanimoto_gp import TanimotoGPUCBConfig, SynthonTanimotoGPUCBSelector
-from tasks.synthonbench.core.task_spec import (
-    build_direct_acquisition,
-    build_synthon_task_spec,
-    disabled_surrogate,
-)
 
 
 @dataclass(frozen=True)
@@ -110,9 +106,13 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     official_task = options.official_task
     reactions = ordered_reactions(official_task.allowed_reactions)
     encoder, selector = _search_components(options, reactions)
-    task_spec = build_synthon_task_spec(
+    declared_task = task_contracts.build_synthon_task_spec(
         encoder=encoder,
-        acquisition=selector.describe() if selector is not None else build_direct_acquisition(),
+        acquisition=(
+            selector.describe()
+            if selector is not None
+            else task_contracts.build_direct_acquisition()
+        ),
         proposal_samples=options.proposal_samples,
         evaluations_per_round=options.evaluations_per_round,
         bo_pool_size=options.bo_pool_size,
@@ -128,7 +128,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
     expander = _expander(options, domain, reactions)
     evaluator = OfficialSynthonEvaluator(official_task)
     engine = LDMEngine(
-        task_spec=task_spec,
+        task_spec=declared_task,
         expander=expander,
         candidate_domain=domain,
         evaluator=evaluator,
@@ -136,7 +136,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         selector=selector,
         surrogate_encoder=encoder,
     )
-    return CampaignComponents(task_spec, domain, expander, encoder, selector, evaluator, engine)
+    return CampaignComponents(declared_task, domain, expander, encoder, selector, evaluator, engine)
 
 
 def build_synthon_selector(
@@ -243,6 +243,5 @@ def _validate_options(options: CampaignComponentOptions) -> None:
 
 __all__ = [
     "CampaignComponentOptions", "CampaignComponents", "build_base_synthon_selector",
-    "build_campaign_components", "build_direct_acquisition", "build_synthon_selector",
-    "build_synthon_task_spec", "disabled_surrogate",
+    "build_campaign_components", "build_synthon_selector",
 ]

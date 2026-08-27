@@ -2,5 +2,5 @@
   "schema_version": 1,
   "task_id": "iron_mind",
   "description": "Closed-loop optimization over source-pinned reaction-condition tables.",
-  "dependency_checker": "tasks.iron_mind.ldm_task.dependencies:check_dependencies"
+  "dependency_checker": "tasks.iron_mind.core.dependencies:check_task_dependencies"
 }

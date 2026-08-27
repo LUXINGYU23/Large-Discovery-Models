@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import operator
 import statistics
 from collections import defaultdict
 from pathlib import Path
@@ -19,15 +20,15 @@ def write_comparison_reports(spec: QuickCompareSpec, manifest: dict[str, Any]) -
 
     runs = _run_records(spec, manifest)
     rows, trajectories = _collect(spec, runs)
-    integrity = _integrity(spec, runs, rows, trajectories)
+    integrity = _integrity(spec, rows, trajectories)
     if not integrity["valid"]:
-        _write_outputs(spec, rows, trajectories, [], {"verdict": "invalid", "integrity": integrity})
+        _write_outputs(spec, rows, trajectories, {"verdict": "invalid", "integrity": integrity})
         manifest.update(state="invalid", integrity=integrity)
         atomic_json_write(spec.output_root / "comparison_manifest.json", manifest)
         raise RuntimeError("quick comparison integrity validation failed")
     aggregates = _aggregate(rows)
-    verdict = _verdict(rows, aggregates)
-    _write_outputs(spec, rows, trajectories, aggregates, verdict)
+    verdict = _verdict(rows, aggregates, spec.trajectory.direction)
+    _write_outputs(spec, rows, trajectories, verdict)
     manifest.update(state="completed", integrity=integrity)
     manifest["reports"] = {
         "summary": "summary.csv", "summary_json": "summary.json", "trajectories": "trajectories.csv",
@@ -57,6 +58,20 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
         budget = _json_object(run_dir / "budget.json")
         config = _json_object(run_dir / "config.json")
         campaign = _json_object(run_dir / "campaign.json")
+        evaluations = int(config["evaluations_per_round"])
+        observations = _observations(run_dir)
+        if len(observations) < evaluations:
+            raise ValueError(
+                f"checkpoint has fewer observations than its initialization batch: {run_dir}"
+            )
+        initial_candidate_ids = tuple(
+            str(item["candidate"]["candidate_id"])
+            for item in observations[:evaluations]
+        )
+        canonical_keys = [
+            str(item["candidate"]["canonical_key"])
+            for item in observations
+        ]
         final_best = round_rows[-1]["best_so_far"]
         row = {
             "case": case, "method": method, "seed": int(seed_text.removeprefix("seed_")),
@@ -65,11 +80,11 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             **{name: _scalar_at_path(result, path) for name, path in spec.result_fields.items()},
             **_budget_fields(budget),
             "wall_time_seconds": _wall_time(run_dir),
-            "evaluations_per_round": int(config["evaluations_per_round"]),
+            "evaluations_per_round": evaluations,
             "proposal_samples": int(config["proposal_samples"]),
             "contract_sha256": str(campaign["contract_sha256"]),
-            "initial_candidate_ids": _initial_candidate_ids(run_dir, int(config["evaluations_per_round"])),
-            "candidate_ids_unique": _candidate_ids_unique(run_dir),
+            "initial_candidate_ids": initial_candidate_ids,
+            "candidate_ids_unique": len(canonical_keys) == len(set(canonical_keys)),
         }
         rows.append(row)
         trajectories.extend(round_rows)
@@ -90,12 +105,13 @@ def _round_rows(spec, run_dir, case, method, seed) -> list[dict[str, Any]]:
         raise ValueError(f"trajectory does not contain exactly {spec.iterations} completed rounds: {run_dir}")
     best = None
     result = []
+    select_best = max if spec.trajectory.direction == "maximize" else min
     for round_idx in expected_rounds:
         values = groups[round_idx]
         if len(values) != evaluations:
             raise ValueError(f"round {round_idx} has {len(values)} evaluations, expected {evaluations}")
-        round_best = max(values) if spec.trajectory.direction == "maximize" else min(values)
-        best = round_best if best is None else _better(best, round_best, spec.trajectory.direction)
+        round_best = select_best(values)
+        best = round_best if best is None else select_best(best, round_best)
         result.append({
             "case": case, "method": method, "seed": seed, "round": round_idx,
             "official_evaluations": (round_idx + 1) * evaluations,
@@ -104,7 +120,7 @@ def _round_rows(spec, run_dir, case, method, seed) -> list[dict[str, Any]]:
     return result
 
 
-def _integrity(spec, records, rows, trajectories) -> dict[str, Any]:
+def _integrity(spec, rows, trajectories) -> dict[str, Any]:
     errors = []
     grouped = defaultdict(list)
     for row in rows:
@@ -153,21 +169,37 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
-def _verdict(rows, aggregates) -> dict[str, Any]:
+def _verdict(rows, aggregates, direction: str) -> dict[str, Any]:
     cases = []
+    better = operator.gt if direction == "maximize" else operator.lt
     for case in sorted({item["case"] for item in rows}):
         summary = {item["method"]: item for item in aggregates if item["case"] == case}
         ldm = summary["ldm"]
         baselines = [summary["bo"], summary["llm"]]
         wins = sum(
-            _seed_metric(rows, case, seed, "ldm", "round_auc") > max(
-                _seed_metric(rows, case, seed, method, "round_auc") for method in ("bo", "llm")
+            all(
+                better(
+                    _seed_metric(rows, case, seed, "ldm", "round_auc"),
+                    _seed_metric(rows, case, seed, method, "round_auc"),
+                )
+                for method in ("bo", "llm")
             )
             for seed in sorted({item["seed"] for item in rows if item["case"] == case})
         )
-        better_auc = all(ldm["mean_round_auc"] > item["mean_round_auc"] for item in baselines)
-        lower_final = any(ldm["mean_final_best"] < item["mean_final_best"] for item in baselines)
-        verdict = "promising" if better_auc and wins >= 2 else "not_promising" if lower_final and wins == 0 else "mixed"
+        better_auc = all(
+            better(ldm["mean_round_auc"], item["mean_round_auc"])
+            for item in baselines
+        )
+        worse_final = any(
+            better(item["mean_final_best"], ldm["mean_final_best"])
+            for item in baselines
+        )
+        if better_auc and wins >= 2:
+            verdict = "promising"
+        elif worse_final and wins == 0:
+            verdict = "not_promising"
+        else:
+            verdict = "mixed"
         cases.append({"case": case, "verdict": verdict, "ldm_seed_wins": wins})
     return {"schema_version": 1, "cases": cases, "aggregates": aggregates}
 
@@ -176,7 +208,7 @@ def _seed_metric(rows, case, seed, method, field):
     return next(item[field] for item in rows if item["case"] == case and item["seed"] == seed and item["method"] == method)
 
 
-def _write_outputs(spec, rows, trajectories, aggregates, summary) -> None:
+def _write_outputs(spec, rows, trajectories, summary) -> None:
     _write_csv(spec.output_root / "summary.csv", rows)
     _write_csv(spec.output_root / "trajectories.csv", trajectories)
     atomic_json_write(spec.output_root / "summary.json", summary)
@@ -222,19 +254,6 @@ def _budget_fields(budget: dict[str, Any]) -> dict[str, float]:
     return {f"budget_{key}": _finite(value, f"budget {key}") for key, value in counters.items()}
 
 
-def _initial_candidate_ids(run_dir: Path, count: int) -> tuple[str, ...]:
-    observations = _observations(run_dir)
-    if len(observations) < count:
-        raise ValueError(f"checkpoint has fewer observations than its initialization batch: {run_dir}")
-    return tuple(str(item["candidate"]["candidate_id"]) for item in observations[:count])
-
-
-def _candidate_ids_unique(run_dir: Path) -> bool:
-    observations = _observations(run_dir)
-    keys = [str(item["candidate"]["canonical_key"]) for item in observations]
-    return len(keys) == len(set(keys))
-
-
 def _observations(run_dir: Path) -> list[dict[str, Any]]:
     checkpoint = _json_object(run_dir / "checkpoint.json")
     state = checkpoint.get("state")
@@ -246,10 +265,6 @@ def _observations(run_dir: Path) -> list[dict[str, Any]]:
 def _wall_time(run_dir: Path) -> float:
     status = _json_object(run_dir / "status.json")
     return _finite(status["updated_at_unix"], "updated_at_unix") - _finite(status["started_at_unix"], "started_at_unix")
-
-
-def _better(left, right, direction):
-    return max(left, right) if direction == "maximize" else min(left, right)
 
 
 def _sample_std(rows, field):

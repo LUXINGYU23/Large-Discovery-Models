@@ -10,12 +10,15 @@ official source-pinned scorer.
 ## Task Boundary
 
 ```text
-ldm_task/  stable shared-runner adapter and dependency hook
-core/      tuple validation, public slates, prompts, task-local Tanimoto GP, LDM policy, oracle adapter
-scripts/   source-pinned official data preparation
-resources/ immutable upstream and qualification contracts
-tests/     task-local contract and algorithm tests
-runs/      generated artifacts only; never committed
+ldm_task/          stable shared-runner adapter
+core/task_spec.py  declarative candidate, response, surrogate, and search contract
+core/factory.py    executable domain, selector, evaluator, and engine assembly
+core/workflow.py   campaign configuration and runtime orchestration
+core/              tuple validation, prompts, Tanimoto GP, LDM policy, oracle adapter
+scripts/           source-pinned official data preparation
+resources/         immutable upstream and qualification contracts
+tests/             task-local contract and algorithm tests
+runs/              generated artifacts only; never committed
 ```
 
 The adapter is self-contained under `tasks/synthonbench` and uses the shared
@@ -167,9 +170,8 @@ export LLM_MODEL_NAME=your-model
 export LLM_API_KEY=your-secret
 ```
 
-`TTS_LLM_URL` / `TTS_LLM_MODEL` / `TTS_LLM_API_KEY`,
-`LDM_LLM_URL` / `LDM_LLM_MODEL` / `LDM_LLM_API_KEY`, and `OPENAI_API_KEY` are
-also accepted. Config files intentionally leave endpoint fields unset. Use
+`OPENAI_API_KEY` is also accepted as the standard API-key fallback. Config
+files intentionally leave endpoint fields unset. Use
 `--llm-json-mode` only when the selected provider supports the OpenAI JSON
 response-format field. Provider-specific OpenAI-compatible request fields can
 be passed as JSON through `--llm-extra-body-json`. The task default is

@@ -10,7 +10,7 @@ from tasks.iron_mind.core.provider import (
 )
 
 
-def test_primary_environment_names_precede_legacy_aliases() -> None:
+def test_provider_settings_resolve_from_standard_environment_names() -> None:
     settings = resolve_openai_provider_settings(
         base_url=None,
         model=None,
@@ -19,9 +19,6 @@ def test_primary_environment_names_precede_legacy_aliases() -> None:
             "LLM_BASE_URL": "https://primary.example/v1",
             "LLM_MODEL_NAME": "primary-model",
             "LLM_API_KEY": "primary-key",
-            "TTS_LLM_URL": "https://legacy.example/v1",
-            "TTS_LLM_MODEL": "legacy-model",
-            "TTS_LLM_API_KEY": "legacy-key",
         },
     )
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -14,9 +13,15 @@ from ldm_tts.registration.dependencies import (
     check_llm_settings,
     fail,
     ok,
+    plan_check_context,
     resolve_task_path,
 )
 from tasks.iron_mind.core.data import FrozenReactionTable, load_frozen_reaction_table
+from tasks.iron_mind.core.provider import (
+    API_KEY_ENV_NAMES,
+    BASE_URL_ENV_NAMES,
+    MODEL_ENV_NAMES,
+)
 from tasks.iron_mind.core.schema import (
     ReactionDatasetSchema,
     load_reaction_schema_from_config,
@@ -25,59 +30,27 @@ from tasks.iron_mind.core.schema import (
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
-SUPPORTED_REAL_PROFILES = frozenset(
-    {
-        "ldm_official_smoke",
-        "ldm_official_20",
-        "ldm_prompt_baseline_smoke",
-        "ldm_prompt_baseline_20",
-        "quick_compare",
-        "quick_compare_direct_llm",
-        "extended_compare",
-        "extended_compare_direct_llm",
-    }
-)
-
-
-@dataclass(frozen=True)
-class DependencyResources:
-    """Tracked resource paths, injectable for focused preflight tests."""
-
-    schema_path: Path
-    contract_path: Path
-    mock_oracle_path: Path
-
-
-DEFAULT_RESOURCES = DependencyResources(
-    schema_path=TASK_ROOT / "resources" / "reaction_schemas.json",
-    contract_path=TASK_ROOT / "resources" / "upstream_contract.json",
-    mock_oracle_path=TASK_ROOT / "resources" / "mock_oracle.csv",
-)
+SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
+CONTRACT_PATH = TASK_ROOT / "resources" / "upstream_contract.json"
+MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
 
 
 def check_task_dependencies(
-    task: str,
-    args: dict[str, Any],
-    env: dict[str, str],
-    cwd: Path,
-    *,
-    mode: str,
-    include_optional: bool,
-    contract_profile: str = "",
-    resources: DependencyResources = DEFAULT_RESOURCES,
+    plan: dict[str, Any], *, include_optional: bool = True
 ) -> list[DependencyCheck]:
     """Check only assets needed by the selected mock or real campaign."""
 
     del include_optional
+    task, args, env, cwd, mode = plan_check_context(plan)
     if mode == "mock" or bool(args.get("mock")):
-        return _mock_checks(task, resources)
-    return _real_checks(task, args, env, cwd, contract_profile, resources)
+        return _mock_checks(task)
+    return _real_checks(task, args, env, cwd)
 
 
-def _mock_checks(task: str, resources: DependencyResources) -> list[DependencyCheck]:
+def _mock_checks(task: str) -> list[DependencyCheck]:
     try:
-        schema = load_reaction_schemas(resources.schema_path)["buchwald_hartwig"]
-        _validate_mock_oracle(resources.mock_oracle_path, schema)
+        schema = load_reaction_schemas(SCHEMA_PATH)["buchwald_hartwig"]
+        _validate_mock_oracle(MOCK_ORACLE_PATH, schema)
     except (KeyError, OSError, ValueError) as exc:
         return [fail(task, "mock assets", str(exc))]
     return [ok(task, "mock assets", "Tracked mock schema and oracle are valid.")]
@@ -88,14 +61,12 @@ def _real_checks(
     args: dict[str, Any],
     env: dict[str, str],
     cwd: Path,
-    contract_profile: str,
-    resources: DependencyResources,
 ) -> list[DependencyCheck]:
     try:
-        contract = _read_json_object(resources.contract_path, "upstream contract")
+        contract = _read_json_object(CONTRACT_PATH, "upstream contract")
     except (OSError, ValueError) as exc:
         return [fail(task, "tracked resources", str(exc))]
-    gate, dataset_id = _source_gate(task, args, contract_profile, contract)
+    gate, dataset_id = _source_gate(task, args, contract)
     if gate.status == "fail":
         return [gate]
     data_root = resolve_task_path(arg_value(args, "data-dir"), cwd)
@@ -126,9 +97,9 @@ def _provider_checks(
         url_arg="llm-url",
         model_arg="llm-model-name",
         api_arg="api-key",
-        url_env=("LLM_BASE_URL", "TTS_LLM_URL", "LDM_LLM_URL"),
-        model_env=("LLM_MODEL_NAME", "TTS_LLM_MODEL", "LDM_LLM_MODEL"),
-        api_env=("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"),
+        url_env=BASE_URL_ENV_NAMES,
+        model_env=MODEL_ENV_NAMES,
+        api_env=API_KEY_ENV_NAMES,
         required=True,
     )
 
@@ -136,17 +107,13 @@ def _provider_checks(
 def _source_gate(
     task: str,
     args: Mapping[str, Any],
-    contract_profile: str,
     contract: Mapping[str, Any],
 ) -> tuple[DependencyCheck, str]:
-    profile = contract_profile.strip()
-    if profile not in SUPPORTED_REAL_PROFILES:
-        return fail(task, "official source gate", f"Unsupported contract profile {profile!r}."), ""
     dataset_id = str(arg_value(dict(args), "dataset-id") or "")
     allowed = _suite_dataset_ids(contract, "public_union")
     if dataset_id not in allowed:
         return fail(task, "official source gate", f"Unknown official dataset_id {dataset_id!r}."), ""
-    return ok(task, "official source gate", "Profile and dataset match the official contract."), dataset_id
+    return ok(task, "official source gate", "Dataset matches the official contract."), dataset_id
 
 
 def _source_revision_check(
@@ -182,11 +149,10 @@ def load_pinned_reaction_table(
     *,
     dataset_id: str,
     data_root: Path,
-    resources: DependencyResources = DEFAULT_RESOURCES,
 ) -> FrozenReactionTable:
     """Load one official dataset through the same artifact contract as preflight."""
 
-    contract = _read_json_object(resources.contract_path, "upstream contract")
+    contract = _read_json_object(CONTRACT_PATH, "upstream contract")
     if dataset_id not in _suite_dataset_ids(contract, "public_union"):
         raise ValueError(f"Unknown official Iron Mind dataset: {dataset_id!r}.")
     return _load_contract_table(
@@ -302,4 +268,4 @@ def _required_string(value: Any, label: str) -> str:
     return value
 
 
-__all__ = ["DependencyResources", "check_task_dependencies", "load_pinned_reaction_table"]
+__all__ = ["check_task_dependencies", "load_pinned_reaction_table"]

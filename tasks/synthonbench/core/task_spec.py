@@ -67,12 +67,7 @@ def build_synthon_task_spec(
             initialization=initialization_mode,
         ),
         surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
-        proposal_search=_proposal_search(
-            search_method,
-            proposal_samples,
-            evaluations_per_round,
-            proposal_max_workers,
-        ),
+        proposal_search=_proposal_search(search_method, search_breadth, proposal_max_workers),
         metadata={
             "search_method": search_method,
             "initialization_mode": initialization_mode,
@@ -107,7 +102,13 @@ def disabled_surrogate() -> SurrogateSpaceSpec:
     )
 
 
-def _reservoir_spec(*, samples, workers, method, initialization) -> ReservoirSpec:
+def _reservoir_spec(
+    *,
+    samples: int,
+    workers: int,
+    method: str,
+    initialization: str,
+) -> ReservoirSpec:
     expansions = []
     if initialization == "shared_random":
         expansions.append(ReservoirExpansionSpec(
@@ -140,27 +141,26 @@ def _reservoir_spec(*, samples, workers, method, initialization) -> ReservoirSpe
 
 def _proposal_search(
     method: str,
-    samples: int,
-    evaluations_per_round: int,
+    breadth: int,
     workers: int,
 ) -> ProposalSearchSpec:
     if method == "bo":
         return ProposalSearchSpec(
             name="score_blind_random_pool_bo",
-            breadth=samples,
+            breadth=breadth,
             evaluation_policy="nystrom_tanimoto_gp_ucb",
             parameters={"model_requests": 0},
         )
     if method == "llm":
         return ProposalSearchSpec(
             name="parallel_independent_direct_llm",
-            breadth=evaluations_per_round,
+            breadth=breadth,
             evaluation_policy="reservoir_order_direct_evaluation",
             parameters={"max_workers": workers, "one_candidate_per_request": True},
         )
     return ProposalSearchSpec(
         name="parallel_independent_requests",
-        breadth=samples,
+        breadth=breadth,
         evaluation_policy="empirical_q0_maintained_acquisition_tilted",
         parameters={"max_workers": workers, "one_candidate_per_request": True},
     )

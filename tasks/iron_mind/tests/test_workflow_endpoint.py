@@ -66,7 +66,7 @@ def test_preflight_programming_error_is_not_silently_paused(tmp_path: Path, monk
 
 
 def test_missing_endpoint_key_pauses_before_the_engine(tmp_path: Path, monkeypatch, capsys) -> None:
-    for name in ("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"):
+    for name in ("LLM_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.delenv(name, raising=False)
 
     code = main(_endpoint_args(tmp_path, "missing-key"))

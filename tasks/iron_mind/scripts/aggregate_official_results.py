@@ -11,10 +11,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
+
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = TASK_ROOT / "resources" / "upstream_contract.json"
-OBJECTIVE_NAME = "reaction_score"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -41,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     _write_csv(args.output_dir / "aggregate_trajectory.csv", trajectories)
     payload = {
         "schema_version": 1,
-        "task": "iron_mind",
+        "task": TASK_ID,
         "method": "ldm_tilted_ucb",
         "suite": args.suite,
         "expected_campaigns_per_dataset": args.expected_campaigns,

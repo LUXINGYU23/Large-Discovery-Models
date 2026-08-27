@@ -31,11 +31,13 @@ maintained BO pool, and selector adapter respectively; no algorithm code is
 imported from another task.
 
 ```text
-ldm_task/   shared-runner adapter
-core/       reaction-domain implementation
-resources/  versioned fixtures and upstream provenance
-scripts/    data preparation and result aggregation
-tests/      task-local tests
+ldm_task/          shared-runner adapter
+core/task_spec.py  declarative candidate, response, surrogate, and search contract
+core/factory.py    executable domain, selector, evaluator, and engine assembly
+core/workflow.py   campaign configuration and runtime orchestration
+resources/         versioned fixtures and upstream provenance
+scripts/           data preparation and result aggregation
+tests/             task-local tests
 ```
 
 ## Campaign Protocol
