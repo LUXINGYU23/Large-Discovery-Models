@@ -31,7 +31,7 @@ def _schema(dataset_id: str) -> ReactionDatasetSchema:
 
 
 def _candidate(schema: ReactionDatasetSchema, *, reverse_conditions: bool = False) -> Candidate:
-    conditions = {factor.name: factor.categories[-1] for factor in schema.factors}
+    conditions = {factor.name: factor.options[-1] for factor in schema.factors}
     if reverse_conditions:
         conditions = dict(reversed(tuple(conditions.items())))
     return Candidate(
@@ -46,7 +46,7 @@ def _expected_values(candidate: Candidate, schema: ReactionDatasetSchema) -> tup
     return tuple(
         float(value == conditions[factor.name])
         for factor in schema.factors
-        for value in factor.categories
+        for value in factor.options
     )
 
 
@@ -102,9 +102,9 @@ def test_encoder_has_exact_schema_dimensions_and_one_hot_segments() -> None:
         assert all(math.isfinite(value) for value in vector.values)
         offset = 0
         for factor in schema.factors:
-            segment = vector.values[offset : offset + len(factor.categories)]
+            segment = vector.values[offset : offset + len(factor.options)]
             assert sum(segment) == 1.0
-            offset += len(factor.categories)
+            offset += len(factor.options)
 
 
 def test_encoder_uses_only_schema_category_order_and_is_process_deterministic() -> None:

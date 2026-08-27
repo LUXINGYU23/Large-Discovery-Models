@@ -11,6 +11,7 @@ from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
+from tasks.synthonbench.core.space_order import ordered_positions
 from tasks.synthonbench.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     build_synthon_prompt_messages,
@@ -52,10 +53,25 @@ class SynthonBenchProposalExpander:
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         """Construct one slate and one endpoint call for every requested proposal."""
 
-        plans = tuple(self.catalog.build_plan(round_idx=request.round_idx, proposal_index=index)
-                      for index in range(request.reservoir_size))
-        proposal_requests = tuple(_proposal_request(request, plan, self.target, self.prompt_policy)
-                                  for plan in plans)
+        excluded = _excluded_anchor_ids(request, self.catalog)
+        plans = tuple(
+            self.catalog.build_plan(
+                round_idx=request.round_idx,
+                proposal_index=index,
+                excluded_anchor_ids=excluded,
+            )
+            for index in range(request.reservoir_size)
+        )
+        proposal_requests = tuple(
+            _proposal_request(
+                request,
+                plan,
+                space=self.catalog.space,
+                target=self.target,
+                prompt_policy=self.prompt_policy,
+            )
+            for plan in plans
+        )
         if self.before_requests is not None:
             self.before_requests(len(proposal_requests))
         responses = self._propose_all(proposal_requests)
@@ -87,9 +103,20 @@ class SynthonBenchProposalExpander:
 
 
 def _proposal_request(
-    request: ExpansionRequest, plan, target: str, prompt_policy: str
+    request: ExpansionRequest,
+    plan,
+    *,
+    space: object,
+    target: str,
+    prompt_policy: str,
 ) -> ProposalRequest:
-    messages = build_synthon_prompt_messages(request, plan, target=target, prompt_policy=prompt_policy)
+    messages = build_synthon_prompt_messages(
+        request,
+        plan,
+        target=target,
+        space=space,
+        prompt_policy=prompt_policy,
+    )
     return ProposalRequest(
         messages=messages,
         metadata={
@@ -143,6 +170,26 @@ def _role_counts(plans) -> dict[str, int]:
     for plan in plans:
         counts[plan.role] = counts.get(plan.role, 0) + 1
     return counts
+
+
+def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCatalog) -> dict[str, set[int]]:
+    if not catalog.unique_anchors:
+        return {}
+    excluded: dict[str, set[int]] = {}
+    for observation in request.observations:
+        payload = observation.candidate.payload
+        reaction_id = payload.get("reaction_id") if isinstance(payload, dict) else None
+        synthon_ids = payload.get("synthon_ids") if isinstance(payload, dict) else None
+        if not isinstance(reaction_id, str) or not isinstance(synthon_ids, list):
+            raise TypeError("SynthonBench observations must retain reaction_id and synthon_ids")
+        positions = ordered_positions(catalog.space, reaction_id)
+        anchor = catalog.anchor_position(reaction_id)
+        anchor_index = positions.index(anchor)
+        anchor_id = synthon_ids[anchor_index]
+        if isinstance(anchor_id, bool) or not isinstance(anchor_id, int):
+            raise TypeError("SynthonBench observation anchor must be an integer")
+        excluded.setdefault(reaction_id, set()).add(anchor_id)
+    return excluded
 
 
 __all__ = ["SynthonBenchProposalExpander"]

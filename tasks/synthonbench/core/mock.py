@@ -13,6 +13,17 @@ def mock_proposal_response(request: ProposalRequest) -> ProposalResponse:
     metadata = request.metadata
     round_idx = int(metadata["round_idx"])
     proposal_index = int(metadata["proposal_index"])
+    complete_options = metadata.get("complete_tuple_options")
+    if complete_options:
+        tuple_index = (round_idx * 37 + proposal_index * 11) % len(complete_options)
+        payload = {
+            "reaction_id": metadata["reaction_id"],
+            "synthon_ids": complete_options[tuple_index],
+        }
+        return ProposalResponse(
+            text=json.dumps(payload),
+            metadata=dict(metadata),
+        )
     slots = metadata["slot_synthon_ids"]
     synthon_ids = [_slot_choice(ids, round_idx, proposal_index, index)
                    for index, ids in enumerate(slots)]

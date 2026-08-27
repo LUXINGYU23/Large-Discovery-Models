@@ -1,33 +1,22 @@
-"""Tests for Iron Mind dependency preflight and component assembly."""
+"""Tests for Iron Mind dependency preflight."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
-from types import MappingProxyType
 
-from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine import LDMEngine
-from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.transport import CallableProposalClient
-from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
-from tasks.iron_mind.core.dependencies import DependencyResources, check_task_dependencies
-from tasks.iron_mind.core.factory import CampaignComponentOptions, build_campaign_components
-from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
-from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
+import pytest
+
+from tasks.iron_mind.core import dependencies
+from tasks.iron_mind.core.dependencies import check_task_dependencies
 from tasks.iron_mind.core.schema import (
-    ReactionDatasetSchema,
     ReactionFactor,
     canonical_schema_payload,
-    load_reaction_schemas,
     schema_sha256,
 )
-from tasks.iron_mind.ldm_task.dependencies import check_dependencies
 
 
-TASK_ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 IRON_MIND_REVISION = "1" * 40
 OLYMPUS_REVISION = "2" * 40
 
@@ -40,12 +29,16 @@ def _write_json(path: Path, payload: object) -> None:
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+
 def _write_dependency_schema(tmp_path: Path) -> tuple[Path, str]:
-    factor = ReactionFactor(name="base", categories=("A",))
+    factor = ReactionFactor(name="base", options=("A",))
     digest = schema_sha256(
         canonical_schema_payload(
-            dataset_id="buchwald_hartwig", factors=(factor,), measurements=("yield",),
-            objective="reaction_score", direction="maximize",
+            dataset_id="buchwald_hartwig",
+            factors=(factor,),
+            measurements=("yield",),
+            objective="reaction_score",
+            direction="maximize",
             observation_policy="single_row",
         )
     )
@@ -77,15 +70,25 @@ def _write_dependency_assets(tmp_path: Path, digest: str) -> tuple[Path, Path, P
     _write_json(
         config_path,
         {
-            "parameters": [{"name": "base", "type": "categorical", "options": ["A"]}],
+            "parameters": [
+                {"name": "base", "type": "categorical", "options": ["A"]}
+            ],
             "measurements": [{"name": "yield", "type": "continuous"}],
         },
     )
     data_path.write_bytes(b"A,2.5\n")
     contract_path = tmp_path / "upstream_contract.json"
     artifacts = {
-        "config": {"path": "olympus/config.json", "bytes": config_path.stat().st_size, "sha256": _sha256(config_path)},
-        "data": {"path": "olympus/data.csv", "bytes": data_path.stat().st_size, "sha256": _sha256(data_path)},
+        "config": {
+            "path": "olympus/config.json",
+            "bytes": config_path.stat().st_size,
+            "sha256": _sha256(config_path),
+        },
+        "data": {
+            "path": "olympus/data.csv",
+            "bytes": data_path.stat().st_size,
+            "sha256": _sha256(data_path),
+        },
     }
     _write_json(
         contract_path,
@@ -122,69 +125,71 @@ def _write_dependency_assets(tmp_path: Path, digest: str) -> tuple[Path, Path, P
     return data_root, data_path, contract_path
 
 
-def _dependency_fixture(tmp_path: Path) -> tuple[DependencyResources, Path, Path]:
+def _dependency_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path]:
     schema_path, digest = _write_dependency_schema(tmp_path)
     data_root, data_path, contract_path = _write_dependency_assets(tmp_path, digest)
     mock_oracle_path = tmp_path / "mock_oracle.csv"
     mock_oracle_path.write_text(
-        "dataset_id,base,reaction_score\nbuchwald_hartwig,A,2.5\n", encoding="utf-8"
+        "dataset_id,base,reaction_score\nbuchwald_hartwig,A,2.5\n",
+        encoding="utf-8",
     )
-    return (
-        DependencyResources(
-            schema_path=schema_path,
-            contract_path=contract_path,
-            mock_oracle_path=mock_oracle_path,
-        ),
-        data_root,
-        data_path,
-    )
+    monkeypatch.setattr(dependencies, "SCHEMA_PATH", schema_path)
+    monkeypatch.setattr(dependencies, "CONTRACT_PATH", contract_path)
+    monkeypatch.setattr(dependencies, "MOCK_ORACLE_PATH", mock_oracle_path)
+    return data_root, data_path
 
 
-def _real_checks(
-    resources: DependencyResources,
-    data_root: Path,
-    *,
-    profile: str = "ldm_official_smoke",
-) -> list:
+def _real_checks(data_root: Path) -> list:
     return check_task_dependencies(
-        "iron_mind",
-        {"data-dir": str(data_root), "dataset-id": "buchwald_hartwig"},
         {
-            "LLM_BASE_URL": "https://example.invalid/v1",
-            "LLM_MODEL_NAME": "test-model",
-            "LLM_API_KEY": "test-key",
+            "task": "iron_mind",
+            "argv": [
+                "--data-dir",
+                str(data_root),
+                "--dataset-id",
+                "buchwald_hartwig",
+            ],
+            "cwd": str(data_root),
+            "mode": "real",
+            "env_overrides": {
+                "LLM_BASE_URL": "https://example.invalid/v1",
+                "LLM_MODEL_NAME": "test-model",
+                "LLM_API_KEY": "test-key",
+            },
         },
-        data_root,
-        mode="real",
         include_optional=False,
-        contract_profile=profile,
-        resources=resources,
     )
 
 
-def test_mock_dependencies_validate_only_tracked_mock_assets(tmp_path: Path) -> None:
-    resources, data_root, _data_path = _dependency_fixture(tmp_path)
+def test_mock_dependencies_validate_only_tracked_mock_assets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_root, _data_path = _dependency_fixture(tmp_path, monkeypatch)
 
     checks = check_task_dependencies(
-        "iron_mind",
-        {"mock": True},
-        {},
-        data_root,
-        mode="mock",
+        {
+            "task": "iron_mind",
+            "argv": ["--mock"],
+            "cwd": str(data_root),
+            "mode": "mock",
+        },
         include_optional=False,
-        resources=resources,
     )
 
-    assert [(check.name, check.status) for check in checks] == [("mock assets", "ok")]
-    assert all("GPU" not in check.name and "LLM" not in check.name for check in checks)
+    assert [(check.name, check.status) for check in checks] == [
+        ("mock assets", "ok")
+    ]
 
 
-def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path: Path) -> None:
-    resources, data_root, data_path = _dependency_fixture(tmp_path)
+def test_real_dependencies_verify_revisions_and_frozen_table_contracts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_root, data_path = _dependency_fixture(tmp_path, monkeypatch)
 
-    checks = _real_checks(resources, data_root)
+    statuses = {check.name: check.status for check in _real_checks(data_root)}
 
-    statuses = {check.name: check.status for check in checks}
     assert statuses == {
         "official source gate": "ok",
         "LLM URL": "ok",
@@ -194,102 +199,9 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(tmp_path:
         "buchwald_hartwig frozen table": "ok",
     }
     data_path.write_bytes(b"A,3.5\n")
-    failed = _real_checks(resources, data_root)
-    table_check = next(check for check in failed if check.name == "buchwald_hartwig frozen table")
+    failed = _real_checks(data_root)
+    table_check = next(
+        check for check in failed if check.name == "buchwald_hartwig frozen table"
+    )
     assert table_check.status == "fail"
     assert "SHA-256" in table_check.message
-
-
-def test_prompt_baseline_profiles_use_the_same_official_source_gate(tmp_path: Path) -> None:
-    resources, data_root, _data_path = _dependency_fixture(tmp_path)
-
-    for profile in ("ldm_prompt_baseline_smoke", "ldm_prompt_baseline_20"):
-        checks = _real_checks(resources, data_root, profile=profile)
-
-        assert checks[0].name == "official source gate"
-        assert checks[0].status == "ok"
-
-
-def test_unsupported_profile_fails_before_data_access(tmp_path: Path) -> None:
-    resources, data_root, _data_path = _dependency_fixture(tmp_path)
-
-    checks = _real_checks(resources, data_root, profile="all_six_datasets")
-
-    assert [(check.name, check.status) for check in checks] == [("official source gate", "fail")]
-    assert "all_six_datasets" in checks[0].message
-    assert "Unsupported" in checks[0].message
-
-
-def test_dependency_adapter_forwards_the_contract_profile(tmp_path: Path) -> None:
-    _resources, data_root, _data_path = _dependency_fixture(tmp_path)
-    plan = {
-        "task": "iron_mind",
-        "argv": ["--data-dir", str(data_root), "--dataset-id", "buchwald_hartwig"],
-        "cwd": str(data_root),
-        "mode": "real",
-        "contract_profile": "all_six_datasets",
-    }
-
-    checks = check_dependencies(plan, include_optional=False)
-
-    assert [(check.name, check.status) for check in checks] == [("official source gate", "fail")]
-    assert "all_six_datasets" in checks[0].message
-
-
-def _factory_schema() -> ReactionDatasetSchema:
-    return load_reaction_schemas(SCHEMA_PATH)["buchwald_hartwig"]
-
-def _factory_table(schema: ReactionDatasetSchema, *, yield_value: float) -> FrozenReactionTable:
-    conditions = {factor.name: factor.categories[0] for factor in schema.factors}
-    row = ReactionRow(
-        row_id=1,
-        conditions=MappingProxyType(conditions),
-        measurements=MappingProxyType({"yield": yield_value}),
-        raw_row_sha256=hashlib.sha256(b"factory-row").hexdigest(),
-    )
-    key = tuple(conditions[name] for name in schema.factor_names)
-    return FrozenReactionTable(
-        schema=schema,
-        rows=(row,),
-        rows_by_conditions=MappingProxyType({key: (row,)}),
-    )
-
-
-def _factory_options(
-    tmp_path: Path,
-    schema: ReactionDatasetSchema,
-    table: FrozenReactionTable,
-    *,
-    run_name: str,
-) -> CampaignComponentOptions:
-    runtime = CampaignRuntime.open(tmp_path / run_name, task="iron_mind")
-    return CampaignComponentOptions(
-        client=CallableProposalClient(lambda _request: "{}"),
-        schema=schema,
-        table=table,
-        sink=DataCollectionSink.disabled(),
-        runtime=runtime,
-        proposal_samples=4,
-        bo_pool_size=2,
-    )
-
-
-def test_factory_assembles_one_shared_engine_shape_for_mock_and_real(tmp_path: Path) -> None:
-    schema = _factory_schema()
-    mock = build_campaign_components(
-        _factory_options(tmp_path, schema, _factory_table(schema, yield_value=1.0), run_name="mock")
-    )
-    real = build_campaign_components(
-        _factory_options(tmp_path, schema, _factory_table(schema, yield_value=2.0), run_name="real")
-    )
-
-    for name in ("domain", "expander", "encoder", "selector", "engine"):
-        assert type(getattr(mock, name)) is type(getattr(real, name))
-    assert isinstance(mock.engine, LDMEngine)
-    assert isinstance(mock.selector, AcquisitionTiltedSelector)
-    assert isinstance(mock.selector.base_selector, ReactionCategoricalGPUCBSelector)
-    assert mock.expander.domain is mock.domain
-    assert mock.engine.task_spec == mock.task_spec
-    assert mock.task_spec.surrogate == mock.encoder.describe()
-    assert mock.task_spec.acquisition == mock.selector.describe()
-    assert mock.evaluator.table is not real.evaluator.table

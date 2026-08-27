@@ -46,19 +46,28 @@ class IronMindProposalExpander:
         before_requests: Callable[[int], None] | None = None,
         max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
         prompt_policy: str = DEFAULT_PROMPT_POLICY,
+        slot_seed: int = 0,
     ) -> None:
         if max_workers < 1:
             raise ValueError("proposal max_workers must be positive")
+        if slot_seed < 0:
+            raise ValueError("slot seed must be non-negative")
         self.client = client
         self.domain = domain
         self.before_requests = before_requests
         self.max_workers = max_workers
         self.prompt_policy = validate_prompt_policy(prompt_policy)
+        self.slot_seed = slot_seed
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         """Launch one request per candidate and return a strict reservoir."""
 
-        slot_plans = _build_slot_plans(request, self.domain.schema, self.prompt_policy)
+        slot_plans = _build_slot_plans(
+            request,
+            self.domain.schema,
+            self.prompt_policy,
+            self.slot_seed,
+        )
         proposal_requests = _build_proposal_requests(
             request,
             self.domain.schema,
@@ -87,6 +96,7 @@ class IronMindProposalExpander:
                 parsed.errors,
                 self.prompt_policy,
                 slot_plans,
+                self.slot_seed,
             ),
         )
 
@@ -105,6 +115,7 @@ def _build_slot_plans(
     request: ExpansionRequest,
     schema: ReactionDatasetSchema,
     prompt_policy: str,
+    slot_seed: int,
 ) -> tuple[ProposalSlotPlan, ...]:
     return tuple(
         build_slot_plan(
@@ -112,6 +123,7 @@ def _build_slot_plans(
             schema,
             proposal_index=index,
             policy=prompt_policy,
+            slot_seed=slot_seed,
         )
         for index in range(request.reservoir_size)
     )
@@ -204,6 +216,7 @@ def _expansion_metadata(
     parse_errors: Sequence[ResponseParseError] = (),
     prompt_policy: str = DEFAULT_PROMPT_POLICY,
     slot_plans: Sequence[ProposalSlotPlan] = (),
+    slot_seed: int = 0,
 ) -> dict[str, Any]:
     metadata = {
         "mode": "proposal_client",
@@ -213,6 +226,7 @@ def _expansion_metadata(
         "response_count": len(responses),
         "max_workers": min(max_workers, request.reservoir_size),
         "prompt_policy": prompt_policy,
+        "prompt_slot_seed": slot_seed,
         "proposal_role_counts": _slot_role_counts(slot_plans),
     }
     if parse_errors:

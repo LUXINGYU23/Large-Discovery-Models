@@ -1,36 +1,39 @@
-"""Task-local assembly around the shared LDM engine."""
+"""Task-owned SynthonBench assembly for LDM, BO, and direct-LLM comparisons."""
 
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Callable
 
-from ldm_tts.contracts import (
-    AcquisitionSpec,
-    CandidateDomainSpec,
-    LDMTaskSpec,
-    ObjectiveSpec,
-    ProposalSearchSpec,
-    ReservoirExpansionSpec,
-    ReservoirSpec,
-    ResponseSpaceSpec,
-)
+from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine import LDMEngine
+from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
+from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
+
+from tasks.synthonbench.core import task_spec as task_contracts
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
-from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ETA,
+    DEFAULT_GP_REACTION_WEIGHT,
+    OBJECTIVE_NAME,
+)
 from tasks.synthonbench.core.evaluator import OfficialSynthonEvaluator
 from tasks.synthonbench.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
-from tasks.synthonbench.core.prompting import (
-    DEFAULT_PROMPT_POLICY,
-    validate_prompt_policy,
-)
+from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
 from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
+from tasks.synthonbench.core.search import (
+    INITIALIZATION_MODES,
+    RandomSynthonPoolExpander,
+    SEARCH_METHODS,
+    SynthonInitializationExpander,
+)
+from tasks.synthonbench.core.space_order import ordered_reactions
 from tasks.synthonbench.core.tanimoto_gp import TanimotoGPUCBConfig, SynthonTanimotoGPUCBSelector
 
 
@@ -38,215 +41,207 @@ from tasks.synthonbench.core.tanimoto_gp import TanimotoGPUCBConfig, SynthonTani
 class CampaignComponentOptions:
     """Dependencies and immutable choices for one SynthonBench campaign."""
 
-    client: ProposalClient
+    client: ProposalClient | None
     official_task: object
     runtime: CampaignRuntime
     sink: DataCollectionSink
     target: str
     proposal_samples: int
     bo_pool_size: int
-    proposal_max_workers: int
-    slate_size: int
-    reaction_allocation: str
-    selection_seed: int
-    fingerprint_bits: int
-    gp_landmarks: int
-    gp_kernel_jitter: float
-    gp_signal_std: float
-    gp_mean_std: float
-    gp_observation_noise_std: float
-    gp_reaction_weight: float
-    acquisition_beta: float
-    alpha: float
-    eta: float
-    z_clip: float
+    bo_search_samples: int = 64
+    evaluations_per_round: int = 1
+    search_method: str = "ldm"
+    initialization_mode: str = "none"
+    proposal_max_workers: int = 64
+    slate_size: int = 24
+    reaction_allocation: str = "product_weighted"
+    selection_seed: int = 0
+    fingerprint_bits: int = 2048
+    gp_landmarks: int = 256
+    gp_kernel_jitter: float = 1.0e-8
+    gp_signal_std: float = 1.0
+    gp_mean_std: float = 1.0
+    gp_observation_noise_std: float = 1.0
+    gp_reaction_weight: float = DEFAULT_GP_REACTION_WEIGHT
+    acquisition_beta: float = 1.0
+    alpha: float = 1.0
+    eta: float = DEFAULT_ACQUISITION_ETA
+    z_clip: float = 5.0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
     before_requests: Callable[[int], None] | None = None
 
     def __post_init__(self) -> None:
-        if self.proposal_samples <= self.bo_pool_size:
-            raise ValueError("proposal_samples must exceed bo_pool_size")
-        if self.proposal_max_workers < 1 or self.slate_size < 1:
-            raise ValueError("worker and slate sizes must be positive")
-        for name in ("acquisition_beta", "alpha", "eta"):
-            value = getattr(self, name)
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and non-negative")
+        if self.search_method not in SEARCH_METHODS:
+            raise ValueError(f"Unknown search method: {self.search_method!r}")
+        if self.initialization_mode not in INITIALIZATION_MODES:
+            raise ValueError(f"Unknown initialization mode: {self.initialization_mode!r}")
+        if min(self.proposal_samples, self.bo_pool_size, self.bo_search_samples, self.evaluations_per_round) < 1:
+            raise ValueError("Proposal, pool, and evaluation counts must be positive")
+        if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
+            raise ValueError("LDM proposal samples must exceed the BO pool size")
+        if self.evaluations_per_round > self.bo_pool_size and self.search_method != "llm":
+            raise ValueError("BO-based methods require evaluations_per_round <= bo_pool_size")
+        if self.search_method in {"ldm", "llm"} and self.client is None:
+            raise ValueError("Model search methods require a proposal client")
+        _validate_options(self)
         validate_prompt_policy(self.prompt_policy)
 
 
 @dataclass(frozen=True)
 class CampaignComponents:
-    """All task adapters connected to a single shared LDMEngine."""
+    """All task adapters connected to one shared :class:`LDMEngine`."""
 
     task_spec: LDMTaskSpec
     domain: SynthonCandidateDomain
-    encoder: SynthonNystromEncoder
-    selector: AcquisitionTiltedSelector
+    expander: ReservoirExpander
+    encoder: SynthonNystromEncoder | None
+    selector: AcquisitionSelector | None
     evaluator: OfficialSynthonEvaluator
     engine: LDMEngine
 
 
 def build_campaign_components(options: CampaignComponentOptions) -> CampaignComponents:
-    """Assemble task-local components without reading global state or credentials."""
+    """Assemble a task-local method without reading credentials or global state."""
 
     official_task = options.official_task
-    allowed_reactions = tuple(official_task.allowed_reactions)
-    encoder = SynthonNystromEncoder(
-        official_task.space,
-        allowed_reactions,
-        landmark_count=options.gp_landmarks,
-        seed=options.selection_seed,
-        fingerprint_bits=options.fingerprint_bits,
-        kernel_jitter=options.gp_kernel_jitter,
-        reaction_weight=options.gp_reaction_weight,
-    )
-    selector = build_synthon_selector(
+    reactions = ordered_reactions(official_task.allowed_reactions)
+    encoder, selector = _search_components(options, reactions)
+    declared_task = task_contracts.build_synthon_task_spec(
         encoder=encoder,
-        selection_seed=options.selection_seed,
-        gp_signal_std=options.gp_signal_std,
-        gp_mean_std=options.gp_mean_std,
-        gp_observation_noise_std=options.gp_observation_noise_std,
-        acquisition_beta=options.acquisition_beta,
-        alpha=options.alpha,
-        eta=options.eta,
-        z_clip=options.z_clip,
-        bo_pool_size=options.bo_pool_size,
+        acquisition=(
+            selector.describe()
+            if selector is not None
+            else task_contracts.build_direct_acquisition()
+        ),
         proposal_samples=options.proposal_samples,
-    )
-    task_spec = build_synthon_task_spec(
-        encoder=encoder,
-        acquisition=selector.describe(),
-        proposal_samples=options.proposal_samples,
+        evaluations_per_round=options.evaluations_per_round,
         bo_pool_size=options.bo_pool_size,
+        bo_search_samples=options.bo_search_samples,
         proposal_max_workers=options.proposal_max_workers,
         slate_size=options.slate_size,
         reaction_allocation=options.reaction_allocation,
         prompt_policy=options.prompt_policy,
+        search_method=options.search_method,
+        initialization_mode=options.initialization_mode,
     )
-    domain = SynthonCandidateDomain(official_task.space, allowed_reactions, options.target, options.sink)
-    catalog = SynthonProposalCatalog(official_task.space, allowed_reactions=allowed_reactions,
-                                    slate_size=options.slate_size, seed=options.selection_seed,
-                                    reaction_allocation=options.reaction_allocation)
-    expander = SynthonBenchProposalExpander(options.client, domain, catalog, target=options.target,
-                                            before_requests=options.before_requests,
-                                            max_workers=options.proposal_max_workers,
-                                            prompt_policy=options.prompt_policy)
+    domain = SynthonCandidateDomain(official_task.space, reactions, options.target, options.sink)
+    expander = _expander(options, domain, reactions)
     evaluator = OfficialSynthonEvaluator(official_task)
-    engine = LDMEngine(task_spec=task_spec, expander=expander, candidate_domain=domain,
-                       evaluator=evaluator, runtime=options.runtime, selector=selector,
-                       surrogate_encoder=encoder)
-    return CampaignComponents(task_spec, domain, encoder, selector, evaluator, engine)
-
-
-def build_synthon_task_spec(
-    *,
-    encoder: SynthonNystromEncoder,
-    acquisition: AcquisitionSpec,
-    proposal_samples: int,
-    bo_pool_size: int,
-    proposal_max_workers: int,
-    slate_size: int,
-    reaction_allocation: str,
-    prompt_policy: str,
-) -> LDMTaskSpec:
-    """Describe the exact finite tuple, response, surrogate, and LDM policy contract."""
-
-    return LDMTaskSpec(
-        task=TASK_ID,
-        candidate_domain=CandidateDomainSpec(
-            name="Source-pinned synthon tuples",
-            kind="reaction_synthon_tuple",
-            dimension=None,
-            representation="One reaction ID and one ordered valid synthon ID per official reaction slot.",
-        ),
-        objectives=(ObjectiveSpec(OBJECTIVE_NAME, "maximize", "Official fixed-oracle SynthonBench utility."),),
-        response_spaces=(_response_space(),),
-        acquisition=acquisition,
-        reservoir=_reservoir_spec(proposal_samples, proposal_max_workers),
-        surrogate=encoder.describe(),
-        proposal_search=ProposalSearchSpec(
-            name="parallel_independent_requests",
-            breadth=proposal_samples,
-            evaluation_policy="empirical_q0_maintained_acquisition_tilted",
-            parameters={"max_workers": proposal_max_workers, "one_candidate_per_request": True},
-        ),
-        metadata={
-            "proposal_samples": proposal_samples,
-            "bo_pool_size": bo_pool_size,
-            "slate_size": slate_size,
-            "reaction_allocation": reaction_allocation,
-            "prompt_policy": prompt_policy,
-            "sampling_mode": "local_concurrent_independent_requests",
-        },
+    engine = LDMEngine(
+        task_spec=declared_task,
+        expander=expander,
+        candidate_domain=domain,
+        evaluator=evaluator,
+        runtime=options.runtime,
+        selector=selector,
+        surrogate_encoder=encoder,
     )
+    return CampaignComponents(declared_task, domain, expander, encoder, selector, evaluator, engine)
 
 
 def build_synthon_selector(
-    *,
-    encoder: SynthonNystromEncoder,
-    selection_seed: int,
-    gp_signal_std: float,
-    gp_mean_std: float,
-    gp_observation_noise_std: float,
-    acquisition_beta: float,
-    alpha: float,
-    eta: float,
-    z_clip: float,
-    bo_pool_size: int,
-    proposal_samples: int,
+    *, encoder: SynthonNystromEncoder, selection_seed: int, gp_signal_std: float,
+    gp_mean_std: float, gp_observation_noise_std: float, acquisition_beta: float,
+    alpha: float, eta: float, z_clip: float, bo_pool_size: int, proposal_samples: int,
 ) -> AcquisitionTiltedSelector:
-    base = SynthonTanimotoGPUCBSelector(
+    """Build the existing empirical-q0 LDM selector."""
+
+    return AcquisitionTiltedSelector(
+        build_base_synthon_selector(
+            encoder=encoder, gp_signal_std=gp_signal_std, gp_mean_std=gp_mean_std,
+            gp_observation_noise_std=gp_observation_noise_std, acquisition_beta=acquisition_beta,
+        ),
+        alpha=alpha, eta=eta, z_clip=z_clip, seed=selection_seed,
+        pool_size=bo_pool_size, proposal_sample_count=proposal_samples,
+    )
+
+
+def build_base_synthon_selector(
+    *, encoder: SynthonNystromEncoder, gp_signal_std: float, gp_mean_std: float,
+    gp_observation_noise_std: float, acquisition_beta: float,
+) -> SynthonTanimotoGPUCBSelector:
+    """Build the plain local Tanimoto GP-UCB comparator."""
+
+    return SynthonTanimotoGPUCBSelector(
         objective_name=OBJECTIVE_NAME,
         feature_dimension=encoder.dimension,
         feature_version=encoder.version,
         config=TanimotoGPUCBConfig(
-            beta=acquisition_beta,
-            signal_std=gp_signal_std,
-            mean_std=gp_mean_std,
+            beta=acquisition_beta, signal_std=gp_signal_std, mean_std=gp_mean_std,
             observation_noise_std=gp_observation_noise_std,
         ),
     )
-    return AcquisitionTiltedSelector(base, alpha=alpha, eta=eta, z_clip=z_clip,
-                                     seed=selection_seed, pool_size=bo_pool_size,
-                                     proposal_sample_count=proposal_samples)
 
 
-def _response_space() -> ResponseSpaceSpec:
-    return ResponseSpaceSpec(
-        name="synthon_tuple_json",
-        output_kind="json_object",
-        parser="tasks.synthonbench.core.proposal_parsing:parse_synthon_response",
-        description="One source-valid tuple chosen only from a supplied finite public synthon slate.",
-        schema={
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["reaction_id", "synthon_ids"],
-            "properties": {"reaction_id": {"type": "string"}, "synthon_ids": {"type": "array"}},
-        },
+def _search_components(options: CampaignComponentOptions, reactions):
+    if options.search_method == "llm":
+        return None, None
+    encoder = SynthonNystromEncoder(
+        options.official_task.space, reactions, landmark_count=options.gp_landmarks,
+        seed=options.selection_seed, fingerprint_bits=options.fingerprint_bits,
+        kernel_jitter=options.gp_kernel_jitter, reaction_weight=options.gp_reaction_weight,
+    )
+    if options.search_method == "bo":
+        return encoder, build_base_synthon_selector(
+            encoder=encoder, gp_signal_std=options.gp_signal_std, gp_mean_std=options.gp_mean_std,
+            gp_observation_noise_std=options.gp_observation_noise_std,
+            acquisition_beta=options.acquisition_beta,
+        )
+    return encoder, build_synthon_selector(
+        encoder=encoder, selection_seed=options.selection_seed, gp_signal_std=options.gp_signal_std,
+        gp_mean_std=options.gp_mean_std, gp_observation_noise_std=options.gp_observation_noise_std,
+        acquisition_beta=options.acquisition_beta, alpha=options.alpha, eta=options.eta,
+        z_clip=options.z_clip, bo_pool_size=options.bo_pool_size, proposal_samples=options.proposal_samples,
     )
 
 
-def _reservoir_spec(proposal_samples: int, max_workers: int) -> ReservoirSpec:
-    return ReservoirSpec(
-        name="synthon_tuple_reservoir",
-        expansions=(ReservoirExpansionSpec(
-            name="independent_synthon_tuple_proposals",
-            action_kind="emit_candidate",
-            response_space="synthon_tuple_json",
-            produces_candidates=True,
-            description=f"Launch {proposal_samples} independent one-candidate requests with at most {max_workers} workers.",
-        ),),
-        candidate_validator="tasks.synthonbench.core.candidate:SynthonCandidateDomain",
-        deduplication_key="official SynthonBench product_id",
-        max_size=proposal_samples,
+def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain, reactions) -> ReservoirExpander:
+    if options.search_method == "bo":
+        search: ReservoirExpander = RandomSynthonPoolExpander(
+            options.official_task.space, reactions, seed=options.selection_seed
+        )
+    else:
+        assert options.client is not None
+        catalog = SynthonProposalCatalog(
+            options.official_task.space, allowed_reactions=reactions, slate_size=options.slate_size,
+            seed=options.selection_seed, reaction_allocation=options.reaction_allocation,
+            unique_anchors=True,
+            proposals_per_round=(
+                options.evaluations_per_round
+                if options.search_method == "llm"
+                else options.proposal_samples
+            ),
+            first_round=1 if options.initialization_mode == "shared_random" else 0,
+            restrict_to_complete_tuples=options.search_method == "llm",
+        )
+        search = SynthonBenchProposalExpander(
+            options.client, domain, catalog, target=options.target, before_requests=options.before_requests,
+            max_workers=options.proposal_max_workers, prompt_policy=options.prompt_policy,
+        )
+    if options.initialization_mode == "none":
+        return search
+    return InitialRoundReservoirExpander(
+        initializer=SynthonInitializationExpander(
+            options.official_task.space, reactions, seed=options.selection_seed,
+            attach_q0=options.search_method == "ldm",
+        ),
+        search_expander=search,
+        initial_reservoir_size=options.evaluations_per_round,
     )
+
+
+def _validate_options(options: CampaignComponentOptions) -> None:
+    values = (options.acquisition_beta, options.alpha, options.eta, options.gp_mean_std, options.gp_reaction_weight)
+    if any(not math.isfinite(item) or item < 0 for item in values):
+        raise ValueError("Acquisition and non-negative GP parameters must be finite")
+    positive = (options.gp_kernel_jitter, options.gp_signal_std, options.gp_observation_noise_std)
+    if any(not math.isfinite(item) or item <= 0 for item in positive):
+        raise ValueError("Positive GP parameters must be finite")
+    if not math.isfinite(options.z_clip) or options.z_clip <= 0:
+        raise ValueError("z_clip must be finite and positive")
 
 
 __all__ = [
-    "CampaignComponentOptions",
-    "CampaignComponents",
-    "build_campaign_components",
-    "build_synthon_selector",
-    "build_synthon_task_spec",
+    "CampaignComponentOptions", "CampaignComponents", "build_base_synthon_selector",
+    "build_campaign_components", "build_synthon_selector",
 ]

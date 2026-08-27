@@ -10,6 +10,7 @@ from ldm_tts.engine.expansion import ExpansionRequest
 
 from tasks.iron_mind.core.prompting import (
     BASELINE_PROMPT_POLICY,
+    DIRECT_PROMPT_POLICY,
     PORTFOLIO_PROMPT_POLICY,
     build_reaction_prompt_messages,
     build_slot_plan,
@@ -53,12 +54,35 @@ def test_portfolio_allocates_unique_focuses_for_a_64_candidate_reservoir() -> No
     assert {plan.policy for plan in plans} == {PORTFOLIO_PROMPT_POLICY}
     assert len({plan.focus for plan in plans}) == request.reservoir_size
     assert all(plan.focus_capacity >= request.reservoir_size for plan in plans)
+    assert len({plan.focus_payload()["additive"] for plan in plans}) == 24
+    assert len({plan.focus_payload()["aryl_halide"] for plan in plans}) == 16
     assert {plan.role for plan in plans} == {
         "chemical_prior",
         "coverage_prior",
         "interaction_prior",
         "operational_contrast",
     }
+
+
+def test_portfolio_rotates_to_a_disjoint_focus_batch_across_rounds_and_seeds() -> None:
+    schema = _schema()
+    first_request = ExpansionRequest(round_idx=0, reservoir_size=64, observations=())
+    next_request = ExpansionRequest(round_idx=1, reservoir_size=64, observations=())
+    first = {
+        build_slot_plan(first_request, schema, proposal_index=index).focus
+        for index in range(first_request.reservoir_size)
+    }
+    next_round = {
+        build_slot_plan(next_request, schema, proposal_index=index).focus
+        for index in range(next_request.reservoir_size)
+    }
+    next_seed = {
+        build_slot_plan(first_request, schema, proposal_index=index, slot_seed=1).focus
+        for index in range(first_request.reservoir_size)
+    }
+
+    assert first.isdisjoint(next_round)
+    assert next_seed == next_round
 
 
 def test_portfolio_prompt_includes_objective_history_role_and_focus() -> None:
@@ -112,6 +136,19 @@ def test_baseline_prompt_has_no_focus_constraint() -> None:
     assert "Objective:" not in messages[1]["content"]
     assert "Required slot focus" not in messages[1]["content"]
     validate_slot_focus(payload, plan)
+
+
+def test_direct_prompt_uses_round_rotated_focus_without_gp_language() -> None:
+    schema = _schema()
+    first = build_slot_plan(_request(reservoir_size=1), schema, proposal_index=0, policy=DIRECT_PROMPT_POLICY)
+    later_request = ExpansionRequest(round_idx=3, reservoir_size=1, observations=())
+    later = build_slot_plan(later_request, schema, proposal_index=0, policy=DIRECT_PROMPT_POLICY)
+    messages = build_reaction_prompt_messages(later_request, schema, later, proposal_index=0)
+
+    assert first.focus != later.focus
+    assert later.role == "direct_search"
+    assert "without a GP selector" in messages[0]["content"]
+    assert "this candidate is evaluated immediately" in messages[1]["content"]
 
 
 def test_prompt_digests_are_slot_specific_and_policy_names_are_validated() -> None:

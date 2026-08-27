@@ -45,7 +45,13 @@ def maintain_empirical_pool(
         raise ValueError("valid proposal occurrences exceed configured proposal samples")
     limit = config.pool_size or len(candidates)
     if len(candidates) <= limit:
-        return EmpiricalPool(candidates, candidates, valid_occurrences, None, "none")
+        return EmpiricalPool(
+            candidates,
+            candidates,
+            valid_occurrences,
+            None,
+            "all_unique_candidates",
+        )
     pool_seed = candidate_set_seed(
         config.seed,
         history_size,

@@ -100,11 +100,29 @@ editing a tracked config, for example:
 --set 'args.llm-extra-body-json={"thinking":{"type":"disabled"}}'
 ```
 
-This example disables DeepSeek V4 thinking for proposal-only generation; other
-OpenAI-compatible providers can use their own documented request object.
+Thinking is disabled by default for proposal-only generation. Use this override
+only to replace the default request object for a different OpenAI-compatible
+provider.
 
 After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
 campaign or a suite configuration for the full benchmark. Set both
 `--set args.proposal-samples=<M>` and `--set args.bo-pool-size=<K>` to change
 the internal search, with `M > K`, without changing the number of evaluated
 reactions.
+
+## 5. Run the Quick Three-Method Comparison
+
+After the official data and endpoint are ready, run the fixed six-round matrix:
+
+```bash
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+```
+
+The BO comparator is offline after data preparation. LDM and direct LLM use
+the generic endpoint variables from step 2. The output root is
+`$IRON_MIND_RUNS_ROOT/quick_compare/`; rerun an interrupted matrix with
+`--resume` after confirming the repository and configurations are unchanged.

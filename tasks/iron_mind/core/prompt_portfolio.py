@@ -10,7 +10,12 @@ from typing import Any
 
 from ldm_tts.engine.expansion import ExpansionRequest
 
-from tasks.iron_mind.core.prompt_policy import ProposalSlotPlan, SYSTEM_PROMPT
+from tasks.iron_mind.core.prompt_policy import (
+    DIRECT_PROMPT_POLICY,
+    DIRECT_SYSTEM_PROMPT,
+    ProposalSlotPlan,
+    SYSTEM_PROMPT,
+)
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, ReactionValue
 
 
@@ -30,7 +35,7 @@ def build_portfolio_messages(
         _output_lines(schema, plan),
     )
     return (
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": _system_prompt(plan)},
         {"role": "user", "content": "\n".join(line for group in lines for line in group)},
     )
 
@@ -70,6 +75,14 @@ def _history_lines(observations: Sequence[Any], schema: ReactionDatasetSchema) -
 
 
 def _portfolio_lines(plan: ProposalSlotPlan) -> tuple[str, ...]:
+    if plan.policy == DIRECT_PROMPT_POLICY:
+        return (
+            "Proposal policy: direct_v1.",
+            "Direct baseline: this candidate is evaluated immediately; no GP ranks a reservoir.",
+            "Choose a condition not already listed in observed evaluations.",
+            "Required slot focus (hard allocation): " + _json_text(plan.focus_payload()),
+            "Your conditions MUST contain every exact value in the required slot focus.",
+        )
     return (
         "Proposal policy: portfolio_v1.",
         f"Assigned portfolio role: {plan.role}.",
@@ -140,6 +153,10 @@ def _example_conditions(
 
 def _direction_text(schema: ReactionDatasetSchema) -> str:
     return "higher is better" if schema.direction == "maximize" else "lower is better"
+
+
+def _system_prompt(plan: ProposalSlotPlan) -> str:
+    return DIRECT_SYSTEM_PROMPT if plan.policy == DIRECT_PROMPT_POLICY else SYSTEM_PROMPT
 
 
 def _json_text(value: Any) -> str:

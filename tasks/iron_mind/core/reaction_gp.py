@@ -23,6 +23,7 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 MIN_HISTORY_FOR_ARD = 3
 TARGET_STD_FLOOR = 1.0
+DEFAULT_MODEL_MISMATCH_VARIANCE = 0.04
 
 
 @dataclass(frozen=True)
@@ -30,15 +31,12 @@ class ReactionGPUCBConfig:
     """Fixed, campaign-local settings for categorical GP-UCB selection."""
 
     base_beta: float = 1.0
-    confidence_delta: float = 0.1
-    noise: float = 1.0e-6
+    noise: float = DEFAULT_MODEL_MISMATCH_VARIANCE
     target_std_floor: float = TARGET_STD_FLOOR
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.base_beta) or self.base_beta < 0:
             raise ValueError("base_beta must be finite and non-negative")
-        if not math.isfinite(self.confidence_delta) or not 0 < self.confidence_delta < 1:
-            raise ValueError("confidence_delta must be between zero and one")
         if not math.isfinite(self.noise) or self.noise <= 0:
             raise ValueError("noise must be finite and positive")
         if not math.isfinite(self.target_std_floor) or self.target_std_floor <= 0:
@@ -54,14 +52,12 @@ class ReactionCategoricalGPUCBSelector:
         schema: ReactionDatasetSchema,
         objective_name: str,
         beta: float = 1.0,
-        confidence_delta: float = 0.1,
         feature_version: str = "",
     ) -> None:
         self.schema = schema
         self.objective_name = str(objective_name)
         self.config = ReactionGPUCBConfig(
             base_beta=float(beta),
-            confidence_delta=float(confidence_delta),
         )
         self.feature_version = str(feature_version)
         self.history: list[BOObservation] = []
@@ -75,8 +71,9 @@ class ReactionCategoricalGPUCBSelector:
             selection_rule="highest factor-aware categorical ARD GP upper confidence bound",
             parameters={
                 "base_beta": self.config.base_beta,
-                "confidence_delta": self.config.confidence_delta,
+                "beta_schedule": "constant",
                 "kernel": "factor_ard_categorical_rbf",
+                "model_mismatch_variance": self.config.noise,
             },
         )
 
@@ -97,11 +94,7 @@ class ReactionCategoricalGPUCBSelector:
         if count < 1:
             raise ValueError("selection count must be positive")
         _validate_representations(candidates, representations, self.feature_version)
-        effective_beta = _finite_reservoir_beta(
-            self.config,
-            history_size=len(self.history),
-            candidate_count=len(candidates),
-        )
+        effective_beta = self.config.base_beta
         predictions = tuple(
             self.surrogate.predict(
                 candidate.candidate_id,
@@ -122,7 +115,7 @@ class ReactionCategoricalGPUCBSelector:
                 "surrogate": self.surrogate.summary(),
                 "base_beta": self.config.base_beta,
                 "effective_beta": effective_beta,
-                "confidence_delta": self.config.confidence_delta,
+                "beta_schedule": "constant",
                 "tie_breaker": "descending_candidate_id",
             },
         )
@@ -256,20 +249,6 @@ def _validate_representations(
         representations[item.candidate_id].version != feature_version for item in candidates
     ):
         raise ValueError("reaction GP representation version does not match the selector")
-
-
-def _finite_reservoir_beta(
-    config: ReactionGPUCBConfig,
-    *,
-    history_size: int,
-    candidate_count: int,
-) -> float:
-    if config.base_beta == 0:
-        return 0.0
-    round_index = max(1, history_size + 1)
-    reservoir_size = max(1, candidate_count)
-    argument = reservoir_size * math.pi**2 * round_index**2 / (6.0 * config.confidence_delta)
-    return config.base_beta * math.sqrt(2.0 * math.log(max(argument, 1.0)))
 
 
 __all__ = [

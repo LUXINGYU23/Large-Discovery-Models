@@ -31,9 +31,29 @@ def test_task_spec_declares_independent_oversampled_proposals() -> None:
     assert spec.surrogate.dimension == 257
     assert spec.surrogate.metadata["kernel"] == "count_tanimoto"
     assert spec.surrogate.metadata["landmark_count"] == 256
+    assert spec.surrogate.metadata["reaction_weight"] == 1.0
+    assert spec.acquisition.parameters["eta_acquisition_tilt"] == 1.0
     assert spec.acquisition.parameters["base_acquisition_parameters"]["surrogate"] == (
         "online_nystrom_fitc_count_tanimoto_gaussian_process"
     )
+
+
+def test_direct_llm_contract_returns_the_official_complete_tuple() -> None:
+    spec = describe_ldm_task(parse_args([
+        "--mock",
+        "--search-method", "llm",
+        "--prompt-policy", "direct_v1",
+    ]))
+
+    assert [space.name for space in spec.response_spaces] == ["synthon_tuple_json"]
+    response = spec.response_spaces[0]
+    assert response.schema["required"] == ["reaction_id", "synthon_ids"]
+    assert response.schema["properties"]["synthon_ids"]["items"] == {"type": "integer"}
+    assert spec.reservoir.max_size == 1
+    assert spec.proposal_search.breadth == 1
+    assert spec.metadata["model_requests_per_round"] == 1
+    assert spec.metadata["search_breadth"] == 1
+    assert spec.surrogate.kind == "none"
 
 
 def test_proposal_defaults_disable_thinking() -> None:
@@ -43,12 +63,28 @@ def test_proposal_defaults_disable_thinking() -> None:
     assert args.llm_max_tokens == 256
 
 
+def test_bo_task_spec_uses_the_configured_task_local_search_breadth() -> None:
+    args = parse_args([
+        "--mock",
+        "--search-method", "bo",
+        "--proposal-mode", "none",
+        "--proposal-samples", "16",
+        "--bo-search-samples", "23",
+    ])
+
+    spec = describe_ldm_task(args)
+
+    assert spec.reservoir.max_size == 23
+    assert spec.proposal_search.breadth == 23
+    assert spec.metadata["search_breadth"] == 23
+
+
 def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
     assert main([
         "--mock",
-        "--iterations", "1",
+        "--iterations", "2",
         "--proposal-samples", "8",
         "--bo-pool-size", "4",
         "--slate-size", "4",
@@ -62,10 +98,10 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
     budget = json.loads((run_dir / "budget.json").read_text(encoding="utf-8"))
 
     assert result["mode"] == "mock"
-    assert result["official_calls"] == 1
-    assert result["official_metrics"]["submitted_calls"] == 1.0
-    assert budget["counters"]["proposal_attempts"] == 8
-    assert budget["counters"]["benchmark_jobs"] == 1
+    assert result["official_calls"] == 2
+    assert result["official_metrics"]["submitted_calls"] == 2.0
+    assert budget["counters"]["proposal_attempts"] == 16
+    assert budget["counters"]["benchmark_jobs"] == 2
     for filename in (
         "submission.csv",
         "trajectory.csv",
@@ -75,6 +111,36 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
         "ldm_data/ldm_ir.jsonl",
     ):
         assert (run_dir / filename).is_file()
+
+
+def test_mock_direct_llm_evaluates_complete_official_tuples(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
+
+    assert main([
+        "--mock",
+        "--search-method", "llm",
+        "--prompt-policy", "direct_v1",
+        "--iterations", "1",
+        "--evaluations-per-round", "4",
+        "--slate-size", "4",
+        "--out-dir", str(tmp_path),
+        "--run-name", "direct_tuple",
+    ]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    run_dir = Path(payload["run_dir"])
+    result = _load_json(run_dir / "result.json")
+    submission = (run_dir / "submission.csv").read_text(encoding="utf-8")
+    submitted_ids = submission.splitlines()
+
+    assert result["official_calls"] == 4
+    assert submitted_ids[0] == "product_id"
+    assert len(submitted_ids) == 5
+    assert all("|" in product_id and "_" in product_id for product_id in submitted_ids[1:])
 
 
 def test_real_profiles_lock_the_scientific_method_arguments() -> None:
@@ -88,9 +154,19 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
 
     for profile in contract.profiles.values():
         assert required <= set(profile.locked_args)
-        config_path = REPO_ROOT / "config" / "synthonbench" / f"{profile.name}.yaml"
+        filename = "quick_compare_base.yaml" if profile.name == "quick_compare" else f"{profile.name}.yaml"
+        config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
+
+
+def test_ldm_comparison_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in ("quick_compare", "extended_compare"):
+        args = contract.profile(profile_name).locked_args
+        headroom = args["proposal-samples"] - args["bo-pool-size"]
+        assert headroom >= args["evaluations-per-round"]
 
 
 def test_qualification_record_covers_the_source_pinned_real_tracks() -> None:

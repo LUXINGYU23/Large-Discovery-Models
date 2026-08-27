@@ -10,12 +10,15 @@ official source-pinned scorer.
 ## Task Boundary
 
 ```text
-ldm_task/  stable shared-runner adapter and dependency hook
-core/      tuple validation, public slates, prompts, task-local Tanimoto GP, LDM policy, oracle adapter
-scripts/   source-pinned official data preparation
-resources/ immutable upstream and qualification contracts
-tests/     task-local contract and algorithm tests
-runs/      generated artifacts only; never committed
+ldm_task/          stable shared-runner adapter
+core/task_spec.py  declarative candidate, response, surrogate, and search contract
+core/factory.py    executable domain, selector, evaluator, and engine assembly
+core/workflow.py   campaign configuration and runtime orchestration
+core/              tuple validation, prompts, Tanimoto GP, LDM policy, oracle adapter
+scripts/           source-pinned official data preparation
+resources/         immutable upstream and qualification contracts
+tests/             task-local contract and algorithm tests
+runs/              generated artifacts only; never committed
 ```
 
 The adapter is self-contained under `tasks/synthonbench` and uses the shared
@@ -40,15 +43,19 @@ Each outer round uses the following task-local realization of the shared LDM
 lifecycle:
 
 1. Draw `M=64` independent reaction-conditioned public slates. Reactions are
-   allocated in proportion to their official product-space sizes by default.
+   allocated in proportion to their official product-space sizes by default,
+   and a deterministic unique anchor synthon keeps the 64 proposal slots
+   distinct within each round while leaving the remaining slots open to the
+   model. Anchors from evaluated history are excluded in later rounds.
 2. Issue one independent OpenAI-compatible request per slate. Each request may
    return exactly one tuple selected from its listed source-valid IDs.
 3. Parse and validate every response against both its slate and the full
    official `SynthonSpace`. There are no replacement or refill requests.
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
-5. If more than `K=32` unique candidates survive, retain a `q0`-weighted
-   Gumbel sample of size `K`. Only this maintained BO pool is scored.
+5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
+   sample of size `K`. The full-budget and qualification profiles use `K=32`;
+   quick-comparison profiles use `K=48`. Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -63,7 +70,15 @@ The public slate is necessary because full reaction slot catalogs contain
 thousands of synthons and cannot be faithfully serialized into one LLM prompt.
 It contains only released IDs and SMILES, never score-table values, top-k lists,
 or unqueried oracle outcomes. Previous charged outcomes are the only feedback
-shown in a prompt.
+shown in a prompt. History records include the exact component SMILES alongside
+their IDs and measured utility, so the model can transfer structural evidence
+instead of trying to infer chemistry from opaque identifiers.
+
+All reaction IDs, slot positions, and synthon IDs are canonically ordered before
+any seeded sampling. A fixed campaign seed therefore defines the same shared
+initial design and task-local GP basis across independently launched methods.
+The shared design is evaluated in its generated order before any method-specific
+acquisition step.
 
 ## Surrogate Representation
 
@@ -76,14 +91,14 @@ count-Tanimoto similarity
 k_0(x,x') = T_{\min/\max}(c(x), c(x')).
 \]
 
-`--gp-reaction-weight` declares an optional reaction-delta ablation,
+`--gp-reaction-weight` adds a reaction-template delta term,
 \((k_0+\lambda_r\mathbf{1}[r=r'])/(1+\lambda_r)\); its committed value is
-`0.0`. At startup, `--gp-landmarks` fixed public tuples are sampled with a
+`1.0`. At startup, `--gp-landmarks` fixed public tuples are sampled with a
 reaction-balanced seed. With `K_{ZZ}=LL^T`, each candidate is encoded as
 `[L^-1 k(Z, x), 1 - k(x, Z) K_ZZ^-1 k(Z, x)]`. The final coordinate is the
-FITC diagonal residual. The online posterior treats it as candidate-specific
-noise and stores only the resulting fixed-size vector in the shared LDM
-checkpoint path.
+FITC diagonal residual. The online posterior standardizes observed utilities,
+treats the residual as candidate-specific noise, and stores only the resulting
+fixed-size vector in the shared LDM checkpoint path.
 
 The default representation uses 2,048 Count-Morgan bins, 256 landmarks, a
 `1e-8` kernel jitter, and a unit signal, mean, and observation-noise scale.
@@ -155,9 +170,8 @@ export LLM_MODEL_NAME=your-model
 export LLM_API_KEY=your-secret
 ```
 
-`TTS_LLM_URL` / `TTS_LLM_MODEL` / `TTS_LLM_API_KEY`,
-`LDM_LLM_URL` / `LDM_LLM_MODEL` / `LDM_LLM_API_KEY`, and `OPENAI_API_KEY` are
-also accepted. Config files intentionally leave endpoint fields unset. Use
+`OPENAI_API_KEY` is also accepted as the standard API-key fallback. Config
+files intentionally leave endpoint fields unset. Use
 `--llm-json-mode` only when the selected provider supports the OpenAI JSON
 response-format field. Provider-specific OpenAI-compatible request fields can
 be passed as JSON through `--llm-extra-body-json`. The task default is
@@ -192,6 +206,51 @@ Each completed run writes:
   real tracks.
 - `result.json`: LDM summary, best utility, and official metrics.
 - shared `status.json`, `budget.json`, events, and checkpoint artifacts.
+
+## Fixed-Budget Quick Comparison
+
+`config/quick_compare/synthonbench.yaml` runs a three-seed comparison on the
+official 1M KIF11 surrogate track. One product-uniform shared initialization
+batch and five optimization batches make six batches of 16 official calls
+(96 calls per campaign).
+
+`config/quick_compare/synthonbench_extended.yaml` preserves the same method,
+seed, and candidate-budget settings but uses eleven optimization batches
+(192 official calls per campaign). It is a separate confirmation profile for
+posterior-convergence checks, not a replacement for the fixed six-batch screen.
+
+LDM retains the current 64 independent public-slate requests, empirical `q0`,
+48-candidate maintained pool, `beta=0.5`, `eta=3`, and task-local
+reaction-aware Nyström count-Tanimoto GP over standardized utilities.
+Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
+official tuples per batch and makes no model requests. Direct LLM sampling
+issues 16 independent finite-choice requests per optimization batch and
+evaluates the returned tuples directly. Each request lists up to eight uniformly
+sampled, complete source-valid tuple objects with component IDs and SMILES. The
+model returns the selected official `reaction_id + synthon_ids` tuple itself;
+the parser rejects invented IDs and combinations that mix different options.
+Its `direct_v1` prompt is recorded under the separate direct-LLM contract
+profile and does not invoke a GP selector. A deterministic anchor synthon keeps
+the 16 requests distinct, and anchors from evaluated history are excluded.
+
+```bash
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+
+uv run --locked --project tasks/synthonbench python \
+  scripts/run_quick_compare.py config/quick_compare/synthonbench_extended.yaml
+```
+
+The result directory contains standard child artifacts plus a portable matrix
+manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
+plot. Endpoint settings remain user-defined OpenAI-compatible environment
+variables; the BO children do not require them.
+For a source archive rather than a Git checkout, set
+`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+explicit provenance.
 
 ## Qualification Status
 

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
 from ldm_tts.contracts import Candidate, Observation, RawProposal
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
+
+
+SELECTION_MODES = ("acquisition", "reservoir_order")
 
 
 @dataclass(frozen=True)
@@ -37,10 +40,13 @@ class ExpansionResult:
     schema_update: dict[str, Any] | None = None
     attempts: tuple[ProposalResponse, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    selection_mode: str = "acquisition"
 
     def __post_init__(self) -> None:
         if not self.proposals and self.schema_update is None and not self.attempts:
             raise ValueError("expansion must emit proposals or update the expansion schema")
+        if self.selection_mode not in SELECTION_MODES:
+            raise ValueError(f"unknown expansion selection mode: {self.selection_mode!r}")
 
 
 @runtime_checkable
@@ -59,6 +65,38 @@ class CallableReservoirExpander:
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         return self.operation(request)
+
+
+class InitialRoundReservoirExpander:
+    """Evaluate one deterministic initial design before delegating to active search."""
+
+    def __init__(
+        self,
+        *,
+        initializer: ReservoirExpander,
+        search_expander: ReservoirExpander,
+        initial_reservoir_size: int,
+    ) -> None:
+        if initial_reservoir_size < 1:
+            raise ValueError("initial reservoir size must be positive")
+        self.initializer = initializer
+        self.search_expander = search_expander
+        self.initial_reservoir_size = initial_reservoir_size
+
+    def expand(self, request: ExpansionRequest) -> ExpansionResult:
+        if request.round_idx == 0:
+            result = self.initializer.expand(
+                replace(request, reservoir_size=self.initial_reservoir_size)
+            )
+            metadata = {"phase": "shared_initialization", **result.metadata}
+            return ExpansionResult(
+                proposals=result.proposals,
+                schema_update=result.schema_update,
+                attempts=result.attempts,
+                metadata=metadata,
+                selection_mode="reservoir_order",
+            )
+        return self.search_expander.expand(request)
 
 
 class DirectEmissionExpander:
@@ -97,5 +135,7 @@ __all__ = [
     "DirectEmissionExpander",
     "ExpansionRequest",
     "ExpansionResult",
+    "InitialRoundReservoirExpander",
     "ReservoirExpander",
+    "SELECTION_MODES",
 ]

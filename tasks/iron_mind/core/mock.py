@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+from collections.abc import Mapping
 from itertools import product
 from pathlib import Path
 from types import MappingProxyType
@@ -25,12 +26,22 @@ def load_mock_table(
     oracle_path: Path,
     *,
     candidate_count: int = MOCK_SEED_ROW_COUNT,
+    round_count: int = 1,
+    slot_seed: int = 0,
 ) -> FrozenReactionTable:
     """Build a deterministic finite mock table sized for one reservoir."""
 
     _validate_candidate_count(candidate_count)
+    if round_count < 1 or slot_seed < 0:
+        raise ValueError("Mock round count must be positive and slot seed non-negative.")
     seed_rows = _load_seed_rows(schema, oracle_path)
-    rows = _expand_mock_rows(schema, seed_rows, candidate_count)
+    rows = _expand_mock_rows(
+        schema,
+        seed_rows,
+        candidate_count,
+        round_count=round_count,
+        slot_seed=slot_seed,
+    )
     indexed = {
         tuple(row.conditions[name] for name in schema.factor_names): (row,)
         for row in rows
@@ -55,19 +66,25 @@ def _expand_mock_rows(
     schema: ReactionDatasetSchema,
     seed_rows: tuple[ReactionRow, ...],
     candidate_count: int,
+    *,
+    round_count: int,
+    slot_seed: int,
 ) -> tuple[ReactionRow, ...]:
-    request = ExpansionRequest(round_idx=0, reservoir_size=candidate_count)
     by_conditions = {
         tuple(row.conditions[name] for name in schema.factor_names): row for row in seed_rows
     }
     rows = []
     known = set()
-    for index in range(candidate_count):
-        values = _portfolio_values(schema, request, index)
-        if values in known:
-            continue
-        rows.append(by_conditions.get(values) or _synthetic_mock_row(schema, len(rows) + 1, values))
-        known.add(values)
+    batch_size = max(1, candidate_count // round_count)
+    for round_idx in range(round_count):
+        request = ExpansionRequest(round_idx=round_idx, reservoir_size=batch_size)
+        for index in range(batch_size):
+            values = _portfolio_values(schema, request, index, slot_seed)
+            if values in known:
+                continue
+            row = by_conditions.get(values) or _synthetic_mock_row(schema, len(rows) + 1, values)
+            rows.append(row)
+            known.add(values)
     for values in product(*(factor.options for factor in schema.factors)):
         if len(rows) == candidate_count:
             break
@@ -84,28 +101,46 @@ def _portfolio_values(
     schema: ReactionDatasetSchema,
     request: ExpansionRequest,
     proposal_index: int,
+    slot_seed: int,
 ) -> tuple[object, ...]:
-    plan = build_slot_plan(request, schema, proposal_index=proposal_index)
+    plan = build_slot_plan(
+        request,
+        schema,
+        proposal_index=proposal_index,
+        slot_seed=slot_seed,
+    )
     focus = plan.focus_payload()
     return tuple(focus.get(factor.name, factor.options[0]) for factor in schema.factors)
 
 
 def mock_proposal_response(
-    table: FrozenReactionTable, *, proposal_index: int
+    table: FrozenReactionTable,
+    *,
+    proposal_index: int,
+    slot_focus: Mapping[str, object] | None = None,
 ) -> ProposalResponse:
     """Return one deterministic response for one independent proposal request."""
 
     if proposal_index < 0 or proposal_index >= len(table.rows):
         raise ValueError("Mock proposal index is outside the mock table.")
-    row = table.rows[proposal_index]
+    matches = tuple(row for row in table.rows if _matches_focus(row, slot_focus))
+    if not matches:
+        raise ValueError("Mock table contains no row for the assigned slot focus.")
+    row = matches[proposal_index % len(matches)]
     text = json.dumps(
         {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)},
         separators=(",", ":"),
     )
     return ProposalResponse(
         text=text,
-        metadata={"provider": "mock", "proposal_index": proposal_index},
+        metadata={"provider": "mock", "proposal_index": proposal_index, "row_id": row.row_id},
     )
+
+
+def _matches_focus(row: ReactionRow, focus: Mapping[str, object] | None) -> bool:
+    if focus is None:
+        return True
+    return all(row.conditions.get(name) == value for name, value in focus.items())
 
 
 def _mock_row(

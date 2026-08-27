@@ -22,7 +22,7 @@ class ReactionFactor:
     """One ordered finite reaction factor from an Olympus config."""
 
     name: str
-    categories: tuple[ReactionValue, ...]
+    options: tuple[ReactionValue, ...]
     parameter_type: str = "categorical"
 
     def __post_init__(self) -> None:
@@ -30,16 +30,10 @@ class ReactionFactor:
             raise ValueError("Reaction factor name must not be empty.")
         if self.parameter_type not in PARAMETER_TYPES:
             raise ValueError(f"Unsupported reaction parameter type: {self.parameter_type!r}.")
-        normalized = tuple(self.normalize(value) for value in self.categories)
+        normalized = tuple(self.normalize(value) for value in self.options)
         if not normalized or len(normalized) != len(set(normalized)):
             raise ValueError("Reaction factor options must be non-empty and unique.")
-        object.__setattr__(self, "categories", normalized)
-
-    @property
-    def options(self) -> tuple[ReactionValue, ...]:
-        """Return the finite Olympus options; ``categories`` is the legacy alias."""
-
-        return self.categories
+        object.__setattr__(self, "options", normalized)
 
     def normalize(self, value: Any) -> ReactionValue:
         """Validate and normalize one JSON value against this factor type."""

@@ -52,13 +52,14 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
     assert task_spec.acquisition.parameters == {
         "base_acquisition": "ucb",
         "base_acquisition_parameters": {
-            "base_beta": 1.0,
-            "confidence_delta": 0.1,
-            "kernel": "factor_ard_categorical_rbf",
-        },
+                "base_beta": 1.0,
+                "beta_schedule": "constant",
+                "kernel": "factor_ard_categorical_rbf",
+                "model_mismatch_variance": 0.04,
+            },
         "base_measure": "empirical_proposal_frequency",
         "alpha_base_measure": 1.0,
-        "eta_acquisition_tilt": 3.0,
+        "eta_acquisition_tilt": 1.0,
         "normalization": "robust_z",
         "z_clip": 5.0,
         "sampling": "gumbel_top_k_without_replacement",
@@ -67,8 +68,8 @@ def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
         "proposal_sample_count": 64,
     }
     assert contract.proposal_provider == {
-        "kind": "model_endpoint",
-        "requires_endpoint_preflight": True,
+        "kind": "hybrid",
+        "requires_endpoint_preflight": False,
         "supports_collection": True,
     }
     assert contract.metrics["reported"][0]["name"] == "reaction_score"
@@ -135,6 +136,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
     assert selection_metadata["valid_proposal_occurrences"] == 64
     assert selection_metadata["unique_candidates_admitted"] == 64
     assert selection_metadata["bo_pool_size"] == 32
+    assert selection_metadata["pool_maintenance"] == "q0_gumbel_top_k_without_replacement"
     assert len(selection_metadata["proposal_base_measure"]) == 64
     assert sum(
         item["proposal_q0_base_mass"]
@@ -155,3 +157,13 @@ def test_describe_ldm_task_separates_proposal_samples_from_the_bo_pool() -> None
         "dataset_id",
         "conditions",
     ]
+
+
+def test_task_spec_declares_plain_bo_and_direct_llm_without_changing_the_engine() -> None:
+    bo = describe_ldm_task(parse_args(["--mock", "--search-method", "bo", "--proposal-mode", "none"]))
+    llm = describe_ldm_task(parse_args(["--mock", "--search-method", "llm"]))
+
+    assert bo.proposal_search.name == "full_finite_domain_bo"
+    assert bo.acquisition.name == "ucb"
+    assert llm.proposal_search.name == "parallel_independent_direct_llm"
+    assert llm.surrogate.kind == "none"

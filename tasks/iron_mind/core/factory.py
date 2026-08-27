@@ -1,4 +1,4 @@
-"""Task-owned assembly of Iron Mind components around shared LDM runtime types."""
+"""Task-owned assembly for Iron Mind LDM, BO, and direct-LLM campaigns."""
 
 from __future__ import annotations
 
@@ -6,55 +6,53 @@ import math
 from dataclasses import dataclass
 from typing import Callable
 
-from ldm_tts.contracts import (
-    AcquisitionSpec,
-    CandidateDomainSpec,
-    LDMTaskSpec,
-    ObjectiveSpec,
-    ProposalSearchSpec,
-    ReservoirExpansionSpec,
-    ReservoirSpec,
-    ResponseSpaceSpec,
-)
+from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine import LDMEngine
+from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
+from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
 
+from tasks.iron_mind.core import task_spec as task_contracts
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
+from tasks.iron_mind.core.constants import OBJECTIVE_NAME
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
 from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
-from tasks.iron_mind.core.proposals import (
-    DEFAULT_PROPOSAL_MAX_WORKERS,
-    IronMindProposalExpander,
-)
+from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS, IronMindProposalExpander
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
+from tasks.iron_mind.core.search import (
+    FullReactionDomainExpander,
+    INITIALIZATION_MODES,
+    IronMindInitializationExpander,
+    SEARCH_METHODS,
+    finite_domain_size,
+)
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
-
-
-TASK_ID = "iron_mind"
-OBJECTIVE_NAME = "reaction_score"
 
 
 @dataclass(frozen=True)
 class CampaignComponentOptions:
-    """Dependencies injected by workflow code for one Iron Mind campaign."""
+    """Dependencies injected by the workflow for one task-local search method."""
 
-    client: ProposalClient
+    client: ProposalClient | None
     schema: ReactionDatasetSchema
     table: FrozenReactionTable
     sink: DataCollectionSink
     runtime: CampaignRuntime
     proposal_samples: int
     bo_pool_size: int
+    search_method: str = "ldm"
+    initialization_mode: str = "none"
     proposal_max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS
     before_requests: Callable[[int], None] | None = None
     acquisition_beta: float = 1.0
     acquisition_alpha: float = 1.0
-    acquisition_eta: float = 3.0
+    acquisition_eta: float = DEFAULT_ETA
     acquisition_z_clip: float = 5.0
     selection_seed: int = 0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
@@ -62,47 +60,115 @@ class CampaignComponentOptions:
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
             raise ValueError("Campaign table schema does not match the supplied schema.")
-        if self.proposal_samples < 1:
-            raise ValueError("Proposal sample count must be positive.")
-        if self.bo_pool_size < 1:
-            raise ValueError("BO pool size must be positive.")
-        if self.proposal_samples <= self.bo_pool_size:
-            raise ValueError("Proposal sample count must exceed BO pool size.")
-        if self.proposal_max_workers < 1:
-            raise ValueError("Proposal max workers must be positive.")
-        if not math.isfinite(self.acquisition_beta) or self.acquisition_beta < 0:
-            raise ValueError("Acquisition beta must be finite and non-negative.")
-        for name, value in (
-            ("Acquisition alpha", self.acquisition_alpha),
-            ("Acquisition eta", self.acquisition_eta),
-        ):
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and non-negative.")
-        if not math.isfinite(self.acquisition_z_clip) or self.acquisition_z_clip <= 0:
-            raise ValueError("Acquisition z-clip must be finite and positive.")
-        if self.selection_seed < 0:
-            raise ValueError("Selection seed must be non-negative.")
+        if self.search_method not in SEARCH_METHODS:
+            raise ValueError(f"Unknown search method: {self.search_method!r}.")
+        if self.initialization_mode not in INITIALIZATION_MODES:
+            raise ValueError(f"Unknown initialization mode: {self.initialization_mode!r}.")
+        if self.proposal_samples < 1 or self.bo_pool_size < 1:
+            raise ValueError("Proposal and BO pool sizes must be positive.")
+        if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
+            raise ValueError("LDM proposal samples must exceed the BO pool size.")
+        if self.search_method in {"ldm", "llm"} and self.client is None:
+            raise ValueError("Model search methods require a proposal client.")
+        if self.proposal_max_workers < 1 or self.selection_seed < 0:
+            raise ValueError("Worker count must be positive and seed non-negative.")
+        _validate_acquisition_options(self)
         validate_prompt_policy(self.prompt_policy)
 
 
 @dataclass(frozen=True)
 class CampaignComponents:
-    """Complete task adapters connected to one shared :class:`LDMEngine`."""
+    """Task adapters connected to one shared :class:`LDMEngine`."""
 
     task_spec: LDMTaskSpec
     domain: IronMindCandidateDomain
-    expander: IronMindProposalExpander
-    encoder: ReactionOneHotEncoder
-    selector: AcquisitionTiltedSelector
+    expander: ReservoirExpander
+    encoder: ReactionOneHotEncoder | None
+    selector: AcquisitionSelector | None
     evaluator: FrozenReactionEvaluator
     engine: LDMEngine
 
 
 def build_campaign_components(options: CampaignComponentOptions) -> CampaignComponents:
-    """Assemble one engine without reading credentials, files, or global task state."""
+    """Assemble the selected method without reading credentials or global state."""
 
+    encoder, selector = _search_components(options)
+    declared_task = task_contracts.build_reaction_task_spec(
+        options.schema,
+        (
+            selector.describe()
+            if selector is not None
+            else task_contracts.build_direct_acquisition()
+        ),
+        proposal_samples=options.proposal_samples,
+        bo_pool_size=options.bo_pool_size,
+        proposal_max_workers=options.proposal_max_workers,
+        prompt_policy=options.prompt_policy,
+        search_method=options.search_method,
+        initialization_mode=options.initialization_mode,
+        surrogate=(
+            encoder.describe()
+            if encoder is not None
+            else task_contracts.disabled_surrogate()
+        ),
+        domain_size=finite_domain_size(options.table),
+    )
+    domain = IronMindCandidateDomain(options.schema, options.table, sink=options.sink)
+    expander = _expander(options, domain)
+    evaluator = FrozenReactionEvaluator(options.table)
+    engine = LDMEngine(
+        task_spec=declared_task,
+        expander=expander,
+        candidate_domain=domain,
+        evaluator=evaluator,
+        runtime=options.runtime,
+        selector=selector,
+        surrogate_encoder=encoder,
+    )
+    return CampaignComponents(declared_task, domain, expander, encoder, selector, evaluator, engine)
+
+
+def build_reaction_selector(**kwargs) -> AcquisitionTiltedSelector:
+    """Build the empirical-q0 LDM selector retained from the main task method."""
+
+    base = build_base_reaction_selector(
+        schema=kwargs["schema"], beta=kwargs["beta"], feature_version=kwargs["feature_version"]
+    )
+    return AcquisitionTiltedSelector(
+        base,
+        alpha=kwargs["alpha"],
+        eta=kwargs["eta"],
+        z_clip=kwargs["z_clip"],
+        seed=kwargs["seed"],
+        pool_size=kwargs["pool_size"],
+        proposal_sample_count=kwargs["proposal_sample_count"],
+    )
+
+
+def build_base_reaction_selector(
+    *, schema: ReactionDatasetSchema, beta: float, feature_version: str
+) -> ReactionCategoricalGPUCBSelector:
+    """Build plain factor-aware categorical GP-UCB for the BO comparator."""
+
+    return ReactionCategoricalGPUCBSelector(
+        schema=schema,
+        objective_name=OBJECTIVE_NAME,
+        beta=beta,
+        feature_version=feature_version,
+    )
+
+
+def _search_components(options: CampaignComponentOptions):
+    if options.search_method == "llm":
+        return None, None
     encoder = ReactionOneHotEncoder(options.schema)
-    selector = build_reaction_selector(
+    if options.search_method == "bo":
+        return encoder, build_base_reaction_selector(
+            schema=options.schema,
+            beta=options.acquisition_beta,
+            feature_version=encoder.version,
+        )
+    return encoder, build_reaction_selector(
         schema=options.schema,
         beta=options.acquisition_beta,
         alpha=options.acquisition_alpha,
@@ -113,177 +179,43 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         proposal_sample_count=options.proposal_samples,
         feature_version=encoder.version,
     )
-    task_spec = build_reaction_task_spec(
-        options.schema,
-        selector.describe(),
-        proposal_samples=options.proposal_samples,
-        bo_pool_size=options.bo_pool_size,
-        proposal_max_workers=options.proposal_max_workers,
-        prompt_policy=options.prompt_policy,
-    )
-    domain = IronMindCandidateDomain(
-        options.schema,
-        options.table,
-        sink=options.sink,
-    )
-    expander = IronMindProposalExpander(
-        options.client,
-        domain,
-        before_requests=options.before_requests,
-        max_workers=options.proposal_max_workers,
-        prompt_policy=options.prompt_policy,
-    )
-    evaluator = FrozenReactionEvaluator(options.table)
-    engine = LDMEngine(
-        task_spec=task_spec,
-        expander=expander,
-        candidate_domain=domain,
-        evaluator=evaluator,
-        runtime=options.runtime,
-        selector=selector,
-        surrogate_encoder=encoder,
-    )
-    return CampaignComponents(task_spec, domain, expander, encoder, selector, evaluator, engine)
 
 
-def build_reaction_task_spec(
-    schema: ReactionDatasetSchema,
-    acquisition: AcquisitionSpec,
-    *,
-    proposal_samples: int,
-    bo_pool_size: int,
-    proposal_max_workers: int,
-    prompt_policy: str = DEFAULT_PROMPT_POLICY,
-) -> LDMTaskSpec:
-    """Describe one fixed-schema reaction search with separate proposal and BO pools."""
-    if proposal_samples < 1:
-        raise ValueError("Proposal sample count must be positive.")
-    if bo_pool_size < 1 or bo_pool_size >= proposal_samples:
-        raise ValueError("BO pool size must be positive and smaller than proposal samples.")
-    if proposal_max_workers < 1:
-        raise ValueError("Proposal max workers must be positive.")
-    prompt_policy = validate_prompt_policy(prompt_policy)
-
-    return LDMTaskSpec(
-        task=TASK_ID,
-        candidate_domain=_candidate_domain_spec(schema),
-        objectives=(
-            ObjectiveSpec(
-                OBJECTIVE_NAME,
-                "maximize",
-                "Frozen-table reaction score; higher is better.",
-            ),
+def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain) -> ReservoirExpander:
+    if options.search_method == "bo":
+        search: ReservoirExpander = FullReactionDomainExpander(options.table)
+    else:
+        assert options.client is not None
+        search = IronMindProposalExpander(
+            options.client,
+            domain,
+            before_requests=options.before_requests,
+            max_workers=options.proposal_max_workers,
+            prompt_policy=options.prompt_policy,
+            slot_seed=options.selection_seed,
+        )
+    if options.initialization_mode == "none":
+        return search
+    return InitialRoundReservoirExpander(
+        initializer=IronMindInitializationExpander(
+            options.table,
+            seed=options.selection_seed,
+            attach_q0=options.search_method == "ldm",
         ),
-        response_spaces=(_reaction_response_space(),),
-        acquisition=acquisition,
-        reservoir=_reaction_reservoir_spec(proposal_samples, proposal_max_workers),
-        surrogate=ReactionOneHotEncoder(schema).describe(),
-        proposal_search=ProposalSearchSpec(
-            name="parallel_independent_requests",
-            breadth=proposal_samples,
-            evaluation_policy="q0_maintained_acquisition_tilted",
-            parameters={"max_workers": proposal_max_workers},
-        ),
-        metadata={
-            "dataset_id": schema.dataset_id,
-            "schema_sha256": schema.schema_sha256,
-            "proposal_samples": proposal_samples,
-            "bo_pool_size": bo_pool_size,
-            "proposal_max_workers": proposal_max_workers,
-            "proposal_transport": "openai_chat_completions_single_choice",
-            "sampling_mode": "local_concurrent_independent_requests",
-            "prompt_policy": prompt_policy,
-            "prompt_version": prompt_policy,
-        },
+        search_expander=search,
+        initial_reservoir_size=1,
     )
 
 
-def build_reaction_selector(
-    *,
-    schema: ReactionDatasetSchema,
-    beta: float,
-    alpha: float,
-    eta: float,
-    z_clip: float,
-    seed: int,
-    pool_size: int,
-    proposal_sample_count: int,
-    feature_version: str,
-) -> AcquisitionTiltedSelector:
-    base_selector = ReactionCategoricalGPUCBSelector(
-        schema=schema,
-        objective_name=OBJECTIVE_NAME,
-        beta=beta,
-        feature_version=feature_version,
-    )
-    return AcquisitionTiltedSelector(
-        base_selector,
-        alpha=alpha,
-        eta=eta,
-        z_clip=z_clip,
-        seed=seed,
-        pool_size=pool_size,
-        proposal_sample_count=proposal_sample_count,
-    )
-
-
-def _candidate_domain_spec(schema: ReactionDatasetSchema) -> CandidateDomainSpec:
-    return CandidateDomainSpec(
-        name="Source-pinned finite reaction conditions",
-        kind="finite_reaction_conditions",
-        dimension=len(schema.factors),
-        representation="One exact typed option per tracked reaction factor.",
-        constraints={"dataset_id": schema.dataset_id, "factor_order": list(schema.factor_names)},
-    )
-
-
-def _reaction_response_space() -> ResponseSpaceSpec:
-    return ResponseSpaceSpec(
-        name="reaction_candidate_json",
-        output_kind="json_object",
-        schema=_reaction_response_schema(),
-        parser="tasks.iron_mind.core.proposal_parsing:parse_reaction_response",
-        description="One source-valid finite reaction candidate per independent request.",
-    )
-
-
-def _reaction_reservoir_spec(candidate_count: int, max_workers: int) -> ReservoirSpec:
-    return ReservoirSpec(
-        name="reaction_condition_reservoir",
-        expansions=(
-            ReservoirExpansionSpec(
-                name="reaction_condition_proposal",
-                action_kind="emit_candidate",
-                response_space="reaction_candidate_json",
-                produces_candidates=True,
-                description=(
-                    f"Launch {candidate_count} independent requests with at most {max_workers} "
-                    "workers; every request emits one strict reaction-condition candidate."
-                ),
-            ),
-        ),
-        candidate_validator="tasks.iron_mind.core.candidate:IronMindCandidateDomain",
-        deduplication_key="SHA-256 canonical reaction payload",
-        max_size=candidate_count,
-    )
-
-
-def _reaction_response_schema() -> dict[str, object]:
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["dataset_id", "conditions"],
-        "properties": {
-            "dataset_id": {"type": "string"},
-            "conditions": {"type": "object"},
-        },
-    }
+def _validate_acquisition_options(options: CampaignComponentOptions) -> None:
+    values = (options.acquisition_beta, options.acquisition_alpha, options.acquisition_eta)
+    if any(not math.isfinite(value) or value < 0 for value in values):
+        raise ValueError("Acquisition parameters must be finite and non-negative.")
+    if not math.isfinite(options.acquisition_z_clip) or options.acquisition_z_clip <= 0:
+        raise ValueError("Acquisition z-clip must be finite and positive.")
 
 
 __all__ = [
-    "CampaignComponentOptions",
-    "CampaignComponents",
-    "build_campaign_components",
-    "build_reaction_selector",
-    "build_reaction_task_spec",
+    "CampaignComponentOptions", "CampaignComponents", "build_base_reaction_selector",
+    "build_campaign_components", "build_reaction_selector",
 ]

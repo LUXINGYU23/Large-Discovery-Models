@@ -16,7 +16,7 @@
       "status": "passed",
       "evidence": [
         "tasks/synthonbench/ldm_task/procedure.py",
-        "tasks/synthonbench/ldm_task/dependencies.py"
+        "tasks/synthonbench/core/dependencies.py"
       ]
     },
     "mock_verified": {

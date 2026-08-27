@@ -8,9 +8,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-BASE_URL_ENV_NAMES = ("LLM_BASE_URL", "TTS_LLM_URL", "LDM_LLM_URL")
-MODEL_ENV_NAMES = ("LLM_MODEL_NAME", "TTS_LLM_MODEL", "LDM_LLM_MODEL")
-API_KEY_ENV_NAMES = ("LLM_API_KEY", "TTS_LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY")
+BASE_URL_ENV_NAMES = ("LLM_BASE_URL",)
+MODEL_ENV_NAMES = ("LLM_MODEL_NAME",)
+API_KEY_ENV_NAMES = ("LLM_API_KEY", "OPENAI_API_KEY")
 
 
 @dataclass(frozen=True)

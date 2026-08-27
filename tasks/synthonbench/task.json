@@ -2,5 +2,5 @@
   "schema_version": 1,
   "task_id": "synthonbench",
   "description": "LDM optimization over source-pinned SynthonBench reaction-synthon spaces and frozen score tables.",
-  "dependency_checker": "tasks.synthonbench.ldm_task.dependencies:check_dependencies"
+  "dependency_checker": "tasks.synthonbench.core.dependencies:check_task_dependencies"
 }

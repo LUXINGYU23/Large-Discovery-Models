@@ -9,7 +9,13 @@ from typing import Any
 import pytest
 from synthonbench.space import Synthon, SynthonSpace
 
-from ldm_tts.contracts import RawProposal, ReservoirBuilder
+from ldm_tts.contracts import (
+    Candidate,
+    EvaluationResult,
+    Observation,
+    RawProposal,
+    ReservoirBuilder,
+)
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.transport import ProposalRequest, ProposalResponse
 from tasks.synthonbench.core import proposals
@@ -22,6 +28,8 @@ from tasks.synthonbench.core.proposal_parsing import (
     parse_synthon_responses,
 )
 from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
+from tasks.synthonbench.core.proposals import PROPOSAL_SOURCE
+from tasks.synthonbench.core.search import SynthonInitializationExpander
 
 REQUEST_SIZE = 4
 
@@ -54,6 +62,115 @@ def test_catalog_is_deterministic_and_reaction_slot_specific() -> None:
     assert first.reaction_id in {"r1", "r2"}
     assert len(first.slot_options) == len(_space().positions(first.reaction_id))
     assert all(option.smiles for slot in first.slot_options for option in slot)
+
+
+def test_unique_anchor_catalog_assigns_distinct_fixed_anchors_within_a_round() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r1",),
+        slate_size=2,
+        seed=7,
+        unique_anchors=True,
+        proposals_per_round=2,
+        restrict_to_complete_tuples=True,
+    )
+    first = catalog.build_plan(round_idx=0, proposal_index=0)
+    second = catalog.build_plan(round_idx=0, proposal_index=1)
+
+    assert first.uniqueness_anchor_position == second.uniqueness_anchor_position
+    anchor = first.uniqueness_anchor_position
+    assert anchor is not None
+    first_anchor = next(slot for slot in first.slot_options if slot[0].position == anchor)
+    second_anchor = next(slot for slot in second.slot_options if slot[0].position == anchor)
+    assert len(first_anchor) == len(second_anchor) == 1
+    assert first_anchor[0].synthon_id != second_anchor[0].synthon_id
+    assert first.complete_tuple_options
+    assert first.complete_tuple_options[0][0] == first_anchor[0].synthon_id
+
+
+def test_unobserved_anchors_remain_available_in_later_rounds() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r1",),
+        slate_size=2,
+        seed=7,
+        unique_anchors=True,
+        proposals_per_round=2,
+    )
+
+    first_round = [catalog.build_plan(round_idx=0, proposal_index=index) for index in range(2)]
+    second_round = [catalog.build_plan(round_idx=1, proposal_index=index) for index in range(2)]
+
+    assert {plan.uniqueness_anchor_id for plan in first_round} == {1, 2}
+    assert {plan.uniqueness_anchor_id for plan in second_round} == {1, 2}
+
+
+def test_unique_anchor_catalog_excludes_history_anchor_ids() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r2",),
+        slate_size=2,
+        seed=7,
+        unique_anchors=True,
+        proposals_per_round=1,
+    )
+    baseline = catalog.build_plan(round_idx=0, proposal_index=0)
+    anchor_id = baseline.uniqueness_anchor_id
+    assert anchor_id is not None
+
+    plan = catalog.build_plan(
+        round_idx=0,
+        proposal_index=0,
+        excluded_anchor_ids={"r2": {anchor_id}},
+    )
+
+    assert plan.uniqueness_anchor_id != anchor_id
+
+
+def test_anchor_exclusion_includes_evaluated_llm_proposals() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(),
+        allowed_reactions=("r1",),
+        slate_size=2,
+        seed=7,
+        unique_anchors=True,
+        proposals_per_round=2,
+    )
+    plan = catalog.build_plan(round_idx=0, proposal_index=0)
+    payload = {
+        "reaction_id": plan.reaction_id,
+        "synthon_ids": [slot[0].synthon_id for slot in plan.slot_options],
+    }
+    candidate = Candidate("observed", payload, "r1|observed", source=PROPOSAL_SOURCE)
+    observation = Observation(
+        candidate,
+        EvaluationResult("observed", "succeeded", metrics={"synthon_utility": -4.0}),
+    )
+    request = ExpansionRequest(round_idx=1, reservoir_size=2, observations=(observation,))
+
+    excluded = proposals._excluded_anchor_ids(request, catalog)
+
+    assert excluded == {"r1": {plan.uniqueness_anchor_id}}
+
+
+def test_direct_catalog_requires_one_complete_tuple_option() -> None:
+    catalog = SynthonProposalCatalog(
+        _space(), allowed_reactions=("r1",), slate_size=2, seed=7,
+        unique_anchors=True, proposals_per_round=1, restrict_to_complete_tuples=True,
+    )
+    plan = catalog.build_plan(round_idx=0, proposal_index=0)
+    expected = {
+        "reaction_id": "r1",
+        "synthon_ids": list(plan.complete_tuple_options[0]),
+    }
+    mixed = {
+        "reaction_id": "r1",
+        "synthon_ids": [plan.complete_tuple_options[0][0], 999],
+    }
+
+    assert parse_synthon_response(json.dumps(expected), plan) == expected
+    with pytest.raises(ValueError, match="complete candidate option"):
+        parse_synthon_response(json.dumps(mixed), plan)
 
 
 def test_parser_rejects_any_tuple_outside_the_assigned_slate() -> None:
@@ -115,6 +232,19 @@ def test_q0_counts_valid_occurrences_before_shared_reservoir_deduplication() -> 
     assert by_key["r1|2_11"].metadata[Q0_METADATA_KEY]["probability"] == pytest.approx(1 / 3)
 
 
+def test_shared_initialization_is_invariant_to_official_collection_order() -> None:
+    space = _UnorderedSpace()
+    request = _request(reservoir_size=3)
+    first = SynthonInitializationExpander(
+        space, ("r2", "r1"), seed=17, attach_q0=False,
+    ).expand(request)
+    second = SynthonInitializationExpander(
+        space, ("r1", "r2"), seed=17, attach_q0=False,
+    ).expand(request)
+
+    assert [item.payload for item in first.proposals] == [item.payload for item in second.proposals]
+
+
 def _space() -> SynthonSpace:
     return SynthonSpace([
         Synthon(1, 1, "r1", "CC"),
@@ -124,6 +254,20 @@ def _space() -> SynthonSpace:
         Synthon(21, 1, "r2", "c1ccccc1"),
         Synthon(22, 1, "r2", "CCN"),
     ])
+
+
+class _UnorderedSpace:
+    def __init__(self) -> None:
+        self._space = _space()
+
+    def positions(self, reaction_id: str):
+        return set(self._space.positions(reaction_id))
+
+    def synthon_ids(self, reaction_id: str, position: int):
+        return set(self._space.synthon_ids(reaction_id, position))
+
+    def product_count_estimate(self, reaction_id: str) -> int:
+        return self._space.product_count_estimate(reaction_id)
 
 
 def _domain() -> SynthonCandidateDomain:

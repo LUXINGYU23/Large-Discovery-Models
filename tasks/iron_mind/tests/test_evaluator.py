@@ -28,7 +28,7 @@ def _schema(dataset_id: str) -> ReactionDatasetSchema:
 
 
 def _conditions(schema: ReactionDatasetSchema) -> dict[str, str]:
-    return {factor.name: factor.categories[0] for factor in schema.factors}
+    return {factor.name: factor.options[0] for factor in schema.factors}
 
 
 def _row(
@@ -163,7 +163,7 @@ def test_unknown_missing_or_non_finite_data_returns_an_explicit_failed_evaluatio
     conditions = _conditions(schema)
     missing = _row(1, conditions, {"desired_yield": 12.0})
     non_finite = _row(2, conditions, {"desired_yield": float("nan"), "undesired_yield": 1.0})
-    unknown_conditions = {**conditions, schema.factor_names[0]: schema.factors[0].categories[-1]}
+    unknown_conditions = {**conditions, schema.factor_names[0]: schema.factors[0].options[-1]}
 
     missing_result = FrozenReactionEvaluator(_table(schema, (missing,))).evaluate(
         _candidate(schema, conditions)

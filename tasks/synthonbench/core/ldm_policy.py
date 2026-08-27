@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from tasks.synthonbench.core.constants import DEFAULT_ACQUISITION_ETA
+
 MAD_SCALE = 1.4826
 DEFAULT_Z_CLIP = 5.0
 EPSILON = 1.0e-12
@@ -17,7 +19,7 @@ class AcquisitionTiltConfig:
     """The q0 and acquisition weights of the LDM sampling policy."""
 
     alpha: float = 1.0
-    eta: float = 3.0
+    eta: float = DEFAULT_ACQUISITION_ETA
     z_clip: float = DEFAULT_Z_CLIP
     seed: int = 0
     pool_size: int | None = None

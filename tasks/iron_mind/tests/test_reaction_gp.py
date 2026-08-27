@@ -72,7 +72,7 @@ def test_discrete_factor_uses_ordered_option_distance() -> None:
     assert kernel[0, 2] == pytest.approx(math.exp(-1.0))
 
 
-def test_selector_records_adaptive_ucb_and_ard_fit_summary() -> None:
+def test_selector_records_calibrated_ucb_and_ard_fit_summary() -> None:
     schema = _schema()
     encoder = ReactionOneHotEncoder(schema)
     candidates = (
@@ -95,7 +95,8 @@ def test_selector_records_adaptive_ucb_and_ard_fit_summary() -> None:
     result = selector.select(candidates, {item.candidate_id: encoder.encode(item) for item in candidates})
 
     summary = result.metadata["surrogate"]
-    assert result.metadata["effective_beta"] > result.metadata["base_beta"]
+    assert result.metadata["effective_beta"] == result.metadata["base_beta"] == 1.0
+    assert selector.describe().parameters["model_mismatch_variance"] == pytest.approx(0.04)
     assert summary["fit_status"] == "fitted_ard_marginal_likelihood"
     assert set(summary["kernel"]["factor_weights"]) == {"base", "solvent"}
     assert all(item.metadata["surrogate"] == "reaction_categorical_ard_gp" for item in result.predictions)

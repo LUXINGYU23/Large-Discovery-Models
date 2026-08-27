@@ -194,7 +194,7 @@ def test_buchwald_rejects_duplicate_observation_keys(tmp_path: Path) -> None:
 
 def test_chan_lam_keeps_replicates_and_stable_raw_row_identity(tmp_path: Path) -> None:
     schema = load_reaction_schemas(SCHEMA_PATH)["chan_lam_full"]
-    conditions = tuple(factor.categories[0] for factor in schema.factors)
+    conditions = tuple(factor.options[0] for factor in schema.factors)
     rows = [conditions + ("78.8", "1.04"), conditions + ("77.22", "0.93")]
     config_path, data_path = _write_fixture(tmp_path, schema, rows)
 
@@ -260,7 +260,7 @@ def _write_fixture(
     data_path = tmp_path / "data.csv"
     config = {
         "parameters": [
-            {"name": factor.name, "type": "categorical", "options": list(factor.categories)}
+            {"name": factor.name, "type": "categorical", "options": list(factor.options)}
             for factor in schema.factors
         ],
         "measurements": [

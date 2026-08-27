@@ -31,11 +31,13 @@ maintained BO pool, and selector adapter respectively; no algorithm code is
 imported from another task.
 
 ```text
-ldm_task/   shared-runner adapter
-core/       reaction-domain implementation
-resources/  versioned fixtures and upstream provenance
-scripts/    data preparation and result aggregation
-tests/      task-local tests
+ldm_task/          shared-runner adapter
+core/task_spec.py  declarative candidate, response, surrogate, and search contract
+core/factory.py    executable domain, selector, evaluator, and engine assembly
+core/workflow.py   campaign configuration and runtime orchestration
+resources/         versioned fixtures and upstream provenance
+scripts/           data preparation and result aggregation
+tests/             task-local tests
 ```
 
 ## Campaign Protocol
@@ -84,10 +86,12 @@ pool, the task first samples the maintained pool without replacement from
 `q0` using Gumbel top-k.
 
 The factor-aware categorical GP then predicts the reaction score on the
-maintained pool. Its acquisition score is GP-UCB,
+maintained pool. A small model-mismatch variance regularizes the exact GP so
+that early categorical ARD fits do not interpolate sparse observations as if
+the kernel were exact. Its acquisition score is GP-UCB,
 
 ```math
-a_t(x) = \mu_t(x) + \beta_t \sigma_t(x).
+a_t(x) = \mu_t(x) + \beta \sigma_t(x).
 ```
 
 The evaluated condition is sampled without replacement from
@@ -97,17 +101,21 @@ The evaluated condition is sampled without replacement from
 \exp\!\left\{\eta\,\operatorname{robust-z}(a_t(x_i))\right\}.
 ```
 
-`--acquisition-beta` controls exploration inside UCB. `--alpha` controls the
+`--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
 different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=3`. `--z-clip` defaults to 5. The campaign index seeds task-side pool
+`eta=1` for the official 20-evaluation protocol; the fixed quick-comparison
+profiles use the calibrated values documented below. `--z-clip` defaults to 5.
+The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
 
 ## Proposal Prompt Policy
 
 Released configurations use `portfolio_v1`. It gives every independently
-issued request a deterministic, distinct focus over enough high-cardinality
-reaction factors to cover the configured reservoir. The model must preserve its
+issued request a deterministic, distinct focus from a seed- and round-rotated
+permutation of the complete focus space. Every focused factor is covered within
+each batch when the reservoir is large enough, and consecutive batches visit
+new focus combinations before cycling. The model must preserve its
 assigned focus, then uses chemical knowledge and the observed history to choose
 the remaining factors under one of four roles: evidence exploitation,
 counterfactual probing, underexplored coverage, or mechanistic divergence.
@@ -173,9 +181,10 @@ Use `--llm-json-mode` only when the selected OpenAI-compatible provider supports
 `response_format={"type":"json_object"}`. It is optional and does not change
 the proposal policy or benchmark budget. For provider-specific request fields,
 pass a JSON object through `--llm-extra-body-json`; it is merged into the
-OpenAI-compatible request body without changing the committed configuration. For
-example, a DeepSeek V4 proposal-only run can disable its default thinking mode
-with `--llm-extra-body-json='{"thinking":{"type":"disabled"}}'`.
+OpenAI-compatible request body without changing the committed configuration.
+The default request body disables optional thinking for the short single-JSON
+proposal. Providers that do not support this extension can use
+`--llm-extra-body-json '{}'` or their documented request object.
 
 ## Prepare the Official Data
 
@@ -248,6 +257,50 @@ The public-union suite adds the remaining public dataset:
 uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/public_union_ldm_20x20.yaml
 ```
+
+## Fixed-Budget Quick Comparison
+
+`config/quick_compare/iron_mind.yaml` compares the repository's LDM method,
+plain task-local GP-UCB BO, and direct LLM sampling on two source-pinned
+datasets. Each case uses three seeds, one shared random initialization round,
+and five optimization rounds. Every campaign therefore makes six official
+evaluations.
+
+`config/quick_compare/iron_mind_extended.yaml` preserves every method and
+seed-setting choice but uses eleven optimization rounds (twelve evaluations
+per campaign). It is the confirmation profile for checking whether a
+data-starved six-evaluation comparison changes after additional GP feedback;
+it does not replace the fixed six-evaluation early-stop screen.
+
+The LDM method retains the 64 independent proposals, empirical `q0`,
+63-candidate maintained pool, `beta=1`, and `eta=3` acquisition tilt locked by
+the quick-comparison profiles. Pure BO
+does not call a model endpoint: it scores every unseen condition in the finite
+reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
+one independent request per optimization round and evaluates its admitted
+candidate directly. Its explicit `direct_v1` prompt removes GP language and
+rotates a hard condition focus across rounds to preserve the one-request,
+one-evaluation baseline.
+
+```bash
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_quick_compare.py config/quick_compare/iron_mind_extended.yaml
+```
+
+The matrix needs `IRON_MIND_DATA_ROOT`, `IRON_MIND_RUNS_ROOT`, and model
+endpoint variables only for the LDM and direct-LLM children. It writes a
+portable manifest, per-campaign standard artifacts, round-level trajectories,
+and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/quick_compare/`.
+Use `--resume` only for the same repository revision and unchanged configs.
+For a source archive rather than a Git checkout, set
+`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+explicit provenance.
 
 ## Outputs
 

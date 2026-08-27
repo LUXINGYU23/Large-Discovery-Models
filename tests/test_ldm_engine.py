@@ -29,6 +29,12 @@ from ldm_tts.optimization.records import BOObservation, SurrogateVector
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
 from ldm_tts.engine.expansion import DirectEmissionExpander, ExpansionRequest
+from ldm_tts.campaign import (
+    CampaignBudget,
+    CampaignRecipe,
+    CampaignRequest,
+    run_campaign,
+)
 from ldm_tts.optimization.gp import RBFGPSurrogate, RBFGPUCBSelector, select_max_ucb_record
 from ldm_tts.transport import CallableProposalClient, ProposalRequest
 
@@ -445,6 +451,31 @@ def test_ldm_engine_enforces_task_contract_and_runs_encoded_selection(tmp_path: 
         )
 
 
+def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path: Path) -> None:
+    spec = replace(integer_task_spec(), surrogate=IntegerEncoder().describe())
+    runtime = CampaignRuntime.open(tmp_path / "initial-design", task="integer_search")
+    engine = LDMEngine(
+        task_spec=spec,
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(
+                proposals=(RawProposal(1, "initial"), RawProposal(2, "initial")),
+                selection_mode="reservoir_order",
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": float(candidate.payload)}),
+        runtime=runtime,
+        selector=RBFGPUCBSelector(objective_name="score", feature_version="integer-v1"),
+        surrogate_encoder=IntegerEncoder(),
+    )
+
+    result = engine.run(LDMEngineConfig(iterations=1, reservoir_size=2))
+
+    assert result.state.observations[0].candidate.payload == 1
+    event = next(item for item in runtime.events() if item["event_type"] == "candidates_selected")
+    assert event["payload"]["metadata"]["selection_source"] == "expander"
+
+
 def test_ldm_engine_resumes_from_shared_checkpoint(tmp_path: Path) -> None:
     run_dir = tmp_path / "resumable-engine"
     spec = integer_task_spec()
@@ -522,3 +553,88 @@ def test_schema_only_expansion_does_not_count_as_an_empty_reservoir(tmp_path: Pa
     assert result.stop_reason == "iteration_budget"
     assert len(result.state.observations) == 1
     assert result.state.expansion_schema["new_parameter"]["type"] == "integer"
+
+
+def test_campaign_algorithm_enforces_an_exact_partial_final_batch(tmp_path: Path) -> None:
+    recipe = CampaignRecipe(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(
+                proposals=tuple(
+                    RawProposal(request.round_idx * 10 + offset, "mock")
+                    for offset in range(3)
+                )
+            )
+        ),
+        candidate_domain=IntegerDomain(maximum=99),
+        evaluator=CallableCandidateEvaluator(
+            lambda candidate: {"score": float(candidate.payload)}
+        ),
+    )
+
+    campaign = run_campaign(
+        CampaignRequest(
+            run_dir=tmp_path / "exact-budget",
+            budget=CampaignBudget(
+                rounds=2,
+                reservoir_size=3,
+                batch_size=2,
+                target_observations=3,
+                max_evaluation_attempts=3,
+            ),
+        ),
+        recipe,
+    )
+
+    assert campaign.engine.stop_reason == "observation_target"
+    assert [item.candidate.payload for item in campaign.engine.state.observations] == [
+        0,
+        1,
+        10,
+    ]
+    assert campaign.runtime.budget.counters["external_evaluations"] == 3
+
+
+def test_campaign_algorithm_replaces_failures_until_success_target(tmp_path: Path) -> None:
+    recipe = CampaignRecipe(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=tuple(RawProposal(value, "mock") for value in range(3))
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(
+            lambda candidate: (
+                EvaluationResult(candidate.candidate_id, "failed", error="retry next")
+                if candidate.payload == 0
+                else {"score": float(candidate.payload)}
+            )
+        ),
+    )
+
+    campaign = run_campaign(
+        CampaignRequest(
+            run_dir=tmp_path / "replace-failures",
+            budget=CampaignBudget(
+                rounds=1,
+                reservoir_size=3,
+                batch_size=2,
+                target_successful_evaluations=2,
+                max_evaluation_attempts=3,
+                max_evaluation_attempts_per_round=3,
+                replace_failed_evaluations=True,
+            ),
+        ),
+        recipe,
+    )
+
+    observations = campaign.engine.state.observations
+    assert campaign.engine.stop_reason == "successful_evaluation_target"
+    assert [item.evaluation.status for item in observations] == [
+        "failed",
+        "succeeded",
+        "succeeded",
+    ]
+    assert campaign.runtime.budget.counters["external_evaluations"] == 3
+    assert campaign.runtime.budget.counters["successful_evaluations"] == 2

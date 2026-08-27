@@ -17,6 +17,7 @@ from ldm_tts.optimization.records import (
 )
 from tasks.iron_mind.core.ldm_policy import (
     AcquisitionTiltConfig,
+    DEFAULT_ETA,
     DEFAULT_Z_CLIP,
     effective_sample_size,
     gumbel_top_k,
@@ -52,7 +53,7 @@ class AcquisitionTiltedSelector:
         base_selector: AcquisitionSelector,
         *,
         alpha: float = 1.0,
-        eta: float = 3.0,
+        eta: float = DEFAULT_ETA,
         z_clip: float = DEFAULT_Z_CLIP,
         seed: int = 0,
         pool_size: int | None = None,

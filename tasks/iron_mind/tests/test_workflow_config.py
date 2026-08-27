@@ -38,7 +38,8 @@ def test_real_smoke_config_is_portable_and_profile_locked(
     assert config["args"]["llm-max-tokens"] == 512
     assert config["args"]["prompt-policy"] == "portfolio_v1"
     assert str(data_root) in plan["argv"]
-    assert str(runs_root / "smoke") in plan["argv"]
+    out_dir = Path(plan["argv"][plan["argv"].index("--out-dir") + 1])
+    assert out_dir == runs_root / "smoke"
     assert config["args"]["llm-url"] is None
     assert config["args"]["llm-model-name"] is None
     assert config["args"]["api-key"] is None
@@ -77,7 +78,7 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert config["args"]["proposal-samples"] == 64
         assert config["args"]["bo-pool-size"] == 32
         assert config["args"]["alpha"] == 1.0
-        assert config["args"]["eta"] == 3.0
+        assert config["args"]["eta"] == 1.0
         assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
         assert config["args"]["llm-max-tokens"] == 512
@@ -107,7 +108,7 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
+        "eta": 1.0,
         "z-clip": 5.0,
         "prompt-policy": "portfolio_v1",
     }

@@ -35,7 +35,10 @@ def check_task_dependencies(plan: dict[str, Any], *, include_optional: bool = Tr
     if mode == "mock" or bool(args.get("mock")):
         return checks
     checks.extend(_prepared_data_checks(task, args))
-    checks.extend(_provider_checks(task, args, env))
+    if arg_value(args, "search-method", default="ldm") == "bo":
+        checks.append(ok(task, "proposal provider", "Pure BO does not use a model endpoint."))
+    else:
+        checks.extend(_provider_checks(task, args, env))
     return checks
 
 
