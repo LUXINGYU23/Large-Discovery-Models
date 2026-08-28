@@ -29,6 +29,7 @@ from tasks.synthonbench.core.constants import (
 )
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, PROMPT_POLICIES
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
+from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 from tasks.synthonbench.core.search import INITIALIZATION_MODES, SEARCH_METHODS
 
 
@@ -85,6 +86,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--eta", type=float, default=DEFAULT_ACQUISITION_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--prompt-policy", choices=PROMPT_POLICIES, default=DEFAULT_PROMPT_POLICY)
+    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
 
 
 def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
@@ -101,6 +103,29 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         default=DEFAULT_LLM_EXTRA_BODY_JSON,
         help="Provider-specific JSON object merged into the OpenAI-compatible request body.",
     )
+    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-candidates-per-session", type=int, default=16)
+    parser.add_argument(
+        "--harness-thinking",
+        choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"),
+        default="max",
+    )
+    parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-cache-dir", type=Path)
+    parser.add_argument("--harness-docker-host")
+    parser.add_argument("--harness-container-user")
+    parser.add_argument("--harness-response-timeout", type=float, default=1200.0)
+    parser.add_argument("--harness-wall-time-seconds", type=int, default=900)
+    parser.add_argument("--harness-provider-calls", type=int, default=24)
+    parser.add_argument("--harness-web-calls", type=int, default=12)
+    parser.add_argument("--harness-context7-calls", type=int, default=4)
+    parser.add_argument("--harness-artifact-bytes", type=int, default=256 * 1024 * 1024)
+    parser.add_argument(
+        "--no-harness-context7",
+        action="store_false",
+        dest="harness_context7",
+        default=True,
+    )
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -115,13 +140,22 @@ def _validate_counts(args: argparse.Namespace) -> None:
     if args.iterations < 0 or args.campaign_index < 0:
         raise SystemExit("--iterations and --campaign-index must be non-negative")
     positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_max_workers", "evaluations_per_round",
-                "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens")
+                "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens",
+                "harness_candidates_per_session", "harness_wall_time_seconds",
+                "harness_provider_calls", "harness_web_calls", "harness_context7_calls",
+                "harness_artifact_bytes")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
     if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.search_method != "llm" and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
+    if args.proposal_backend == "harness":
+        expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
+        if args.proposal_samples != expected:
+            raise SystemExit(
+                "--proposal-samples must equal four times --harness-candidates-per-session"
+            )
 
 
 def _validate_numbers(args: argparse.Namespace) -> None:
@@ -132,6 +166,7 @@ def _validate_numbers(args: argparse.Namespace) -> None:
         "z_clip",
         "llm_timeout",
         "audit_timeout",
+        "harness_response_timeout",
     )
     if any(not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0 for name in positive):
         raise SystemExit("GP scales, timeouts, and --z-clip must be finite and positive")
@@ -150,6 +185,16 @@ def _validate_provider_options(args: argparse.Namespace) -> None:
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
+    if args.proposal_backend == "harness":
+        if args.search_method != "ldm":
+            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+        if args.proposal_mode != "none":
+            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+        if not args.mock and (args.data_dir is None or args.source_dir is None):
+            raise SystemExit("real SynthonBench campaigns require --data-dir and --source-dir")
+        if args.oracle_kind == "glide" and args.scale != "1M":
+            raise SystemExit("the official real-Glide oracle exists only for --scale=1M")
+        return
     model_method = args.search_method in {"ldm", "llm"}
     if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:
         raise SystemExit("mock model methods require --proposal-mode=callable or openai")

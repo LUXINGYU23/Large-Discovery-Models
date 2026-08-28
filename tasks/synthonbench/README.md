@@ -179,6 +179,81 @@ be passed as JSON through `--llm-extra-body-json`. The task default is
 JSON decision. Providers that do not recognize this extension can override it
 with `--llm-extra-body-json '{}'` or their own request body.
 
+The default `direct` proposal backend uses Chat Completions for independent
+one-candidate requests. The optional persistent harness backend uses the
+OpenAI Responses wire format through Pi; its endpoint must support that API.
+
+## Persistent Research Harness
+
+The harness backend changes only the proposal policy used by LDM. At campaign
+startup it creates four persistent Pi sessions with task-owned roles for target
+SAR, reaction feasibility, scaffold exploration, and property risk. Every
+session receives 16 deterministic public slates per active round and submits
+one ordered 16-candidate minibatch. The combined 64 raw occurrences enter the
+same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
+LDM acquisition tilt used by the direct backend.
+
+Agents submit slate-local `item_index` and `option_indices` values rather than
+copying long synthon identifiers. The task deterministically maps those local
+indices back to the official `reaction_id` and ordered `synthon_ids`, then runs
+the same slate, domain, and unseen-candidate validation used elsewhere.
+
+Harness slates are independently sampled and may overlap. Repeated valid unseen
+candidates within or across sessions remain separate raw occurrences, so agent
+agreement increases that candidate's empirical `q0` before reservoir
+deduplication. There is no profile-balanced correction or per-session `q0`.
+
+The SynthonBench harness profile set loads the four committed `AGENTS.md` files
+under `resources/harness/profiles/` and no skills. Pi provides web retrieval and
+Context7. File and shell operations run in a separate Gondolin microVM for each
+session, with guest networking disabled. Benchmark names, repository paths,
+datasets, and hidden scores are blocked from research queries and fetched URLs.
+
+Build the pinned sidecar image once:
+
+```bash
+docker build -t ldm-pi-harness:latest harnesses/pi
+```
+
+Linux KVM must be available to Docker. Keep the Gondolin cache and all run data
+outside the repository, then run the committed two-round smoke profile:
+
+```bash
+export SYNTHONBENCH_WORK_ROOT=/path/to/synthonbench-workdir
+export SYNTHONBENCH_DATA_ROOT="$SYNTHONBENCH_WORK_ROOT/data"
+export SYNTHONBENCH_SOURCE_ROOT="$SYNTHONBENCH_WORK_ROOT/source"
+export SYNTHONBENCH_RUNS_ROOT="$SYNTHONBENCH_WORK_ROOT/runs"
+
+export LLM_BASE_URL=https://your-provider.example/v1
+export LLM_MODEL_NAME=your-responses-model
+export LLM_API_KEY=your-secret
+
+uv run --locked --project tasks/synthonbench \
+  python scripts/run_ldm_tts.py \
+  config/synthonbench/harness_surrogate_smoke.yaml
+```
+
+Instead of an API-key environment variable, pass
+`--set args.harness-api-key-file=/path/to/private/key`. For rootless or remote
+Docker, set `DOCKER_HOST` normally or pass
+`--set args.harness-docker-host=unix:///path/to/docker.sock`. Container storage,
+the Gondolin cache, official data, and run outputs remain user-selected paths;
+none are written into the task directory.
+
+Each harness run retains native Pi session JSONL, redacted raw model-provider
+request and response bodies with one compact mapping index, and the three small
+turn files needed for recovery (`input.json`, `submission.json`, and
+`turn_committed.json`). Tool calls and results already live in the native Pi
+session and are not duplicated into parallel trace files. API keys are sent to
+the sidecar once over stdin and are excluded from commands, container
+environment variables, manifests, sessions, and captured provider bodies.
+
+Pi's built-in provider retry remains disabled. If a Responses stream ends with
+the known interrupted-stream error before terminal submission, the same session
+makes one submission-only recovery request using its existing analysis. Both
+provider attempts remain in the raw trace. A second interruption fails the turn;
+the runner never switches to the direct backend or invents replacement candidates.
+
 ## Real Runs
 
 After preparation and endpoint configuration:

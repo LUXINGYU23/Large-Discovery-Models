@@ -9,6 +9,7 @@ from ldm_tts.registration.experiment import (
     load_experiment_contract,
     validate_profile_args,
 )
+from tasks.synthonbench.core import dependencies as dependency_checks
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +62,47 @@ def test_proposal_defaults_disable_thinking() -> None:
 
     assert args.llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
     assert args.llm_max_tokens == 256
+
+
+def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
+    key_file = tmp_path / "api_key"
+    key_file.write_text("test-secret", encoding="utf-8")
+    args = {
+        "proposal-backend": "harness",
+        "harness-api-key-file": str(key_file),
+        "llm-url": "https://provider.example",
+        "llm-model-name": "model",
+    }
+
+    checks = dependency_checks._provider_checks("synthonbench", args, {})
+    by_name = {check.name: check for check in checks}
+
+    assert "LLM API key" not in by_name
+    assert by_name["Harness API key file"].status == "ok"
+    assert "test-secret" not in repr(checks)
+
+    key_file.write_text("", encoding="utf-8")
+    failed = dependency_checks._provider_checks("synthonbench", args, {})
+    assert {check.name: check.status for check in failed}["Harness API key file"] == "fail"
+
+
+def test_harness_preflight_accepts_the_standard_api_key_environment() -> None:
+    args = {
+        "proposal-backend": "harness",
+        "llm-url": "https://provider.example",
+        "llm-model-name": "model",
+    }
+
+    checks = dependency_checks._provider_checks(
+        "synthonbench",
+        args,
+        {"LLM_API_KEY": "test-secret"},
+    )
+
+    by_name = {check.name: check for check in checks}
+    assert by_name["LLM API key"].status == "ok"
+    assert "Harness API key file" not in by_name
+    assert "test-secret" not in repr(checks)
 
 
 def test_bo_task_spec_uses_the_configured_task_local_search_breadth() -> None:
@@ -145,14 +187,27 @@ def test_mock_direct_llm_evaluates_complete_official_tuples(
 
 def test_real_profiles_lock_the_scientific_method_arguments() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
-    required = {
-        "proposal-samples", "bo-pool-size", "proposal-max-workers", "fingerprint-bits",
+    common = {
+        "proposal-samples", "bo-pool-size", "fingerprint-bits",
         "gp-landmarks", "gp-kernel-jitter", "gp-signal-std", "gp-mean-std",
         "gp-observation-noise-std", "gp-reaction-weight", "acquisition-beta", "alpha", "eta", "z-clip",
+    }
+    direct = {
+        "proposal-max-workers",
         "llm-max-tokens", "llm-temperature", "llm-extra-body-json",
+    }
+    harness = {
+        "harness-candidates-per-session", "harness-thinking", "harness-provider-calls",
+        "harness-web-calls", "harness-context7-calls", "harness-wall-time-seconds",
+        "harness-artifact-bytes",
     }
 
     for profile in contract.profiles.values():
+        required = common | (
+            harness
+            if profile.locked_args.get("proposal-backend") == "harness"
+            else direct
+        )
         assert required <= set(profile.locked_args)
         filename = "quick_compare_base.yaml" if profile.name == "quick_compare" else f"{profile.name}.yaml"
         config_path = REPO_ROOT / "config" / "synthonbench" / filename

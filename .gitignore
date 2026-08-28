@@ -1,6 +1,7 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+node_modules/
 build/
 dist/
 wheels/
@@ -32,6 +33,7 @@ api_credential.json
 # Agent prompt files (generated per-session by launchers)
 CLAUDE.md
 AGENTS.md
+!tasks/synthonbench/resources/harness/profiles/*/AGENTS.md
 
 # Experimental code/artifacts
 dev/

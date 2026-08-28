@@ -148,7 +148,7 @@ def test_anchor_exclusion_includes_evaluated_llm_proposals() -> None:
     )
     request = ExpansionRequest(round_idx=1, reservoir_size=2, observations=(observation,))
 
-    excluded = proposals._excluded_anchor_ids(request, catalog)
+    excluded = proposals.excluded_anchor_ids(request, catalog)
 
     assert excluded == {"r1": {plan.uniqueness_anchor_id}}
 

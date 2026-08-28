@@ -45,13 +45,30 @@ export LLM_MODEL_NAME=your-model
 export LLM_API_KEY=your-secret
 ```
 
-The task accepts any OpenAI-compatible Chat Completions provider. Credentials
-remain outside tracked configuration and run metadata.
+The direct backend accepts any OpenAI-compatible Chat Completions provider.
+The persistent research harness uses the OpenAI Responses wire format instead.
+Credentials remain outside tracked configuration and run metadata.
 
 The default request body disables optional thinking for the one-tuple JSON
 response: `{"thinking":{"type":"disabled"}}`. If the selected provider does
 not support that extension, set `--llm-extra-body-json '{}'` or supply its own
 compatible JSON body.
+
+To use the persistent four-profile harness, build its image and run the
+committed smoke profile after preparing official data:
+
+```bash
+docker build -t ldm-pi-harness:latest harnesses/pi
+
+uv run --locked --project tasks/synthonbench \
+  python scripts/run_ldm_tts.py \
+  config/synthonbench/harness_surrogate_smoke.yaml
+```
+
+Docker must have access to Linux KVM. The profile creates four persistent
+sessions, requests 16 candidates from each, and feeds all 64 occurrences into
+the existing LDM `q0 + GP-UCB acquisition tilt` path. See `README.md` for
+rootless Docker, private key-file, cache, and artifact configuration.
 
 ## 4. Check and Run the Surrogate Oracle Track
 

@@ -58,6 +58,15 @@ def prompt_sha256(messages: Sequence[dict[str, str]]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def serialize_observations(
+    observations: Sequence[Observation],
+    space: object,
+) -> list[dict[str, object]]:
+    """Serialize measured public history without hidden benchmark state."""
+
+    return [_history_item(item, space) for item in observations]
+
+
 def _system_prompt() -> str:
     return (
         "You are a molecular-design proposal component in a budgeted black-box search. "
@@ -202,5 +211,6 @@ __all__ = [
     "PROMPT_POLICIES",
     "build_synthon_prompt_messages",
     "prompt_sha256",
+    "serialize_observations",
     "validate_prompt_policy",
 ]

@@ -1,0 +1,42 @@
+name: synthonbench_harness_surrogate_smoke
+task: synthonbench
+algorithm: ldm_persistent_agent_harness_tanimoto_gp_ucb
+mode: real
+description: Two-round persistent-agent LDM smoke run on the official 1M surrogate track.
+contract_profile: harness_surrogate_smoke
+args:
+  proposal-backend: harness
+  proposal-mode: none
+  scale: 1M
+  target: kif11
+  oracle-kind: surrogate
+  iterations: 2
+  proposal-samples: 64
+  harness-candidates-per-session: 16
+  harness-thinking: max
+  harness-provider-calls: 8
+  harness-web-calls: 4
+  harness-context7-calls: 2
+  harness-wall-time-seconds: 900
+  harness-artifact-bytes: 67108864
+  harness-image: ldm-pi-harness:latest
+  harness-cache-dir: ${SYNTHONBENCH_WORK_ROOT}/gondolin-cache
+  bo-pool-size: 32
+  evaluations-per-round: 1
+  slate-size: 24
+  reaction-allocation: product_weighted
+  fingerprint-bits: 2048
+  gp-landmarks: 256
+  gp-kernel-jitter: 1.0e-8
+  gp-signal-std: 1.0
+  gp-mean-std: 1.0
+  gp-observation-noise-std: 1.0
+  gp-reaction-weight: 1.0
+  acquisition-beta: 1.0
+  alpha: 1.0
+  eta: 1.0
+  z-clip: 5.0
+  data-dir: ${SYNTHONBENCH_DATA_ROOT}
+  source-dir: ${SYNTHONBENCH_SOURCE_ROOT}
+  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/harness_surrogate_smoke
+  audit-timeout: 900.0

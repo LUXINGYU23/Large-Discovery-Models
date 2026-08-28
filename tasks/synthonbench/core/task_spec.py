@@ -32,6 +32,8 @@ def build_synthon_task_spec(
     prompt_policy: str,
     search_method: str = "ldm",
     initialization_mode: str = "none",
+    proposal_backend: str = "direct",
+    harness_profile_count: int = 0,
 ) -> LDMTaskSpec:
     """Describe finite tuple, response, and method-specific acquisition semantics."""
 
@@ -65,22 +67,39 @@ def build_synthon_task_spec(
             workers=proposal_max_workers,
             method=search_method,
             initialization=initialization_mode,
+            backend=proposal_backend,
         ),
         surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
-        proposal_search=_proposal_search(search_method, search_breadth, proposal_max_workers),
+        proposal_search=_proposal_search(
+            search_method,
+            search_breadth,
+            proposal_max_workers,
+            proposal_backend,
+            harness_profile_count,
+        ),
         metadata={
             "search_method": search_method,
             "initialization_mode": initialization_mode,
+            "proposal_backend": proposal_backend,
             "proposal_samples": proposal_samples,
             "model_requests_per_round": (
-                0 if search_method == "bo" else search_breadth
+                0
+                if search_method == "bo"
+                else None
+                if proposal_backend == "harness"
+                else search_breadth
+            ),
+            "model_session_turns_per_round": (
+                harness_profile_count if proposal_backend == "harness" else 0
             ),
             "search_breadth": search_breadth,
             "bo_pool_size": bo_pool_size,
             "bo_search_samples": bo_search_samples,
             "slate_size": slate_size,
             "reaction_allocation": reaction_allocation,
-            "prompt_policy": prompt_policy,
+            "prompt_policy": (
+                "task_local_agents" if proposal_backend == "harness" else prompt_policy
+            ),
         },
     )
 
@@ -108,6 +127,7 @@ def _reservoir_spec(
     workers: int,
     method: str,
     initialization: str,
+    backend: str,
 ) -> ReservoirSpec:
     expansions = []
     if initialization == "shared_random":
@@ -118,11 +138,12 @@ def _reservoir_spec(
             produces_candidates=True,
             description="Deterministic product-uniform initial sample from the official space.",
         ))
-    description = (
-        "Score-blind random unseen product pool for base GP-UCB."
-        if method == "bo"
-        else f"Launch {samples} independent one-candidate requests with at most {workers} workers."
-    )
+    if method == "bo":
+        description = "Score-blind random unseen product pool for base GP-UCB."
+    elif backend == "harness":
+        description = "Collect validated minibatches from persistent research sessions."
+    else:
+        description = f"Launch {samples} independent one-candidate requests with at most {workers} workers."
     expansions.append(ReservoirExpansionSpec(
         name=f"{method}_search_expansion",
         action_kind="emit_candidate",
@@ -143,6 +164,8 @@ def _proposal_search(
     method: str,
     breadth: int,
     workers: int,
+    backend: str,
+    harness_profile_count: int,
 ) -> ProposalSearchSpec:
     if method == "bo":
         return ProposalSearchSpec(
@@ -157,6 +180,20 @@ def _proposal_search(
             breadth=breadth,
             evaluation_policy="reservoir_order_direct_evaluation",
             parameters={"max_workers": workers, "one_candidate_per_request": True},
+        )
+    if backend == "harness":
+        if harness_profile_count < 1 or breadth % harness_profile_count:
+            raise ValueError("harness breadth must divide evenly across profiles")
+        return ProposalSearchSpec(
+            name="persistent_parallel_research_sessions",
+            breadth=breadth,
+            evaluation_policy="empirical_q0_maintained_acquisition_tilted",
+            parameters={
+                "profile_count": harness_profile_count,
+                "candidates_per_session": breadth // harness_profile_count,
+                "persistent_sessions": True,
+                "skills_loaded": False,
+            },
         )
     return ProposalSearchSpec(
         name="parallel_independent_requests",

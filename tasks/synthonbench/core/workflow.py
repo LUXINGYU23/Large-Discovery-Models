@@ -11,6 +11,12 @@ from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
+from ldm_tts.harness import (
+    HarnessClient,
+    HarnessLimits,
+    HarnessNetworkPolicy,
+    HarnessPoolConfig,
+)
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -29,6 +35,13 @@ from tasks.synthonbench.core.factory import (
     build_base_synthon_selector,
     build_campaign_components,
     build_synthon_selector,
+)
+from tasks.synthonbench.core.harness import (
+    HARNESS_ALLOWED_HOSTS,
+    HARNESS_DENIED_HOSTS,
+    HARNESS_FORBIDDEN_PATTERNS,
+    HARNESS_PROFILE_IDS,
+    harness_profiles,
 )
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
@@ -71,6 +84,10 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
         prompt_policy=args.prompt_policy,
         search_method=args.search_method,
         initialization_mode=args.initialization_mode,
+        proposal_backend=args.proposal_backend,
+        harness_profile_count=(
+            len(HARNESS_PROFILE_IDS) if args.proposal_backend == "harness" else 0
+        ),
     )
 
 
@@ -110,14 +127,31 @@ def _load_contract():
 
 def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
                   payload: dict[str, Any]) -> int:
-    provider = provider_settings(args) if args.proposal_mode == "openai" else None
+    provider = (
+        provider_settings(args)
+        if args.proposal_mode == "openai" or args.proposal_backend == "harness"
+        else None
+    )
     if provider is not None:
         args.llm_url, args.llm_model_name = provider.base_url, provider.model
     runtime = _open_runtime(args, task_spec, contract, profile_name)
+    if args.proposal_backend == "harness":
+        assert provider is not None
+        missing = _missing_harness_provider(provider)
+        if missing:
+            pause_endpoint(runtime, args, payload, missing)
+            return 2
+        harness_client = _harness_client(args, runtime, provider)
+        try:
+            harness_client.start()
+            components = _components(args, benchmark, runtime, None, harness_client)
+            return _finish_campaign(args, benchmark, components, runtime, payload)
+        finally:
+            harness_client.close()
     client = _proposal_client(args, provider)
     if provider is not None and not preflight_endpoint(client, runtime, args, payload, provider):
         return 2
-    components = _components(args, benchmark, runtime, client)
+    components = _components(args, benchmark, runtime, client, None)
     return _finish_campaign(args, benchmark, components, runtime, payload)
 
 
@@ -211,12 +245,17 @@ def _reservoir_size(args) -> int:
     return args.bo_search_samples if args.search_method == "bo" else args.proposal_samples
 
 
-def _components(args, benchmark, runtime, client):
+def _components(args, benchmark, runtime, client, harness_client):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
         (lambda count: runtime.consume("llm_requests", count))
         if args.proposal_mode == "openai"
         else None
+    )
+    profiles = (
+        harness_profiles(args.harness_candidates_per_session)
+        if args.proposal_backend == "harness"
+        else ()
     )
     return build_campaign_components(CampaignComponentOptions(
         client=client,
@@ -247,7 +286,79 @@ def _components(args, benchmark, runtime, client):
         z_clip=args.z_clip,
         prompt_policy=args.prompt_policy,
         before_requests=before_requests,
+        proposal_backend=args.proposal_backend,
+        harness_client=harness_client,
+        harness_profiles=profiles,
+        account_harness_usage=(
+            runtime.consume_many if args.proposal_backend == "harness" else None
+        ),
     ))
+
+
+def _missing_harness_provider(provider) -> str:
+    missing = [
+        name
+        for name, value in (
+            ("LLM_BASE_URL", provider.base_url),
+            ("LLM_MODEL_NAME", provider.model),
+            ("LLM_API_KEY or --harness-api-key-file", provider.api_key),
+        )
+        if not value
+    ]
+    return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
+
+
+def _harness_client(args, runtime: CampaignRuntime, provider) -> HarnessClient:
+    artifact_root = (runtime.run_dir / "harness").resolve()
+    cache_root = (
+        args.harness_cache_dir.expanduser().resolve()
+        if args.harness_cache_dir is not None
+        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
+    )
+    resource_root = (TASK_ROOT / "resources" / "harness").resolve()
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    command = ["docker"]
+    if args.harness_docker_host:
+        command.extend(("--host", args.harness_docker_host))
+    command.extend(("run", "--rm", "-i"))
+    if args.harness_container_user:
+        command.extend(("--user", args.harness_container_user))
+    command.extend((
+        "--device", "/dev/kvm",
+        "--env", "HOME=/runtime-home",
+        "--mount", f"type=bind,src={artifact_root},dst=/artifacts",
+        "--mount", f"type=bind,src={resource_root},dst=/resources,readonly",
+        "--mount", f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
+        args.harness_image,
+    ))
+    profiles = harness_profiles(args.harness_candidates_per_session)
+    config = HarnessPoolConfig(
+        artifact_root=Path("/artifacts"),
+        base_url=provider.base_url,
+        model=provider.model,
+        profiles=profiles,
+        thinking=args.harness_thinking,
+        limits=HarnessLimits(
+            wall_time_seconds=args.harness_wall_time_seconds,
+            provider_calls=args.harness_provider_calls,
+            web_calls=args.harness_web_calls,
+            context7_calls=args.harness_context7_calls,
+            artifact_bytes=args.harness_artifact_bytes,
+        ),
+        network_policy=HarnessNetworkPolicy(
+            allowed_hosts=HARNESS_ALLOWED_HOSTS,
+            denied_hosts=HARNESS_DENIED_HOSTS,
+            forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
+        ),
+        context7_enabled=args.harness_context7,
+    )
+    return HarnessClient(
+        command,
+        api_key=provider.api_key,
+        config=config,
+        response_timeout_seconds=args.harness_response_timeout,
+    )
 
 
 def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,
@@ -281,6 +392,7 @@ def _run_payload(args, benchmark, task_spec, contract_sha256: str, profile_name:
         "target": benchmark.target,
         "oracle_kind": benchmark.oracle_kind,
         "proposal_mode": args.proposal_mode,
+        "proposal_backend": args.proposal_backend,
         "search_method": args.search_method,
         "initialization_mode": args.initialization_mode,
         "contract_profile": profile_name,

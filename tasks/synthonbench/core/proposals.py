@@ -53,7 +53,7 @@ class SynthonBenchProposalExpander:
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         """Construct one slate and one endpoint call for every requested proposal."""
 
-        excluded = _excluded_anchor_ids(request, self.catalog)
+        excluded = excluded_anchor_ids(request, self.catalog)
         plans = tuple(
             self.catalog.build_plan(
                 round_idx=request.round_idx,
@@ -172,7 +172,10 @@ def _role_counts(plans) -> dict[str, int]:
     return counts
 
 
-def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCatalog) -> dict[str, set[int]]:
+def excluded_anchor_ids(
+    request: ExpansionRequest,
+    catalog: SynthonProposalCatalog,
+) -> dict[str, set[int]]:
     if not catalog.unique_anchors:
         return {}
     excluded: dict[str, set[int]] = {}
@@ -192,4 +195,4 @@ def _excluded_anchor_ids(request: ExpansionRequest, catalog: SynthonProposalCata
     return excluded
 
 
-__all__ = ["SynthonBenchProposalExpander"]
+__all__ = ["SynthonBenchProposalExpander", "excluded_anchor_ids"]
