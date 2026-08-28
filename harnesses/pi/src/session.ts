@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import {
 	createAgentSession,
 	DefaultResourceLoader,
@@ -22,7 +23,9 @@ import type {
 	SessionTurnInput,
 } from "./protocol.js";
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
-import { atomicJson } from "./trace.js";
+import { atomicJson, canonicalSha256, sha256 } from "./trace.js";
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 interface CandidateSubmission {
 	submissionId: string;
@@ -31,12 +34,21 @@ interface CandidateSubmission {
 
 const submissionSchema = Type.Object({
 	candidates: Type.Array(Type.Record(Type.String(), Type.Unknown())),
-});
+}, { additionalProperties: false });
+
+interface SavedSubmission {
+	submission: CandidateSubmission;
+	tools: { webCalls: number; context7Calls: number };
+}
 
 export interface CommittedTurn {
 	profileId: string;
 	sessionId: string;
 	turnId: string;
+	roundIndex: number;
+	historyFromSeq: number;
+	historyToSeq: number;
+	historyDigest: string;
 	inputDigest: string;
 	submission: CandidateSubmission;
 	usage: {
@@ -72,6 +84,56 @@ async function optionalJson<T>(path: string): Promise<T | undefined> {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
 		throw error;
 	}
+}
+
+async function directorySha256(root: string): Promise<string> {
+	const files: Array<{ path: string; sha256: string }> = [];
+	async function visit(directory: string): Promise<void> {
+		const entries = await readdir(directory, { withFileTypes: true });
+		for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+			const path = join(directory, entry.name);
+			if (entry.isDirectory()) await visit(path);
+			else if (entry.isFile()) files.push({
+				path: relative(root, path).replaceAll("\\", "/"),
+				sha256: sha256(await readFile(path)),
+			});
+		}
+	}
+	await visit(root);
+	return canonicalSha256(files);
+}
+
+async function runtimePackages(): Promise<Record<string, string>> {
+	const lockBody = await readFile(join(APP_ROOT, "package-lock.json"));
+	const lock = JSON.parse(lockBody.toString()) as {
+		packages?: Record<string, { version?: unknown }>;
+	};
+	function version(name: string): string {
+		const value = lock.packages?.[`node_modules/${name}`]?.version;
+		if (typeof value !== "string") throw new Error(`package version missing from lockfile: ${name}`);
+		return value;
+	}
+	return {
+		node: process.version,
+		piCodingAgent: version("@earendil-works/pi-coding-agent"),
+		gondolin: version("@earendil-works/gondolin"),
+		piWebAccess: version("pi-web-access"),
+		context7: version("@upstash/context7-pi"),
+		packageLockSha256: sha256(lockBody),
+	};
+}
+
+function sessionTools(context7Enabled: boolean): string[] {
+	return [
+		"read",
+		"write",
+		"bash",
+		"web_search",
+		"fetch_content",
+		"get_search_content",
+		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
+		"submit_candidates",
+	];
 }
 
 class SubmissionController {
@@ -157,6 +219,9 @@ class PersistentProfileSession {
 	private readonly gondolin: GondolinController;
 	private readonly submissions = new SubmissionController();
 	private session: AgentSession | undefined;
+	private historyCursor = 0;
+	private agentsSha256 = "";
+	private skillDirSha256: string[] = [];
 
 	constructor(
 		private readonly profile: HarnessProfileConfig,
@@ -174,6 +239,14 @@ class PersistentProfileSession {
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
 		const agents = await readFile(this.profile.agentsPath, "utf8");
+		this.agentsSha256 = sha256(agents);
+		if (this.agentsSha256 !== this.profile.agentsSha256) {
+			throw new Error(`AGENTS.md digest mismatch for profile ${this.profile.profileId}`);
+		}
+		this.skillDirSha256 = await Promise.all(this.profile.skillDirs.map(directorySha256));
+		if (this.skillDirSha256.some((value, index) => value !== this.profile.skillDirSha256[index])) {
+			throw new Error(`skill directory digest mismatch for profile ${this.profile.profileId}`);
+		}
 		const providerId = `ldm-harness-${this.profile.profileId}`;
 		const agentDirectory = join(this.profileRoot, "pi-agent");
 		await mkdir(agentDirectory, { recursive: true });
@@ -206,12 +279,18 @@ class PersistentProfileSession {
 			},
 		});
 
-		const modelRuntime = await ModelRuntime.create({
-			authPath: join(agentDirectory, "auth.json"),
-			modelsPath,
-			refreshOnCreate: false,
-		});
-		await modelRuntime.setRuntimeApiKey(providerId, "sidecar-proxy-token");
+		const authPath = join(agentDirectory, "auth.json");
+		let modelRuntime: ModelRuntime;
+		try {
+			modelRuntime = await ModelRuntime.create({
+				authPath,
+				modelsPath,
+				refreshOnCreate: false,
+			});
+			await modelRuntime.setRuntimeApiKey(providerId, "sidecar-proxy-token");
+		} finally {
+			await rm(authPath, { force: true });
+		}
 		const model = modelRuntime.getModel(providerId, this.config.model);
 		if (!model) throw new Error(`Pi model registration failed for ${providerId}/${this.config.model}`);
 
@@ -265,18 +344,10 @@ class PersistentProfileSession {
 			settingsManager: settings,
 			sessionManager: manager,
 			customTools: [this.submissions.tool()],
-			tools: [
-				"read",
-				"write",
-				"bash",
-				"web_search",
-				"fetch_content",
-				"get_search_content",
-				...(this.config.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
-				"submit_candidates",
-			],
+			tools: sessionTools(this.config.context7Enabled),
 		});
 		this.session = session;
+		this.historyCursor = await this.recoverHistoryCursor();
 	}
 
 	async runTurn(input: SessionTurnInput): Promise<CommittedTurn> {
@@ -285,11 +356,20 @@ class PersistentProfileSession {
 		const commitPath = join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json");
 		const priorCommit = await optionalJson<CommittedTurn>(commitPath);
 		if (priorCommit) {
-			if (priorCommit.inputDigest !== input.inputDigest || priorCommit.profileId !== input.profileId) {
+			if (
+				priorCommit.inputDigest !== input.inputDigest
+				|| priorCommit.profileId !== input.profileId
+				|| priorCommit.historyFromSeq !== input.historyFromSeq
+				|| priorCommit.historyToSeq !== input.historyToSeq
+				|| priorCommit.historyDigest !== input.historyDigest
+			) {
 				throw new Error(`committed turn digest mismatch: ${input.turnId}`);
 			}
+			this.acceptCursor(input, true);
+			this.historyCursor = input.historyToSeq;
 			return priorCommit;
 		}
+		this.acceptCursor(input, false);
 
 		const inputPath = join(turnRoot, "input.json");
 		const priorInput = await optionalJson<SessionTurnInput>(inputPath);
@@ -299,20 +379,25 @@ class PersistentProfileSession {
 		if (!priorInput) await atomicJson(inputPath, input);
 
 		const submissionPath = join(turnRoot, "submission.json");
-		const savedSubmission = await optionalJson<CandidateSubmission>(submissionPath);
+		const savedSubmission = await optionalJson<SavedSubmission>(submissionPath);
 		if (savedSubmission) {
-			return this.commit(input, savedSubmission, { providerCalls: 0, artifactBytes: 0 }, { webCalls: 0, context7Calls: 0 });
+			const provider = await this.proxy.recoveredTurnSummary(turnRoot, input.turnId);
+			return this.commit(input, savedSubmission.submission, provider, savedSubmission.tools);
 		}
 
 		this.submissions.begin(
 			input.turnId,
 			this.profile.candidatesPerTurn,
-			(value) => atomicJson(submissionPath, value),
+			(value) => atomicJson(submissionPath, {
+				submission: value,
+				tools: this.policy.snapshot(),
+			} satisfies SavedSubmission),
 			priorInput !== undefined,
 		);
 		this.policy.begin(input.forbiddenQueryTerms);
 		await this.proxy.beginTurn(
 			this.profile.profileId,
+			this.session.sessionManager.getSessionId(),
 			input.turnId,
 			turnRoot,
 			this.config.limits.providerCalls,
@@ -336,6 +421,20 @@ class PersistentProfileSession {
 			policySummary = this.policy.end();
 		}
 		return this.commit(input, submission, providerSummary, policySummary);
+	}
+
+	manifestEntry(): Record<string, unknown> {
+		if (!this.session) throw new Error("profile session is not initialized");
+		const sessionFile = this.session.sessionManager.getSessionFile();
+		return {
+			profileId: this.profile.profileId,
+			candidatesPerTurn: this.profile.candidatesPerTurn,
+			agentsSha256: this.agentsSha256,
+			skills: this.skillDirSha256.map((value, index) => ({ directoryIndex: index, sha256: value })),
+			sessionId: this.session.sessionManager.getSessionId(),
+			session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,
+			workspace: relative(this.config.artifactRoot, this.workspace),
+		};
 	}
 
 	async close(): Promise<void> {
@@ -398,6 +497,10 @@ class PersistentProfileSession {
 			profileId: this.profile.profileId,
 			sessionId: this.session.sessionManager.getSessionId(),
 			turnId: input.turnId,
+			roundIndex: input.roundIndex,
+			historyFromSeq: input.historyFromSeq,
+			historyToSeq: input.historyToSeq,
+			historyDigest: input.historyDigest,
 			inputDigest: input.inputDigest,
 			submission,
 			usage: {
@@ -412,7 +515,40 @@ class PersistentProfileSession {
 			},
 		};
 		await atomicJson(join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json"), commit);
+		this.historyCursor = input.historyToSeq;
 		return commit;
+	}
+
+	private acceptCursor(input: SessionTurnInput, replay: boolean): void {
+		if (input.historyFromSeq === this.historyCursor) return;
+		if (replay && input.historyToSeq === this.historyCursor) return;
+		throw new Error(
+			`history cursor mismatch for ${this.profile.profileId}: expected ${this.historyCursor}, received ${input.historyFromSeq}`,
+		);
+	}
+
+	private async recoverHistoryCursor(): Promise<number> {
+		const turnRoot = join(this.config.artifactRoot, "turns");
+		let names: string[];
+		try {
+			names = await readdir(turnRoot);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+			throw error;
+		}
+		const commits = (
+			await Promise.all(names.map((name) => optionalJson<CommittedTurn>(join(turnRoot, name, "turn_committed.json"))))
+		)
+			.filter((value): value is CommittedTurn => value?.profileId === this.profile.profileId)
+			.sort((left, right) => left.roundIndex - right.roundIndex);
+		let cursor = 0;
+		for (const commit of commits) {
+			if (commit.historyFromSeq !== cursor || commit.historyToSeq < cursor) {
+				throw new Error(`invalid committed history chain for profile ${this.profile.profileId}`);
+			}
+			cursor = commit.historyToSeq;
+		}
+		return cursor;
 	}
 }
 
@@ -421,11 +557,20 @@ export class PiSessionPool {
 	private readonly proxy: ProviderProxy;
 
 	constructor(private readonly config: InitializeFrame, apiKey: string) {
-		this.proxy = new ProviderProxy(config.baseUrl, apiKey);
+		this.proxy = new ProviderProxy(config.baseUrl, apiKey, config.campaignId);
 	}
 
 	async initialize(): Promise<void> {
 		await mkdir(this.config.artifactRoot, { recursive: true });
+		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
+			agentsSha256: profile.agentsSha256,
+			candidatesPerTurn: profile.candidatesPerTurn,
+			profileId: profile.profileId,
+			skillDirSha256: profile.skillDirSha256,
+		})));
+		if (profileSetSha256 !== this.config.profileSetSha256) {
+			throw new Error("profile set digest mismatch");
+		}
 		process.env.PI_CODING_AGENT_DIR = join(this.config.artifactRoot, "web-cache");
 		await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true });
 		await writeFile(
@@ -447,14 +592,33 @@ export class PiSessionPool {
 		await Promise.all([...this.sessions.values()].map((session) => session.initialize()));
 		await atomicJson(join(this.config.artifactRoot, "manifest.json"), {
 			protocolVersion: this.config.protocolVersion,
+			campaignId: this.config.campaignId,
+			taskId: this.config.taskId,
+			caseId: this.config.caseId,
+			seed: this.config.seed,
+			backend: "pi",
+			baseUrl: this.config.baseUrl,
 			model: this.config.model,
 			wireApi: this.config.wireApi,
 			thinking: this.config.thinking,
-			profiles: this.config.profiles.map((profile) => ({
-				profileId: profile.profileId,
-				candidatesPerTurn: profile.candidatesPerTurn,
-				skills: profile.skillDirs,
-			})),
+			candidateSchemaSha256: this.config.candidateSchemaSha256,
+			profileSetSha256,
+			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
+			networkPolicy: this.config.networkPolicy,
+			limits: this.config.limits,
+			webProvider: this.config.webProvider,
+			context7Enabled: this.config.context7Enabled,
+			tools: sessionTools(this.config.context7Enabled),
+			topology: {
+				profileCount: this.config.profiles.length,
+				candidatesPerTurn: this.config.profiles.map((profile) => profile.candidatesPerTurn),
+				totalCandidatesPerRound: this.config.profiles.reduce(
+					(total, profile) => total + profile.candidatesPerTurn,
+					0,
+				),
+			},
+			packages: await runtimePackages(),
+			profiles: [...this.sessions.values()].map((session) => session.manifestEntry()),
 		});
 	}
 

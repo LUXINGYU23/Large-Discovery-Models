@@ -1,15 +1,30 @@
 import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
-import { ProtocolError, parseFrame } from "./protocol.js";
+import { PROTOCOL_VERSION, ProtocolError, parseFrame } from "./protocol.js";
 import { Redactor } from "./trace.js";
 
 let apiKey: string | undefined;
+let campaignId: string | undefined;
 let pool: PiSessionPool | undefined;
 let redactor = new Redactor([]);
 let closing = false;
 
 function respond(value: unknown): void {
 	process.stdout.write(`${JSON.stringify(redactor.value(value))}\n`);
+}
+
+function respondTo(
+	frame: { requestId: string; campaignId: string },
+	type: string,
+	fields: Record<string, unknown> = {},
+): void {
+	respond({
+		type,
+		requestId: frame.requestId,
+		protocolVersion: PROTOCOL_VERSION,
+		campaignId: frame.campaignId,
+		...fields,
+	});
 }
 
 function errorCode(error: unknown): string {
@@ -36,10 +51,12 @@ async function handle(line: string): Promise<boolean> {
 	if (frame.type === "bootstrap_secret") {
 		if (apiKey || pool) throw new ProtocolError("invalid_state", "bootstrap_secret is accepted exactly once before initialize");
 		apiKey = frame.apiKey;
+		campaignId = frame.campaignId;
 		redactor = new Redactor([apiKey]);
-		respond({ type: "secret_bootstrapped", requestId: frame.requestId });
+		respondTo(frame, "secret_bootstrapped");
 		return true;
 	}
+	if (frame.campaignId !== campaignId) throw new ProtocolError("invalid_state", "campaignId changed after bootstrap");
 	if (frame.type === "initialize") {
 		if (!apiKey) throw new ProtocolError("invalid_state", "bootstrap_secret must precede initialize");
 		if (pool) throw new ProtocolError("invalid_state", "sidecar is already initialized");
@@ -52,9 +69,7 @@ async function handle(line: string): Promise<boolean> {
 			throw error;
 		}
 		apiKey = undefined;
-		respond({
-			type: "initialized",
-			requestId: frame.requestId,
+		respondTo(frame, "initialized", {
 			profiles: frame.profiles.map((profile) => profile.profileId),
 			manifest: "manifest.json",
 		});
@@ -63,13 +78,12 @@ async function handle(line: string): Promise<boolean> {
 	if (frame.type === "run_turn") {
 		if (!pool) throw new ProtocolError("invalid_state", "sidecar is not initialized");
 		const turns = await pool.runTurns(frame.turns);
-		const response = { type: "turn_committed", requestId: frame.requestId, turns };
-		respond(response);
+		respondTo(frame, "turn_committed", { turns });
 		return true;
 	}
 	if (frame.type === "close") {
 		await close();
-		respond({ type: "closed", requestId: frame.requestId });
+		respondTo(frame, "closed");
 		return false;
 	}
 	return true;
@@ -79,9 +93,13 @@ const lines = createInterface({ input: process.stdin, crlfDelay: Infinity, termi
 for await (const line of lines) {
 	if (!line.trim()) continue;
 	let requestId: string | undefined;
+	let requestCampaignId: string | undefined;
 	try {
 		const parsed = JSON.parse(line) as { requestId?: unknown };
 		if (typeof parsed.requestId === "string") requestId = parsed.requestId;
+		if (typeof (parsed as { campaignId?: unknown }).campaignId === "string") {
+			requestCampaignId = (parsed as { campaignId: string }).campaignId;
+		}
 	} catch {
 		// parseFrame returns the authoritative protocol error below.
 	}
@@ -91,6 +109,8 @@ for await (const line of lines) {
 		const response = {
 			type: "error",
 			requestId,
+			protocolVersion: PROTOCOL_VERSION,
+			campaignId: requestCampaignId ?? campaignId,
 			error: { code: errorCode(error), message: redactor.text((error as Error).message) },
 		};
 		respond(response);

@@ -165,6 +165,22 @@ export function sha256(value: Buffer | string): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
+export function canonicalSha256(value: unknown): string {
+	return sha256(JSON.stringify(canonicalValue(value)));
+}
+
+function canonicalValue(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(canonicalValue);
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value)
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([key, item]) => [key, canonicalValue(item)]),
+		);
+	}
+	return value;
+}
+
 export function safeHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string | string[]> {
 	const safe: Record<string, string | string[]> = {};
 	const sensitive = new Set([

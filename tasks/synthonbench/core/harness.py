@@ -9,7 +9,15 @@ from typing import Any
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
-from ldm_tts.harness import HarnessClient, HarnessProfile, HarnessTurn, HarnessTurnResult
+from ldm_tts.harness import (
+    HarnessClient,
+    HarnessProfile,
+    HarnessTurn,
+    HarnessTurnResult,
+    canonical_sha256,
+    file_sha256,
+    profile_set_sha256,
+)
 from tasks.synthonbench.core.candidate import (
     CandidatePayloadError,
     SynthonCandidateDomain,
@@ -57,6 +65,11 @@ HARNESS_FORBIDDEN_TERMS = (
     "mireklzicar/synthonbench",
     "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
 )
+HARNESS_CANDIDATE_SCHEMA = {
+    "item_index": "copy the assigned zero-based item_index",
+    "option_indices": "one zero-based option_index from every slot, in slot order",
+}
+_LOCAL_PROFILE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness" / "profiles"
 
 
 def harness_profiles(
@@ -69,6 +82,7 @@ def harness_profiles(
             profile_id,
             resource_root / profile_id / "AGENTS.md",
             candidates_per_turn,
+            agents_sha256=file_sha256(_LOCAL_PROFILE_ROOT / profile_id / "AGENTS.md"),
         )
         for profile_id in HARNESS_PROFILE_IDS
     )
@@ -85,6 +99,7 @@ class SynthonHarnessExpander:
         *,
         target: str,
         profiles: Sequence[HarnessProfile],
+        campaign_id: str,
         first_active_round: int,
         account: Callable[[dict[str, int]], None] | None = None,
     ) -> None:
@@ -97,6 +112,8 @@ class SynthonHarnessExpander:
         self.catalog = catalog
         self.target = target
         self.profiles = tuple(profiles)
+        self.campaign_id = campaign_id
+        self.profile_set_sha256 = profile_set_sha256(self.profiles)
         self.first_active_round = first_active_round
         self.account = account
 
@@ -114,11 +131,14 @@ class SynthonHarnessExpander:
                 "harness_turns": len(turns),
             })
         results = self.client.run_turn(turns)
-        proposals = self._proposals(request, plans, results)
+        raw_proposals = self._proposals(request, plans, results)
+        proposals = attach_empirical_base_measure(
+            raw_proposals, request, self.domain
+        )
         if self.account is not None:
             self.account(_usage_counts(results))
         return ExpansionResult(
-            proposals=attach_empirical_base_measure(proposals, request, self.domain),
+            proposals=proposals,
             metadata={
                 "sampling_mode": "persistent_parallel_research_sessions",
                 "round_idx": request.round_idx,
@@ -127,6 +147,9 @@ class SynthonHarnessExpander:
                     profile.candidates_per_turn for profile in self.profiles
                 ],
                 "proposal_count": len(proposals),
+                "candidate_lineage": [
+                    _candidate_lineage(item, self.domain) for item in proposals
+                ],
                 "sessions": [_result_summary(item) for item in results],
             },
         )
@@ -149,13 +172,29 @@ class SynthonHarnessExpander:
     ) -> tuple[HarnessTurn, ...]:
         history = _history_delta(request, self.first_active_round)
         serialized_history = serialize_observations(history, self.catalog.space)
+        history_to_seq = len(request.observations)
+        history_from_seq = history_to_seq - len(history)
+        history_digest = canonical_sha256(serialized_history)
+        forbidden_query_terms = _forbidden_query_terms(request, plans)
         turns: list[HarnessTurn] = []
         offset = 0
         for profile in self.profiles:
             assigned = plans[offset : offset + profile.candidates_per_turn]
             turns.append(HarnessTurn(
                 profile_id=profile.profile_id,
-                turn_id=f"round_{request.round_idx:04d}_{profile.profile_id}",
+                turn_id=_turn_id(
+                    campaign_id=self.campaign_id,
+                    profile_id=profile.profile_id,
+                    profile_set_digest=self.profile_set_sha256,
+                    round_index=request.round_idx,
+                    history_from_seq=history_from_seq,
+                    history_to_seq=history_to_seq,
+                    history_digest=history_digest,
+                ),
+                round_index=request.round_idx,
+                history_from_seq=history_from_seq,
+                history_to_seq=history_to_seq,
+                history_digest=history_digest,
                 message=_turn_message(
                     request,
                     profile,
@@ -163,8 +202,11 @@ class SynthonHarnessExpander:
                     target=self.target,
                     observations=serialized_history,
                     initial=request.round_idx == self.first_active_round,
+                    history_from_seq=history_from_seq,
+                    history_to_seq=history_to_seq,
+                    history_digest=history_digest,
                 ),
-                forbidden_query_terms=HARNESS_FORBIDDEN_TERMS,
+                forbidden_query_terms=forbidden_query_terms,
             ))
             offset += profile.candidates_per_turn
         return tuple(turns)
@@ -204,11 +246,15 @@ class SynthonHarnessExpander:
                         "collectable": False,
                         "round_idx": request.round_idx,
                         "sampling_mode": "persistent_parallel_research_sessions",
-                        "profile_id": result.profile_id,
-                        "session_id": result.session_id,
-                        "session_turn_id": result.turn_id,
-                        "submission_id": result.submission_id,
-                        "submission_index": index,
+                        "harness_lineage": {
+                            "campaign_id": self.campaign_id,
+                            "round_index": request.round_idx,
+                            "profile_id": result.profile_id,
+                            "session_id": result.session_id,
+                            "turn_id": result.turn_id,
+                            "submission_id": result.submission_id,
+                            "item_index": index,
+                        },
                         **plan.metadata(),
                     },
                 )
@@ -232,6 +278,40 @@ def _history_delta(
     )
 
 
+def _turn_id(
+    *,
+    campaign_id: str,
+    profile_id: str,
+    profile_set_digest: str,
+    round_index: int,
+    history_from_seq: int,
+    history_to_seq: int,
+    history_digest: str,
+) -> str:
+    digest = canonical_sha256({
+        "campaignId": campaign_id,
+        "historyDigest": history_digest,
+        "historyFromSeq": history_from_seq,
+        "historyToSeq": history_to_seq,
+        "profileId": profile_id,
+        "profileSetSha256": profile_set_digest,
+        "roundIndex": round_index,
+    })
+    return f"round_{round_index:04d}_{profile_id}_{digest[:16]}"
+
+
+def _forbidden_query_terms(
+    request: ExpansionRequest,
+    plans: Sequence[ProposalSlotPlan],
+) -> tuple[str, ...]:
+    terms = set(HARNESS_FORBIDDEN_TERMS)
+    terms.update(plan.reaction_id for plan in plans)
+    for observation in request.observations:
+        terms.add(observation.candidate_id)
+        terms.add(observation.canonical_key)
+    return tuple(sorted(term for term in terms if term))
+
+
 def _turn_message(
     request: ExpansionRequest,
     profile: HarnessProfile,
@@ -240,11 +320,17 @@ def _turn_message(
     target: str,
     observations: Sequence[dict[str, object]],
     initial: bool,
+    history_from_seq: int,
+    history_to_seq: int,
+    history_digest: str,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
         "task": TASK_ID,
         "round_index": request.round_idx,
+        "history_from_seq": history_from_seq,
+        "history_to_seq": history_to_seq,
+        "history_digest": history_digest,
         "target_label": target,
         "objective": f"maximize measured {OBJECTIVE_NAME}; higher is better",
         "new_measured_observations": list(observations),
@@ -253,10 +339,7 @@ def _turn_message(
             "tool": "submit_candidates",
             "candidate_count": profile.candidates_per_turn,
             "order": "candidate j must have item_index j and answer assigned_items[j]",
-            "candidate_schema": {
-                "item_index": "copy the assigned zero-based item_index",
-                "option_indices": "one zero-based option_index from every slot, in slot order",
-            },
+            "candidate_schema": HARNESS_CANDIDATE_SCHEMA,
         },
         "constraints": [
             "Use only public literature and the supplied slate data.",
@@ -352,11 +435,27 @@ def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
     }
 
 
+def _candidate_lineage(
+    proposal: RawProposal,
+    domain: SynthonCandidateDomain,
+) -> dict[str, object]:
+    prepared = prepare_candidate_payload(
+        proposal.payload, domain.space, domain.allowed_reactions
+    )
+    lineage = proposal.metadata["harness_lineage"]
+    assert isinstance(lineage, dict)
+    return {"canonical_key": prepared.product_id, **lineage}
+
+
 def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
     return {
         "profile_id": result.profile_id,
         "session_id": result.session_id,
         "session_turn_id": result.turn_id,
+        "round_index": result.round_index,
+        "history_from_seq": result.history_from_seq,
+        "history_to_seq": result.history_to_seq,
+        "history_digest": result.history_digest,
         "submission_id": result.submission_id,
         "candidate_count": len(result.candidates),
         "usage": result.usage,
@@ -366,6 +465,7 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 
 __all__ = [
     "HARNESS_ALLOWED_HOSTS",
+    "HARNESS_CANDIDATE_SCHEMA",
     "HARNESS_DENIED_HOSTS",
     "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",

@@ -193,6 +193,13 @@ one ordered 16-candidate minibatch. The combined 64 raw occurrences enter the
 same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
 LDM acquisition tilt used by the direct backend.
 
+The Python runner remains the owner of measured optimization history. The first
+active turn bootstraps each session with all existing observations; later turns
+append only the newly measured suffix. Every turn carries an explicit history
+range and digest. A session rejects a gap, overlap, or changed replay before it
+can call the model, while the native Pi conversation retains each profile's
+private research context.
+
 Agents submit slate-local `item_index` and `option_indices` values rather than
 copying long synthon identifiers. The task deterministically maps those local
 indices back to the official `reaction_id` and ordered `synthon_ids`, then runs
@@ -247,6 +254,9 @@ turn files needed for recovery (`input.json`, `submission.json`, and
 session and are not duplicated into parallel trace files. API keys are sent to
 the sidecar once over stdin and are excluded from commands, container
 environment variables, manifests, sessions, and captured provider bodies.
+The run manifest records the campaign/task/case identity, seed, model and wire
+API, limits, network policy, tool set, pinned package versions, profile resource
+digests, and the profile-to-session mapping.
 
 Pi's built-in provider retry remains disabled. If a Responses stream ends with
 the known interrupted-stream error before terminal submission, the same session

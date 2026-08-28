@@ -11,7 +11,7 @@ from collections import deque
 from collections.abc import Sequence
 from typing import Any
 
-from ldm_tts.harness.protocol import HarnessPoolConfig, HarnessTurn, HarnessTurnResult
+from ldm_tts.harness.protocol import PROTOCOL_VERSION, HarnessPoolConfig, HarnessTurn, HarnessTurnResult
 
 
 class HarnessError(RuntimeError):
@@ -89,7 +89,14 @@ class HarnessClient:
             raise HarnessError("harness response does not match the requested profiles")
         for result in results:
             turn = expected[result.profile_id]
-            if result.turn_id != turn.turn_id or result.input_digest != turn.input_digest:
+            if (
+                result.turn_id != turn.turn_id
+                or result.round_index != turn.round_index
+                or result.history_from_seq != turn.history_from_seq
+                or result.history_to_seq != turn.history_to_seq
+                or result.history_digest != turn.history_digest
+                or result.input_digest != turn.input_digest
+            ):
                 raise HarnessError("harness response does not match the requested turn")
         return results
 
@@ -130,7 +137,7 @@ class HarnessClient:
     ) -> dict[str, Any]:
         request_id = self._next_request_id()
         return self._exchange(
-            {"type": frame_type, "requestId": request_id, **fields},
+            {**self.config.common_frame(request_id, frame_type), **fields},
             expected_type,
             timeout_seconds=timeout_seconds,
         )
@@ -165,12 +172,29 @@ class HarnessClient:
             raise HarnessError("harness sidecar returned invalid JSON") from exc
         if not isinstance(response, dict) or response.get("requestId") != frame["requestId"]:
             raise HarnessError("harness sidecar response requestId mismatch")
+        if (
+            response.get("protocolVersion") != PROTOCOL_VERSION
+            or response.get("campaignId") != self.config.campaign_id
+        ):
+            raise HarnessError("harness sidecar response protocol identity mismatch")
         if response.get("type") == "error":
+            _assert_response_keys(response, {"type", "requestId", "protocolVersion", "campaignId", "error"})
             error = response.get("error")
             message = error.get("message") if isinstance(error, dict) else "unknown sidecar error"
             raise HarnessError(str(message))
         if response.get("type") != expected_type:
             raise HarnessError(f"expected harness response {expected_type!r}")
+        expected_keys = {
+            "secret_bootstrapped": {"type", "requestId", "protocolVersion", "campaignId"},
+            "initialized": {
+                "type", "requestId", "protocolVersion", "campaignId", "profiles", "manifest",
+            },
+            "turn_committed": {
+                "type", "requestId", "protocolVersion", "campaignId", "turns",
+            },
+            "closed": {"type", "requestId", "protocolVersion", "campaignId"},
+        }
+        _assert_response_keys(response, expected_keys[expected_type])
         return response
 
     def _next_request_id(self) -> str:
@@ -205,6 +229,11 @@ def _terminate(process: subprocess.Popen[str]) -> None:
 def _parse_turn_result(value: Any) -> HarnessTurnResult:
     if not isinstance(value, dict):
         raise HarnessError("committed harness turn must be an object")
+    _assert_response_keys(value, {
+        "profileId", "sessionId", "turnId", "roundIndex", "historyFromSeq",
+        "historyToSeq", "historyDigest", "inputDigest", "submission", "usage",
+        "artifacts",
+    })
     submission = value.get("submission")
     usage = value.get("usage")
     artifacts = value.get("artifacts")
@@ -213,12 +242,24 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         raise HarnessError("committed harness turn has invalid candidates")
     if not isinstance(usage, dict) or not isinstance(artifacts, dict):
         raise HarnessError("committed harness turn has invalid metadata")
+    assert isinstance(submission, dict)
+    _assert_response_keys(submission, {"submissionId", "candidates"})
+    _assert_response_keys(usage, {"providerCalls", "webCalls", "context7Calls", "artifactBytes"})
+    _assert_response_keys(artifacts, {"turn", "session"})
     try:
+        history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
+        history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
+        if history_to_seq < history_from_seq:
+            raise HarnessError("committed harness turn has invalid history range")
         return HarnessTurnResult(
             profile_id=_required_string(value["profileId"], "profileId"),
             session_id=_required_string(value["sessionId"], "sessionId"),
             turn_id=_required_string(value["turnId"], "turnId"),
-            input_digest=_required_string(value["inputDigest"], "inputDigest"),
+            round_index=_required_nonnegative_int(value["roundIndex"], "roundIndex"),
+            history_from_seq=history_from_seq,
+            history_to_seq=history_to_seq,
+            history_digest=_required_digest(value["historyDigest"], "historyDigest"),
+            input_digest=_required_digest(value["inputDigest"], "inputDigest"),
             submission_id=_required_string(submission["submissionId"], "submissionId"),
             candidates=tuple(dict(item) for item in candidates),
             usage=dict(usage),
@@ -232,6 +273,24 @@ def _required_string(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value:
         raise HarnessError(f"committed harness turn has invalid {name}")
     return value
+
+
+def _required_nonnegative_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return value
+
+
+def _required_digest(value: Any, name: str) -> str:
+    result = _required_string(value, name)
+    if len(result) != 64 or any(character not in "0123456789abcdef" for character in result):
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return result
+
+
+def _assert_response_keys(response: dict[str, Any], expected: set[str]) -> None:
+    if set(response) != expected:
+        raise HarnessError("harness sidecar returned unexpected response fields")
 
 
 __all__ = ["HarnessClient", "HarnessError"]

@@ -47,6 +47,10 @@ class FakeHarnessClient:
                 profile_id=turn.profile_id,
                 session_id=f"session-{turn.profile_id}",
                 turn_id=turn.turn_id,
+                round_index=turn.round_index,
+                history_from_seq=turn.history_from_seq,
+                history_to_seq=turn.history_to_seq,
+                history_digest=turn.history_digest,
                 input_digest=turn.input_digest,
                 submission_id=f"submission-{turn.profile_id}",
                 candidates=tuple(candidates),
@@ -63,6 +67,10 @@ class ConsensusClient:
                 profile_id=turn.profile_id,
                 session_id=f"session-{turn.profile_id}",
                 turn_id=turn.turn_id,
+                round_index=turn.round_index,
+                history_from_seq=turn.history_from_seq,
+                history_to_seq=turn.history_to_seq,
+                history_digest=turn.history_digest,
                 input_digest=turn.input_digest,
                 submission_id=f"submission-{turn.profile_id}",
                 candidates=({"item_index": 0, "option_indices": [0, 0]},),
@@ -81,13 +89,15 @@ def test_harness_expander_validates_four_minibatches_and_reuses_global_q0() -> N
 
     assert len(result.proposals) == 4
     assert len(client.batches[0]) == 4
-    assert {item.metadata["profile_id"] for item in result.proposals} == {
+    assert {item.metadata["harness_lineage"]["profile_id"] for item in result.proposals} == {
         "target_sar",
         "reaction_feasibility",
         "scaffold_exploration",
         "property_risk",
     }
     assert all(Q0_METADATA_KEY in item.metadata for item in result.proposals)
+    assert [item.metadata["harness_lineage"]["item_index"] for item in result.proposals] == [0, 0, 0, 0]
+    assert len(result.metadata["candidate_lineage"]) == 4
     assert result.metadata["sampling_mode"] == "persistent_parallel_research_sessions"
 
 
@@ -106,6 +116,9 @@ def test_harness_second_turn_sends_only_the_previous_round_measurements() -> Non
     messages = [json.loads(turn.message.split("\n\n", 1)[1]) for turn in client.batches[0]]
     assert all(message["message_type"] == "history_delta" for message in messages)
     assert all(len(message["new_measured_observations"]) == 1 for message in messages)
+    assert all(turn.history_from_seq == 1 and turn.history_to_seq == 2 for turn in client.batches[0])
+    assert len({turn.history_digest for turn in client.batches[0]}) == 1
+    assert all("latest" in turn.forbidden_query_terms for turn in client.batches[0])
     assert all(
         message["new_measured_observations"][0]["synthon_ids"] == [2, 12]
         for message in messages
@@ -157,6 +170,7 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
         ),
         target="kif11",
         profiles=harness_profiles(1, resource_root=Path("profiles")),
+        campaign_id="test-campaign",
         first_active_round=0,
     )
 
@@ -214,11 +228,18 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     ]) == 0
 
     payload = json.loads(capsys.readouterr().out)
-    budget = json.loads((Path(payload["run_dir"]) / "budget.json").read_text(encoding="utf-8"))
+    run_dir = Path(payload["run_dir"])
+    budget = json.loads((run_dir / "budget.json").read_text(encoding="utf-8"))
     assert budget["counters"]["proposal_attempts"] == 4
     assert budget["counters"]["harness_turns"] == 4
     assert budget["counters"]["llm_requests"] == 8
     assert budget["counters"]["benchmark_jobs"] == 1
+    checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+    lineage = checkpoint["state"]["observations"][0]["candidate"]["metadata"]["harness_lineage"]
+    assert set(lineage) == {
+        "campaign_id", "round_index", "profile_id", "session_id",
+        "turn_id", "submission_id", "item_index",
+    }
 
 
 def _expander(client) -> SynthonHarnessExpander:
@@ -238,6 +259,7 @@ def _expander(client) -> SynthonHarnessExpander:
         catalog,
         target="kif11",
         profiles=harness_profiles(1, resource_root=Path("profiles")),
+        campaign_id="test-campaign",
         first_active_round=0,
     )
 

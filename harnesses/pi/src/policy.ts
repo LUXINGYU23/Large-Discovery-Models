@@ -101,6 +101,13 @@ export class PolicyController {
 		return { webCalls: active?.webCalls ?? 0, context7Calls: active?.context7Calls ?? 0 };
 	}
 
+	snapshot(): { webCalls: number; context7Calls: number } {
+		return {
+			webCalls: this.active?.webCalls ?? 0,
+			context7Calls: this.active?.context7Calls ?? 0,
+		};
+	}
+
 	createExtension(): ExtensionFactory {
 		return (pi) => {
 			pi.on("tool_call", (event) => this.toolCall(event));

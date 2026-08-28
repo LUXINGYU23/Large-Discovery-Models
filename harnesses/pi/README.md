@@ -17,6 +17,12 @@ sent once through the bootstrap frame and are not placed in container arguments,
 environment variables, manifests, or session files. Do not invoke the sidecar
 manually for normal experiments.
 
+The strict JSONL protocol binds every request and response to one protocol
+version and campaign. Turn inputs include a monotonic history range and digest;
+the sidecar advances each persistent session only after an atomic turn commit.
+Committed turns are idempotent and partial submissions recover from their saved
+candidate batch and measured usage.
+
 Each run stores only:
 
 - native Pi session JSONL with messages, tool calls, and tool results;
@@ -29,4 +35,4 @@ submission-only recovery when a Responses stream is interrupted before terminal
 submission, retaining every raw attempt under the same turn budget.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
-artifacts, read-only task profiles, and the Gondolin image cache explicitly;
+artifacts, read-only task profiles, and the Gondolin image cache explicitly.

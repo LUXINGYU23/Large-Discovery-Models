@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PiSessionPool } from "./session.js";
 import type { InitializeFrame } from "./protocol.js";
-import { sha256 } from "./trace.js";
+import { canonicalSha256, sha256 } from "./trace.js";
 
 function usage() {
 	return {
@@ -111,17 +111,37 @@ async function main(): Promise<void> {
 	assert(address && typeof address !== "string");
 
 	const agentsPath = join(root, "AGENTS.md");
-	await writeFile(agentsPath, "You are the capability-smoke researcher. Use the available tools and submit exactly two candidates.\n");
+	const agents = "You are the capability-smoke researcher. Use the available tools and submit exactly two candidates.\n";
+	await writeFile(agentsPath, agents);
+	const profile = {
+		profileId: "target_sar",
+		agentsPath,
+		agentsSha256: sha256(agents),
+		skillDirs: [],
+		skillDirSha256: [],
+		candidatesPerTurn: 2,
+	};
 	const config: InitializeFrame = {
 		type: "initialize",
 		requestId: "initialize",
-		protocolVersion: 1,
+		protocolVersion: 2,
+		campaignId: "capability-campaign",
 		artifactRoot: join(root, "harness"),
 		baseUrl: `http://127.0.0.1:${address.port}/v1`,
 		wireApi: "responses",
 		model: "fake-responses-model",
 		thinking: "max",
-		profiles: [{ profileId: "target_sar", agentsPath, skillDirs: [], candidatesPerTurn: 2 }],
+		taskId: "capability",
+		caseId: "local-smoke",
+		seed: 1,
+		candidateSchemaSha256: sha256("candidate-schema"),
+		profileSetSha256: canonicalSha256([{
+			agentsSha256: profile.agentsSha256,
+			candidatesPerTurn: profile.candidatesPerTurn,
+			profileId: profile.profileId,
+			skillDirSha256: profile.skillDirSha256,
+		}]),
+		profiles: [profile],
 		networkPolicy: {
 			allowedHosts: ["example.com", "context7.com"],
 			deniedHosts: ["github.com"],
@@ -138,6 +158,10 @@ async function main(): Promise<void> {
 		const [turn] = await pool.runTurns([{
 			profileId: "target_sar",
 			turnId: "capability_turn",
+			roundIndex: 0,
+			historyFromSeq: 0,
+			historyToSeq: 1,
+			historyDigest: sha256("history-0"),
 			inputDigest,
 			message: "Verify the sandbox with bash and read, then submit exactly two candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
@@ -157,6 +181,10 @@ async function main(): Promise<void> {
 		const recoveryInput = {
 			profileId: "target_sar",
 			turnId: "capability_recovery_turn",
+			roundIndex: 1,
+			historyFromSeq: 1,
+			historyToSeq: 2,
+			historyDigest: sha256("history-1"),
 			inputDigest: sha256("capability-recovery-turn"),
 			message: "Submit exactly two more candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
@@ -166,6 +194,13 @@ async function main(): Promise<void> {
 		assert.equal(recovered.submission.candidates.length, 2);
 		assert.equal(recovered.usage.providerCalls, 3);
 		assert.deepEqual((JSON.parse(requestBodies[5] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
+		const [replayed] = await pool.runTurns([recoveryInput]);
+		assert.deepEqual(replayed, recovered);
+		assert.equal(call, 7);
+		await assert.rejects(
+			pool.runTurns([{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }]),
+			/history cursor mismatch/,
+		);
 
 
 		const sessionFiles = await readdir(join(root, "harness", "sessions", "target_sar", "pi-session"));
@@ -186,6 +221,13 @@ async function main(): Promise<void> {
 		assert.match(session, /sandbox-ok/);
 		const providerIndex = await readFile(join(root, "harness", "sessions", "target_sar", "turns", "capability_turn", "provider_index.jsonl"), "utf8");
 		assert.equal(providerIndex.trim().split("\n").length, 4);
+		assert.equal((await readdir(join(root, "harness", "sessions", "target_sar", "pi-agent"))).includes("auth.json"), false);
+		const manifest = JSON.parse(await readFile(join(root, "harness", "manifest.json"), "utf8")) as {
+			campaignId?: unknown; profileSetSha256?: unknown; profiles?: Array<{ sessionId?: unknown }>;
+		};
+		assert.equal(manifest.campaignId, config.campaignId);
+		assert.equal(manifest.profileSetSha256, config.profileSetSha256);
+		assert.equal(manifest.profiles?.[0]?.sessionId, turn.sessionId);
 
 		const recoveryRoot = join(root, "harness", "sessions", "target_sar", "turns", "capability_recovery_turn");
 		const recoveryIndex = await readFile(join(recoveryRoot, "provider_index.jsonl"), "utf8");

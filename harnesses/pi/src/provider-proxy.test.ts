@@ -26,10 +26,10 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 	const address = upstream.address();
 	assert(address && typeof address !== "string");
 	const root = await mkdtemp(join(tmpdir(), "ldm-provider-proxy-"));
-	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, secret);
+	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, secret, "campaign-1");
 	try {
 		await proxy.start();
-		await proxy.beginTurn("target_sar", "turn_1", root, 2, 1_000_000);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, 2, 1_000_000);
 		const response = await fetch(`${proxy.baseUrl("target_sar")}/responses`, {
 			method: "POST",
 			headers: { authorization: "Bearer sidecar-proxy-token", "content-type": "application/json" },
@@ -51,12 +51,14 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 		assert.doesNotMatch(metadata, new RegExp(secret));
 		assert.match(responseTrace, /\[REDACTED\]/);
 		const index = JSON.parse(metadata.trim()) as {
+			campaignId: string; profileId: string; sessionId: string;
 			response: { chunks: number; headers: Record<string, string> };
 		};
+		assert.deepEqual([index.campaignId, index.profileId, index.sessionId], ["campaign-1", "target_sar", "session-1"]);
 		assert.equal(index.response.chunks, 4);
 		assert.equal(index.response.headers["set-cookie"], "[REDACTED]");
 
-		await proxy.beginTurn("target_sar", "turn_1", root, 2, 1_000_000);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, 2, 1_000_000);
 		const recovered = await fetch(proxy.baseUrl("target_sar") + "/responses", {
 			method: "POST",
 			body: "{}",
@@ -74,7 +76,7 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 
 test("provider proxy rejects credentials embedded in the base URL", () => {
 	assert.throws(
-		() => new ProviderProxy("https://user:secret@provider.example/v1", "secret"),
+		() => new ProviderProxy("https://user:secret@provider.example/v1", "secret", "campaign-1"),
 		/base URL must not contain credentials/,
 	);
 });

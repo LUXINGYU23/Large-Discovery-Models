@@ -242,6 +242,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
                 catalog,
                 target=options.target,
                 profiles=options.harness_profiles,
+                campaign_id=options.runtime.run_id,
                 first_active_round=1 if options.initialization_mode == "shared_random" else 0,
                 account=options.account_harness_usage,
             )

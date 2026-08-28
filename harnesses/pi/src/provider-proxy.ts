@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { ArtifactBudget, Redactor, TraceWriter, safeHeaders, sha256 } from "./trace.js";
 
 interface ActiveTurn {
+	profileId: string;
+	sessionId: string;
 	turnId: string;
 	turnRoot: string;
 	maxProviderCalls: number;
@@ -45,7 +47,7 @@ export class ProviderProxy {
 	private server: Server | undefined;
 	private port: number | undefined;
 
-	constructor(baseUrl: string, private readonly apiKey: string) {
+	constructor(baseUrl: string, private readonly apiKey: string, private readonly campaignId: string) {
 		this.targetBaseUrl = new URL(baseUrl);
 		if (this.targetBaseUrl.protocol !== "http:" && this.targetBaseUrl.protocol !== "https:") {
 			throw new Error("provider base URL must use HTTP(S)");
@@ -77,6 +79,7 @@ export class ProviderProxy {
 
 	async beginTurn(
 		profileId: string,
+		sessionId: string,
 		turnId: string,
 		turnRoot: string,
 		maxProviderCalls: number,
@@ -86,6 +89,8 @@ export class ProviderProxy {
 		const recovered = await existingTrace(turnRoot, turnId);
 		const budget = new ArtifactBudget(maxArtifactBytes, recovered.artifactBytes);
 		this.activeTurns.set(profileId, {
+			profileId,
+			sessionId,
 			turnId,
 			turnRoot,
 			maxProviderCalls,
@@ -93,6 +98,11 @@ export class ProviderProxy {
 			budget,
 			trace: new TraceWriter(turnRoot, this.redactor, budget),
 		});
+	}
+
+	async recoveredTurnSummary(turnRoot: string, turnId: string): Promise<ProviderTurnSummary> {
+		const recovered = await existingTrace(turnRoot, turnId);
+		return { providerCalls: recovered.requestCount, artifactBytes: recovered.artifactBytes };
 	}
 
 	async endTurn(profileId: string): Promise<ProviderTurnSummary> {
@@ -133,6 +143,9 @@ export class ProviderProxy {
 			if (active.requestCount >= active.maxProviderCalls) {
 				await active.trace.append("provider_index.jsonl", {
 					type: "provider_request_blocked",
+					campaignId: this.campaignId,
+					profileId: active.profileId,
+					sessionId: active.sessionId,
 					turnId: active.turnId,
 					reason: "provider_call_limit",
 				});
@@ -190,6 +203,9 @@ export class ProviderProxy {
 						}
 						void active.trace.append("provider_index.jsonl", {
 							type: "provider_exchange",
+							campaignId: this.campaignId,
+							profileId: active.profileId,
+							sessionId: active.sessionId,
 							requestId,
 							turnId: active.turnId,
 							request: {
@@ -217,6 +233,9 @@ export class ProviderProxy {
 			upstream.on("error", async (error) => {
 				await active.trace.append("provider_index.jsonl", {
 					type: "provider_transport_error",
+					campaignId: this.campaignId,
+					profileId: active.profileId,
+					sessionId: active.sessionId,
 					requestId,
 					turnId: active.turnId,
 					message: this.redactor.text(error.message),

@@ -15,7 +15,17 @@ def test_persistent_harness_client_runs_one_profile_batch(
         artifact_root=tmp_path,
         base_url="https://provider.example/v1",
         model="test-model",
-        profiles=(HarnessProfile("chemist", Path("/resources/AGENTS.md"), 1),),
+        profiles=(HarnessProfile(
+            "chemist",
+            Path("/resources/AGENTS.md"),
+            1,
+            agents_sha256="a" * 64,
+        ),),
+        campaign_id="campaign-1",
+        task_id="fixture",
+        case_id="case-1",
+        seed=1,
+        candidate_schema_sha256="b" * 64,
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
     client = HarnessClient(
@@ -24,7 +34,15 @@ def test_persistent_harness_client_runs_one_profile_batch(
         config=config,
         response_timeout_seconds=5,
     )
-    turn = HarnessTurn("chemist", "round_0_chemist", "research")
+    turn = HarnessTurn(
+        profile_id="chemist",
+        turn_id="round_0_chemist",
+        round_index=0,
+        history_from_seq=0,
+        history_to_seq=0,
+        history_digest="c" * 64,
+        message="research",
+    )
 
     with client:
         result = client.run_turn((turn,))
