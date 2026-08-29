@@ -341,7 +341,9 @@ Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
 The committed six-round and extended profiles request maximum reasoning effort for
-both direct methods and the Harness. Direct requests use six local workers;
+both direct methods and the Harness. Direct methods use the Chat Completions
+`reasoning_effort` field, while the Harness uses Pi's Responses API
+thinking-level mapping. Direct requests use six local workers;
 this changes only scheduling, not the independent request count. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
 provider and model.

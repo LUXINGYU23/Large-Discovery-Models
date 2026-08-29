@@ -108,7 +108,7 @@
         "z-clip": 2.0,
         "llm-temperature": 0.7,
         "prompt-policy": "portfolio_v1",
-        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
     "pilot_evaluation_direct_llm": {
@@ -134,7 +134,7 @@
         "z-clip": 2.0,
         "llm-temperature": 0.7,
         "prompt-policy": "direct_v1",
-        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
     "pilot_evaluation_extended": {
@@ -160,7 +160,7 @@
         "z-clip": 2.0,
         "llm-temperature": 0.7,
         "prompt-policy": "portfolio_v1",
-        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
     "pilot_evaluation_extended_direct_llm": {
@@ -186,7 +186,7 @@
         "z-clip": 2.0,
         "llm-temperature": 0.7,
         "prompt-policy": "direct_v1",
-        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
     "pilot_evaluation_harness": {

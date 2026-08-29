@@ -326,6 +326,11 @@ candidate directly. Its explicit `direct_v1` prompt removes GP language and
 rotates a hard condition focus across rounds to preserve the one-request,
 one-evaluation baseline.
 
+The pilot direct methods request maximum reasoning through the Chat
+Completions `reasoning_effort` field. The Harness uses Pi's Responses API
+thinking-level mapping instead; these provider fields are intentionally
+different.
+
 ```bash
 uv run --locked --project tasks/iron_mind python \
   scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml --dry-run

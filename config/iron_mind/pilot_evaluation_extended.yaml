@@ -26,7 +26,7 @@ args:
   llm-timeout: 120.0
   llm-max-tokens: 512
   llm-temperature: 0.7
-  llm-extra-body-json: '{{"reasoning":{{"effort":"max","summary":"auto"}}}}'
+  llm-extra-body-json: '{{"reasoning_effort":"max"}}'
   prompt-policy: portfolio_v1
   out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended
 env:

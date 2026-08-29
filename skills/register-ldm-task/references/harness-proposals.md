@@ -14,6 +14,13 @@ Agent roles. Supporting both normally makes `proposal_provider.kind` `hybrid`;
 record the method-to-provider mapping and preflight only the selected online
 method.
 
+Treat reasoning controls as transport-specific provider fields. OpenAI-style
+Chat Completions commonly uses top-level `reasoning_effort`, while a Responses
+SDK may map a thinking level to `reasoning.effort`. Do not copy one wire shape
+to the other. Qualify the exact configured endpoint with an actual request and
+verify the transmitted body or nonzero reasoning-token accounting; a value in
+YAML alone does not prove that the provider honored it.
+
 The Harness remains inside the task's `ReservoirExpander`. Do not add another
 Campaign, BO loop, optimization history, evaluator path, or central task branch.
 

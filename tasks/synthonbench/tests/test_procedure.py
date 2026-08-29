@@ -223,6 +223,20 @@ def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headro
         assert headroom >= args["evaluations-per-round"]
 
 
+def test_pilot_direct_profiles_request_max_chat_reasoning() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in (
+        "pilot_evaluation",
+        "pilot_evaluation_direct_llm",
+        "pilot_evaluation_extended",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        assert contract.profile(profile_name).locked_args["llm-extra-body-json"] == (
+            '{{"reasoning_effort":"max"}}'
+        )
+
+
 def test_qualification_record_covers_the_source_pinned_real_tracks() -> None:
     evidence = _load_json(TASK_ROOT / "resources" / "qualification_evidence.json")
     record = _load_json(TASK_ROOT / "resources" / "verification_record.json")

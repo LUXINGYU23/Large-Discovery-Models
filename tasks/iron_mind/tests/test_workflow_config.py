@@ -90,6 +90,20 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert "/mnt/data1/" not in serialized
 
 
+def test_pilot_direct_profiles_request_max_chat_reasoning() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in (
+        "pilot_evaluation",
+        "pilot_evaluation_direct_llm",
+        "pilot_evaluation_extended",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        assert contract.profile(profile_name).locked_args["llm-extra-body-json"] == (
+            '{{"reasoning_effort":"max"}}'
+        )
+
+
 def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
     config_path = CONFIG_ROOT / "mock.yaml"
     config = load_config(config_path)
