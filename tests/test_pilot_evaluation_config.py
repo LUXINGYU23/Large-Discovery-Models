@@ -16,7 +16,7 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
     spec = load_pilot_evaluation_spec(REPO_ROOT / "config" / "pilot_evaluation" / "iron_mind.yaml")
 
     assert spec.task == "iron_mind"
-    assert spec.methods == ("ldm", "bo", "llm")
+    assert spec.methods == ("ldm", "harness", "bo", "llm")
     assert len(spec.cases) == 2
     assert spec.seeds == (0, 1, 2)
     assert spec.iterations == 6
@@ -38,6 +38,7 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
         "args.proposal-samples=16",
         "args.proposal-max-workers=4",
     )
+    assert spec.method_overrides["harness"][0] == 'contract_profile="pilot_evaluation_harness"'
     assert spec.method_overrides["harness"][0] == 'contract_profile="pilot_evaluation_harness"'
 
 

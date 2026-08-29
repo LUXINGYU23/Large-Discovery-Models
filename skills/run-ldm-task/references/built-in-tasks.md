@@ -6,6 +6,7 @@
 - [nanoGPT](#nanogpt)
 - [Small Molecule](#small-molecule)
 - [Antibody](#antibody)
+- [Iron Mind](#iron-mind)
 - [SynthonBench](#synthonbench)
 
 ## Common Rules
@@ -48,7 +49,7 @@ settings. Keep authenticated keys in environment variables or documented
 ignored protected files, never tracked YAML or literal command arguments.
 
 Direct proposal backends use Chat Completions. A task's research Harness may
-use another compatible wire API; SynthonBench's Pi sidecar uses Responses and
+use another compatible wire API; the Pi sidecar uses Responses and
 must be checked through its documented capability smoke.
 
 ## nanoGPT
@@ -131,6 +132,38 @@ The antibody campaign runs through `run_campaign`: one engine campaign per
 adapted into the task's expander and selector
 (`tasks/antibody/core/engine_adapters.py`). `results.csv` and
 `llm_acq_decisions.jsonl` remain as event re-exports.
+
+## Iron Mind
+
+Files:
+
+```text
+tasks/iron_mind/README.md
+tasks/iron_mind/QUICKSTART.md
+config/iron_mind/mock.yaml
+config/iron_mind/harness_smoke.yaml
+config/pilot_evaluation/iron_mind.yaml
+```
+
+Both proposal backends use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY`.
+Direct sampling uses Chat Completions. Harness sampling uses the Pi Responses
+sidecar and additionally requires Docker, Linux KVM, a built Harness image, and
+writable external run/cache roots. A protected API-key file may be selected by
+`--harness-api-key-file`.
+
+Iron Mind constructs the shared `LDMEngine` directly around source-pinned
+finite reaction tables. Four persistent Harness profiles each submit 16 exact
+condition combinations. Task-local Python rejects invalid, historically
+evaluated, and within-session duplicate candidates before commit; cross-session
+agreement remains as proposal-frequency mass. Accepted occurrences then use
+the same empirical `q0`, factor-aware categorical GP-UCB, acquisition tilt,
+and frozen evaluator as direct LDM.
+
+Follow `tasks/iron_mind/QUICKSTART.md`: validate the mock path, prepare the
+official source-pinned data, build the sidecar, run `harness_smoke.yaml`, and
+only then run the four-method pilot matrix. Inspect `<run_dir>/harness/` for
+session/provider traces and the normal campaign artifacts for optimization
+history and results.
 
 ## SynthonBench
 

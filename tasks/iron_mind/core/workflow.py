@@ -11,6 +11,13 @@ from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
+from ldm_tts.harness import (
+    HarnessClient,
+    HarnessLimits,
+    HarnessNetworkPolicy,
+    HarnessPoolConfig,
+    canonical_sha256,
+)
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -20,6 +27,7 @@ from ldm_tts.transport import CallableProposalClient, ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
 
 from tasks.iron_mind.core.data import FrozenReactionTable
+from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.dependencies import load_pinned_reaction_table
 from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
 from tasks.iron_mind.core.factory import (
@@ -27,6 +35,16 @@ from tasks.iron_mind.core.factory import (
     build_base_reaction_selector,
     build_campaign_components,
     build_reaction_selector,
+)
+from tasks.iron_mind.core.harness import (
+    HARNESS_ALLOWED_HOSTS,
+    HARNESS_DENIED_HOSTS,
+    HARNESS_FORBIDDEN_PATTERNS,
+    HARNESS_PROFILE_IDS,
+    harness_candidate_schema,
+    harness_profiles,
+    harness_tool_extensions,
+    write_harness_space_catalog,
 )
 from tasks.iron_mind.core.mock import (
     MOCK_SEED_ROW_COUNT,
@@ -83,6 +101,10 @@ def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskS
         initialization_mode=args.initialization_mode,
         surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
         domain_size=finite_domain_size(table),
+        proposal_backend=args.proposal_backend,
+        harness_profile_count=(
+            len(HARNESS_PROFILE_IDS) if args.proposal_backend == "harness" else 0
+        ),
     )
 
 
@@ -105,26 +127,53 @@ def _run_campaign(
     args, table, task_spec, contract, profile_name: str, payload: dict[str, Any]
 ) -> int:
     schema = table.schema
-    provider = provider_settings(args) if args.proposal_mode == "openai" else None
+    provider = (
+        provider_settings(args)
+        if args.proposal_mode == "openai" or args.proposal_backend == "harness"
+        else None
+    )
     if provider is not None:
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
     runtime = _open_runtime(args, table, task_spec, contract, profile_name)
+    if args.proposal_backend == "harness":
+        assert provider is not None
+        missing = _missing_harness_provider(provider)
+        if missing:
+            pause_endpoint(runtime, args, payload, missing)
+            return 2
+        harness_client = _harness_client(args, runtime, provider, table)
+        try:
+            harness_client.start()
+            components = _components(args, table, runtime, None, harness_client)
+            return _finish_campaign(args, components, runtime, payload)
+        finally:
+            harness_client.close()
     client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
-        assert provider is not None
+        assert provider is not None and client is not None
         if not preflight_endpoint(client, runtime, args, payload, provider):
             return 2
+    components = _components(args, table, runtime, client, None)
+    return _finish_campaign(args, components, runtime, payload)
+
+
+def _components(args, table, runtime, client, harness_client):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
         (lambda count: runtime.consume("llm_requests", count))
         if args.proposal_mode == "openai"
         else None
     )
-    components = build_campaign_components(
+    profiles = (
+        harness_profiles(args.harness_candidates_per_session)
+        if args.proposal_backend == "harness"
+        else ()
+    )
+    return build_campaign_components(
         CampaignComponentOptions(
             client=client,
-            schema=schema,
+            schema=table.schema,
             table=table,
             sink=sink,
             runtime=runtime,
@@ -140,9 +189,96 @@ def _run_campaign(
             acquisition_z_clip=args.z_clip,
             selection_seed=args.campaign_index,
             prompt_policy=args.prompt_policy,
+            proposal_backend=args.proposal_backend,
+            harness_client=harness_client,
+            harness_profiles=profiles,
+            account_harness_usage=(
+                runtime.consume_many if args.proposal_backend == "harness" else None
+            ),
         )
     )
-    return _finish_campaign(args, components, runtime, payload)
+
+
+def _missing_harness_provider(provider) -> str:
+    missing = [
+        name
+        for name, value in (
+            ("LLM_BASE_URL", provider.base_url),
+            ("LLM_MODEL_NAME", provider.model),
+            ("LLM_API_KEY or --harness-api-key-file", provider.api_key),
+        )
+        if not value
+    ]
+    return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
+
+
+def _harness_client(
+    args,
+    runtime: CampaignRuntime,
+    provider: OpenAIProviderSettings,
+    table: FrozenReactionTable,
+) -> HarnessClient:
+    artifact_root = (runtime.run_dir / "harness").resolve()
+    cache_root = (
+        args.harness_cache_dir.expanduser().resolve()
+        if args.harness_cache_dir is not None
+        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
+    )
+    resource_root = (TASK_ROOT / "resources" / "harness").resolve()
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    domain = IronMindCandidateDomain(table.schema, table)
+    write_harness_space_catalog(domain, artifact_root / "reaction_space.json")
+    command = ["docker"]
+    if args.harness_docker_host:
+        command.extend(("--host", args.harness_docker_host))
+    command.extend(("run", "--rm", "-i"))
+    if args.harness_container_user:
+        command.extend(("--user", args.harness_container_user))
+    command.extend(
+        (
+            "--device",
+            "/dev/kvm",
+            "--env",
+            "HOME=/runtime-home",
+            "--env",
+            "LDM_IRON_MIND_CATALOG=/artifacts/reaction_space.json",
+            "--mount",
+            f"type=bind,src={artifact_root},dst=/artifacts",
+            "--mount",
+            f"type=bind,src={resource_root},dst=/resources,readonly",
+            "--mount",
+            f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
+            args.harness_image,
+        )
+    )
+    profiles = harness_profiles(args.harness_candidates_per_session)
+    config = HarnessPoolConfig(
+        artifact_root=Path("/artifacts"),
+        base_url=provider.base_url,
+        model=provider.model,
+        profiles=profiles,
+        campaign_id=runtime.run_id,
+        task_id=TASK_ID,
+        case_id=args.dataset_id,
+        seed=args.campaign_index,
+        candidate_schema_sha256=canonical_sha256(harness_candidate_schema(table.schema)),
+        tool_extensions=harness_tool_extensions(),
+        thinking=args.harness_thinking,
+        limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds),
+        network_policy=HarnessNetworkPolicy(
+            allowed_hosts=HARNESS_ALLOWED_HOSTS,
+            denied_hosts=HARNESS_DENIED_HOSTS,
+            forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
+        ),
+        context7_enabled=args.harness_context7,
+    )
+    return HarnessClient(
+        command,
+        api_key=provider.api_key,
+        config=config,
+        response_timeout_seconds=args.harness_response_timeout,
+    )
 
 
 def _finish_campaign(
@@ -192,6 +328,7 @@ def _run_payload(
         "search_method": args.search_method,
         "initialization_mode": args.initialization_mode,
         "proposal_mode": args.proposal_mode,
+        "proposal_backend": args.proposal_backend,
         "dataset_id": args.dataset_id,
         "objective": OBJECTIVE_NAME,
         "contract_profile": profile_name,

@@ -1,11 +1,12 @@
-name: iron_mind_pilot_evaluation
+name: iron_mind_pilot_evaluation_harness
 task: iron_mind
-algorithm: ldm_bo_llm_pilot_evaluation
+algorithm: persistent_agent_harness_ldm
 mode: real
-description: Fixed-budget six-round comparison base for Iron Mind.
-contract_profile: pilot_evaluation
+description: Fixed-budget six-round persistent-agent LDM comparison for Iron Mind.
+contract_profile: pilot_evaluation_harness
 args:
-  proposal-mode: openai
+  proposal-backend: harness
+  proposal-mode: none
   search-method: ldm
   initialization-mode: shared_random
   dataset-id: reductive_amination
@@ -18,16 +19,17 @@ args:
   alpha: 1.0
   eta: 3.0
   z-clip: 5.0
+  harness-candidates-per-session: 16
+  harness-thinking: max
+  harness-wall-time-seconds: 1800
+  harness-response-timeout: 2100
+  harness-image: ldm-pi-harness:latest
+  harness-cache-dir: ${IRON_MIND_WORK_ROOT}/gondolin-cache
   campaign-index: 0
   data-dir: ${IRON_MIND_DATA_ROOT}
   llm-url: null
   llm-model-name: null
   api-key: null
-  llm-timeout: 120.0
-  llm-max-tokens: 512
-  llm-temperature: 0.7
-  llm-extra-body-json: '{{"reasoning":{{"effort":"max","summary":"auto"}}}}'
-  prompt-policy: portfolio_v1
   out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

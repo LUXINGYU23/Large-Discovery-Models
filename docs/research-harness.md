@@ -6,10 +6,10 @@ submit candidate minibatches. It replaces a direct model request inside the
 task expander. It does not replace the shared LDM campaign, BO model,
 acquisition rule, candidate domain, or evaluator.
 
-SynthonBench is the reference integration. It runs four persistent Pi sessions
-with different `AGENTS.md` profiles and routes all accepted candidate
-occurrences through the same empirical `q0`, GP-UCB, acquisition tilt, and
-official evaluation path used by its direct proposal backend.
+SynthonBench and Iron Mind are the reference integrations. Each runs four
+persistent Pi sessions with different `AGENTS.md` profiles and routes accepted
+candidate occurrences through the same task-owned empirical `q0`, GP-UCB,
+acquisition tilt, and official evaluation path used by its direct backend.
 
 ## Architecture
 
@@ -119,5 +119,4 @@ real capability smoke with the configured wire API, container isolation,
 profiles, and task tools. Then verify one Harness-generated reservoir enters the
 normal acquisition and official evaluator path. See
 the [Pi sidecar contract](../harnesses/pi/README.md) for the current runtime
-requirements and the [SynthonBench guide](../tasks/synthonbench/README.md) for
-the reference task workflow.
+requirements and the task README for the concrete workflow.

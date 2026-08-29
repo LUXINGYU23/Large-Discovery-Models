@@ -90,7 +90,7 @@ def _provider_checks(
 ) -> list[DependencyCheck]:
     if arg_value(dict(args), "search-method", default="ldm") == "bo":
         return [ok(task, "proposal provider", "Pure BO does not use a model endpoint.")]
-    return check_llm_settings(
+    checks = check_llm_settings(
         task,
         dict(args),
         dict(env),
@@ -102,6 +102,38 @@ def _provider_checks(
         api_env=API_KEY_ENV_NAMES,
         required=True,
     )
+    if arg_value(dict(args), "proposal-backend", default="direct") != "harness":
+        return checks
+    raw_key_path = arg_value(dict(args), "harness-api-key-file")
+    if not raw_key_path:
+        return checks
+    checks = [check for check in checks if check.name != "LLM API key"]
+    key_path = Path(str(raw_key_path)).expanduser()
+    try:
+        configured = key_path.is_file() and bool(
+            key_path.read_text(encoding="utf-8").strip()
+        )
+    except OSError as exc:
+        return checks + [
+            fail(task, "Harness API key file", "Cannot read key file.", str(exc))
+        ]
+    if not configured:
+        return checks + [
+            fail(
+                task,
+                "Harness API key file",
+                "Key file must exist and contain a non-empty API key.",
+                str(key_path),
+            )
+        ]
+    return checks + [
+        ok(
+            task,
+            "Harness API key file",
+            "Harness API key file is configured.",
+            str(key_path),
+        )
+    ]
 
 
 def _source_gate(

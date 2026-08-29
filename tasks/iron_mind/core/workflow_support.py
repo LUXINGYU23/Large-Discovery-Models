@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -16,6 +17,7 @@ from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )
+from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
 
 
 def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
@@ -27,9 +29,8 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
     selected = args.iterations * args.evaluations_per_round
     proposal_requests = _proposal_requests(args, search_rounds)
     valid = _valid_candidates(args, domain_size, initial_evaluations, search_rounds)
-    return {
+    budget = {
         "outer_iterations": args.iterations,
-        "llm_requests": proposal_requests if args.proposal_mode == "openai" else 0,
         "proposal_attempts": proposal_requests,
         "valid_search_candidates": valid,
         "selected_candidates": selected,
@@ -38,6 +39,11 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
+    if args.proposal_backend == "harness":
+        budget["harness_turns"] = search_rounds * len(HARNESS_PROFILE_IDS)
+    else:
+        budget["llm_requests"] = proposal_requests if args.proposal_mode == "openai" else 0
+    return budget
 
 
 def campaign_budget(
@@ -54,6 +60,8 @@ def campaign_budget(
 def _proposal_requests(args: Any, search_rounds: int) -> int:
     if args.search_method == "bo":
         return 0
+    if args.proposal_backend == "harness":
+        return search_rounds * len(HARNESS_PROFILE_IDS)
     per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
     return search_rounds * per_round
 
@@ -92,11 +100,18 @@ def load_campaign_state(runtime: CampaignRuntime, resume: bool) -> LDMEngineStat
 def provider_settings(args: Any) -> OpenAIProviderSettings:
     """Resolve generic OpenAI-compatible endpoint settings for one run."""
 
-    return resolve_openai_provider_settings(
+    settings = resolve_openai_provider_settings(
         base_url=args.llm_url,
         model=args.llm_model_name,
         api_key=args.api_key,
     )
+    key_file = getattr(args, "harness_api_key_file", None)
+    if getattr(args, "proposal_backend", "direct") == "harness" and key_file is not None:
+        api_key = Path(key_file).expanduser().read_text(encoding="utf-8").strip()
+        if not api_key:
+            raise ValueError("harness API key file is empty")
+        settings = replace(settings, api_key=api_key)
+    return settings
 
 
 def preflight_endpoint(

@@ -152,3 +152,28 @@ def test_profile_allows_custom_proposal_and_bo_pool_sizes(
     assert plan["contract_profile"] == "ldm_official_smoke"
     assert "--proposal-samples" in plan["argv"]
     assert "--bo-pool-size" in plan["argv"]
+
+
+def test_harness_smoke_config_is_portable_and_profile_locked(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("IRON_MIND_WORK_ROOT", str(tmp_path / "work"))
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    config_path = CONFIG_ROOT / "harness_smoke.yaml"
+    config = load_config(config_path)
+    plan = build_plan(config, config_path)
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+    profile = contract.profile("harness_official_smoke")
+
+    assert plan["contract_profile"] == "harness_official_smoke"
+    assert profile.budget["harness_turns"] == 4
+    assert config["args"]["proposal-backend"] == "harness"
+    assert config["args"]["proposal-mode"] == "none"
+    assert config["args"]["harness-candidates-per-session"] == 16
+    assert config["args"]["harness-thinking"] == "max"
+    assert config["args"]["llm-url"] is None
+    assert config["args"]["llm-model-name"] is None
+    assert config["args"]["api-key"] is None
+    cache_value = plan["argv"][plan["argv"].index("--harness-cache-dir") + 1]
+    assert Path(cache_value) == tmp_path / "work" / "gondolin-cache"

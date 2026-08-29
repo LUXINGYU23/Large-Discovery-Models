@@ -11,6 +11,7 @@ from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.harness import HarnessClient, HarnessProfile
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
 
@@ -19,6 +20,7 @@ from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.constants import OBJECTIVE_NAME
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
+from tasks.iron_mind.core.harness import IronMindHarnessExpander
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
 from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
@@ -56,6 +58,10 @@ class CampaignComponentOptions:
     acquisition_z_clip: float = 5.0
     selection_seed: int = 0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
+    proposal_backend: str = "direct"
+    harness_client: HarnessClient | None = None
+    harness_profiles: tuple[HarnessProfile, ...] = ()
+    account_harness_usage: Callable[[dict[str, int]], None] | None = None
 
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
@@ -68,12 +74,23 @@ class CampaignComponentOptions:
             raise ValueError("Proposal and BO pool sizes must be positive.")
         if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
             raise ValueError("LDM proposal samples must exceed the BO pool size.")
-        if self.search_method in {"ldm", "llm"} and self.client is None:
-            raise ValueError("Model search methods require a proposal client.")
+        if self.proposal_backend not in {"direct", "harness"}:
+            raise ValueError("proposal_backend must be direct or harness")
+        if self.proposal_backend == "harness":
+            if self.search_method != "ldm":
+                raise ValueError("The harness backend is available only for LDM search")
+            if self.harness_client is None or not self.harness_profiles:
+                raise ValueError("Harness search requires a client and profile set")
+            expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
+            if self.proposal_samples != expected:
+                raise ValueError("proposal_samples must equal the harness minibatch total")
+        elif self.search_method in {"ldm", "llm"} and self.client is None:
+            raise ValueError("Direct model search methods require a proposal client.")
         if self.proposal_max_workers < 1 or self.selection_seed < 0:
             raise ValueError("Worker count must be positive and seed non-negative.")
         _validate_acquisition_options(self)
-        validate_prompt_policy(self.prompt_policy)
+        if self.proposal_backend == "direct":
+            validate_prompt_policy(self.prompt_policy)
 
 
 @dataclass(frozen=True)
@@ -112,6 +129,8 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
             else task_contracts.disabled_surrogate()
         ),
         domain_size=finite_domain_size(options.table),
+        proposal_backend=options.proposal_backend,
+        harness_profile_count=len(options.harness_profiles),
     )
     domain = IronMindCandidateDomain(options.schema, options.table, sink=options.sink)
     expander = _expander(options, domain)
@@ -184,6 +203,16 @@ def _search_components(options: CampaignComponentOptions):
 def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain) -> ReservoirExpander:
     if options.search_method == "bo":
         search: ReservoirExpander = FullReactionDomainExpander(options.table)
+    elif options.proposal_backend == "harness":
+        assert options.harness_client is not None
+        search = IronMindHarnessExpander(
+            options.harness_client,
+            domain,
+            profiles=options.harness_profiles,
+            campaign_id=options.runtime.run_id,
+            first_active_round=1 if options.initialization_mode == "shared_random" else 0,
+            account=options.account_harness_usage,
+        )
     else:
         assert options.client is not None
         search = IronMindProposalExpander(
