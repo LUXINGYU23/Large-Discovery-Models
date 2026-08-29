@@ -21,6 +21,13 @@ to the other. Qualify the exact configured endpoint with an actual request and
 verify the transmitted body or nonzero reasoning-token accounting; a value in
 YAML alone does not prove that the provider honored it.
 
+Concurrent direct sampling must tolerate transient provider throttling without
+turning a requested batch into a smaller one. Use bounded transport retries
+with backoff for the same logical proposal, and set any shared circuit-breaker
+threshold above one expected concurrency burst. Force a transient 429 in tests
+and verify that candidate cardinality and logical proposal accounting remain
+unchanged after recovery.
+
 The Harness remains inside the task's `ReservoirExpander`. Do not add another
 Campaign, BO loop, optimization history, evaluator path, or central task branch.
 

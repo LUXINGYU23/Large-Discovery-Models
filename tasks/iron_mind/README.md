@@ -329,7 +329,8 @@ one-evaluation baseline.
 The pilot direct methods request maximum reasoning through the Chat
 Completions `reasoning_effort` field. The Harness uses Pi's Responses API
 thinking-level mapping instead; these provider fields are intentionally
-different.
+different. Direct requests retain six workers and apply bounded backoff to
+transient provider failures without changing the logical candidate count.
 
 ```bash
 uv run --locked --project tasks/iron_mind python \

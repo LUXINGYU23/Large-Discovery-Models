@@ -345,7 +345,9 @@ def test_openai_client_uses_the_standard_chat_completion_contract() -> None:
         max_tokens=256,
     )
 
-    assert client.max_retries == 0
+    assert client.max_retries == 3
+    assert client.retry_backoff_seconds == 10.0
+    assert client.breaker.failure_threshold == 32
     assert client.require_models_preflight is False
     assert client.extra_body == {}
 

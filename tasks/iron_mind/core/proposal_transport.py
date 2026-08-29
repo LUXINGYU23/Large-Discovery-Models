@@ -6,7 +6,15 @@ from collections.abc import Mapping
 from typing import Any
 
 from ldm_tts.transport import ProposalClient
-from ldm_tts.transport.openai import OpenAICompatibleProposalClient
+from ldm_tts.transport.openai import (
+    EndpointCircuitBreaker,
+    OpenAICompatibleProposalClient,
+)
+
+
+TRANSIENT_MAX_RETRIES = 3
+TRANSIENT_RETRY_BACKOFF_SECONDS = 10.0
+TRANSIENT_CIRCUIT_FAILURE_THRESHOLD = 32
 
 
 def build_openai_reaction_client(
@@ -29,9 +37,13 @@ def build_openai_reaction_client(
         timeout_seconds=timeout_seconds,
         max_tokens=max_tokens,
         temperature=temperature,
-        max_retries=0,
+        max_retries=TRANSIENT_MAX_RETRIES,
+        retry_backoff_seconds=TRANSIENT_RETRY_BACKOFF_SECONDS,
         extra_body=_request_extra_body(json_mode, extra_body),
         require_models_preflight=False,
+        breaker=EndpointCircuitBreaker(
+            failure_threshold=TRANSIENT_CIRCUIT_FAILURE_THRESHOLD,
+        ),
     )
 
 

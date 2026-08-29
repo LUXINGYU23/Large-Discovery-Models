@@ -27,11 +27,28 @@ from tasks.synthonbench.core.proposal_parsing import (
     parse_synthon_response,
     parse_synthon_responses,
 )
+from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
 from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
 from tasks.synthonbench.core.proposals import PROPOSAL_SOURCE
 from tasks.synthonbench.core.search import SynthonInitializationExpander
 
 REQUEST_SIZE = 4
+
+
+def test_direct_transport_retries_transient_provider_failures() -> None:
+    client = build_openai_synthon_client(
+        base_url="https://example.invalid/v1",
+        model="test-model",
+        api_key="",
+        timeout_seconds=10.0,
+        max_tokens=256,
+        temperature=0.7,
+        json_mode=False,
+    )
+
+    assert client.max_retries == 3
+    assert client.retry_backoff_seconds == 10.0
+    assert client.breaker.failure_threshold == 32
 
 
 class IndexedProposalClient:

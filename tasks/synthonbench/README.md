@@ -344,7 +344,9 @@ The committed six-round and extended profiles request maximum reasoning effort f
 both direct methods and the Harness. Direct methods use the Chat Completions
 `reasoning_effort` field, while the Harness uses Pi's Responses API
 thinking-level mapping. Direct requests use six local workers;
-this changes only scheduling, not the independent request count. Endpoint and
+this changes only scheduling, not the independent request count. Transient
+provider failures receive bounded backoff retries for the same logical
+proposal. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
 provider and model.
 
