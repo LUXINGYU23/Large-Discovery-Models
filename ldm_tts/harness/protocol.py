@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
@@ -168,8 +168,17 @@ class HarnessPoolConfig:
         return profile_set_sha256(self.profiles)
 
     @property
+    def candidate_schema_json(self) -> str:
+        return json.dumps(
+            self.candidate_schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+    @property
     def candidate_schema_sha256(self) -> str:
-        return canonical_sha256(self.candidate_schema)
+        return hashlib.sha256(self.candidate_schema_json.encode("utf-8")).hexdigest()
 
     def common_frame(self, request_id: str, frame_type: str) -> dict[str, Any]:
         return {
@@ -190,7 +199,7 @@ class HarnessPoolConfig:
             "taskId": self.task_id,
             "caseId": self.case_id,
             "seed": self.seed,
-            "candidateSchema": self.candidate_schema,
+            "candidateSchemaJson": self.candidate_schema_json,
             "candidateSchemaSha256": self.candidate_schema_sha256,
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],

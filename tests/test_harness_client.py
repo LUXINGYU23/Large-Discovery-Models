@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -13,6 +15,41 @@ from ldm_tts.harness import (
     HarnessSubmissionValidation,
     HarnessTurn,
 )
+
+
+def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Path) -> None:
+    schema = {
+        "type": "object",
+        "properties": {"value": {"type": "number", "enum": [1.0, 0.000001]}},
+        "required": ["value"],
+        "additionalProperties": False,
+    }
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        base_url="https://provider.example/v1",
+        model="test-model",
+        profiles=(HarnessProfile(
+            "chemist",
+            Path("/resources/AGENTS.md"),
+            1,
+            agents_sha256="a" * 64,
+        ),),
+        campaign_id="campaign-1",
+        task_id="fixture",
+        case_id="case-1",
+        seed=1,
+        candidate_schema=schema,
+    )
+
+    frame = config.initialize_frame("initialize-1")
+
+    schema_json = frame["candidateSchemaJson"]
+    assert isinstance(schema_json, str)
+    assert json.loads(schema_json) == schema
+    assert frame["candidateSchemaSha256"] == hashlib.sha256(
+        schema_json.encode("utf-8")
+    ).hexdigest()
+    assert "candidateSchema" not in frame
 
 
 def test_persistent_harness_client_runs_one_profile_batch(

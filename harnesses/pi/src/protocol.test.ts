@@ -1,15 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PROTOCOL_VERSION, ProtocolError, parseFrame } from "./protocol.js";
-import { canonicalSha256 } from "./trace.js";
+import { sha256 } from "./trace.js";
 
 test("parseFrame accepts the explicit responses configuration", () => {
 	const candidateSchema = {
 		type: "object",
-		properties: { value: { type: "string" } },
+		properties: { value: { type: "number", enum: [1, 0.000001] } },
 		required: ["value"],
 		additionalProperties: false,
 	};
+	const candidateSchemaJson = '{"additionalProperties":false,"properties":{"value":{"enum":[1.0,0.000001],"type":"number"}},"required":["value"],"type":"object"}';
 	const frame = parseFrame(JSON.stringify({
 		type: "initialize",
 		requestId: "init-1",
@@ -23,8 +24,8 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		taskId: "synthonbench",
 		caseId: "surrogate:1M:kif11",
 		seed: 1,
-		candidateSchema,
-		candidateSchemaSha256: canonicalSha256(candidateSchema),
+		candidateSchemaJson,
+		candidateSchemaSha256: sha256(candidateSchemaJson),
 		profileSetSha256: "c".repeat(64),
 		profiles: [{
 			profileId: "target_sar",
@@ -41,7 +42,10 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		context7Enabled: true,
 	}));
 	assert.equal(frame.type, "initialize");
-	if (frame.type === "initialize") assert.equal(frame.thinking, "max");
+	if (frame.type === "initialize") {
+		assert.equal(frame.thinking, "max");
+		assert.deepEqual(frame.candidateSchema, candidateSchema);
+	}
 });
 
 test("parseFrame rejects a candidate schema with a changed digest", () => {
@@ -59,11 +63,7 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			taskId: "fixture",
 			caseId: "case",
 			seed: 1,
-			candidateSchema: {
-				type: "object",
-				properties: {},
-				additionalProperties: false,
-			},
+			candidateSchemaJson: '{"additionalProperties":false,"properties":{},"type":"object"}',
 			candidateSchemaSha256: "b".repeat(64),
 			profileSetSha256: "c".repeat(64),
 			profiles: [{

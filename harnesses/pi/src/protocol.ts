@@ -1,6 +1,6 @@
-import { canonicalSha256 } from "./trace.js";
+import { sha256 } from "./trace.js";
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -361,16 +361,23 @@ export function parseFrame(line: string): InputFrame {
 
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
-		"model", "thinking", "taskId", "caseId", "seed", "candidateSchema", "candidateSchemaSha256", "profileSetSha256",
+		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaJson", "candidateSchemaSha256", "profileSetSha256",
 		"profiles", "toolExtensions", "networkPolicy", "limits", "webProvider", "context7Enabled",
 	], "frame");
-	const candidateSchema = record(data.candidateSchema, "candidateSchema");
+	const candidateSchemaJson = string(data.candidateSchemaJson, "candidateSchemaJson");
+	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
+	if (sha256(candidateSchemaJson) !== candidateSchemaSha256) {
+		throw new ProtocolError("invalid_frame", "candidateSchema digest mismatch");
+	}
+	let parsedCandidateSchema: unknown;
+	try {
+		parsedCandidateSchema = JSON.parse(candidateSchemaJson);
+	} catch {
+		throw new ProtocolError("invalid_frame", "candidateSchemaJson is not valid JSON");
+	}
+	const candidateSchema = record(parsedCandidateSchema, "candidateSchemaJson");
 	if (candidateSchema.type !== "object" || candidateSchema.additionalProperties !== false) {
 		throw new ProtocolError("invalid_frame", "candidateSchema must be a strict JSON object schema");
-	}
-	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
-	if (canonicalSha256(candidateSchema) !== candidateSchemaSha256) {
-		throw new ProtocolError("invalid_frame", "candidateSchema digest mismatch");
 	}
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
