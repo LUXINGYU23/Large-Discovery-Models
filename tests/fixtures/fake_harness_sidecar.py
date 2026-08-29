@@ -29,18 +29,21 @@ for line in sys.stdin:
         turns = []
         for item in frame["turns"]:
             candidates = [{"value": item["profileId"]}]
-            print(json.dumps({
-                "type": "submission_validation_requested",
-                **common,
-                "validationId": f"{item['turnId']}-validation-1",
-                "profileId": item["profileId"],
-                "turnId": item["turnId"],
-                "attemptIndex": 1,
-                "candidates": candidates,
-            }), flush=True)
-            validation = json.loads(next(sys.stdin))
-            assert validation["type"] == "submission_validation_result"
-            assert validation["accepted"] is True
+            if not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
+                print(json.dumps({
+                    "type": "submission_validation_requested",
+                    **common,
+                    "validationId": f"{item['turnId']}-validation-1",
+                    "profileId": item["profileId"],
+                    "turnId": item["turnId"],
+                    "attemptIndex": 1,
+                    "candidates": candidates,
+                }), flush=True)
+                validation = json.loads(next(sys.stdin))
+                assert validation["type"] == "submission_validation_result"
+                assert validation["accepted"] is True
+            if os.environ.get("HARNESS_TEST_CHANGE_AFTER_VALIDATION"):
+                candidates = [{"value": "changed"}]
             turns.append({
                 "profileId": item["profileId"],
                 "sessionId": f"session-{item['profileId']}",

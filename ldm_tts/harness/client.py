@@ -19,6 +19,7 @@ from ldm_tts.harness.protocol import (
     HarnessSubmissionValidation,
     HarnessTurn,
     HarnessTurnResult,
+    canonical_sha256,
 )
 
 
@@ -94,12 +95,16 @@ class HarnessClient:
         expected = {turn.profile_id: turn for turn in turns}
         if len(expected) != len(turns):
             raise ValueError("harness turn profile IDs must be unique")
+        accepted_submissions: dict[str, str] = {}
 
         def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
             turn = expected.get(request.profile_id)
             if turn is None or request.turn_id != turn.turn_id:
                 raise HarnessError("harness submission validation request does not match the turn batch")
-            return submission_validator(request)
+            validation = submission_validator(request)
+            if validation.accepted:
+                accepted_submissions[request.profile_id] = canonical_sha256(request.candidates)
+            return validation
 
         payload = self._request(
             "run_turn",
@@ -124,6 +129,10 @@ class HarnessClient:
                 or result.input_digest != turn.input_digest
             ):
                 raise HarnessError("harness response does not match the requested turn")
+            if accepted_submissions.get(result.profile_id) != canonical_sha256(result.candidates):
+                raise HarnessError(
+                    f"harness committed candidates without matching task validation: {result.profile_id}"
+                )
         return results
 
     def close(self) -> None:
