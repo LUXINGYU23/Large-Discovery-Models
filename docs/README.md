@@ -12,6 +12,8 @@ technical and operational contracts.
   coverage thresholds.
 - [Fixed-budget pilot evaluation](pilot-evaluation.md): reusable LDM, BO, and
   direct-LLM comparison matrices and task onboarding.
+- [Research Harness integration](research-harness.md): persistent Agent
+  proposal sessions, task validation, resources, traces, and qualification.
 - [Data collection](data-collection.md): the shared `ldm-2.0` collection,
   augmentation, rendering, and validation workflow.
 - [Agent execution](agent-execution.md): machine-oriented rules for safely

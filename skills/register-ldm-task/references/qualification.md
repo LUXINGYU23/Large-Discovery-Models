@@ -43,6 +43,9 @@ Required evidence:
 - At least one accepted action crosses the same parser used by real inference.
 - Collection tests validate canonical IR and prevent provenance/outcome leakage.
 - Search and evaluation counters match the mock topology exactly.
+- A Harness-backed mock uses a protocol-faithful fake sidecar, exercises
+  provisional submission validation and correction, and needs no container,
+  KVM, endpoint, or secret.
 
 ## 3. Contract Verified
 
@@ -50,6 +53,9 @@ Required evidence:
 
 - Candidate validation rejects unsafe, malformed, duplicate, and over-budget
   candidates before expensive evaluation.
+- Harness profiles, optional skills, candidate schemas, and task tools have
+  stable recorded digests; the task validator returns indexed rejection codes
+  and actionable reasons before a turn commits.
 - Fixed benchmark code remains unchanged outside the editable region.
 - Tensor shapes, dtypes, finite outputs, parameter count, and requested devices
   pass the cheap contract evaluator.
@@ -79,6 +85,13 @@ Required evidence:
   validates connectivity, provider/model identity, response shape, and latency
   before search begins. Endpoint checks are not gates for deterministic,
   dataset-backed, or simulator providers that declare the capability false.
+- For a hybrid task, the selected method's provider mapping controls preflight;
+  offline methods remain service-free while direct and Harness methods verify
+  their actual wire API.
+- A Harness backend additionally runs the real sidecar capability smoke using
+  its configured wire API, container isolation, tools, and one persistent
+  session. A Chat Completions-only probe does not qualify a Responses-based
+  Harness.
 - One configured test-time-search reservoir is generated and cheaply validated.
 - Acquisition scores every valid candidate and selects exactly the configured
   number for expensive evaluation.
@@ -99,8 +112,14 @@ Required evidence:
 - `budget.json` separately limits and reports outer iterations, LLM requests,
   valid search candidates, expensive attempts, benchmark jobs, and completions;
   every declared counter is present even when its value is zero.
+- Harness campaigns also report session turns and measured provider, web,
+  Context7, and artifact usage without using those measurements as hidden stop
+  conditions unless the experiment contract explicitly says so.
 - Resume reconstructs state from terminal manifests and never repeats a
   completed expensive evaluation.
+- Harness resume reuses committed turn identity and artifacts, never commits a
+  partial submission, and never advances a session twice for the same history
+  range and digest.
 - Detached launch returns a durable execution handle, unbuffered log, heartbeat
   status, and unique run directory without copying credentials. The handle may
   be a local PID or a remote execution ID.

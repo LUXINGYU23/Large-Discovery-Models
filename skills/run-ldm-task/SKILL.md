@@ -1,6 +1,6 @@
 ---
 name: run-ldm-task
-description: Validate, configure, dry-run, smoke-test, execute, monitor, and summarize an existing manifest-registered LDM task through this repository's config runner. Use when asked to run LDM, run a task config or suite, test an existing task, perform a minimal first real run, verify an OpenAI-compatible served model before LDM execution, resume a task run, or diagnose preflight failures for nanogpt, small_molecule, antibody, or another registered task.
+description: Validate, configure, dry-run, smoke-test, execute, monitor, and summarize an existing manifest-registered LDM task through this repository's config runner. Use when asked to run LDM, run a task config or suite, test an existing task, perform a minimal first real run, verify a direct model or research-Harness backend, resume a task run, or diagnose preflight failures for a registered task.
 ---
 
 # Run An Existing LDM Task
@@ -11,7 +11,7 @@ Preserve task configuration unless the user asks for an edit. Use temporary
 profile.
 
 Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
-`nanogpt`, `small_molecule`, or `antibody`. For another task, read its
+`nanogpt`, `small_molecule`, `antibody`, or `synthonbench`. For another task, read its
 `tasks/<task_id>/README.md` and `task.json` instead of inventing flags.
 
 ## Resolve The Run
@@ -29,14 +29,16 @@ Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
    `task` matches the intended task.
 4. Classify the runtime implementation:
    - **Engine-native**: the executed task path calls
-     `ldm_tts.campaign.run_campaign` with a `CampaignRecipe`; expect
+     `ldm_tts.campaign.run_campaign` with a `CampaignRecipe`, or directly uses
+     the shared `LDMEngine` and `CampaignRuntime` for a documented specialized
+     lifecycle; expect
      the shared lifecycle, budget, event, checkpoint, status, and summary
      artifacts. All built-in tasks (`nanogpt`, `small_molecule`, `antibody`,
      `llm_kv_adaptive_quantization`, `causal_discovery_discrete`,
-     `ai4bio_mutation_effect_prediction`) are engine-native.
-   - **Compatibility**: only legacy or experimental tasks use a task-specific
-     loop or `run_budgeted_search`; follow their README for artifacts, counters,
-     and resume behavior.
+     `ai4bio_mutation_effect_prediction`, `iron_mind`, and `synthonbench`) are
+     engine-native.
+   - **Task-owned runtime**: a task-specific loop is not engine-native; follow
+     its README and do not claim shared lifecycle, budget, or resume behavior.
    - Emitting `LDMTaskSpec` does not by itself make a task engine-native. Verify
      the executed code path rather than inferring runtime ownership from names.
 5. Classify the requested execution level:
@@ -91,18 +93,28 @@ may proceed only when they do not invalidate the requested mode.
 
 ## Verify Required Providers
 
-Read `experiment.json.proposal_provider` before a tiny or full real run. When
-`requires_endpoint_preflight` is true, identify the configured base URL, API key
-source, and model ID. Probe both `/models` and `/chat/completions` using the
-environment variable names documented by the task. Keep the base URL at the API
-root, normally ending in `/v1`. Skip endpoint-only probes when the declared
-provider does not require them, while still running its documented dependency
-and contract checks.
+Read `experiment.json.proposal_provider`, the selected config, and the task
+README before a tiny or full real run. When `requires_endpoint_preflight` is
+true, identify the configured backend, base URL, API key source, model ID, and
+wire API. Keep the base URL at the API root, normally ending in `/v1`.
 
+For a direct proposal backend, probe model discovery and the actual Chat
+Completions route. For a research Harness, run its documented sidecar capability
+smoke with the configured wire API, profiles, container isolation, and task
+tools; the current Pi implementation uses OpenAI Responses. Do not certify a
+Harness with only a `/chat/completions` request. Skip endpoint-only probes when
+the declared provider does not require them, while still running its documented
+dependency and contract checks.
+
+For a `hybrid` provider, resolve the selected method's backend from the config,
+`evaluation.settings`, and task README. Do not let an offline BO mode suppress
+the preflight required by an online direct or Harness mode, and do not block an
+offline method on credentials it cannot use.
 Do not print, log, commit, or place a real key on a command line as a literal.
-Use an existing environment variable. `EMPTY` is acceptable only for a local
-server that does not validate credentials. If the endpoint is unreachable, stop
-and report it; do not start or replace a model server unless the user asks.
+Use an existing environment variable or the task's documented ignored,
+protected key file. `EMPTY` is acceptable only for a local server that does not
+validate credentials. If the endpoint is unreachable, stop and report it; do
+not start or replace a model server unless the user asks.
 
 ## Execute Progressively
 
@@ -111,7 +123,7 @@ For mock mode, run the checked-in mock config after the three preflight gates.
 For real mode, reread and follow the task README's **Minimal First Real Run**
 exactly. Do not copy an older recipe from this skill over a newer task README:
 
-1. Run the provider-specific preflight when required.
+1. Run the backend-specific direct-provider or Harness preflight when required.
 2. Run the light dependency check.
 3. Run the task-level zero-iteration or dry contract smoke.
 4. Run the documented tiny real budget.
@@ -136,7 +148,9 @@ For an engine-native run, inspect `ldm_task_spec.json`, `events.jsonl`,
 qualified contract is active, also inspect `experiment_contract.json`. Built-in
 tasks also re-export their historical trajectory files (see
 [references/built-in-tasks.md](references/built-in-tasks.md)). For a
-compatibility run, inspect the task-specific artifacts named by its README and
+Harness-backed run, also inspect the run-local Harness manifest, committed turn
+records, session lineage, redacted provider index, and Harness/provider/tool
+budget counters. For a task-owned runtime, inspect the task-specific artifacts named by its README and
 do not claim shared-engine resume or budget semantics unless the executed path
 actually provides them.
 
@@ -151,6 +165,7 @@ After execution, report:
 - task, config, mode, and effective overrides;
 - interpreter/project used;
 - dependency and endpoint results;
+- proposal backend, wire API, and Harness profile/session counts when applicable;
 - runtime classification and whether a named contract profile remained active;
 - output, event/trajectory, checkpoint, status, summary, and best-candidate
   paths that apply to that runtime;

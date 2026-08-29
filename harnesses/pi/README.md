@@ -6,6 +6,10 @@ web extensions, terminal candidate submission, and raw model-provider transport
 capture. Task validation, optimization history, `q0`, GP inference, acquisition,
 and evaluation remain in Python.
 
+For the task-neutral Python interface, task ownership boundary, resource
+layout, and qualification rules, see
+[`docs/research-harness.md`](../../docs/research-harness.md).
+
 Build the release image from the repository root:
 
 ```bash

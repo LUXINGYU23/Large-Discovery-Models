@@ -185,6 +185,10 @@ OpenAI Responses wire format through Pi; its endpoint must support that API.
 
 ## Persistent Research Harness
 
+This section documents the SynthonBench adapter. The shared interface and task
+registration rules are in the
+[Research Harness integration guide](../../docs/research-harness.md).
+
 The harness backend changes only the proposal policy used by LDM. At campaign
 startup it creates four persistent Pi sessions with task-owned roles for target
 SAR, reaction feasibility, scaffold exploration, and property risk. Every

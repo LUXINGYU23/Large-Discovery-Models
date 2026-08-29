@@ -1,4 +1,4 @@
 interface:
   display_name: "Register LDM Task"
-  short_description: "Register and qualify an LDM benchmark task"
-  default_prompt: "Use $register-ldm-task to register and scientifically qualify a new LDM task with an enforced experiment contract."
+  short_description: "Register and qualify an LDM task or Harness backend"
+  default_prompt: "Use $register-ldm-task to register and scientifically qualify a new LDM task, including its proposal backend and experiment contract."

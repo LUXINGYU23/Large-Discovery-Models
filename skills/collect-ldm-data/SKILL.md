@@ -17,8 +17,9 @@ the selected task's README when present.
 
 1. Work from the repository root and inspect `git status --short`.
 2. Identify the task, source run/config, collection mode, output campaign,
-   reasoning policy, and whether the user requested a mock, tiny real, or full
-   run. Do not promote the requested execution level.
+   reasoning policy, whether the source is an accepted direct action or a raw
+   Harness session trace, and whether the user requested a mock, tiny real, or
+   full run. Do not promote the requested execution level.
 3. Choose a new ignored output directory under
    `data/generated/<campaign>/`, unless the user explicitly requests a safe
    resume. Never append a different run or schema to an existing campaign by
@@ -40,6 +41,13 @@ not rebuild the training target from post-selection state. Do not collect
 rejected attempts, the first unvalidated tool call, silently repaired outputs,
 evaluator predictions emitted by the model, or post-BO candidates as if the
 teacher proposed them.
+
+Research-Harness session JSONL and redacted provider request/response files are
+raw multi-turn traces, not accepted-action IR. Preserve them under the run's
+Harness artifact root. Do not pass them to `DataCollectionSink`, the renderer,
+or expert augmentation until a separate converter defines the model-visible
+messages, terminal accepted action, rejected-attempt treatment, tool-result
+policy, and leakage checks.
 
 Keep run IDs, evaluator outcomes, selected candidates, acquisition values, and
 drop counts under `collection.provenance` or `collection.outcome`. The renderer
@@ -159,3 +167,5 @@ counts, action distribution, validation results, and residual warnings. State
 whether the corpus is action-level or underwent a separate acquisition-weighted
 selection step. Do not describe current action-level collection as
 acquisition-weighted candidate distillation unless such a step actually ran.
+For a Harness source, explicitly report that only raw session/transport traces
+were retained unless a named and validated conversion contract was executed.
