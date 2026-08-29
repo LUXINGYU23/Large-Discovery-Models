@@ -246,7 +246,7 @@ async function main(): Promise<void> {
 			?.message;
 		assert(readResult);
 		assert.equal(readResult.isError, false, JSON.stringify(readResult.content));
-		assert.match(JSON.stringify(readResult.content), /sandbox-ok/);
+		assert.match(JSON.stringify(readResult.content), /sandbox-network-ok/);
 		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-network-ok");
 		assert.match(session, /submit_candidates/);
 		assert.match(session, /historical_duplicate/);
