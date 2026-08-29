@@ -1,7 +1,7 @@
 schema_version: 1
-name: iron_mind_quick_compare
+name: iron_mind_pilot_evaluation_extended
 task: iron_mind
-base_config: ../iron_mind/quick_compare_base.yaml
+base_config: ../iron_mind/pilot_evaluation_extended.yaml
 cases:
   - id: reductive_amination
     overrides:
@@ -14,12 +14,12 @@ method_overrides:
   ldm: []
   bo: []
   llm:
-    - contract_profile="quick_compare_direct_llm"
+    - contract_profile="pilot_evaluation_extended_direct_llm"
     - args.prompt-policy="direct_v1"
 seeds: [0, 1, 2]
-optimization_rounds: 5
+optimization_rounds: 11
 initialization_mode: shared_random
-output_root: ${IRON_MIND_RUNS_ROOT}/quick_compare
+output_root: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended
 trajectory:
   step_column: round
   step_kind: round

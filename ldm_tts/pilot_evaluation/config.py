@@ -1,4 +1,4 @@
-"""Strict configuration loading for the reusable quick-comparison matrix."""
+"""Strict configuration loading for the reusable pilot-evaluation matrix."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ STEP_KINDS = ("round", "evaluation_index")
 
 
 @dataclass(frozen=True)
-class ComparisonCase:
-    """One fixed benchmark case expressed as standard runner overrides."""
+class EvaluationCase:
+    """One benchmark case expressed as standard runner overrides."""
 
     case_id: str
     overrides: tuple[str, ...]
@@ -34,13 +34,13 @@ class TrajectorySpec:
 
 
 @dataclass(frozen=True)
-class QuickCompareSpec:
+class PilotEvaluationSpec:
     """Validated matrix specification with no task-specific control flow."""
 
     task: str
     name: str
     base_config: Path
-    cases: tuple[ComparisonCase, ...]
+    cases: tuple[EvaluationCase, ...]
     methods: tuple[str, ...]
     method_overrides: dict[str, tuple[str, ...]]
     seeds: tuple[int, ...]
@@ -71,14 +71,14 @@ class QuickCompareSpec:
         }
 
 
-def load_quick_compare_spec(path: Path) -> QuickCompareSpec:
+def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     """Load one versioned matrix specification and reject ambiguous fields."""
 
     resolved = Path(path).resolve()
     raw = load_config(resolved)
     _require_exact_keys(raw)
     methods = _methods(raw.get("methods"))
-    return QuickCompareSpec(
+    return PilotEvaluationSpec(
         task=_required_string(raw.get("task"), "task"),
         name=_required_string(raw.get("name"), "name"),
         base_config=_resolve_base_config(resolved, raw),
@@ -102,19 +102,19 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         "optimization_rounds", "initialization_mode", "output_root", "trajectory", "result_fields",
     }
     if set(raw) != expected or raw.get("schema_version") != 1:
-        raise ValueError("quick comparison config must use schema_version=1 and the documented fields")
+        raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 
 def _methods(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
-        raise ValueError("quick comparison methods must be a non-empty list")
+        raise ValueError("pilot evaluation methods must be a non-empty list")
     methods = tuple(value)
     if any(not isinstance(item, str) or item not in SUPPORTED_METHODS for item in methods):
-        raise ValueError(f"quick comparison methods must come from {list(SUPPORTED_METHODS)}")
+        raise ValueError(f"pilot evaluation methods must come from {list(SUPPORTED_METHODS)}")
     if len(set(methods)) != len(methods):
-        raise ValueError("quick comparison methods must be unique")
+        raise ValueError("pilot evaluation methods must be unique")
     if not BASELINE_METHODS <= set(methods):
-        raise ValueError("quick comparison methods must include ldm, bo, and llm")
+        raise ValueError("pilot evaluation methods must include ldm, bo, and llm")
     return methods
 
 
@@ -122,33 +122,33 @@ def _resolve_base_config(path: Path, raw: dict[str, Any]) -> Path:
     candidate = Path(_required_string(raw.get("base_config"), "base_config"))
     resolved = (path.parent / candidate).resolve() if not candidate.is_absolute() else candidate
     if not resolved.is_file():
-        raise ValueError(f"quick comparison base config does not exist: {resolved}")
+        raise ValueError(f"pilot evaluation base config does not exist: {resolved}")
     return resolved
 
 
-def _cases(value: Any) -> tuple[ComparisonCase, ...]:
+def _cases(value: Any) -> tuple[EvaluationCase, ...]:
     if not isinstance(value, list) or not value:
-        raise ValueError("quick comparison cases must be a non-empty list")
+        raise ValueError("pilot evaluation cases must be a non-empty list")
     cases = []
     for item in value:
         if not isinstance(item, dict) or set(item) != {"id", "overrides"}:
-            raise ValueError("each quick comparison case needs only id and overrides")
+            raise ValueError("each pilot evaluation case needs only id and overrides")
         overrides = item["overrides"]
         if not isinstance(overrides, list) or not all(isinstance(entry, str) and "=" in entry for entry in overrides):
             raise ValueError("case overrides must be PATH=VALUE strings")
-        cases.append(ComparisonCase(_required_string(item.get("id"), "id"), tuple(overrides)))
+        cases.append(EvaluationCase(_required_string(item.get("id"), "id"), tuple(overrides)))
     if len({item.case_id for item in cases}) != len(cases):
-        raise ValueError("quick comparison case IDs must be unique")
+        raise ValueError("pilot evaluation case IDs must be unique")
     return tuple(cases)
 
 
 def _seeds(value: Any) -> tuple[int, ...]:
     if not isinstance(value, list) or len(value) != 3:
-        raise ValueError("quick comparison requires exactly three seeds")
+        raise ValueError("pilot evaluation requires exactly three seeds")
     if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in value):
-        raise ValueError("quick comparison seeds must be non-negative integers")
+        raise ValueError("pilot evaluation seeds must be non-negative integers")
     if len(set(value)) != len(value):
-        raise ValueError("quick comparison seeds must be unique")
+        raise ValueError("pilot evaluation seeds must be unique")
     return tuple(value)
 
 
@@ -189,20 +189,20 @@ def _result_fields(value: Any) -> dict[str, str]:
 def _output_root(value: Any) -> Path:
     raw = os.path.expandvars(_required_string(value, "output_root"))
     if "$" in raw:
-        raise ValueError("quick comparison output_root contains an unresolved environment variable")
+        raise ValueError("pilot evaluation output_root contains an unresolved environment variable")
     return Path(raw).resolve()
 
 
 def _required_string(value: Any, key: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"quick comparison {key} must be a non-empty string")
+        raise ValueError(f"pilot evaluation {key} must be a non-empty string")
     return value.strip()
 
 
 def _positive_int(value: Any, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise ValueError(f"quick comparison {name} must be a positive integer")
+        raise ValueError(f"pilot evaluation {name} must be a positive integer")
     return value
 
 
-__all__ = ["QuickCompareSpec", "load_quick_compare_spec"]
+__all__ = ["PilotEvaluationSpec", "load_pilot_evaluation_spec"]

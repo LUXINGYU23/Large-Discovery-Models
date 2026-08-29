@@ -10,7 +10,7 @@ technical and operational contracts.
   for candidates, reservoirs, evaluation, acquisition, and campaigns.
 - [Testing and coverage](testing.md): isolated environments, test lanes, and
   coverage thresholds.
-- [Fixed-budget quick comparison](quick-comparison.md): reusable LDM, BO, and
+- [Fixed-budget pilot evaluation](pilot-evaluation.md): reusable LDM, BO, and
   direct-LLM comparison matrices and task onboarding.
 - [Data collection](data-collection.md): the shared `ldm-2.0` collection,
   augmentation, rendering, and validation workflow.

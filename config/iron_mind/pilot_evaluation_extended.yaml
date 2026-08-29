@@ -1,9 +1,9 @@
-name: iron_mind_extended_compare
+name: iron_mind_pilot_evaluation_extended
 task: iron_mind
-algorithm: ldm_bo_llm_extended_compare
+algorithm: ldm_bo_llm_pilot_evaluation_extended
 mode: real
 description: Fixed-budget twelve-round confirmation comparison for Iron Mind.
-contract_profile: extended_compare
+contract_profile: pilot_evaluation_extended
 args:
   proposal-mode: openai
   search-method: ldm
@@ -27,6 +27,6 @@ args:
   llm-max-tokens: 512
   llm-temperature: 0.7
   prompt-policy: portfolio_v1
-  out-dir: ${IRON_MIND_RUNS_ROOT}/extended_compare
+  out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

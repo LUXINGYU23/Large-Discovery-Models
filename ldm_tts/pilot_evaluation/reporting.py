@@ -1,4 +1,4 @@
-"""Aggregation and integrity evidence for fixed-round quick comparisons."""
+"""Aggregation and integrity evidence for fixed-round pilot evaluations."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.quick_compare.config import QuickCompareSpec
+from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 
 
-def write_comparison_reports(spec: QuickCompareSpec, manifest: dict[str, Any]) -> None:
-    """Validate completed child artifacts and export task-neutral comparison outputs."""
+def write_evaluation_reports(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> None:
+    """Validate completed child artifacts and export task-neutral evaluation outputs."""
 
     runs = _run_records(spec, manifest)
     rows, trajectories = _collect(spec, runs)
@@ -24,8 +24,8 @@ def write_comparison_reports(spec: QuickCompareSpec, manifest: dict[str, Any]) -
     if not integrity["valid"]:
         _write_outputs(spec, rows, trajectories, {"verdict": "invalid", "integrity": integrity})
         manifest.update(state="invalid", integrity=integrity)
-        atomic_json_write(spec.output_root / "comparison_manifest.json", manifest)
-        raise RuntimeError("quick comparison integrity validation failed")
+        atomic_json_write(spec.output_root / "evaluation_manifest.json", manifest)
+        raise RuntimeError("pilot evaluation integrity validation failed")
     aggregates = _aggregate(rows)
     verdict = _verdict(rows, aggregates, spec.trajectory.direction)
     _write_outputs(spec, rows, trajectories, verdict)
@@ -35,14 +35,14 @@ def write_comparison_reports(spec: QuickCompareSpec, manifest: dict[str, Any]) -
         "summary": "summary.csv", "summary_json": "summary.json", "trajectories": "trajectories.csv",
         "plot": "best_so_far.png", "verdict": "summary.json",
     }
-    atomic_json_write(spec.output_root / "comparison_manifest.json", manifest)
+    atomic_json_write(spec.output_root / "evaluation_manifest.json", manifest)
 
 
 def _run_records(spec, manifest) -> list[tuple[str, dict[str, Any]]]:
     expected = {f"{case.case_id}/{method}/seed_{seed}" for case in spec.cases for method in spec.methods for seed in spec.seeds}
     actual = set(manifest["runs"])
     if actual != expected:
-        raise ValueError("comparison manifest does not contain the complete case/method/seed matrix")
+        raise ValueError("evaluation manifest does not contain the complete case/method/seed matrix")
     return sorted(manifest["runs"].items())
 
 
@@ -346,4 +346,4 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-__all__ = ["write_comparison_reports"]
+__all__ = ["write_evaluation_reports"]

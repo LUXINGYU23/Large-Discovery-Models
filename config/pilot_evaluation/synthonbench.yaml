@@ -1,7 +1,7 @@
 schema_version: 1
-name: synthonbench_quick_compare
+name: synthonbench_pilot_evaluation
 task: synthonbench
-base_config: ../synthonbench/quick_compare_base.yaml
+base_config: ../synthonbench/pilot_evaluation_base.yaml
 cases:
   - id: surrogate_1m_kif11
     overrides:
@@ -12,7 +12,7 @@ methods: [ldm, harness, bo, llm]
 method_overrides:
   ldm: []
   harness:
-    - contract_profile="quick_compare_harness"
+    - contract_profile="pilot_evaluation_harness"
     - args.proposal-backend="harness"
     - args.harness-candidates-per-session=16
     - args.harness-thinking="max"
@@ -22,14 +22,14 @@ method_overrides:
     - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
   bo: []
   llm:
-    - contract_profile="quick_compare_direct_llm"
+    - contract_profile="pilot_evaluation_direct_llm"
     - args.prompt-policy="direct_v1"
     - args.proposal-samples=16
     - args.proposal-max-workers=4
 seeds: [0, 1, 2]
 optimization_rounds: 5
 initialization_mode: shared_random
-output_root: ${SYNTHONBENCH_RUNS_ROOT}/quick_compare
+output_root: ${SYNTHONBENCH_RUNS_ROOT}/pilot_evaluation
 trajectory:
   step_column: call_idx
   step_kind: evaluation_index

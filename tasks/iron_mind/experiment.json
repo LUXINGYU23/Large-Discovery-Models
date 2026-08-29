@@ -84,7 +84,7 @@
     "benchmark_jobs": 20
   },
   "profiles": {
-    "quick_compare": {
+    "pilot_evaluation": {
       "description": "Six-round fixed-budget comparison of LDM, pure BO, and direct LLM methods.",
       "budget": {
         "outer_iterations": 6,
@@ -109,7 +109,7 @@
         "prompt-policy": "portfolio_v1"
       }
     },
-    "quick_compare_direct_llm": {
+    "pilot_evaluation_direct_llm": {
       "description": "Six-round fixed-budget direct-LLM comparator with no GP selector.",
       "budget": {
         "outer_iterations": 6,
@@ -134,7 +134,7 @@
         "prompt-policy": "direct_v1"
       }
     },
-    "extended_compare": {
+    "pilot_evaluation_extended": {
       "description": "Twelve-round fixed-budget confirmation of LDM, pure BO, and direct LLM methods.",
       "budget": {
         "outer_iterations": 12,
@@ -159,7 +159,7 @@
         "prompt-policy": "portfolio_v1"
       }
     },
-    "extended_compare_direct_llm": {
+    "pilot_evaluation_extended_direct_llm": {
       "description": "Twelve-round fixed-budget direct-LLM comparator with no GP selector.",
       "budget": {
         "outer_iterations": 12,

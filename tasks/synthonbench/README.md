@@ -55,7 +55,7 @@ lifecycle:
    `q0(x) = count(x) / valid_occurrences`.
 5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
    sample of size `K`. The full-budget and qualification profiles use `K=32`;
-   quick-comparison profiles use `K=48`. Only this maintained BO pool is scored.
+   pilot-evaluation profiles use `K=48`. Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -304,15 +304,15 @@ Each completed run writes:
 - `result.json`: LDM summary, best utility, and official metrics.
 - shared `status.json`, `budget.json`, events, and checkpoint artifacts.
 
-## Fixed-Round Quick Comparison
+## Fixed-Round Pilot Evaluation
 
-`config/quick_compare/synthonbench.yaml` runs a three-seed, four-method comparison on the
+`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, four-method comparison on the
 official 1M KIF11 surrogate track. One product-uniform shared initialization
 batch and five optimization batches make six outer rounds. Each round targets
 16 official calls; invalid, previously evaluated, or duplicate generated
 candidates are not replaced, so reports retain the actual call count.
 
-`config/quick_compare/synthonbench_extended.yaml` preserves the same method,
+`config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
 (12 outer rounds, targeting 192 official calls per campaign). It is a separate confirmation profile for
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
@@ -333,7 +333,7 @@ the parser rejects invented IDs and combinations that mix different options.
 Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
-The committed quick and extended profiles request maximum reasoning effort for
+The committed six-round and extended profiles request maximum reasoning effort for
 both direct methods and the Harness. Direct requests use four local workers;
 this changes only scheduling, not the independent request count. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
@@ -341,13 +341,13 @@ provider and model.
 
 ```bash
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml --dry-run
 
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml
 
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench_extended.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench_extended.yaml
 ```
 
 The result directory contains standard child artifacts plus a portable matrix
@@ -355,7 +355,7 @@ manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
 plot. Endpoint settings remain user-defined OpenAI-compatible environment
 variables; the BO children do not require them.
 For a source archive rather than a Git checkout, set
-`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+`LDM_PILOT_EVALUATION_COMMIT` to the archive release commit so the manifest records
 explicit provenance.
 
 ## Qualification Status

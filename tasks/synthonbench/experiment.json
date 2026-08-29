@@ -134,7 +134,7 @@
         "z-clip": 5.0
       }
     },
-    "quick_compare_harness": {
+    "pilot_evaluation_harness": {
       "description": "Six-round fixed-budget persistent-agent LDM comparison on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 6,
@@ -177,7 +177,7 @@
         "initialization-mode": "shared_random"
       }
     },
-    "quick_compare": {
+    "pilot_evaluation": {
       "description": "Six-round fixed-budget comparison on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 6,
@@ -217,7 +217,7 @@
         "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
-    "quick_compare_direct_llm": {
+    "pilot_evaluation_direct_llm": {
       "description": "Six-round fixed-budget direct-LLM comparator on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 6,
@@ -257,7 +257,7 @@
         "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
-    "extended_compare_harness": {
+    "pilot_evaluation_extended_harness": {
       "description": "Twelve-round fixed-budget persistent-agent LDM confirmation on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 12,
@@ -300,7 +300,7 @@
         "initialization-mode": "shared_random"
       }
     },
-    "extended_compare": {
+    "pilot_evaluation_extended": {
       "description": "Twelve-round fixed-budget confirmation on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 12,
@@ -340,7 +340,7 @@
         "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
-    "extended_compare_direct_llm": {
+    "pilot_evaluation_extended_direct_llm": {
       "description": "Twelve-round fixed-budget direct-LLM comparator on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 12,

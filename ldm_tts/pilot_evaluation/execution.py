@@ -14,15 +14,15 @@ from typing import Any, Iterable
 
 from ldm_tts.cli.runner import apply_override, build_plan, load_config, preflight_plan, run_plan
 from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.quick_compare.config import QuickCompareSpec
-from ldm_tts.quick_compare.reporting import write_comparison_reports
+from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
+from ldm_tts.pilot_evaluation.reporting import write_evaluation_reports
 
 
-_MANIFEST_NAME = "comparison_manifest.json"
+_MANIFEST_NAME = "evaluation_manifest.json"
 
 
 @dataclass(frozen=True)
-class _ComparisonRun:
+class _EvaluationRun:
     case_id: str
     method: str
     seed: int
@@ -33,8 +33,8 @@ class _ComparisonRun:
         return f"{self.case_id}/{self.method}/seed_{self.seed}"
 
 
-def run_comparison(
-    spec: QuickCompareSpec,
+def run_evaluation(
+    spec: PilotEvaluationSpec,
     *,
     resume: bool,
     dry_run: bool,
@@ -42,12 +42,12 @@ def run_comparison(
     methods: Iterable[str] | None = None,
     seeds: Iterable[int] | None = None,
 ) -> int:
-    """Run a fresh or provenance-checked resumed comparison matrix."""
+    """Run a fresh or provenance-checked resumed evaluation matrix."""
 
     base = load_config(spec.base_config)
     if base.get("task") != spec.task:
         raise ValueError(
-            "quick comparison task must match base config task: "
+            "pilot evaluation task must match base config task: "
             f"{spec.task!r} != {base.get('task')!r}"
         )
     selected = _select_runs(spec, cases=cases, methods=methods, seeds=seeds)
@@ -60,7 +60,7 @@ def run_comparison(
         _run_child(manifest, spec, item, plan, resume=resume)
     if _matrix_complete(spec, manifest):
         try:
-            write_comparison_reports(spec, manifest)
+            write_evaluation_reports(spec, manifest)
         except Exception as error:
             manifest["state"] = "failed"
             manifest["error"] = {
@@ -76,7 +76,7 @@ def run_comparison(
     return 0
 
 
-def _select_runs(spec, *, cases, methods, seeds) -> tuple[_ComparisonRun, ...]:
+def _select_runs(spec, *, cases, methods, seeds) -> tuple[_EvaluationRun, ...]:
     case_ids = _selected_values(cases, (item.case_id for item in spec.cases), "case")
     method_ids = _selected_values(methods, spec.methods, "method")
     seed_ids = _selected_values(seeds, spec.seeds, "seed")
@@ -86,7 +86,7 @@ def _select_runs(spec, *, cases, methods, seeds) -> tuple[_ComparisonRun, ...]:
             for seed in spec.seeds:
                 if case.case_id in case_ids and method in method_ids and seed in seed_ids:
                     run_dir = spec.output_root / "campaigns" / case.case_id / method / f"seed_{seed}"
-                    runs.append(_ComparisonRun(case.case_id, method, seed, run_dir))
+                    runs.append(_EvaluationRun(case.case_id, method, seed, run_dir))
     return tuple(runs)
 
 
@@ -95,7 +95,7 @@ def _selected_values(requested, available, label: str) -> set:
     values = available_set if requested is None else set(requested)
     unknown = sorted(values - available_set)
     if unknown:
-        raise ValueError(f"unknown quick comparison {label}: {', '.join(map(str, unknown))}")
+        raise ValueError(f"unknown pilot evaluation {label}: {', '.join(map(str, unknown))}")
     return values
 
 
@@ -107,15 +107,15 @@ def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]
     )
     if resume:
         if not path.is_file():
-            raise FileNotFoundError(f"quick comparison manifest does not exist: {path}")
+            raise FileNotFoundError(f"pilot evaluation manifest does not exist: {path}")
         manifest = _read_json(path)
         if manifest.get("fingerprint") != fingerprint:
-            raise ValueError("quick comparison provenance differs; refuse --resume")
+            raise ValueError("pilot evaluation provenance differs; refuse --resume")
         return manifest
     if spec.output_root.exists():
-        raise FileExistsError(f"quick comparison output already exists: {spec.output_root}; use --resume")
+        raise FileExistsError(f"pilot evaluation output already exists: {spec.output_root}; use --resume")
     if not dry_run and base.get("mode") == "real" and repository["dirty"]:
-        raise RuntimeError("real quick comparison requires a clean repository")
+        raise RuntimeError("real pilot evaluation requires a clean repository")
     manifest = {
         "schema_version": 1,
         "name": spec.name,
@@ -134,7 +134,7 @@ def _open_manifest(spec, base, *, resume: bool, dry_run: bool) -> dict[str, Any]
     return manifest
 
 
-def _child_plan(spec, base, run: _ComparisonRun, *, resume: bool) -> dict[str, Any]:
+def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, Any]:
     config = copy.deepcopy(base)
     case = next(item for item in spec.cases if item.case_id == run.case_id)
     for override in case.overrides:
@@ -180,10 +180,10 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     if entry["status"] != "completed":
         manifest["state"] = "failed"
         _write_manifest(spec, manifest)
-        raise RuntimeError(f"quick comparison child failed: {run.key}")
+        raise RuntimeError(f"pilot evaluation child failed: {run.key}")
 
 
-def _matrix_complete(spec: QuickCompareSpec, manifest: dict[str, Any]) -> bool:
+def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> bool:
     expected = {
         f"{case.case_id}/{method}/seed_{seed}"
         for case in spec.cases
@@ -218,11 +218,11 @@ def _repository_state() -> dict[str, Any]:
         commit = _git(root, "rev-parse", "HEAD")
         dirty = bool(_git(root, "status", "--porcelain"))
     except (OSError, subprocess.CalledProcessError) as error:
-        commit = os.environ.get("LDM_QUICK_COMPARE_COMMIT", "").strip()
+        commit = os.environ.get("LDM_PILOT_EVALUATION_COMMIT", "").strip()
         if not commit:
             raise RuntimeError(
-                "quick comparison requires Git metadata or an explicit "
-                "LDM_QUICK_COMPARE_COMMIT for an archived release"
+                "pilot evaluation requires Git metadata or an explicit "
+                "LDM_PILOT_EVALUATION_COMMIT for an archived release"
             ) from error
         return {"commit": commit, "dirty": False, "source": "environment"}
     return {"commit": commit, "dirty": dirty, "source": "git"}
@@ -245,8 +245,8 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _write_manifest(spec: QuickCompareSpec, manifest: dict[str, Any]) -> None:
+def _write_manifest(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> None:
     atomic_json_write(spec.output_root / _MANIFEST_NAME, manifest)
 
 
-__all__ = ["run_comparison"]
+__all__ = ["run_evaluation"]

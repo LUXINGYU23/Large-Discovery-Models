@@ -208,16 +208,16 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
             else direct
         )
         assert required <= set(profile.locked_args)
-        filename = "quick_compare_base.yaml" if profile.name == "quick_compare" else f"{profile.name}.yaml"
+        filename = "pilot_evaluation_base.yaml" if profile.name == "pilot_evaluation" else f"{profile.name}.yaml"
         config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
 
 
-def test_ldm_comparison_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
+def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
 
-    for profile_name in ("quick_compare", "extended_compare"):
+    for profile_name in ("pilot_evaluation", "pilot_evaluation_extended"):
         args = contract.profile(profile_name).locked_args
         headroom = args["proposal-samples"] - args["bo-pool-size"]
         assert headroom >= args["evaluations-per-round"]

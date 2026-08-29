@@ -1,9 +1,9 @@
-name: synthonbench_extended_compare_direct_llm
+name: synthonbench_pilot_evaluation_direct_llm
 task: synthonbench
-algorithm: direct_llm_extended_compare
+algorithm: direct_llm_pilot_evaluation
 mode: real
-description: Fixed-budget twelve-round direct LLM comparison base for SynthonBench.
-contract_profile: extended_compare_direct_llm
+description: Fixed-budget six-round direct LLM comparison base for SynthonBench.
+contract_profile: pilot_evaluation_direct_llm
 args:
   proposal-mode: openai
   search-method: llm
@@ -11,7 +11,7 @@ args:
   scale: 1M
   target: kif11
   oracle-kind: surrogate
-  iterations: 12
+  iterations: 6
   proposal-samples: 16
   bo-pool-size: 48
   bo-search-samples: 64
@@ -41,7 +41,7 @@ args:
   llm-max-tokens: 256
   llm-temperature: 0.7
   llm-extra-body-json: '{{"reasoning":{{"effort":"max","summary":"auto"}}}}'
-  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/extended_compare
+  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/pilot_evaluation
   audit-timeout: 900.0
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

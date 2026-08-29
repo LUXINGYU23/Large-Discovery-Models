@@ -1,7 +1,7 @@
 schema_version: 1
-name: synthonbench_extended_compare
+name: synthonbench_pilot_evaluation_extended
 task: synthonbench
-base_config: ../synthonbench/extended_compare.yaml
+base_config: ../synthonbench/pilot_evaluation_extended.yaml
 cases:
   - id: surrogate_1m_kif11
     overrides:
@@ -12,7 +12,7 @@ methods: [ldm, harness, bo, llm]
 method_overrides:
   ldm: []
   harness:
-    - contract_profile="extended_compare_harness"
+    - contract_profile="pilot_evaluation_extended_harness"
     - args.proposal-backend="harness"
     - args.harness-candidates-per-session=16
     - args.harness-thinking="max"
@@ -22,14 +22,14 @@ method_overrides:
     - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
   bo: []
   llm:
-    - contract_profile="extended_compare_direct_llm"
+    - contract_profile="pilot_evaluation_extended_direct_llm"
     - args.prompt-policy="direct_v1"
     - args.proposal-samples=16
     - args.proposal-max-workers=4
 seeds: [0, 1, 2]
 optimization_rounds: 11
 initialization_mode: shared_random
-output_root: ${SYNTHONBENCH_RUNS_ROOT}/extended_compare
+output_root: ${SYNTHONBENCH_RUNS_ROOT}/pilot_evaluation_extended
 trajectory:
   step_column: call_idx
   step_kind: evaluation_index

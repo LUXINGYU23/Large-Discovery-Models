@@ -1,15 +1,15 @@
-name: iron_mind_extended_compare_direct_llm
+name: iron_mind_pilot_evaluation_direct_llm
 task: iron_mind
-algorithm: direct_llm_extended_compare
+algorithm: direct_llm_pilot_evaluation
 mode: real
-description: Fixed-budget twelve-round direct LLM comparison for Iron Mind.
-contract_profile: extended_compare_direct_llm
+description: Fixed-budget six-round direct LLM comparison base for Iron Mind.
+contract_profile: pilot_evaluation_direct_llm
 args:
   proposal-mode: openai
   search-method: llm
   initialization-mode: shared_random
   dataset-id: reductive_amination
-  iterations: 12
+  iterations: 6
   proposal-samples: 64
   bo-pool-size: 63
   proposal-max-workers: 64
@@ -27,6 +27,6 @@ args:
   llm-max-tokens: 512
   llm-temperature: 0.7
   prompt-policy: direct_v1
-  out-dir: ${IRON_MIND_RUNS_ROOT}/extended_compare
+  out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

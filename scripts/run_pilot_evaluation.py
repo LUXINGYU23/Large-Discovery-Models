@@ -1,4 +1,4 @@
-"""Run a versioned fixed-round comparison matrix."""
+"""Run a versioned fixed-round pilot evaluation."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ldm_tts.quick_compare.cli import main
+from ldm_tts.pilot_evaluation.cli import main
 
 
 if __name__ == "__main__":

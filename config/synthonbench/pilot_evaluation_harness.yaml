@@ -1,9 +1,9 @@
-name: synthonbench_extended_compare_harness
+name: synthonbench_pilot_evaluation_harness
 task: synthonbench
 algorithm: persistent_agent_harness_ldm
 mode: real
-description: Fixed-budget twelve-round persistent-agent LDM confirmation for SynthonBench.
-contract_profile: extended_compare_harness
+description: Fixed-budget six-round persistent-agent LDM comparison for SynthonBench.
+contract_profile: pilot_evaluation_harness
 args:
   proposal-backend: harness
   proposal-mode: none
@@ -12,7 +12,7 @@ args:
   scale: 1M
   target: kif11
   oracle-kind: surrogate
-  iterations: 12
+  iterations: 6
   proposal-samples: 64
   bo-pool-size: 48
   bo-search-samples: 64
@@ -42,7 +42,7 @@ args:
   llm-url: null
   llm-model-name: null
   api-key: null
-  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/extended_compare
+  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/pilot_evaluation
   audit-timeout: 900.0
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

@@ -1,4 +1,4 @@
-"""Direction-aware aggregation checks for quick comparisons."""
+"""Direction-aware aggregation checks for pilot evaluations."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from types import SimpleNamespace
 
-from ldm_tts.quick_compare.reporting import _round_rows, _verdict
+from ldm_tts.pilot_evaluation.reporting import _round_rows, _verdict
 
 
 def test_minimization_verdict_treats_lower_ldm_values_as_better() -> None:

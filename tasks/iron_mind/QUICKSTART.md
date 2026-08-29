@@ -110,19 +110,19 @@ campaign or a suite configuration for the full benchmark. Set both
 the internal search, with `M > K`, without changing the number of evaluated
 reactions.
 
-## 5. Run the Quick Three-Method Comparison
+## 5. Run the Three-Method Pilot Evaluation
 
 After the official data and endpoint are ready, run the fixed six-round matrix:
 
 ```bash
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml --dry-run
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml
 ```
 
 The BO comparator is offline after data preparation. LDM and direct LLM use
 the generic endpoint variables from step 2. The output root is
-`$IRON_MIND_RUNS_ROOT/quick_compare/`; rerun an interrupted matrix with
+`$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted matrix with
 `--resume` after confirming the repository and configurations are unchanged.

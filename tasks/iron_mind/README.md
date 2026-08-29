@@ -104,7 +104,7 @@ The evaluated condition is sampled without replacement from
 `--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
 different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=1` for the official 20-evaluation protocol; the fixed quick-comparison
+`eta=1` for the official 20-evaluation protocol; the fixed pilot-evaluation
 profiles use the calibrated values documented below. `--z-clip` defaults to 5.
 The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
@@ -258,15 +258,15 @@ uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/public_union_ldm_20x20.yaml
 ```
 
-## Fixed-Budget Quick Comparison
+## Fixed-Budget Pilot Evaluation
 
-`config/quick_compare/iron_mind.yaml` compares the repository's LDM method,
+`config/pilot_evaluation/iron_mind.yaml` compares the repository's LDM method,
 plain task-local GP-UCB BO, and direct LLM sampling on two source-pinned
 datasets. Each case uses three seeds, one shared random initialization round,
 and five optimization rounds. Every campaign therefore makes six official
 evaluations.
 
-`config/quick_compare/iron_mind_extended.yaml` preserves every method and
+`config/pilot_evaluation/iron_mind_extended.yaml` preserves every method and
 seed-setting choice but uses eleven optimization rounds (twelve evaluations
 per campaign). It is the confirmation profile for checking whether a
 data-starved six-evaluation comparison changes after additional GP feedback;
@@ -274,7 +274,7 @@ it does not replace the fixed six-evaluation early-stop screen.
 
 The LDM method retains the 64 independent proposals, empirical `q0`,
 63-candidate maintained pool, `beta=1`, and `eta=3` acquisition tilt locked by
-the quick-comparison profiles. Pure BO
+the pilot-evaluation profiles. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted
@@ -284,22 +284,22 @@ one-evaluation baseline.
 
 ```bash
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml --dry-run
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind_extended.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind_extended.yaml
 ```
 
 The matrix needs `IRON_MIND_DATA_ROOT`, `IRON_MIND_RUNS_ROOT`, and model
 endpoint variables only for the LDM and direct-LLM children. It writes a
 portable manifest, per-campaign standard artifacts, round-level trajectories,
-and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/quick_compare/`.
+and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/pilot_evaluation/`.
 Use `--resume` only for the same repository revision and unchanged configs.
 For a source archive rather than a Git checkout, set
-`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+`LDM_PILOT_EVALUATION_COMMIT` to the archive release commit so the manifest records
 explicit provenance.
 
 ## Outputs
