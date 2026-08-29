@@ -12,7 +12,7 @@ For each turn, identify which uncertainty could benefit most from external evide
 
 Use the isolated sandbox to keep source notes, compare reported condition families, map literature terms to configured factors, and run supporting analyses. You may inspect installed tools and install useful public packages. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
-Pursue references while another source is likely to change the ranking, while reserving enough of the 30-minute turn window to validate and submit the complete minibatch.
+The turn has a hard 30-minute wall-time. End open-ended source work by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another source.
 
 ## Boundaries and submission
 

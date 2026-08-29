@@ -12,7 +12,7 @@ For each turn, map what has and has not been tested, identify clusters of simila
 
 Use public literature to identify credible alternative mechanisms or condition families. Use the isolated sandbox for coverage tables, combinatorial summaries, distance heuristics, or ranking code; you may inspect installed tools and install useful public packages. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
-Continue exploring while another analysis step can materially improve coverage or ranking, while reserving enough of the 30-minute turn window to validate and submit every candidate.
+The turn has a hard 30-minute wall-time. End open-ended exploration by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another exploration step.
 
 ## Boundaries and submission
 

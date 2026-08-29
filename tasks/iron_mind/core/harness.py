@@ -406,6 +406,12 @@ def _turn_message(
             "candidate_count": profile.candidates_per_turn,
             "candidate_schema": candidate_schema,
         },
+        "time_budget": {
+            "hard_wall_time_minutes": 30,
+            "end_open_ended_research_by_minute": 20,
+            "first_submission_by_minute": 25,
+            "remaining_time_use": "repair_rejected_entries_only",
+        },
         "constraints": [
             "Choose reaction-condition hypotheses autonomously from the structured source-pinned condition-space tools.",
             "Do not search for this benchmark, its repository, datasets, evaluation tables, or hidden scores.",
@@ -414,7 +420,7 @@ def _turn_message(
             "The isolated sandbox contains no authoritative task data; use the structured tools for the legal condition space and measurements.",
             "Research autonomously when useful: search public literature, inspect public documents, and run scratch analysis code in the sandbox.",
             "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
-            "Use tools iteratively when useful, while reserving time to validate and submit the complete minibatch.",
+            "End open-ended research by minute 20 and make the first complete validated submission by minute 25; delivering the minibatch takes priority over further research.",
             "Never submit a candidate listed in evaluated_candidates.",
             "A candidate proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
             "Historical repeats, invalid candidates, and duplicates within your own minibatch will be rejected with exact reasons.",

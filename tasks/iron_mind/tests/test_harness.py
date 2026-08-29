@@ -127,6 +127,16 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
         "search_reaction_conditions",
         "validate_reaction_candidate",
     ] for message in messages)
+    assert all(
+        message["time_budget"]
+        == {
+            "hard_wall_time_minutes": 30,
+            "end_open_ended_research_by_minute": 20,
+            "first_submission_by_minute": 25,
+            "remaining_time_use": "repair_rejected_entries_only",
+        }
+        for message in messages
+    )
     assert all(turn.history_from_seq == 1 and turn.history_to_seq == 2 for turn in client.batches[0])
 
 

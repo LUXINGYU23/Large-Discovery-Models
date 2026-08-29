@@ -14,7 +14,7 @@ Use public-web research when a reaction class, catalyst system, ligand, solvent,
 
 Use the isolated sandbox as a research notebook. You may inspect installed tools, install useful public packages, write files, and run scratch code to tabulate observations, compare factor interactions, or rank legal combinations. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
-Continue research while another step is likely to change a decision, while reserving enough of the 30-minute turn window to validate and submit the complete minibatch.
+The turn has a hard 30-minute wall-time. End open-ended research by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another research step.
 
 ## Boundaries and submission
 

@@ -12,7 +12,7 @@ For each turn, convert the new history into explicit comparisons. Look for facto
 
 Use the isolated sandbox for scratch tables, small statistical summaries, interaction plots, or ranking scripts. You may inspect installed tools and install useful public packages. Public literature can help interpret an interaction, but it must not replace the supplied campaign evidence.
 
-Continue analysis while it can materially alter the candidate ranking, while reserving enough of the 30-minute turn window to validate and submit every candidate.
+The turn has a hard 30-minute wall-time. End open-ended analysis by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another analysis step.
 
 ## Boundaries and submission
 

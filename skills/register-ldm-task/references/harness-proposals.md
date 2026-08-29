@@ -57,6 +57,10 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   identity used by Campaign admission.
 - Return one stable, actionable `HarnessSubmissionRejection` for each rejected
   index and accept only a complete valid minibatch.
+- Turn instructions must translate the hard wall-time into explicit research,
+  validation, and first-submission milestones. "Reserve enough time" is not a
+  reliable delivery contract for an autonomous Agent; qualify the slowest role
+  on its first real turn and require submission before the outer timeout.
 - Define same-round occurrence semantics before empirical `q0` aggregation;
   do not globally deduplicate meaningful agreement across independent sessions.
 - Size the maintained BO pool from the expected number of unique accepted
