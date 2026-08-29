@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 1;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -18,6 +18,12 @@ export interface HarnessProfileConfig {
 	candidatesPerTurn: number;
 }
 
+export interface HarnessToolExtensionConfig {
+	path: string;
+	sha256: string;
+	toolNames: string[];
+}
+
 export interface NetworkPolicy {
 	allowedHosts: string[];
 	deniedHosts: string[];
@@ -26,10 +32,6 @@ export interface NetworkPolicy {
 
 export interface HarnessLimits {
 	wallTimeSeconds: number;
-	providerCalls: number;
-	webCalls: number;
-	context7Calls: number;
-	artifactBytes: number;
 }
 
 export interface BootstrapSecretFrame extends CommonFrame {
@@ -50,6 +52,7 @@ export interface InitializeFrame extends CommonFrame {
 	candidateSchemaSha256: string;
 	profileSetSha256: string;
 	profiles: HarnessProfileConfig[];
+	toolExtensions: HarnessToolExtensionConfig[];
 	networkPolicy: NetworkPolicy;
 	limits: HarnessLimits;
 	webProvider: "anysearch";
@@ -73,11 +76,46 @@ export interface RunTurnFrame extends CommonFrame {
 	turns: SessionTurnInput[];
 }
 
+export interface SubmissionRejection {
+	index: number;
+	code: string;
+	message: string;
+}
+
+export interface SubmissionValidationResultFrame extends CommonFrame {
+	type: "submission_validation_result";
+	validationId: string;
+	accepted: boolean;
+	rejected: SubmissionRejection[];
+	requiredReplacements: number;
+}
+
+export interface SubmissionValidationRequest {
+	profileId: string;
+	turnId: string;
+	attemptIndex: number;
+	candidates: Array<Record<string, unknown>>;
+}
+
+export interface SubmissionValidationDecision {
+	accepted: boolean;
+	rejected: SubmissionRejection[];
+}
+
+export type SubmissionValidator = (
+	request: SubmissionValidationRequest,
+) => Promise<SubmissionValidationDecision>;
+
 export interface CloseFrame extends CommonFrame {
 	type: "close";
 }
 
-export type InputFrame = BootstrapSecretFrame | InitializeFrame | RunTurnFrame | CloseFrame;
+export type InputFrame =
+	| BootstrapSecretFrame
+	| InitializeFrame
+	| RunTurnFrame
+	| SubmissionValidationResultFrame
+	| CloseFrame;
 
 export class ProtocolError extends Error {
 	readonly code: string;
@@ -176,6 +214,32 @@ function parseProfiles(value: unknown): HarnessProfileConfig[] {
 	return profiles;
 }
 
+function parseToolExtensions(value: unknown): HarnessToolExtensionConfig[] {
+	if (!Array.isArray(value)) throw new ProtocolError("invalid_frame", "toolExtensions must be an array");
+	const extensions = value.map((item, index) => {
+		const name = `toolExtensions[${index}]`;
+		const data = record(item, name);
+		exactKeys(data, ["path", "sha256", "toolNames"], name);
+		const toolNames = stringArray(data.toolNames, `${name}.toolNames`);
+		if (toolNames.length === 0 || toolNames.some((toolName) => !/^[a-z][a-z0-9_]*$/.test(toolName))) {
+			throw new ProtocolError("invalid_frame", `${name}.toolNames must contain lowercase identifiers`);
+		}
+		if (new Set(toolNames).size !== toolNames.length) {
+			throw new ProtocolError("invalid_frame", `${name}.toolNames must be unique`);
+		}
+		return {
+			path: string(data.path, `${name}.path`),
+			sha256: digest(data.sha256, `${name}.sha256`),
+			toolNames,
+		};
+	});
+	const names = extensions.flatMap((extension) => extension.toolNames);
+	if (new Set(names).size !== names.length) {
+		throw new ProtocolError("invalid_frame", "tool names must be unique across extensions");
+	}
+	return extensions;
+}
+
 function common(data: Record<string, unknown>): Omit<CommonFrame, "type"> & { type: string } {
 	if (data.protocolVersion !== PROTOCOL_VERSION) {
 		throw new ProtocolError("protocol_mismatch", `expected protocol ${PROTOCOL_VERSION}`);
@@ -205,6 +269,50 @@ export function parseFrame(line: string): InputFrame {
 	if (identity.type === "close") {
 		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId"], "frame");
 		return { ...identity, type: "close" };
+	}
+	if (identity.type === "submission_validation_result") {
+		exactKeys(data, [
+			"type", "requestId", "protocolVersion", "campaignId", "validationId",
+			"accepted", "rejected", "requiredReplacements",
+		], "frame");
+		if (typeof data.accepted !== "boolean") {
+			throw new ProtocolError("invalid_frame", "accepted must be boolean");
+		}
+		if (!Array.isArray(data.rejected)) {
+			throw new ProtocolError("invalid_frame", "rejected must be an array");
+		}
+		const rejected = data.rejected.map((item, index) => {
+			const name = `rejected[${index}]`;
+			const rejection = record(item, name);
+			exactKeys(rejection, ["index", "code", "message"], name);
+			const code = string(rejection.code, `${name}.code`);
+			if (!/^[a-z][a-z0-9_]*$/.test(code)) {
+				throw new ProtocolError("invalid_frame", `${name}.code must be a lowercase identifier`);
+			}
+			return {
+				index: nonnegativeInteger(rejection.index, `${name}.index`),
+				code,
+				message: string(rejection.message, `${name}.message`),
+			};
+		});
+		if (new Set(rejected.map((item) => item.index)).size !== rejected.length) {
+			throw new ProtocolError("invalid_frame", "submission rejection indices must be unique");
+		}
+		const requiredReplacements = nonnegativeInteger(
+			data.requiredReplacements,
+			"requiredReplacements",
+		);
+		if (requiredReplacements !== rejected.length || data.accepted !== (rejected.length === 0)) {
+			throw new ProtocolError("invalid_frame", "submission validation result is inconsistent");
+		}
+		return {
+			...identity,
+			type: "submission_validation_result",
+			validationId: string(data.validationId, "validationId"),
+			accepted: data.accepted,
+			rejected,
+			requiredReplacements,
+		};
 	}
 	if (identity.type === "run_turn") {
 		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "turns"], "frame");
@@ -251,12 +359,12 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaSha256", "profileSetSha256",
-		"profiles", "networkPolicy", "limits", "webProvider", "context7Enabled",
+		"profiles", "toolExtensions", "networkPolicy", "limits", "webProvider", "context7Enabled",
 	], "frame");
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
 	const limits = record(data.limits, "limits");
-	exactKeys(limits, ["wallTimeSeconds", "providerCalls", "webCalls", "context7Calls", "artifactBytes"], "limits");
+	exactKeys(limits, ["wallTimeSeconds"], "limits");
 	const thinking = string(data.thinking, "thinking") as ThinkingLevel;
 	const thinkingLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 	if (!thinkingLevels.includes(thinking)) throw new ProtocolError("invalid_frame", `invalid thinking level: ${thinking}`);
@@ -280,6 +388,7 @@ export function parseFrame(line: string): InputFrame {
 		candidateSchemaSha256: digest(data.candidateSchemaSha256, "candidateSchemaSha256"),
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
 		profiles: parseProfiles(data.profiles),
+		toolExtensions: parseToolExtensions(data.toolExtensions),
 		networkPolicy: {
 			allowedHosts: stringArray(policy.allowedHosts, "networkPolicy.allowedHosts"),
 			deniedHosts: stringArray(policy.deniedHosts, "networkPolicy.deniedHosts"),
@@ -287,10 +396,6 @@ export function parseFrame(line: string): InputFrame {
 		},
 		limits: {
 			wallTimeSeconds: positiveInteger(limits.wallTimeSeconds, "limits.wallTimeSeconds"),
-			providerCalls: positiveInteger(limits.providerCalls, "limits.providerCalls"),
-			webCalls: positiveInteger(limits.webCalls, "limits.webCalls"),
-			context7Calls: positiveInteger(limits.context7Calls, "limits.context7Calls"),
-			artifactBytes: positiveInteger(limits.artifactBytes, "limits.artifactBytes"),
 		},
 		webProvider: "anysearch",
 		context7Enabled: data.context7Enabled,

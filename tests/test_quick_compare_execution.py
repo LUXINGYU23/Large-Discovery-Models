@@ -52,6 +52,33 @@ def test_partial_matrix_can_resume_without_publishing_reports(tmp_path: Path) ->
     assert _json(output_root / "comparison_manifest.json")["state"] == "completed"
 
 
+def test_reporting_failure_marks_manifest_failed(tmp_path: Path, monkeypatch) -> None:
+    base_path = tmp_path / "base.yaml"
+    quick_path = tmp_path / "quick.yaml"
+    output_root = tmp_path / "comparison"
+    _write_yaml(base_path, _base_config())
+    _write_yaml(quick_path, _quick_config(base_path, output_root))
+
+    def fail_reporting(*_args) -> None:
+        raise ValueError("invalid comparison trajectory")
+
+    monkeypatch.setattr(
+        "ldm_tts.quick_compare.execution.write_comparison_reports",
+        fail_reporting,
+    )
+
+    with pytest.raises(ValueError, match="invalid comparison trajectory"):
+        run_comparison(load_quick_compare_spec(quick_path), resume=False, dry_run=False)
+
+    manifest = _json(output_root / "comparison_manifest.json")
+    assert manifest["state"] == "failed"
+    assert manifest["error"] == {
+        "stage": "reporting",
+        "type": "ValueError",
+        "message": "invalid comparison trajectory",
+    }
+
+
 def test_matrix_rejects_a_task_label_that_differs_from_its_base_config(tmp_path: Path) -> None:
     base_path = tmp_path / "base.yaml"
     quick_path = tmp_path / "quick.yaml"

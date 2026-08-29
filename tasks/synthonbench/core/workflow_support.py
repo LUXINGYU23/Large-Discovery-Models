@@ -27,21 +27,13 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
     proposal_attempts = _proposal_attempt_count(args, search_rounds)
     if args.proposal_backend == "harness":
         harness_turns = search_rounds * len(HARNESS_PROFILE_IDS)
-        llm_requests = harness_turns * args.harness_provider_calls
-        harness_web_calls = harness_turns * args.harness_web_calls
-        harness_context7_calls = harness_turns * args.harness_context7_calls
-        harness_artifact_bytes = harness_turns * args.harness_artifact_bytes
     else:
-        harness_turns = harness_web_calls = harness_context7_calls = harness_artifact_bytes = 0
+        harness_turns = 0
         llm_requests = proposal_attempts if args.proposal_mode == "openai" else 0
     dynamic = {
         "outer_iterations": args.iterations,
-        "llm_requests": llm_requests,
         "proposal_attempts": proposal_attempts,
         "harness_turns": harness_turns,
-        "harness_web_calls": harness_web_calls,
-        "harness_context7_calls": harness_context7_calls,
-        "harness_artifact_bytes": harness_artifact_bytes,
         "valid_search_candidates": _valid_candidate_count(args, initial, search_rounds),
         "selected_candidates": selected,
         "external_evaluations": selected,
@@ -49,6 +41,8 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
+    if args.proposal_backend != "harness":
+        dynamic["llm_requests"] = llm_requests
     return {**dynamic, **dict(profile_budget or {})}
 
 

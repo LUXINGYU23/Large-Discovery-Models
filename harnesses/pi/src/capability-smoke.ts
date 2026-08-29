@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PiSessionPool } from "./session.js";
-import type { InitializeFrame } from "./protocol.js";
+import { PROTOCOL_VERSION, type InitializeFrame } from "./protocol.js";
 import { canonicalSha256, sha256 } from "./trace.js";
 
 function usage() {
@@ -95,10 +95,14 @@ async function main(): Promise<void> {
 				candidates: [{ reaction_id: "r1", synthon_ids: ["a", "b"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
 		} else if (call === 4) {
-			writeEvents(response, textEvents(call, "Submitted."));
+			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+				candidates: [{ reaction_id: "r5", synthon_ids: ["i", "j"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
+			})));
 		} else if (call === 5) {
-			writeEvents(response, failureEvents(call, "stream_read_error"));
+			writeEvents(response, textEvents(call, "Corrected submission accepted."));
 		} else if (call === 6) {
+			writeEvents(response, failureEvents(call, "stream_read_error"));
+		} else if (call === 7) {
 			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
 				candidates: [{ reaction_id: "r3", synthon_ids: ["e", "f"] }, { reaction_id: "r4", synthon_ids: ["g", "h"] }],
 			})));
@@ -124,7 +128,7 @@ async function main(): Promise<void> {
 	const config: InitializeFrame = {
 		type: "initialize",
 		requestId: "initialize",
-		protocolVersion: 2,
+		protocolVersion: PROTOCOL_VERSION,
 		campaignId: "capability-campaign",
 		artifactRoot: join(root, "harness"),
 		baseUrl: `http://127.0.0.1:${address.port}/v1`,
@@ -142,16 +146,30 @@ async function main(): Promise<void> {
 			skillDirSha256: profile.skillDirSha256,
 		}]),
 		profiles: [profile],
+		toolExtensions: [],
 		networkPolicy: {
 			allowedHosts: ["example.com", "context7.com"],
 			deniedHosts: ["github.com"],
 			forbiddenQueryPatterns: ["benchmark score"],
 		},
-		limits: { wallTimeSeconds: 120, providerCalls: 6, webCalls: 2, context7Calls: 2, artifactBytes: 5_000_000 },
+		limits: { wallTimeSeconds: 120 },
 		webProvider: "anysearch",
 		context7Enabled: true,
 	};
 	const pool = new PiSessionPool(config, secret);
+	const validate = async (request: { turnId: string; attemptIndex: number }) => {
+		if (request.turnId === "capability_turn" && request.attemptIndex === 1) {
+			return {
+				accepted: false,
+				rejected: [{
+					index: 0,
+					code: "historical_duplicate",
+					message: "Candidate r1 was already evaluated; replace index 0.",
+				}],
+			};
+		}
+		return { accepted: true, rejected: [] };
+	};
 	try {
 		await pool.initialize();
 		const inputDigest = sha256("capability-turn");
@@ -165,18 +183,19 @@ async function main(): Promise<void> {
 			inputDigest,
 			message: "Verify the sandbox with bash and read, then submit exactly two candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
-		}]);
+		}], validate);
 		assert(turn);
 		assert.equal(turn.submission.candidates.length, 2);
-		assert.equal(turn.usage.providerCalls, 4);
+		assert.equal(turn.usage.providerCalls, 5);
 		assert(requestBodies[0]?.includes("capability-smoke researcher"));
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });
 		assert.equal(payloads[0]?.tool_choice, "required");
 		const submissionChoice = { type: "function", name: "submit_candidates" };
-		assert.deepEqual(payloads[1]?.tool_choice, submissionChoice);
-		assert.deepEqual(payloads[2]?.tool_choice, submissionChoice);
-		assert.equal(payloads[3]?.tool_choice, undefined);
+		assert.equal(payloads[1]?.tool_choice, undefined);
+		assert.equal(payloads[2]?.tool_choice, undefined);
+		assert.deepEqual(payloads[3]?.tool_choice, submissionChoice);
+		assert.equal(payloads[4]?.tool_choice, undefined);
 
 		const recoveryInput = {
 			profileId: "target_sar",
@@ -189,16 +208,19 @@ async function main(): Promise<void> {
 			message: "Submit exactly two more candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
 		};
-		const [recovered] = await pool.runTurns([recoveryInput]);
+		const [recovered] = await pool.runTurns([recoveryInput], validate);
 		assert(recovered);
 		assert.equal(recovered.submission.candidates.length, 2);
 		assert.equal(recovered.usage.providerCalls, 3);
-		assert.deepEqual((JSON.parse(requestBodies[5] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
-		const [replayed] = await pool.runTurns([recoveryInput]);
+		assert.deepEqual((JSON.parse(requestBodies[6] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
+		const [replayed] = await pool.runTurns([recoveryInput], validate);
 		assert.deepEqual(replayed, recovered);
-		assert.equal(call, 7);
+		assert.equal(call, 8);
 		await assert.rejects(
-			pool.runTurns([{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }]),
+			pool.runTurns(
+				[{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }],
+				validate,
+			),
 			/history cursor mismatch/,
 		);
 
@@ -217,16 +239,28 @@ async function main(): Promise<void> {
 		assert.match(JSON.stringify(readResult.content), /sandbox-ok/);
 		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-ok");
 		assert.match(session, /submit_candidates/);
+		assert.match(session, /historical_duplicate/);
+		assert.match(session, /already evaluated; replace index 0/);
 		assert.match(session, /previous provider stream ended/);
 		assert.match(session, /sandbox-ok/);
 		const providerIndex = await readFile(join(root, "harness", "sessions", "target_sar", "turns", "capability_turn", "provider_index.jsonl"), "utf8");
-		assert.equal(providerIndex.trim().split("\n").length, 4);
+		assert.equal(providerIndex.trim().split("\n").length, 5);
 		assert.equal((await readdir(join(root, "harness", "sessions", "target_sar", "pi-agent"))).includes("auth.json"), false);
 		const manifest = JSON.parse(await readFile(join(root, "harness", "manifest.json"), "utf8")) as {
-			campaignId?: unknown; profileSetSha256?: unknown; profiles?: Array<{ sessionId?: unknown }>;
+			campaignId?: unknown;
+			profileSetSha256?: unknown;
+			contextWindow?: unknown;
+			compaction?: unknown;
+			profiles?: Array<{ sessionId?: unknown }>;
 		};
 		assert.equal(manifest.campaignId, config.campaignId);
 		assert.equal(manifest.profileSetSha256, config.profileSetSha256);
+		assert.equal(manifest.contextWindow, 262_144);
+		assert.deepEqual(manifest.compaction, {
+			enabled: true,
+			reserveTokens: 16_384,
+			keepRecentTokens: 20_000,
+		});
 		assert.equal(manifest.profiles?.[0]?.sessionId, turn.sessionId);
 
 		const recoveryRoot = join(root, "harness", "sessions", "target_sar", "turns", "capability_recovery_turn");

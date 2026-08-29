@@ -29,7 +29,7 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, secret, "campaign-1");
 	try {
 		await proxy.start();
-		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, 2, 1_000_000);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root);
 		const response = await fetch(`${proxy.baseUrl("target_sar")}/responses`, {
 			method: "POST",
 			headers: { authorization: "Bearer sidecar-proxy-token", "content-type": "application/json" },
@@ -58,7 +58,7 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 		assert.equal(index.response.chunks, 4);
 		assert.equal(index.response.headers["set-cookie"], "[REDACTED]");
 
-		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, 2, 1_000_000);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root);
 		const recovered = await fetch(proxy.baseUrl("target_sar") + "/responses", {
 			method: "POST",
 			body: "{}",

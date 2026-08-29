@@ -1,4 +1,4 @@
-"""Run a versioned fixed-budget comparison matrix."""
+"""Run a versioned fixed-round comparison matrix."""
 
 from __future__ import annotations
 

@@ -10,7 +10,8 @@ from typing import Any
 from ldm_tts.cli.runner import load_config
 
 
-METHODS = ("ldm", "bo", "llm")
+SUPPORTED_METHODS = ("ldm", "harness", "bo", "llm")
+BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
 
 
@@ -40,6 +41,7 @@ class QuickCompareSpec:
     name: str
     base_config: Path
     cases: tuple[ComparisonCase, ...]
+    methods: tuple[str, ...]
     method_overrides: dict[str, tuple[str, ...]]
     seeds: tuple[int, ...]
     optimization_rounds: int
@@ -58,7 +60,7 @@ class QuickCompareSpec:
             "name": self.name,
             "base_config": str(self.base_config),
             "cases": [{"id": item.case_id, "overrides": list(item.overrides)} for item in self.cases],
-            "methods": list(METHODS),
+            "methods": list(self.methods),
             "method_overrides": {name: list(values) for name, values in self.method_overrides.items()},
             "seeds": list(self.seeds),
             "optimization_rounds": self.optimization_rounds,
@@ -75,12 +77,14 @@ def load_quick_compare_spec(path: Path) -> QuickCompareSpec:
     resolved = Path(path).resolve()
     raw = load_config(resolved)
     _require_exact_keys(raw)
+    methods = _methods(raw.get("methods"))
     return QuickCompareSpec(
         task=_required_string(raw.get("task"), "task"),
         name=_required_string(raw.get("name"), "name"),
         base_config=_resolve_base_config(resolved, raw),
         cases=_cases(raw.get("cases")),
-        method_overrides=_method_overrides(raw.get("method_overrides")),
+        methods=methods,
+        method_overrides=_method_overrides(raw.get("method_overrides"), methods),
         seeds=_seeds(raw.get("seeds")),
         optimization_rounds=_positive_int(raw.get("optimization_rounds"), "optimization_rounds"),
         initialization_mode=_required_string(
@@ -99,8 +103,19 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
     }
     if set(raw) != expected or raw.get("schema_version") != 1:
         raise ValueError("quick comparison config must use schema_version=1 and the documented fields")
-    if tuple(raw.get("methods", ())) != METHODS:
-        raise ValueError("quick comparison methods must be exactly [ldm, bo, llm]")
+
+
+def _methods(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise ValueError("quick comparison methods must be a non-empty list")
+    methods = tuple(value)
+    if any(not isinstance(item, str) or item not in SUPPORTED_METHODS for item in methods):
+        raise ValueError(f"quick comparison methods must come from {list(SUPPORTED_METHODS)}")
+    if len(set(methods)) != len(methods):
+        raise ValueError("quick comparison methods must be unique")
+    if not BASELINE_METHODS <= set(methods):
+        raise ValueError("quick comparison methods must include ldm, bo, and llm")
+    return methods
 
 
 def _resolve_base_config(path: Path, raw: dict[str, Any]) -> Path:
@@ -137,11 +152,11 @@ def _seeds(value: Any) -> tuple[int, ...]:
     return tuple(value)
 
 
-def _method_overrides(value: Any) -> dict[str, tuple[str, ...]]:
-    if not isinstance(value, dict) or set(value) != set(METHODS):
-        raise ValueError("method_overrides must define ldm, bo, and llm")
+def _method_overrides(value: Any, methods: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
+    if not isinstance(value, dict) or set(value) != set(methods):
+        raise ValueError("method_overrides must define exactly the configured methods")
     result: dict[str, tuple[str, ...]] = {}
-    for method in METHODS:
+    for method in methods:
         overrides = value[method]
         if not isinstance(overrides, list) or not all(
             isinstance(item, str) and "=" in item for item in overrides
@@ -190,4 +205,4 @@ def _positive_int(value: Any, name: str) -> int:
     return value
 
 
-__all__ = ["METHODS", "QuickCompareSpec", "load_quick_compare_spec"]
+__all__ = ["QuickCompareSpec", "load_quick_compare_spec"]

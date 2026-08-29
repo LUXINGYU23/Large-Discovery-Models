@@ -68,11 +68,12 @@
       "data_repository": "mireklzicar/synthonbench at revision 19f7bb669032f60b306139318d3f71a26f60134a",
       "candidate_contract": "One exact reaction_id plus ordered slot-specific synthon_ids tuple, validated against the released SynthonSpace.",
       "oracle_contract": "Every selected unseen tuple is scored by official GlobalSynthonTask; duplicate tuples are excluded before evaluation.",
-      "proposal_contract": "The direct backend issues independent one-candidate Chat Completions requests. The optional harness backend collects ordered minibatches from four persistent Pi sessions over the Responses API. Both backends restrict every candidate to a deterministic public reaction-conditioned slate.",
+      "proposal_contract": "The direct backend issues independent one-candidate Chat Completions requests over deterministic public slates. The harness backend lets four persistent Pi sessions query a structured read-only view of the official SynthonSpace and submit exact reaction_id plus synthon_ids tuples over the Responses API.",
       "method": "Structure-aware proposal occurrences from the selected backend, empirical q0 from all valid unseen occurrences, q0-weighted Gumbel maintenance of a configurable BO pool, task-local reaction-aware Nystr\u00f6m/FITC count-Tanimoto GP-UCB scoring over standardized utilities, and q0^alpha exp(eta z(UCB)) Gumbel sampling.",
       "audit": "The source-pinned scripts/score_submission.py is executed unchanged for released 1M, 10M, and 100M score tables.",
       "method_providers": {
         "ldm": "model_endpoint",
+        "harness": "model_endpoint",
         "llm": "model_endpoint",
         "bo": "dataset_or_deterministic_search"
       }
@@ -97,12 +98,8 @@
       "description": "Two-round persistent-agent LDM smoke run on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 2,
-        "llm_requests": 64,
         "proposal_attempts": 8,
         "harness_turns": 8,
-        "harness_web_calls": 32,
-        "harness_context7_calls": 16,
-        "harness_artifact_bytes": 536870912,
         "selected_candidates": 2,
         "external_evaluations": 2,
         "expensive_evaluation_attempts": 2,
@@ -120,11 +117,7 @@
         "proposal-samples": 64,
         "harness-candidates-per-session": 16,
         "harness-thinking": "max",
-        "harness-provider-calls": 8,
-        "harness-web-calls": 4,
-        "harness-context7-calls": 2,
-        "harness-wall-time-seconds": 900,
-        "harness-artifact-bytes": 67108864,
+        "harness-wall-time-seconds": 1800,
         "bo-pool-size": 32,
         "slate-size": 24,
         "reaction-allocation": "product_weighted",
@@ -139,6 +132,49 @@
         "alpha": 1.0,
         "eta": 1.0,
         "z-clip": 5.0
+      }
+    },
+    "quick_compare_harness": {
+      "description": "Six-round fixed-budget persistent-agent LDM comparison on the official 1M surrogate track.",
+      "budget": {
+        "outer_iterations": 6,
+        "proposal_attempts": 20,
+        "harness_turns": 20,
+        "valid_search_candidates": 336,
+        "selected_candidates": 96,
+        "external_evaluations": 96,
+        "expensive_evaluation_attempts": 96,
+        "successful_evaluations": 96,
+        "benchmark_jobs": 96
+      },
+      "locked_args": {
+        "scale": "1M",
+        "target": "kif11",
+        "oracle-kind": "surrogate",
+        "proposal-backend": "harness",
+        "proposal-mode": "none",
+        "iterations": 6,
+        "evaluations-per-round": 16,
+        "proposal-samples": 64,
+        "harness-candidates-per-session": 16,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "bo-pool-size": 48,
+        "bo-search-samples": 64,
+        "slate-size": 24,
+        "reaction-allocation": "product_weighted",
+        "fingerprint-bits": 2048,
+        "gp-landmarks": 256,
+        "gp-kernel-jitter": 1.0e-8,
+        "gp-signal-std": 1.0,
+        "gp-mean-std": 1.0,
+        "gp-observation-noise-std": 1.0,
+        "gp-reaction-weight": 1.0,
+        "acquisition-beta": 0.5,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
+        "initialization-mode": "shared_random"
       }
     },
     "quick_compare": {
@@ -160,7 +196,7 @@
         "proposal-samples": 64,
         "bo-pool-size": 48,
         "bo-search-samples": 64,
-        "proposal-max-workers": 64,
+        "proposal-max-workers": 4,
         "slate-size": 24,
         "reaction-allocation": "product_weighted",
         "fingerprint-bits": 2048,
@@ -178,7 +214,7 @@
         "prompt-policy": "policy_v1",
         "llm-max-tokens": 256,
         "llm-temperature": 0.7,
-        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
     "quick_compare_direct_llm": {
@@ -200,7 +236,7 @@
         "proposal-samples": 16,
         "bo-pool-size": 48,
         "bo-search-samples": 64,
-        "proposal-max-workers": 16,
+        "proposal-max-workers": 4,
         "slate-size": 24,
         "reaction-allocation": "product_weighted",
         "fingerprint-bits": 2048,
@@ -218,7 +254,50 @@
         "prompt-policy": "direct_v1",
         "llm-max-tokens": 256,
         "llm-temperature": 0.7,
-        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
+      }
+    },
+    "extended_compare_harness": {
+      "description": "Twelve-round fixed-budget persistent-agent LDM confirmation on the official 1M surrogate track.",
+      "budget": {
+        "outer_iterations": 12,
+        "proposal_attempts": 44,
+        "harness_turns": 44,
+        "valid_search_candidates": 720,
+        "selected_candidates": 192,
+        "external_evaluations": 192,
+        "expensive_evaluation_attempts": 192,
+        "successful_evaluations": 192,
+        "benchmark_jobs": 192
+      },
+      "locked_args": {
+        "scale": "1M",
+        "target": "kif11",
+        "oracle-kind": "surrogate",
+        "proposal-backend": "harness",
+        "proposal-mode": "none",
+        "iterations": 12,
+        "evaluations-per-round": 16,
+        "proposal-samples": 64,
+        "harness-candidates-per-session": 16,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "bo-pool-size": 48,
+        "bo-search-samples": 64,
+        "slate-size": 24,
+        "reaction-allocation": "product_weighted",
+        "fingerprint-bits": 2048,
+        "gp-landmarks": 256,
+        "gp-kernel-jitter": 1.0e-8,
+        "gp-signal-std": 1.0,
+        "gp-mean-std": 1.0,
+        "gp-observation-noise-std": 1.0,
+        "gp-reaction-weight": 1.0,
+        "acquisition-beta": 0.5,
+        "alpha": 1.0,
+        "eta": 3.0,
+        "z-clip": 5.0,
+        "initialization-mode": "shared_random"
       }
     },
     "extended_compare": {
@@ -240,7 +319,7 @@
         "proposal-samples": 64,
         "bo-pool-size": 48,
         "bo-search-samples": 64,
-        "proposal-max-workers": 64,
+        "proposal-max-workers": 4,
         "slate-size": 24,
         "reaction-allocation": "product_weighted",
         "fingerprint-bits": 2048,
@@ -258,7 +337,7 @@
         "prompt-policy": "policy_v1",
         "llm-max-tokens": 256,
         "llm-temperature": 0.7,
-        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
     "extended_compare_direct_llm": {
@@ -280,7 +359,7 @@
         "proposal-samples": 16,
         "bo-pool-size": 48,
         "bo-search-samples": 64,
-        "proposal-max-workers": 16,
+        "proposal-max-workers": 4,
         "slate-size": 24,
         "reaction-allocation": "product_weighted",
         "fingerprint-bits": 2048,
@@ -298,7 +377,7 @@
         "prompt-policy": "direct_v1",
         "llm-max-tokens": 256,
         "llm-temperature": 0.7,
-        "llm-extra-body-json": "{{\"thinking\":{{\"type\":\"disabled\"}}}}"
+        "llm-extra-body-json": "{{\"reasoning\":{{\"effort\":\"max\",\"summary\":\"auto\"}}}}"
       }
     },
     "surrogate_1m_qualification": {

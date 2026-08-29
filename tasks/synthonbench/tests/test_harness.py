@@ -10,18 +10,36 @@ from synthonbench.space import Synthon, SynthonSpace
 
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation
 from ldm_tts.engine.expansion import ExpansionRequest
-from ldm_tts.harness import HarnessTurnResult
+from ldm_tts.harness import HarnessSubmissionRequest, HarnessTurnResult
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
-from tasks.synthonbench.core.catalog import SynthonProposalCatalog
 from tasks.synthonbench.core.constants import Q0_METADATA_KEY
-from tasks.synthonbench.core.harness import SynthonHarnessExpander, harness_profiles
+from tasks.synthonbench.core.harness import (
+    HARNESS_CANDIDATE_SCHEMA,
+    SynthonHarnessExpander,
+    _validate_submission,
+    harness_profiles,
+)
+from tasks.synthonbench.core.space_order import (
+    ordered_positions,
+    ordered_reactions,
+    ordered_synthon_ids,
+)
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
 
 
 class FakeHarnessClient:
-    def __init__(self, *, corrupt: bool = False) -> None:
-        self.corrupt = corrupt
+    def __init__(
+        self,
+        *,
+        candidate: dict[str, object] | None = None,
+        initial_by_profile: dict[str, dict[str, object]] | None = None,
+        replacement_by_profile: dict[str, dict[str, object]] | None = None,
+    ) -> None:
+        self.candidate = candidate or {"reaction_id": "r1", "synthon_ids": [3, 13]}
+        self.initial_by_profile = initial_by_profile or {}
+        self.replacement_by_profile = replacement_by_profile or {}
         self.batches = []
+        self.rejections = {}
 
     def start(self) -> None:
         pass
@@ -29,20 +47,34 @@ class FakeHarnessClient:
     def close(self) -> None:
         pass
 
-    def run_turn(self, turns):
+    def run_turn(self, turns, *, submission_validator):
         self.batches.append(turns)
         results = []
         for turn in turns:
             payload = json.loads(turn.message.split("\n\n", 1)[1])
-            candidates = []
-            for item_index, item in enumerate(payload["assigned_items"]):
-                candidate = {
-                    "item_index": item_index,
-                    "option_indices": [0 for _slot in item["slot_options"]],
-                }
-                candidates.append(candidate)
-            if self.corrupt and not results:
-                candidates[0]["option_indices"][0] = 999
+            candidate = self.initial_by_profile.get(turn.profile_id, self.candidate)
+            candidates = [
+                {**candidate}
+                for _ in range(payload["submission_contract"]["candidate_count"])
+            ]
+            validation = submission_validator(HarnessSubmissionRequest(
+                turn.profile_id,
+                turn.turn_id,
+                1,
+                tuple(candidates),
+            ))
+            if not validation.accepted:
+                replacement = self.replacement_by_profile.get(turn.profile_id)
+                if replacement is None:
+                    raise AssertionError(validation.rejections)
+                self.rejections[turn.profile_id] = validation.rejections
+                candidates = [{**replacement} for _ in candidates]
+                assert submission_validator(HarnessSubmissionRequest(
+                    turn.profile_id,
+                    turn.turn_id,
+                    2,
+                    tuple(candidates),
+                )).accepted
             results.append(HarnessTurnResult(
                 profile_id=turn.profile_id,
                 session_id=f"session-{turn.profile_id}",
@@ -58,27 +90,6 @@ class FakeHarnessClient:
                 artifacts={"turn": f"turns/{turn.turn_id}"},
             ))
         return tuple(results)
-
-
-class ConsensusClient:
-    def run_turn(self, turns):
-        return tuple(
-            HarnessTurnResult(
-                profile_id=turn.profile_id,
-                session_id=f"session-{turn.profile_id}",
-                turn_id=turn.turn_id,
-                round_index=turn.round_index,
-                history_from_seq=turn.history_from_seq,
-                history_to_seq=turn.history_to_seq,
-                history_digest=turn.history_digest,
-                input_digest=turn.input_digest,
-                submission_id=f"submission-{turn.profile_id}",
-                candidates=({"item_index": 0, "option_indices": [0, 0]},),
-                usage={},
-                artifacts={},
-            )
-            for turn in turns
-        )
 
 
 def test_harness_expander_validates_four_minibatches_and_reuses_global_q0() -> None:
@@ -116,6 +127,17 @@ def test_harness_second_turn_sends_only_the_previous_round_measurements() -> Non
     messages = [json.loads(turn.message.split("\n\n", 1)[1]) for turn in client.batches[0]]
     assert all(message["message_type"] == "history_delta" for message in messages)
     assert all(len(message["new_measured_observations"]) == 1 for message in messages)
+    assert all(message["evaluated_candidates"] == [
+        {"reaction_id": "r1", "synthon_ids": [1, 11]},
+        {"reaction_id": "r1", "synthon_ids": [2, 12]},
+    ] for message in messages)
+    assert all(message["novelty_contract"] == {
+        "historical_candidates_are_forbidden": True,
+        "required_unseen_candidate_count": 1,
+        "same_round_cross_session_agreement_is_allowed": True,
+        "same_session_duplicates_are_forbidden": True,
+        "validate_before_submission": True,
+    } for message in messages)
     assert all(turn.history_from_seq == 1 and turn.history_to_seq == 2 for turn in client.batches[0])
     assert len({turn.history_digest for turn in client.batches[0]}) == 1
     assert all("latest" in turn.forbidden_query_terms for turn in client.batches[0])
@@ -124,33 +146,75 @@ def test_harness_second_turn_sends_only_the_previous_round_measurements() -> Non
         for message in messages
     )
     assert all(
-        "Treat this as a bounded selection turn, not open-ended research."
-        in message["constraints"]
+        message["submission_contract"]["candidate_schema"] == HARNESS_CANDIDATE_SCHEMA
         for message in messages
     )
     assert all(
-        any("one batch of optional tool calls" in item for item in message["constraints"])
+        message["synthon_space_tools"] == [
+            "list_synthon_reactions",
+            "search_synthon_space",
+            "validate_synthon_candidate",
+        ]
         for message in messages
-    )
-    assert all(
-        message["submission_contract"]["candidate_schema"] == {
-            "item_index": "copy the assigned zero-based item_index",
-            "option_indices": "one zero-based option_index from every slot, in slot order",
-        }
-        for message in messages
-    )
-    assert all(
-        set(option) == {"option_index", "smiles"}
-        for message in messages for item in message["assigned_items"]
-        for slot in item["slot_options"] for option in slot["options"]
     )
 
 
-def test_harness_rejects_a_candidate_outside_its_assigned_slate() -> None:
-    with pytest.raises(ValueError, match=r"option_indices\[0\]"):
-        _expander(FakeHarnessClient(corrupt=True)).expand(
-            ExpansionRequest(round_idx=0, reservoir_size=4)
-        )
+def test_submission_validator_returns_actionable_reasons() -> None:
+    domain = SynthonCandidateDomain(_space(), ("r1",), "kif11")
+    validation = _validate_submission(
+        HarnessSubmissionRequest(
+            "target_sar",
+            "turn-1",
+            1,
+            (
+                {"reaction_id": "r1", "synthon_ids": [1, 11]},
+                {"reaction_id": "r1", "synthon_ids": [999, 11]},
+                {"reaction_id": "r1", "synthon_ids": [2, 12]},
+                {"reaction_id": "r1", "synthon_ids": [2, 12]},
+            ),
+        ),
+        domain,
+        {"r1|1_11"},
+    )
+
+    assert [item.code for item in validation.rejections] == [
+        "historical_duplicate", "invalid_candidate", "same_session_duplicate",
+    ]
+    assert "already evaluated" in validation.rejections[0].message
+    assert "synthon ID 999" in validation.rejections[1].message
+    assert "duplicates index 2" in validation.rejections[2].message
+
+
+def test_harness_rejects_history_and_refills_before_q0() -> None:
+    initial = {
+        "target_sar": {"reaction_id": "r1", "synthon_ids": [1, 11]},
+        "reaction_feasibility": {"reaction_id": "r1", "synthon_ids": [2, 11]},
+        "scaffold_exploration": {"reaction_id": "r1", "synthon_ids": [3, 11]},
+        "property_risk": {"reaction_id": "r1", "synthon_ids": [4, 11]},
+    }
+    client = FakeHarnessClient(initial_by_profile=initial, replacement_by_profile={
+        **initial,
+        "target_sar": {"reaction_id": "r1", "synthon_ids": [5, 11]},
+    })
+    measured = _observation("measured", [1, 11], round_idx=0)
+
+    result = _expander(client).expand(ExpansionRequest(
+        round_idx=1,
+        reservoir_size=4,
+        observations=(measured,),
+    ))
+
+    assert len(result.proposals) == 4
+    assert [item.metadata["harness_lineage"]["profile_id"] for item in result.proposals] == [
+        "target_sar", "reaction_feasibility", "scaffold_exploration", "property_risk",
+    ]
+    rejection = client.rejections["target_sar"][0]
+    assert rejection.code == "historical_duplicate"
+    assert "already evaluated" in rejection.message
+    assert all(
+        proposal.metadata[Q0_METADATA_KEY]["valid_occurrence_count"] == 4
+        for proposal in result.proposals
+    )
 
 
 def test_cross_profile_consensus_increases_shared_occurrence_probability() -> None:
@@ -159,15 +223,8 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
         Synthon(11, 2, "r1", "N"),
     ])
     expander = SynthonHarnessExpander(
-        ConsensusClient(),
+        FakeHarnessClient(candidate={"reaction_id": "r1", "synthon_ids": [1, 11]}),
         SynthonCandidateDomain(space, ("r1",), "kif11"),
-        SynthonProposalCatalog(
-            space,
-            allowed_reactions=("r1",),
-            slate_size=1,
-            seed=3,
-            unique_anchors=False,
-        ),
         target="kif11",
         profiles=harness_profiles(1, resource_root=Path("profiles")),
         campaign_id="test-campaign",
@@ -206,11 +263,18 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     monkeypatch,
     capsys,
 ) -> None:
-    client = FakeHarnessClient()
-    monkeypatch.setattr(
-        "tasks.synthonbench.core.workflow._harness_client",
-        lambda *_args: client,
-    )
+    def fake_client(_args, _runtime, _provider, benchmark):
+        reaction_id = ordered_reactions(benchmark.task.allowed_reactions)[0]
+        candidate = {
+            "reaction_id": reaction_id,
+            "synthon_ids": [
+                ordered_synthon_ids(benchmark.task.space, reaction_id, position)[0]
+                for position in ordered_positions(benchmark.task.space, reaction_id)
+            ],
+        }
+        return FakeHarnessClient(candidate=candidate)
+
+    monkeypatch.setattr("tasks.synthonbench.core.workflow._harness_client", fake_client)
 
     assert main([
         "--mock",
@@ -245,18 +309,9 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
 def _expander(client) -> SynthonHarnessExpander:
     space = _space()
     domain = SynthonCandidateDomain(space, ("r1",), "kif11")
-    catalog = SynthonProposalCatalog(
-        space,
-        allowed_reactions=("r1",),
-        slate_size=3,
-        seed=7,
-        unique_anchors=True,
-        proposals_per_round=4,
-    )
     return SynthonHarnessExpander(
         client,
         domain,
-        catalog,
         target="kif11",
         profiles=harness_profiles(1, resource_root=Path("profiles")),
         campaign_id="test-campaign",

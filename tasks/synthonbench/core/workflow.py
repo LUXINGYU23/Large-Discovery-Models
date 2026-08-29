@@ -44,6 +44,8 @@ from tasks.synthonbench.core.harness import (
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     harness_profiles,
+    harness_tool_extensions,
+    write_harness_space_catalog,
 )
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
@@ -143,7 +145,7 @@ def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
         if missing:
             pause_endpoint(runtime, args, payload, missing)
             return 2
-        harness_client = _harness_client(args, runtime, provider)
+        harness_client = _harness_client(args, runtime, provider, benchmark)
         try:
             harness_client.start()
             components = _components(args, benchmark, runtime, None, harness_client)
@@ -310,7 +312,7 @@ def _missing_harness_provider(provider) -> str:
     return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
 
 
-def _harness_client(args, runtime: CampaignRuntime, provider) -> HarnessClient:
+def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> HarnessClient:
     artifact_root = (runtime.run_dir / "harness").resolve()
     cache_root = (
         args.harness_cache_dir.expanduser().resolve()
@@ -320,6 +322,16 @@ def _harness_client(args, runtime: CampaignRuntime, provider) -> HarnessClient:
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
     cache_root.mkdir(parents=True, exist_ok=True)
+    write_harness_space_catalog(
+        benchmark.task.space,
+        benchmark.task.allowed_reactions,
+        artifact_root / "synthon_space.json",
+        reactions_path=(
+            benchmark.data_dir / "spaces" / "reactions.tsv"
+            if benchmark.data_dir is not None
+            else None
+        ),
+    )
     command = ["docker"]
     if args.harness_docker_host:
         command.extend(("--host", args.harness_docker_host))
@@ -329,6 +341,7 @@ def _harness_client(args, runtime: CampaignRuntime, provider) -> HarnessClient:
     command.extend((
         "--device", "/dev/kvm",
         "--env", "HOME=/runtime-home",
+        "--env", "LDM_SYNTHON_SPACE_CATALOG=/artifacts/synthon_space.json",
         "--mount", f"type=bind,src={artifact_root},dst=/artifacts",
         "--mount", f"type=bind,src={resource_root},dst=/resources,readonly",
         "--mount", f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
@@ -345,13 +358,10 @@ def _harness_client(args, runtime: CampaignRuntime, provider) -> HarnessClient:
         case_id=f"{args.oracle_kind}:{args.scale}:{args.target}",
         seed=args.campaign_index,
         candidate_schema_sha256=canonical_sha256(HARNESS_CANDIDATE_SCHEMA),
+        tool_extensions=harness_tool_extensions(),
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,
-            provider_calls=args.harness_provider_calls,
-            web_calls=args.harness_web_calls,
-            context7_calls=args.harness_context7_calls,
-            artifact_bytes=args.harness_artifact_bytes,
         ),
         network_policy=HarnessNetworkPolicy(
             allowed_hosts=HARNESS_ALLOWED_HOSTS,

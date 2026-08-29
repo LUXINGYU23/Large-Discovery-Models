@@ -33,13 +33,7 @@ function policyHandlers(controller: PolicyController) {
 }
 
 function controller(): PolicyController {
-	return new PolicyController(policy, {
-		providerCalls: 4,
-		webCalls: 4,
-		context7Calls: 2,
-		artifactBytes: 1024,
-		wallTimeSeconds: 30,
-	}, "anysearch");
+	return new PolicyController(policy, "anysearch");
 }
 
 test("web results are filtered before their responseId becomes session-readable", () => {
@@ -94,4 +88,27 @@ test("responseIds remain private to the policy controller that received them", (
 	assert.equal(ownerHandlers.call(read), undefined);
 	owner.end();
 	other.end();
+});
+
+test("tool usage is counted without a call limit", () => {
+	const subject = controller();
+	const handlers = policyHandlers(subject);
+	subject.begin([]);
+	for (let index = 0; index < 20; index += 1) {
+		assert.equal(handlers.call({
+			type: "tool_call",
+			toolCallId: `search-${index}`,
+			toolName: "web_search",
+			input: { query: `reaction design ${index}` },
+		} as ToolCallEvent), undefined);
+	}
+	for (let index = 0; index < 10; index += 1) {
+		assert.equal(handlers.call({
+			type: "tool_call",
+			toolCallId: `context-${index}`,
+			toolName: "query-docs",
+			input: { query: `library API ${index}` },
+		} as ToolCallEvent), undefined);
+	}
+	assert.deepEqual(subject.end(), { webCalls: 20, context7Calls: 10 });
 });

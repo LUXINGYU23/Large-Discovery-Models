@@ -28,6 +28,19 @@ for line in sys.stdin:
     elif frame["type"] == "run_turn":
         turns = []
         for item in frame["turns"]:
+            candidates = [{"value": item["profileId"]}]
+            print(json.dumps({
+                "type": "submission_validation_requested",
+                **common,
+                "validationId": f"{item['turnId']}-validation-1",
+                "profileId": item["profileId"],
+                "turnId": item["turnId"],
+                "attemptIndex": 1,
+                "candidates": candidates,
+            }), flush=True)
+            validation = json.loads(next(sys.stdin))
+            assert validation["type"] == "submission_validation_result"
+            assert validation["accepted"] is True
             turns.append({
                 "profileId": item["profileId"],
                 "sessionId": f"session-{item['profileId']}",
@@ -39,7 +52,7 @@ for line in sys.stdin:
                 "inputDigest": item["inputDigest"],
                 "submission": {
                     "submissionId": f"{item['turnId']}-submission",
-                    "candidates": [{"value": item["profileId"]}],
+                    "candidates": candidates,
                 },
                 "usage": {"providerCalls": 1, "webCalls": 0, "context7Calls": 0, "artifactBytes": 12},
                 "artifacts": {"turn": f"turns/{item['turnId']}", "session": f"sessions/{item['profileId']}.jsonl"},

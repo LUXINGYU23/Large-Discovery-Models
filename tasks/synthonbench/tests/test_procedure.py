@@ -197,9 +197,8 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         "llm-max-tokens", "llm-temperature", "llm-extra-body-json",
     }
     harness = {
-        "harness-candidates-per-session", "harness-thinking", "harness-provider-calls",
-        "harness-web-calls", "harness-context7-calls", "harness-wall-time-seconds",
-        "harness-artifact-bytes",
+        "harness-candidates-per-session", "harness-thinking",
+        "harness-wall-time-seconds",
     }
 
     for profile in contract.profiles.values():

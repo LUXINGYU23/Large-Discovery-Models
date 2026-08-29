@@ -14,7 +14,7 @@ from typing import Any, Iterable
 
 from ldm_tts.cli.runner import apply_override, build_plan, load_config, preflight_plan, run_plan
 from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.quick_compare.config import METHODS, QuickCompareSpec
+from ldm_tts.quick_compare.config import QuickCompareSpec
 from ldm_tts.quick_compare.reporting import write_comparison_reports
 
 
@@ -23,8 +23,6 @@ _MANIFEST_NAME = "comparison_manifest.json"
 
 @dataclass(frozen=True)
 class _ComparisonRun:
-    """One reproducible case/method/seed child campaign."""
-
     case_id: str
     method: str
     seed: int
@@ -61,7 +59,17 @@ def run_comparison(
     for item, plan in zip(selected, plans, strict=True):
         _run_child(manifest, spec, item, plan, resume=resume)
     if _matrix_complete(spec, manifest):
-        write_comparison_reports(spec, manifest)
+        try:
+            write_comparison_reports(spec, manifest)
+        except Exception as error:
+            manifest["state"] = "failed"
+            manifest["error"] = {
+                "stage": "reporting",
+                "type": type(error).__name__,
+                "message": str(error),
+            }
+            _write_manifest(spec, manifest)
+            raise
     else:
         manifest["state"] = "partial"
         _write_manifest(spec, manifest)
@@ -70,11 +78,11 @@ def run_comparison(
 
 def _select_runs(spec, *, cases, methods, seeds) -> tuple[_ComparisonRun, ...]:
     case_ids = _selected_values(cases, (item.case_id for item in spec.cases), "case")
-    method_ids = _selected_values(methods, METHODS, "method")
+    method_ids = _selected_values(methods, spec.methods, "method")
     seed_ids = _selected_values(seeds, spec.seeds, "seed")
     runs = []
     for case in spec.cases:
-        for method in METHODS:
+        for method in spec.methods:
             for seed in spec.seeds:
                 if case.case_id in case_ids and method in method_ids and seed in seed_ids:
                     run_dir = spec.output_root / "campaigns" / case.case_id / method / f"seed_{seed}"
@@ -133,7 +141,7 @@ def _child_plan(spec, base, run: _ComparisonRun, *, resume: bool) -> dict[str, A
         apply_override(config, override)
     for override in spec.method_overrides[run.method]:
         apply_override(config, override)
-    _set(config, "args.search-method", run.method)
+    _set(config, "args.search-method", "ldm" if run.method == "harness" else run.method)
     _set(config, "args.proposal-mode", _proposal_mode(config, run.method))
     _set(config, "args.initialization-mode", spec.initialization_mode)
     _set(config, "args.iterations", spec.iterations)
@@ -179,7 +187,7 @@ def _matrix_complete(spec: QuickCompareSpec, manifest: dict[str, Any]) -> bool:
     expected = {
         f"{case.case_id}/{method}/seed_{seed}"
         for case in spec.cases
-        for method in METHODS
+        for method in spec.methods
         for seed in spec.seeds
     }
     return set(manifest["runs"]) == expected and all(
@@ -188,7 +196,7 @@ def _matrix_complete(spec: QuickCompareSpec, manifest: dict[str, Any]) -> bool:
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method == "bo":
+    if method in {"bo", "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

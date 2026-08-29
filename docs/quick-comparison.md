@@ -1,4 +1,4 @@
-# Fixed-Budget Quick Comparison
+# Fixed-Round Quick Comparison
 
 The quick-comparison pipeline runs the same benchmark case and seed schedule
 with three methods: LDM, task-local BO, and direct LLM sampling. It is intended
@@ -58,9 +58,12 @@ The configured output root contains:
 - `summary.json`: aggregate statistics and the simple comparison verdict.
 - `best_so_far.png`: mean best-so-far trajectories by case and method.
 
-Integrity validation requires equal official evaluation counts, shared initial
-candidates, unique evaluated candidates, no model calls from BO, and the
-configured proposal counts for LDM and direct LLM.
+Integrity validation requires every child to complete the configured rounds,
+shared initial candidates, unique evaluated candidates, no model calls from BO,
+and the configured proposal counts for LDM and direct LLM. A round may contain
+fewer successful evaluations when generated candidates are invalid, previously
+evaluated, or duplicated. Reports retain the actual per-round and cumulative
+evaluation counts, while round-AUC weights completed rounds equally.
 
 ## Registering Another Task
 

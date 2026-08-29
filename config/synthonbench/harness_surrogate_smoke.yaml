@@ -14,11 +14,7 @@ args:
   proposal-samples: 64
   harness-candidates-per-session: 16
   harness-thinking: max
-  harness-provider-calls: 8
-  harness-web-calls: 4
-  harness-context7-calls: 2
-  harness-wall-time-seconds: 900
-  harness-artifact-bytes: 67108864
+  harness-wall-time-seconds: 1800
   harness-image: ldm-pi-harness:latest
   harness-cache-dir: ${SYNTHONBENCH_WORK_ROOT}/gondolin-cache
   bo-pool-size: 32

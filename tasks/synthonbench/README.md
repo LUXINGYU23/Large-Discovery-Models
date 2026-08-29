@@ -188,8 +188,10 @@ OpenAI Responses wire format through Pi; its endpoint must support that API.
 The harness backend changes only the proposal policy used by LDM. At campaign
 startup it creates four persistent Pi sessions with task-owned roles for target
 SAR, reaction feasibility, scaffold exploration, and property risk. Every
-session receives 16 deterministic public slates per active round and submits
-one ordered 16-candidate minibatch. The combined 64 raw occurrences enter the
+session autonomously selects reaction types and searches a structured,
+read-only snapshot of the official SynthonSpace before submitting one
+16-candidate minibatch of exact `reaction_id + synthon_ids` tuples. The
+combined 64 raw occurrences enter the
 same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
 LDM acquisition tilt used by the direct backend.
 
@@ -200,13 +202,17 @@ range and digest. A session rejects a gap, overlap, or changed replay before it
 can call the model, while the native Pi conversation retains each profile's
 private research context.
 
-Agents submit slate-local `item_index` and `option_indices` values rather than
-copying long synthon identifiers. The task deterministically maps those local
-indices back to the official `reaction_id` and ordered `synthon_ids`, then runs
-the same slate, domain, and unseen-candidate validation used elsewhere.
+The task-local Pi extension exposes `list_synthon_reactions`,
+`search_synthon_space`, and `validate_synthon_candidate`. The Python adapter
+creates the tool catalog from the loaded official `SynthonSpace`; the raw data
+file is not exposed to the agent shell. Every submitted tuple is validated
+again against the official Python object before entering LDM.
 
-Harness slates are independently sampled and may overlap. Repeated valid unseen
-candidates within or across sessions remain separate raw occurrences, so agent
+Each session must submit 16 legal, historically unseen candidates. Historical
+repeats, invalid tuples, and duplicates within one session minibatch are
+rejected before commit with their indices and exact reasons; the same Pi
+session replaces them until its quota is full. Equal candidates proposed by
+different sessions remain separate raw occurrences, so independent agent
 agreement increases that candidate's empirical `q0` before reservoir
 deduplication. There is no profile-balanced correction or per-session `q0`.
 
@@ -215,6 +221,10 @@ under `resources/harness/profiles/` and no skills. Pi provides web retrieval and
 Context7. File and shell operations run in a separate Gondolin microVM for each
 session, with guest networking disabled. Benchmark names, repository paths,
 datasets, and hidden scores are blocked from research queries and fetched URLs.
+Each session may use up to 30 minutes per turn; this is the only Harness
+research limit. Provider calls, web and Context7 calls, and trace bytes are
+recorded without hard caps. The default Pi context is 256K tokens with built-in
+automatic compaction.
 
 Build the pinned sidecar image once:
 
@@ -255,14 +265,16 @@ session and are not duplicated into parallel trace files. API keys are sent to
 the sidecar once over stdin and are excluded from commands, container
 environment variables, manifests, sessions, and captured provider bodies.
 The run manifest records the campaign/task/case identity, seed, model and wire
-API, limits, network policy, tool set, pinned package versions, profile resource
-digests, and the profile-to-session mapping.
+API, 262,144-token context window, Pi automatic-compaction settings, wall-time limit,
+network policy, tool set, pinned package versions, profile resource digests, and
+the profile-to-session mapping.
 
-Pi's built-in provider retry remains disabled. If a Responses stream ends with
-the known interrupted-stream error before terminal submission, the same session
-makes one submission-only recovery request using its existing analysis. Both
-provider attempts remain in the raw trace. A second interruption fails the turn;
-the runner never switches to the direct backend or invents replacement candidates.
+If a Responses stream ends with the known interrupted-stream error before
+terminal submission, the same session continues submission-only recovery using
+its existing analysis until it commits, encounters a non-recoverable error, or
+reaches the turn wall-time limit. Every provider attempt remains in the raw
+trace; the runner never switches to the direct backend or invents replacement
+candidates.
 
 ## Real Runs
 
@@ -292,21 +304,25 @@ Each completed run writes:
 - `result.json`: LDM summary, best utility, and official metrics.
 - shared `status.json`, `budget.json`, events, and checkpoint artifacts.
 
-## Fixed-Budget Quick Comparison
+## Fixed-Round Quick Comparison
 
-`config/quick_compare/synthonbench.yaml` runs a three-seed comparison on the
+`config/quick_compare/synthonbench.yaml` runs a three-seed, four-method comparison on the
 official 1M KIF11 surrogate track. One product-uniform shared initialization
-batch and five optimization batches make six batches of 16 official calls
-(96 calls per campaign).
+batch and five optimization batches make six outer rounds. Each round targets
+16 official calls; invalid, previously evaluated, or duplicate generated
+candidates are not replaced, so reports retain the actual call count.
 
 `config/quick_compare/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
-(192 official calls per campaign). It is a separate confirmation profile for
+(12 outer rounds, targeting 192 official calls per campaign). It is a separate confirmation profile for
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
-LDM retains the current 64 independent public-slate requests, empirical `q0`,
-48-candidate maintained pool, `beta=0.5`, `eta=3`, and task-local
-reaction-aware Nyström count-Tanimoto GP over standardized utilities.
+Direct-API LDM retains the current 64 independent public-slate requests,
+empirical `q0`, 48-candidate maintained pool, `beta=0.5`, `eta=3`, and
+task-local reaction-aware Nyström count-Tanimoto GP over standardized
+utilities. Harness LDM replaces those 64 endpoint calls with four persistent
+research sessions, each submitting 16 independently researched official-space
+tuples, then uses the same `q0`, pool maintenance, GP, and acquisition tilt.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent finite-choice requests per optimization batch and
@@ -317,6 +333,11 @@ the parser rejects invented IDs and combinations that mix different options.
 Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
+The committed quick and extended profiles request maximum reasoning effort for
+both direct methods and the Harness. Direct requests use four local workers;
+this changes only scheduling, not the independent request count. Endpoint and
+model names remain user-configured so all model-backed methods can use the same
+provider and model.
 
 ```bash
 uv run --locked --project tasks/synthonbench python \

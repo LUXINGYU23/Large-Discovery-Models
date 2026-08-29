@@ -2,13 +2,6 @@ import { createHash } from "node:crypto";
 import { mkdir, open, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-export class ArtifactLimitError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "ArtifactLimitError";
-	}
-}
-
 export class Redactor {
 	private readonly secrets: Buffer[];
 
@@ -87,26 +80,6 @@ function replacement(length: number): Buffer {
 	return value;
 }
 
-export class ArtifactBudget {
-	private used: number;
-
-	constructor(readonly limit: number, used = 0) {
-		this.used = used;
-		if (used > limit) throw new ArtifactLimitError(`turn artifact limit exceeded: ${used} > ${limit}`);
-	}
-
-	consume(bytes: number): void {
-		this.used += bytes;
-		if (this.used > this.limit) {
-			throw new ArtifactLimitError(`turn artifact limit exceeded: ${this.used} > ${this.limit}`);
-		}
-	}
-
-	get bytes(): number {
-		return this.used;
-	}
-}
-
 export async function atomicJson(path: string, value: unknown): Promise<void> {
 	await mkdir(dirname(path), { recursive: true });
 	const body = `${JSON.stringify(value, null, 2)}\n`;
@@ -117,16 +90,19 @@ export async function atomicJson(path: string, value: unknown): Promise<void> {
 
 export class TraceWriter {
 	private queue: Promise<void> = Promise.resolve();
+	private writtenBytes: number;
 
 	constructor(
 		readonly root: string,
 		private readonly redactor: Redactor,
-		private readonly budget?: ArtifactBudget,
-	) {}
+		initialBytes = 0,
+	) {
+		this.writtenBytes = initialBytes;
+	}
 
 	append(relativePath: string, value: unknown): Promise<void> {
 		const body = `${JSON.stringify(this.redactor.value(value))}\n`;
-		this.budget?.consume(Buffer.byteLength(body));
+		this.writtenBytes += Buffer.byteLength(body);
 		this.queue = this.queue.then(async () => {
 			const path = join(this.root, relativePath);
 			await mkdir(dirname(path), { recursive: true });
@@ -142,7 +118,7 @@ export class TraceWriter {
 
 	writeRaw(relativePath: string, value: Buffer): Promise<void> {
 		const body = this.redactor.buffer(value);
-		this.budget?.consume(body.length);
+		this.writtenBytes += body.length;
 		this.queue = this.queue.then(async () => {
 			const path = join(this.root, relativePath);
 			await mkdir(dirname(path), { recursive: true });
@@ -158,6 +134,10 @@ export class TraceWriter {
 
 	flush(): Promise<void> {
 		return this.queue;
+	}
+
+	get bytes(): number {
+		return this.writtenBytes;
 	}
 }
 

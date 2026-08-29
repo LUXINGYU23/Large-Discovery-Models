@@ -114,12 +114,8 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
-    parser.add_argument("--harness-response-timeout", type=float, default=1200.0)
-    parser.add_argument("--harness-wall-time-seconds", type=int, default=900)
-    parser.add_argument("--harness-provider-calls", type=int, default=24)
-    parser.add_argument("--harness-web-calls", type=int, default=12)
-    parser.add_argument("--harness-context7-calls", type=int, default=4)
-    parser.add_argument("--harness-artifact-bytes", type=int, default=256 * 1024 * 1024)
+    parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
+    parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument(
         "--no-harness-context7",
         action="store_false",
@@ -141,9 +137,7 @@ def _validate_counts(args: argparse.Namespace) -> None:
         raise SystemExit("--iterations and --campaign-index must be non-negative")
     positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_max_workers", "evaluations_per_round",
                 "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens",
-                "harness_candidates_per_session", "harness_wall_time_seconds",
-                "harness_provider_calls", "harness_web_calls", "harness_context7_calls",
-                "harness_artifact_bytes")
+                "harness_candidates_per_session", "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
     if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:

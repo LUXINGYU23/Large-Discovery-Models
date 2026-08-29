@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 1
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
@@ -67,36 +67,40 @@ class HarnessProfile:
         }
 
 
+@dataclass(frozen=True)
+class HarnessToolExtension:
+    path: Path
+    sha256: str
+    tool_names: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if _SHA256_PATTERN.fullmatch(self.sha256) is None:
+            raise ValueError("harness tool extension sha256 must be a lowercase SHA-256 digest")
+        if not self.tool_names or any(
+            re.fullmatch(r"[a-z][a-z0-9_]*", name) is None for name in self.tool_names
+        ):
+            raise ValueError("harness tool extension names must be lowercase identifiers")
+        if len(set(self.tool_names)) != len(self.tool_names):
+            raise ValueError("harness tool extension names must be unique")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"path": str(self.path), "sha256": self.sha256, "toolNames": list(self.tool_names)}
+
+
 def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
     return canonical_sha256([profile.identity() for profile in profiles])
 
 
 @dataclass(frozen=True)
 class HarnessLimits:
-    wall_time_seconds: int = 900
-    provider_calls: int = 24
-    web_calls: int = 12
-    context7_calls: int = 4
-    artifact_bytes: int = 256 * 1024 * 1024
+    wall_time_seconds: int = 1800
 
     def __post_init__(self) -> None:
-        if min(
-            self.wall_time_seconds,
-            self.provider_calls,
-            self.web_calls,
-            self.context7_calls,
-            self.artifact_bytes,
-        ) < 1:
-            raise ValueError("harness limits must be positive")
+        if self.wall_time_seconds < 1:
+            raise ValueError("harness wall-time limit must be positive")
 
     def to_dict(self) -> dict[str, int]:
-        return {
-            "wallTimeSeconds": self.wall_time_seconds,
-            "providerCalls": self.provider_calls,
-            "webCalls": self.web_calls,
-            "context7Calls": self.context7_calls,
-            "artifactBytes": self.artifact_bytes,
-        }
+        return {"wallTimeSeconds": self.wall_time_seconds}
 
 
 @dataclass(frozen=True)
@@ -124,6 +128,7 @@ class HarnessPoolConfig:
     case_id: str
     seed: int
     candidate_schema_sha256: str
+    tool_extensions: tuple[HarnessToolExtension, ...] = ()
     thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
@@ -142,6 +147,9 @@ class HarnessPoolConfig:
             raise ValueError("harness requires at least one profile")
         if len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
             raise ValueError("harness profile_id values must be unique")
+        tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
+        if len(set(tool_names)) != len(tool_names):
+            raise ValueError("harness tool names must be unique across extensions")
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
 
@@ -171,6 +179,7 @@ class HarnessPoolConfig:
             "candidateSchemaSha256": self.candidate_schema_sha256,
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
+            "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
             "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
             "webProvider": "anysearch",
@@ -240,14 +249,66 @@ class HarnessTurnResult:
     artifacts: dict[str, str]
 
 
+@dataclass(frozen=True)
+class HarnessSubmissionRequest:
+    profile_id: str
+    turn_id: str
+    attempt_index: int
+    candidates: tuple[dict[str, Any], ...]
+
+    def __post_init__(self) -> None:
+        if not self.profile_id or not self.turn_id:
+            raise ValueError("harness submission identity must not be empty")
+        if self.attempt_index < 1:
+            raise ValueError("harness submission attempt_index must be positive")
+        if not self.candidates:
+            raise ValueError("harness submission candidates must not be empty")
+
+
+@dataclass(frozen=True)
+class HarnessSubmissionRejection:
+    index: int
+    code: str
+    message: str
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise ValueError("harness submission rejection index must be non-negative")
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.code) is None:
+            raise ValueError("harness submission rejection code must be a lowercase identifier")
+        if not self.message.strip():
+            raise ValueError("harness submission rejection message must not be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"index": self.index, "code": self.code, "message": self.message}
+
+
+@dataclass(frozen=True)
+class HarnessSubmissionValidation:
+    rejections: tuple[HarnessSubmissionRejection, ...] = ()
+
+    def __post_init__(self) -> None:
+        indices = [rejection.index for rejection in self.rejections]
+        if len(set(indices)) != len(indices):
+            raise ValueError("harness submission rejection indices must be unique")
+
+    @property
+    def accepted(self) -> bool:
+        return not self.rejections
+
+
 __all__ = [
     "PROTOCOL_VERSION",
     "HarnessLimits",
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
+    "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
+    "HarnessSubmissionRequest",
+    "HarnessSubmissionRejection",
+    "HarnessSubmissionValidation",
     "canonical_sha256",
     "file_sha256",
     "profile_set_sha256",

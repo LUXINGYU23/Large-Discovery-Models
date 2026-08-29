@@ -3,7 +3,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from ldm_tts.harness import HarnessClient, HarnessPoolConfig, HarnessProfile, HarnessTurn
+from ldm_tts.harness import (
+    HarnessClient,
+    HarnessPoolConfig,
+    HarnessProfile,
+    HarnessSubmissionValidation,
+    HarnessTurn,
+)
 
 
 def test_persistent_harness_client_runs_one_profile_batch(
@@ -45,7 +51,10 @@ def test_persistent_harness_client_runs_one_profile_batch(
     )
 
     with client:
-        result = client.run_turn((turn,))
+        result = client.run_turn(
+            (turn,),
+            submission_validator=lambda _request: HarnessSubmissionValidation(),
+        )
 
     assert result[0].session_id == "session-chemist"
     assert result[0].input_digest == turn.input_digest

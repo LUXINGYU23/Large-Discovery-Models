@@ -4,17 +4,15 @@ import { createServer, type Server } from "node:http";
 import { createHash } from "node:crypto";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { ArtifactBudget, Redactor, TraceWriter, safeHeaders, sha256 } from "./trace.js";
+import { Redactor, TraceWriter, safeHeaders, sha256 } from "./trace.js";
 
 interface ActiveTurn {
 	profileId: string;
 	sessionId: string;
 	turnId: string;
 	turnRoot: string;
-	maxProviderCalls: number;
 	requestCount: number;
 	trace: TraceWriter;
-	budget: ArtifactBudget;
 }
 
 export interface ProviderTurnSummary {
@@ -82,21 +80,16 @@ export class ProviderProxy {
 		sessionId: string,
 		turnId: string,
 		turnRoot: string,
-		maxProviderCalls: number,
-		maxArtifactBytes: number,
 	): Promise<void> {
 		if (this.activeTurns.has(profileId)) throw new Error(`profile already has an active turn: ${profileId}`);
 		const recovered = await existingTrace(turnRoot, turnId);
-		const budget = new ArtifactBudget(maxArtifactBytes, recovered.artifactBytes);
 		this.activeTurns.set(profileId, {
 			profileId,
 			sessionId,
 			turnId,
 			turnRoot,
-			maxProviderCalls,
 			requestCount: recovered.requestCount,
-			budget,
-			trace: new TraceWriter(turnRoot, this.redactor, budget),
+			trace: new TraceWriter(turnRoot, this.redactor, recovered.artifactBytes),
 		});
 	}
 
@@ -110,7 +103,7 @@ export class ProviderProxy {
 		if (!active) return { providerCalls: 0, artifactBytes: 0 };
 		this.activeTurns.delete(profileId);
 		await active.trace.flush();
-		return { providerCalls: active.requestCount, artifactBytes: active.budget.bytes };
+		return { providerCalls: active.requestCount, artifactBytes: active.trace.bytes };
 	}
 
 	async close(): Promise<void> {
@@ -140,18 +133,6 @@ export class ProviderProxy {
 			const profileId = decodeURIComponent(encodedProfile);
 			const active = this.activeTurns.get(profileId);
 			if (!active) return await this.reject(response, 409, "profile has no active turn");
-			if (active.requestCount >= active.maxProviderCalls) {
-				await active.trace.append("provider_index.jsonl", {
-					type: "provider_request_blocked",
-					campaignId: this.campaignId,
-					profileId: active.profileId,
-					sessionId: active.sessionId,
-					turnId: active.turnId,
-					reason: "provider_call_limit",
-				});
-				return await this.reject(response, 429, "provider call limit reached");
-			}
-
 			active.requestCount += 1;
 			const requestId = `${active.turnId}-provider-${active.requestCount}`;
 			const body = await this.readRequest(request);

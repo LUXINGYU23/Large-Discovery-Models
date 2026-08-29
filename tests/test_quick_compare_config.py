@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ldm_tts.quick_compare.config import METHODS, load_quick_compare_spec
+from ldm_tts.quick_compare.config import load_quick_compare_spec
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
     spec = load_quick_compare_spec(REPO_ROOT / "config" / "quick_compare" / "iron_mind.yaml")
 
     assert spec.task == "iron_mind"
-    assert tuple(METHODS) == ("ldm", "bo", "llm")
+    assert spec.methods == ("ldm", "bo", "llm")
     assert len(spec.cases) == 2
     assert spec.seeds == (0, 1, 2)
     assert spec.iterations == 6
@@ -32,11 +32,13 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
     spec = load_quick_compare_spec(REPO_ROOT / "config" / "quick_compare" / "synthonbench.yaml")
 
     assert spec.trajectory.step_kind == "evaluation_index"
+    assert spec.methods == ("ldm", "harness", "bo", "llm")
     assert spec.result_fields["best_found_utility"] == "best_found_utility"
     assert spec.method_overrides["llm"][-2:] == (
         "args.proposal-samples=16",
-        "args.proposal-max-workers=16",
+        "args.proposal-max-workers=4",
     )
+    assert spec.method_overrides["harness"][0] == 'contract_profile="quick_compare_harness"'
 
 
 def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, tmp_path) -> None:
@@ -47,5 +49,9 @@ def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, t
     synthon = load_quick_compare_spec(REPO_ROOT / "config" / "quick_compare" / "synthonbench_extended.yaml")
 
     assert iron.iterations == synthon.iterations == 12
+    assert iron.methods == ("ldm", "bo", "llm")
+    assert synthon.methods == ("ldm", "harness", "bo", "llm")
     assert iron.method_overrides["llm"][0] == 'contract_profile="extended_compare_direct_llm"'
     assert synthon.method_overrides["llm"][0] == 'contract_profile="extended_compare_direct_llm"'
+    assert synthon.method_overrides["llm"][-1] == "args.proposal-max-workers=4"
+    assert synthon.method_overrides["harness"][0] == 'contract_profile="extended_compare_harness"'

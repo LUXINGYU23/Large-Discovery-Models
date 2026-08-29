@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ProtocolError, parseFrame } from "./protocol.js";
+import { PROTOCOL_VERSION, ProtocolError, parseFrame } from "./protocol.js";
 
 test("parseFrame accepts the explicit responses configuration", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "initialize",
 		requestId: "init-1",
-		protocolVersion: 2,
+		protocolVersion: PROTOCOL_VERSION,
 		campaignId: "campaign-1",
 		artifactRoot: "/run/harness",
 		baseUrl: "https://provider.example",
@@ -26,8 +26,9 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			skillDirSha256: [],
 			candidatesPerTurn: 16,
 		}],
+		toolExtensions: [],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
-		limits: { wallTimeSeconds: 60, providerCalls: 8, webCalls: 4, context7Calls: 2, artifactBytes: 1_000_000 },
+		limits: { wallTimeSeconds: 60 },
 		webProvider: "anysearch",
 		context7Enabled: true,
 	}));
@@ -40,7 +41,7 @@ test("parseFrame rejects path traversal turn identifiers", () => {
 		() => parseFrame(JSON.stringify({
 			type: "run_turn",
 			requestId: "turn-1",
-			protocolVersion: 2,
+			protocolVersion: PROTOCOL_VERSION,
 			campaignId: "campaign-1",
 			turns: [{
 				profileId: "target_sar",
@@ -63,9 +64,46 @@ test("parseFrame rejects unknown fields instead of silently ignoring them", () =
 		() => parseFrame(JSON.stringify({
 			type: "close",
 			requestId: "close-1",
-			protocolVersion: 2,
+			protocolVersion: PROTOCOL_VERSION,
 			campaignId: "campaign-1",
 			legacyFallback: true,
+		})),
+		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
+	);
+});
+
+test("parseFrame accepts a consistent submission validation result", () => {
+	const frame = parseFrame(JSON.stringify({
+		type: "submission_validation_result",
+		requestId: "turn-1",
+		protocolVersion: PROTOCOL_VERSION,
+		campaignId: "campaign-1",
+		validationId: "validation-1",
+		accepted: false,
+		rejected: [{
+			index: 2,
+			code: "historical_duplicate",
+			message: "The candidate was already evaluated.",
+		}],
+		requiredReplacements: 1,
+	}));
+	assert.equal(frame.type, "submission_validation_result");
+	if (frame.type === "submission_validation_result") {
+		assert.equal(frame.rejected[0]?.code, "historical_duplicate");
+	}
+});
+
+test("parseFrame rejects inconsistent submission validation results", () => {
+	assert.throws(
+		() => parseFrame(JSON.stringify({
+			type: "submission_validation_result",
+			requestId: "turn-1",
+			protocolVersion: PROTOCOL_VERSION,
+			campaignId: "campaign-1",
+			validationId: "validation-1",
+			accepted: true,
+			rejected: [{ index: 0, code: "invalid_candidate", message: "Invalid." }],
+			requiredReplacements: 1,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
 	);

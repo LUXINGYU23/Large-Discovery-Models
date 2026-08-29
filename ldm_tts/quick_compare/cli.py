@@ -10,7 +10,7 @@ from ldm_tts.quick_compare.execution import run_comparison
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a fixed-budget LDM, BO, and LLM comparison.")
+    parser = argparse.ArgumentParser(description="Run a fixed-round LDM, BO, and LLM comparison.")
     parser.add_argument("config", type=Path)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")

@@ -3,7 +3,7 @@ import type {
 	ToolCallEvent,
 	ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
-import type { HarnessLimits, NetworkPolicy } from "./protocol.js";
+import type { NetworkPolicy } from "./protocol.js";
 
 interface ActivePolicyTurn {
 	forbiddenTerms: string[];
@@ -86,7 +86,6 @@ export class PolicyController {
 
 	constructor(
 		private readonly policy: NetworkPolicy,
-		private readonly limits: HarnessLimits,
 		private readonly webProvider: string,
 	) {}
 
@@ -123,21 +122,18 @@ export class PolicyController {
 		try {
 			if (event.toolName === "web_search") {
 				active.webCalls += 1;
-				if (active.webCalls > this.limits.webCalls) throw new Error("web tool call limit reached");
 				assertAllowedQuery(queryText(input), this.policy, active.forbiddenTerms);
 				input.provider = this.webProvider;
 				input.workflow = "none";
 				input.domainFilter = [...this.policy.allowedHosts];
 			} else if (event.toolName === "fetch_content") {
 				active.webCalls += 1;
-				if (active.webCalls > this.limits.webCalls) throw new Error("web tool call limit reached");
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 				for (const url of fetchUrls(input)) {
 					assertAllowedUrl(url, this.policy);
 				}
 			} else if (event.toolName === "get_search_content") {
 				active.webCalls += 1;
-				if (active.webCalls > this.limits.webCalls) throw new Error("web tool call limit reached");
 				const responseId = input.responseId;
 				if (typeof responseId !== "string" || !this.responseIds.has(responseId)) {
 					throw new Error("responseId does not belong to this session");
@@ -145,7 +141,6 @@ export class PolicyController {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			} else if (event.toolName === "resolve-library-id" || event.toolName === "query-docs") {
 				active.context7Calls += 1;
-				if (active.context7Calls > this.limits.context7Calls) throw new Error("Context7 call limit reached");
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			}
 		} catch (error) {
