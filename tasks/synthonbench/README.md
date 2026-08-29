@@ -54,8 +54,8 @@ lifecycle:
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
 5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
-   sample of size `K`. The full-budget and qualification profiles use `K=32`;
-   pilot-evaluation profiles use `K=48`. Only this maintained BO pool is scored.
+   sample of size `K`. The full-budget, qualification, and pilot-evaluation
+   profiles use `K=32`. Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -212,23 +212,25 @@ creates the tool catalog from the loaded official `SynthonSpace`; the raw data
 file is not exposed to the agent shell. Every submitted tuple is validated
 again against the official Python object before entering LDM.
 
-Each session must submit 16 legal, historically unseen candidates. Historical
-repeats, invalid tuples, and duplicates within one session minibatch are
-rejected before commit with their indices and exact reasons; the same Pi
-session replaces them until its quota is full. Equal candidates proposed by
-different sessions remain separate raw occurrences, so independent agent
-agreement increases that candidate's empirical `q0` before reservoir
+Each session must submit 16 legal candidates absent from the authoritative
+evaluated snapshot. Evaluated repeats, invalid tuples, and duplicates within one
+session minibatch are rejected before commit with their indices and exact
+reasons; the same Pi session replaces them until its quota is full. A candidate
+proposed in an earlier turn but not evaluated remains eligible. Equal candidates
+proposed by different sessions remain separate raw occurrences, so independent
+agent agreement increases that candidate's empirical `q0` before reservoir
 deduplication. There is no profile-balanced correction or per-session `q0`.
 
 The SynthonBench harness profile set loads the four committed `AGENTS.md` files
-under `resources/harness/profiles/` and no skills. Pi provides web retrieval and
-Context7. File and shell operations run in a separate Gondolin microVM for each
-session, with guest networking disabled. Benchmark names, repository paths,
-datasets, and hidden scores are blocked from research queries and fetched URLs.
-Each session may use up to 30 minutes per turn; this is the only Harness
-research limit. Provider calls, web and Context7 calls, and trace bytes are
-recorded without hard caps. The default Pi context is 256K tokens with built-in
-automatic compaction.
+under `resources/harness/profiles/` and no skills. Pi provides web retrieval,
+Context7, and a separate Gondolin microVM for each session. The guest has root
+shell, file, package-installation, and unrestricted HTTP(S) access; the host
+repository and official task data are not mounted. Benchmark names, repository
+paths, datasets, and hidden scores remain blocked from research queries and
+fetched URLs as an evaluation-integrity rule. Each session may use up to 30
+minutes per turn; this is the only Harness research limit. Provider calls, web
+and Context7 calls, and trace bytes are recorded without hard caps. The default
+Pi context is 256K tokens with built-in automatic compaction.
 
 Build the pinned sidecar image once:
 
@@ -322,7 +324,8 @@ seed, and candidate-budget settings but uses eleven optimization batches
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
 Direct-API LDM retains the current 64 independent public-slate requests,
-empirical `q0`, 48-candidate maintained pool, `beta=0.5`, `eta=3`, and
+empirical `q0`, a 32-candidate maintained pool, `beta=0.5`, `eta=1`, and
+acquisition z-clipping at 2, together with the
 task-local reaction-aware Nyström count-Tanimoto GP over standardized
 utilities. Harness LDM replaces those 64 endpoint calls with four persistent
 research sessions, each submitting 16 independently researched official-space
@@ -338,7 +341,7 @@ Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
 The committed six-round and extended profiles request maximum reasoning effort for
-both direct methods and the Harness. Direct requests use four local workers;
+both direct methods and the Harness. Direct requests use six local workers;
 this changes only scheduling, not the independent request count. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
 provider and model.

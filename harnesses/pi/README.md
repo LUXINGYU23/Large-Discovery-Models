@@ -56,3 +56,10 @@ The container requires Linux KVM for Gondolin. The task runner mounts run
 artifacts, read-only task profiles, and the Gondolin image cache explicitly.
 Tasks may also register digest-verified, read-only tool extensions; their tool
 names and source digests are recorded in the run manifest.
+
+The Gondolin guest grants its Agent root-level shell and file access inside the
+isolated microVM and unrestricted outbound HTTP(S) when a task leaves the host
+allow/deny lists empty. The guest sees only its session workspace, not the host
+repository, benchmark data, oracle, credentials, or other sessions. Task query
+rules that prevent benchmark leakage remain independent from sandbox network
+permissions.

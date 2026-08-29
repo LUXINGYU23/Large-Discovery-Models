@@ -42,22 +42,6 @@ HARNESS_PROFILE_IDS = (
     "property_risk",
 )
 HARNESS_SOURCE = "synthonbench_persistent_research_harness"
-HARNESS_ALLOWED_HOSTS = (
-    "arxiv.org",
-    "biorxiv.org",
-    "chemrxiv.org",
-    "doi.org",
-    "europepmc.org",
-    "github.com",
-    "nature.com",
-    "ncbi.nlm.nih.gov",
-    "nih.gov",
-    "pubs.acs.org",
-    "raw.githubusercontent.com",
-    "sciencedirect.com",
-    "wiley.com",
-)
-HARNESS_DENIED_HOSTS = ("huggingface.co", "datasets-server.huggingface.co")
 HARNESS_FORBIDDEN_PATTERNS = (
     r"synthon\s*bench",
     r"mireklzicar[/\\]synthonbench",
@@ -68,8 +52,17 @@ HARNESS_FORBIDDEN_TERMS = (
     "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
 )
 HARNESS_CANDIDATE_SCHEMA = {
-    "reaction_id": "one reaction_id returned by list_synthon_reactions",
-    "synthon_ids": "one valid synthon ID per reaction position, in official position order",
+    "type": "object",
+    "properties": {
+        "reaction_id": {"type": "string", "minLength": 1},
+        "synthon_ids": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "minItems": 1,
+        },
+    },
+    "required": ["reaction_id", "synthon_ids"],
+    "additionalProperties": False,
 }
 HARNESS_TOOL_NAMES = (
     "list_synthon_reactions",
@@ -387,8 +380,9 @@ def _turn_message(
         "new_measured_observations": list(observations),
         "evaluated_candidates": list(evaluated_candidates),
         "novelty_contract": {
-            "historical_candidates_are_forbidden": True,
-            "required_unseen_candidate_count": profile.candidates_per_turn,
+            "evaluated_candidates_are_forbidden": True,
+            "prior_unmeasured_submissions_may_be_reproposed": True,
+            "required_not_evaluated_candidate_count": profile.candidates_per_turn,
             "same_round_cross_session_agreement_is_allowed": True,
             "same_session_duplicates_are_forbidden": True,
             "validate_before_submission": True,
@@ -404,12 +398,14 @@ def _turn_message(
             "Do not search for this benchmark, its repository, datasets, or hidden scores.",
             "Every candidate must be an exact legal reaction_id plus ordered synthon_ids tuple returned by the structured tools.",
             "Do not estimate or claim benchmark scores as measurements.",
-            "Do not inspect the repository, filesystem, or installed software for additional task data; use the official-space tools instead.",
+            "The isolated sandbox contains no authoritative task data; use the structured tools for the official space and supplied measurements.",
             "Research autonomously when it can improve the choices: search public literature, inspect public documents, and write or run scratch analysis code in the sandbox.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "Use the reaction summary to narrow the turn to roughly two to six evidence-backed reaction directions; do not enumerate the entire SynthonSpace without a specific reason.",
             "Use tools iteratively when useful, but leave enough of the 30-minute turn window to validate and submit the complete minibatch.",
             "If a tool fails or gives no decisive evidence, continue from the supplied data rather than withholding a candidate.",
             "Never submit an exact reaction_id plus ordered synthon_ids tuple listed in evaluated_candidates.",
+            "A tuple proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
             "Historical repeats, invalid tuples, and duplicates within your own minibatch will be rejected with exact reasons.",
             "If submission is rejected, replace the reported entries and resubmit the complete minibatch; do not repeat the research phase.",
         ],
@@ -534,9 +530,7 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 
 
 __all__ = [
-    "HARNESS_ALLOWED_HOSTS",
     "HARNESS_CANDIDATE_SCHEMA",
-    "HARNESS_DENIED_HOSTS",
     "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",

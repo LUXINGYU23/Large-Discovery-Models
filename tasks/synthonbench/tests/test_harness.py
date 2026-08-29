@@ -132,8 +132,9 @@ def test_harness_second_turn_sends_only_the_previous_round_measurements() -> Non
         {"reaction_id": "r1", "synthon_ids": [2, 12]},
     ] for message in messages)
     assert all(message["novelty_contract"] == {
-        "historical_candidates_are_forbidden": True,
-        "required_unseen_candidate_count": 1,
+        "evaluated_candidates_are_forbidden": True,
+        "prior_unmeasured_submissions_may_be_reproposed": True,
+        "required_not_evaluated_candidate_count": 1,
         "same_round_cross_session_agreement_is_allowed": True,
         "same_session_duplicates_are_forbidden": True,
         "validate_before_submission": True,

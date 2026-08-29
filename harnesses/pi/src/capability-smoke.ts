@@ -86,7 +86,7 @@ async function main(): Promise<void> {
 		call += 1;
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "bash", JSON.stringify({
-				command: "printf 'sandbox-ok' > proof.txt; cat proof.txt; if command -v wget >/dev/null && wget -qO- -T 2 https://example.com >/dev/null 2>&1; then exit 9; fi; if command -v curl >/dev/null && curl -fsS --max-time 2 https://example.com >/dev/null 2>&1; then exit 9; fi",
+				command: "if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
 			})));
 		} else if (call === 2) {
 			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
@@ -125,6 +125,15 @@ async function main(): Promise<void> {
 		skillDirSha256: [],
 		candidatesPerTurn: 2,
 	};
+	const candidateSchema = {
+		type: "object",
+		properties: {
+			reaction_id: { type: "string" },
+			synthon_ids: { type: "array", items: { type: "string" } },
+		},
+		required: ["reaction_id", "synthon_ids"],
+		additionalProperties: false,
+	};
 	const config: InitializeFrame = {
 		type: "initialize",
 		requestId: "initialize",
@@ -138,7 +147,8 @@ async function main(): Promise<void> {
 		taskId: "capability",
 		caseId: "local-smoke",
 		seed: 1,
-		candidateSchemaSha256: sha256("candidate-schema"),
+		candidateSchema,
+		candidateSchemaSha256: canonicalSha256(candidateSchema),
 		profileSetSha256: canonicalSha256([{
 			agentsSha256: profile.agentsSha256,
 			candidatesPerTurn: profile.candidatesPerTurn,
@@ -148,8 +158,8 @@ async function main(): Promise<void> {
 		profiles: [profile],
 		toolExtensions: [],
 		networkPolicy: {
-			allowedHosts: ["example.com", "context7.com"],
-			deniedHosts: ["github.com"],
+			allowedHosts: [],
+			deniedHosts: [],
 			forbiddenQueryPatterns: ["benchmark score"],
 		},
 		limits: { wallTimeSeconds: 120 },
@@ -237,12 +247,12 @@ async function main(): Promise<void> {
 		assert(readResult);
 		assert.equal(readResult.isError, false, JSON.stringify(readResult.content));
 		assert.match(JSON.stringify(readResult.content), /sandbox-ok/);
-		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-ok");
+		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-network-ok");
 		assert.match(session, /submit_candidates/);
 		assert.match(session, /historical_duplicate/);
 		assert.match(session, /already evaluated; replace index 0/);
 		assert.match(session, /previous provider stream ended/);
-		assert.match(session, /sandbox-ok/);
+		assert.match(session, /sandbox-network-ok/);
 		const providerIndex = await readFile(join(root, "harness", "sessions", "target_sar", "turns", "capability_turn", "provider_index.jsonl"), "utf8");
 		assert.equal(providerIndex.trim().split("\n").length, 5);
 		assert.equal((await readdir(join(root, "harness", "sessions", "target_sar", "pi-agent"))).includes("auth.json"), false);

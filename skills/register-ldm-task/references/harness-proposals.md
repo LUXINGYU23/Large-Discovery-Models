@@ -27,21 +27,39 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   structured task tools under `tasks/<task_id>/resources/harness/`.
 - Record SHA-256 identities for profiles, skills, candidate schemas, and tool
   sources; mount these resources read-only.
+- Provide the sidecar with the task's strict candidate JSON Schema, including
+  required fields, value constraints, and `additionalProperties: false`. The
+  sidecar must expose that schema through `submit_candidates` and require the
+  exact profile minibatch size; task validation remains the authoritative
+  admission boundary.
 - Build deterministic `HarnessTurn` identities from campaign, profile, round,
   and history range/digest.
 - Send newly measured observations for reasoning and a compact authoritative
   evaluated-candidate snapshot when historical repeats are forbidden.
+- State explicitly that only the authoritative evaluated snapshot is excluded.
+  Candidates proposed in an earlier turn but not evaluated remain eligible;
+  persistent sessions must not invent a private exclusion set.
 - Validate every provisional submission through the same parser and canonical
   identity used by Campaign admission.
 - Return one stable, actionable `HarnessSubmissionRejection` for each rejected
   index and accept only a complete valid minibatch.
 - Define same-round occurrence semantics before empirical `q0` aggregation;
   do not globally deduplicate meaningful agreement across independent sessions.
+- Size the maintained BO pool from the expected number of unique accepted
+  occurrences, with headroom for cross-session agreement. Do not set the pool
+  equal to a raw occurrence count that duplicates cannot fill.
 
 Pass the API key only through Harness bootstrap. Keep native sessions, redacted
 provider transport, and input/submission/commit lineage below
 `<run_dir>/harness/`. Do not write credentials there and do not treat raw
 multi-turn traces as `ldm-2.0` accepted-action rows.
+
+Sandbox isolation and network policy are separate concerns. The Pi sidecar may
+give the Agent root shell, file, package-installation, and unrestricted HTTP(S)
+access inside its isolated microVM without mounting host task data. An empty
+host allow list means unrestricted network access. Benchmark-name and
+hidden-answer query prohibitions are evaluation-integrity rules, not a
+substitute for sandbox isolation.
 
 ## Verify Before Qualification
 
@@ -55,3 +73,10 @@ capability smoke with the configured wire API, isolation, profiles, and tools.
 Verify that one accepted Harness reservoir enters the normal acquisition and
 official evaluator path. For Pi-specific runtime requirements, follow
 `harnesses/pi/README.md`.
+
+After a multi-round run, audit native traces rather than relying only on the
+summary. Check malformed submissions and wrong cardinalities, whether sessions
+incorrectly exclude unmeasured prior proposals, cross-profile overlap before
+`q0`, unique-count headroom for the maintained pool, acquisition effective
+sample size, web/tool failures, and whether roles actually use the sandbox
+capabilities claimed by their `AGENTS.md`.

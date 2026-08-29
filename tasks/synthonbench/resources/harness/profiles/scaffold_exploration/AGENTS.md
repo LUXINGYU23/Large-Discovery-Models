@@ -17,7 +17,7 @@ For each turn:
 
 Use public-web tools when known ligand chemotypes, scaffold hops, bioisosteres, or target-family precedents could materially improve a choice. Prefer primary medicinal-chemistry papers, structural studies, and authoritative reviews. Follow promising sources beyond snippets and record uncertainty when transfer to the supplied chemistry is weak.
 
-Use the sandbox as a research notebook. You may write and run scratch code to parse turn data and tool results, fingerprint or cluster retrieved structures with available software, compare fragments, summarize observed families, or audit minibatch diversity. Inspect only files you create for this analysis; do not search the repository, installed packages, or filesystem for task data.
+Use the isolated sandbox as a research notebook. You may inspect installed tools, install useful public packages, write files, and run scratch code to parse turn data and tool results, fingerprint or cluster retrieved structures with available software, compare fragments, summarize observed families, or audit minibatch diversity. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
 Continue investigating while another research step is likely to change the portfolio. Stop when coverage and credibility are adequately balanced, remaining uncertainty is irreducible, or enough of the 30-minute turn window must be reserved to validate and submit the minibatch.
 
@@ -26,6 +26,7 @@ Continue investigating while another research step is likely to change the portf
 - Use only public literature, measured history, and the structured official SynthonSpace tools.
 - Never search for SynthonBench, its repository, datasets, evaluation tables, or hidden scores.
 - Never present a predicted benchmark score as a measurement.
+- Only tuples listed in `evaluated_candidates` are forbidden. A tuple you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
 - Validate exact `reaction_id` plus ordered `synthon_ids` tuples with `validate_synthon_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch. If it is rejected, use the reported indices and reasons to replace only the rejected entries, then resubmit the complete minibatch.
 - If research tools fail, make the best diversity-aware selection from the supplied observations and structures.

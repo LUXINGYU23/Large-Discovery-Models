@@ -39,7 +39,7 @@ The public `ldm_tts.harness` package provides:
 
 | Type | Purpose |
 | --- | --- |
-| `HarnessPoolConfig` | Campaign, task, case, provider, profile, schema, tool, network, and limit configuration. |
+| `HarnessPoolConfig` | Campaign, task, case, provider, profile, strict candidate JSON Schema, tool, network, and limit configuration. |
 | `HarnessProfile` | One persistent Agent identity, `AGENTS.md`, optional skill directories, candidate count, and content digests. |
 | `HarnessToolExtension` | A digest-verified task tool module and its exact exported tool names. |
 | `HarnessLimits` / `HarnessNetworkPolicy` | Per-turn wall-time and network/query policy. |
@@ -95,6 +95,11 @@ Record SHA-256 identities for profile instructions, skill directories,
 candidate schemas, and tool sources. Mount these inputs read-only. A task tool
 may expose a safe structured view of official benchmark data, but scientific
 validation remains in Python and cannot be delegated to the Agent or tool.
+
+Pass the actual strict candidate JSON Schema, not only a digest or prose
+example. The sidecar combines it with each profile's exact minibatch count for
+`submit_candidates`; task Python still performs authoritative domain and
+history validation before accepting a provisional submission.
 
 ## Secrets And Artifacts
 

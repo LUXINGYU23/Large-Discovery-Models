@@ -14,7 +14,7 @@ args:
   oracle-kind: surrogate
   iterations: 12
   proposal-samples: 64
-  bo-pool-size: 48
+  bo-pool-size: 32
   bo-search-samples: 64
   evaluations-per-round: 16
   slate-size: 24
@@ -28,8 +28,8 @@ args:
   gp-reaction-weight: 1.0
   acquisition-beta: 0.5
   alpha: 1.0
-  eta: 3.0
-  z-clip: 5.0
+  eta: 1.0
+  z-clip: 2.0
   harness-candidates-per-session: 16
   harness-thinking: max
   harness-wall-time-seconds: 1800

@@ -16,7 +16,6 @@ from ldm_tts.harness import (
     HarnessLimits,
     HarnessNetworkPolicy,
     HarnessPoolConfig,
-    canonical_sha256,
 )
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
@@ -37,8 +36,6 @@ from tasks.iron_mind.core.factory import (
     build_reaction_selector,
 )
 from tasks.iron_mind.core.harness import (
-    HARNESS_ALLOWED_HOSTS,
-    HARNESS_DENIED_HOSTS,
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     harness_candidate_schema,
@@ -262,13 +259,11 @@ def _harness_client(
         task_id=TASK_ID,
         case_id=args.dataset_id,
         seed=args.campaign_index,
-        candidate_schema_sha256=canonical_sha256(harness_candidate_schema(table.schema)),
+        candidate_schema=harness_candidate_schema(table.schema),
         tool_extensions=harness_tool_extensions(),
         thinking=args.harness_thinking,
         limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds),
         network_policy=HarnessNetworkPolicy(
-            allowed_hosts=HARNESS_ALLOWED_HOSTS,
-            denied_hosts=HARNESS_DENIED_HOSTS,
             forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
         ),
         context7_enabled=args.harness_context7,

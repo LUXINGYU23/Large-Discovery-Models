@@ -114,7 +114,14 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
     assert all(message["message_type"] == "history_delta" for message in messages)
     assert all(len(message["new_measured_observations"]) == 1 for message in messages)
     assert all(len(message["evaluated_candidates"]) == 2 for message in messages)
-    assert all(message["novelty_contract"]["required_unseen_candidate_count"] == 1 for message in messages)
+    assert all(
+        message["novelty_contract"]["required_not_evaluated_candidate_count"] == 1
+        for message in messages
+    )
+    assert all(
+        message["novelty_contract"]["prior_unmeasured_submissions_may_be_reproposed"]
+        for message in messages
+    )
     assert all(message["reaction_space_tools"] == [
         "describe_reaction_space",
         "search_reaction_conditions",

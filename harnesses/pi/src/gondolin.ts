@@ -9,8 +9,15 @@ import {
 	type ReadOperations,
 	type WriteOperations,
 } from "@earendil-works/pi-coding-agent";
+import type { NetworkPolicy } from "./protocol.js";
 
 const GUEST_WORKSPACE = "/workspace";
+
+function hostMatches(hostname: string, configured: string): boolean {
+	const host = hostname.toLowerCase().replace(/\.$/, "");
+	const expected = configured.toLowerCase().replace(/^\*\./, "").replace(/\.$/, "");
+	return expected === "*" || host === expected || host.endsWith(`.${expected}`);
+}
 
 export function guestPath(hostWorkspace: string, value: string): string {
 	const input = value.trim();
@@ -98,7 +105,10 @@ export class GondolinController {
 	private vm: VM | undefined;
 	private starting: Promise<VM> | undefined;
 
-	constructor(private readonly hostWorkspace: string) {}
+	constructor(
+		private readonly hostWorkspace: string,
+		private readonly networkPolicy: NetworkPolicy,
+	) {}
 
 	createExtension(): ExtensionFactory {
 		return (pi) => {
@@ -111,7 +121,18 @@ export class GondolinController {
 				if (this.vm) return this.vm;
 				if (!this.starting) {
 					this.starting = (async () => {
-						const { httpHooks, env } = createHttpHooks({ allowedHosts: [] });
+						const { httpHooks, env } = createHttpHooks({
+							...(this.networkPolicy.allowedHosts.length > 0
+								? { allowedHosts: this.networkPolicy.allowedHosts }
+								: {}),
+							blockInternalRanges: false,
+							isRequestAllowed: (request) => {
+								const hostname = new URL(request.url).hostname;
+								return !this.networkPolicy.deniedHosts.some(
+									(host) => hostMatches(hostname, host),
+								);
+							},
+						});
 						const created = await VM.create({
 							sessionLabel: `ldm-harness-${path.basename(hostWorkspace)}`,
 							httpHooks,

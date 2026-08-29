@@ -72,7 +72,7 @@ def test_discrete_factor_uses_ordered_option_distance() -> None:
     assert kernel[0, 2] == pytest.approx(math.exp(-1.0))
 
 
-def test_selector_records_calibrated_ucb_and_ard_fit_summary() -> None:
+def test_selector_waits_for_sufficient_history_before_fitting_ard() -> None:
     schema = _schema()
     encoder = ReactionOneHotEncoder(schema)
     candidates = (
@@ -97,9 +97,47 @@ def test_selector_records_calibrated_ucb_and_ard_fit_summary() -> None:
     summary = result.metadata["surrogate"]
     assert result.metadata["effective_beta"] == result.metadata["base_beta"] == 1.0
     assert selector.describe().parameters["model_mismatch_variance"] == pytest.approx(0.04)
-    assert summary["fit_status"] == "fitted_ard_marginal_likelihood"
+    assert summary["fit_status"] == "fitted_default_hyperparameters"
+    assert summary["ard_history_threshold"] == 8
     assert set(summary["kernel"]["factor_weights"]) == {"base", "solvent"}
     assert all(item.metadata["surrogate"] == "reaction_categorical_ard_gp" for item in result.predictions)
+
+
+def test_selector_fits_ard_after_the_schema_scaled_history_threshold() -> None:
+    schema = _schema()
+    encoder = ReactionOneHotEncoder(schema)
+    candidates = (
+        _candidate(schema, "a", base="A", solvent="X"),
+        _candidate(schema, "b", base="A", solvent="Y"),
+        _candidate(schema, "c", base="B", solvent="X"),
+        _candidate(schema, "d", base="B", solvent="Y"),
+    )
+    history = [
+        BOObservation.scalar(
+            item.candidate_id,
+            score,
+            encoder.encode(item).values,
+            feature_version=encoder.version,
+        )
+        for item, score in zip(
+            candidates * 2,
+            (1.0, 2.0, 8.0, 9.0, 1.5, 2.5, 8.5, 9.5),
+            strict=True,
+        )
+    ]
+    selector = ReactionCategoricalGPUCBSelector(
+        schema=schema,
+        objective_name="reaction_score",
+        feature_version=encoder.version,
+    )
+
+    selector.fit(history)
+    result = selector.select(
+        candidates,
+        {item.candidate_id: encoder.encode(item) for item in candidates},
+    )
+
+    assert result.metadata["surrogate"]["fit_status"] == "fitted_ard_marginal_likelihood"
 
 
 def test_single_observation_shapes_the_next_round_posterior() -> None:

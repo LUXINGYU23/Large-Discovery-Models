@@ -193,8 +193,10 @@ proposal. Providers that do not support this extension can use
 The Harness backend keeps four task-local Pi sessions alive for a campaign:
 mechanistic chemistry, empirical interactions, literature evidence, and design
 space exploration. Each active round sends the new measurements plus a compact
-snapshot of all evaluated conditions. Every session must commit 16 legal,
-historically unseen candidates.
+snapshot of all evaluated conditions. Every session must commit 16 legal
+candidates absent from that authoritative evaluated snapshot. A candidate
+proposed in an earlier turn but not evaluated remains eligible; a persistent
+session must not maintain a private exclusion set.
 
 The structured tools expose factor definitions and complete legal condition
 combinations from the source-pinned table, but never oracle scores. Python
@@ -220,6 +222,12 @@ The sidecar requires Linux KVM. Set `--harness-api-key-file` to use an ignored,
 protected key file instead of `LLM_API_KEY`. Harness traces are written below
 `<run_dir>/harness/`; profiles, tools, schemas, requests, responses, sessions,
 and submissions are content-addressed in the run artifacts.
+
+Pi provides web retrieval, Context7, and an isolated Gondolin microVM with root
+shell, file, package-installation, and unrestricted HTTP(S) access. The host
+repository and task data are not mounted into the guest. Benchmark names,
+repository paths, datasets, and hidden scores remain blocked from research
+queries and fetched URLs as an evaluation-integrity rule.
 
 ## Prepare the Official Data
 
@@ -301,15 +309,16 @@ datasets. Each case uses three seeds, one shared random initialization round,
 and five optimization rounds. Every campaign therefore makes six official
 evaluations.
 
-`config/pilot_evaluation/iron_mind_extended.yaml` is the existing twelve-round
-confirmation matrix for the three direct/BO baselines. The six-round standard
-matrix is the registered Harness comparison.
+`config/pilot_evaluation/iron_mind_extended.yaml` is the twelve-round
+confirmation matrix for direct LDM, Harness LDM, pure BO, and direct LLM. The
+six-round standard matrix provides the corresponding lower-cost screen.
 
 Direct LDM retains 64 independent requests with at most 6 concurrent workers.
 Harness LDM uses four concurrent persistent sessions with 16 candidates each.
-Both use empirical `q0`,
-63-candidate maintained pool, `beta=1`, and `eta=3` acquisition tilt locked by
-the pilot-evaluation profiles. Pure BO
+Both use empirical `q0`, a 32-candidate maintained pool, `beta=1`, `eta=1`, and
+acquisition z-clipping at 2 as locked by the pilot-evaluation profiles. The
+smaller pool preserves oversampling headroom when independent sessions agree
+on the same candidate. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted

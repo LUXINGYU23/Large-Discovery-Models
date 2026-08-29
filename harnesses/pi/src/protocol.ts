@@ -1,4 +1,6 @@
-export const PROTOCOL_VERSION = 1;
+import { canonicalSha256 } from "./trace.js";
+
+export const PROTOCOL_VERSION = 2;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -49,6 +51,7 @@ export interface InitializeFrame extends CommonFrame {
 	taskId: string;
 	caseId: string;
 	seed: number;
+	candidateSchema: Record<string, unknown>;
 	candidateSchemaSha256: string;
 	profileSetSha256: string;
 	profiles: HarnessProfileConfig[];
@@ -358,9 +361,17 @@ export function parseFrame(line: string): InputFrame {
 
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
-		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaSha256", "profileSetSha256",
+		"model", "thinking", "taskId", "caseId", "seed", "candidateSchema", "candidateSchemaSha256", "profileSetSha256",
 		"profiles", "toolExtensions", "networkPolicy", "limits", "webProvider", "context7Enabled",
 	], "frame");
+	const candidateSchema = record(data.candidateSchema, "candidateSchema");
+	if (candidateSchema.type !== "object" || candidateSchema.additionalProperties !== false) {
+		throw new ProtocolError("invalid_frame", "candidateSchema must be a strict JSON object schema");
+	}
+	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
+	if (canonicalSha256(candidateSchema) !== candidateSchemaSha256) {
+		throw new ProtocolError("invalid_frame", "candidateSchema digest mismatch");
+	}
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
 	const limits = record(data.limits, "limits");
@@ -385,7 +396,8 @@ export function parseFrame(line: string): InputFrame {
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),
-		candidateSchemaSha256: digest(data.candidateSchemaSha256, "candidateSchemaSha256"),
+		candidateSchema,
+		candidateSchemaSha256,
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
 		profiles: parseProfiles(data.profiles),
 		toolExtensions: parseToolExtensions(data.toolExtensions),

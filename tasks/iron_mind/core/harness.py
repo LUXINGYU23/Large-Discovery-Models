@@ -40,21 +40,6 @@ HARNESS_PROFILE_IDS = (
     "design_space_exploration",
 )
 HARNESS_SOURCE = "iron_mind_persistent_research_harness"
-HARNESS_ALLOWED_HOSTS = (
-    "arxiv.org",
-    "chemrxiv.org",
-    "doi.org",
-    "europepmc.org",
-    "github.com",
-    "nature.com",
-    "ncbi.nlm.nih.gov",
-    "nih.gov",
-    "pubs.acs.org",
-    "raw.githubusercontent.com",
-    "sciencedirect.com",
-    "wiley.com",
-)
-HARNESS_DENIED_HOSTS = ("huggingface.co", "datasets-server.huggingface.co")
 HARNESS_FORBIDDEN_PATTERNS = (
     r"iron[\s_-]*mind",
     r"gomesgroup[/\\]iron-mind-public",
@@ -77,11 +62,31 @@ _LOCAL_TOOL_PATH = _LOCAL_RESOURCE_ROOT / "tools" / "reaction_space.mjs"
 
 def harness_candidate_schema(schema) -> dict[str, object]:
     return {
-        "dataset_id": schema.dataset_id,
-        "conditions": {
-            factor.name: list(factor.options)
-            for factor in schema.factors
+        "type": "object",
+        "properties": {
+            "dataset_id": {
+                "type": "string",
+                "enum": [schema.dataset_id],
+            },
+            "conditions": {
+                "type": "object",
+                "properties": {
+                    factor.name: {
+                        "type": (
+                            "string"
+                            if factor.parameter_type == "categorical"
+                            else "number"
+                        ),
+                        "enum": list(factor.options),
+                    }
+                    for factor in schema.factors
+                },
+                "required": list(schema.factor_names),
+                "additionalProperties": False,
+            },
         },
+        "required": ["dataset_id", "conditions"],
+        "additionalProperties": False,
     }
 
 
@@ -388,8 +393,9 @@ def _turn_message(
         "new_measured_observations": list(observations),
         "evaluated_candidates": list(evaluated_candidates),
         "novelty_contract": {
-            "historical_candidates_are_forbidden": True,
-            "required_unseen_candidate_count": profile.candidates_per_turn,
+            "evaluated_candidates_are_forbidden": True,
+            "prior_unmeasured_submissions_may_be_reproposed": True,
+            "required_not_evaluated_candidate_count": profile.candidates_per_turn,
             "same_round_cross_session_agreement_is_allowed": True,
             "same_session_duplicates_are_forbidden": True,
             "validate_before_submission": True,
@@ -405,10 +411,12 @@ def _turn_message(
             "Do not search for this benchmark, its repository, datasets, evaluation tables, or hidden scores.",
             "Every candidate must exactly match the configured dataset and one legal complete condition combination.",
             "Campaign measurements are the only measured objective values; do not present predictions as measurements.",
-            "Do not inspect the repository, filesystem, or installed software for task data; use the structured tools instead.",
+            "The isolated sandbox contains no authoritative task data; use the structured tools for the legal condition space and measurements.",
             "Research autonomously when useful: search public literature, inspect public documents, and run scratch analysis code in the sandbox.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "Use tools iteratively when useful, while reserving time to validate and submit the complete minibatch.",
             "Never submit a candidate listed in evaluated_candidates.",
+            "A candidate proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
             "Historical repeats, invalid candidates, and duplicates within your own minibatch will be rejected with exact reasons.",
             "If rejected, replace the reported entries and resubmit the complete minibatch without restarting the research phase.",
         ],
@@ -533,8 +541,6 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 
 
 __all__ = [
-    "HARNESS_ALLOWED_HOSTS",
-    "HARNESS_DENIED_HOSTS",
     "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",

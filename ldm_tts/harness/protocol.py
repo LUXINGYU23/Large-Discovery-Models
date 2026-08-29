@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
@@ -127,7 +127,7 @@ class HarnessPoolConfig:
     task_id: str
     case_id: str
     seed: int
-    candidate_schema_sha256: str
+    candidate_schema: dict[str, Any]
     tool_extensions: tuple[HarnessToolExtension, ...] = ()
     thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
@@ -141,8 +141,18 @@ class HarnessPoolConfig:
             raise ValueError("harness campaign, task, and case identities are required")
         if self.seed < 0:
             raise ValueError("harness seed must be non-negative")
-        if _SHA256_PATTERN.fullmatch(self.candidate_schema_sha256) is None:
-            raise ValueError("candidate_schema_sha256 must be a lowercase SHA-256 digest")
+        if (
+            not isinstance(self.candidate_schema, dict)
+            or self.candidate_schema.get("type") != "object"
+            or self.candidate_schema.get("additionalProperties") is not False
+        ):
+            raise ValueError(
+                "harness candidate_schema must be a strict JSON object schema"
+            )
+        try:
+            canonical_sha256(self.candidate_schema)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("harness candidate_schema must be JSON serializable") from exc
         if not self.profiles:
             raise ValueError("harness requires at least one profile")
         if len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
@@ -156,6 +166,10 @@ class HarnessPoolConfig:
     @property
     def profile_set_sha256(self) -> str:
         return profile_set_sha256(self.profiles)
+
+    @property
+    def candidate_schema_sha256(self) -> str:
+        return canonical_sha256(self.candidate_schema)
 
     def common_frame(self, request_id: str, frame_type: str) -> dict[str, Any]:
         return {
@@ -176,6 +190,7 @@ class HarnessPoolConfig:
             "taskId": self.task_id,
             "caseId": self.case_id,
             "seed": self.seed,
+            "candidateSchema": self.candidate_schema,
             "candidateSchemaSha256": self.candidate_schema_sha256,
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],

@@ -34,7 +34,12 @@ def test_persistent_harness_client_runs_one_profile_batch(
         task_id="fixture",
         case_id="case-1",
         seed=1,
-        candidate_schema_sha256="b" * 64,
+        candidate_schema={
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
     client = HarnessClient(
@@ -89,7 +94,12 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
         task_id="fixture",
         case_id="case-1",
         seed=1,
-        candidate_schema_sha256="b" * 64,
+        candidate_schema={
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
     )
     monkeypatch.setenv(environment_variable, "1")
     client = HarnessClient(

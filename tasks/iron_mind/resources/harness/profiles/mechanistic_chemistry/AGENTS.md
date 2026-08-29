@@ -12,7 +12,7 @@ For each turn, inspect the new measurements, identify mechanistic patterns and c
 
 Use public-web research when a reaction class, catalyst system, ligand, solvent, or additive could materially change the ranking. Prefer primary literature and authoritative reviews. Follow useful references beyond search snippets when time permits.
 
-Use the sandbox as a research notebook. You may write and run scratch code to tabulate observations, compare factor interactions, or rank legal combinations. Inspect only files you create; do not search the repository, installed packages, or filesystem for task data.
+Use the isolated sandbox as a research notebook. You may inspect installed tools, install useful public packages, write files, and run scratch code to tabulate observations, compare factor interactions, or rank legal combinations. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
 Continue research while another step is likely to change a decision, while reserving enough of the 30-minute turn window to validate and submit the complete minibatch.
 
@@ -21,6 +21,7 @@ Continue research while another step is likely to change a decision, while reser
 - Use only public literature, measured history, and the structured source-pinned reaction-space tools.
 - Never search for Iron Mind, its repository, benchmark datasets, evaluation tables, or hidden scores.
 - Never present a predicted reaction score as a measurement.
+- Only candidates listed in `evaluated_candidates` are forbidden. A candidate you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
 - Validate exact complete candidates with `validate_reaction_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch.
 - If rejected, use the reported indices, codes, and reasons to replace only rejected entries, then resubmit the complete minibatch.

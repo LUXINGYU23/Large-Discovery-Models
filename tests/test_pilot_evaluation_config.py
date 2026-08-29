@@ -36,9 +36,8 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
     assert spec.result_fields["best_found_utility"] == "best_found_utility"
     assert spec.method_overrides["llm"][-2:] == (
         "args.proposal-samples=16",
-        "args.proposal-max-workers=4",
+        "args.proposal-max-workers=6",
     )
-    assert spec.method_overrides["harness"][0] == 'contract_profile="pilot_evaluation_harness"'
     assert spec.method_overrides["harness"][0] == 'contract_profile="pilot_evaluation_harness"'
 
 
@@ -50,9 +49,12 @@ def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, t
     synthon = load_pilot_evaluation_spec(REPO_ROOT / "config" / "pilot_evaluation" / "synthonbench_extended.yaml")
 
     assert iron.iterations == synthon.iterations == 12
-    assert iron.methods == ("ldm", "bo", "llm")
+    assert iron.methods == ("ldm", "harness", "bo", "llm")
     assert synthon.methods == ("ldm", "harness", "bo", "llm")
     assert iron.method_overrides["llm"][0] == 'contract_profile="pilot_evaluation_extended_direct_llm"'
     assert synthon.method_overrides["llm"][0] == 'contract_profile="pilot_evaluation_extended_direct_llm"'
-    assert synthon.method_overrides["llm"][-1] == "args.proposal-max-workers=4"
+    assert synthon.method_overrides["llm"][-1] == "args.proposal-max-workers=6"
+    assert iron.method_overrides["harness"][0] == (
+        'contract_profile="pilot_evaluation_extended_harness"'
+    )
     assert synthon.method_overrides["harness"][0] == 'contract_profile="pilot_evaluation_extended_harness"'

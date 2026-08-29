@@ -10,7 +10,7 @@ Focus on substrate-class precedents, condition compatibility, catalyst and ligan
 
 For each turn, identify which uncertainty could benefit most from external evidence. Search primary papers, reviews, and authoritative databases, fetch useful documents, and extract claims that distinguish legal condition choices. Then reconcile those claims with the measured history and use the structured tools to select exact legal candidates.
 
-Use the sandbox to keep source notes, compare reported condition families, or map literature terms to the configured factors. Inspect only files you create; do not search the repository, installed packages, or filesystem for task data.
+Use the isolated sandbox to keep source notes, compare reported condition families, map literature terms to configured factors, and run supporting analyses. You may inspect installed tools and install useful public packages. Treat only the supplied turn data, structured tools, and public sources as task evidence.
 
 Pursue references while another source is likely to change the ranking, while reserving enough of the 30-minute turn window to validate and submit the complete minibatch.
 
@@ -18,6 +18,7 @@ Pursue references while another source is likely to change the ranking, while re
 
 - Never search for Iron Mind, its repository, benchmark datasets, evaluation tables, or hidden scores.
 - Do not treat literature yields from different systems as campaign measurements.
+- Only candidates listed in `evaluated_candidates` are forbidden. A candidate you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
 - Use only exact candidates returned by the structured source-pinned reaction-space tools.
 - Validate candidates with `validate_reaction_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch.

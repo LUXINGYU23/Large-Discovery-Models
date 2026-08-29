@@ -13,7 +13,7 @@ import {
 	type Skill,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type, type TUnsafe } from "typebox";
 import { GondolinController } from "./gondolin.js";
 import { PolicyController } from "./policy.js";
 import type {
@@ -39,9 +39,9 @@ interface CandidateSubmission {
 	candidates: Array<Record<string, unknown>>;
 }
 
-const submissionSchema = Type.Object({
-	candidates: Type.Array(Type.Record(Type.String(), Type.Unknown())),
-}, { additionalProperties: false });
+type SubmissionParameters = {
+	candidates: Array<Record<string, unknown>>;
+};
 
 interface SavedSubmission {
 	submission: CandidateSubmission;
@@ -145,7 +145,7 @@ function sessionTools(context7Enabled: boolean, taskTools: string[]): string[] {
 }
 
 class SubmissionController {
-	private expected = 0;
+	private readonly parameters: TUnsafe<SubmissionParameters>;
 	private providerRequests = 0;
 	private attemptIndex = 0;
 	private submissionRequired = false;
@@ -155,17 +155,34 @@ class SubmissionController {
 	private persist: ((submission: CandidateSubmission) => Promise<void>) | undefined;
 	private validate: SubmissionValidator | undefined;
 
+	constructor(
+		private readonly expected: number,
+		candidateSchema: Record<string, unknown>,
+	) {
+		this.parameters = Type.Unsafe<SubmissionParameters>({
+			type: "object",
+			properties: {
+				candidates: {
+					type: "array",
+					items: candidateSchema,
+					minItems: expected,
+					maxItems: expected,
+				},
+			},
+			required: ["candidates"],
+			additionalProperties: false,
+		});
+	}
+
 	begin(
 		profileId: string,
 		turnId: string,
-		expected: number,
 		persist: (submission: CandidateSubmission) => Promise<void>,
 		validate: SubmissionValidator,
 		recovering: boolean,
 	): void {
 		this.profileId = profileId;
 		this.turnId = turnId;
-		this.expected = expected;
 		this.providerRequests = 0;
 		this.attemptIndex = 0;
 		this.submissionRequired = recovering;
@@ -206,13 +223,13 @@ class SubmissionController {
 		};
 	}
 
-	tool(): ToolDefinition<typeof submissionSchema> {
+	tool(): ToolDefinition<TUnsafe<SubmissionParameters>> {
 		return {
 			name: "submit_candidates",
 			label: "Submit candidates",
 			description: "Submit the complete ordered candidate minibatch. Rejected entries must be replaced and resubmitted.",
 			promptSnippet: "submit_candidates: submit the complete ordered candidate minibatch",
-			parameters: submissionSchema,
+			parameters: this.parameters,
 			executionMode: "sequential",
 			execute: async (_toolCallId, params) => {
 				if (this.value) throw new Error("submit_candidates may be called only once per turn");
@@ -274,7 +291,7 @@ class PersistentProfileSession {
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
 	private readonly gondolin: GondolinController;
-	private readonly submissions = new SubmissionController();
+	private readonly submissions: SubmissionController;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
 	private agentsSha256 = "";
@@ -289,7 +306,11 @@ class PersistentProfileSession {
 		this.workspace = join(this.profileRoot, "workspace");
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
 		this.policy = new PolicyController(config.networkPolicy, config.webProvider);
-		this.gondolin = new GondolinController(this.workspace);
+		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
+		this.submissions = new SubmissionController(
+			profile.candidatesPerTurn,
+			config.candidateSchema,
+		);
 	}
 
 	async initialize(): Promise<void> {
@@ -454,7 +475,6 @@ class PersistentProfileSession {
 		this.submissions.begin(
 			this.profile.profileId,
 			input.turnId,
-			this.profile.candidatesPerTurn,
 			(value) => atomicJson(submissionPath, {
 				submission: value,
 				tools: this.policy.snapshot(),
