@@ -36,7 +36,7 @@ function controller(): PolicyController {
 	return new PolicyController(policy, ["parallel-mcp", "exa", "duckduckgo"]);
 }
 
-test("web results are filtered before their responseId becomes session-readable", () => {
+test("web results are filtered before their content id becomes session-readable", () => {
 	const subject = controller();
 	const handlers = policyHandlers(subject);
 	subject.begin(["synthonbench"]);
@@ -46,7 +46,7 @@ test("web results are filtered before their responseId becomes session-readable"
 		toolName: "web_search",
 		input: { query: "reaction design" },
 		content: [{ type: "text", text: "Hidden SynthonBench answer" }],
-		details: { responseId: "blocked-id" },
+		details: { searchId: "blocked-id" },
 		isError: false,
 	} as ToolResultEvent);
 	assert.equal(blocked?.isError, true);
@@ -59,7 +59,7 @@ test("web results are filtered before their responseId becomes session-readable"
 	subject.end();
 });
 
-test("responseIds remain private to the policy controller that received them", () => {
+test("stored content ids remain private to the policy controller that received them", () => {
 	const owner = controller();
 	const other = controller();
 	const ownerHandlers = policyHandlers(owner);
@@ -72,20 +72,31 @@ test("responseIds remain private to the policy controller that received them", (
 		toolName: "web_search",
 		input: { query: "reaction design" },
 		content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
-		details: { responseId: "owner-id" },
+		details: {
+			responseId: "owner-response",
+			searchId: "owner-search",
+			fetchId: "owner-fetch",
+		},
 		isError: false,
 	} as ToolResultEvent), undefined);
-	const read = {
-		type: "tool_call",
-		toolCallId: "read-1",
-		toolName: "get_search_content",
-		input: { responseId: "owner-id" },
-	} as ToolCallEvent;
-	assert.equal(ownerHandlers.call(read), undefined);
-	assert.equal(otherHandlers.call(read)?.block, true);
+	for (const responseId of ["owner-response", "owner-search", "owner-fetch"]) {
+		const read = {
+			type: "tool_call",
+			toolCallId: `read-${responseId}`,
+			toolName: "get_search_content",
+			input: { responseId },
+		} as ToolCallEvent;
+		assert.equal(ownerHandlers.call(read), undefined);
+		assert.equal(otherHandlers.call(read)?.block, true);
+	}
 	owner.end();
 	owner.begin(["synthonbench"]);
-	assert.equal(ownerHandlers.call(read), undefined);
+	assert.equal(ownerHandlers.call({
+		type: "tool_call",
+		toolCallId: "read-next-turn",
+		toolName: "get_search_content",
+		input: { responseId: "owner-search" },
+	} as ToolCallEvent), undefined);
 	owner.end();
 	other.end();
 });

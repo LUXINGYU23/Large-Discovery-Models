@@ -117,7 +117,7 @@ function normalizeProviderSelection(value: unknown, allowed: readonly string[]):
 
 export class PolicyController {
 	private active: ActivePolicyTurn | undefined;
-	private readonly responseIds = new Set<string>();
+	private readonly contentIds = new Set<string>();
 
 	constructor(
 		private readonly policy: NetworkPolicy,
@@ -172,7 +172,7 @@ export class PolicyController {
 			} else if (event.toolName === "get_search_content") {
 				active.webCalls += 1;
 				const responseId = input.responseId;
-				if (typeof responseId !== "string" || !this.responseIds.has(responseId)) {
+				if (typeof responseId !== "string" || !this.contentIds.has(responseId)) {
 					throw new Error("responseId does not belong to this session");
 				}
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
@@ -206,8 +206,14 @@ export class PolicyController {
 				}
 			}
 			if ((event.toolName === "web_search" || event.toolName === "fetch_content") && !event.isError) {
-				const details = event.details as { responseId?: unknown } | undefined;
-				if (typeof details?.responseId === "string") this.responseIds.add(details.responseId);
+				const details = event.details as {
+					responseId?: unknown;
+					searchId?: unknown;
+					fetchId?: unknown;
+				} | undefined;
+				for (const id of [details?.responseId, details?.searchId, details?.fetchId]) {
+					if (typeof id === "string") this.contentIds.add(id);
+				}
 			}
 		} catch {
 			return {
