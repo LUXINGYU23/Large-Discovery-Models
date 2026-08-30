@@ -345,7 +345,7 @@ class PersistentProfileSession {
 						name: this.config.model,
 						reasoning: true,
 						thinkingLevelMap: {
-							off: "off",
+							off: "none",
 							minimal: "minimal",
 							low: "low",
 							medium: "medium",

@@ -191,6 +191,16 @@ async function main(): Promise<void> {
 	};
 	try {
 		await pool.initialize();
+		const models = JSON.parse(await readFile(
+			join(root, "harness", "sessions", "target_sar", "pi-agent", "models.json"),
+			"utf8",
+		)) as {
+			providers: Record<string, { models: Array<{ thinkingLevelMap: Record<string, string> }> }>;
+		};
+		assert.equal(
+			models.providers["ldm-harness-target_sar"]?.models[0]?.thinkingLevelMap.off,
+			"none",
+		);
 		const inputDigest = sha256("capability-turn");
 		const [turn] = await pool.runTurns([{
 			profileId: "target_sar",
