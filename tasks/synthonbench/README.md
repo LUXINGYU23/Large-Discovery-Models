@@ -346,7 +346,9 @@ both direct methods and the Harness. Direct methods use the Chat Completions
 thinking-level mapping. Direct requests use four local workers;
 this changes only scheduling, not the independent request count. Transient
 provider failures receive bounded backoff retries for the same logical
-proposal. Endpoint and
+proposal. The max-reasoning pilot profiles allow up to 600 seconds per direct
+request because reasoning latency can substantially exceed short-completion
+defaults. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
 provider and model.
 
