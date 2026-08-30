@@ -313,7 +313,7 @@ evaluations.
 confirmation matrix for direct LDM, Harness LDM, pure BO, and direct LLM. The
 six-round standard matrix provides the corresponding lower-cost screen.
 
-Direct LDM retains 64 independent requests with at most 6 concurrent workers.
+Direct LDM retains 64 independent requests with at most 4 concurrent workers.
 Harness LDM uses four concurrent persistent sessions with 16 candidates each.
 Both use empirical `q0`, a 32-candidate maintained pool, `beta=1`, `eta=1`, and
 acquisition z-clipping at 2 as locked by the pilot-evaluation profiles. The
@@ -329,7 +329,7 @@ one-evaluation baseline.
 The pilot direct methods request maximum reasoning through the Chat
 Completions `reasoning_effort` field. The Harness uses Pi's Responses API
 thinking-level mapping instead; these provider fields are intentionally
-different. Direct requests retain six workers and apply bounded backoff to
+different. Direct requests retain four workers and apply bounded backoff to
 transient provider failures without changing the logical candidate count.
 
 ```bash

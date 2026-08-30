@@ -232,9 +232,11 @@ def test_pilot_direct_profiles_request_max_chat_reasoning() -> None:
         "pilot_evaluation_extended",
         "pilot_evaluation_extended_direct_llm",
     ):
-        assert contract.profile(profile_name).locked_args["llm-extra-body-json"] == (
+        args = contract.profile(profile_name).locked_args
+        assert args["llm-extra-body-json"] == (
             '{{"reasoning_effort":"max"}}'
         )
+        assert args["proposal-max-workers"] == 4
 
 
 def test_qualification_record_covers_the_source_pinned_real_tracks() -> None:

@@ -13,7 +13,7 @@ args:
   iterations: 6
   proposal-samples: 64
   bo-pool-size: 32
-  proposal-max-workers: 6
+  proposal-max-workers: 4
   evaluations-per-round: 1
   acquisition-beta: 1.0
   alpha: 1.0
