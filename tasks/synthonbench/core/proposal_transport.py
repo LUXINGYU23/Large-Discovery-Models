@@ -28,7 +28,7 @@ def build_openai_synthon_client(
     json_mode: bool,
     extra_body: Mapping[str, Any] | None = None,
 ) -> OpenAICompatibleProposalClient:
-    """Build the shared transport for one logical proposal per request."""
+    """Build the shared transport for task-local proposal requests."""
 
     return OpenAICompatibleProposalClient(
         url=base_url,

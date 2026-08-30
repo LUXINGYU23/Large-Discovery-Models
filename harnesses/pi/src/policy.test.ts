@@ -33,7 +33,7 @@ function policyHandlers(controller: PolicyController) {
 }
 
 function controller(): PolicyController {
-	return new PolicyController(policy, "anysearch");
+	return new PolicyController(policy, ["parallel-mcp", "exa", "duckduckgo"]);
 }
 
 test("web results are filtered before their responseId becomes session-readable", () => {
@@ -111,4 +111,52 @@ test("tool usage is counted without a call limit", () => {
 		} as ToolCallEvent), undefined);
 	}
 	assert.deepEqual(subject.end(), { webCalls: 20, context7Calls: 10 });
+});
+
+test("web search preserves allowed provider choices and rejects providers outside the route", () => {
+	const subject = controller();
+	const handlers = policyHandlers(subject);
+	subject.begin([]);
+	const allowed = {
+		type: "tool_call",
+		toolCallId: "search-allowed",
+		toolName: "web_search",
+		input: { query: "reaction design", provider: "DuckDuckGo" },
+	} as ToolCallEvent;
+	assert.equal(handlers.call(allowed), undefined);
+	assert.equal((allowed.input as Record<string, unknown>).provider, "duckduckgo");
+
+	const blocked = handlers.call({
+		type: "tool_call",
+		toolCallId: "search-blocked",
+		toolName: "web_search",
+		input: { query: "reaction design", provider: "tavily" },
+	} as ToolCallEvent);
+	assert.equal(blocked?.block, true);
+	assert.match(blocked?.reason ?? "", /"reason":"provider_not_allowed"/);
+	assert.match(blocked?.reason ?? "", /"allowed_providers":\["parallel-mcp","exa","duckduckgo"\]/);
+	subject.end();
+});
+
+test("unrestricted search keeps Agent domain filters and defaults to automatic routing", () => {
+	const subject = new PolicyController(
+		{ allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
+		["parallel-mcp", "exa", "duckduckgo"],
+	);
+	const handlers = policyHandlers(subject);
+	subject.begin([]);
+	const call = {
+		type: "tool_call",
+		toolCallId: "search-auto",
+		toolName: "web_search",
+		input: { query: "reaction design", domainFilter: ["pubmed.ncbi.nlm.nih.gov"] },
+	} as ToolCallEvent;
+	assert.equal(handlers.call(call), undefined);
+	assert.deepEqual(call.input, {
+		query: "reaction design",
+		domainFilter: ["pubmed.ncbi.nlm.nih.gov"],
+		provider: "auto",
+		workflow: "none",
+	});
+	subject.end();
 });

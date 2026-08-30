@@ -9,7 +9,10 @@ from synthonbench.space import Synthon, SynthonSpace
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation
 from ldm_tts.engine.expansion import ExpansionRequest
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
-from tasks.synthonbench.core.prompting import build_synthon_prompt_messages
+from tasks.synthonbench.core.prompting import (
+    build_synthon_batch_prompt_messages,
+    build_synthon_prompt_messages,
+)
 from tasks.synthonbench.core.proposal_parsing import parse_synthon_response
 
 
@@ -70,6 +73,32 @@ def test_prompt_exposes_structures_for_history_and_complete_options() -> None:
     assert "option_index" not in user
     assert '"smiles":"CC"' in user
     assert '"smiles":"N"' in user
+
+
+def test_batch_prompt_requests_one_indexed_candidate_per_slot() -> None:
+    space = _space()
+    catalog = SynthonProposalCatalog(
+        space,
+        allowed_reactions=("r1",),
+        slate_size=2,
+        seed=11,
+        unique_anchors=True,
+        proposals_per_round=2,
+    )
+    plans = tuple(catalog.build_plan(round_idx=0, proposal_index=index) for index in range(2))
+
+    messages = build_synthon_batch_prompt_messages(
+        ExpansionRequest(round_idx=0, reservoir_size=2),
+        plans,
+        target="kif11",
+        space=space,
+    )
+
+    user = messages[1]["content"]
+    assert '"candidate_count":2' in user
+    assert '"proposal_index":0' in user
+    assert '"proposal_index":1' in user
+    assert "Include every proposal_index exactly once" in user
 
 
 def _space() -> SynthonSpace:

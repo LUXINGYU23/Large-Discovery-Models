@@ -305,7 +305,7 @@ class PersistentProfileSession {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
-		this.policy = new PolicyController(config.networkPolicy, config.webProvider);
+		this.policy = new PolicyController(config.networkPolicy, config.webSearch.providers);
 		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
 		this.submissions = new SubmissionController(
 			profile.candidatesPerTurn,
@@ -671,7 +671,7 @@ export class PiSessionPool {
 		await writeFile(
 			join(process.env.PI_CODING_AGENT_DIR, "web-search.json"),
 			`${JSON.stringify({
-				provider: this.config.webProvider,
+				searchRouting: this.config.webSearch,
 				fetchContent: { domainPolicy: { allow: this.config.networkPolicy.allowedHosts, deny: this.config.networkPolicy.deniedHosts } },
 				fetchRouting: { providers: ["http"], allowRemoteHostedProviders: false },
 				githubClone: { enabled: false },
@@ -703,7 +703,7 @@ export class PiSessionPool {
 			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
 			networkPolicy: this.config.networkPolicy,
 			limits: this.config.limits,
-			webProvider: this.config.webProvider,
+			webSearch: this.config.webSearch,
 			context7Enabled: this.config.context7Enabled,
 			tools: sessionTools(
 				this.config.context7Enabled,

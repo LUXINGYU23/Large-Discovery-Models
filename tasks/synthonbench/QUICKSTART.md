@@ -49,8 +49,9 @@ The direct backend accepts any OpenAI-compatible Chat Completions provider.
 The persistent research harness uses the OpenAI Responses wire format instead.
 Credentials remain outside tracked configuration and run metadata.
 
-The default request body disables optional thinking for the one-tuple JSON
-response: `{"thinking":{"type":"disabled"}}`. If the selected provider does
+The default request body disables optional thinking for the compact JSON
+response: `{"thinking":{"type":"disabled"}}`. Direct LDM launches four
+concurrent requests with 16 indexed candidates in each response. If the selected provider does
 not support that extension, set `--llm-extra-body-json '{}'` or supply its own
 compatible JSON body.
 

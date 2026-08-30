@@ -1,6 +1,6 @@
 import { sha256 } from "./trace.js";
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -36,6 +36,13 @@ export interface HarnessLimits {
 	wallTimeSeconds: number;
 }
 
+export type SearchFallbackKind = "transient" | "quota" | "network" | "invalid-response" | "unsupported";
+
+export interface WebSearchConfig {
+	providers: string[];
+	fallbackOn: SearchFallbackKind[];
+}
+
 export interface BootstrapSecretFrame extends CommonFrame {
 	type: "bootstrap_secret";
 	apiKey: string;
@@ -58,7 +65,7 @@ export interface InitializeFrame extends CommonFrame {
 	toolExtensions: HarnessToolExtensionConfig[];
 	networkPolicy: NetworkPolicy;
 	limits: HarnessLimits;
-	webProvider: "anysearch";
+	webSearch: WebSearchConfig;
 	context7Enabled: boolean;
 }
 
@@ -362,7 +369,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaJson", "candidateSchemaSha256", "profileSetSha256",
-		"profiles", "toolExtensions", "networkPolicy", "limits", "webProvider", "context7Enabled",
+		"profiles", "toolExtensions", "networkPolicy", "limits", "webSearch", "context7Enabled",
 	], "frame");
 	const candidateSchemaJson = string(data.candidateSchemaJson, "candidateSchemaJson");
 	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
@@ -383,11 +390,32 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
 	const limits = record(data.limits, "limits");
 	exactKeys(limits, ["wallTimeSeconds"], "limits");
+	const webSearch = record(data.webSearch, "webSearch");
+	exactKeys(webSearch, ["providers", "fallbackOn"], "webSearch");
+	const providers = stringArray(webSearch.providers, "webSearch.providers");
+	if (
+		providers.length === 0
+		|| new Set(providers).size !== providers.length
+		|| providers.some((provider) => !/^[a-z][a-z0-9-]*$/.test(provider) || provider === "auto" || provider === "all")
+	) {
+		throw new ProtocolError(
+			"invalid_frame",
+			"webSearch.providers must contain unique resolved lowercase provider names",
+		);
+	}
+	const fallbackOn = stringArray(webSearch.fallbackOn, "webSearch.fallbackOn");
+	const fallbackKinds: SearchFallbackKind[] = ["transient", "quota", "network", "invalid-response", "unsupported"];
+	if (
+		fallbackOn.length === 0
+		|| new Set(fallbackOn).size !== fallbackOn.length
+		|| fallbackOn.some((kind) => !fallbackKinds.includes(kind as SearchFallbackKind))
+	) {
+		throw new ProtocolError("invalid_frame", "webSearch.fallbackOn contains invalid or duplicate kinds");
+	}
 	const thinking = string(data.thinking, "thinking") as ThinkingLevel;
 	const thinkingLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 	if (!thinkingLevels.includes(thinking)) throw new ProtocolError("invalid_frame", `invalid thinking level: ${thinking}`);
 	if (data.wireApi !== "responses") throw new ProtocolError("invalid_frame", "wireApi must be responses");
-	if (data.webProvider !== "anysearch") throw new ProtocolError("invalid_frame", "webProvider must be anysearch");
 	if (typeof data.context7Enabled !== "boolean") {
 		throw new ProtocolError("invalid_frame", "context7Enabled must be boolean");
 	}
@@ -416,7 +444,10 @@ export function parseFrame(line: string): InputFrame {
 		limits: {
 			wallTimeSeconds: positiveInteger(limits.wallTimeSeconds, "limits.wallTimeSeconds"),
 		},
-		webProvider: "anysearch",
+		webSearch: {
+			providers,
+			fallbackOn: fallbackOn as SearchFallbackKind[],
+		},
 		context7Enabled: data.context7Enabled,
 	};
 }

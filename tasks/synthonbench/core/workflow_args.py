@@ -20,6 +20,7 @@ from tasks.synthonbench.core.constants import (
     DEFAULT_GP_SIGNAL_STD,
     DEFAULT_LLM_EXTRA_BODY_JSON,
     DEFAULT_LLM_MAX_TOKENS,
+    DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST,
     DEFAULT_PROPOSAL_MAX_WORKERS,
     DEFAULT_PROPOSAL_SAMPLES,
     DEFAULT_SLATE_SIZE,
@@ -41,7 +42,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     _add_ldm_arguments(parser)
     _add_provider_arguments(parser)
     _add_runtime_arguments(parser)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.proposal_candidates_per_request is None:
+        args.proposal_candidates_per_request = (
+            min(DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST, args.proposal_samples)
+            if args.search_method == "ldm" and args.proposal_backend == "direct"
+            else 1
+        )
+    return args
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -70,6 +78,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--bo-pool-size", type=int, default=DEFAULT_BO_POOL_SIZE)
     parser.add_argument("--bo-search-samples", type=int, default=DEFAULT_BO_SEARCH_SAMPLES)
+    parser.add_argument("--proposal-candidates-per-request", type=int)
     parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--slate-size", type=int, default=DEFAULT_SLATE_SIZE)
@@ -135,7 +144,8 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 def _validate_counts(args: argparse.Namespace) -> None:
     if args.iterations < 0 or args.campaign_index < 0:
         raise SystemExit("--iterations and --campaign-index must be non-negative")
-    positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_max_workers", "evaluations_per_round",
+    positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_candidates_per_request",
+                "proposal_max_workers", "evaluations_per_round",
                 "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens",
                 "harness_candidates_per_session", "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
@@ -144,6 +154,17 @@ def _validate_counts(args: argparse.Namespace) -> None:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.search_method != "llm" and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
+    if args.proposal_backend == "direct" and args.search_method in {"ldm", "llm"}:
+        breadth = (
+            args.proposal_samples
+            if args.search_method == "ldm"
+            else args.evaluations_per_round
+        )
+        if breadth % args.proposal_candidates_per_request:
+            raise SystemExit(
+                "the direct proposal breadth must divide evenly by "
+                "--proposal-candidates-per-request"
+            )
     if args.proposal_backend == "harness":
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:

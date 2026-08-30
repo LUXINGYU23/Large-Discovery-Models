@@ -50,6 +50,17 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         schema_json.encode("utf-8")
     ).hexdigest()
     assert "candidateSchema" not in frame
+    assert frame["webSearch"] == {
+        "providers": ["parallel-mcp", "exa", "duckduckgo"],
+        "fallbackOn": [
+            "transient",
+            "quota",
+            "network",
+            "invalid-response",
+            "unsupported",
+        ],
+    }
+    assert "webProvider" not in frame
 
 
 def test_persistent_harness_client_runs_one_profile_batch(

@@ -38,13 +38,17 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		toolExtensions: [],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
 		limits: { wallTimeSeconds: 60 },
-		webProvider: "anysearch",
+		webSearch: {
+			providers: ["parallel-mcp", "exa", "duckduckgo"],
+			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
+		},
 		context7Enabled: true,
 	}));
 	assert.equal(frame.type, "initialize");
 	if (frame.type === "initialize") {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.candidateSchema, candidateSchema);
+		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
 	}
 });
 
@@ -77,7 +81,10 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			toolExtensions: [],
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
 			limits: { wallTimeSeconds: 60 },
-			webProvider: "anysearch",
+			webSearch: {
+				providers: ["parallel-mcp", "exa", "duckduckgo"],
+				fallbackOn: ["quota", "network"],
+			},
 			context7Enabled: true,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",

@@ -39,6 +39,13 @@ compaction enabled. The release configuration reserves 16,384 tokens for the
 next response and retains the most recent 20,000 tokens verbatim; Pi writes
 compaction entries into its native session history.
 
+The sidecar writes the configured ordered provider route to Pi Web Access.
+`provider: auto` uses automatic fallback, while an Agent may explicitly retry
+with any provider in that route when returned sources are unsuitable. Provider
+names outside the route are rejected with a model-visible structured reason;
+they are never silently substituted. The default route is `parallel-mcp`,
+`exa`, then `duckduckgo`; all are usable without a task-owned search API key.
+
 Each run stores only:
 
 - native Pi session JSONL with messages, tool calls, and tool results;

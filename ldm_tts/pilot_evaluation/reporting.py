@@ -88,6 +88,9 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             "evaluation_utilization": len(observations) / (spec.iterations * evaluations),
             "completed_rounds": len(round_rows),
             "proposal_samples": int(config["proposal_samples"]),
+            "proposal_candidates_per_request": int(
+                config.get("proposal_candidates_per_request", 1)
+            ),
             "harness_candidates_per_session": int(config.get("harness_candidates_per_session", 0)),
             "contract_sha256": str(campaign["contract_sha256"]),
             "initial_candidate_ids": initial_candidate_ids,
@@ -157,9 +160,10 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             errors.append(f"BO used model proposals: {row['case']}/{row['seed']}")
         if row["method"] in {"ldm", "llm"}:
             actual = row["budget_proposal_attempts"]
-            rounds = spec.optimization_rounds
-            per_round = row["proposal_samples"] if row["method"] == "ldm" else row["evaluations_per_round"]
-            if actual != rounds * per_round:
+            expected = _expected_model_proposal_attempts(
+                row, spec.optimization_rounds
+            )
+            if actual != expected:
                 errors.append(f"unexpected proposal count for {row['case']}/{row['method']}/{row['seed']}")
         if row["method"] == "harness":
             per_session = row["harness_candidates_per_session"]
@@ -172,6 +176,16 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
     if len(trajectories) != len(rows) * spec.iterations:
         errors.append("round trajectory count is incomplete")
     return {"valid": not errors, "errors": errors}
+
+
+def _expected_model_proposal_attempts(row: dict[str, Any], rounds: int) -> int:
+    per_round = (
+        row["proposal_samples"]
+        if row["method"] == "ldm"
+        else row["evaluations_per_round"]
+    )
+    candidates_per_request = row.get("proposal_candidates_per_request", 1)
+    return rounds * math.ceil(per_round / candidates_per_request)
 
 
 def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

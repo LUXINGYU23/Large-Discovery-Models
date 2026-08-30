@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -51,8 +52,8 @@ def _proposal_attempt_count(args: Any, search_rounds: int) -> int:
         return 0
     if args.proposal_backend == "harness":
         return search_rounds * len(HARNESS_PROFILE_IDS)
-    per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
-    return search_rounds * per_round
+    breadth = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
+    return search_rounds * math.ceil(breadth / args.proposal_candidates_per_request)
 
 
 def _valid_candidate_count(args: Any, initial: int, search_rounds: int) -> int:

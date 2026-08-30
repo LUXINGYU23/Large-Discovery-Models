@@ -16,15 +16,23 @@ TASK_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = TASK_ROOT.parents[1]
 
 
-def test_task_spec_declares_independent_oversampled_proposals() -> None:
+def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> None:
     spec = describe_ldm_task(parse_args(["--mock"]))
 
     assert spec.task == "synthonbench"
     assert spec.candidate_domain.kind == "reaction_synthon_tuple"
     assert spec.reservoir.max_size == 64
-    assert spec.proposal_search.name == "parallel_independent_requests"
+    assert spec.proposal_search.name == "parallel_independent_minibatch_requests"
     assert spec.proposal_search.breadth == 64
-    assert spec.proposal_search.parameters["one_candidate_per_request"] is True
+    assert spec.proposal_search.parameters == {
+        "request_count": 4,
+        "candidates_per_request": 16,
+        "max_workers": 4,
+    }
+    assert spec.metadata["model_requests_per_round"] == 4
+    assert spec.metadata["candidates_per_model_request"] == 16
+    assert spec.response_spaces[0].name == "synthon_tuple_batch_json"
+    assert spec.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 16
     assert spec.metadata["bo_pool_size"] == 32
     assert spec.acquisition.name == "ucb_tilted"
     assert spec.acquisition.parameters["pool_size"] == 32
@@ -53,6 +61,7 @@ def test_direct_llm_contract_returns_the_official_complete_tuple() -> None:
     assert spec.reservoir.max_size == 1
     assert spec.proposal_search.breadth == 1
     assert spec.metadata["model_requests_per_round"] == 1
+    assert spec.metadata["candidates_per_model_request"] == 1
     assert spec.metadata["search_breadth"] == 1
     assert spec.surrogate.kind == "none"
 
@@ -61,7 +70,9 @@ def test_proposal_defaults_disable_thinking() -> None:
     args = parse_args(["--mock"])
 
     assert args.llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
-    assert args.llm_max_tokens == 256
+    assert args.llm_max_tokens == 2048
+    assert args.proposal_candidates_per_request == 16
+    assert args.proposal_max_workers == 4
 
 
 def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
@@ -142,7 +153,7 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
     assert result["mode"] == "mock"
     assert result["official_calls"] == 2
     assert result["official_metrics"]["submitted_calls"] == 2.0
-    assert budget["counters"]["proposal_attempts"] == 16
+    assert budget["counters"]["proposal_attempts"] == 2
     assert budget["counters"]["benchmark_jobs"] == 2
     for filename in (
         "submission.csv",
@@ -193,7 +204,7 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         "gp-observation-noise-std", "gp-reaction-weight", "acquisition-beta", "alpha", "eta", "z-clip",
     }
     direct = {
-        "proposal-max-workers",
+        "proposal-candidates-per-request", "proposal-max-workers",
         "llm-max-tokens", "llm-temperature", "llm-extra-body-json",
     }
     harness = {
@@ -221,6 +232,41 @@ def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headro
         args = contract.profile(profile_name).locked_args
         headroom = args["proposal-samples"] - args["bo-pool-size"]
         assert headroom >= args["evaluations-per-round"]
+
+
+def test_pilot_profiles_lock_the_intended_request_shapes() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in ("pilot_evaluation", "pilot_evaluation_extended"):
+        args = contract.profile(profile_name).locked_args
+        assert args["proposal-samples"] == 64
+        assert args["proposal-candidates-per-request"] == 16
+        assert args["proposal-max-workers"] == 4
+        assert args["llm-max-tokens"] == 2048
+
+    for profile_name in (
+        "pilot_evaluation_direct_llm",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        args = contract.profile(profile_name).locked_args
+        assert args["proposal-samples"] == 16
+        assert args["proposal-candidates-per-request"] == 1
+        assert args["proposal-max-workers"] == 4
+        assert args["llm-max-tokens"] == 256
+
+
+def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in (
+        "pilot_evaluation_extended",
+        "pilot_evaluation_extended_harness",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        args = contract.profile(profile_name).locked_args
+        assert args["bo-pool-size"] == 48
+        assert args["eta"] == 3.0
+        assert args["z-clip"] == 5.0
 
 
 def test_pilot_direct_profiles_request_max_chat_reasoning() -> None:

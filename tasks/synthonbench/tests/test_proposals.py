@@ -24,6 +24,7 @@ from tasks.synthonbench.core.catalog import SynthonProposalCatalog
 from tasks.synthonbench.core.constants import Q0_METADATA_KEY
 from tasks.synthonbench.core.proposal_base_measure import attach_empirical_base_measure
 from tasks.synthonbench.core.proposal_parsing import (
+    parse_synthon_batch_response,
     parse_synthon_response,
     parse_synthon_responses,
 )
@@ -32,7 +33,7 @@ from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
 from tasks.synthonbench.core.proposals import PROPOSAL_SOURCE
 from tasks.synthonbench.core.search import SynthonInitializationExpander
 
-REQUEST_SIZE = 4
+REQUEST_SIZE = 64
 
 
 def test_direct_transport_retries_transient_provider_failures() -> None:
@@ -213,14 +214,65 @@ def test_parser_isolates_type_errors_without_refills() -> None:
     assert parsed.errors[0].message == "reaction_id must be a string"
 
 
-def test_expander_keeps_independent_requests_and_records_the_actual_allocation() -> None:
+def test_batch_parser_preserves_valid_peers_and_reports_the_failed_slot() -> None:
+    plans = tuple(_catalog(seed=0).build_plan(round_idx=0, proposal_index=index)
+                  for index in range(2))
+    candidates = [
+        {
+            "proposal_index": plan.proposal_index,
+            "reaction_id": plan.reaction_id,
+            "synthon_ids": [slot[0].synthon_id for slot in plan.slot_options],
+        }
+        for plan in plans
+    ]
+    candidates[1]["reaction_id"] = "missing"
+
+    parsed = parse_synthon_batch_response(
+        json.dumps({"candidates": candidates}),
+        plans,
+    )
+
+    assert [item.proposal_index for item in parsed.proposals] == [0]
+    assert parsed.errors[0].proposal_index == 1
+    assert "assigned reaction slate" in parsed.errors[0].message
+
+
+def test_batch_parser_requires_the_exact_candidate_count() -> None:
+    plans = tuple(_catalog(seed=0).build_plan(round_idx=0, proposal_index=index)
+                  for index in range(2))
+
+    with pytest.raises(ValueError, match="exactly 2 candidates"):
+        parse_synthon_batch_response(json.dumps({"candidates": []}), plans)
+
+
+def test_batch_response_failure_counts_every_missing_candidate() -> None:
+    class InvalidBatchClient:
+        def propose(self, request: ProposalRequest) -> ProposalResponse:
+            return ProposalResponse(text='{"candidates":[]}')
+
+    result = _expander(InvalidBatchClient()).expand(_request())
+
+    assert result.metadata["invalid_response_count"] == 4
+    assert result.metadata["invalid_candidate_count"] == 64
+    assert result.metadata["candidate_count_parsed"] == 0
+
+
+def test_expander_issues_four_independent_requests_of_sixteen_candidates() -> None:
     client = IndexedProposalClient()
     result = _expander(client).expand(_request())
 
-    assert len(result.attempts) == REQUEST_SIZE
+    assert len(result.attempts) == 4
     assert len(result.proposals) == REQUEST_SIZE
-    assert [item.metadata["proposal_index"] for item in client.requests] == list(range(REQUEST_SIZE))
-    assert result.metadata["sampling_mode"] == "local_concurrent_independent_requests"
+    assert [item.metadata["proposal_indices"] for item in client.requests] == [
+        list(range(start, start + 16)) for start in range(0, REQUEST_SIZE, 16)
+    ]
+    assert result.metadata["request_count"] == 4
+    assert result.metadata["candidates_per_request"] == 16
+    assert result.metadata["candidate_count_requested"] == 64
+    assert result.metadata["candidate_count_parsed"] == 64
+    assert result.metadata["sampling_mode"] == (
+        "local_concurrent_independent_minibatch_requests"
+    )
     assert result.metadata["reaction_allocation"] == "product_weighted"
 
 
@@ -230,7 +282,7 @@ def test_endpoint_requests_use_local_workers_without_changing_candidate_count(mo
 
     result = _expander(client).expand(_request())
 
-    assert len(result.attempts) == REQUEST_SIZE
+    assert len(result.attempts) == 4
     assert len(result.proposals) == REQUEST_SIZE
 
 
@@ -302,7 +354,14 @@ def _catalog(seed: int) -> SynthonProposalCatalog:
 
 
 def _expander(client: Any) -> SynthonBenchProposalExpander:
-    return SynthonBenchProposalExpander(client, _domain(), _catalog(seed=3), target="kif11", max_workers=2)
+    return SynthonBenchProposalExpander(
+        client,
+        _domain(),
+        _catalog(seed=3),
+        target="kif11",
+        candidates_per_request=16,
+        max_workers=2,
+    )
 
 
 def _request(**overrides: Any) -> ExpansionRequest:
@@ -312,7 +371,15 @@ def _request(**overrides: Any) -> ExpansionRequest:
 
 
 def _response_from_request(request: ProposalRequest) -> ProposalResponse:
+    plans = request.metadata.get("proposal_plans")
+    assert isinstance(plans, list)
     return ProposalResponse(text=json.dumps({
-        "reaction_id": request.metadata["reaction_id"],
-        "synthon_ids": [ids[0] for ids in request.metadata["slot_synthon_ids"]],
+        "candidates": [
+            {
+                "proposal_index": plan["proposal_index"],
+                "reaction_id": plan["reaction_id"],
+                "synthon_ids": [ids[0] for ids in plan["slot_synthon_ids"]],
+            }
+            for plan in plans
+        ]
     }))

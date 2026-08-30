@@ -43,6 +43,7 @@ The public `ldm_tts.harness` package provides:
 | `HarnessProfile` | One persistent Agent identity, `AGENTS.md`, optional skill directories, candidate count, and content digests. |
 | `HarnessToolExtension` | A digest-verified task tool module and its exact exported tool names. |
 | `HarnessLimits` / `HarnessNetworkPolicy` | Per-turn wall-time and network/query policy. |
+| `HarnessWebSearch` | Ordered search route, Agent provider allowlist, and automatic fallback conditions. |
 | `HarnessTurn` | One profile's round, history range and digest, task message, and forbidden query terms. |
 | `HarnessClient` | Long-lived sidecar process, secret bootstrap, strict request/response validation, and turn execution. |
 | `HarnessSubmissionRequest` | One provisional minibatch submitted by a profile during a turn. |
@@ -54,6 +55,16 @@ wire format. It owns session lifecycle, automatic context compaction, isolated
 file and shell tools, web and Context7 extensions, terminal candidate
 submission, and redacted raw provider capture. The shared Python protocol is
 task-neutral and does not understand domain candidate identities.
+
+Web search defaults to the keyless `parallel-mcp`, `exa`, then `duckduckgo`
+route.
+Requests that omit `provider` or use `auto` follow the route and fall through on
+configured service failures. An Agent may explicitly select one provider, or a
+concurrent provider list, only from the same route. A disallowed selection is
+returned with the requested value and allowed providers so the Agent can
+correct the call in the current session. Tasks may replace the route through
+`HarnessPoolConfig.web_search`; the route is also the authorization boundary
+for provider cost and data disclosure.
 
 ## Task Responsibilities
 

@@ -42,14 +42,15 @@ task's machine-readable provenance.
 Each outer round uses the following task-local realization of the shared LDM
 lifecycle:
 
-1. Draw `M=64` independent reaction-conditioned public slates. Reactions are
+1. Draw `M=64` independent reaction-conditioned public slots. Reactions are
    allocated in proportion to their official product-space sizes by default,
    and a deterministic unique anchor synthon keeps the 64 proposal slots
    distinct within each round while leaving the remaining slots open to the
    model. Anchors from evaluated history are excluded in later rounds.
-2. Issue one independent OpenAI-compatible request per slate. Each request may
-   return exactly one tuple selected from its listed source-valid IDs.
-3. Parse and validate every response against both its slate and the full
+2. Partition the slots into four independent 16-candidate minibatches and issue
+   the four OpenAI-compatible requests concurrently. Each response must contain
+   one indexed tuple for every slot in its minibatch.
+3. Parse and validate every candidate against both its slot and the full
    official `SynthonSpace`. There are no replacement or refill requests.
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
@@ -66,7 +67,7 @@ lifecycle:
 8. Send each selected unseen tuple to official `GlobalSynthonTask.score()`.
    One selected tuple is one charged official oracle call.
 
-The public slate is necessary because full reaction slot catalogs contain
+The public slots are necessary because full reaction catalogs contain
 thousands of synthons and cannot be faithfully serialized into one LLM prompt.
 It contains only released IDs and SMILES, never score-table values, top-k lists,
 or unqueried oracle outcomes. Previous charged outcomes are the only feedback
@@ -175,13 +176,18 @@ files intentionally leave endpoint fields unset. Use
 `--llm-json-mode` only when the selected provider supports the OpenAI JSON
 response-format field. Provider-specific OpenAI-compatible request fields can
 be passed as JSON through `--llm-extra-body-json`. The task default is
-`{"thinking":{"type":"disabled"}}`, because each request must emit one short
-JSON decision. Providers that do not recognize this extension can override it
+`{"thinking":{"type":"disabled"}}`; the standard Direct LDM request returns
+one compact 16-candidate JSON minibatch. Providers that do not recognize this
+extension can override it
 with `--llm-extra-body-json '{}'` or their own request body.
 
-The default `direct` proposal backend uses Chat Completions for independent
-one-candidate requests. The optional persistent harness backend uses the
+The default `direct` LDM backend uses four independent Chat Completions calls,
+each returning 16 candidates. The direct-LLM comparator retains independent
+one-candidate calls. The optional persistent harness backend uses the
 OpenAI Responses wire format through Pi; its endpoint must support that API.
+`--proposal-samples` controls total occurrences and
+`--proposal-candidates-per-request` controls the fixed response minibatch; the
+direct proposal breadth must divide evenly by the minibatch size.
 
 ## Persistent Research Harness
 
@@ -315,19 +321,21 @@ Each completed run writes:
 `config/pilot_evaluation/synthonbench.yaml` runs a three-seed, four-method comparison on the
 official 1M KIF11 surrogate track. One product-uniform shared initialization
 batch and five optimization batches make six outer rounds. Each round targets
-16 official calls; invalid, previously evaluated, or duplicate generated
-candidates are not replaced, so reports retain the actual call count.
+16 official calls. Direct methods do not replace invalid, previously evaluated,
+or duplicate generated candidates; Harness sessions repair rejected entries
+before committing each minibatch.
 
 `config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
 (12 outer rounds, targeting 192 official calls per campaign). It is a separate confirmation profile for
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
-Direct-API LDM retains the current 64 independent public-slate requests,
-empirical `q0`, a 32-candidate maintained pool, `beta=0.5`, `eta=1`, and
-acquisition z-clipping at 2, together with the
+Direct-API LDM uses four independent concurrent requests with 16 indexed public
+proposal slots per response, producing 64 raw occurrences for empirical `q0`,
+a 32-candidate maintained pool, `beta=0.5`, `eta=1`, and acquisition z-clipping
+at 2, together with the
 task-local reaction-aware Nyström count-Tanimoto GP over standardized
-utilities. Harness LDM replaces those 64 endpoint calls with four persistent
+utilities. Harness LDM uses the same 4-by-16 proposal shape through four persistent
 research sessions, each submitting 16 independently researched official-space
 tuples, then uses the same `q0`, pool maintenance, GP, and acquisition tilt.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
@@ -343,12 +351,14 @@ the 16 requests distinct, and anchors from evaluated history are excluded.
 The committed six-round and extended profiles request maximum reasoning effort for
 both direct methods and the Harness. Direct methods use the Chat Completions
 `reasoning_effort` field, while the Harness uses Pi's Responses API
-thinking-level mapping. Direct requests use four local workers;
-this changes only scheduling, not the independent request count. Transient
+thinking-level mapping. Direct LDM starts all four minibatch requests
+concurrently. The direct-LLM comparator queues its 16 single-candidate requests
+through the same four-worker limit. Transient
 provider failures receive bounded backoff retries for the same logical
 proposal. The max-reasoning pilot profiles allow up to 600 seconds per direct
 request because reasoning latency can substantially exceed short-completion
-defaults. Endpoint and
+defaults. Direct LDM allows 2,048 output tokens for its 16-candidate JSON
+response; direct LLM retains 256 for one candidate. Endpoint and
 model names remain user-configured so all model-backed methods can use the same
 provider and model.
 

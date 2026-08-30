@@ -85,24 +85,30 @@ async function main(): Promise<void> {
 		requestBodies.push(body);
 		call += 1;
 		if (call === 1) {
+			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
+				query: "Buchwald Hartwig reaction primary literature",
+				numResults: 3,
+				provider: "auto",
+			})));
+		} else if (call === 2) {
 			writeEvents(response, toolEvents(call, "bash", JSON.stringify({
 				command: "if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
 			})));
-		} else if (call === 2) {
-			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
 		} else if (call === 3) {
+			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
+		} else if (call === 4) {
 			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
 				candidates: [{ reaction_id: "r1", synthon_ids: ["a", "b"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
-		} else if (call === 4) {
+		} else if (call === 5) {
 			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
 				candidates: [{ reaction_id: "r5", synthon_ids: ["i", "j"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
-		} else if (call === 5) {
-			writeEvents(response, textEvents(call, "Corrected submission accepted."));
 		} else if (call === 6) {
-			writeEvents(response, failureEvents(call, "stream_read_error"));
+			writeEvents(response, textEvents(call, "Corrected submission accepted."));
 		} else if (call === 7) {
+			writeEvents(response, failureEvents(call, "stream_read_error"));
+		} else if (call === 8) {
 			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
 				candidates: [{ reaction_id: "r3", synthon_ids: ["e", "f"] }, { reaction_id: "r4", synthon_ids: ["g", "h"] }],
 			})));
@@ -163,7 +169,10 @@ async function main(): Promise<void> {
 			forbiddenQueryPatterns: ["benchmark score"],
 		},
 		limits: { wallTimeSeconds: 120 },
-		webProvider: "anysearch",
+		webSearch: {
+			providers: ["parallel-mcp", "exa", "duckduckgo"],
+			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
+		},
 		context7Enabled: true,
 	};
 	const pool = new PiSessionPool(config, secret);
@@ -196,7 +205,8 @@ async function main(): Promise<void> {
 		}], validate);
 		assert(turn);
 		assert.equal(turn.submission.candidates.length, 2);
-		assert.equal(turn.usage.providerCalls, 5);
+		assert.equal(turn.usage.providerCalls, 6);
+		assert.equal(turn.usage.webCalls, 1);
 		assert(requestBodies[0]?.includes("capability-smoke researcher"));
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });
@@ -204,8 +214,9 @@ async function main(): Promise<void> {
 		const submissionChoice = { type: "function", name: "submit_candidates" };
 		assert.equal(payloads[1]?.tool_choice, undefined);
 		assert.equal(payloads[2]?.tool_choice, undefined);
-		assert.deepEqual(payloads[3]?.tool_choice, submissionChoice);
-		assert.equal(payloads[4]?.tool_choice, undefined);
+		assert.equal(payloads[3]?.tool_choice, undefined);
+		assert.deepEqual(payloads[4]?.tool_choice, submissionChoice);
+		assert.equal(payloads[5]?.tool_choice, undefined);
 
 		const recoveryInput = {
 			profileId: "target_sar",
@@ -222,10 +233,10 @@ async function main(): Promise<void> {
 		assert(recovered);
 		assert.equal(recovered.submission.candidates.length, 2);
 		assert.equal(recovered.usage.providerCalls, 3);
-		assert.deepEqual((JSON.parse(requestBodies[6] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
+		assert.deepEqual((JSON.parse(requestBodies[7] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
 		const [replayed] = await pool.runTurns([recoveryInput], validate);
 		assert.deepEqual(replayed, recovered);
-		assert.equal(call, 8);
+		assert.equal(call, 9);
 		await assert.rejects(
 			pool.runTurns(
 				[{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }],
@@ -253,8 +264,10 @@ async function main(): Promise<void> {
 		assert.match(session, /already evaluated; replace index 0/);
 		assert.match(session, /previous provider stream ended/);
 		assert.match(session, /sandbox-network-ok/);
+		assert.match(session, /web_search/);
+		assert.match(session, /Buchwald Hartwig/);
 		const providerIndex = await readFile(join(root, "harness", "sessions", "target_sar", "turns", "capability_turn", "provider_index.jsonl"), "utf8");
-		assert.equal(providerIndex.trim().split("\n").length, 5);
+		assert.equal(providerIndex.trim().split("\n").length, 6);
 		assert.equal((await readdir(join(root, "harness", "sessions", "target_sar", "pi-agent"))).includes("auth.json"), false);
 		const manifest = JSON.parse(await readFile(join(root, "harness", "manifest.json"), "utf8")) as {
 			campaignId?: unknown;

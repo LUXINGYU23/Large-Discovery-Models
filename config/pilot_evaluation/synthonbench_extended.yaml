@@ -25,7 +25,9 @@ method_overrides:
     - contract_profile="pilot_evaluation_extended_direct_llm"
     - args.prompt-policy="direct_v1"
     - args.proposal-samples=16
+    - args.proposal-candidates-per-request=1
     - args.proposal-max-workers=4
+    - args.llm-max-tokens=256
 seeds: [0, 1, 2]
 optimization_rounds: 11
 initialization_mode: shared_random

@@ -80,13 +80,48 @@ function fetchUrls(input: Record<string, unknown>): string[] {
 	return [...values(input.url), ...values(input.urls)];
 }
 
+function providerRejection(
+	reason: "invalid_provider_selection" | "provider_not_allowed",
+	requested: unknown,
+	allowed: readonly string[],
+): Error {
+	return new Error(`Web search provider rejected: ${JSON.stringify({
+		accepted: false,
+		reason,
+		requested_provider: requested ?? null,
+		allowed_providers: allowed,
+		guidance: "Use provider auto or select only from allowed_providers.",
+	})}`);
+}
+
+function normalizeProviderSelection(value: unknown, allowed: readonly string[]): "auto" | string | string[] {
+	if (value === undefined || (typeof value === "string" && value.trim().toLowerCase() === "auto")) {
+		return "auto";
+	}
+	const requested = Array.isArray(value) ? value : [value];
+	if (
+		requested.length === 0
+		|| requested.some((provider) => typeof provider !== "string" || provider.trim().length === 0)
+	) {
+		throw providerRejection("invalid_provider_selection", value, allowed);
+	}
+	const normalized = (requested as string[]).map((provider) => provider.trim().toLowerCase());
+	if (new Set(normalized).size !== normalized.length) {
+		throw providerRejection("invalid_provider_selection", value, allowed);
+	}
+	if (normalized.some((provider) => !allowed.includes(provider))) {
+		throw providerRejection("provider_not_allowed", value, allowed);
+	}
+	return Array.isArray(value) ? normalized : normalized[0] as string;
+}
+
 export class PolicyController {
 	private active: ActivePolicyTurn | undefined;
 	private readonly responseIds = new Set<string>();
 
 	constructor(
 		private readonly policy: NetworkPolicy,
-		private readonly webProvider: string,
+		private readonly webProviders: readonly string[],
 	) {}
 
 	begin(forbiddenTerms: string[]): void {
@@ -123,9 +158,11 @@ export class PolicyController {
 			if (event.toolName === "web_search") {
 				active.webCalls += 1;
 				assertAllowedQuery(queryText(input), this.policy, active.forbiddenTerms);
-				input.provider = this.webProvider;
+				input.provider = normalizeProviderSelection(input.provider, this.webProviders);
 				input.workflow = "none";
-				input.domainFilter = [...this.policy.allowedHosts];
+				if (this.policy.allowedHosts.length > 0) {
+					input.domainFilter = [...this.policy.allowedHosts];
+				}
 			} else if (event.toolName === "fetch_content") {
 				active.webCalls += 1;
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);

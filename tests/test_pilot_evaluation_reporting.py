@@ -6,7 +6,11 @@ import csv
 from pathlib import Path
 from types import SimpleNamespace
 
-from ldm_tts.pilot_evaluation.reporting import _round_rows, _verdict
+from ldm_tts.pilot_evaluation.reporting import (
+    _expected_model_proposal_attempts,
+    _round_rows,
+    _verdict,
+)
 
 
 def test_minimization_verdict_treats_lower_ldm_values_as_better() -> None:
@@ -55,6 +59,24 @@ def test_harness_receives_its_own_baseline_verdict() -> None:
 
     assert result["cases"][0]["harness_verdict"] == "promising"
     assert result["cases"][0]["harness_seed_wins"] == 3
+
+
+def test_model_proposal_budget_counts_minibatch_requests() -> None:
+    ldm = {
+        "method": "ldm",
+        "proposal_samples": 64,
+        "evaluations_per_round": 16,
+        "proposal_candidates_per_request": 16,
+    }
+    llm = {
+        "method": "llm",
+        "proposal_samples": 16,
+        "evaluations_per_round": 16,
+        "proposal_candidates_per_request": 1,
+    }
+
+    assert _expected_model_proposal_attempts(ldm, 11) == 44
+    assert _expected_model_proposal_attempts(llm, 11) == 176
 
 
 def test_evaluation_index_trajectory_uses_checkpoint_rounds_with_short_batches(

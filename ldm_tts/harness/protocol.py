@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
+_SEARCH_FALLBACK_KINDS = frozenset(
+    {"transient", "quota", "network", "invalid-response", "unsupported"}
+)
 
 
 def canonical_sha256(value: Any) -> str:
@@ -118,6 +121,44 @@ class HarnessNetworkPolicy:
 
 
 @dataclass(frozen=True)
+class HarnessWebSearch:
+    providers: tuple[str, ...] = ("parallel-mcp", "exa", "duckduckgo")
+    fallback_on: tuple[str, ...] = (
+        "transient",
+        "quota",
+        "network",
+        "invalid-response",
+        "unsupported",
+    )
+
+    def __post_init__(self) -> None:
+        if not self.providers:
+            raise ValueError("harness web search requires at least one provider")
+        if len(set(self.providers)) != len(self.providers):
+            raise ValueError("harness web search providers must be unique")
+        if any(
+            re.fullmatch(r"[a-z][a-z0-9-]*", provider) is None
+            or provider in {"auto", "all"}
+            for provider in self.providers
+        ):
+            raise ValueError(
+                "harness web search providers must be resolved lowercase provider names"
+            )
+        if not self.fallback_on:
+            raise ValueError("harness web search fallback_on must not be empty")
+        if len(set(self.fallback_on)) != len(self.fallback_on):
+            raise ValueError("harness web search fallback kinds must be unique")
+        if any(kind not in _SEARCH_FALLBACK_KINDS for kind in self.fallback_on):
+            raise ValueError("unsupported harness web search fallback kind")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "providers": list(self.providers),
+            "fallbackOn": list(self.fallback_on),
+        }
+
+
+@dataclass(frozen=True)
 class HarnessPoolConfig:
     artifact_root: Path
     base_url: str
@@ -132,6 +173,7 @@ class HarnessPoolConfig:
     thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
+    web_search: HarnessWebSearch = field(default_factory=HarnessWebSearch)
     context7_enabled: bool = True
 
     def __post_init__(self) -> None:
@@ -206,7 +248,7 @@ class HarnessPoolConfig:
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
             "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
-            "webProvider": "anysearch",
+            "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
         }
 
@@ -327,6 +369,7 @@ __all__ = [
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
+    "HarnessWebSearch",
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",

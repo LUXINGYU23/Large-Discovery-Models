@@ -13,6 +13,7 @@ args:
   oracle-kind: surrogate
   iterations: 6
   proposal-samples: 16
+  proposal-candidates-per-request: 1
   bo-pool-size: 32
   bo-search-samples: 64
   proposal-max-workers: 4

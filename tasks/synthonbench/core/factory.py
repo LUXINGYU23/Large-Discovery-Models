@@ -54,7 +54,8 @@ class CampaignComponentOptions:
     evaluations_per_round: int = 1
     search_method: str = "ldm"
     initialization_mode: str = "none"
-    proposal_max_workers: int = 64
+    proposal_candidates_per_request: int = 16
+    proposal_max_workers: int = 4
     slate_size: int = 24
     reaction_allocation: str = "product_weighted"
     selection_seed: int = 0
@@ -81,7 +82,13 @@ class CampaignComponentOptions:
             raise ValueError(f"Unknown search method: {self.search_method!r}")
         if self.initialization_mode not in INITIALIZATION_MODES:
             raise ValueError(f"Unknown initialization mode: {self.initialization_mode!r}")
-        if min(self.proposal_samples, self.bo_pool_size, self.bo_search_samples, self.evaluations_per_round) < 1:
+        if min(
+            self.proposal_samples,
+            self.bo_pool_size,
+            self.bo_search_samples,
+            self.evaluations_per_round,
+            self.proposal_candidates_per_request,
+        ) < 1:
             raise ValueError("Proposal, pool, and evaluation counts must be positive")
         if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
             raise ValueError("LDM proposal samples must exceed the BO pool size")
@@ -99,6 +106,16 @@ class CampaignComponentOptions:
                 raise ValueError("proposal_samples must equal the harness minibatch total")
         elif self.search_method in {"ldm", "llm"} and self.client is None:
             raise ValueError("Direct model search methods require a proposal client")
+        if self.proposal_backend == "direct" and self.search_method in {"ldm", "llm"}:
+            breadth = (
+                self.proposal_samples
+                if self.search_method == "ldm"
+                else self.evaluations_per_round
+            )
+            if breadth % self.proposal_candidates_per_request:
+                raise ValueError(
+                    "direct proposal breadth must divide evenly by candidates per request"
+                )
         _validate_options(self)
         if self.proposal_backend == "direct":
             validate_prompt_policy(self.prompt_policy)
@@ -134,6 +151,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         evaluations_per_round=options.evaluations_per_round,
         bo_pool_size=options.bo_pool_size,
         bo_search_samples=options.bo_search_samples,
+        proposal_candidates_per_request=options.proposal_candidates_per_request,
         proposal_max_workers=options.proposal_max_workers,
         slate_size=options.slate_size,
         reaction_allocation=options.reaction_allocation,
@@ -246,6 +264,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         assert options.client is not None
         search = SynthonBenchProposalExpander(
             options.client, domain, catalog, target=options.target, before_requests=options.before_requests,
+            candidates_per_request=options.proposal_candidates_per_request,
             max_workers=options.proposal_max_workers, prompt_policy=options.prompt_policy,
         )
     if options.initialization_mode == "none":
