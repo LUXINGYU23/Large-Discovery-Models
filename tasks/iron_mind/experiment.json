@@ -59,11 +59,12 @@
       "oracle": "source-pinned Olympus reaction tables",
       "paper_v2_suite": "six datasets used by the published paper figures",
       "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
-      "proposal_contract": "one strict candidate JSON object per independently issued OpenAI-compatible request; the portfolio prompt assigns each request a distinct factor focus, and the shared reservoir validates source membership and removes duplicates",
-      "proposal_sampling": "64 independent one-candidate requests by default; portfolio_v1 uses deterministic focus allocations plus task-specific roles, and the local worker limit defaults to 64 without refill requests",
+      "proposal_contract": "direct sampling uses one strict candidate JSON object per independent Chat Completions request; harness sampling uses four persistent task-local research sessions, structured source-pinned space tools, and complete validated minibatches",
+      "proposal_sampling": "direct LDM uses 64 independent one-candidate requests; harness LDM uses four concurrent persistent sessions with 16 candidates each, rejects historical and within-session repeats before commit, preserves cross-session occurrences, and then estimates empirical q0",
       "method": "empirical-q0 LDM proposal distribution, q0-weighted maintenance of a configurable BO pool, regularized factor-aware categorical ARD GP-UCB scoring with constant beta, and acquisition-tilted sampling",
       "method_providers": {
         "ldm": "model_endpoint",
+        "harness": "persistent_agent_harness",
         "llm": "model_endpoint",
         "bo": "dataset_or_deterministic_search"
       }
@@ -84,8 +85,8 @@
     "benchmark_jobs": 20
   },
   "profiles": {
-    "quick_compare": {
-      "description": "Six-round fixed-budget comparison of LDM, pure BO, and direct LLM methods.",
+    "pilot_evaluation": {
+      "description": "Six-round fixed-budget comparison of direct LDM, harness LDM, pure BO, and direct LLM methods.",
       "budget": {
         "outer_iterations": 6,
         "selected_candidates": 6,
@@ -98,18 +99,19 @@
         "iterations": 6,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
-        "bo-pool-size": 63,
-        "proposal-max-workers": 64,
+        "bo-pool-size": 32,
+        "proposal-max-workers": 4,
         "initialization-mode": "shared_random",
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
-        "z-clip": 5.0,
+        "eta": 1.0,
+        "z-clip": 2.0,
         "llm-temperature": 0.7,
-        "prompt-policy": "portfolio_v1"
+        "prompt-policy": "portfolio_v1",
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
-    "quick_compare_direct_llm": {
+    "pilot_evaluation_direct_llm": {
       "description": "Six-round fixed-budget direct-LLM comparator with no GP selector.",
       "budget": {
         "outer_iterations": 6,
@@ -123,19 +125,20 @@
         "iterations": 6,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
-        "bo-pool-size": 63,
-        "proposal-max-workers": 64,
+        "bo-pool-size": 32,
+        "proposal-max-workers": 4,
         "initialization-mode": "shared_random",
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
-        "z-clip": 5.0,
+        "eta": 1.0,
+        "z-clip": 2.0,
         "llm-temperature": 0.7,
-        "prompt-policy": "direct_v1"
+        "prompt-policy": "direct_v1",
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
-    "extended_compare": {
-      "description": "Twelve-round fixed-budget confirmation of LDM, pure BO, and direct LLM methods.",
+    "pilot_evaluation_extended": {
+      "description": "Twelve-round fixed-budget comparison of direct LDM, harness LDM, pure BO, and direct LLM methods.",
       "budget": {
         "outer_iterations": 12,
         "selected_candidates": 12,
@@ -148,18 +151,19 @@
         "iterations": 12,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
-        "bo-pool-size": 63,
-        "proposal-max-workers": 64,
+        "bo-pool-size": 32,
+        "proposal-max-workers": 4,
         "initialization-mode": "shared_random",
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
-        "z-clip": 5.0,
+        "eta": 1.0,
+        "z-clip": 2.0,
         "llm-temperature": 0.7,
-        "prompt-policy": "portfolio_v1"
+        "prompt-policy": "portfolio_v1",
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
-    "extended_compare_direct_llm": {
+    "pilot_evaluation_extended_direct_llm": {
       "description": "Twelve-round fixed-budget direct-LLM comparator with no GP selector.",
       "budget": {
         "outer_iterations": 12,
@@ -173,15 +177,109 @@
         "iterations": 12,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
-        "bo-pool-size": 63,
-        "proposal-max-workers": 64,
+        "bo-pool-size": 32,
+        "proposal-max-workers": 4,
         "initialization-mode": "shared_random",
         "acquisition-beta": 1.0,
         "alpha": 1.0,
-        "eta": 3.0,
-        "z-clip": 5.0,
+        "eta": 1.0,
+        "z-clip": 2.0,
         "llm-temperature": 0.7,
-        "prompt-policy": "direct_v1"
+        "prompt-policy": "direct_v1",
+        "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
+      }
+    },
+    "pilot_evaluation_harness": {
+      "description": "Six-round fixed-budget persistent-agent LDM comparison on source-pinned Iron Mind tables.",
+      "budget": {
+        "outer_iterations": 6,
+        "proposal_attempts": 20,
+        "harness_turns": 20,
+        "valid_search_candidates": 321,
+        "selected_candidates": 6,
+        "external_evaluations": 6,
+        "expensive_evaluation_attempts": 6,
+        "successful_evaluations": 6,
+        "benchmark_jobs": 6
+      },
+      "locked_args": {
+        "proposal-backend": "harness",
+        "proposal-mode": "none",
+        "search-method": "ldm",
+        "iterations": 6,
+        "evaluations-per-round": 1,
+        "proposal-samples": 64,
+        "harness-candidates-per-session": 16,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "bo-pool-size": 32,
+        "initialization-mode": "shared_random",
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 1.0,
+        "z-clip": 2.0
+      }
+    },
+    "pilot_evaluation_extended_harness": {
+      "description": "Twelve-round fixed-budget persistent-agent LDM comparison on source-pinned Iron Mind tables.",
+      "budget": {
+        "outer_iterations": 12,
+        "proposal_attempts": 44,
+        "harness_turns": 44,
+        "valid_search_candidates": 705,
+        "selected_candidates": 12,
+        "external_evaluations": 12,
+        "expensive_evaluation_attempts": 12,
+        "successful_evaluations": 12,
+        "benchmark_jobs": 12
+      },
+      "locked_args": {
+        "proposal-backend": "harness",
+        "proposal-mode": "none",
+        "search-method": "ldm",
+        "iterations": 12,
+        "evaluations-per-round": 1,
+        "proposal-samples": 64,
+        "harness-candidates-per-session": 16,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "bo-pool-size": 32,
+        "initialization-mode": "shared_random",
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 1.0,
+        "z-clip": 2.0
+      }
+    },
+    "harness_official_smoke": {
+      "description": "Two-round real capability gate for the persistent Iron Mind research harness.",
+      "budget": {
+        "outer_iterations": 2,
+        "proposal_attempts": 4,
+        "harness_turns": 4,
+        "valid_search_candidates": 65,
+        "selected_candidates": 2,
+        "external_evaluations": 2,
+        "expensive_evaluation_attempts": 2,
+        "successful_evaluations": 2,
+        "benchmark_jobs": 2
+      },
+      "locked_args": {
+        "proposal-backend": "harness",
+        "proposal-mode": "none",
+        "search-method": "ldm",
+        "iterations": 2,
+        "evaluations-per-round": 1,
+        "proposal-samples": 64,
+        "harness-candidates-per-session": 16,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "bo-pool-size": 32,
+        "initialization-mode": "shared_random",
+        "acquisition-beta": 1.0,
+        "alpha": 1.0,
+        "eta": 1.0,
+        "z-clip": 5.0
       }
     },
     "ldm_official_smoke": {

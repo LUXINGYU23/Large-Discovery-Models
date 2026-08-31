@@ -51,6 +51,50 @@ def build_synthon_prompt_messages(
     ]
 
 
+def build_synthon_batch_prompt_messages(
+    request: ExpansionRequest,
+    plans: Sequence[ProposalSlotPlan],
+    *,
+    target: str,
+    space: object,
+    prompt_policy: str = DEFAULT_PROMPT_POLICY,
+) -> list[dict[str, str]]:
+    """Build one request that returns one candidate for every independent slot."""
+
+    if len(plans) < 2:
+        raise ValueError("batch proposal prompts require at least two slots")
+    policy = validate_prompt_policy(prompt_policy)
+    payload = {
+        "target_label": target,
+        "objective": "maximize the measured SynthonBench utility; a higher numeric value is better",
+        "observed_history": _history_summary(request.observations, space),
+        "proposal_slots": [_batch_slot(plan, policy) for plan in plans],
+        "output_contract": {
+            "candidate_count": len(plans),
+            "candidates": [
+                {
+                    "proposal_index": "copy the integer from the corresponding proposal slot",
+                    "reaction_id": "copy the fixed reaction_id from that slot",
+                    "synthon_ids": "one complete ordered integer array valid for that slot",
+                }
+            ],
+        },
+    }
+    user = (
+        f"Complete all {len(plans)} independent molecular-design proposal slots. "
+        "Choose exactly one tuple per slot using only that slot's supplied options; never mix "
+        "components between slots. The measured history is shared evidence, not an exclusion "
+        "list beyond candidates explicitly present in it.\n\n"
+        + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        + "\n\nReturn exactly one JSON object containing only candidates. Include every "
+        "proposal_index exactly once and include no explanation or additional fields."
+    )
+    return [
+        {"role": "system", "content": _batch_system_prompt(len(plans))},
+        {"role": "user", "content": user},
+    ]
+
+
 def prompt_sha256(messages: Sequence[dict[str, str]]) -> str:
     """Return a stable digest without persisting endpoint credentials."""
 
@@ -58,11 +102,29 @@ def prompt_sha256(messages: Sequence[dict[str, str]]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def serialize_observations(
+    observations: Sequence[Observation],
+    space: object,
+) -> list[dict[str, object]]:
+    """Serialize measured public history without hidden benchmark state."""
+
+    return [_history_item(item, space) for item in observations]
+
+
 def _system_prompt() -> str:
     return (
         "You are a molecular-design proposal component in a budgeted black-box search. "
         "Choose one valid tuple only from the supplied reaction-specific synthon slate. "
         "Do not invent identifiers, do not predict scores, and return JSON only."
+    )
+
+
+def _batch_system_prompt(candidate_count: int) -> str:
+    return (
+        "You are a molecular-design proposal component in a budgeted black-box search. "
+        f"Return exactly {candidate_count} valid tuples, one for each supplied independent "
+        "reaction-specific synthon slot. Do not invent identifiers, do not predict scores, "
+        "and return JSON only."
     )
 
 
@@ -120,6 +182,16 @@ def _candidate_options(plan: ProposalSlotPlan, policy: str) -> dict[str, object]
             ]
         }
     return {"slot_options": _slot_payload(plan)}
+
+
+def _batch_slot(plan: ProposalSlotPlan, policy: str) -> dict[str, object]:
+    return {
+        "proposal_index": plan.proposal_index,
+        "reaction_id": plan.reaction_id,
+        "proposal_role": plan.role,
+        "selection_instruction": _policy_instruction(policy, plan.role),
+        **_candidate_options(plan, policy),
+    }
 
 
 def _direct_candidate_option(
@@ -200,7 +272,9 @@ def _history_components(
 __all__ = [
     "DEFAULT_PROMPT_POLICY",
     "PROMPT_POLICIES",
+    "build_synthon_batch_prompt_messages",
     "build_synthon_prompt_messages",
     "prompt_sha256",
+    "serialize_observations",
     "validate_prompt_policy",
 ]

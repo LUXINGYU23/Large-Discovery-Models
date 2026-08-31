@@ -9,16 +9,8 @@ from typing import Any
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
-
+from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
-from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
-from tasks.iron_mind.core.proposal_parsing import (
-    ParsedReactionResponses,
-    ResponseParseError,
-    parse_reaction_responses,
-    validate_candidate_count,
-)
-from tasks.iron_mind.core.proposal_transport import supports_local_concurrency
 from tasks.iron_mind.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     ProposalSlotPlan,
@@ -27,8 +19,14 @@ from tasks.iron_mind.core.prompting import (
     prompt_sha256,
     validate_prompt_policy,
 )
+from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
+from tasks.iron_mind.core.proposal_parsing import (
+    ParsedReactionResponses,
+    ResponseParseError,
+    parse_reaction_responses,
+    validate_candidate_count,
+)
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
-
 
 PROPOSAL_SOURCE = "iron_mind_reaction_proposal"
 SAMPLING_MODE = "local_concurrent_independent_requests"
@@ -103,7 +101,9 @@ class IronMindProposalExpander:
     def _propose_all(
         self, proposal_requests: Sequence[ProposalRequest]
     ) -> tuple[ProposalResponse, ...]:
-        if len(proposal_requests) == 1 or not supports_local_concurrency(self.client):
+        if len(proposal_requests) == 1 or not isinstance(
+            self.client, OpenAICompatibleProposalClient
+        ):
             return tuple(self.client.propose(item) for item in proposal_requests)
         worker_count = min(self.max_workers, len(proposal_requests))
         with ThreadPoolExecutor(max_workers=worker_count) as executor:

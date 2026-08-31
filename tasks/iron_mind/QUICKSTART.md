@@ -20,7 +20,8 @@ The mock path needs no external data, GPU, or model endpoint.
 
 ## 2. Configure a Model Endpoint
 
-Real runs require an OpenAI-compatible Chat Completions endpoint:
+Direct runs require an OpenAI-compatible Chat Completions endpoint. Harness
+runs use the same provider identity over the Responses API:
 
 ```bash
 export LLM_BASE_URL=https://your-model-host.example/v1
@@ -110,19 +111,39 @@ campaign or a suite configuration for the full benchmark. Set both
 the internal search, with `M > K`, without changing the number of evaluated
 reactions.
 
-## 5. Run the Quick Three-Method Comparison
+## 5. Verify the Harness Backend
+
+Harness runs require Docker and Linux KVM. Build the pinned Pi sidecar, then
+run the two-round capability gate:
+
+```bash
+docker build -t ldm-pi-harness:latest harnesses/pi
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/check_task_dependencies.py config/iron_mind/harness_smoke.yaml --no-optional
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_ldm_tts.py config/iron_mind/harness_smoke.yaml
+```
+
+To read the API key from a protected file, add
+`--set args.harness-api-key-file=/absolute/path/to/key`. The sidecar stores raw
+session and redacted provider traces below the campaign's `harness/` directory.
+
+## 6. Run the Four-Method Pilot Evaluation
 
 After the official data and endpoint are ready, run the fixed six-round matrix:
 
 ```bash
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml --dry-run
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_quick_compare.py config/quick_compare/iron_mind.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml
 ```
 
-The BO comparator is offline after data preparation. LDM and direct LLM use
-the generic endpoint variables from step 2. The output root is
-`$IRON_MIND_RUNS_ROOT/quick_compare/`; rerun an interrupted matrix with
+The BO comparator is offline after data preparation. Direct LDM, Harness LDM,
+and direct LLM use the generic endpoint variables from step 2. The Harness
+children also use the image and KVM setup from step 5. The output root is
+`$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted matrix with
 `--resume` after confirming the repository and configurations are unchanged.

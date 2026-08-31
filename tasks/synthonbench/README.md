@@ -42,20 +42,21 @@ task's machine-readable provenance.
 Each outer round uses the following task-local realization of the shared LDM
 lifecycle:
 
-1. Draw `M=64` independent reaction-conditioned public slates. Reactions are
+1. Draw `M=64` independent reaction-conditioned public slots. Reactions are
    allocated in proportion to their official product-space sizes by default,
    and a deterministic unique anchor synthon keeps the 64 proposal slots
    distinct within each round while leaving the remaining slots open to the
    model. Anchors from evaluated history are excluded in later rounds.
-2. Issue one independent OpenAI-compatible request per slate. Each request may
-   return exactly one tuple selected from its listed source-valid IDs.
-3. Parse and validate every response against both its slate and the full
+2. Partition the slots into four independent 16-candidate minibatches and issue
+   the four OpenAI-compatible requests concurrently. Each response must contain
+   one indexed tuple for every slot in its minibatch.
+3. Parse and validate every candidate against both its slot and the full
    official `SynthonSpace`. There are no replacement or refill requests.
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
 5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
-   sample of size `K`. The full-budget and qualification profiles use `K=32`;
-   quick-comparison profiles use `K=48`. Only this maintained BO pool is scored.
+   sample of size `K`. The full-budget, qualification, and pilot-evaluation
+   profiles use `K=32`. Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -66,7 +67,7 @@ lifecycle:
 8. Send each selected unseen tuple to official `GlobalSynthonTask.score()`.
    One selected tuple is one charged official oracle call.
 
-The public slate is necessary because full reaction slot catalogs contain
+The public slots are necessary because full reaction catalogs contain
 thousands of synthons and cannot be faithfully serialized into one LLM prompt.
 It contains only released IDs and SMILES, never score-table values, top-k lists,
 or unqueried oracle outcomes. Previous charged outcomes are the only feedback
@@ -175,9 +176,117 @@ files intentionally leave endpoint fields unset. Use
 `--llm-json-mode` only when the selected provider supports the OpenAI JSON
 response-format field. Provider-specific OpenAI-compatible request fields can
 be passed as JSON through `--llm-extra-body-json`. The task default is
-`{"thinking":{"type":"disabled"}}`, because each request must emit one short
-JSON decision. Providers that do not recognize this extension can override it
+`{"thinking":{"type":"disabled"}}`; the standard Direct LDM request returns
+one compact 16-candidate JSON minibatch. Providers that do not recognize this
+extension can override it
 with `--llm-extra-body-json '{}'` or their own request body.
+
+The default `direct` LDM backend uses four independent Chat Completions calls,
+each returning 16 candidates. The direct-LLM comparator retains independent
+one-candidate calls. The optional persistent harness backend uses the
+OpenAI Responses wire format through Pi; its endpoint must support that API.
+`--proposal-samples` controls total occurrences and
+`--proposal-candidates-per-request` controls the fixed response minibatch; the
+direct proposal breadth must divide evenly by the minibatch size.
+
+## Persistent Research Harness
+
+This section documents the SynthonBench adapter. The shared interface and task
+registration rules are in the
+[Research Harness integration guide](../../docs/research-harness.md).
+
+The harness backend changes only the proposal policy used by LDM. At campaign
+startup it creates four persistent Pi sessions with task-owned roles for target
+SAR, reaction feasibility, scaffold exploration, and property risk. Every
+session autonomously selects reaction types and searches a structured,
+read-only snapshot of the official SynthonSpace before submitting one
+16-candidate minibatch of exact `reaction_id + synthon_ids` tuples. The
+combined 64 raw occurrences enter the
+same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
+LDM acquisition tilt used by the direct backend.
+
+The Python runner remains the owner of measured optimization history. The first
+active turn bootstraps each session with all existing observations; later turns
+append only the newly measured suffix. Every turn carries an explicit history
+range and digest. A session rejects a gap, overlap, or changed replay before it
+can call the model, while the native Pi conversation retains each profile's
+private research context.
+
+The task-local Pi extension exposes `list_synthon_reactions`,
+`search_synthon_space`, and `validate_synthon_candidate`. The Python adapter
+creates the tool catalog from the loaded official `SynthonSpace`; the raw data
+file is not exposed to the agent shell. Every submitted tuple is validated
+again against the official Python object before entering LDM.
+
+Each session must submit 16 legal candidates absent from the authoritative
+evaluated snapshot. Evaluated repeats, invalid tuples, and duplicates within one
+session minibatch are rejected before commit with their indices and exact
+reasons; the same Pi session replaces them until its quota is full. A candidate
+proposed in an earlier turn but not evaluated remains eligible. Equal candidates
+proposed by different sessions remain separate raw occurrences, so independent
+agent agreement increases that candidate's empirical `q0` before reservoir
+deduplication. There is no profile-balanced correction or per-session `q0`.
+
+The SynthonBench harness profile set loads the four committed `AGENTS.md` files
+under `resources/harness/profiles/` and no skills. Pi provides web retrieval,
+Context7, and a separate Gondolin microVM for each session. The guest has root
+shell, file, package-installation, and unrestricted HTTP(S) access; the host
+repository and official task data are not mounted. Benchmark names, repository
+paths, datasets, and hidden scores remain blocked from research queries and
+fetched URLs as an evaluation-integrity rule. Each session may use up to 30
+minutes per turn; this is the only Harness research limit. Provider calls, web
+and Context7 calls, and trace bytes are recorded without hard caps. The default
+Pi context is 256K tokens with built-in automatic compaction.
+
+Build the pinned sidecar image once:
+
+```bash
+docker build -t ldm-pi-harness:latest harnesses/pi
+```
+
+Linux KVM must be available to Docker. Keep the Gondolin cache and all run data
+outside the repository, then run the committed two-round smoke profile:
+
+```bash
+export SYNTHONBENCH_WORK_ROOT=/path/to/synthonbench-workdir
+export SYNTHONBENCH_DATA_ROOT="$SYNTHONBENCH_WORK_ROOT/data"
+export SYNTHONBENCH_SOURCE_ROOT="$SYNTHONBENCH_WORK_ROOT/source"
+export SYNTHONBENCH_RUNS_ROOT="$SYNTHONBENCH_WORK_ROOT/runs"
+
+export LLM_BASE_URL=https://your-provider.example/v1
+export LLM_MODEL_NAME=your-responses-model
+export LLM_API_KEY=your-secret
+
+uv run --locked --project tasks/synthonbench \
+  python scripts/run_ldm_tts.py \
+  config/synthonbench/harness_surrogate_smoke.yaml
+```
+
+Instead of an API-key environment variable, pass
+`--set args.harness-api-key-file=/path/to/private/key`. For rootless or remote
+Docker, set `DOCKER_HOST` normally or pass
+`--set args.harness-docker-host=unix:///path/to/docker.sock`. Container storage,
+the Gondolin cache, official data, and run outputs remain user-selected paths;
+none are written into the task directory.
+
+Each harness run retains native Pi session JSONL, redacted raw model-provider
+request and response bodies with one compact mapping index, and the three small
+turn files needed for recovery (`input.json`, `submission.json`, and
+`turn_committed.json`). Tool calls and results already live in the native Pi
+session and are not duplicated into parallel trace files. API keys are sent to
+the sidecar once over stdin and are excluded from commands, container
+environment variables, manifests, sessions, and captured provider bodies.
+The run manifest records the campaign/task/case identity, seed, model and wire
+API, 262,144-token context window, Pi automatic-compaction settings, wall-time limit,
+network policy, tool set, pinned package versions, profile resource digests, and
+the profile-to-session mapping.
+
+If a Responses stream ends with the known interrupted-stream error before
+terminal submission, the same session continues submission-only recovery using
+its existing analysis until it commits, encounters a non-recoverable error, or
+reaches the turn wall-time limit. Every provider attempt remains in the raw
+trace; the runner never switches to the direct backend or invents replacement
+candidates.
 
 ## Real Runs
 
@@ -207,21 +316,28 @@ Each completed run writes:
 - `result.json`: LDM summary, best utility, and official metrics.
 - shared `status.json`, `budget.json`, events, and checkpoint artifacts.
 
-## Fixed-Budget Quick Comparison
+## Fixed-Round Pilot Evaluation
 
-`config/quick_compare/synthonbench.yaml` runs a three-seed comparison on the
+`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, four-method comparison on the
 official 1M KIF11 surrogate track. One product-uniform shared initialization
-batch and five optimization batches make six batches of 16 official calls
-(96 calls per campaign).
+batch and five optimization batches make six outer rounds. Each round targets
+16 official calls. Direct methods do not replace invalid, previously evaluated,
+or duplicate generated candidates; Harness sessions repair rejected entries
+before committing each minibatch.
 
-`config/quick_compare/synthonbench_extended.yaml` preserves the same method,
+`config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
-(192 official calls per campaign). It is a separate confirmation profile for
+(12 outer rounds, targeting 192 official calls per campaign). It is a separate confirmation profile for
 posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
-LDM retains the current 64 independent public-slate requests, empirical `q0`,
-48-candidate maintained pool, `beta=0.5`, `eta=3`, and task-local
-reaction-aware Nyström count-Tanimoto GP over standardized utilities.
+Direct-API LDM uses four independent concurrent requests with 16 indexed public
+proposal slots per response, producing 64 raw occurrences for empirical `q0`,
+a 32-candidate maintained pool, `beta=0.5`, `eta=1`, and acquisition z-clipping
+at 2, together with the
+task-local reaction-aware Nyström count-Tanimoto GP over standardized
+utilities. Harness LDM uses the same 4-by-16 proposal shape through four persistent
+research sessions, each submitting 16 independently researched official-space
+tuples, then uses the same `q0`, pool maintenance, GP, and acquisition tilt.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent finite-choice requests per optimization batch and
@@ -232,16 +348,29 @@ the parser rejects invented IDs and combinations that mix different options.
 Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
+The committed six-round and extended profiles request maximum reasoning effort for
+both direct methods and the Harness. Direct methods use the Chat Completions
+`reasoning_effort` field, while the Harness uses Pi's Responses API
+thinking-level mapping. Direct LDM starts all four minibatch requests
+concurrently. The direct-LLM comparator queues its 16 single-candidate requests
+through the same four-worker limit. Transient
+provider failures receive bounded backoff retries for the same logical
+proposal. The max-reasoning pilot profiles allow up to 600 seconds per direct
+request because reasoning latency can substantially exceed short-completion
+defaults. Direct LDM allows 2,048 output tokens for its 16-candidate JSON
+response; direct LLM retains 256 for one candidate. Endpoint and
+model names remain user-configured so all model-backed methods can use the same
+provider and model.
 
 ```bash
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml --dry-run
 
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml
 
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench_extended.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench_extended.yaml
 ```
 
 The result directory contains standard child artifacts plus a portable matrix
@@ -249,7 +378,7 @@ manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
 plot. Endpoint settings remain user-defined OpenAI-compatible environment
 variables; the BO children do not require them.
 For a source archive rather than a Git checkout, set
-`LDM_QUICK_COMPARE_COMMIT` to the archive release commit so the manifest records
+`LDM_PILOT_EVALUATION_COMMIT` to the archive release commit so the manifest records
 explicit provenance.
 
 ## Qualification Status

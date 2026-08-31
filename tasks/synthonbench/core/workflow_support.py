@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,7 @@ from tasks.synthonbench.core.provider import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )
+from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 
 
 def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None) -> dict[str, int | float]:
@@ -22,11 +25,16 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
     initial = initial_rounds * args.evaluations_per_round
     search_rounds = args.iterations - initial_rounds
     selected = args.iterations * args.evaluations_per_round
-    proposals = _proposal_count(args, search_rounds)
+    proposal_attempts = _proposal_attempt_count(args, search_rounds)
+    if args.proposal_backend == "harness":
+        harness_turns = search_rounds * len(HARNESS_PROFILE_IDS)
+    else:
+        harness_turns = 0
+        llm_requests = proposal_attempts if args.proposal_mode == "openai" else 0
     dynamic = {
         "outer_iterations": args.iterations,
-        "llm_requests": proposals if args.proposal_mode == "openai" else 0,
-        "proposal_attempts": proposals,
+        "proposal_attempts": proposal_attempts,
+        "harness_turns": harness_turns,
         "valid_search_candidates": _valid_candidate_count(args, initial, search_rounds),
         "selected_candidates": selected,
         "external_evaluations": selected,
@@ -34,14 +42,18 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
+    if args.proposal_backend != "harness":
+        dynamic["llm_requests"] = llm_requests
     return {**dynamic, **dict(profile_budget or {})}
 
 
-def _proposal_count(args: Any, search_rounds: int) -> int:
+def _proposal_attempt_count(args: Any, search_rounds: int) -> int:
     if args.search_method == "bo":
         return 0
-    per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
-    return search_rounds * per_round
+    if args.proposal_backend == "harness":
+        return search_rounds * len(HARNESS_PROFILE_IDS)
+    breadth = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
+    return search_rounds * math.ceil(breadth / args.proposal_candidates_per_request)
 
 
 def _valid_candidate_count(args: Any, initial: int, search_rounds: int) -> int:
@@ -65,7 +77,18 @@ def load_campaign_state(runtime: CampaignRuntime, resume: bool) -> LDMEngineStat
 
 
 def provider_settings(args: Any) -> OpenAIProviderSettings:
-    return resolve_openai_provider_settings(base_url=args.llm_url, model=args.llm_model_name, api_key=args.api_key)
+    settings = resolve_openai_provider_settings(
+        base_url=args.llm_url,
+        model=args.llm_model_name,
+        api_key=args.api_key,
+    )
+    key_file = getattr(args, "harness_api_key_file", None)
+    if getattr(args, "proposal_backend", "direct") == "harness" and key_file is not None:
+        api_key = Path(key_file).expanduser().read_text(encoding="utf-8").strip()
+        if not api_key:
+            raise ValueError("harness API key file is empty")
+        settings = replace(settings, api_key=api_key)
+    return settings
 
 
 def preflight_endpoint(client, runtime: CampaignRuntime, args: Any, payload: dict[str, Any],

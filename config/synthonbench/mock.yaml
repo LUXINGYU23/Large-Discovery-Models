@@ -8,8 +8,9 @@ args:
   proposal-mode: callable
   iterations: 2
   proposal-samples: 8
+  proposal-candidates-per-request: 8
   bo-pool-size: 4
-  proposal-max-workers: 8
+  proposal-max-workers: 1
   evaluations-per-round: 1
   slate-size: 24
   reaction-allocation: product_weighted

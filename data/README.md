@@ -71,6 +71,11 @@ antibody direct-sequence paths all support this sink contract. See the detailed
 task mapping for boundaries that remain intentionally excluded, such as antibody
 policy/DSL updates and random fallbacks.
 
+Persistent research-Harness runs retain native session JSONL and redacted
+provider transport under their run artifact directory. Those multi-turn traces
+are not emitted through `DataCollectionSink` and are not valid `ldm-2.0` rows
+without a separate converter and leakage contract.
+
 ## Add Expert Reasoning
 
 Reasoning augmentation explains an already accepted action using only the

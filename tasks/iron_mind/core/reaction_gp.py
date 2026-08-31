@@ -21,7 +21,7 @@ from tasks.iron_mind.core.reaction_kernel import (
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 
 
-MIN_HISTORY_FOR_ARD = 3
+MIN_HISTORY_FOR_ARD = 8
 TARGET_STD_FLOOR = 1.0
 DEFAULT_MODEL_MISMATCH_VARIANCE = 0.04
 
@@ -134,6 +134,10 @@ class _ReactionCategoricalGPSurrogate:
         self.observations = list(observations)
         self.config = config
         self.parameters = default_kernel_parameters(schema)
+        self.ard_history_threshold = max(
+            MIN_HISTORY_FOR_ARD,
+            2 * len(schema.factors),
+        )
         self.fit_status = "prior"
         self.y_mean = 0.0
         self.y_scale = config.target_std_floor
@@ -155,7 +159,7 @@ class _ReactionCategoricalGPSurrogate:
             dtype=int,
         )
         targets = (scores - self.y_mean) / self.y_scale
-        if len(self.observations) >= MIN_HISTORY_FOR_ARD:
+        if len(self.observations) >= self.ard_history_threshold:
             self.parameters = learn_kernel_parameters(
                 self.codes,
                 targets,
@@ -208,6 +212,7 @@ class _ReactionCategoricalGPSurrogate:
             "name": "reaction_categorical_ard_gp",
             "fit_status": self.fit_status,
             "history_size": len(self.observations),
+            "ard_history_threshold": self.ard_history_threshold,
             "target_mean": self.y_mean,
             "target_scale": self.y_scale,
             "kernel": self.parameters.to_dict(self.schema),

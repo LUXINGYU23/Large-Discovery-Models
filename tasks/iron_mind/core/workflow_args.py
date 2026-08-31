@@ -12,6 +12,7 @@ from tasks.iron_mind.core.prompting import (
     validate_prompt_policy,
 )
 from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
+from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
 from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
 from tasks.iron_mind.core.provider import parse_openai_extra_body_json
 from tasks.iron_mind.core.search import INITIALIZATION_MODES, SEARCH_METHODS
@@ -29,6 +30,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
     parser.add_argument("--mock", action="store_true")
     parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
+    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
     parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
@@ -62,6 +64,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=tuple(sorted(PROMPT_POLICIES)),
         default=DEFAULT_PROMPT_POLICY,
     )
+    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-candidates-per-session", type=int, default=16)
+    parser.add_argument(
+        "--harness-thinking",
+        choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"),
+        default="max",
+    )
+    parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-cache-dir", type=Path)
+    parser.add_argument("--harness-docker-host")
+    parser.add_argument("--harness-container-user")
+    parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
+    parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
+    parser.add_argument(
+        "--no-harness-context7",
+        action="store_false",
+        dest="harness_context7",
+        default=True,
+    )
     parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
@@ -80,6 +101,16 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.proposal_max_workers < 1:
         raise SystemExit("--proposal-max-workers must be positive")
+    if args.harness_candidates_per_session < 1 or args.harness_wall_time_seconds < 1:
+        raise SystemExit("Harness candidate and wall-time limits must be positive")
+    if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
+        raise SystemExit("--harness-response-timeout must be finite and positive")
+    if args.proposal_backend == "harness":
+        expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
+        if args.proposal_samples != expected:
+            raise SystemExit(
+                "--proposal-samples must equal four times --harness-candidates-per-session"
+            )
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
     _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
@@ -109,6 +140,12 @@ def _validate_non_negative(value: float, option: str) -> None:
 
 
 def _validate_search_mode(args: argparse.Namespace) -> None:
+    if args.proposal_backend == "harness":
+        if args.search_method != "ldm":
+            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+        if args.proposal_mode != "none":
+            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+        return
     model_method = args.search_method in {"ldm", "llm"}
     if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:
         raise SystemExit("Mock model methods require --proposal-mode=callable or openai")

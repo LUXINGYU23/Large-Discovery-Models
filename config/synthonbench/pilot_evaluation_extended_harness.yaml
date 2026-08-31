@@ -1,0 +1,48 @@
+name: synthonbench_pilot_evaluation_extended_harness
+task: synthonbench
+algorithm: persistent_agent_harness_ldm
+mode: real
+description: Fixed-budget twelve-round persistent-agent LDM confirmation for SynthonBench.
+contract_profile: pilot_evaluation_extended_harness
+args:
+  proposal-backend: harness
+  proposal-mode: none
+  search-method: ldm
+  initialization-mode: shared_random
+  scale: 1M
+  target: kif11
+  oracle-kind: surrogate
+  iterations: 12
+  proposal-samples: 64
+  bo-pool-size: 48
+  bo-search-samples: 64
+  evaluations-per-round: 16
+  slate-size: 24
+  reaction-allocation: product_weighted
+  fingerprint-bits: 2048
+  gp-landmarks: 256
+  gp-kernel-jitter: 1.0e-8
+  gp-signal-std: 1.0
+  gp-mean-std: 1.0
+  gp-observation-noise-std: 1.0
+  gp-reaction-weight: 1.0
+  acquisition-beta: 0.5
+  alpha: 1.0
+  eta: 3.0
+  z-clip: 5.0
+  harness-candidates-per-session: 16
+  harness-thinking: max
+  harness-wall-time-seconds: 1800
+  harness-response-timeout: 2100
+  harness-image: ldm-pi-harness:latest
+  harness-cache-dir: ${SYNTHONBENCH_WORK_ROOT}/gondolin-cache
+  campaign-index: 0
+  data-dir: ${SYNTHONBENCH_DATA_ROOT}
+  source-dir: ${SYNTHONBENCH_SOURCE_ROOT}
+  llm-url: null
+  llm-model-name: null
+  api-key: null
+  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/pilot_evaluation_extended
+  audit-timeout: 900.0
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

@@ -205,3 +205,38 @@ def test_real_dependencies_verify_revisions_and_frozen_table_contracts(
     )
     assert table_check.status == "fail"
     assert "SHA-256" in table_check.message
+
+
+def test_harness_dependency_check_accepts_a_protected_key_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_root, _ = _dependency_fixture(tmp_path, monkeypatch)
+    key_path = tmp_path / "provider_key"
+    key_path.write_text("test-key", encoding="utf-8")
+
+    checks = check_task_dependencies(
+        {
+            "task": "iron_mind",
+            "argv": [
+                "--data-dir",
+                str(data_root),
+                "--dataset-id",
+                "buchwald_hartwig",
+                "--proposal-backend",
+                "harness",
+                "--harness-api-key-file",
+                str(key_path),
+            ],
+            "cwd": str(data_root),
+            "mode": "real",
+            "env_overrides": {
+                "LLM_BASE_URL": "https://example.invalid/v1",
+                "LLM_MODEL_NAME": "test-model",
+            },
+        },
+        include_optional=False,
+    )
+    statuses = {check.name: check.status for check in checks}
+
+    assert "LLM API key" not in statuses
+    assert statuses["Harness API key file"] == "ok"

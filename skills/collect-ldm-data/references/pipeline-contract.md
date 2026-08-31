@@ -52,6 +52,7 @@ action must appear in `request.allowed_actions`.
 | Small molecule | Implemented for accepted direct-LLM attempts in `tasks/small_molecule/core/ldm_tilted_case2/trace.py`. | `smallmol`, `complete_design`, `propose`. |
 | nanoGPT | Implemented in `tasks/nanogpt/core/workflow.py` for validated operation edits and expansion-schema actions. | `nanogpt`, `parameter_edits`, `propose`, `expand_design_space`, or `add_new_parameter`. |
 | Antibody | Implemented in `tasks/antibody/core/ldm_light/ldm_acq.py` for validated direct LLM sequence actions; fallback and policy-DSL decisions are rejected. | `protein`, `complete_design`, `propose`; sequence rows use `reasoning_available:false`. |
+| SynthonBench Harness | Native sessions and redacted provider transport are retained under the run's Harness artifact root. No `ldm-2.0` converter is implemented. | Raw multi-turn research trace only; do not register as SFT data. |
 
 The small-molecule adapter is intentionally narrow. Seed-plan and ReaSyn
 analogue prompts are not collected by the current direct-LLM adapter. Each hook
@@ -77,6 +78,12 @@ append frozen IR, retaining outcomes only as collection metadata
 
 Do not turn a selected post-BO candidate into a teacher target unless a separate,
 explicit distillation transform defines and labels that policy.
+
+Harness traces require a separate conversion contract because they contain
+multiple model turns, tool calls, rejected provisional submissions, and one
+terminal accepted minibatch. Raw trace retention alone does not identify the
+training input/output boundary or prove that task-private and post-evaluation
+state is absent.
 
 ## Environment
 
@@ -119,3 +126,5 @@ Alpaca outputs.
 - `expand_design_space` is rare in existing nanoGPT data and requires deliberate
   collection or oversampling if it should be learned.
 - Split by whole run, seed, or antigen to avoid trajectory leakage.
+- Native Harness sessions are not accepted-action IR and have no released
+  `ldm-2.0` conversion path.

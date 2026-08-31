@@ -21,6 +21,14 @@ selection, scores, runtime metadata, and provenance for auditing, but do not let
 that metadata leak into the model-visible instruction unless it was genuinely
 visible to the teacher model at proposal time.
 
+Persistent research-Harness traces are a separate artifact class. SynthonBench
+retains native Pi sessions, tool calls/results, provisional submission retries,
+and redacted provider transport under `<run_dir>/harness/`; it does not emit
+those records through `DataCollectionSink`. Raw trace retention is not an
+`ldm-2.0` conversion because the multi-turn model-visible boundary, rejected
+attempt policy, terminal action, and leakage rules still need an explicit
+converter.
+
 For the full schema, see [data/SCHEMA.md](../data/SCHEMA.md). For the collection,
 augmentation, rendering, and validation workflow, see
 [data/README.md](../data/README.md).
@@ -172,6 +180,8 @@ Do not collect:
 - objective predictions made by the model
 - prompts that contain leaked answers or stale required outputs
 - metadata/provenance inside model-visible instruction text
+- raw Harness sessions as accepted-action IR without a separate validated
+  conversion contract
 
 This matters especially for nanogpt, where response transcripts can contain
 multiple rejected tool calls before the accepted operation set.

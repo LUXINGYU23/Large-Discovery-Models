@@ -70,10 +70,12 @@ in evidence rather than model confidence alone.
 | `llm_kv_adaptive_quantization` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) |
 | `ai4bio_mutation_effect_prediction` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Bounded mutation-effect predictor architectures evaluated on three pinned ProteinGym assays through MLS-Bench. | [Clean-room quick start](tasks/ai4bio_mutation_effect_prediction/QUICKSTART.md) | [Task guide](tasks/ai4bio_mutation_effect_prediction/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) |
 | `causal_discovery_discrete` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Bounded discrete causal-graph discovery evaluated on five pinned Bayesian-network datasets through MLS-Bench. | [Clean-room quick start](tasks/causal_discovery_discrete/QUICKSTART.md) | [Task guide](tasks/causal_discovery_discrete/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [recorded Delta campaign](ready2run_examples/run_customized_causal_discovery_discrete/) |
+| `iron_mind` | Source-pinned reaction conditions for the official Iron Mind benchmark datasets. | [Clean-room quick start](tasks/iron_mind/QUICKSTART.md) | [Task guide](tasks/iron_mind/README.md) |
+| `synthonbench` | Official reaction and ordered-synthon tuples, with direct and persistent research-Harness proposal backends. | [Clean-room quick start](tasks/synthonbench/QUICKSTART.md) | [Task guide](tasks/synthonbench/README.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The six built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The eight built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
@@ -81,12 +83,14 @@ scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
 predictor and five-network discrete causal-discovery evaluations. Run the
 documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all six
+Task registration and conventional layout validation pass for all eight
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
 not benchmark-qualified implementations. The AI4Bio mutation-effect and
 discrete causal-discovery tasks have source-pinned qualified contracts and
-machine-readable evidence through `campaign_qualified`. AI4Bio includes an
+machine-readable evidence through `campaign_qualified`. Iron Mind and
+SynthonBench have source-pinned qualified contracts with evidence through
+`tiny_campaign_verified`. AI4Bio includes an
 official one-iteration campaign and separately labeled 3- and 20-iteration
 extended-budget runs. Discrete causal discovery includes a separately labeled
 20-iteration extended-budget run with 100 official network jobs. Qualification
@@ -102,8 +106,9 @@ agent workflows cataloged under [`skills/`](skills/README.md):
 
 ## The Research Loop
 
-Within each discovery round, the LLM supplies a candidate reservoir while a GP
-surrogate and acquisition function tilt search toward promising candidates.
+Within each discovery round, a direct model call or research Harness supplies a
+candidate reservoir while a GP surrogate and acquisition function tilt search
+toward promising candidates.
 Evaluation feedback updates the surrogate and model context in the fast loop;
 the accumulated test-time-search data can also support slower model updates.
 
@@ -257,7 +262,7 @@ real LLM endpoints or domain-specific external tools.
 
 ## Environment Setup
 
-Real experiments need an OpenAI-compatible LLM endpoint. CUDA requirements are
+Model-backed real experiments need an OpenAI-compatible endpoint. CUDA requirements are
 task-specific; the validated small-molecule direct and antibody smoke paths are
 CPU-only:
 
@@ -278,15 +283,16 @@ export TTS_LLM_MODEL=$LLM_MODEL_NAME
 
 ### OpenAI-Compatible Served Model API
 
-Real runs (`mock: false`) require a reachable served chat model or model API;
-mock smoke runs do not contact an LLM endpoint.
+Model-backed real runs (`mock: false`) require a reachable served model API;
+mock smoke runs do not contact an endpoint.
 
-All three task adapters support an OpenAI-compatible Chat Completions API,
+Direct proposal backends use an OpenAI-compatible Chat Completions API,
 including models served locally by vLLM, SGLang, or another compatible server,
-and authenticated remote gateways such as LiteLLM. `LLM_BASE_URL` must be the
-API root, normally ending in `/v1`; do not include `/chat/completions`, because
-the OpenAI client appends that route. `LLM_MODEL_NAME` must match a model ID
-advertised by the server.
+and authenticated remote gateways such as LiteLLM. Research-Harness backends
+may use a different compatible wire API; the current Pi sidecar uses OpenAI
+Responses. `LLM_BASE_URL` must be the API root, normally ending in `/v1`; do not
+append `/chat/completions` or `/responses`. `LLM_MODEL_NAME` must match a model
+ID advertised by the server.
 
 Use `EMPTY` when a local server requires the Authorization header but does not
 validate credentials. Use the actual secret for remote or authenticated APIs.
@@ -303,13 +309,20 @@ args:
   llm-model-name: null
 ```
 
-Verify model discovery and Chat Completions before launching a real search.
+Verify model discovery and the wire API used by the selected proposal backend
+before launching a real search.
 Use the environment-only Python probe in the relevant
 [nanoGPT](tasks/nanogpt/QUICKSTART.md#8-optional-real-run-preparation),
 [small-molecule](tasks/small_molecule/QUICKSTART.md#6-probe-the-model-api), or
 [antibody](tasks/antibody/QUICKSTART.md#5-probe-the-model-api) quick start.
 The dependency checker validates that URL, model, and key settings are present;
 the probe additionally verifies the routes used at runtime.
+
+For a persistent research Harness, also verify the sidecar, container isolation,
+profiles, and task tools with its capability smoke. A successful Chat
+Completions probe does not certify a Responses-based Harness. See the
+[Research Harness integration guide](docs/research-harness.md) and
+[Pi sidecar contract](harnesses/pi/README.md).
 
 Small-molecule real runs need additional task dependency paths:
 
@@ -497,13 +510,15 @@ flowchart TB
     H --> O["Trajectory, task spec,<br/>summary, and best result"]
 ```
 
-The three adapters instantiate the same roles with different domain objects:
+The task adapters instantiate the same roles with different domain objects:
 
 | Task | Candidate domain | Reservoir expansion | Surrogate representation | External evaluation |
 | --- | --- | --- | --- | --- |
 | `nanogpt` | Valid `train.py` programs. | Code edits or structured parameter edits; the expansion schema may activate additional parameters. | Fixed code hash vector, fixed operation vector, or evolving operation vector. | Run the generated training program and optimize `val_bpb` or another configured metric. |
 | `small_molecule` | Valid canonical SMILES. | Direct SMILES emission or seed-conditioned analogue generation. | Fixed molecular fingerprint or implicit SMILES string kernel; direct-only modes use none. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
 | `antibody` | Valid fixed-length CDRH3 sequences. | Direct sequence emission or DSL-policy-guided sequence generation. | Fixed categorical sequence representation; direct-only modes use none. | Minimize Absolut binding energy for the selected antigen. |
+| `iron_mind` | Valid source-pinned reaction-condition combinations. | Independent direct condition proposals. | Task-local factor-aware GP representation. | Read the official benchmark reaction score. |
+| `synthonbench` | Valid official reaction ID plus ordered synthon-ID tuples. | Independent direct proposals or four persistent Pi research sessions. | Reaction-aware Nyström/FITC count-Tanimoto representation. | Run the official SynthonBench surrogate or Glide oracle. |
 
 The shared code keeps orchestration, config loading, task-space specs, response
 parsing, trajectory metadata, and common tests in one place. Task adapters keep
@@ -538,12 +553,14 @@ resume, and summaries. A task supplies adapters at the scientific seams:
 | `SurrogateEncoder` | Encode an admitted candidate. | Versioned surrogate vectors and shared GP-UCB selector. |
 | `CandidateEvaluator` | Run the external scientific measurement. | Status classification, objective validation, observation records, and budgets. |
 | `ProposalClient` | Provide model transport without scientific behavior. | OpenAI-compatible retries, circuit breaking, timing, usage, text, and tool calls. |
+| `HarnessClient` | Run persistent research sessions behind a task expander. | Versioned turns, provisional submission validation, session lineage, and sidecar lifecycle. |
 
 `CampaignRuntime` writes a common `campaign.json`, `budget.json`, `status.json`,
 `events.jsonl`, `checkpoint.json`, `ldm_task_spec.json`, and `summary.json`
 contract. Every built-in task — `nanogpt`, `small_molecule`, `antibody`,
 `llm_kv_adaptive_quantization`, `causal_discovery_discrete`, and
-`ai4bio_mutation_effect_prediction` — calls the shared campaign interface and
+`ai4bio_mutation_effect_prediction`, `iron_mind`, and `synthonbench` — calls
+`run_campaign` or the shared `LDMEngine` interface and
 delegates lifecycle ownership to it; the tasks keep exporting their historical
 trajectory files (for example `small_molecule`'s `history.json`/`rounds.jsonl`
 and `antibody`'s `results.csv`/`llm_acq_decisions.jsonl`) from engine events so
@@ -588,14 +605,15 @@ tasks; only the surrogate/posterior adapter remains domain-specific.
 
 ## Codebase Architecture
 
-The codebase has four layers:
+The codebase has five layers:
 
 | Layer | Where | Responsibility |
 | --- | --- | --- |
 | Shared runner | `ldm_tts.cli.runner`, `scripts/run_ldm_tts.py` | Load configs, build commands, run suites, and provide dry-runs. |
 | Shared algorithms | `ldm_tts/` | Describe task spaces, traverse proposal states, implement acquisition scoring and budgets, parse responses, and serialize traces. |
+| Research Harness | `ldm_tts.harness`, `harnesses/pi` | Run versioned persistent Agent sessions, isolated tools, provisional candidate submission, and redacted transport capture. |
 | Task adapters | `tasks/<task>/ldm_task/procedure.py` | Provide a thin, stable entry point for the shared runner. |
-| Task implementations | `tasks/<task>/core/` | Own prompts, LLM/provider calls, reservoir expansion adapters, surrogate representations, domain scoring, resume behavior, and output writing. |
+| Task implementations | `tasks/<task>/core/` | Own prompts, direct or Harness proposal adapters, candidate validation, surrogate representations, domain scoring, resume behavior, and output writing. |
 
 Key shared packages:
 
@@ -609,6 +627,7 @@ Key shared packages:
 | `ldm_tts.optimization.records` | Lightweight BO records and protocols. |
 | `ldm_tts.engine` | Campaign orchestration, reservoir expansion, budgets, events, checkpoints, and run artifacts. |
 | `ldm_tts.transport` | Proposal transport interface, OpenAI-compatible adapter, and response parsing. |
+| `ldm_tts.harness` | Persistent research-Harness protocol, client, profiles, turns, submission validation, and lineage records. |
 | `ldm_tts.registration` | Manifest discovery, experiment contracts, scaffolding, and generic dependency-check primitives. |
 | `ldm_tts.data` | Runtime collection, ldm-2.0 intermediate records, rendering, and expert augmentation. |
 | `ldm_tts.cli` | Configuration expansion and command-line campaign execution. |

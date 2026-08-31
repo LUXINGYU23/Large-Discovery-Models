@@ -45,13 +45,33 @@ export LLM_MODEL_NAME=your-model
 export LLM_API_KEY=your-secret
 ```
 
-The task accepts any OpenAI-compatible Chat Completions provider. Credentials
-remain outside tracked configuration and run metadata.
+The direct backend accepts any OpenAI-compatible Chat Completions provider.
+The persistent research harness uses the OpenAI Responses wire format instead.
+Credentials remain outside tracked configuration and run metadata.
 
-The default request body disables optional thinking for the one-tuple JSON
-response: `{"thinking":{"type":"disabled"}}`. If the selected provider does
+The default request body disables optional thinking for the compact JSON
+response: `{"thinking":{"type":"disabled"}}`. Direct LDM launches four
+concurrent requests with 16 indexed candidates in each response. If the selected provider does
 not support that extension, set `--llm-extra-body-json '{}'` or supply its own
 compatible JSON body.
+
+To use the persistent four-profile harness, build its image and run the
+committed smoke profile after preparing official data:
+
+```bash
+docker build -t ldm-pi-harness:latest harnesses/pi
+
+uv run --locked --project tasks/synthonbench \
+  python scripts/run_ldm_tts.py \
+  config/synthonbench/harness_surrogate_smoke.yaml
+```
+
+Docker must have access to Linux KVM. The profile creates four persistent
+sessions, requests 16 candidates from each, and feeds all 64 occurrences into
+the existing LDM `q0 + GP-UCB acquisition tilt` path. Each session chooses its
+own reaction types and exact tuples through structured official SynthonSpace
+tools. See `README.md` for
+rootless Docker, private key-file, cache, and artifact configuration.
 
 ## 4. Check and Run the Surrogate Oracle Track
 
@@ -69,19 +89,22 @@ Replace the config with `glide_1m_qualification.yaml` for the Glide
 ligand-efficiency track. The full batch-16 10,000-call profiles are documented
 in `README.md`.
 
-## 5. Run the Quick Three-Method Comparison
+## 5. Run the Four-Method Pilot Evaluation
 
 With the 1M surrogate data prepared, run:
 
 ```bash
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml --dry-run
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml --dry-run
 
 uv run --locked --project tasks/synthonbench python \
-  scripts/run_quick_compare.py config/quick_compare/synthonbench.yaml
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml
 ```
 
-The matrix runs LDM, offline task-local BO, and direct LLM sampling on three
-seeds with the same initial 16 official calls. Output is written under
-`$SYNTHONBENCH_RUNS_ROOT/quick_compare/`. Use `--resume` only with the same
-repository revision and configuration files.
+The matrix runs direct-API LDM, persistent-agent Harness LDM, offline task-local
+BO, and direct LLM sampling on three seeds with the same initial 16 official
+calls. Output is written under
+`$SYNTHONBENCH_RUNS_ROOT/pilot_evaluation/`. Use `--resume` only with the same
+repository revision and configuration files. The committed evaluation profiles
+request maximum reasoning effort for every model-backed method and use the same
+user-configured endpoint and model.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Run LDM Task"
-  short_description: "Validate and run an existing LDM task safely"
-  default_prompt: "Use $run-ldm-task to validate and run an existing LDM task from its repository config."
+  short_description: "Validate and run a direct or Harness-backed LDM task"
+  default_prompt: "Use $run-ldm-task to validate and run an existing LDM task with its configured direct or research-Harness backend."

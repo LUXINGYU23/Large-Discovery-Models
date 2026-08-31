@@ -22,6 +22,7 @@ tasks/<task_id>/
 │   └── __init__.py
 ├── resources/                # versioned schemas, seeds, inputs, models
 │   ├── README.md
+│   ├── harness/              # optional Agent profiles, skills, and tools
 │   └── qualification_evidence.json  # ordered machine-readable gate evidence
 ├── scripts/                  # optional maintenance/training CLIs
 ├── environments/             # optional Conda or external-tool specs
@@ -40,7 +41,8 @@ out of this package so the interface remains small and stable.
 
 The remaining directories have one ownership rule each:
 
-- `core/` contains importable search, surrogate, evaluator, and model-client code.
+- `core/` contains importable search, surrogate, evaluator, direct model-client,
+  and optional Harness adapter code.
 - `resources/` contains versioned non-generated inputs required at runtime.
 - `scripts/` contains auxiliary CLIs that are not runner entrypoints.
 - `environments/` contains optional environment specifications beyond `pyproject.toml`.
@@ -102,6 +104,12 @@ settings, per-candidate limits, proposal-provider capabilities, and named
 campaign profiles. Endpoint preflight is required only when
 `proposal_provider.requires_endpoint_preflight` is true.
 
+For `proposal_provider.kind: hybrid`, record which named methods use direct
+model, Harness, dataset, or deterministic providers under
+`evaluation.settings`. Preflight must follow the selected method: offline BO
+must remain service-free, while direct and Harness methods verify their actual
+wire API and runtime.
+
 Scaffolds begin at `qualification: draft`. Change this to `qualified` only after
 one official-budget seed evaluation and a tiny LDM-selected real evaluation pass.
 Real configs select a profile at top level:
@@ -149,20 +157,48 @@ and result exit status. Candidate generation, model calls, surrogate fitting,
 acquisition, and evaluators belong in `core/`. Versioned schemas and seed
 inputs belong in `resources/`.
 
-New tasks should implement mock and real campaigns through
+New tasks should normally implement mock and real campaigns through
 `ldm_tts.campaign.run_campaign`. Supply a `CampaignRecipe` with the minimum
 behavioral adapters: `ReservoirExpander`, `CandidateDomainAdapter`, and
 `CandidateEvaluator`. Add `SurrogateEncoder` plus `AcquisitionSelector` only
 when the task uses surrogate-guided selection. Keep the procedure adapter
 limited to CLI parsing, `LDMTaskSpec` construction, dependency preparation, and
-campaign dispatch; do not open `CampaignRuntime` or assemble budget ledgers in
-task workflows.
+campaign dispatch.
 
 The campaign algorithm creates authoritative `Candidate`, `EvaluationResult`, and
 `Observation` records. Do not introduce task-local equivalents unless the task
-payload needs a private intermediate record behind an engine adapter. Use
-`CampaignRuntime` for run identity, contract snapshots, budgets, events,
-checkpoints, status, and final summaries.
+payload needs a private intermediate record behind an engine adapter.
+`run_campaign` normally owns `CampaignRuntime`; a documented specialized path
+under `core/` may construct the shared `LDMEngine` and one `CampaignRuntime`
+directly when an official evaluator lifecycle cannot be represented by a
+`CampaignRecipe`. It must still delegate run identity, contract snapshots,
+budgets, events, checkpoints, status, and final summaries to those shared
+components rather than assembling parallel task-local lifecycle machinery.
+
+### Optional Research Harness Backend
+
+A task may implement reservoir expansion with persistent Agent sessions through
+the public `ldm_tts.harness` package. The Harness remains behind the task's
+ordinary `ReservoirExpander`; it must not introduce another campaign, BO loop,
+or evaluator path.
+
+Keep `AGENTS.md` profiles, optional skills, and structured task tools under
+`resources/harness/`. Give every resource a stable digest and mount it
+read-only. Start one `HarnessClient` for the campaign, submit versioned
+`HarnessTurn` batches, and pass a task-owned validator to `run_turn`. Candidate
+canonicalization and scientific validity remain authoritative in Python.
+
+Submission validation happens before a turn commits. Return indexed, stable,
+actionable reasons for invalid candidates, historical repeats, and any
+task-defined duplicate rule so the Agent can replace rejected entries in the
+same session. Accept a complete minibatch before computing empirical proposal
+mass or running acquisition.
+
+Harness-native sessions and redacted provider request/response records belong
+under the ignored run directory. They are raw research traces, not automatic
+`ldm-2.0` training rows. See the
+[Research Harness integration guide](../docs/research-harness.md) and the
+[Pi sidecar contract](../harnesses/pi/README.md).
 
 For consistency and inspectability, also define:
 
@@ -294,6 +330,9 @@ dry contract run, then a tiny evaluated run.
 - Acquisition scoring uses `ldm_tts.optimization.acquisition` unless a documented domain
   algorithm requires additional task-local behavior.
 - Mock tests cross the same procedure interface as real runs.
+- Harness-backed tasks test profile/tool digests, strict minibatches,
+  provisional rejection and correction, turn lineage, budgets, and secret
+  redaction before a real sidecar capability smoke.
 - Secrets are supplied through environment variables or ignored local files.
 - Generated runs, caches, model downloads, and virtual environments remain
   untracked.

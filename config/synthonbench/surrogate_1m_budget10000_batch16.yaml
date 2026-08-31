@@ -11,8 +11,9 @@ args:
   oracle-kind: surrogate
   iterations: 625
   proposal-samples: 64
+  proposal-candidates-per-request: 16
   bo-pool-size: 32
-  proposal-max-workers: 64
+  proposal-max-workers: 4
   evaluations-per-round: 16
   slate-size: 24
   reaction-allocation: product_weighted
@@ -34,7 +35,7 @@ args:
   llm-model-name: null
   api-key: null
   llm-timeout: 120.0
-  llm-max-tokens: 256
+  llm-max-tokens: 2048
   llm-temperature: 0.7
   llm-extra-body-json: '{{"thinking":{{"type":"disabled"}}}}'
   out-dir: ${SYNTHONBENCH_RUNS_ROOT}/surrogate_1m_budget10000_batch16

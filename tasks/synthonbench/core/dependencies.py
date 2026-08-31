@@ -70,7 +70,7 @@ def _prepared_data_checks(task: str, args: dict[str, Any]) -> list[DependencyChe
 
 
 def _provider_checks(task: str, args: dict[str, Any], env: dict[str, str]) -> list[DependencyCheck]:
-    return check_llm_settings(
+    checks = check_llm_settings(
         task,
         args,
         env,
@@ -82,6 +82,40 @@ def _provider_checks(task: str, args: dict[str, Any], env: dict[str, str]) -> li
         api_env=API_KEY_ENV_NAMES,
         required=True,
     )
+    if arg_value(args, "proposal-backend", default="direct") != "harness":
+        return checks
+
+    raw_key_path = arg_value(args, "harness-api-key-file")
+    if not raw_key_path:
+        return checks
+
+    checks = [check for check in checks if check.name != "LLM API key"]
+    key_path = Path(str(raw_key_path)).expanduser()
+    try:
+        configured = key_path.is_file() and bool(
+            key_path.read_text(encoding="utf-8").strip()
+        )
+    except OSError as exc:
+        return checks + [
+            fail(task, "Harness API key file", "Cannot read key file.", str(exc))
+        ]
+    if not configured:
+        return checks + [
+            fail(
+                task,
+                "Harness API key file",
+                "Key file must exist and contain a non-empty API key.",
+                str(key_path),
+            )
+        ]
+    return checks + [
+        ok(
+            task,
+            "Harness API key file",
+            "Harness API key file is configured.",
+            str(key_path),
+        )
+    ]
 
 
 __all__ = ["check_task_dependencies"]

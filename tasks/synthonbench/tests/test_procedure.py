@@ -9,21 +9,30 @@ from ldm_tts.registration.experiment import (
     load_experiment_contract,
     validate_profile_args,
 )
+from tasks.synthonbench.core import dependencies as dependency_checks
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = TASK_ROOT.parents[1]
 
 
-def test_task_spec_declares_independent_oversampled_proposals() -> None:
+def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> None:
     spec = describe_ldm_task(parse_args(["--mock"]))
 
     assert spec.task == "synthonbench"
     assert spec.candidate_domain.kind == "reaction_synthon_tuple"
     assert spec.reservoir.max_size == 64
-    assert spec.proposal_search.name == "parallel_independent_requests"
+    assert spec.proposal_search.name == "parallel_independent_minibatch_requests"
     assert spec.proposal_search.breadth == 64
-    assert spec.proposal_search.parameters["one_candidate_per_request"] is True
+    assert spec.proposal_search.parameters == {
+        "request_count": 4,
+        "candidates_per_request": 16,
+        "max_workers": 4,
+    }
+    assert spec.metadata["model_requests_per_round"] == 4
+    assert spec.metadata["candidates_per_model_request"] == 16
+    assert spec.response_spaces[0].name == "synthon_tuple_batch_json"
+    assert spec.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 16
     assert spec.metadata["bo_pool_size"] == 32
     assert spec.acquisition.name == "ucb_tilted"
     assert spec.acquisition.parameters["pool_size"] == 32
@@ -52,6 +61,7 @@ def test_direct_llm_contract_returns_the_official_complete_tuple() -> None:
     assert spec.reservoir.max_size == 1
     assert spec.proposal_search.breadth == 1
     assert spec.metadata["model_requests_per_round"] == 1
+    assert spec.metadata["candidates_per_model_request"] == 1
     assert spec.metadata["search_breadth"] == 1
     assert spec.surrogate.kind == "none"
 
@@ -60,7 +70,50 @@ def test_proposal_defaults_disable_thinking() -> None:
     args = parse_args(["--mock"])
 
     assert args.llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
-    assert args.llm_max_tokens == 256
+    assert args.llm_max_tokens == 2048
+    assert args.proposal_candidates_per_request == 16
+    assert args.proposal_max_workers == 4
+
+
+def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
+    key_file = tmp_path / "api_key"
+    key_file.write_text("test-secret", encoding="utf-8")
+    args = {
+        "proposal-backend": "harness",
+        "harness-api-key-file": str(key_file),
+        "llm-url": "https://provider.example",
+        "llm-model-name": "model",
+    }
+
+    checks = dependency_checks._provider_checks("synthonbench", args, {})
+    by_name = {check.name: check for check in checks}
+
+    assert "LLM API key" not in by_name
+    assert by_name["Harness API key file"].status == "ok"
+    assert "test-secret" not in repr(checks)
+
+    key_file.write_text("", encoding="utf-8")
+    failed = dependency_checks._provider_checks("synthonbench", args, {})
+    assert {check.name: check.status for check in failed}["Harness API key file"] == "fail"
+
+
+def test_harness_preflight_accepts_the_standard_api_key_environment() -> None:
+    args = {
+        "proposal-backend": "harness",
+        "llm-url": "https://provider.example",
+        "llm-model-name": "model",
+    }
+
+    checks = dependency_checks._provider_checks(
+        "synthonbench",
+        args,
+        {"LLM_API_KEY": "test-secret"},
+    )
+
+    by_name = {check.name: check for check in checks}
+    assert by_name["LLM API key"].status == "ok"
+    assert "Harness API key file" not in by_name
+    assert "test-secret" not in repr(checks)
 
 
 def test_bo_task_spec_uses_the_configured_task_local_search_breadth() -> None:
@@ -100,7 +153,7 @@ def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, c
     assert result["mode"] == "mock"
     assert result["official_calls"] == 2
     assert result["official_metrics"]["submitted_calls"] == 2.0
-    assert budget["counters"]["proposal_attempts"] == 16
+    assert budget["counters"]["proposal_attempts"] == 2
     assert budget["counters"]["benchmark_jobs"] == 2
     for filename in (
         "submission.csv",
@@ -145,28 +198,92 @@ def test_mock_direct_llm_evaluates_complete_official_tuples(
 
 def test_real_profiles_lock_the_scientific_method_arguments() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
-    required = {
-        "proposal-samples", "bo-pool-size", "proposal-max-workers", "fingerprint-bits",
+    common = {
+        "proposal-samples", "bo-pool-size", "fingerprint-bits",
         "gp-landmarks", "gp-kernel-jitter", "gp-signal-std", "gp-mean-std",
         "gp-observation-noise-std", "gp-reaction-weight", "acquisition-beta", "alpha", "eta", "z-clip",
+    }
+    direct = {
+        "proposal-candidates-per-request", "proposal-max-workers",
         "llm-max-tokens", "llm-temperature", "llm-extra-body-json",
+    }
+    harness = {
+        "harness-candidates-per-session", "harness-thinking",
+        "harness-wall-time-seconds",
     }
 
     for profile in contract.profiles.values():
+        required = common | (
+            harness
+            if profile.locked_args.get("proposal-backend") == "harness"
+            else direct
+        )
         assert required <= set(profile.locked_args)
-        filename = "quick_compare_base.yaml" if profile.name == "quick_compare" else f"{profile.name}.yaml"
+        filename = "pilot_evaluation_base.yaml" if profile.name == "pilot_evaluation" else f"{profile.name}.yaml"
         config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
 
 
-def test_ldm_comparison_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
+def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
 
-    for profile_name in ("quick_compare", "extended_compare"):
+    for profile_name in ("pilot_evaluation", "pilot_evaluation_extended"):
         args = contract.profile(profile_name).locked_args
         headroom = args["proposal-samples"] - args["bo-pool-size"]
         assert headroom >= args["evaluations-per-round"]
+
+
+def test_pilot_profiles_lock_the_intended_request_shapes() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in ("pilot_evaluation", "pilot_evaluation_extended"):
+        args = contract.profile(profile_name).locked_args
+        assert args["proposal-samples"] == 64
+        assert args["proposal-candidates-per-request"] == 16
+        assert args["proposal-max-workers"] == 4
+        assert args["llm-max-tokens"] == 2048
+
+    for profile_name in (
+        "pilot_evaluation_direct_llm",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        args = contract.profile(profile_name).locked_args
+        assert args["proposal-samples"] == 16
+        assert args["proposal-candidates-per-request"] == 1
+        assert args["proposal-max-workers"] == 4
+        assert args["llm-max-tokens"] == 256
+
+
+def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in (
+        "pilot_evaluation_extended",
+        "pilot_evaluation_extended_harness",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        args = contract.profile(profile_name).locked_args
+        assert args["bo-pool-size"] == 48
+        assert args["eta"] == 3.0
+        assert args["z-clip"] == 5.0
+
+
+def test_pilot_direct_profiles_request_max_chat_reasoning() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name in (
+        "pilot_evaluation",
+        "pilot_evaluation_direct_llm",
+        "pilot_evaluation_extended",
+        "pilot_evaluation_extended_direct_llm",
+    ):
+        args = contract.profile(profile_name).locked_args
+        assert args["llm-extra-body-json"] == (
+            '{{"reasoning_effort":"max"}}'
+        )
+        assert args["proposal-max-workers"] == 4
+        assert args["llm-timeout"] == 600.0
 
 
 def test_qualification_record_covers_the_source_pinned_real_tracks() -> None:
