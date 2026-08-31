@@ -28,11 +28,11 @@ from tasks.iron_mind.core.proposal_parsing import (
     parse_reaction_response,
     parse_reaction_responses,
 )
+from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.proposals import (
     IronMindProposalExpander,
     build_reaction_proposal_request,
 )
-from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -225,7 +225,9 @@ def test_openai_path_executes_independent_requests_with_local_workers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = BarrierProposalClient(_candidate_payloads())
-    monkeypatch.setattr(proposals, "supports_local_concurrency", lambda _client: True)
+    monkeypatch.setattr(
+        proposals, "OpenAICompatibleProposalClient", BarrierProposalClient
+    )
 
     result = IronMindProposalExpander(
         client,

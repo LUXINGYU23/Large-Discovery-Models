@@ -221,12 +221,17 @@ def _verdict(rows, aggregates, direction: str) -> dict[str, Any]:
 def _method_verdict(rows, case, summary, method, better):
     candidate = summary[method]
     baselines = [summary["bo"], summary["llm"]]
-    seeds = sorted({item["seed"] for item in rows if item["case"] == case})
+    seed_rows = {
+        (item["seed"], item["method"]): item
+        for item in rows
+        if item["case"] == case
+    }
+    seeds = sorted({seed for seed, _method in seed_rows})
     wins = sum(
         all(
             better(
-                _seed_metric(rows, case, seed, method, "round_auc"),
-                _seed_metric(rows, case, seed, baseline, "round_auc"),
+                seed_rows[(seed, method)]["round_auc"],
+                seed_rows[(seed, baseline)]["round_auc"],
             )
             for baseline in ("bo", "llm")
         )
@@ -239,10 +244,6 @@ def _method_verdict(rows, case, summary, method, better):
     if worse_final and wins == 0:
         return "not_promising", wins
     return "mixed", wins
-
-
-def _seed_metric(rows, case, seed, method, field):
-    return next(item[field] for item in rows if item["case"] == case and item["seed"] == seed and item["method"] == method)
 
 
 def _write_outputs(spec, rows, trajectories, summary) -> None:
@@ -264,24 +265,22 @@ def _plot(spec, trajectories) -> None:
         groups[(item["case"], item["method"], item["round"])].append(item["best_so_far"])
     for case in sorted({item["case"] for item in trajectories}):
         for method in spec.methods:
-            points = [(round_idx, statistics.fmean(values)) for (label, name, round_idx), values in groups.items() if label == case and name == method]
-            if points:
-                points.sort()
-                x = [item[0] + 1 for item in points]
+            series = sorted(
+                (round_idx, values)
+                for (label, name, round_idx), values in groups.items()
+                if label == case and name == method
+            )
+            if series:
+                x = [round_idx + 1 for round_idx, _values in series]
                 axis.plot(
                     x,
-                    [item[1] for item in points],
+                    [statistics.fmean(values) for _round_idx, values in series],
                     label=f"{case}/{method} ({len(spec.seeds)} seeds)",
                 )
-                raw = {
-                    round_idx: values
-                    for (label, name, round_idx), values in groups.items()
-                    if label == case and name == method
-                }
                 axis.fill_between(
                     x,
-                    [min(raw[item[0]]) for item in points],
-                    [max(raw[item[0]]) for item in points],
+                    [min(values) for _round_idx, values in series],
+                    [max(values) for _round_idx, values in series],
                     alpha=0.1,
                 )
     axis.set_xlabel("Campaign round (round 1 is shared initialization)")

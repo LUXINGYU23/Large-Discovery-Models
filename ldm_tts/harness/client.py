@@ -22,7 +22,6 @@ from ldm_tts.harness.protocol import (
     canonical_sha256,
 )
 
-
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
 
 
@@ -338,27 +337,24 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
     _assert_response_keys(submission, {"submissionId", "candidates"})
     _assert_response_keys(usage, {"providerCalls", "webCalls", "context7Calls", "artifactBytes"})
     _assert_response_keys(artifacts, {"turn", "session"})
-    try:
-        history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
-        history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
-        if history_to_seq < history_from_seq:
-            raise HarnessError("committed harness turn has invalid history range")
-        return HarnessTurnResult(
-            profile_id=_required_string(value["profileId"], "profileId"),
-            session_id=_required_string(value["sessionId"], "sessionId"),
-            turn_id=_required_string(value["turnId"], "turnId"),
-            round_index=_required_nonnegative_int(value["roundIndex"], "roundIndex"),
-            history_from_seq=history_from_seq,
-            history_to_seq=history_to_seq,
-            history_digest=_required_digest(value["historyDigest"], "historyDigest"),
-            input_digest=_required_digest(value["inputDigest"], "inputDigest"),
-            submission_id=_required_string(submission["submissionId"], "submissionId"),
-            candidates=tuple(dict(item) for item in candidates),
-            usage=dict(usage),
-            artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
-        )
-    except KeyError as exc:
-        raise HarnessError("committed harness turn is missing identity fields") from exc
+    history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
+    history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
+    if history_to_seq < history_from_seq:
+        raise HarnessError("committed harness turn has invalid history range")
+    return HarnessTurnResult(
+        profile_id=_required_string(value["profileId"], "profileId"),
+        session_id=_required_string(value["sessionId"], "sessionId"),
+        turn_id=_required_string(value["turnId"], "turnId"),
+        round_index=_required_nonnegative_int(value["roundIndex"], "roundIndex"),
+        history_from_seq=history_from_seq,
+        history_to_seq=history_to_seq,
+        history_digest=_required_digest(value["historyDigest"], "historyDigest"),
+        input_digest=_required_digest(value["inputDigest"], "inputDigest"),
+        submission_id=_required_string(submission["submissionId"], "submissionId"),
+        candidates=tuple(dict(item) for item in candidates),
+        usage=dict(usage),
+        artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
+    )
 
 
 def _required_string(value: Any, name: str) -> str:

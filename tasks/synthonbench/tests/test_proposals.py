@@ -29,8 +29,10 @@ from tasks.synthonbench.core.proposal_parsing import (
     parse_synthon_responses,
 )
 from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
-from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
-from tasks.synthonbench.core.proposals import PROPOSAL_SOURCE
+from tasks.synthonbench.core.proposals import (
+    PROPOSAL_SOURCE,
+    SynthonBenchProposalExpander,
+)
 from tasks.synthonbench.core.search import SynthonInitializationExpander
 
 REQUEST_SIZE = 64
@@ -278,7 +280,9 @@ def test_expander_issues_four_independent_requests_of_sixteen_candidates() -> No
 
 def test_endpoint_requests_use_local_workers_without_changing_candidate_count(monkeypatch) -> None:
     client = BarrierProposalClient()
-    monkeypatch.setattr(proposals, "supports_local_concurrency", lambda _: True)
+    monkeypatch.setattr(
+        proposals, "OpenAICompatibleProposalClient", BarrierProposalClient
+    )
 
     result = _expander(client).expand(_request())
 

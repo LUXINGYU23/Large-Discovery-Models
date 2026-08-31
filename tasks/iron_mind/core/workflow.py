@@ -123,7 +123,6 @@ def main(argv: list[str] | None = None) -> int:
 def _run_campaign(
     args, table, task_spec, contract, profile_name: str, payload: dict[str, Any]
 ) -> int:
-    schema = table.schema
     provider = (
         provider_settings(args)
         if args.proposal_mode == "openai" or args.proposal_backend == "harness"

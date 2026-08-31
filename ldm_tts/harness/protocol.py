@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 PROTOCOL_VERSION = 4
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
@@ -51,14 +50,6 @@ class HarnessProfile:
         if any(_SHA256_PATTERN.fullmatch(value) is None for value in self.skill_dir_sha256):
             raise ValueError("harness skill directory digests must be lowercase SHA-256 values")
 
-    def identity(self) -> dict[str, Any]:
-        return {
-            "agentsSha256": self.agents_sha256,
-            "candidatesPerTurn": self.candidates_per_turn,
-            "profileId": self.profile_id,
-            "skillDirSha256": list(self.skill_dir_sha256),
-        }
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "profileId": self.profile_id,
@@ -91,7 +82,15 @@ class HarnessToolExtension:
 
 
 def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
-    return canonical_sha256([profile.identity() for profile in profiles])
+    return canonical_sha256([
+        {
+            "agentsSha256": profile.agents_sha256,
+            "candidatesPerTurn": profile.candidates_per_turn,
+            "profileId": profile.profile_id,
+            "skillDirSha256": list(profile.skill_dir_sha256),
+        }
+        for profile in profiles
+    ])
 
 
 @dataclass(frozen=True)

@@ -5,12 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from ldm_tts.transport import ProposalClient
 from ldm_tts.transport.openai import (
     EndpointCircuitBreaker,
     OpenAICompatibleProposalClient,
 )
-
 
 TRANSIENT_MAX_RETRIES = 3
 TRANSIENT_RETRY_BACKOFF_SECONDS = 10.0
@@ -47,10 +45,6 @@ def build_openai_reaction_client(
     )
 
 
-def supports_local_concurrency(client: ProposalClient) -> bool:
-    return isinstance(client, OpenAICompatibleProposalClient)
-
-
 def _request_extra_body(
     json_mode: bool,
     extra_body: Mapping[str, Any] | None,
@@ -66,4 +60,4 @@ def _request_extra_body(
     return body
 
 
-__all__ = ["build_openai_reaction_client", "supports_local_concurrency"]
+__all__ = ["build_openai_reaction_client"]

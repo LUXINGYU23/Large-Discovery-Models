@@ -30,10 +30,10 @@ queue/
 !.env.example
 api_credential.json
 
-# Agent prompt files (generated per-session by launchers)
+# Local agent prompts; task-owned harness profiles remain version controlled
 CLAUDE.md
 AGENTS.md
-!tasks/synthonbench/resources/harness/profiles/*/AGENTS.md
+!tasks/*/resources/harness/profiles/*/AGENTS.md
 
 # Experimental code/artifacts
 dev/

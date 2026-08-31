@@ -9,9 +9,9 @@ from typing import Any
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
+from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
-from tasks.synthonbench.core.space_order import ordered_positions
 from tasks.synthonbench.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     build_synthon_batch_prompt_messages,
@@ -24,7 +24,7 @@ from tasks.synthonbench.core.proposal_parsing import (
     parse_synthon_batch_responses,
     parse_synthon_responses,
 )
-from tasks.synthonbench.core.proposal_transport import supports_local_concurrency
+from tasks.synthonbench.core.space_order import ordered_positions
 
 PROPOSAL_SOURCE = "synthonbench_independent_llm"
 SINGLE_SAMPLING_MODE = "local_concurrent_independent_requests"
@@ -114,7 +114,9 @@ class SynthonBenchProposalExpander:
         )
 
     def _propose_all(self, requests: Sequence[ProposalRequest]) -> tuple[ProposalResponse, ...]:
-        if len(requests) == 1 or not supports_local_concurrency(self.client):
+        if len(requests) == 1 or not isinstance(
+            self.client, OpenAICompatibleProposalClient
+        ):
             return tuple(self.client.propose(item) for item in requests)
         worker_count = min(self.max_workers, len(requests))
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
