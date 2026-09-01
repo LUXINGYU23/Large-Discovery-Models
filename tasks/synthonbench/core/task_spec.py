@@ -53,6 +53,9 @@ def build_synthon_task_spec(
         else 1
     )
     response_space = _response_space(direct_batch_size)
+    response_spaces = (response_space,)
+    if initialization_mode == "shared_random" and response_space.name != "synthon_tuple_json":
+        response_spaces += (_response_space(1),)
     return LDMTaskSpec(
         task=TASK_ID,
         candidate_domain=CandidateDomainSpec(
@@ -68,7 +71,7 @@ def build_synthon_task_spec(
                 "Official fixed-oracle SynthonBench utility.",
             ),
         ),
-        response_spaces=(response_space,),
+        response_spaces=response_spaces,
         acquisition=acquisition,
         reservoir=_reservoir_spec(
             samples=search_breadth,

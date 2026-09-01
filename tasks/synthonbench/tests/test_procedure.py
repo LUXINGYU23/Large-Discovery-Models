@@ -19,7 +19,9 @@ REPO_ROOT = TASK_ROOT.parents[1]
 
 
 def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> None:
-    spec = describe_ldm_task(parse_args(["--mock"]))
+    spec = describe_ldm_task(parse_args([
+        "--mock", "--initialization-mode", "shared_random",
+    ]))
 
     assert spec.task == "synthonbench"
     assert spec.candidate_domain.kind == "reaction_synthon_tuple"
@@ -35,6 +37,10 @@ def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> Non
     assert spec.metadata["candidates_per_model_request"] == 16
     assert spec.response_spaces[0].name == "synthon_tuple_batch_json"
     assert spec.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 16
+    assert [space.name for space in spec.response_spaces] == [
+        "synthon_tuple_batch_json",
+        "synthon_tuple_json",
+    ]
     assert spec.metadata["bo_pool_size"] == 32
     assert spec.acquisition.name == "ucb_tilted"
     assert spec.acquisition.parameters["pool_size"] == 32
