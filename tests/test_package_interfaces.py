@@ -89,7 +89,7 @@ def guarded_import(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 
 builtins.__import__ = guarded_import
-from ldm_tts.contracts import Candidate, LDMTaskSpec
+from ldm_tts.contracts import BatchCandidateEvaluator, Candidate, LDMTaskSpec
 """
     subprocess.run(
         [sys.executable, "-c", script],

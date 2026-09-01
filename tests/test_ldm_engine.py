@@ -8,6 +8,7 @@ import pytest
 
 from ldm_tts.contracts import (
     AcquisitionSpec,
+    BatchCandidateEvaluator,
     Candidate,
     CandidateDomainSpec,
     CandidateRejection,
@@ -376,6 +377,206 @@ def test_ldm_engine_runs_complete_lifecycle_and_persists_authoritative_state(
     )
 
 
+def test_ldm_engine_can_advance_without_finishing_external_campaign(
+    tmp_path: Path,
+) -> None:
+    runtime = CampaignRuntime.open(
+        tmp_path / "externally-driven",
+        task="integer_search",
+        budget_limits={"external_evaluations": 2},
+    )
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(
+                proposals=(RawProposal(request.round_idx, "mock"),)
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(
+            lambda candidate: {"score": float(candidate.payload)}
+        ),
+        runtime=runtime,
+    )
+
+    first = engine.run(
+        LDMEngineConfig(iterations=1, reservoir_size=1),
+        finalize_runtime=False,
+    )
+    second = engine.run(
+        LDMEngineConfig(iterations=2, reservoir_size=1),
+        state=first.state,
+        finalize_runtime=False,
+    )
+
+    assert second.state.next_round == 2
+    assert [item.candidate.payload for item in second.state.observations] == [0, 1]
+    assert runtime.budget.counters["external_evaluations"] == 2
+    assert not any(
+        event["event_type"] == "campaign_finished" for event in runtime.events()
+    )
+    status = json.loads((runtime.run_dir / "status.json").read_text(encoding="utf-8"))
+    assert status["status"] == "running"
+    assert status["phase"] == "awaiting_external_driver"
+
+    runtime.finish(second.summary)
+
+    assert [
+        event["event_type"] for event in runtime.events()
+    ].count("campaign_finished") == 1
+
+
+class CountingBatchEvaluator:
+    def __init__(self, results: list[EvaluationResult] | None = None) -> None:
+        self.results = results
+        self.batch_calls = 0
+        self.single_calls = 0
+
+    def evaluate(self, candidate: Candidate) -> EvaluationResult:
+        self.single_calls += 1
+        return EvaluationResult(
+            candidate.candidate_id,
+            "succeeded",
+            {"score": float(candidate.payload)},
+        )
+
+    def evaluate_batch(
+        self, candidates: list[Candidate] | tuple[Candidate, ...]
+    ) -> list[EvaluationResult]:
+        self.batch_calls += 1
+        if self.results is not None:
+            return self.results
+        return [
+            EvaluationResult(
+                candidate.candidate_id,
+                "succeeded",
+                {"score": float(candidate.payload)},
+            )
+            for candidate in candidates
+        ]
+
+
+def test_ldm_engine_evaluates_a_minibatch_with_one_batch_call(tmp_path: Path) -> None:
+    evaluator = CountingBatchEvaluator()
+    assert isinstance(evaluator, BatchCandidateEvaluator)
+    runtime = CampaignRuntime.open(
+        tmp_path / "batch-evaluation",
+        task="integer_search",
+    )
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=tuple(RawProposal(value, "mock") for value in range(3))
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=evaluator,
+        runtime=runtime,
+    )
+
+    result = engine.run(
+        LDMEngineConfig(
+            iterations=1,
+            reservoir_size=3,
+            evaluations_per_round=3,
+        )
+    )
+
+    assert evaluator.batch_calls == 1
+    assert evaluator.single_calls == 0
+    assert len(result.state.observations) == 3
+    assert runtime.budget.counters["external_evaluations"] == 3
+
+
+def test_ldm_engine_classifies_one_batch_failure_for_each_candidate(
+    tmp_path: Path,
+) -> None:
+    class FailingBatchEvaluator(CountingBatchEvaluator):
+        def evaluate_batch(self, candidates):
+            self.batch_calls += 1
+            raise RuntimeError("batch service failed")
+
+    evaluator = FailingBatchEvaluator()
+    runtime = CampaignRuntime.open(
+        tmp_path / "failed-batch",
+        task="integer_search",
+    )
+    result = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=(RawProposal(0, "mock"), RawProposal(1, "mock"))
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=evaluator,
+        runtime=runtime,
+    ).run(
+        LDMEngineConfig(
+            iterations=1,
+            reservoir_size=2,
+            evaluations_per_round=2,
+        )
+    )
+
+    assert evaluator.batch_calls == 1
+    assert [item.evaluation.status for item in result.state.observations] == [
+        "failed",
+        "failed",
+    ]
+    assert {
+        item.evaluation.error for item in result.state.observations
+    } == {"batch service failed"}
+
+
+@pytest.mark.parametrize(
+    "results",
+    [
+        [EvaluationResult("integer-0", "succeeded", {"score": 0.0})],
+        [
+            EvaluationResult("integer-1", "succeeded", {"score": 1.0}),
+            EvaluationResult("integer-0", "succeeded", {"score": 0.0}),
+        ],
+        [
+            EvaluationResult("integer-0", "succeeded", {"score": 0.0}),
+            EvaluationResult("other", "succeeded", {"score": 1.0}),
+        ],
+    ],
+    ids=("wrong-count", "wrong-order", "wrong-id"),
+)
+def test_ldm_engine_rejects_malformed_batch_results(
+    tmp_path: Path,
+    results: list[EvaluationResult],
+) -> None:
+    runtime = CampaignRuntime.open(
+        tmp_path / f"malformed-{len(results)}-{results[-1].candidate_id}",
+        task="integer_search",
+    )
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=(RawProposal(0, "mock"), RawProposal(1, "mock"))
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CountingBatchEvaluator(results),
+        runtime=runtime,
+    )
+
+    with pytest.raises(ValueError, match="batch evaluator"):
+        engine.run(
+            LDMEngineConfig(
+                iterations=1,
+                reservoir_size=2,
+                evaluations_per_round=2,
+            )
+        )
+
+    assert json.loads((runtime.run_dir / "status.json").read_text())["status"] == "failed"
+
+
 def test_ldm_engine_classifies_evaluator_failures_and_stops_at_external_budget(
     tmp_path: Path,
 ) -> None:
@@ -596,6 +797,22 @@ def test_campaign_algorithm_enforces_an_exact_partial_final_batch(tmp_path: Path
 
 
 def test_campaign_algorithm_replaces_failures_until_success_target(tmp_path: Path) -> None:
+    class ReplacementBatchEvaluator(CountingBatchEvaluator):
+        def evaluate(self, candidate: Candidate) -> EvaluationResult:
+            self.single_calls += 1
+            if candidate.payload == 0:
+                return EvaluationResult(
+                    candidate.candidate_id,
+                    "failed",
+                    error="retry next",
+                )
+            return EvaluationResult(
+                candidate.candidate_id,
+                "succeeded",
+                {"score": float(candidate.payload)},
+            )
+
+    evaluator = ReplacementBatchEvaluator()
     recipe = CampaignRecipe(
         task_spec=integer_task_spec(),
         expander=CallableReservoirExpander(
@@ -604,13 +821,7 @@ def test_campaign_algorithm_replaces_failures_until_success_target(tmp_path: Pat
             )
         ),
         candidate_domain=IntegerDomain(),
-        evaluator=CallableCandidateEvaluator(
-            lambda candidate: (
-                EvaluationResult(candidate.candidate_id, "failed", error="retry next")
-                if candidate.payload == 0
-                else {"score": float(candidate.payload)}
-            )
-        ),
+        evaluator=evaluator,
     )
 
     campaign = run_campaign(
@@ -638,3 +849,5 @@ def test_campaign_algorithm_replaces_failures_until_success_target(tmp_path: Pat
     ]
     assert campaign.runtime.budget.counters["external_evaluations"] == 3
     assert campaign.runtime.budget.counters["successful_evaluations"] == 2
+    assert evaluator.batch_calls == 0
+    assert evaluator.single_calls == 3

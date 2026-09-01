@@ -10,6 +10,7 @@ from ldm_tts.contracts.candidate import (
     ReservoirBuilder,
 )
 from ldm_tts.contracts.evaluation import (
+    BatchCandidateEvaluator,
     CallableCandidateEvaluator,
     CandidateEvaluator,
     EvaluationResult,
@@ -31,6 +32,7 @@ from ldm_tts.contracts.task import (
 
 __all__ = [
     "AcquisitionSpec",
+    "BatchCandidateEvaluator",
     "CallableCandidateEvaluator",
     "Candidate",
     "CandidateAdmission",
