@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task_id": "nucleobench",
-  "stage": "mock_verified",
+  "stage": "tiny_campaign_verified",
   "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
   "contract_profile": "",
   "gates": {
@@ -32,16 +32,30 @@
       ]
     },
     "contract_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "tasks/nucleobench/resources/upstream_contract.json",
+        "tasks/nucleobench/scripts/prepare_official_data.py",
+        "tasks/nucleobench/tests/test_official_adapter.py",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "The official source, Malinois K562 starts, model artifact, constructor arguments, editable mask, and runner protocol are digest-pinned."
     },
     "seed_evaluated": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/malinois_k562_seed_qualification.yaml",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "The first paired start was evaluated by the unchanged source-pinned Malinois oracle."
     },
     "tiny_campaign_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/malinois_k562_tiny_campaign.yaml",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "Direct LDM, four-session LDM Harness, one-session direct Harness, and completed-campaign resume paths passed real two-round qualification."
     },
     "campaign_qualified": {
       "status": "pending",

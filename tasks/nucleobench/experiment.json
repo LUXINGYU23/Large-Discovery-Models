@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task_id": "nucleobench",
-  "qualification": "draft",
+  "qualification": "qualified",
   "benchmark": {
     "source_url": "https://github.com/move37-labs/nucleobench",
     "source_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",

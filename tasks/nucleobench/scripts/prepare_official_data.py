@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import math
@@ -17,7 +18,6 @@ from tasks.nucleobench.core.constants import (
     UPSTREAM_URL,
 )
 from tasks.nucleobench.core.source import prepare_source_checkout
-
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 PREPARED_MANIFEST = "prepared_manifest.json"
@@ -96,6 +96,7 @@ def prepare_case_data(
         raise ValueError(f"output directory is not empty: {output_dir}")
 
     starts = _load_start_sequences(starts_path, case.sequence_length)
+    starts_source_digest = _digest(starts_path)
     start_set_sha256 = _canonical_json_sha256(starts)
     _require_expected_digest(
         start_set_sha256,
@@ -135,6 +136,10 @@ def prepare_case_data(
             "sha256": start_set_sha256,
             "file_bytes": prepared_starts_digest["bytes"],
             "file_sha256": prepared_starts_digest["sha256"],
+            "source_file": {
+                "name": starts_path.name,
+                **starts_source_digest,
+            },
         },
         "editable_positions": {
             "path": prepared_positions.name,
@@ -159,7 +164,11 @@ def prepare_case_data(
 
 
 def _load_start_sequences(path: Path, sequence_length: int) -> list[str]:
-    payload = _load_json(path, "start sequence file")
+    payload = (
+        _load_start_sequences_csv(path, sequence_length)
+        if path.suffix.lower() == ".csv"
+        else _load_json(path, "start sequence file")
+    )
     if not isinstance(payload, list) or len(payload) != OFFICIAL_START_COUNT:
         raise ValueError(
             f"start sequence file must contain exactly {OFFICIAL_START_COUNT} sequences"
@@ -169,16 +178,38 @@ def _load_start_sequences(path: Path, sequence_length: int) -> list[str]:
     starts = [str(sequence) for sequence in payload]
     if len(set(starts)) != OFFICIAL_START_COUNT:
         raise ValueError(
-            f"start sequence file must contain {OFFICIAL_START_COUNT} unique start sequences"
+            "start sequence file must contain "
+            f"{OFFICIAL_START_COUNT} unique start sequences"
         )
     for index, sequence in enumerate(starts):
         if len(sequence) != sequence_length:
             raise ValueError(
-                f"start sequence {index} has length {len(sequence)}; expected {sequence_length}"
+                f"start sequence {index} has length {len(sequence)}; "
+                f"expected {sequence_length}"
             )
         if not set(sequence).issubset(set("ACGT")):
             raise ValueError(f"start sequence {index} contains a non-DNA base")
     return starts
+
+
+def _load_start_sequences_csv(path: Path, sequence_length: int) -> list[str]:
+    if not path.is_file():
+        raise ValueError(f"start sequence file does not exist: {path}")
+    csv.field_size_limit(max(csv.field_size_limit(), 1_000_000))
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.reader(handle)
+        header = next(reader, None)
+        if header is None or "0" not in header:
+            raise ValueError("start sequence CSV must contain the official '0' column")
+        sequence_column = header.index("0")
+        sequences = []
+        for row_number, row in enumerate(reader, start=2):
+            if len(row) <= sequence_column:
+                raise ValueError(f"start sequence CSV row {row_number} is incomplete")
+            sequence = row[sequence_column].strip()
+            if len(sequence) == sequence_length:
+                sequences.append(sequence)
+    return sequences
 
 
 def _load_editable_positions(
@@ -204,7 +235,8 @@ def _load_editable_positions(
         raise ValueError("editable positions contains a position outside the sequence")
     if len(positions) != expected_count:
         raise ValueError(
-            f"editable positions count must equal {expected_count}, got {len(positions)}"
+            f"editable positions count must equal {expected_count}, "
+            f"got {len(positions)}"
         )
     return sorted(positions)
 

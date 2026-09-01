@@ -20,6 +20,7 @@ from ldm_tts.engine.reporting import (
     build_campaign_result,
     build_trajectory_rows,
     load_successful_observations,
+    read_json_object,
     write_trajectory_csv,
 )
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write, unique_run_dir
@@ -266,13 +267,15 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             or args.max_seconds is not None
         ):
             parser.error(
-                "round termination requires positive --iterations and prohibits --max-seconds"
+                "round termination requires positive --iterations and prohibits "
+                "--max-seconds"
             )
     elif (
         args.iterations is not None or args.max_seconds is None or args.max_seconds < 1
     ):
         parser.error(
-            "wall-time termination requires positive --max-seconds and prohibits --iterations"
+            "wall-time termination requires positive --max-seconds and prohibits "
+            "--iterations"
         )
     if args.execution_profile == "pilot_evaluation" and (
         args.termination_kind != "rounds"
@@ -304,7 +307,8 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         and args.proposal_candidates_per_request != expected_request_size
     ):
         parser.error(
-            "direct LDM uses one B-sized request per lineage; direct LLM uses one candidate per request"
+            "direct LDM uses one B-sized request per lineage; direct LLM uses one "
+            "candidate per request"
         )
     if args.search_method in {"ldm", "llm"}:
         if args.proposal_mode != "openai" and not args.mock:
@@ -368,7 +372,8 @@ def main(argv: list[str] | None = None) -> int:
         and contract.qualification != "qualified"
     ):
         raise SystemExit(
-            "NucleoBench pilot and official execution are not qualified; complete qualification first."
+            "NucleoBench pilot and official execution are not qualified; "
+            "complete qualification first."
         )
     provider = (
         resolve_provider_settings(args)
@@ -540,7 +545,8 @@ def _run_real(
         and args.max_seconds != case.max_seconds
     ):
         raise SystemExit(
-            f"Official {case.case_id} execution requires --max-seconds={case.max_seconds}."
+            f"Official {case.case_id} execution requires "
+            f"--max-seconds={case.max_seconds}."
         )
     expected_profile = {
         "pilot_evaluation": "pilot_evaluation_malinois_k562",
@@ -647,20 +653,7 @@ def _run_real(
                     "checkpoint already exceeds the configured round limit"
                 )
             if remaining_steps == 0:
-                summary = {
-                    **designer.summary(),
-                    "stop_reason": "round_budget_finished",
-                    "official_output_count": 0,
-                }
-                runtime.finish(summary)
-                report = write_campaign_reports(
-                    runtime,
-                    execution=_execution_record(
-                        args, prepared, method_digest, designer.active_steps
-                    ),
-                    oracle_manifest=oracle_manifest,
-                    official_outputs=(),
-                )
+                report = _finish_completed_resume(runtime)
             else:
                 all_args = build_official_runner_args(
                     official.parsed_args_type,
@@ -869,6 +862,13 @@ def _campaign_state(runtime: CampaignRuntime, resume: bool) -> LDMEngineState:
         if checkpoint is None
         else LDMEngineState.from_checkpoint(checkpoint)
     )
+
+
+def _finish_completed_resume(runtime: CampaignRuntime) -> dict[str, Any]:
+    summary = read_json_object(runtime.run_dir / "summary.json")
+    result = read_json_object(runtime.run_dir / "result.json")
+    runtime.finish(summary)
+    return result
 
 
 def _default_run_name(args: argparse.Namespace) -> str:

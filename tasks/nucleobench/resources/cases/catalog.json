@@ -13,7 +13,7 @@
       "sequence_length": 200,
       "editable_position_count": 200,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "qualified"
     },
     {
       "case_id": "malinois_hepg2",

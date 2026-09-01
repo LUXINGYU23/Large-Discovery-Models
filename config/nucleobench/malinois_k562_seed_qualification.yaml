@@ -21,4 +21,5 @@ args:
   hardware-profile: n1-highmem-16-cpu
   out-dir: ${NUCLEOBENCH_RUNS_ROOT}/qualification
 env:
+  CUDA_VISIBLE_DEVICES: ""
   LDM_DATA_COLLECTION_ENABLED: "1"

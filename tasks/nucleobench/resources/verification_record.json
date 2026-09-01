@@ -1,33 +1,130 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "record_type": "nucleobench_malinois_k562_qualification",
   "task_id": "nucleobench",
-  "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
-  "records": [
-    {
-      "stage": "mock_verified",
-      "date": "2026-09-01",
-      "config": "config/nucleobench/mock.yaml",
-      "command": "python scripts/run_ldm_tts.py config/nucleobench/mock.yaml",
-      "result": {
-        "rounds": 2,
-        "successful_evaluations": 2,
-        "valid_search_candidates": 5,
-        "status": "completed"
-      },
-      "verified_artifacts": [
-        "campaign.json",
-        "config.json",
-        "ldm_task_spec.json",
-        "experiment_contract.json",
-        "budget.json",
-        "status.json",
-        "events.jsonl",
-        "checkpoint.json",
-        "summary.json",
-        "result.json",
-        "trajectory.csv",
-        "ldm_data/ldm_ir.jsonl"
-      ]
+  "verified_on": "2026-09-01",
+  "official_contract": {
+    "source_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+    "package_version": "2.0.10",
+    "source_checkout_clean": true,
+    "official_start_count": 100,
+    "start_table": {
+      "file": "start_sequences_df.csv",
+      "bytes": 23288093,
+      "sha256": "4c0e9e5a2811e41a152bc7ecffe2641cef5bc9f4f15675d3c988f793a28d409c"
+    },
+    "canonical_start_set_sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5",
+    "prepared_manifest_sha256": "b55271e7dc6b91dcd2e924e73b515fa9144e605b749eab7ce1b056d3ec322ec4",
+    "model_artifact": {
+      "bytes": 51736581,
+      "sha256": "06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592"
+    },
+    "model_init_args": {
+      "target_feature": 0,
+      "bending_factor": 1.0,
+      "a_min": -2.0,
+      "a_max": 6.0,
+      "target_alpha": 1.0,
+      "flank_length": 200
+    },
+    "official_time_limit_seconds": 28800,
+    "reference_hardware": "Google Cloud n1-highmem-16 CPU"
+  },
+  "qualification_environment": {
+    "benchmark_comparable": false,
+    "device_policy": "CUDA disabled so the official Malinois implementation runs on its CPU reference path.",
+    "host_inventory": "8 x NVIDIA H100 80GB HBM3",
+    "proposal_provider": {
+      "kind": "OpenAI-compatible endpoint",
+      "wire_api": "responses",
+      "model": "gpt-5.6-luna",
+      "reasoning": "max"
+    },
+    "harness_image_sha256": "6dffc6227ecd3f90f5d79e2f558f098a61069025753ffa9f321846774a782b8a"
+  },
+  "local_validation": {
+    "task_tests": {
+      "status": "passed",
+      "passed": 69
+    },
+    "mock_campaign": {
+      "status": "completed",
+      "total_rounds": 2,
+      "successful_evaluations": 2,
+      "valid_search_candidates": 5
+    },
+    "pilot_dry_run": {
+      "status": "passed",
+      "plans": 15
     }
-  ]
+  },
+  "seed_evaluation": {
+    "status": "succeeded",
+    "case_id": "malinois_k562",
+    "start_index": 0,
+    "candidate_id": "nucleobench:160fbf4cbd0ba370be666713ca901c520f841b2ad7e0b35ae259a172c2b2ce1c",
+    "energy": 0.7432525753974915,
+    "utility": -0.7432525753974915
+  },
+  "tiny_campaigns": {
+    "ldm": {
+      "status": "succeeded",
+      "total_rounds": 2,
+      "active_optimization_rounds": 1,
+      "proposal_attempts": 4,
+      "valid_search_candidates": 4,
+      "selected_candidates": 1,
+      "external_evaluations": 1,
+      "official_model_calls": 5,
+      "best_candidate_id": "nucleobench:2f699696d97e2707c996173c958c4770ef6acce5d1eda07be7f291cabbda3aa0",
+      "best_energy": 0.6529845595359802,
+      "best_utility": -0.6529845595359802,
+      "official_result_sha256": "3e26da155095765031089e222a1d4860d38c2afd949911a4db2a34eb8ef4f1f1"
+    },
+    "ldm_harness": {
+      "status": "succeeded",
+      "total_rounds": 2,
+      "active_optimization_rounds": 1,
+      "persistent_sessions": 4,
+      "proposal_attempts": 4,
+      "valid_search_candidates": 3,
+      "selected_candidates": 1,
+      "external_evaluations": 1,
+      "model_requests": 78,
+      "tool_calls": 110,
+      "best_candidate_id": "nucleobench:bcd9cc3d89c82e63d68cc66fda57444c929041d207ad48703f0d0c8d391437e0",
+      "best_energy": -2.4858431816101074,
+      "best_utility": 2.4858431816101074,
+      "official_result_sha256": "aad59135bf4d8008eabb2d3a9fb52c477398dd56acfcb7ae020681b7ff628853"
+    },
+    "harness": {
+      "status": "succeeded",
+      "total_rounds": 2,
+      "active_optimization_rounds": 1,
+      "persistent_sessions": 1,
+      "proposal_attempts": 1,
+      "valid_search_candidates": 1,
+      "selected_candidates": 1,
+      "external_evaluations": 1,
+      "model_requests": 26,
+      "tool_calls": 58,
+      "best_candidate_id": "nucleobench:01ef6bdcbf845c3b6245873a2d212b44bb2e65364c08665f6318bf768d827ff5",
+      "best_energy": -0.0641484260559082,
+      "best_utility": 0.0641484260559082,
+      "official_result_sha256": "7d3756b7ea8f3bf9cae288bb8c9ca23da496a654971085883d60ae3168c7bf77"
+    }
+  },
+  "completed_resume_check": {
+    "status": "passed",
+    "method": "ldm",
+    "event_count_before": 15,
+    "event_count_after": 18,
+    "official_model_calls_before_and_after": 5,
+    "external_evaluations_before_and_after": 1,
+    "successful_evaluations_before_and_after": 1,
+    "result_sha256_before_and_after": "9dbeee401962d782afad47613cbae76168ace6d381cb4d68fb59049cca3aba81",
+    "summary_sha256_before_and_after": "2efe169dc0bd446e1ffd359afb615490e017ab6501ee13070b009c5f35a9681e",
+    "duplicate_evaluations": 0
+  },
+  "qualification_boundary": "These runs verify source preparation, the unchanged official Malinois oracle, real endpoint and Harness proposal paths, official output preservation, and resumability. They are two-round engineering qualifications, not 12-round development comparisons or official wall-time benchmark results."
 }

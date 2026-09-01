@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import subprocess
@@ -11,7 +12,7 @@ import pytest
 
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
-from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.designer import (
     NucleoBenchDesigner,
@@ -30,6 +31,7 @@ from tasks.nucleobench.core.oracles.malinois import (
 )
 from tasks.nucleobench.core.source import require_clean_revision
 from tasks.nucleobench.core.workflow import (
+    _finish_completed_resume,
     build_official_runner_args,
     run_official_driver,
 )
@@ -84,6 +86,11 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
     assert manifest["case_id"] == "malinois_k562"
     assert manifest["start_set"]["count"] == 100
     assert manifest["start_set"]["sha256"] == _start_set_sha256(_start_sequences())
+    assert manifest["start_set"]["source_file"] == {
+        "name": "starts.json",
+        "bytes": starts.stat().st_size,
+        "sha256": hashlib.sha256(starts.read_bytes()).hexdigest(),
+    }
     assert manifest["editable_positions"]["count"] == 200
     assert manifest["model_artifact"]["sha256"] == model_sha256
     assert manifest["model_init_args"] == {
@@ -103,6 +110,40 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
     assert prepared.context.start_sequence == _start_sequences()[7]
     assert prepared.context.editable_positions == tuple(range(200))
     assert prepared.model_artifact == model.resolve()
+
+
+def test_prepare_case_data_extracts_the_official_malinois_csv(
+    tmp_path: Path,
+) -> None:
+    _, model, positions = _write_inputs(tmp_path)
+    starts = _start_sequences()
+    source = tmp_path / "start_sequences_df.csv"
+    with source.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["", "0"])
+        writer.writerow([1299, "A" * 3_000])
+        writer.writerows(
+            (source_index, sequence)
+            for source_index, sequence in enumerate(starts, start=1300)
+        )
+
+    output = tmp_path / "prepared-csv"
+    manifest = prepare_case_data(
+        case_id="malinois_k562",
+        starts_path=source,
+        model_artifact=model,
+        output_dir=output,
+        editable_positions_path=positions,
+        expected_model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
+        expected_start_set_sha256=_start_set_sha256(starts),
+        bending_factor=1.0,
+    )
+
+    assert json.loads((output / "starts.json").read_text()) == starts
+    assert manifest["start_set"]["source_file"]["name"] == source.name
+    assert manifest["start_set"]["source_file"]["sha256"] == hashlib.sha256(
+        source.read_bytes()
+    ).hexdigest()
 
 
 def test_prepare_case_data_rejects_unverified_or_invalid_inputs(tmp_path: Path) -> None:
@@ -267,6 +308,44 @@ def test_recording_model_preserves_output_and_records_only_sequence_digests(
     assert event["payload"]["utilities"] == [1.25, -2.5]
     assert len(event["payload"]["sequence_sha256"]) == 2
     assert "AAAAAAAA" not in json.dumps(event)
+
+
+def test_recording_model_continues_trace_counters_after_resume(tmp_path: Path) -> None:
+    run_dir = tmp_path / "campaign"
+    runtime = CampaignRuntime.open(run_dir, task="nucleobench")
+    RecordingSequenceModel(lambda sequences: [1.0] * len(sequences), runtime)(
+        ["A" * 8]
+    )
+
+    resumed = CampaignRuntime.open(run_dir, task="nucleobench", resume=True)
+    RecordingSequenceModel(lambda sequences: [1.0] * len(sequences), resumed)(
+        ["C" * 8, "G" * 8]
+    )
+
+    calls = [
+        event["payload"]
+        for event in resumed.events()
+        if event["event_type"] == "official_model_called"
+    ]
+    assert [call["call_index"] for call in calls] == [1, 2]
+    assert [call["cumulative_sequence_count"] for call in calls] == [1, 3]
+
+
+def test_completed_resume_preserves_existing_result_artifacts(tmp_path: Path) -> None:
+    run_dir = tmp_path / "campaign"
+    runtime = CampaignRuntime.open(run_dir, task="nucleobench")
+    summary = {"observation_count": 2, "official_output_count": 3}
+    result = {
+        "evaluation_count": 2,
+        "official_outputs": [{"path": "official/results.parquet"}],
+    }
+    runtime.finish(summary)
+    atomic_json_write(run_dir / "result.json", result)
+
+    resumed = CampaignRuntime.open(run_dir, task="nucleobench", resume=True)
+    assert _finish_completed_resume(resumed) == result
+    assert json.loads((run_dir / "summary.json").read_text()) == summary
+    assert json.loads((run_dir / "result.json").read_text()) == result
 
 
 def test_official_driver_preserves_raw_outputs_and_finishes_once(

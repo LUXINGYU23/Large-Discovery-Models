@@ -48,4 +48,5 @@ args:
   harness-wall-time-seconds: 1800
   out-dir: ${NUCLEOBENCH_RUNS_ROOT}/official_benchmark
 env:
+  CUDA_VISIBLE_DEVICES: ""
   LDM_DATA_COLLECTION_ENABLED: "1"

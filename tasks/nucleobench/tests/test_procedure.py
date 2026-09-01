@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from ldm_tts.cli.runner import build_plan, load_config
+from ldm_tts.registration.dependencies import has_failures
 from ldm_tts.registration.experiment import load_experiment_contract
+from tasks.nucleobench.core import dependencies
 from tasks.nucleobench.core.cases import CaseCatalogError, load_case_catalog
 from tasks.nucleobench.core.constants import CATALOG_PATH
 from tasks.nucleobench.core.workflow import describe_ldm_task, resolve_provider_settings
@@ -15,6 +17,28 @@ from tasks.nucleobench.ldm_task.procedure import main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_ROOT = TASK_ROOT.parents[1] / "config" / "nucleobench"
+
+
+def test_real_dependency_check_requires_the_pinned_official_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = {"task": "nucleobench", "mode": "real", "argv": []}
+
+    monkeypatch.setattr(
+        dependencies.metadata,
+        "version",
+        lambda _name: dependencies.UPSTREAM_PACKAGE_VERSION,
+    )
+    checks = dependencies.check_task_dependencies(plan)
+    assert not has_failures(checks)
+
+    def missing(_name: str) -> str:
+        raise dependencies.metadata.PackageNotFoundError
+
+    monkeypatch.setattr(dependencies.metadata, "version", missing)
+    checks = dependencies.check_task_dependencies(plan)
+    assert has_failures(checks)
+    assert checks[-1].name == "official runtime"
 
 
 def test_catalog_covers_the_pinned_public_suite() -> None:
@@ -28,14 +52,16 @@ def test_catalog_covers_the_pinned_public_suite() -> None:
         "rinalmo": 1,
         "enformer": 1,
     }
-    assert {case.state for case in cases} == {"planned"}
+    states = {case.case_id: case.state for case in cases}
+    assert states["malinois_k562"] == "qualified"
+    assert set(states.values()) == {"planned", "qualified"}
 
 
-def test_experiment_contract_is_draft_with_both_termination_profiles() -> None:
+def test_experiment_contract_is_qualified_with_both_termination_profiles() -> None:
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
     case_ids = {case.case_id for case in load_case_catalog()}
 
-    assert contract.qualification == "draft"
+    assert contract.qualification == "qualified"
     assert set(contract.evaluation["datasets"]) == case_ids
     assert set(contract.profiles) == {
         "pilot_evaluation_malinois_k562",
@@ -221,24 +247,6 @@ def test_bo_dry_run_does_not_require_or_read_provider_credentials(capsys) -> Non
     }
 
 
-def test_pilot_execution_is_rejected_before_qualification() -> None:
-    with pytest.raises(SystemExit, match="not qualified"):
-        main(
-            [
-                "--case-id",
-                "malinois_k562",
-                "--execution-profile",
-                "pilot_evaluation",
-                "--termination-kind",
-                "rounds",
-                "--initialization-mode",
-                "shared_start",
-                "--iterations",
-                "12",
-            ]
-        )
-
-
 @pytest.mark.parametrize(
     "argv",
     [
@@ -300,6 +308,7 @@ def test_release_configs_use_one_real_workflow_and_distinct_termination_modes() 
         assert plan["module"] == "tasks.nucleobench.ldm_task.procedure"
         assert config["args"]["execution-profile"] == expected[0]
         assert config["args"]["termination-kind"] == expected[1]
+        assert config["env"]["CUDA_VISIBLE_DEVICES"] == ""
 
     official = load_config(CONFIG_ROOT / "malinois_k562_official_base.yaml")
     assert "iterations" not in official["args"]

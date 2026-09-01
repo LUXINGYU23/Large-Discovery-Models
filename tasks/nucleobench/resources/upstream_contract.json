@@ -14,6 +14,7 @@
   "official_scope": {
     "case_count": 17,
     "paired_start_count": 100,
+    "reference_hardware": "Google Cloud n1-highmem-16 CPU",
     "families": {
       "malinois": 3,
       "bpnet": 12,
@@ -54,11 +55,14 @@
     "malinois_k562": {
       "model_artifact": {
         "official_uri": "gs://tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
-        "sha256": null
+        "https_uri": "https://storage.googleapis.com/tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
+        "bytes": 51736581,
+        "md5": "375142a714e7df73c463b46113a65210",
+        "sha256": "06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592"
       },
       "model_init_args": {
         "target_feature": 0,
-        "bending_factor": null,
+        "bending_factor": 1.0,
         "a_min": -2.0,
         "a_max": 6.0,
         "target_alpha": 1.0,
@@ -66,8 +70,21 @@
       },
       "start_set": {
         "required_count": 100,
-        "authoritative_source": null,
-        "sha256": null
+        "authoritative_source": {
+          "concept_doi": "10.5281/zenodo.15775703",
+          "record_id": 17079936,
+          "record_url": "https://zenodo.org/records/17079936",
+          "file": "start_sequences_df.csv",
+          "bytes": 23288093,
+          "md5": "64dc535d88ea659d52b5a39956b896fe",
+          "sha256": "4c0e9e5a2811e41a152bc7ecffe2641cef5bc9f4f15675d3c988f793a28d409c"
+        },
+        "extraction": {
+          "sequence_column": "0",
+          "source_row_indices": [1300, 1399],
+          "sequence_length": 200
+        },
+        "sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5"
       },
       "editable_positions": {
         "mode": "all_positions",
@@ -76,10 +93,9 @@
     }
   },
   "qualification_blockers": [
-    "Verify and digest the authoritative paired-start source for every case, including Malinois K562.",
-    "Verify the official Malinois bending_factor and model artifact SHA-256.",
+    "Verify and digest the authoritative paired-start source for every remaining case, including the RiNALMo task added after the published Zenodo start table.",
     "Record complete official model constructor arguments for every remaining case.",
-    "Verify formal benchmark seeds and equivalent hardware requirements.",
-    "Record source, model, start-set, and editable-mask artifact digests."
+    "Verify the exact benchmark seed values and the hardware-equivalence policy for non-reference infrastructure.",
+    "Record model, start-set, and editable-mask artifact digests for every remaining case."
   ]
 }

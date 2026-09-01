@@ -7,24 +7,22 @@ interface. The upstream source is pinned to commit
 
 The adapter does not modify official model wrappers, energy functions,
 editable-position masks, start sequences, runner termination, or result
-serialization. LDM will be exposed as a NucleoBench `SequenceOptimizer`, while
+serialization. LDM is exposed as a NucleoBench `SequenceOptimizer`, while
 the source-pinned `docker_entrypoint.run_loop` remains the outer benchmark
 driver.
 
 ## Current Status
 
-The task is registered with a draft experiment contract. Its versioned case
-catalog covers the 17 public NucleoBench tasks, all currently marked
-`planned`. The mutation-patch candidate contract and external data preparation
-command are implemented. A deterministic mock campaign is available for local
-contract verification. The pinned Malinois loader and official
-`SequenceOptimizer`-compatible adapter are implemented, but official model
-campaigns are not yet qualified.
+The experiment contract and `malinois_k562` case are qualified through the
+`tiny_campaign_verified` gate. Qualification used the source-pinned official
+start set and Malinois model for a seed evaluation, a direct LDM tiny campaign,
+a four-session LDM Harness tiny campaign, a one-session direct Harness tiny
+campaign, and a no-duplicate-evaluation resume check. The other 16 public cases
+remain `planned`.
 
-The first implementation target is `malinois_k562`. After that case passes
-source preparation, seed evaluation, a tiny campaign, and qualification, the
-same task package will be extended to the remaining cases without duplicating
-the workflow or optimization methods.
+The same task package will be extended to the remaining cases without
+duplicating the workflow or optimization methods. No 12-round Pilot Evaluation
+or official wall-time result is included in this qualification claim.
 
 ## Case Families
 
@@ -47,11 +45,21 @@ From the repository root:
 ```bash
 uv sync --locked --project tasks/nucleobench
 uv run --locked --project tasks/nucleobench \
-  python scripts/validate_tasks.py --task nucleobench
+  python scripts/validate_tasks.py --task nucleobench \
+  --require-qualified --require-stage tiny_campaign_verified
 uv run --locked --project tasks/nucleobench \
   python -m tasks.nucleobench.ldm_task.procedure \
   --case-id malinois_k562 --dry-run
 ```
+
+Real official-oracle runs require Linux and the pinned upstream runtime:
+
+```bash
+uv sync --locked --project tasks/nucleobench --extra official
+```
+
+The released Malinois configs hide CUDA and use the official CPU reference
+path, including on accelerator-equipped hosts.
 
 The dry run is inspection-only. Executable mock and official workflows are not
 equivalent: the mock verifies repository integration but is not a benchmark
@@ -70,10 +78,10 @@ data-collection sink without network, model weights, or GPU access.
 
 ## Prepare Malinois K562 Inputs
 
-Preparation validates a clean checkout at the pinned revision, a JSON array of
-100 unique 200-base starts, the editable positions, and a local copy of the
-official model artifact. It writes only small prepared files and a digest-bound
-manifest to an external directory.
+Preparation validates a clean checkout at the pinned revision, the official
+Zenodo start table or an equivalent JSON array, the editable positions, and a
+local copy of the official model artifact. It writes only small prepared files
+and a digest-bound manifest to an external directory.
 
 ```bash
 uv run --locked --project tasks/nucleobench \
@@ -81,23 +89,24 @@ uv run --locked --project tasks/nucleobench \
   --case malinois_k562 \
   --source-dir /external/nucleobench/source \
   --output-dir /external/nucleobench/data/malinois_k562 \
-  --starts-file /external/nucleobench/inputs/malinois_k562_starts.json \
+  --starts-file /external/nucleobench/inputs/start_sequences_df.csv \
   --model-artifact /external/nucleobench/models/malinois_artifacts.tar.gz \
-  --model-sha256 <verified-sha256> \
-  --start-set-sha256 <verified-canonical-start-set-sha256> \
-  --bending-factor <verified-official-value>
+  --model-sha256 06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592 \
+  --start-set-sha256 2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5 \
+  --bending-factor 1.0
 ```
 
-The model may be obtained from the official URI recorded in
+The official start table is published as `start_sequences_df.csv` in Zenodo
+record `17079936`. The model may be obtained from the official URI recorded in
 [`resources/upstream_contract.json`](resources/upstream_contract.json) or from
-a user-selected mirror. The script never stores weights in Git. A prepared
-manifest is an input-integrity record; the case remains `planned` until its
-authoritative starts and complete model arguments pass qualification.
+a user-selected mirror. The script never stores weights or starts in Git. A
+prepared manifest is an input-integrity record and is required before any real
+campaign.
 
 ## Execution Profiles
 
-The draft contract separates two drivers that will share the same candidate,
-surrogate, proposal, and selection implementation:
+The contract separates two drivers that share the same candidate, surrogate,
+proposal, and selection implementation:
 
 - `pilot_evaluation`: 12 total rounds for fast three-seed method comparison.
 - `official_benchmark`: the unchanged official runner terminates by wall time,

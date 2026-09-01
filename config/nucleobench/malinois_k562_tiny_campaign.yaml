@@ -31,4 +31,5 @@ args:
   api-key-file: ${NUCLEOBENCH_API_KEY_FILE}
   out-dir: ${NUCLEOBENCH_RUNS_ROOT}/qualification
 env:
+  CUDA_VISIBLE_DEVICES: ""
   LDM_DATA_COLLECTION_ENABLED: "1"

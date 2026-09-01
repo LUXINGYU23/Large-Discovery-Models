@@ -29,7 +29,7 @@ class PreparedMalinoisCase:
 
 @dataclass(frozen=True)
 class OfficialMalinoisAPI:
-    model: "RecordingSequenceModel"
+    model: RecordingSequenceModel
     run_loop: Callable[..., Any]
     parsed_args_type: type
 
@@ -40,8 +40,10 @@ class RecordingSequenceModel:
     def __init__(self, model: Callable[[list[str]], Any], runtime: CampaignRuntime):
         self.model = model
         self.runtime = runtime
-        self.call_count = 0
-        self.sequence_count = 0
+        self.call_count = int(runtime.budget.counters.get("official_model_calls", 0))
+        self.sequence_count = int(
+            runtime.budget.counters.get("official_model_sequences", 0)
+        )
 
     def __call__(self, sequences: Sequence[str]) -> Any:
         if isinstance(sequences, str):
