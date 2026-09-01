@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source": {
+    "url": "https://github.com/move37-labs/nucleobench",
+    "revision": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+    "package_version": "2.0.10",
+    "license": "Apache-2.0"
+  },
+  "publication": {
+    "title": "GrAdaBeam: Combining model gradients with evolutionary search for generalizable nucleic acid design",
+    "doi": "10.1101/2025.06.20.660785",
+    "url": "https://www.biorxiv.org/content/10.1101/2025.06.20.660785"
+  },
+  "official_scope": {
+    "case_count": 17,
+    "paired_start_count": 100,
+    "families": {
+      "malinois": 3,
+      "bpnet": 12,
+      "rinalmo": 1,
+      "enformer": 1
+    }
+  },
+  "verified_contracts": {
+    "optimizer_interface": [
+      "SequenceOptimizer.run(n_steps)",
+      "SequenceOptimizer.get_samples(n_samples)",
+      "SequenceOptimizer.is_finished()"
+    ],
+    "runner": "docker_entrypoint.run_loop",
+    "termination_modes": [
+      "max_number_of_rounds",
+      "max_seconds"
+    ],
+    "model_registry": [
+      "malinois",
+      "bpnet",
+      "rinalmo_mrl",
+      "enformer"
+    ]
+  },
+  "qualification_blockers": [
+    "Verify and digest the authoritative paired-start source for every case.",
+    "Record complete official model constructor arguments for each prepared case.",
+    "Verify formal benchmark seeds and equivalent hardware requirements.",
+    "Record source, model, start-set, and editable-mask artifact digests."
+  ]
+}

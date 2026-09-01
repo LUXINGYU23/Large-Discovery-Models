@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "task_id": "nucleobench",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/move37-labs/nucleobench",
+    "source_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+    "task_path": "tasks/nucleobench"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": false,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "energy",
+        "direction": "minimize",
+        "description": "Energy returned by the unchanged source-pinned NucleoBench model wrapper."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "utility",
+        "direction": "maximize",
+        "description": "Negative official energy, used internally so all LDM selectors maximize one objective."
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "elapsed_seconds",
+        "direction": "minimize",
+        "description": "Wall-clock time reported by the official runner."
+      },
+      {
+        "name": "oracle_evaluations",
+        "direction": "minimize",
+        "description": "Number of official model evaluations charged to the campaign."
+      },
+      {
+        "name": "hamming_distance",
+        "direction": "maximize",
+        "description": "Distance from the paired official start sequence."
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "malinois_k562",
+      "malinois_hepg2",
+      "malinois_sknsh",
+      "bpnet_atac",
+      "bpnet_ctcf",
+      "bpnet_e2f3",
+      "bpnet_elf4",
+      "bpnet_gata2",
+      "bpnet_junb",
+      "bpnet_max",
+      "bpnet_mecom",
+      "bpnet_myc",
+      "bpnet_otx1",
+      "bpnet_rad21",
+      "bpnet_sox6",
+      "rinalmo_mrl",
+      "enformer_muscle_not_liver"
+    ],
+    "settings": {
+      "official_runner": "The source-pinned docker_entrypoint.run_loop drives the optimizer without modification.",
+      "candidate_contract": "A start-relative mutation patch over the official editable positions.",
+      "pilot_termination": "Twelve total rounds: one shared-start initialization round and eleven active optimization rounds.",
+      "official_termination": "Wall time only: eight hours for Malinois, BPNet, and RiNALMo; twelve hours for Enformer.",
+      "case_status_source": "tasks/nucleobench/resources/cases/catalog.json",
+      "method_providers": {
+        "ldm": "model_endpoint",
+        "ldm_harness": "persistent_agent_harness",
+        "bo": "score_blind_mutation_search",
+        "llm": "model_endpoint",
+        "harness": "persistent_agent_harness"
+      }
+    },
+    "per_candidate_limits": {
+      "benchmark_jobs": 1
+    }
+  },
+  "budget": {},
+  "profiles": {
+    "pilot_evaluation_malinois_k562": {
+      "description": "Twelve-round development comparison for the Malinois K562 case.",
+      "budget": {
+        "outer_iterations": 12
+      },
+      "locked_args": {
+        "case-id": "malinois_k562",
+        "execution-profile": "pilot_evaluation",
+        "termination-kind": "rounds",
+        "iterations": 12,
+        "initialization-mode": "shared_start"
+      }
+    },
+    "official_benchmark_malinois_k562": {
+      "description": "Official wall-time-limited Malinois K562 campaign.",
+      "budget": {
+        "max_seconds": 28800
+      },
+      "locked_args": {
+        "case-id": "malinois_k562",
+        "execution-profile": "official_benchmark",
+        "termination-kind": "wall_time",
+        "max-seconds": 28800,
+        "initialization-mode": "official_start"
+      }
+    }
+  }
+}
