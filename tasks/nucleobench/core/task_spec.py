@@ -13,14 +13,61 @@ from ldm_tts.contracts import (
     ResponseSpaceSpec,
     SurrogateSpaceSpec,
 )
-
 from tasks.nucleobench.core.cases import NucleoBenchCase
-from tasks.nucleobench.core.constants import TASK_ID
+from tasks.nucleobench.core.constants import (
+    DIRECT_SEARCH_METHODS,
+    SEARCH_METHODS,
+    TASK_ID,
+)
 
 
-def build_task_spec(case: NucleoBenchCase) -> LDMTaskSpec:
+def build_task_spec(
+    case: NucleoBenchCase,
+    *,
+    search_method: str = "ldm",
+    acquisition: AcquisitionSpec | None = None,
+    surrogate: SurrogateSpaceSpec | None = None,
+) -> LDMTaskSpec:
     """Describe the shared mutation-patch search used by every execution profile."""
 
+    if search_method not in SEARCH_METHODS:
+        raise ValueError(f"unknown NucleoBench search method: {search_method!r}")
+    direct = search_method in DIRECT_SEARCH_METHODS
+    if surrogate is None:
+        surrogate = (
+            SurrogateSpaceSpec(
+                kind="none",
+                representation="Disabled for direct candidate evaluation.",
+                dimension_policy="none",
+            )
+            if direct
+            else SurrogateSpaceSpec(
+                kind="kernel",
+                representation=(
+                    "Categorical equality over official editable positions with a "
+                    "normalized Hamming exponential kernel."
+                ),
+                dimension_policy="implicit",
+            )
+        )
+    if direct != (surrogate.kind == "none"):
+        raise ValueError("direct methods disable the surrogate; BO-based methods require it")
+    if acquisition is None:
+        acquisition = (
+            AcquisitionSpec(
+                name="direct_evaluation",
+                objective_names=("utility",),
+                score_direction="reservoir_order",
+                selection_rule="evaluate the emitted minibatch without surrogate ranking",
+            )
+            if direct
+            else AcquisitionSpec(
+                name="hamming_gp_ucb_ldm_tilt",
+                objective_names=("utility",),
+                score_direction="maximize",
+                selection_rule="Empirical q0 tilted by task-local Hamming GP-UCB.",
+            )
+        )
     response_name = "mutation_patch_json"
     return LDMTaskSpec(
         task=TASK_ID,
@@ -73,12 +120,7 @@ def build_task_spec(case: NucleoBenchCase) -> LDMTaskSpec:
                 },
             ),
         ),
-        acquisition=AcquisitionSpec(
-            name="hamming_gp_ucb_ldm_tilt",
-            objective_names=("utility",),
-            score_direction="maximize",
-            selection_rule="Empirical q0 tilted by task-local Hamming GP-UCB.",
-        ),
+        acquisition=acquisition,
         reservoir=ReservoirSpec(
             name="mutation_patch_reservoir",
             expansions=(
@@ -94,13 +136,9 @@ def build_task_spec(case: NucleoBenchCase) -> LDMTaskSpec:
                 "case, paired-start digest, start index, and rebuilt sequence digest"
             ),
         ),
-        surrogate=SurrogateSpaceSpec(
-            kind="kernel",
-            representation="Sparse categorical Hamming similarity over edited positions.",
-            dimension_policy="implicit",
-        ),
+        surrogate=surrogate,
         proposal_search=ProposalSearchSpec(
-            name="method_specific_mutation_search",
+            name=f"{search_method}_mutation_search",
             evaluation_policy="official model evaluation through the shared LDM engine",
         ),
         metadata={
@@ -110,6 +148,7 @@ def build_task_spec(case: NucleoBenchCase) -> LDMTaskSpec:
             "model_name": case.model_name,
             "target": case.target,
             "max_seconds": case.max_seconds,
+            "search_method": search_method,
         },
     )
 

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 TASK_ID = "nucleobench"
+NUCLEOBENCH_Q0_METADATA_KEY = "nucleobench_empirical_q0"
+SEARCH_METHODS = frozenset({"ldm", "ldm_harness", "bo", "llm", "harness"})
+DIRECT_SEARCH_METHODS = frozenset({"llm", "harness"})
 UPSTREAM_URL = "https://github.com/move37-labs/nucleobench"
 UPSTREAM_COMMIT = "a6d8b040a4fa80b18266ee5416c904d01f842428"
 UPSTREAM_PACKAGE_VERSION = "2.0.10"
@@ -47,9 +49,12 @@ FAMILY_PROTOCOLS = {
 __all__ = [
     "CASE_STATES",
     "CATALOG_PATH",
+    "DIRECT_SEARCH_METHODS",
     "FAMILY_PROTOCOLS",
+    "NUCLEOBENCH_Q0_METADATA_KEY",
     "OFFICIAL_CASE_COUNT",
     "OFFICIAL_START_COUNT",
+    "SEARCH_METHODS",
     "TASK_ID",
     "UPSTREAM_COMMIT",
     "UPSTREAM_PACKAGE_VERSION",

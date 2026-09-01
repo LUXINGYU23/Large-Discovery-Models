@@ -12,8 +12,11 @@ from typing import Any
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from ldm_tts.data import DataCollectionSink, make_complete_design_ir
 from tasks.nucleobench.core.cases import NucleoBenchCase
-from tasks.nucleobench.core.constants import OFFICIAL_START_COUNT, TASK_ID
-
+from tasks.nucleobench.core.constants import (
+    NUCLEOBENCH_Q0_METADATA_KEY,
+    OFFICIAL_START_COUNT,
+    TASK_ID,
+)
 
 DNA_BASES = frozenset("ACGT")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -103,7 +106,12 @@ class NucleoBenchCandidateDomain:
                 exc.metadata,
             )
 
-        candidate = _make_candidate(self.context, prepared, proposal.source)
+        candidate = _make_candidate(
+            self.context,
+            prepared,
+            proposal.source,
+            proposal.metadata,
+        )
         if proposal.metadata.get("collectable"):
             self._collect(candidate, proposal.metadata)
         return candidate
@@ -255,19 +263,24 @@ def _make_candidate(
     context: MutationContext,
     prepared: PreparedMutationCandidate,
     source: str,
+    proposal_metadata: Mapping[str, Any] | None = None,
 ) -> Candidate:
+    metadata = {
+        "case_id": context.case.case_id,
+        "start_set_digest": context.start_set_digest,
+        "start_index": context.start_index,
+        "sequence_sha256": prepared.sequence_sha256,
+        "hamming_distance": prepared.hamming_distance,
+    }
+    q0 = (proposal_metadata or {}).get(NUCLEOBENCH_Q0_METADATA_KEY)
+    if isinstance(q0, Mapping):
+        metadata[NUCLEOBENCH_Q0_METADATA_KEY] = dict(q0)
     return Candidate(
         candidate_id=f"nucleobench:{prepared.canonical_key}",
         payload=prepared.payload,
         canonical_key=prepared.canonical_key,
         source=source,
-        metadata={
-            "case_id": context.case.case_id,
-            "start_set_digest": context.start_set_digest,
-            "start_index": context.start_index,
-            "sequence_sha256": prepared.sequence_sha256,
-            "hamming_distance": prepared.hamming_distance,
-        },
+        metadata=metadata,
     )
 
 

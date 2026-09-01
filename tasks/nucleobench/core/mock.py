@@ -25,7 +25,6 @@ from tasks.nucleobench.core.candidate import MutationContext
 from tasks.nucleobench.core.cases import NucleoBenchCase
 from tasks.nucleobench.core.task_spec import build_task_spec
 
-
 MOCK_START_SEQUENCE = "AAAAAAAA"
 MOCK_EDITABLE_POSITIONS = (0, 2, 4, 6)
 MOCK_CASE = NucleoBenchCase(
@@ -87,6 +86,7 @@ def build_mock_task_spec() -> LDMTaskSpec:
         metadata={
             **task_spec.metadata,
             "execution_profile": "mock",
+            "search_method": "mock",
         },
     )
 
