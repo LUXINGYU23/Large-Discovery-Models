@@ -1,6 +1,6 @@
 import { sha256 } from "./trace.js";
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -26,6 +26,29 @@ export interface HarnessToolExtensionConfig {
 	toolNames: string[];
 }
 
+export type McpInjectedValue =
+	| { value: string }
+	| { secretName: string; secretSource: string; prefix: string };
+
+interface McpServerBase {
+	serverId: string;
+	tools: string[];
+	configSha256: string;
+}
+
+export type McpServerConfig =
+	| (McpServerBase & {
+		transport: "stdio";
+		command: string;
+		args: string[];
+		env: Record<string, McpInjectedValue>;
+	})
+	| (McpServerBase & {
+		transport: "streamable_http";
+		url: string;
+		headers: Record<string, McpInjectedValue>;
+	});
+
 export interface NetworkPolicy {
 	allowedHosts: string[];
 	deniedHosts: string[];
@@ -46,6 +69,7 @@ export interface WebSearchConfig {
 export interface BootstrapSecretFrame extends CommonFrame {
 	type: "bootstrap_secret";
 	apiKey: string;
+	namedSecrets: Record<string, string>;
 }
 
 export interface InitializeFrame extends CommonFrame {
@@ -63,6 +87,7 @@ export interface InitializeFrame extends CommonFrame {
 	profileSetSha256: string;
 	profiles: HarnessProfileConfig[];
 	toolExtensions: HarnessToolExtensionConfig[];
+	mcpServers: McpServerConfig[];
 	networkPolicy: NetworkPolicy;
 	limits: HarnessLimits;
 	webSearch: WebSearchConfig;
@@ -250,6 +275,94 @@ function parseToolExtensions(value: unknown): HarnessToolExtensionConfig[] {
 	return extensions;
 }
 
+function parseInjectedValues(value: unknown, name: string): Record<string, McpInjectedValue> {
+	const data = record(value, name);
+	return Object.fromEntries(Object.entries(data).map(([key, raw]) => {
+		if (!key) throw new ProtocolError("invalid_frame", `${name} names must not be empty`);
+		const item = record(raw, `${name}.${key}`);
+		if ("value" in item) {
+			exactKeys(item, ["value"], `${name}.${key}`);
+			return [key, { value: string(item.value, `${name}.${key}.value`) }];
+		}
+		exactKeys(item, ["secretName", "secretSource", "prefix"], `${name}.${key}`);
+		if (typeof item.prefix !== "string") {
+			throw new ProtocolError("invalid_frame", `${name}.${key}.prefix must be a string`);
+		}
+		return [key, {
+			secretName: string(item.secretName, `${name}.${key}.secretName`),
+			secretSource: string(item.secretSource, `${name}.${key}.secretSource`),
+			prefix: item.prefix,
+		}];
+	}));
+}
+
+function parseMcpServers(value: unknown): McpServerConfig[] {
+	if (!Array.isArray(value)) throw new ProtocolError("invalid_frame", "mcpServers must be an array");
+	const servers = value.map((raw, index): McpServerConfig => {
+		const name = `mcpServers[${index}]`;
+		const data = record(raw, name);
+		const serverId = string(data.serverId, `${name}.serverId`);
+		if (!/^[a-z][a-z0-9_]*$/.test(serverId)) {
+			throw new ProtocolError("invalid_frame", `${name}.serverId must be a lowercase identifier`);
+		}
+		const tools = stringArray(data.tools, `${name}.tools`);
+		if (
+			tools.length === 0
+			|| new Set(tools).size !== tools.length
+			|| tools.some((tool) => !/^[A-Za-z0-9_-]+$/.test(tool))
+		) {
+			throw new ProtocolError("invalid_frame", `${name}.tools must be a unique function-name allowlist`);
+		}
+		const base = {
+			serverId,
+			tools,
+			configSha256: digest(data.configSha256, `${name}.configSha256`),
+		};
+		if (data.transport === "stdio") {
+			exactKeys(data, ["serverId", "transport", "tools", "configSha256", "command", "args", "env"], name);
+			return {
+				...base,
+				transport: "stdio",
+				command: string(data.command, `${name}.command`),
+				args: stringArray(data.args, `${name}.args`),
+				env: parseInjectedValues(data.env, `${name}.env`),
+			};
+		}
+		if (data.transport === "streamable_http") {
+			exactKeys(data, ["serverId", "transport", "tools", "configSha256", "url", "headers"], name);
+			const url = string(data.url, `${name}.url`);
+			let parsed: URL;
+			try {
+				parsed = new URL(url);
+			} catch {
+				throw new ProtocolError("invalid_frame", `${name}.url must be absolute`);
+			}
+			const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+			if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback)) {
+				throw new ProtocolError("invalid_frame", `${name}.url must use HTTPS except on loopback`);
+			}
+			if (parsed.username || parsed.password) {
+				throw new ProtocolError("invalid_frame", `${name}.url must not contain credentials`);
+			}
+			return {
+				...base,
+				transport: "streamable_http",
+				url,
+				headers: parseInjectedValues(data.headers, `${name}.headers`),
+			};
+		}
+		throw new ProtocolError("invalid_frame", `${name}.transport is unsupported`);
+	});
+	if (new Set(servers.map((server) => server.serverId)).size !== servers.length) {
+		throw new ProtocolError("invalid_frame", "MCP server IDs must be unique");
+	}
+	const toolNames = servers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`));
+	if (new Set(toolNames).size !== toolNames.length) {
+		throw new ProtocolError("invalid_frame", "MCP tool names must be unique");
+	}
+	return servers;
+}
+
 function common(data: Record<string, unknown>): Omit<CommonFrame, "type"> & { type: string } {
 	if (data.protocolVersion !== PROTOCOL_VERSION) {
 		throw new ProtocolError("protocol_mismatch", `expected protocol ${PROTOCOL_VERSION}`);
@@ -273,8 +386,19 @@ export function parseFrame(line: string): InputFrame {
 	const identity = common(data);
 
 	if (identity.type === "bootstrap_secret") {
-		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "apiKey"], "frame");
-		return { ...identity, type: "bootstrap_secret", apiKey: string(data.apiKey, "apiKey") };
+		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "apiKey", "namedSecrets"], "frame");
+		const namedSecrets = record(data.namedSecrets, "namedSecrets");
+		return {
+			...identity,
+			type: "bootstrap_secret",
+			apiKey: string(data.apiKey, "apiKey"),
+			namedSecrets: Object.fromEntries(
+				Object.entries(namedSecrets).map(([name, value]) => {
+					if (!name) throw new ProtocolError("invalid_frame", "named secret names must not be empty");
+					return [name, string(value, `namedSecrets.${name}`)];
+				}),
+			),
+		};
 	}
 	if (identity.type === "close") {
 		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId"], "frame");
@@ -369,7 +493,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaJson", "candidateSchemaSha256", "profileSetSha256",
-		"profiles", "toolExtensions", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		"profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
 	], "frame");
 	const candidateSchemaJson = string(data.candidateSchemaJson, "candidateSchemaJson");
 	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
@@ -436,6 +560,7 @@ export function parseFrame(line: string): InputFrame {
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
 		profiles: parseProfiles(data.profiles),
 		toolExtensions: parseToolExtensions(data.toolExtensions),
+		mcpServers: parseMcpServers(data.mcpServers),
 		networkPolicy: {
 			allowedHosts: stringArray(policy.allowedHosts, "networkPolicy.allowedHosts"),
 			deniedHosts: stringArray(policy.deniedHosts, "networkPolicy.deniedHosts"),

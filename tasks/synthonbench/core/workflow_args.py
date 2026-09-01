@@ -119,6 +119,7 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         default="max",
     )
     parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")

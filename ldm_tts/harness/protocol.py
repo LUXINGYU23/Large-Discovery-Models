@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-PROTOCOL_VERSION = 4
+PROTOCOL_VERSION = 5
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
@@ -79,6 +79,83 @@ class HarnessToolExtension:
 
     def to_dict(self) -> dict[str, Any]:
         return {"path": str(self.path), "sha256": self.sha256, "toolNames": list(self.tool_names)}
+
+
+@dataclass(frozen=True)
+class HarnessMcpValue:
+    value: str | None = None
+    secret_name: str | None = None
+    secret_source: str | None = None
+    prefix: str = ""
+
+    def __post_init__(self) -> None:
+        if (self.value is None) == (self.secret_name is None):
+            raise ValueError("MCP values require exactly one literal or secret")
+        if self.secret_name is not None and not self.secret_source:
+            raise ValueError("MCP secret values require a source description")
+        if self.value is not None and (self.secret_source is not None or self.prefix):
+            raise ValueError("MCP literal values cannot declare secret metadata")
+
+    def to_dict(self) -> dict[str, str]:
+        if self.value is not None:
+            return {"value": self.value}
+        assert self.secret_name is not None and self.secret_source is not None
+        return {
+            "secretName": self.secret_name,
+            "secretSource": self.secret_source,
+            "prefix": self.prefix,
+        }
+
+
+@dataclass(frozen=True)
+class HarnessMcpServer:
+    server_id: str
+    transport: str
+    tools: tuple[str, ...]
+    config_sha256: str
+    command: str | None = None
+    args: tuple[str, ...] = ()
+    env: tuple[tuple[str, HarnessMcpValue], ...] = ()
+    url: str | None = None
+    headers: tuple[tuple[str, HarnessMcpValue], ...] = ()
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.server_id) is None:
+            raise ValueError("MCP server_id must be a lowercase identifier")
+        if self.transport not in {"stdio", "streamable_http"}:
+            raise ValueError("unsupported MCP transport")
+        if not self.tools or len(set(self.tools)) != len(self.tools):
+            raise ValueError("MCP tools must be a non-empty unique allowlist")
+        if any(re.fullmatch(r"[A-Za-z0-9_-]+", name) is None for name in self.tools):
+            raise ValueError("MCP tool names must be valid function identifiers")
+        if _SHA256_PATTERN.fullmatch(self.config_sha256) is None:
+            raise ValueError("MCP config_sha256 must be a lowercase SHA-256 digest")
+        if self.transport == "stdio" and (not self.command or self.url is not None or self.headers):
+            raise ValueError("stdio MCP servers require command and prohibit HTTP fields")
+        if self.transport == "streamable_http" and (
+            not self.url or self.command is not None or self.args or self.env
+        ):
+            raise ValueError("HTTP MCP servers require url and prohibit stdio fields")
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "serverId": self.server_id,
+            "transport": self.transport,
+            "tools": list(self.tools),
+            "configSha256": self.config_sha256,
+        }
+        if self.transport == "stdio":
+            result.update(
+                command=self.command,
+                args=list(self.args),
+                env={name: value.to_dict() for name, value in self.env},
+            )
+        else:
+            result.update(
+                url=self.url,
+                headers={name: value.to_dict() for name, value in self.headers},
+            )
+        return result
 
 
 def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
@@ -169,6 +246,7 @@ class HarnessPoolConfig:
     seed: int
     candidate_schema: dict[str, Any]
     tool_extensions: tuple[HarnessToolExtension, ...] = ()
+    mcp_servers: tuple[HarnessMcpServer, ...] = ()
     thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
@@ -201,6 +279,18 @@ class HarnessPoolConfig:
         tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
         if len(set(tool_names)) != len(tool_names):
             raise ValueError("harness tool names must be unique across extensions")
+        server_ids = [server.server_id for server in self.mcp_servers]
+        if len(set(server_ids)) != len(server_ids):
+            raise ValueError("harness MCP server IDs must be unique")
+        mcp_tool_names = [
+            f"mcp__{server.server_id}__{name}"
+            for server in self.mcp_servers
+            for name in server.tools
+        ]
+        if len(set(mcp_tool_names)) != len(mcp_tool_names):
+            raise ValueError("harness MCP tool names must be unique")
+        if set(tool_names) & set(mcp_tool_names):
+            raise ValueError("harness task and MCP tool names must not conflict")
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
 
@@ -245,6 +335,7 @@ class HarnessPoolConfig:
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
+            "mcpServers": [server.to_dict() for server in self.mcp_servers],
             "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
             "webSearch": self.web_search.to_dict(),
@@ -365,6 +456,8 @@ class HarnessSubmissionValidation:
 __all__ = [
     "PROTOCOL_VERSION",
     "HarnessLimits",
+    "HarnessMcpServer",
+    "HarnessMcpValue",
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",

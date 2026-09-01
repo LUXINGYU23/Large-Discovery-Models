@@ -19,7 +19,7 @@ for line in sys.stdin:
     if frame["type"] == "bootstrap_secret":
         response = (
             {"type": "error", **common, "error": {"message": "secret inherited"}}
-            if os.environ.get("HARNESS_TEST_SECRET")
+            if os.environ.get("HARNESS_TEST_SECRET") or os.environ.get("HARNESS_MCP_SECRET")
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":

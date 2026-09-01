@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from ldm_tts.harness.protocol import (
@@ -36,6 +36,7 @@ class HarnessClient:
         *,
         api_key: str,
         config: HarnessPoolConfig,
+        named_secrets: Mapping[str, str] | None = None,
         response_timeout_seconds: float = 2100,
     ) -> None:
         if not command:
@@ -46,6 +47,9 @@ class HarnessClient:
             raise ValueError("harness response timeout must be positive")
         self.command = tuple(str(part) for part in command)
         self._api_key = api_key
+        self._named_secrets = dict(named_secrets or {})
+        if any(not name or not value for name, value in self._named_secrets.items()):
+            raise ValueError("harness named secrets require non-empty names and values")
         self.config = config
         self.response_timeout_seconds = float(response_timeout_seconds)
         self._process: subprocess.Popen[str] | None = None
@@ -56,6 +60,7 @@ class HarnessClient:
     def start(self) -> None:
         if self._process is not None:
             raise HarnessError("harness client is already started")
+        secret_values = {self._api_key, *self._named_secrets.values()}
         process = subprocess.Popen(
             self.command,
             stdin=subprocess.PIPE,
@@ -67,7 +72,7 @@ class HarnessClient:
             env={
                 name: value
                 for name, value in os.environ.items()
-                if value != self._api_key
+                if value not in secret_values
             },
         )
         self._process = process
@@ -75,8 +80,13 @@ class HarnessClient:
         threading.Thread(target=self._read_stdout, args=(process.stdout,), daemon=True).start()
         threading.Thread(target=self._read_stderr, args=(process.stderr,), daemon=True).start()
         try:
-            self._request("bootstrap_secret", {"apiKey": self._api_key}, "secret_bootstrapped")
+            self._request(
+                "bootstrap_secret",
+                {"apiKey": self._api_key, "namedSecrets": self._named_secrets},
+                "secret_bootstrapped",
+            )
             self._api_key = ""
+            self._named_secrets.clear()
             request_id = self._next_request_id()
             self._exchange(self.config.initialize_frame(request_id), "initialized")
         except BaseException:
@@ -138,6 +148,7 @@ class HarnessClient:
         process = self._process
         if process is None:
             self._api_key = ""
+            self._named_secrets.clear()
             return
         try:
             if process.poll() is None:
@@ -153,6 +164,7 @@ class HarnessClient:
         finally:
             self._process = None
             self._api_key = ""
+            self._named_secrets.clear()
 
     def __enter__(self) -> "HarnessClient":
         self.start()

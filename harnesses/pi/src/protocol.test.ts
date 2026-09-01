@@ -36,6 +36,20 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			candidatesPerTurn: 16,
 		}],
 		toolExtensions: [],
+		mcpServers: [{
+			serverId: "literature",
+			transport: "streamable_http",
+			url: "https://mcp.example/mcp",
+			headers: {
+				Authorization: {
+					secretName: "mcp.literature.header.auth",
+					secretSource: "secret_env:LITERATURE_TOKEN",
+					prefix: "Bearer ",
+				},
+			},
+			tools: ["search"],
+			configSha256: "d".repeat(64),
+		}],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
 		limits: { wallTimeSeconds: 60 },
 		webSearch: {
@@ -49,6 +63,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.candidateSchema, candidateSchema);
 		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
+		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
 });
 
@@ -79,6 +94,7 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 				candidatesPerTurn: 1,
 			}],
 			toolExtensions: [],
+			mcpServers: [],
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
 			limits: { wallTimeSeconds: 60 },
 			webSearch: {
@@ -89,6 +105,21 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
 	);
+});
+
+test("parseFrame requires named secret bootstrap values", () => {
+	const frame = parseFrame(JSON.stringify({
+		type: "bootstrap_secret",
+		requestId: "secret-1",
+		protocolVersion: PROTOCOL_VERSION,
+		campaignId: "campaign-1",
+		apiKey: "provider-secret",
+		namedSecrets: { "mcp.remote.header.auth": "mcp-secret" },
+	}));
+	assert.equal(frame.type, "bootstrap_secret");
+	if (frame.type === "bootstrap_secret") {
+		assert.equal(frame.namedSecrets["mcp.remote.header.auth"], "mcp-secret");
+	}
 });
 
 test("parseFrame rejects path traversal turn identifiers", () => {

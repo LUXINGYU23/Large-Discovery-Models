@@ -163,6 +163,7 @@ async function main(): Promise<void> {
 		}]),
 		profiles: [profile],
 		toolExtensions: [],
+		mcpServers: [],
 		networkPolicy: {
 			allowedHosts: [],
 			deniedHosts: [],

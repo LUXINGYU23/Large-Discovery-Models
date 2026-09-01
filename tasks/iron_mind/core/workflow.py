@@ -16,6 +16,7 @@ from ldm_tts.harness import (
     HarnessLimits,
     HarnessNetworkPolicy,
     HarnessPoolConfig,
+    load_harness_mcp_config,
 )
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
@@ -212,6 +213,7 @@ def _harness_client(
     provider: OpenAIProviderSettings,
     table: FrozenReactionTable,
 ) -> HarnessClient:
+    mcp = load_harness_mcp_config(args.harness_mcp_config)
     artifact_root = (runtime.run_dir / "harness").resolve()
     cache_root = (
         args.harness_cache_dir.expanduser().resolve()
@@ -258,6 +260,7 @@ def _harness_client(
         seed=args.campaign_index,
         candidate_schema=harness_candidate_schema(table.schema),
         tool_extensions=harness_tool_extensions(),
+        mcp_servers=mcp.servers,
         thinking=args.harness_thinking,
         limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds),
         network_policy=HarnessNetworkPolicy(
@@ -269,6 +272,7 @@ def _harness_client(
         command,
         api_key=provider.api_key,
         config=config,
+        named_secrets=mcp.named_secrets,
         response_timeout_seconds=args.harness_response_timeout,
     )
 

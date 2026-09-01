@@ -71,6 +71,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="max",
     )
     parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")

@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TUnsafe } from "typebox";
 import { GondolinController } from "./gondolin.js";
+import { McpToolBridge } from "./mcp.js";
 import { PolicyController } from "./policy.js";
 import type {
 	HarnessLimits,
@@ -126,11 +127,12 @@ async function runtimePackages(): Promise<Record<string, string>> {
 		gondolin: version("@earendil-works/gondolin"),
 		piWebAccess: version("pi-web-access"),
 		context7: version("@upstash/context7-pi"),
+		mcpClient: version("@modelcontextprotocol/client"),
 		packageLockSha256: sha256(lockBody),
 	};
 }
 
-function sessionTools(context7Enabled: boolean, taskTools: string[]): string[] {
+function sessionTools(context7Enabled: boolean, taskTools: string[], mcpTools: string[] = []): string[] {
 	return [
 		"read",
 		"write",
@@ -140,6 +142,7 @@ function sessionTools(context7Enabled: boolean, taskTools: string[]): string[] {
 		"get_search_content",
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
+		...mcpTools,
 		"submit_candidates",
 	];
 }
@@ -291,6 +294,7 @@ class PersistentProfileSession {
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
 	private readonly gondolin: GondolinController;
+	private readonly mcp: McpToolBridge;
 	private readonly submissions: SubmissionController;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
@@ -301,12 +305,18 @@ class PersistentProfileSession {
 		private readonly profile: HarnessProfileConfig,
 		private readonly config: InitializeFrame,
 		private readonly proxy: ProviderProxy,
+		namedSecrets: Readonly<Record<string, string>>,
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
 		this.policy = new PolicyController(config.networkPolicy, config.webSearch.providers);
 		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
+		this.mcp = new McpToolBridge(
+			config.mcpServers,
+			namedSecrets,
+			`ldm-pi-${config.campaignId}-${profile.profileId}`,
+		);
 		this.submissions = new SubmissionController(
 			profile.candidatesPerTurn,
 			config.candidateSchema,
@@ -330,6 +340,7 @@ class PersistentProfileSession {
 				throw new Error(`tool extension digest mismatch: ${extension.path}`);
 			}
 		}
+		await this.mcp.initialize();
 		const providerId = `ldm-harness-${this.profile.profileId}`;
 		const agentDirectory = join(this.profileRoot, "pi-agent");
 		await mkdir(agentDirectory, { recursive: true });
@@ -427,10 +438,11 @@ class PersistentProfileSession {
 			resourceLoader: loader,
 			settingsManager: settings,
 			sessionManager: manager,
-			customTools: [this.submissions.tool()],
+			customTools: [...this.mcp.toolDefinitions(), this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.mcp.toolNames(),
 			),
 		});
 		this.session = session;
@@ -523,12 +535,17 @@ class PersistentProfileSession {
 		};
 	}
 
+	mcpManifest(): Array<Record<string, unknown>> {
+		return this.mcp.manifest().map((server) => ({ profileId: this.profile.profileId, ...server }));
+	}
+
 	async close(): Promise<void> {
 		if (this.session) {
 			await this.session.abort();
 			this.session.dispose();
 			this.session = undefined;
 		}
+		await this.mcp.close();
 		await this.gondolin.close();
 	}
 
@@ -651,7 +668,11 @@ export class PiSessionPool {
 	private readonly sessions = new Map<string, PersistentProfileSession>();
 	private readonly proxy: ProviderProxy;
 
-	constructor(private readonly config: InitializeFrame, apiKey: string) {
+	constructor(
+		private readonly config: InitializeFrame,
+		apiKey: string,
+		private readonly namedSecrets: Readonly<Record<string, string>> = {},
+	) {
 		this.proxy = new ProviderProxy(config.baseUrl, apiKey, config.campaignId);
 	}
 
@@ -681,7 +702,7 @@ export class PiSessionPool {
 		);
 		await this.proxy.start();
 		for (const profile of this.config.profiles) {
-			const session = new PersistentProfileSession(profile, this.config, this.proxy);
+			const session = new PersistentProfileSession(profile, this.config, this.proxy, this.namedSecrets);
 			this.sessions.set(profile.profileId, session);
 		}
 		await Promise.all([...this.sessions.values()].map((session) => session.initialize()));
@@ -708,8 +729,12 @@ export class PiSessionPool {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.config.mcpServers.flatMap((server) => server.tools.map(
+					(tool) => `mcp__${server.serverId}__${tool}`,
+				)),
 			),
 			toolExtensions: this.config.toolExtensions,
+			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),
 			topology: {
 				profileCount: this.config.profiles.length,
 				candidatesPerTurn: this.config.profiles.map((profile) => profile.candidatesPerTurn),

@@ -61,6 +61,7 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         ],
     }
     assert "webProvider" not in frame
+    assert frame["mcpServers"] == []
 
 
 def test_persistent_harness_client_runs_one_profile_batch(
@@ -90,10 +91,12 @@ def test_persistent_harness_client_runs_one_profile_batch(
         },
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
+    monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-secret")
     client = HarnessClient(
         (sys.executable, "-u", str(fixture)),
         api_key="test-secret",
         config=config,
+        named_secrets={"mcp.fixture.env.token": "mcp-secret"},
         response_timeout_seconds=5,
     )
     turn = HarnessTurn(
