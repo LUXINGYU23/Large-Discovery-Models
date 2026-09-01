@@ -87,7 +87,7 @@ servers:
         "servers:\n  remote:\n    transport: streamable_http\n"
         "    url: http://mcp.example/mcp\n    tools: [query]\n",
         "servers:\n  local:\n    transport: stdio\n    command: node\n"
-        "    tools: [query]\n    legacy_fallback: true\n",
+        "    tools: [query]\n    unexpected_field: true\n",
     ),
 )
 def test_mcp_config_rejects_insecure_or_unknown_configuration(

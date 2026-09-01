@@ -181,10 +181,10 @@ one compact 16-candidate JSON minibatch. Providers that do not recognize this
 extension can override it
 with `--llm-extra-body-json '{}'` or their own request body.
 
-The default `direct` LDM backend uses four independent Chat Completions calls,
-each returning 16 candidates. The direct-LLM comparator retains independent
-one-candidate calls. The optional persistent harness backend uses the
-OpenAI Responses wire format through Pi; its endpoint must support that API.
+The default `ldm` method uses four independent Chat Completions calls, each
+returning 16 candidates. The direct-LLM comparator retains independent
+one-candidate calls. Both persistent Harness methods use the OpenAI Responses
+wire format through Pi; their endpoint must support that API.
 `--proposal-samples` controls total occurrences and
 `--proposal-candidates-per-request` controls the fixed response minibatch; the
 direct proposal breadth must divide evenly by the minibatch size.
@@ -195,8 +195,8 @@ This section documents the SynthonBench adapter. The shared interface and task
 registration rules are in the
 [Research Harness integration guide](../../docs/research-harness.md).
 
-The harness backend changes only the proposal policy used by LDM. At campaign
-startup it creates four persistent Pi sessions with task-owned roles for target
+The `ldm_harness` method changes only the proposal policy used by LDM. At
+campaign startup it creates four persistent Pi sessions with task-owned roles for target
 SAR, reaction feasibility, scaffold exploration, and property risk. Every
 session autonomously selects reaction types and searches a structured,
 read-only snapshot of the official SynthonSpace before submitting one
@@ -204,6 +204,12 @@ read-only snapshot of the official SynthonSpace before submitting one
 combined 64 raw occurrences enter the
 same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
 LDM acquisition tilt used by the direct backend.
+
+The direct `harness` method creates one persistent comprehensive-research
+session and requests exactly 16 distinct legal tuples per active round. All 16
+accepted tuples are evaluated in stable submission order. This path reuses the
+same history, official-space validation, rejection, and refill logic, but does
+not estimate `q0`, maintain a BO pool, fit the Tanimoto GP, or run acquisition.
 
 The Python runner remains the owner of measured optimization history. The first
 active turn bootstraps each session with all existing observations; later turns
@@ -227,16 +233,25 @@ proposed by different sessions remain separate raw occurrences, so independent
 agent agreement increases that candidate's empirical `q0` before reservoir
 deduplication. There is no profile-balanced correction or per-session `q0`.
 
-The SynthonBench harness profile set loads the four committed `AGENTS.md` files
-under `resources/harness/profiles/` and no skills. Pi provides web retrieval,
+The `ldm_harness` profile set loads four committed `AGENTS.md` files and the
+direct `harness` method loads one comprehensive profile under
+`resources/harness/profiles/`; neither loads skills. Pi provides web retrieval,
 Context7, and a separate Gondolin microVM for each session. The guest has root
 shell, file, package-installation, and unrestricted HTTP(S) access; the host
 repository and official task data are not mounted. Benchmark names, repository
 paths, datasets, and hidden scores remain blocked from research queries and
 fetched URLs as an evaluation-integrity rule. Each session may use up to 30
-minutes per turn; this is the only Harness research limit. Provider calls, web
-and Context7 calls, and trace bytes are recorded without hard caps. The default
-Pi context is 256K tokens with built-in automatic compaction.
+minutes per turn. Network tools have task defaults and any tool, including an
+MCP tool, can receive a hard per-turn budget. The Agent sees initial and
+remaining counts. Unlisted tools are unlimited. The default Pi context is 256K
+tokens with built-in automatic compaction.
+
+Load an MCP configuration with `--harness-mcp-config`. The strict YAML accepts
+stdio and Streamable HTTP servers with explicit tool allowlists and
+environment- or file-backed secret references. Configure tool limits with
+`--harness-tool-budget NAME=COUNT`; see
+[`docs/research-harness.md`](../../docs/research-harness.md) for the schema,
+default network budgets, and accounting rules.
 
 Build the pinned sidecar image once:
 
@@ -318,12 +333,13 @@ Each completed run writes:
 
 ## Fixed-Round Pilot Evaluation
 
-`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, four-method comparison on the
-official 1M KIF11 surrogate track. One product-uniform shared initialization
-batch and five optimization batches make six outer rounds. Each round targets
-16 official calls. Direct methods do not replace invalid, previously evaluated,
-or duplicate generated candidates; Harness sessions repair rejected entries
-before committing each minibatch.
+`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, five-method
+comparison on the official 1M KIF11 surrogate track: direct LDM, Harness LDM,
+pure BO, direct LLM, and direct research Harness. One product-uniform shared
+initialization batch and five optimization batches make six outer rounds. Each
+round targets 16 official calls. Direct API methods do not replace invalid,
+previously evaluated, or duplicate generated candidates; Harness sessions
+repair rejected entries before committing each minibatch.
 
 `config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
@@ -348,6 +364,9 @@ the parser rejects invented IDs and combinations that mix different options.
 Its `direct_v1` prompt is recorded under the separate direct-LLM contract
 profile and does not invoke a GP selector. A deterministic anchor synthon keeps
 the 16 requests distinct, and anchors from evaluated history are excluded.
+Direct research Harness asks one persistent comprehensive Agent for 16 distinct
+official tuples and evaluates the complete accepted minibatch without GP
+selection.
 The committed six-round and extended profiles request maximum reasoning effort for
 both direct methods and the Harness. Direct methods use the Chat Completions
 `reasoning_effort` field, while the Harness uses Pi's Responses API

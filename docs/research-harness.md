@@ -1,15 +1,17 @@
 # Research Harness Integration
 
-The research Harness is an optional reservoir-expansion backend for tasks that
-need persistent Agents to inspect evidence, use tools, run sandbox analysis, and
-submit candidate minibatches. It replaces a direct model request inside the
-task expander. It does not replace the shared LDM campaign, BO model,
-acquisition rule, candidate domain, or evaluator.
+The research Harness lets a persistent Agent inspect optimization history, use
+tools, work in an isolated sandbox, and submit task candidates. It is available
+through two distinct search methods:
 
-SynthonBench and Iron Mind are the reference integrations. Each runs four
-persistent Pi sessions with different `AGENTS.md` profiles and routes accepted
-candidate occurrences through the same task-owned empirical `q0`, GP-UCB,
-acquisition tilt, and official evaluation path used by its direct backend.
+| Method | Candidate generation | Selection before evaluation |
+| --- | --- | --- |
+| `ldm_harness` | Multiple task-defined persistent Agents submit an over-sampled reservoir. | The task estimates empirical `q0`, fits its surrogate, and applies the LDM acquisition policy. |
+| `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
+
+Iron Mind and SynthonBench are the reference integrations. The shared Harness
+does not know their candidate identity, legal search space, duplicate policy,
+surrogate, or evaluator.
 
 ## Architecture
 
@@ -18,20 +20,22 @@ shared Campaign / LDMEngine
   -> task-owned ReservoirExpander
      -> ldm_tts.harness.HarnessClient
         -> versioned JSONL sidecar protocol
-           -> persistent Pi sessions and isolated tools
-        <- provisional candidate submissions
-     -> task-owned submission validation
+           -> persistent Pi session
+           -> isolated shell and file tools
+           -> web, Context7, task-local, and configured MCP tools
+        <- provisional candidate submission
+     -> task-owned validation
         -> reject with indexed reasons and continue the same turn
         -> or accept and commit the turn
-  -> task-owned CandidateDomainAdapter
-  -> surrogate and acquisition
-  -> authoritative evaluator and Observation history
+  -> ldm_harness: task surrogate and acquisition selector
+  -> harness: stable reservoir order
+  -> authoritative task evaluator and Observation history
 ```
 
-The Campaign owns optimization history. Each Harness session owns its private
-research transcript. On every active round, the task projects the authoritative
-history into a monotonic delta plus any compact exclusion snapshot needed to
-prevent historical repeats.
+The Campaign owns measured optimization history. Each Pi session owns its
+private research transcript. A task sends an initial history snapshot and then
+monotonic deltas, together with the compact exclusion set needed to reject
+previously evaluated candidates.
 
 ## Shared Interface
 
@@ -39,59 +43,101 @@ The public `ldm_tts.harness` package provides:
 
 | Type | Purpose |
 | --- | --- |
-| `HarnessPoolConfig` | Campaign, task, case, provider, profile, strict candidate JSON Schema, tool, network, and limit configuration. |
+| `HarnessPoolConfig` | Campaign, provider, profile, candidate schema, tools, MCP servers, network policy, and limits. |
 | `HarnessProfile` | One persistent Agent identity, `AGENTS.md`, optional skill directories, candidate count, and content digests. |
-| `HarnessToolExtension` | A digest-verified task tool module and its exact exported tool names. |
-| `HarnessLimits` / `HarnessNetworkPolicy` | Per-turn wall-time and network/query policy. |
-| `HarnessWebSearch` | Ordered search route, Agent provider allowlist, and automatic fallback conditions. |
-| `HarnessTurn` | One profile's round, history range and digest, task message, and forbidden query terms. |
-| `HarnessClient` | Long-lived sidecar process, secret bootstrap, strict request/response validation, and turn execution. |
-| `HarnessSubmissionRequest` | One provisional minibatch submitted by a profile during a turn. |
-| `HarnessSubmissionValidation` / `HarnessSubmissionRejection` | Task-owned acceptance or indexed rejection reasons for a provisional submission. |
-| `HarnessTurnResult` | Committed candidates, session/turn lineage, measured usage, and artifact references. |
+| `HarnessToolExtension` | A digest-verified task tool module and its exported tool names. |
+| `HarnessMcpServer` | One allowlisted stdio or Streamable HTTP MCP server. |
+| `HarnessLimits` | Per-turn wall time and per-tool call budgets. |
+| `HarnessTurn` | One profile round with deterministic history lineage and task input. |
+| `HarnessClient` | Sidecar lifecycle, secret bootstrap, protocol validation, and turn execution. |
+| `HarnessSubmissionValidation` | Task-owned acceptance or indexed rejection of a provisional submission. |
+| `HarnessTurnResult` | Committed candidates, session lineage, measured usage, and artifact references. |
 
-The current Pi sidecar lives in `harnesses/pi` and uses the OpenAI Responses
-wire format. It owns session lifecycle, automatic context compaction, isolated
-file and shell tools, web and Context7 extensions, terminal candidate
-submission, and redacted raw provider capture. The shared Python protocol is
-task-neutral and does not understand domain candidate identities.
+The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
+session lifecycle, automatic context compaction, isolated file and shell tools,
+web and Context7 extensions, MCP clients, candidate submission, and redacted
+provider capture.
 
-Web search defaults to the keyless `parallel-mcp`, `exa`, then `duckduckgo`
-route.
-Requests that omit `provider` or use `auto` follow the route and fall through on
-configured service failures. An Agent may explicitly select one provider, or a
-concurrent provider list, only from the same route. A disallowed selection is
-returned with the requested value and allowed providers so the Agent can
-correct the call in the current session. Tasks may replace the route through
-`HarnessPoolConfig.web_search`; the route is also the authorization boundary
-for provider cost and data disclosure.
+## MCP Tools
+
+Pass `--harness-mcp-config` a YAML file with an explicit server and tool
+allowlist. Supported transports are stdio and Streamable HTTP:
+
+```yaml
+servers:
+  local_analysis:
+    transport: stdio
+    command: node
+    args: [/absolute/path/to/server.js]
+    env:
+      SERVICE_TOKEN:
+        secret_file: /absolute/path/to/protected-token
+    tools: [analyze_candidate]
+  literature:
+    transport: streamable_http
+    url: https://mcp.example.org/mcp
+    headers:
+      Authorization:
+        secret_env: LITERATURE_API_KEY
+        prefix: "Bearer "
+    tools: [search, fetch]
+```
+
+The Agent sees `mcp__local_analysis__analyze_candidate`,
+`mcp__literature__search`, and `mcp__literature__fetch`. An empty allowlist is
+invalid. HTTP endpoints require HTTPS except for loopback tests, and URLs cannot
+contain credentials. Literal values use `{value: ...}`; secrets use
+`secret_env` or `secret_file` and are resolved by Python before sidecar
+bootstrap. Secret values are excluded from commands, manifests, sessions, and
+provider captures.
+
+## Tool Budgets
+
+`--harness-tool-budget NAME=COUNT` sets a hard per-Agent, per-optimization-turn
+limit. In a runner YAML, use a list when configuring more than one tool:
+
+```yaml
+args:
+  harness-tool-budget:
+    - web_search=4
+    - fetch_content=8
+    - mcp__literature__search=2
+```
+
+The default network budgets are four `web_search` calls, eight
+`fetch_content`, eight `get_search_content`, two `resolve-library-id`, and four
+`query-docs` calls per turn. Context7 budgets are omitted when Context7 is
+disabled. A tool absent from the mapping is unlimited; zero disables it.
+`submit_candidates` cannot be budgeted.
+
+The Agent receives the budget snapshot at turn start and the remaining count
+after each call. A tool execution attempt consumes one call even when the tool
+returns an error. A policy rejection or budget rejection does not consume a
+call. Reservations are persisted before execution, so resuming an interrupted
+turn cannot reset or double-spend its budget.
 
 ## Task Responsibilities
 
-A Harness-enabled task keeps its integration in `tasks/<task_id>/core/` and
-implements it behind the ordinary `ReservoirExpander` interface. The task must:
+A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 
 1. Start one `HarnessClient` for the campaign and close it in a `finally` block.
-2. Define stable profiles and candidate counts. Skills are optional and may be
-   omitted while preserving the interface.
-3. Build deterministic turns from campaign/profile/round/history identity.
-4. Send newly measured observations for reasoning and a compact authoritative
-   evaluated-candidate snapshot when historical repeats are forbidden.
-5. Validate provisional submissions with the same parser and canonical identity
-   used by candidate admission.
-6. Return stable rejection codes and actionable messages for every rejected
-   index, allowing correction within the same session and wall-time window.
-7. Accept only a complete valid minibatch before computing proposal frequencies
-   or entering surrogate/acquisition selection.
-8. Count Harness turns and measured provider/tool usage through the campaign
-   budget ledger.
+2. Define the profile set and exact candidate count for each search method.
+3. Build deterministic turns from campaign, profile, round, and history identity.
+4. Send newly measured observations and the authoritative evaluated-candidate
+   exclusion snapshot.
+5. Validate provisional submissions with the same parser, canonical identity,
+   and official-space checks used by candidate admission.
+6. Return stable rejection codes, rejected indices, candidate identities, and
+   actionable reasons so the Agent can repair the same submission in-session.
+7. Refill until the complete valid minibatch is accepted.
+8. Preserve meaningful same-round occurrences before estimating `q0` for
+   `ldm_harness`; require distinct real evaluations for direct `harness`.
+9. Record Harness turns and measured provider/tool usage in the campaign budget.
 
-Duplicate policy is task-owned. A task using empirical proposal frequency must
-state whether agreement across independent sessions represents additional
-probability mass. It must not globally deduplicate meaningful occurrences before
-estimating `q0`.
+Only candidates in the authoritative evaluated set are historical repeats.
+Candidates proposed in an earlier turn but never evaluated remain eligible.
 
-## Resources And Tools
+## Resources And Artifacts
 
 Versioned task inputs belong under:
 
@@ -99,40 +145,36 @@ Versioned task inputs belong under:
 tasks/<task_id>/resources/harness/
 |-- profiles/<profile_id>/AGENTS.md
 |-- profiles/<profile_id>/skills/   # optional
-`-- tools/                           # optional structured task tools
+`-- tools/                           # optional task-local structured tools
 ```
 
-Record SHA-256 identities for profile instructions, skill directories,
-candidate schemas, and tool sources. Mount these inputs read-only. A task tool
-may expose a safe structured view of official benchmark data, but scientific
-validation remains in Python and cannot be delegated to the Agent or tool.
+Record content digests for profile instructions, skills, candidate schemas, and
+tool sources. Mount task inputs read-only. The sidecar receives the strict
+candidate JSON Schema and exact minibatch count; Python remains the
+authoritative scientific validator.
 
-Pass the actual strict candidate JSON Schema, not only a digest or prose
-example. The sidecar combines it with each profile's exact minibatch count for
-`submit_candidates`; task Python still performs authoritative domain and
-history validation before accepting a provisional submission.
+Harness artifacts are written below `<run_dir>/harness/`:
 
-## Secrets And Artifacts
+- native Pi session JSONL with messages, tool calls, and tool results;
+- redacted raw provider requests and responses plus their compact index;
+- turn input, provisional submission, validation, and commit records;
+- a manifest with provider identity, profiles, MCP configuration digests,
+  effective tool budgets, usage, and session lineage.
 
-Pass the provider key once through the Harness bootstrap frame. Do not place it
-in container arguments, container environment variables, configs, prompts,
-manifests, or trace files.
-
-Write Harness outputs below `<run_dir>/harness/`. The Pi sidecar retains native
-session JSONL, redacted provider requests and responses, input/submission/commit
-records, and a run manifest. These files are raw research traces. They are not
-canonical `ldm-2.0` accepted-action records and require a separate conversion
-and leakage contract before training use.
+The native Pi session is the only full conversation record. Python does not
+duplicate model or MCP transcripts. These files are raw research traces, not
+canonical `ldm-2.0` accepted-action records.
 
 ## Qualification
 
-A mock test should use a protocol-faithful fake sidecar and cover turn identity,
-strict minibatch cardinality, rejection and correction, budget accounting, and
-lineage without Docker, KVM, a network endpoint, or a secret.
+Use a protocol-faithful fake sidecar to test session identity, strict
+cardinality, rejection and correction, budget accounting, MCP allowlists, and
+lineage without Docker or credentials. Before a real claim, run the sidecar
+tests and one capability smoke with the selected Responses endpoint, container
+isolation, profiles, and tools. For `ldm_harness`, verify that accepted
+occurrences enter `q0`, surrogate, and acquisition selection. For `harness`,
+verify that the accepted minibatch goes directly to the official evaluator and
+that no surrogate or selector is instantiated.
 
-Before claiming a tiny real Harness campaign, run the sidecar's unit tests and a
-real capability smoke with the configured wire API, container isolation,
-profiles, and task tools. Then verify one Harness-generated reservoir enters the
-normal acquisition and official evaluator path. See
-the [Pi sidecar contract](../harnesses/pi/README.md) for the current runtime
-requirements and the task README for the concrete workflow.
+See the [Pi sidecar contract](../harnesses/pi/README.md) and the task README for
+runtime-specific commands.

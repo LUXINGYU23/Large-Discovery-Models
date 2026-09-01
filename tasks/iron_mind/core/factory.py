@@ -1,4 +1,4 @@
-"""Task-owned assembly for Iron Mind LDM, BO, and direct-LLM campaigns."""
+"""Task-owned assembly for Iron Mind campaign methods."""
 
 from __future__ import annotations
 

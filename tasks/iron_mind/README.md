@@ -5,10 +5,11 @@ reaction-condition tables. It does not run the upstream Iron Mind optimizer.
 
 Each external round follows the Iron Mind comparison protocol: exactly one
 reaction condition is evaluated. The direct backend asks the model for 64
-independent proposal samples. The optional Harness backend collects 16
-candidates from each of four persistent research sessions. Both estimate the
-same empirical model base measure and route candidates through the same
-task-local GP and acquisition-tilted LDM policy.
+independent proposal samples. `ldm_harness` instead collects 16 candidates from
+each of four persistent research sessions; both LDM methods estimate empirical
+`q0` and use the same task-local GP and acquisition-tilted policy. The separate
+`harness` method uses one persistent research session to choose the single
+condition evaluated that round, without `q0`, a GP, or an acquisition selector.
 
 ## Architecture
 
@@ -190,7 +191,7 @@ proposal. Providers that do not support this extension can use
 
 ## Persistent Research Harness
 
-The Harness backend keeps four task-local Pi sessions alive for a campaign:
+The `ldm_harness` method keeps four task-local Pi sessions alive for a campaign:
 mechanistic chemistry, empirical interactions, literature evidence, and design
 space exploration. Each active round sends the new measurements plus a compact
 snapshot of all evaluated conditions. Every session must commit 16 legal
@@ -205,6 +206,12 @@ historical repeats, and duplicates within one session are returned to the Agent
 with indexed reasons and must be replaced. Agreement across different sessions
 is retained as repeated occurrences before empirical `q0` is calculated.
 
+The direct `harness` method uses one persistent comprehensive-research session.
+It submits one legal unseen condition per active round, and that condition is
+evaluated directly in submission order. It reuses the same task-owned history,
+validation, rejection, and refill rules but does not instantiate the reaction
+GP, maintained BO pool, or LDM selector.
+
 Build the Pi sidecar and run the two-round real capability gate before a larger
 Harness experiment:
 
@@ -212,10 +219,10 @@ Harness experiment:
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/check_task_dependencies.py config/iron_mind/harness_smoke.yaml --no-optional
+  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_ldm_tts.py config/iron_mind/harness_smoke.yaml
+  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml
 ```
 
 The sidecar requires Linux KVM. Set `--harness-api-key-file` to use an ignored,
@@ -228,6 +235,13 @@ shell, file, package-installation, and unrestricted HTTP(S) access. The host
 repository and task data are not mounted into the guest. Benchmark names,
 repository paths, datasets, and hidden scores remain blocked from research
 queries and fetched URLs as an evaluation-integrity rule.
+
+Optional MCP servers are loaded with `--harness-mcp-config`. The task accepts
+only explicit stdio or Streamable HTTP tool allowlists and exposes them as
+namespaced tools. Configure hard per-Agent, per-turn limits with repeated
+`--harness-tool-budget NAME=COUNT` values. Default web and Context7 budgets,
+secret references, and trace semantics are documented in
+[`docs/research-harness.md`](../../docs/research-harness.md).
 
 ## Prepare the Official Data
 
@@ -304,14 +318,14 @@ uv run --locked --project tasks/iron_mind python \
 ## Fixed-Budget Pilot Evaluation
 
 `config/pilot_evaluation/iron_mind.yaml` compares direct LDM, Harness-backed
-LDM, plain task-local GP-UCB BO, and direct LLM sampling on two source-pinned
-datasets. Each case uses three seeds, one shared random initialization round,
-and five optimization rounds. Every campaign therefore makes six official
-evaluations.
+LDM, plain task-local GP-UCB BO, direct LLM sampling, and direct research
+Harness on two source-pinned datasets. Each case uses three seeds, one shared
+random initialization round, and five optimization rounds. Every campaign
+therefore makes six official evaluations.
 
 `config/pilot_evaluation/iron_mind_extended.yaml` is the twelve-round
-confirmation matrix for direct LDM, Harness LDM, pure BO, and direct LLM. The
-six-round standard matrix provides the corresponding lower-cost screen.
+confirmation matrix for the same five methods. The six-round standard matrix
+provides the corresponding lower-cost screen.
 
 Direct LDM retains 64 independent requests with at most 4 concurrent workers.
 Harness LDM uses four concurrent persistent sessions with 16 candidates each.
@@ -324,7 +338,9 @@ reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted
 candidate directly. Its explicit `direct_v1` prompt removes GP language and
 rotates a hard condition focus across rounds to preserve the one-request,
-one-evaluation baseline.
+one-evaluation baseline. Direct research Harness also evaluates one candidate
+per optimization round, but obtains it from one persistent Agent session with
+tools and the accumulated private research transcript.
 
 The pilot direct methods request maximum reasoning through the Chat
 Completions `reasoning_effort` field. The Harness uses Pi's Responses API

@@ -68,12 +68,13 @@
       "data_repository": "mireklzicar/synthonbench at revision 19f7bb669032f60b306139318d3f71a26f60134a",
       "candidate_contract": "One exact reaction_id plus ordered slot-specific synthon_ids tuple, validated against the released SynthonSpace.",
       "oracle_contract": "Every selected unseen tuple is scored by official GlobalSynthonTask; duplicate tuples are excluded before evaluation.",
-      "proposal_contract": "Direct LDM issues four independent Chat Completions requests per standard round, each returning 16 indexed candidates from deterministic public slots; the direct-LLM comparator retains independent one-candidate requests. The harness backend lets four persistent Pi sessions query a structured read-only view of the official SynthonSpace and submit exact reaction_id plus synthon_ids tuples over the Responses API.",
-      "method": "Structure-aware proposal occurrences from the selected backend, empirical q0 from all valid unseen occurrences, q0-weighted Gumbel maintenance of a configurable BO pool, task-local reaction-aware Nystr\u00f6m/FITC count-Tanimoto GP-UCB scoring over standardized utilities, and q0^alpha exp(eta z(UCB)) Gumbel sampling.",
+      "proposal_contract": "Direct LDM issues four independent Chat Completions requests per standard round, each returning 16 indexed candidates from deterministic public slots; direct LLM retains independent one-candidate requests. Harness LDM uses four persistent Pi sessions to submit official tuples, while direct research Harness uses one persistent session to submit the 16 tuples evaluated that round.",
+      "method": "LDM methods use structure-aware proposal occurrences, empirical q0, q0-weighted Gumbel maintenance of a configurable BO pool, task-local reaction-aware Nystr\u00f6m/FITC count-Tanimoto GP-UCB, and q0^alpha exp(eta z(UCB)) sampling; direct LLM and direct research Harness evaluate accepted tuples without a surrogate selector.",
       "audit": "The source-pinned scripts/score_submission.py is executed unchanged for released 1M, 10M, and 100M score tables.",
       "method_providers": {
         "ldm": "model_endpoint",
-        "harness": "model_endpoint",
+        "ldm_harness": "persistent_agent_harness",
+        "harness": "persistent_agent_harness",
         "llm": "model_endpoint",
         "bo": "dataset_or_deterministic_search"
       }

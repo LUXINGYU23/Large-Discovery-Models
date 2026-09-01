@@ -115,8 +115,6 @@ def test_harness_methods_build_distinct_child_plans(monkeypatch, tmp_path: Path)
 
     assert ldm_harness["contract_profile"] == "pilot_evaluation_ldm_harness"
     assert direct_harness["contract_profile"] == "pilot_evaluation_harness"
-    assert "--proposal-backend" not in ldm_harness["argv"]
-    assert "--proposal-backend" not in direct_harness["argv"]
     assert _option(ldm_harness["argv"], "--search-method") == "ldm_harness"
     assert _option(direct_harness["argv"], "--search-method") == "harness"
     assert _option(ldm_harness["argv"], "--proposal-samples") == "64"

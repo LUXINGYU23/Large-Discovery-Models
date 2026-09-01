@@ -152,7 +152,7 @@ test("parseFrame rejects unknown fields instead of silently ignoring them", () =
 			requestId: "close-1",
 			protocolVersion: PROTOCOL_VERSION,
 			campaignId: "campaign-1",
-			legacyFallback: true,
+			unexpectedField: true,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
 	);

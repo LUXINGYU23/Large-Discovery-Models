@@ -46,6 +46,12 @@ names outside the route are rejected with a model-visible structured reason;
 they are never silently substituted. The default route is `parallel-mcp`,
 `exa`, then `duckduckgo`; all are usable without a task-owned search API key.
 
+The sidecar can also load explicitly allowlisted MCP tools over stdio or
+Streamable HTTP. Python resolves environment- or file-backed secrets before
+bootstrap; only secret references and redacted configuration digests are
+persisted. MCP tools are exposed as `mcp__<server_id>__<tool_name>`. Server
+lifecycle, protocol failures, and calls are recorded in the native Pi session.
+
 Each run stores only:
 
 - native Pi session JSONL with messages, tool calls, and tool results;
@@ -53,11 +59,15 @@ Each run stores only:
 - `input.json`, `submission.json`, and `turn_committed.json` for recovery and lineage;
 - one run `manifest.json`.
 
-Agents may make as many provider and tool calls and write as much trace data as
-needed within the configured wall-time limit. Provider, web, Context7, and
-artifact usage is measured but never used to stop a turn. If a provider stream
-ends before a committed batch, the sidecar continues submission-only recovery
-within the same wall-time window and retains every raw attempt.
+Each turn has a wall-time limit and may define hard limits for individual tools.
+The Agent sees its initial tool budget and the remaining count after every
+call. Unlisted tools are unlimited and a zero limit disables a tool.
+`submit_candidates` cannot be limited. A started tool execution consumes one
+call even when it fails; policy and budget rejections do not. Reservations are
+persisted before execution, so an interrupted turn resumes with the same used
+counts. If a provider stream ends before a committed batch, the sidecar
+continues submission-only recovery within the same wall-time window and retains
+every raw attempt.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
 artifacts, read-only task profiles, and the Gondolin image cache explicitly.

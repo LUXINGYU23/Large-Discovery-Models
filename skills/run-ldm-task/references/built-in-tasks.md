@@ -141,12 +141,12 @@ Files:
 tasks/iron_mind/README.md
 tasks/iron_mind/QUICKSTART.md
 config/iron_mind/mock.yaml
-config/iron_mind/harness_smoke.yaml
+config/iron_mind/ldm_harness_smoke.yaml
 config/pilot_evaluation/iron_mind.yaml
 ```
 
-Both proposal backends use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY`.
-Direct sampling uses Chat Completions. Harness sampling uses the Pi Responses
+All model-backed methods use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY`.
+Direct sampling uses Chat Completions. Harness methods use the Pi Responses
 sidecar and additionally requires Docker, Linux KVM, a built Harness image, and
 writable external run/cache roots. A protected API-key file may be selected by
 `--harness-api-key-file`.
@@ -157,13 +157,16 @@ condition combinations. Task-local Python rejects invalid, historically
 evaluated, and within-session duplicate candidates before commit; cross-session
 agreement remains as proposal-frequency mass. Accepted occurrences then use
 the same empirical `q0`, factor-aware categorical GP-UCB, acquisition tilt,
-and frozen evaluator as direct LDM.
+and frozen evaluator as direct LDM. The direct research Harness instead uses
+one persistent session to choose the evaluated condition without `q0`, GP, or
+acquisition.
 
 Follow `tasks/iron_mind/QUICKSTART.md`: validate the mock path, prepare the
-official source-pinned data, build the sidecar, run `harness_smoke.yaml`, and
-only then run the four-method pilot matrix. Inspect `<run_dir>/harness/` for
+official source-pinned data, build the sidecar, run `ldm_harness_smoke.yaml`, and
+only then run the five-method Pilot Evaluation. Inspect `<run_dir>/harness/` for
 session/provider traces and the normal campaign artifacts for optimization
-history and results.
+history and results. Optional MCP servers and per-tool turn budgets use the
+shared Harness configuration in `docs/research-harness.md`.
 
 ## SynthonBench
 
@@ -176,9 +179,9 @@ config/synthonbench/mock.yaml
 config/synthonbench/ldm_harness_surrogate_smoke.yaml
 ```
 
-The direct backend uses the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
-`LLM_API_KEY` settings. The Harness backend uses the same provider identity but
-runs the Pi sidecar over the OpenAI Responses wire format. It additionally
+Direct methods use the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
+`LLM_API_KEY` settings. Harness methods use the same provider identity but run
+the Pi sidecar over the OpenAI Responses wire format. They additionally
 requires Docker, Linux KVM, the configured Harness image, writable run and cache
 directories, and read-only task profiles/tools. An ignored protected key file
 may be selected by the task config instead of placing a key in process
@@ -194,5 +197,8 @@ official-oracle lifecycle. Four persistent task profiles submit provisional
 minibatches through one `HarnessClient`. The task validates exact reaction and
 ordered-synthon tuples before each turn commits, then routes accepted
 occurrences through the same empirical `q0`, task-local GP-UCB, acquisition,
-and official evaluator used by the ordinary LDM path. Inspect `<run_dir>/harness/`
-alongside the shared campaign artifacts.
+and official evaluator used by the ordinary LDM path. Direct research Harness
+uses one persistent comprehensive session and evaluates its complete 16-tuple
+minibatch without `q0`, GP, or acquisition. Inspect `<run_dir>/harness/`
+alongside the shared campaign artifacts. Optional MCP servers and per-tool turn
+budgets use `docs/research-harness.md`.

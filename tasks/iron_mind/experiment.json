@@ -59,11 +59,12 @@
       "oracle": "source-pinned Olympus reaction tables",
       "paper_v2_suite": "six datasets used by the published paper figures",
       "public_union_suite": "paper_v2 plus N-Alkylation / Deprotection",
-      "proposal_contract": "direct sampling uses one strict candidate JSON object per independent Chat Completions request; harness sampling uses four persistent task-local research sessions, structured source-pinned space tools, and complete validated minibatches",
-      "proposal_sampling": "direct LDM uses 64 independent one-candidate requests; harness LDM uses four concurrent persistent sessions with 16 candidates each, rejects historical and within-session repeats before commit, preserves cross-session occurrences, and then estimates empirical q0",
-      "method": "empirical-q0 LDM proposal distribution, q0-weighted maintenance of a configurable BO pool, regularized factor-aware categorical ARD GP-UCB scoring with constant beta, and acquisition-tilted sampling",
+      "proposal_contract": "direct LDM uses one strict candidate JSON object per independent Chat Completions request; Harness LDM uses four persistent task-local research sessions and complete validated minibatches; direct research Harness uses one persistent session and submits the one condition evaluated that round",
+      "proposal_sampling": "direct LDM uses 64 independent one-candidate requests; Harness LDM uses four concurrent persistent sessions with 16 candidates each, rejects historical and within-session repeats before commit, preserves cross-session occurrences, and estimates empirical q0; direct research Harness does not estimate q0",
+      "method": "LDM methods use empirical q0, q0-weighted maintenance of a configurable BO pool, regularized factor-aware categorical ARD GP-UCB scoring with constant beta, and acquisition-tilted sampling; direct LLM and direct research Harness evaluate accepted candidates without a surrogate selector",
       "method_providers": {
         "ldm": "model_endpoint",
+        "ldm_harness": "persistent_agent_harness",
         "harness": "persistent_agent_harness",
         "llm": "model_endpoint",
         "bo": "dataset_or_deterministic_search"
@@ -86,7 +87,7 @@
   },
   "profiles": {
     "pilot_evaluation": {
-      "description": "Six-round fixed-budget comparison of direct LDM, harness LDM, pure BO, and direct LLM methods.",
+      "description": "Six-round fixed-budget comparison of direct LDM, Harness LDM, pure BO, direct LLM, and direct research Harness methods.",
       "budget": {
         "outer_iterations": 6,
         "selected_candidates": 6,
@@ -138,7 +139,7 @@
       }
     },
     "pilot_evaluation_extended": {
-      "description": "Twelve-round fixed-budget comparison of direct LDM, harness LDM, pure BO, and direct LLM methods.",
+      "description": "Twelve-round fixed-budget comparison of direct LDM, Harness LDM, pure BO, direct LLM, and direct research Harness methods.",
       "budget": {
         "outer_iterations": 12,
         "selected_candidates": 12,

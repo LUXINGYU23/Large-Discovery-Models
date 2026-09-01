@@ -9,3 +9,7 @@ source-pinned artifacts outside the repository.
 source-pinned Official Example, Surrogate Oracle, and Glide
 Ligand-Efficiency verification boundary. Campaign outputs remain outside the
 repository.
+
+`harness/` contains the four role-specific LDM profiles, one direct-research
+profile, and the digest-pinned official SynthonSpace tool extension. Profiles
+load no skills; external MCP tools are user-configured at runtime.

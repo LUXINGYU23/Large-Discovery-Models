@@ -1,4 +1,4 @@
-"""Task-owned SynthonBench assembly for LDM, BO, and direct-LLM comparisons."""
+"""Task-owned assembly for SynthonBench campaign methods."""
 
 from __future__ import annotations
 
