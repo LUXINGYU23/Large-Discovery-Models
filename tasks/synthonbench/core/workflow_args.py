@@ -159,7 +159,7 @@ def _validate_counts(args: argparse.Namespace) -> None:
     positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_candidates_per_request",
                 "proposal_max_workers", "evaluations_per_round",
                 "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens",
-                "harness_candidates_per_session", "harness_wall_time_seconds")
+                "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
     if args.search_method in {"ldm", "ldm_harness"} and args.proposal_samples <= args.bo_pool_size:
@@ -178,6 +178,8 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "--proposal-candidates-per-request"
             )
     if args.search_method == "ldm_harness":
+        if args.harness_candidates_per_session < 1:
+            raise SystemExit("--harness-candidates-per-session must be positive")
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:
             raise SystemExit(
@@ -186,22 +188,30 @@ def _validate_counts(args: argparse.Namespace) -> None:
 
 
 def _validate_numbers(args: argparse.Namespace) -> None:
-    positive = (
-        "gp_kernel_jitter",
-        "gp_signal_std",
-        "gp_observation_noise_std",
-        "z_clip",
-        "llm_timeout",
-        "audit_timeout",
-        "harness_response_timeout",
-    )
+    positive = ["audit_timeout", "harness_response_timeout"]
+    if args.search_method != "harness":
+        positive.extend((
+            "gp_kernel_jitter",
+            "gp_signal_std",
+            "gp_observation_noise_std",
+            "z_clip",
+            "llm_timeout",
+        ))
     if any(not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0 for name in positive):
         raise SystemExit("GP scales, timeouts, and --z-clip must be finite and positive")
-    nonnegative = ("acquisition_beta", "alpha", "eta", "gp_mean_std", "gp_reaction_weight")
-    if any(not math.isfinite(getattr(args, name)) or getattr(args, name) < 0 for name in nonnegative):
-        raise SystemExit("acquisition-beta, alpha, and eta must be finite and non-negative")
-    if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
-        raise SystemExit("--llm-temperature must be finite and between 0 and 2")
+    if args.search_method != "harness":
+        nonnegative = (
+            "acquisition_beta", "alpha", "eta", "gp_mean_std", "gp_reaction_weight"
+        )
+        if any(
+            not math.isfinite(getattr(args, name)) or getattr(args, name) < 0
+            for name in nonnegative
+        ):
+            raise SystemExit(
+                "acquisition-beta, alpha, and eta must be finite and non-negative"
+            )
+        if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
+            raise SystemExit("--llm-temperature must be finite and between 0 and 2")
 
 
 def _validate_provider_options(args: argparse.Namespace) -> None:
@@ -215,11 +225,11 @@ def _validate_provider_options(args: argparse.Namespace) -> None:
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
-    if args.search_method == "harness":
-        raise SystemExit("Standalone Harness is not implemented for SynthonBench yet")
-    if args.search_method == "ldm_harness":
+    if args.search_method in {"ldm_harness", "harness"}:
         if args.proposal_mode != "none":
-            raise SystemExit("--search-method=ldm_harness requires --proposal-mode=none")
+            raise SystemExit(
+                f"--search-method={args.search_method} requires --proposal-mode=none"
+            )
         if not args.mock and (args.data_dir is None or args.source_dir is None):
             raise SystemExit("real SynthonBench campaigns require --data-dir and --source-dir")
         if args.oracle_kind == "glide" and args.scale != "1M":

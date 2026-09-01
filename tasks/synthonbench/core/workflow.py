@@ -42,6 +42,7 @@ from tasks.synthonbench.core.harness import (
     HARNESS_CANDIDATE_SCHEMA,
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
+    direct_harness_profile,
     harness_profiles,
     harness_tool_extensions,
     write_harness_space_catalog,
@@ -76,8 +77,12 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
     selector = _selector(args, encoder)
     return build_synthon_task_spec(
         encoder=encoder,
-        acquisition=selector.describe() if selector is not None else build_direct_acquisition(),
-        proposal_samples=args.proposal_samples,
+        acquisition=(
+            selector.describe()
+            if selector is not None
+            else build_direct_acquisition(args.search_method)
+        ),
+        proposal_samples=_proposal_samples(args),
         evaluations_per_round=args.evaluations_per_round,
         bo_pool_size=args.bo_pool_size,
         bo_search_samples=args.bo_search_samples,
@@ -89,7 +94,11 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
         search_method=args.search_method,
         initialization_mode=args.initialization_mode,
         harness_profile_count=(
-            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 0
+            len(HARNESS_PROFILE_IDS)
+            if args.search_method == "ldm_harness"
+            else 1
+            if args.search_method == "harness"
+            else 0
         ),
     )
 
@@ -138,7 +147,7 @@ def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
     if provider is not None:
         args.llm_url, args.llm_model_name = provider.base_url, provider.model
     runtime = _open_runtime(args, task_spec, contract, profile_name)
-    if args.search_method == "ldm_harness":
+    if args.search_method in {"ldm_harness", "harness"}:
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
@@ -203,7 +212,7 @@ def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient | Non
 
 
 def _encoder(args, benchmark) -> SynthonNystromEncoder | None:
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return None
     return SynthonNystromEncoder(
         benchmark.task.space,
@@ -243,7 +252,7 @@ def _selector(args, encoder: SynthonNystromEncoder | None):
 
 
 def _reservoir_size(args) -> int:
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return args.evaluations_per_round
     return args.bo_search_samples if args.search_method == "bo" else args.proposal_samples
 
@@ -255,18 +264,14 @@ def _components(args, benchmark, runtime, client, harness_client):
         if args.proposal_mode == "openai"
         else None
     )
-    profiles = (
-        harness_profiles(args.harness_candidates_per_session)
-        if args.search_method == "ldm_harness"
-        else ()
-    )
+    profiles = _harness_profiles(args)
     return build_campaign_components(CampaignComponentOptions(
         client=client,
         official_task=benchmark.task,
         runtime=runtime,
         sink=sink,
         target=benchmark.target,
-        proposal_samples=args.proposal_samples,
+        proposal_samples=_proposal_samples(args),
         bo_pool_size=args.bo_pool_size,
         bo_search_samples=args.bo_search_samples,
         evaluations_per_round=args.evaluations_per_round,
@@ -293,7 +298,9 @@ def _components(args, benchmark, runtime, client, harness_client):
         harness_client=harness_client,
         harness_profiles=profiles,
         account_harness_usage=(
-            runtime.consume_many if args.search_method == "ldm_harness" else None
+            runtime.consume_many
+            if args.search_method in {"ldm_harness", "harness"}
+            else None
         ),
     ))
 
@@ -347,7 +354,7 @@ def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> Harn
         "--mount", f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
         args.harness_image,
     ))
-    profiles = harness_profiles(args.harness_candidates_per_session)
+    profiles = _harness_profiles(args)
     config = HarnessPoolConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
@@ -400,6 +407,22 @@ def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,
     payload.update(engine_summary=result.summary, result=report, run_dir=str(runtime.run_dir.resolve()))
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if result.summary["successful_evaluation_count"] else 1
+
+
+def _proposal_samples(args) -> int:
+    return (
+        args.evaluations_per_round
+        if args.search_method == "harness"
+        else args.proposal_samples
+    )
+
+
+def _harness_profiles(args):
+    if args.search_method == "ldm_harness":
+        return harness_profiles(args.harness_candidates_per_session)
+    if args.search_method == "harness":
+        return direct_harness_profile(args.evaluations_per_round)
+    return ()
 
 
 def _run_payload(args, benchmark, task_spec, contract_sha256: str, profile_name: str) -> dict[str, Any]:

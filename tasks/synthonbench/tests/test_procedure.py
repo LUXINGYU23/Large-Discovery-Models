@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from ldm_tts.registration.experiment import (
     load_experiment_contract,
     validate_profile_args,
 )
 from tasks.synthonbench.core import dependencies as dependency_checks
+from tasks.synthonbench.core import factory
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +66,17 @@ def test_direct_llm_contract_returns_the_official_complete_tuple() -> None:
     assert spec.metadata["candidates_per_model_request"] == 1
     assert spec.metadata["search_breadth"] == 1
     assert spec.surrogate.kind == "none"
+
+
+def test_direct_harness_factory_does_not_build_a_surrogate(monkeypatch) -> None:
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("standalone Harness must not construct a surrogate")
+
+    monkeypatch.setattr(factory, "SynthonNystromEncoder", fail_if_called)
+
+    assert factory._search_components(
+        SimpleNamespace(search_method="harness"), ()
+    ) == (None, None)
 
 
 def test_proposal_defaults_disable_thinking() -> None:
@@ -211,18 +224,41 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         "harness-candidates-per-session", "harness-thinking",
         "harness-wall-time-seconds",
     }
+    direct_harness = {
+        "proposal-samples", "harness-thinking", "harness-wall-time-seconds",
+    }
 
     for profile in contract.profiles.values():
-        required = common | (
-            harness
-            if profile.locked_args.get("search-method") == "ldm_harness"
-            else direct
+        method = profile.locked_args.get("search-method")
+        required = (
+            direct_harness
+            if method == "harness"
+            else common | harness
+            if method == "ldm_harness"
+            else common | direct
         )
         assert required <= set(profile.locked_args)
         filename = "pilot_evaluation_base.yaml" if profile.name == "pilot_evaluation" else f"{profile.name}.yaml"
         config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
+
+
+def test_direct_harness_profiles_lock_one_sixteen_candidate_session() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name, iterations in (
+        ("pilot_evaluation_harness", 6),
+        ("pilot_evaluation_extended_harness", 12),
+    ):
+        profile = contract.profile(profile_name)
+        args = profile.locked_args
+
+        assert args["search-method"] == "harness"
+        assert args["proposal-mode"] == "none"
+        assert args["proposal-samples"] == 16
+        assert args["evaluations-per-round"] == 16
+        assert profile.budget["harness_turns"] == iterations - 1
 
 
 def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headroom() -> None:

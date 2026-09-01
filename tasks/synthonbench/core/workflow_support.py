@@ -26,8 +26,11 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
     search_rounds = args.iterations - initial_rounds
     selected = args.iterations * args.evaluations_per_round
     proposal_attempts = _proposal_attempt_count(args, search_rounds)
-    if args.search_method == "ldm_harness":
-        harness_turns = search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method in {"ldm_harness", "harness"}:
+        profile_count = (
+            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 1
+        )
+        harness_turns = search_rounds * profile_count
     else:
         harness_turns = 0
         llm_requests = proposal_attempts if args.proposal_mode == "openai" else 0
@@ -42,7 +45,7 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
-    if args.search_method != "ldm_harness":
+    if args.search_method not in {"ldm_harness", "harness"}:
         dynamic["llm_requests"] = llm_requests
     return {**dynamic, **dict(profile_budget or {})}
 
@@ -52,6 +55,8 @@ def _proposal_attempt_count(args: Any, search_rounds: int) -> int:
         return 0
     if args.search_method == "ldm_harness":
         return search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method == "harness":
+        return search_rounds
     breadth = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
     return search_rounds * math.ceil(breadth / args.proposal_candidates_per_request)
 
@@ -59,7 +64,7 @@ def _proposal_attempt_count(args: Any, search_rounds: int) -> int:
 def _valid_candidate_count(args: Any, initial: int, search_rounds: int) -> int:
     if args.search_method == "ldm":
         return initial + search_rounds * args.proposal_samples
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return initial + search_rounds * args.evaluations_per_round
     return initial + search_rounds * args.proposal_samples
 

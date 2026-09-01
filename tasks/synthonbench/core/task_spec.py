@@ -78,7 +78,11 @@ def build_synthon_task_spec(
             candidates_per_request=direct_batch_size,
             response_space=response_space.name,
         ),
-        surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
+        surrogate=(
+            encoder.describe()
+            if encoder is not None
+            else disabled_surrogate(search_method)
+        ),
         proposal_search=_proposal_search(
             search_method,
             search_breadth,
@@ -123,19 +127,27 @@ def build_synthon_task_spec(
     )
 
 
-def build_direct_acquisition() -> AcquisitionSpec:
+def build_direct_acquisition(search_method: str) -> AcquisitionSpec:
     return AcquisitionSpec(
-        name="direct_llm_reservoir_order",
+        name=f"direct_{search_method}_reservoir_order",
         objective_names=(OBJECTIVE_NAME,),
         score_direction="maximize",
-        selection_rule="evaluate every admitted direct LLM candidate in reservoir order",
+        selection_rule=(
+            "evaluate every admitted direct LLM candidate in reservoir order"
+            if search_method == "llm"
+            else "evaluate every admitted Harness candidate in reservoir order"
+        ),
     )
 
 
-def disabled_surrogate() -> SurrogateSpaceSpec:
+def disabled_surrogate(search_method: str) -> SurrogateSpaceSpec:
     return SurrogateSpaceSpec(
         kind="none",
-        representation="No surrogate for direct LLM baseline.",
+        representation=(
+            "No surrogate for direct LLM baseline."
+            if search_method == "llm"
+            else "No surrogate for direct Harness evaluation."
+        ),
         dimension_policy="none",
     )
 

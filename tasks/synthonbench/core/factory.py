@@ -93,9 +93,7 @@ class CampaignComponentOptions:
             raise ValueError("LDM proposal samples must exceed the BO pool size")
         if self.evaluations_per_round > self.bo_pool_size and self.search_method not in {"llm", "harness"}:
             raise ValueError("BO-based methods require evaluations_per_round <= bo_pool_size")
-        if self.search_method == "harness":
-            raise ValueError("Standalone Harness is not implemented for SynthonBench yet")
-        if self.search_method == "ldm_harness":
+        if self.search_method in {"ldm_harness", "harness"}:
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
             expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
@@ -113,7 +111,8 @@ class CampaignComponentOptions:
                 raise ValueError(
                     "direct proposal breadth must divide evenly by candidates per request"
                 )
-        _validate_options(self)
+        if self.search_method != "harness":
+            _validate_options(self)
         if self.search_method in {"ldm", "llm"}:
             validate_prompt_policy(self.prompt_policy)
 
@@ -142,7 +141,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         acquisition=(
             selector.describe()
             if selector is not None
-            else task_contracts.build_direct_acquisition()
+            else task_contracts.build_direct_acquisition(options.search_method)
         ),
         proposal_samples=options.proposal_samples,
         evaluations_per_round=options.evaluations_per_round,
@@ -207,7 +206,7 @@ def build_base_synthon_selector(
 
 
 def _search_components(options: CampaignComponentOptions, reactions):
-    if options.search_method == "llm":
+    if options.search_method in {"llm", "harness"}:
         return None, None
     encoder = SynthonNystromEncoder(
         options.official_task.space, reactions, landmark_count=options.gp_landmarks,
@@ -233,7 +232,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         search: ReservoirExpander = RandomSynthonPoolExpander(
             options.official_task.space, reactions, seed=options.selection_seed
         )
-    elif options.search_method == "ldm_harness":
+    elif options.search_method in {"ldm_harness", "harness"}:
         assert options.harness_client is not None
         search = SynthonHarnessExpander(
             options.harness_client,
@@ -242,6 +241,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
             profiles=options.harness_profiles,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
+            attach_empirical_q0=options.search_method == "ldm_harness",
             account=options.account_harness_usage,
         )
     else:
