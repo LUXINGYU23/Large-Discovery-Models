@@ -39,7 +39,7 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         budget["harness_turns"] = search_rounds * len(HARNESS_PROFILE_IDS)
     else:
         budget["llm_requests"] = proposal_requests if args.proposal_mode == "openai" else 0
@@ -60,14 +60,14 @@ def campaign_budget(
 def _proposal_requests(args: Any, search_rounds: int) -> int:
     if args.search_method == "bo":
         return 0
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         return search_rounds * len(HARNESS_PROFILE_IDS)
     per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
     return search_rounds * per_round
 
 
 def _valid_candidates(args: Any, domain_size: int, initial: int, search_rounds: int) -> int:
-    if args.search_method == "ldm":
+    if args.search_method in {"ldm", "ldm_harness"}:
         return initial + search_rounds * args.proposal_samples
     if args.search_method == "llm":
         return initial + search_rounds * args.evaluations_per_round
@@ -106,7 +106,7 @@ def provider_settings(args: Any) -> OpenAIProviderSettings:
         api_key=args.api_key,
     )
     key_file = getattr(args, "harness_api_key_file", None)
-    if getattr(args, "proposal_backend", "direct") == "harness" and key_file is not None:
+    if args.search_method in {"ldm_harness", "harness"} and key_file is not None:
         api_key = Path(key_file).expanduser().read_text(encoding="utf-8").strip()
         if not api_key:
             raise ValueError("harness API key file is empty")

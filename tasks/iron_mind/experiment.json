@@ -189,7 +189,7 @@
         "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
-    "pilot_evaluation_harness": {
+    "pilot_evaluation_ldm_harness": {
       "description": "Six-round fixed-budget persistent-agent LDM comparison on source-pinned Iron Mind tables.",
       "budget": {
         "outer_iterations": 6,
@@ -203,9 +203,8 @@
         "benchmark_jobs": 6
       },
       "locked_args": {
-        "proposal-backend": "harness",
         "proposal-mode": "none",
-        "search-method": "ldm",
+        "search-method": "ldm_harness",
         "iterations": 6,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
@@ -220,7 +219,7 @@
         "z-clip": 2.0
       }
     },
-    "pilot_evaluation_extended_harness": {
+    "pilot_evaluation_extended_ldm_harness": {
       "description": "Twelve-round fixed-budget persistent-agent LDM comparison on source-pinned Iron Mind tables.",
       "budget": {
         "outer_iterations": 12,
@@ -234,9 +233,8 @@
         "benchmark_jobs": 12
       },
       "locked_args": {
-        "proposal-backend": "harness",
         "proposal-mode": "none",
-        "search-method": "ldm",
+        "search-method": "ldm_harness",
         "iterations": 12,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
@@ -251,7 +249,7 @@
         "z-clip": 2.0
       }
     },
-    "harness_official_smoke": {
+    "ldm_harness_official_smoke": {
       "description": "Two-round real capability gate for the persistent Iron Mind research harness.",
       "budget": {
         "outer_iterations": 2,
@@ -265,9 +263,8 @@
         "benchmark_jobs": 2
       },
       "locked_args": {
-        "proposal-backend": "harness",
         "proposal-mode": "none",
-        "search-method": "ldm",
+        "search-method": "ldm_harness",
         "iterations": 2,
         "evaluations-per-round": 1,
         "proposal-samples": 64,

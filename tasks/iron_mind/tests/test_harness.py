@@ -178,8 +178,8 @@ def test_catalog_and_task_spec_expose_space_without_oracle_scores(tmp_path) -> N
     args = parse_args(
         [
             "--mock",
-            "--proposal-backend",
-            "harness",
+            "--search-method",
+            "ldm_harness",
             "--proposal-mode",
             "none",
             "--initialization-mode",

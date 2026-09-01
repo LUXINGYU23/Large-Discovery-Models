@@ -86,9 +86,8 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
         prompt_policy=args.prompt_policy,
         search_method=args.search_method,
         initialization_mode=args.initialization_mode,
-        proposal_backend=args.proposal_backend,
         harness_profile_count=(
-            len(HARNESS_PROFILE_IDS) if args.proposal_backend == "harness" else 0
+            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 0
         ),
     )
 
@@ -131,13 +130,13 @@ def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
                   payload: dict[str, Any]) -> int:
     provider = (
         provider_settings(args)
-        if args.proposal_mode == "openai" or args.proposal_backend == "harness"
+        if args.proposal_mode == "openai" or args.search_method in {"ldm_harness", "harness"}
         else None
     )
     if provider is not None:
         args.llm_url, args.llm_model_name = provider.base_url, provider.model
     runtime = _open_runtime(args, task_spec, contract, profile_name)
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
@@ -256,7 +255,7 @@ def _components(args, benchmark, runtime, client, harness_client):
     )
     profiles = (
         harness_profiles(args.harness_candidates_per_session)
-        if args.proposal_backend == "harness"
+        if args.search_method == "ldm_harness"
         else ()
     )
     return build_campaign_components(CampaignComponentOptions(
@@ -289,11 +288,10 @@ def _components(args, benchmark, runtime, client, harness_client):
         z_clip=args.z_clip,
         prompt_policy=args.prompt_policy,
         before_requests=before_requests,
-        proposal_backend=args.proposal_backend,
         harness_client=harness_client,
         harness_profiles=profiles,
         account_harness_usage=(
-            runtime.consume_many if args.proposal_backend == "harness" else None
+            runtime.consume_many if args.search_method == "ldm_harness" else None
         ),
     ))
 
@@ -406,7 +404,6 @@ def _run_payload(args, benchmark, task_spec, contract_sha256: str, profile_name:
         "target": benchmark.target,
         "oracle_kind": benchmark.oracle_kind,
         "proposal_mode": args.proposal_mode,
-        "proposal_backend": args.proposal_backend,
         "search_method": args.search_method,
         "initialization_mode": args.initialization_mode,
         "contract_profile": profile_name,

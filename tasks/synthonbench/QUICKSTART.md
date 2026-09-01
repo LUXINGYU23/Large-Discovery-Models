@@ -63,7 +63,7 @@ docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/synthonbench \
   python scripts/run_ldm_tts.py \
-  config/synthonbench/harness_surrogate_smoke.yaml
+  config/synthonbench/ldm_harness_surrogate_smoke.yaml
 ```
 
 Docker must have access to Linux KVM. The profile creates four persistent

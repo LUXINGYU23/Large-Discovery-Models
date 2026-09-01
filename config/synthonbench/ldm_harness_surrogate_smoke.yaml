@@ -1,12 +1,12 @@
-name: synthonbench_harness_surrogate_smoke
+name: synthonbench_ldm_harness_surrogate_smoke
 task: synthonbench
 algorithm: ldm_persistent_agent_harness_tanimoto_gp_ucb
 mode: real
 description: Two-round persistent-agent LDM smoke run on the official 1M surrogate track.
-contract_profile: harness_surrogate_smoke
+contract_profile: ldm_harness_surrogate_smoke
 args:
-  proposal-backend: harness
   proposal-mode: none
+  search-method: ldm_harness
   scale: 1M
   target: kif11
   oracle-kind: surrogate
@@ -34,5 +34,5 @@ args:
   z-clip: 5.0
   data-dir: ${SYNTHONBENCH_DATA_ROOT}
   source-dir: ${SYNTHONBENCH_SOURCE_ROOT}
-  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/harness_surrogate_smoke
+  out-dir: ${SYNTHONBENCH_RUNS_ROOT}/ldm_harness_surrogate_smoke
   audit-timeout: 900.0

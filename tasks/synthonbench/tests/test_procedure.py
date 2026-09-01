@@ -79,7 +79,7 @@ def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
     key_file = tmp_path / "api_key"
     key_file.write_text("test-secret", encoding="utf-8")
     args = {
-        "proposal-backend": "harness",
+        "search-method": "ldm_harness",
         "harness-api-key-file": str(key_file),
         "llm-url": "https://provider.example",
         "llm-model-name": "model",
@@ -99,7 +99,7 @@ def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
 
 def test_harness_preflight_accepts_the_standard_api_key_environment() -> None:
     args = {
-        "proposal-backend": "harness",
+        "search-method": "ldm_harness",
         "llm-url": "https://provider.example",
         "llm-model-name": "model",
     }
@@ -215,7 +215,7 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
     for profile in contract.profiles.values():
         required = common | (
             harness
-            if profile.locked_args.get("proposal-backend") == "harness"
+            if profile.locked_args.get("search-method") == "ldm_harness"
             else direct
         )
         assert required <= set(profile.locked_args)
@@ -260,7 +260,7 @@ def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
 
     for profile_name in (
         "pilot_evaluation_extended",
-        "pilot_evaluation_extended_harness",
+        "pilot_evaluation_extended_ldm_harness",
         "pilot_evaluation_extended_direct_llm",
     ):
         args = contract.profile(profile_name).locked_args

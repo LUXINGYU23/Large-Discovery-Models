@@ -102,7 +102,10 @@ def _provider_checks(
         api_env=API_KEY_ENV_NAMES,
         required=True,
     )
-    if arg_value(dict(args), "proposal-backend", default="direct") != "harness":
+    if arg_value(dict(args), "search-method", default="ldm") not in {
+        "ldm_harness",
+        "harness",
+    }:
         return checks
     raw_key_path = arg_value(dict(args), "harness-api-key-file")
     if not raw_key_path:

@@ -9,12 +9,11 @@ cases:
   - id: buchwald_hartwig
     overrides:
       - args.dataset-id="buchwald_hartwig"
-methods: [ldm, harness, bo, llm]
+methods: [ldm, ldm_harness, bo, llm]
 method_overrides:
   ldm: []
-  harness:
-    - contract_profile="pilot_evaluation_extended_harness"
-    - args.proposal-backend="harness"
+  ldm_harness:
+    - contract_profile="pilot_evaluation_extended_ldm_harness"
     - args.harness-candidates-per-session=16
     - args.harness-thinking="max"
     - args.harness-wall-time-seconds=1800
@@ -28,7 +27,7 @@ method_overrides:
 seeds: [0, 1, 2]
 optimization_rounds: 11
 initialization_mode: shared_random
-output_root: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended_harness
+output_root: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended
 trajectory:
   step_column: round
   step_kind: round

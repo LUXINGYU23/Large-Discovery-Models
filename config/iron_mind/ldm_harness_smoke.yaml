@@ -1,13 +1,12 @@
-name: iron_mind_harness_official_smoke
+name: iron_mind_ldm_harness_official_smoke
 task: iron_mind
 algorithm: persistent_agent_harness_ldm
 mode: real
 description: Two-round real capability gate for the persistent Iron Mind research harness.
-contract_profile: harness_official_smoke
+contract_profile: ldm_harness_official_smoke
 args:
-  proposal-backend: harness
   proposal-mode: none
-  search-method: ldm
+  search-method: ldm_harness
   initialization-mode: shared_random
   dataset-id: reductive_amination
   iterations: 2

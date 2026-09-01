@@ -72,7 +72,6 @@ class CampaignComponentOptions:
     z_clip: float = 5.0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
     before_requests: Callable[[int], None] | None = None
-    proposal_backend: str = "direct"
     harness_client: HarnessClient | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
     account_harness_usage: Callable[[dict[str, int]], None] | None = None
@@ -90,15 +89,13 @@ class CampaignComponentOptions:
             self.proposal_candidates_per_request,
         ) < 1:
             raise ValueError("Proposal, pool, and evaluation counts must be positive")
-        if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
+        if self.search_method in {"ldm", "ldm_harness"} and self.proposal_samples <= self.bo_pool_size:
             raise ValueError("LDM proposal samples must exceed the BO pool size")
-        if self.evaluations_per_round > self.bo_pool_size and self.search_method != "llm":
+        if self.evaluations_per_round > self.bo_pool_size and self.search_method not in {"llm", "harness"}:
             raise ValueError("BO-based methods require evaluations_per_round <= bo_pool_size")
-        if self.proposal_backend not in {"direct", "harness"}:
-            raise ValueError("proposal_backend must be direct or harness")
-        if self.proposal_backend == "harness":
-            if self.search_method != "ldm":
-                raise ValueError("The harness backend is available only for LDM search")
+        if self.search_method == "harness":
+            raise ValueError("Standalone Harness is not implemented for SynthonBench yet")
+        if self.search_method == "ldm_harness":
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
             expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
@@ -106,7 +103,7 @@ class CampaignComponentOptions:
                 raise ValueError("proposal_samples must equal the harness minibatch total")
         elif self.search_method in {"ldm", "llm"} and self.client is None:
             raise ValueError("Direct model search methods require a proposal client")
-        if self.proposal_backend == "direct" and self.search_method in {"ldm", "llm"}:
+        if self.search_method in {"ldm", "llm"}:
             breadth = (
                 self.proposal_samples
                 if self.search_method == "ldm"
@@ -117,7 +114,7 @@ class CampaignComponentOptions:
                     "direct proposal breadth must divide evenly by candidates per request"
                 )
         _validate_options(self)
-        if self.proposal_backend == "direct":
+        if self.search_method in {"ldm", "llm"}:
             validate_prompt_policy(self.prompt_policy)
 
 
@@ -158,7 +155,6 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         prompt_policy=options.prompt_policy,
         search_method=options.search_method,
         initialization_mode=options.initialization_mode,
-        proposal_backend=options.proposal_backend,
         harness_profile_count=len(options.harness_profiles),
     )
     domain = SynthonCandidateDomain(official_task.space, reactions, options.target, options.sink)
@@ -237,7 +233,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         search: ReservoirExpander = RandomSynthonPoolExpander(
             options.official_task.space, reactions, seed=options.selection_seed
         )
-    elif options.proposal_backend == "harness":
+    elif options.search_method == "ldm_harness":
         assert options.harness_client is not None
         search = SynthonHarnessExpander(
             options.harness_client,
@@ -272,7 +268,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
     return InitialRoundReservoirExpander(
         initializer=SynthonInitializationExpander(
             options.official_task.space, reactions, seed=options.selection_seed,
-            attach_q0=options.search_method == "ldm",
+            attach_q0=options.search_method in {"ldm", "ldm_harness"},
         ),
         search_expander=search,
         initial_reservoir_size=options.evaluations_per_round,

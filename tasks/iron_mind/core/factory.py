@@ -58,7 +58,6 @@ class CampaignComponentOptions:
     acquisition_z_clip: float = 5.0
     selection_seed: int = 0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
-    proposal_backend: str = "direct"
     harness_client: HarnessClient | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
     account_harness_usage: Callable[[dict[str, int]], None] | None = None
@@ -72,13 +71,11 @@ class CampaignComponentOptions:
             raise ValueError(f"Unknown initialization mode: {self.initialization_mode!r}.")
         if self.proposal_samples < 1 or self.bo_pool_size < 1:
             raise ValueError("Proposal and BO pool sizes must be positive.")
-        if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
+        if self.search_method in {"ldm", "ldm_harness"} and self.proposal_samples <= self.bo_pool_size:
             raise ValueError("LDM proposal samples must exceed the BO pool size.")
-        if self.proposal_backend not in {"direct", "harness"}:
-            raise ValueError("proposal_backend must be direct or harness")
-        if self.proposal_backend == "harness":
-            if self.search_method != "ldm":
-                raise ValueError("The harness backend is available only for LDM search")
+        if self.search_method == "harness":
+            raise ValueError("Standalone Harness is not implemented for Iron Mind yet")
+        if self.search_method == "ldm_harness":
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
             expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
@@ -89,7 +86,7 @@ class CampaignComponentOptions:
         if self.proposal_max_workers < 1 or self.selection_seed < 0:
             raise ValueError("Worker count must be positive and seed non-negative.")
         _validate_acquisition_options(self)
-        if self.proposal_backend == "direct":
+        if self.search_method in {"ldm", "llm"}:
             validate_prompt_policy(self.prompt_policy)
 
 
@@ -129,7 +126,6 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
             else task_contracts.disabled_surrogate()
         ),
         domain_size=finite_domain_size(options.table),
-        proposal_backend=options.proposal_backend,
         harness_profile_count=len(options.harness_profiles),
     )
     domain = IronMindCandidateDomain(options.schema, options.table, sink=options.sink)
@@ -203,7 +199,7 @@ def _search_components(options: CampaignComponentOptions):
 def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain) -> ReservoirExpander:
     if options.search_method == "bo":
         search: ReservoirExpander = FullReactionDomainExpander(options.table)
-    elif options.proposal_backend == "harness":
+    elif options.search_method == "ldm_harness":
         assert options.harness_client is not None
         search = IronMindHarnessExpander(
             options.harness_client,
@@ -229,7 +225,7 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
         initializer=IronMindInitializationExpander(
             options.table,
             seed=options.selection_seed,
-            attach_q0=options.search_method == "ldm",
+            attach_q0=options.search_method in {"ldm", "ldm_harness"},
         ),
         search_expander=search,
         initial_reservoir_size=1,

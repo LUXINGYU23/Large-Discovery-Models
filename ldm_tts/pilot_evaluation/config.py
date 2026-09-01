@@ -10,7 +10,7 @@ from typing import Any
 from ldm_tts.cli.runner import load_config
 
 
-SUPPORTED_METHODS = ("ldm", "harness", "bo", "llm")
+SUPPORTED_METHODS = ("ldm", "ldm_harness", "bo", "llm", "harness")
 BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
 

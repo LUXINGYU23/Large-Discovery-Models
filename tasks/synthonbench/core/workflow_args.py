@@ -46,7 +46,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.proposal_candidates_per_request is None:
         args.proposal_candidates_per_request = (
             min(DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST, args.proposal_samples)
-            if args.search_method == "ldm" and args.proposal_backend == "direct"
+            if args.search_method == "ldm"
             else 1
         )
     return args
@@ -95,7 +95,6 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--eta", type=float, default=DEFAULT_ACQUISITION_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--prompt-policy", choices=PROMPT_POLICIES, default=DEFAULT_PROMPT_POLICY)
-    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
 
 
 def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
@@ -150,11 +149,11 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "harness_candidates_per_session", "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
-    if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
+    if args.search_method in {"ldm", "ldm_harness"} and args.proposal_samples <= args.bo_pool_size:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
-    if args.search_method != "llm" and args.evaluations_per_round > args.bo_pool_size:
+    if args.search_method not in {"llm", "harness"} and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
-    if args.proposal_backend == "direct" and args.search_method in {"ldm", "llm"}:
+    if args.search_method in {"ldm", "llm"}:
         breadth = (
             args.proposal_samples
             if args.search_method == "ldm"
@@ -165,7 +164,7 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "the direct proposal breadth must divide evenly by "
                 "--proposal-candidates-per-request"
             )
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:
             raise SystemExit(
@@ -200,11 +199,11 @@ def _validate_provider_options(args: argparse.Namespace) -> None:
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
-    if args.proposal_backend == "harness":
-        if args.search_method != "ldm":
-            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+    if args.search_method == "harness":
+        raise SystemExit("Standalone Harness is not implemented for SynthonBench yet")
+    if args.search_method == "ldm_harness":
         if args.proposal_mode != "none":
-            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+            raise SystemExit("--search-method=ldm_harness requires --proposal-mode=none")
         if not args.mock and (args.data_dir is None or args.source_dir is None):
             raise SystemExit("real SynthonBench campaigns require --data-dir and --source-dir")
         if args.oracle_kind == "glide" and args.scale != "1M":

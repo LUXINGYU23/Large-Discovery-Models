@@ -173,7 +173,7 @@ Files:
 tasks/synthonbench/README.md
 tasks/synthonbench/QUICKSTART.md
 config/synthonbench/mock.yaml
-config/synthonbench/harness_surrogate_smoke.yaml
+config/synthonbench/ldm_harness_surrogate_smoke.yaml
 ```
 
 The direct backend uses the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and

@@ -98,9 +98,8 @@ def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskS
         initialization_mode=args.initialization_mode,
         surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
         domain_size=finite_domain_size(table),
-        proposal_backend=args.proposal_backend,
         harness_profile_count=(
-            len(HARNESS_PROFILE_IDS) if args.proposal_backend == "harness" else 0
+            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 0
         ),
     )
 
@@ -125,14 +124,14 @@ def _run_campaign(
 ) -> int:
     provider = (
         provider_settings(args)
-        if args.proposal_mode == "openai" or args.proposal_backend == "harness"
+        if args.proposal_mode == "openai" or args.search_method in {"ldm_harness", "harness"}
         else None
     )
     if provider is not None:
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
     runtime = _open_runtime(args, table, task_spec, contract, profile_name)
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
@@ -163,7 +162,7 @@ def _components(args, table, runtime, client, harness_client):
     )
     profiles = (
         harness_profiles(args.harness_candidates_per_session)
-        if args.proposal_backend == "harness"
+        if args.search_method == "ldm_harness"
         else ()
     )
     return build_campaign_components(
@@ -185,11 +184,10 @@ def _components(args, table, runtime, client, harness_client):
             acquisition_z_clip=args.z_clip,
             selection_seed=args.campaign_index,
             prompt_policy=args.prompt_policy,
-            proposal_backend=args.proposal_backend,
             harness_client=harness_client,
             harness_profiles=profiles,
             account_harness_usage=(
-                runtime.consume_many if args.proposal_backend == "harness" else None
+                runtime.consume_many if args.search_method == "ldm_harness" else None
             ),
         )
     )
@@ -322,7 +320,6 @@ def _run_payload(
         "search_method": args.search_method,
         "initialization_mode": args.initialization_mode,
         "proposal_mode": args.proposal_mode,
-        "proposal_backend": args.proposal_backend,
         "dataset_id": args.dataset_id,
         "objective": OBJECTIVE_NAME,
         "contract_profile": profile_name,
@@ -443,7 +440,7 @@ def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncode
 
 
 def _reservoir_size(args, components) -> int:
-    if args.search_method == "ldm":
+    if args.search_method in {"ldm", "ldm_harness"}:
         return args.proposal_samples
     if args.search_method == "llm":
         return args.evaluations_per_round

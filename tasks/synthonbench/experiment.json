@@ -94,7 +94,7 @@
     "benchmark_jobs": 10000
   },
   "profiles": {
-    "harness_surrogate_smoke": {
+    "ldm_harness_surrogate_smoke": {
       "description": "Two-round persistent-agent LDM smoke run on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 2,
@@ -110,8 +110,8 @@
         "scale": "1M",
         "target": "kif11",
         "oracle-kind": "surrogate",
-        "proposal-backend": "harness",
         "proposal-mode": "none",
+        "search-method": "ldm_harness",
         "iterations": 2,
         "evaluations-per-round": 1,
         "proposal-samples": 64,
@@ -134,7 +134,7 @@
         "z-clip": 5.0
       }
     },
-    "pilot_evaluation_harness": {
+    "pilot_evaluation_ldm_harness": {
       "description": "Six-round fixed-budget persistent-agent LDM comparison on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 6,
@@ -151,8 +151,8 @@
         "scale": "1M",
         "target": "kif11",
         "oracle-kind": "surrogate",
-        "proposal-backend": "harness",
         "proposal-mode": "none",
+        "search-method": "ldm_harness",
         "iterations": 6,
         "evaluations-per-round": 16,
         "proposal-samples": 64,
@@ -261,7 +261,7 @@
         "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}"
       }
     },
-    "pilot_evaluation_extended_harness": {
+    "pilot_evaluation_extended_ldm_harness": {
       "description": "Twelve-round fixed-budget persistent-agent LDM confirmation on the official 1M surrogate track.",
       "budget": {
         "outer_iterations": 12,
@@ -278,8 +278,8 @@
         "scale": "1M",
         "target": "kif11",
         "oracle-kind": "surrogate",
-        "proposal-backend": "harness",
         "proposal-mode": "none",
+        "search-method": "ldm_harness",
         "iterations": 12,
         "evaluations-per-round": 16,
         "proposal-samples": 64,

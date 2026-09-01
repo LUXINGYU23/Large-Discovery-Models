@@ -141,7 +141,7 @@ def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, A
         apply_override(config, override)
     for override in spec.method_overrides[run.method]:
         apply_override(config, override)
-    _set(config, "args.search-method", "ldm" if run.method == "harness" else run.method)
+    _set(config, "args.search-method", run.method)
     _set(config, "args.proposal-mode", _proposal_mode(config, run.method))
     _set(config, "args.initialization-mode", spec.initialization_mode)
     _set(config, "args.iterations", spec.iterations)
@@ -196,7 +196,7 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "harness"}:
+    if method in {"bo", "ldm_harness", "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

@@ -259,7 +259,7 @@ export LLM_API_KEY=your-secret
 
 uv run --locked --project tasks/synthonbench \
   python scripts/run_ldm_tts.py \
-  config/synthonbench/harness_surrogate_smoke.yaml
+  config/synthonbench/ldm_harness_surrogate_smoke.yaml
 ```
 
 Instead of an API-key environment variable, pass

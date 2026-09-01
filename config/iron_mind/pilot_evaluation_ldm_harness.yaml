@@ -1,13 +1,12 @@
-name: iron_mind_pilot_evaluation_harness
+name: iron_mind_pilot_evaluation_ldm_harness
 task: iron_mind
 algorithm: persistent_agent_harness_ldm
 mode: real
 description: Fixed-budget six-round persistent-agent LDM comparison for Iron Mind.
-contract_profile: pilot_evaluation_harness
+contract_profile: pilot_evaluation_ldm_harness
 args:
-  proposal-backend: harness
   proposal-mode: none
-  search-method: ldm
+  search-method: ldm_harness
   initialization-mode: shared_random
   dataset-id: reductive_amination
   iterations: 6

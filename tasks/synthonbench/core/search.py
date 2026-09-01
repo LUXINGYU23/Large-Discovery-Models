@@ -19,7 +19,7 @@ from tasks.synthonbench.core.space_order import (
 
 
 INITIALIZATION_MODES = ("none", "shared_random")
-SEARCH_METHODS = ("ldm", "bo", "llm")
+SEARCH_METHODS = ("ldm", "ldm_harness", "bo", "llm", "harness")
 
 
 class SynthonInitializationExpander:

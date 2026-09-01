@@ -30,7 +30,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
     parser.add_argument("--mock", action="store_true")
     parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
-    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
     parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
@@ -97,7 +96,7 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--proposal-samples must be positive")
     if args.bo_pool_size < 1:
         raise SystemExit("--bo-pool-size must be positive")
-    if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
+    if args.search_method in {"ldm", "ldm_harness"} and args.proposal_samples <= args.bo_pool_size:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.proposal_max_workers < 1:
         raise SystemExit("--proposal-max-workers must be positive")
@@ -105,7 +104,7 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Harness candidate and wall-time limits must be positive")
     if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
         raise SystemExit("--harness-response-timeout must be finite and positive")
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:
             raise SystemExit(
@@ -140,11 +139,11 @@ def _validate_non_negative(value: float, option: str) -> None:
 
 
 def _validate_search_mode(args: argparse.Namespace) -> None:
-    if args.proposal_backend == "harness":
-        if args.search_method != "ldm":
-            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+    if args.search_method == "harness":
+        raise SystemExit("Standalone Harness is not implemented for Iron Mind yet")
+    if args.search_method == "ldm_harness":
         if args.proposal_mode != "none":
-            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+            raise SystemExit("--search-method=ldm_harness requires --proposal-mode=none")
         return
     model_method = args.search_method in {"ldm", "llm"}
     if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:

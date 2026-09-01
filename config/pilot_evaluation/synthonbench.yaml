@@ -8,12 +8,11 @@ cases:
       - args.scale="1M"
       - args.target="kif11"
       - args.oracle-kind="surrogate"
-methods: [ldm, harness, bo, llm]
+methods: [ldm, ldm_harness, bo, llm]
 method_overrides:
   ldm: []
-  harness:
-    - contract_profile="pilot_evaluation_harness"
-    - args.proposal-backend="harness"
+  ldm_harness:
+    - contract_profile="pilot_evaluation_ldm_harness"
     - args.harness-candidates-per-session=16
     - args.harness-thinking="max"
     - args.harness-wall-time-seconds=1800

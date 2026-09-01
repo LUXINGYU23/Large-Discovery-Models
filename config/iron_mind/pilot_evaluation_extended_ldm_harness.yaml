@@ -1,13 +1,12 @@
-name: iron_mind_pilot_evaluation_extended_harness
+name: iron_mind_pilot_evaluation_extended_ldm_harness
 task: iron_mind
 algorithm: persistent_agent_harness_ldm_extended
 mode: real
 description: Fixed-budget twelve-round persistent-agent LDM comparison for Iron Mind.
-contract_profile: pilot_evaluation_extended_harness
+contract_profile: pilot_evaluation_extended_ldm_harness
 args:
-  proposal-backend: harness
   proposal-mode: none
-  search-method: ldm
+  search-method: ldm_harness
   initialization-mode: shared_random
   dataset-id: reductive_amination
   iterations: 12
@@ -30,6 +29,6 @@ args:
   llm-url: null
   llm-model-name: null
   api-key: null
-  out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended_harness
+  out-dir: ${IRON_MIND_RUNS_ROOT}/pilot_evaluation_extended_ldm_harness
 env:
   LDM_DATA_COLLECTION_ENABLED: "1"

@@ -245,7 +245,7 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
 def test_harness_task_spec_declares_persistent_four_profile_sampling() -> None:
     args = parse_args([
         "--mock",
-        "--proposal-backend", "harness",
+        "--search-method", "ldm_harness",
         "--proposal-mode", "none",
     ])
 
@@ -279,7 +279,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
 
     assert main([
         "--mock",
-        "--proposal-backend", "harness",
+        "--search-method", "ldm_harness",
         "--proposal-mode", "none",
         "--proposal-samples", "4",
         "--harness-candidates-per-session", "1",
