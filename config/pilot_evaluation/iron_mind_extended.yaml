@@ -9,7 +9,7 @@ cases:
   - id: buchwald_hartwig
     overrides:
       - args.dataset-id="buchwald_hartwig"
-methods: [ldm, ldm_harness, bo, llm]
+methods: [ldm, ldm_harness, bo, llm, harness]
 method_overrides:
   ldm: []
   ldm_harness:
@@ -24,6 +24,14 @@ method_overrides:
   llm:
     - contract_profile="pilot_evaluation_extended_direct_llm"
     - args.prompt-policy="direct_v1"
+  harness:
+    - contract_profile="pilot_evaluation_extended_harness"
+    - args.proposal-samples=1
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${IRON_MIND_WORK_ROOT}/gondolin-cache"
 seeds: [0, 1, 2]
 optimization_rounds: 11
 initialization_mode: shared_random

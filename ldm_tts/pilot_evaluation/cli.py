@@ -10,7 +10,9 @@ from ldm_tts.pilot_evaluation.execution import run_evaluation
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a fixed-round LDM, BO, and LLM pilot evaluation.")
+    parser = argparse.ArgumentParser(
+        description="Run a fixed-round task-method pilot evaluation."
+    )
     parser.add_argument("config", type=Path)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")

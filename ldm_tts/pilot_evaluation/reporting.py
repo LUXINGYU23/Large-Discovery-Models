@@ -15,6 +15,15 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 
 
+METHOD_LABELS = {
+    "ldm": "LDM",
+    "ldm_harness": "LDM + Research Harness",
+    "bo": "Bayesian Optimization",
+    "llm": "Direct LLM",
+    "harness": "Direct Research Harness",
+}
+
+
 def write_evaluation_reports(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> None:
     """Validate completed child artifacts and export task-neutral evaluation outputs."""
 
@@ -77,7 +86,10 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
         ]
         final_best = round_rows[-1]["best_so_far"]
         row = {
-            "case": case, "method": method, "seed": int(seed_text.removeprefix("seed_")),
+            "case": case,
+            "method": method,
+            "method_label": METHOD_LABELS.get(method, method),
+            "seed": int(seed_text.removeprefix("seed_")),
             "final_best": final_best,
             "round_auc": statistics.fmean(item["best_so_far"] for item in round_rows),
             **{name: _scalar_at_path(result, path) for name, path in spec.result_fields.items()},
@@ -130,7 +142,11 @@ def _round_rows(spec, run_dir, case, method, seed, observations) -> list[dict[st
         round_best = select_best(values)
         best = round_best if best is None else select_best(best, round_best)
         result.append({
-            "case": case, "method": method, "seed": seed, "round": round_idx,
+            "case": case,
+            "method": method,
+            "method_label": METHOD_LABELS.get(method, method),
+            "seed": seed,
+            "round": round_idx,
             "round_evaluations": len(values),
             "official_evaluations": official_evaluations,
             "round_best": round_best, "best_so_far": best,
@@ -165,14 +181,31 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             )
             if actual != expected:
                 errors.append(f"unexpected proposal count for {row['case']}/{row['method']}/{row['seed']}")
-        if row["method"] == "harness":
+        if row["method"] == "ldm_harness":
             per_session = row["harness_candidates_per_session"]
             if per_session < 1 or row["proposal_samples"] % per_session:
-                errors.append(f"invalid harness minibatch for {row['case']}/{row['seed']}")
+                errors.append(
+                    f"invalid LDM Harness minibatch for {row['case']}/{row['seed']}"
+                )
             else:
                 turns = spec.optimization_rounds * (row["proposal_samples"] // per_session)
                 if row["budget_proposal_attempts"] != turns or row["budget_harness_turns"] != turns:
-                    errors.append(f"unexpected harness turn count for {row['case']}/{row['seed']}")
+                    errors.append(
+                        f"unexpected LDM Harness turn count for {row['case']}/{row['seed']}"
+                    )
+        if row["method"] == "harness":
+            if row["proposal_samples"] != row["evaluations_per_round"]:
+                errors.append(
+                    f"invalid direct Harness minibatch for {row['case']}/{row['seed']}"
+                )
+            turns = spec.optimization_rounds
+            if (
+                row["budget_proposal_attempts"] != turns
+                or row["budget_harness_turns"] != turns
+            ):
+                errors.append(
+                    f"unexpected direct Harness turn count for {row['case']}/{row['seed']}"
+                )
     if len(trajectories) != len(rows) * spec.iterations:
         errors.append("round trajectory count is incomplete")
     return {"valid": not errors, "errors": errors}
@@ -195,7 +228,10 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     output = []
     for (case, method), group in sorted(grouped.items()):
         output.append({
-            "case": case, "method": method, "seed_count": len(group),
+            "case": case,
+            "method": method,
+            "method_label": METHOD_LABELS.get(method, method),
+            "seed_count": len(group),
             "mean_final_best": statistics.fmean(item["final_best"] for item in group),
             "std_final_best": _sample_std(group, "final_best"),
             "mean_round_auc": statistics.fmean(item["round_auc"] for item in group),
@@ -211,6 +247,14 @@ def _verdict(rows, aggregates, direction: str) -> dict[str, Any]:
         summary = {item["method"]: item for item in aggregates if item["case"] == case}
         verdict, wins = _method_verdict(rows, case, summary, "ldm", better)
         result = {"case": case, "verdict": verdict, "ldm_seed_wins": wins}
+        if "ldm_harness" in summary:
+            harness_ldm_verdict, harness_ldm_wins = _method_verdict(
+                rows, case, summary, "ldm_harness", better
+            )
+            result.update(
+                ldm_harness_verdict=harness_ldm_verdict,
+                ldm_harness_seed_wins=harness_ldm_wins,
+            )
         if "harness" in summary:
             harness_verdict, harness_wins = _method_verdict(rows, case, summary, "harness", better)
             result.update(harness_verdict=harness_verdict, harness_seed_wins=harness_wins)
@@ -275,7 +319,10 @@ def _plot(spec, trajectories) -> None:
                 axis.plot(
                     x,
                     [statistics.fmean(values) for _round_idx, values in series],
-                    label=f"{case}/{method} ({len(spec.seeds)} seeds)",
+                    label=(
+                        f"{case}/{METHOD_LABELS.get(method, method)} "
+                        f"({len(spec.seeds)} seeds)"
+                    ),
                 )
                 axis.fill_between(
                     x,
