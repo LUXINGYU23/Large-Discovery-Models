@@ -125,7 +125,7 @@ class NucleoBenchCandidateDomain:
             task_id=TASK_ID,
             domain="nucleobench_mutation_patch",
             task_description=(
-                "Propose a nucleotide mutation patch relative to one source-pinned "
+                "Propose a nucleotide mutation patch relative to one configured "
                 "NucleoBench paired start."
             ),
             objectives=[{"name": "utility", "direction": "maximize"}],

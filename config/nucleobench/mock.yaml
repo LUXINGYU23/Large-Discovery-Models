@@ -1,0 +1,14 @@
+name: nucleobench_mock
+task: nucleobench
+algorithm: deterministic_mock_reservoir
+mode: mock
+description: Deterministic mutation-patch contract run through the shared LDM engine.
+args:
+  mock: true
+  case-id: mock_dna
+  iterations: 2
+  reservoir-size: 4
+  evaluations-per-round: 1
+  out-dir: runs
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

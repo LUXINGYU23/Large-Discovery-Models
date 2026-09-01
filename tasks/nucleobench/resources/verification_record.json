@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "task_id": "nucleobench",
+  "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+  "records": [
+    {
+      "stage": "mock_verified",
+      "date": "2026-09-01",
+      "config": "config/nucleobench/mock.yaml",
+      "command": "python scripts/run_ldm_tts.py config/nucleobench/mock.yaml",
+      "result": {
+        "rounds": 2,
+        "successful_evaluations": 2,
+        "valid_search_candidates": 5,
+        "status": "completed"
+      },
+      "verified_artifacts": [
+        "campaign.json",
+        "config.json",
+        "ldm_task_spec.json",
+        "experiment_contract.json",
+        "budget.json",
+        "status.json",
+        "events.jsonl",
+        "checkpoint.json",
+        "summary.json",
+        "result.json",
+        "trajectory.csv",
+        "ldm_data/ldm_ir.jsonl"
+      ]
+    }
+  ]
+}

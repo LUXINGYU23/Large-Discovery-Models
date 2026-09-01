@@ -47,7 +47,7 @@ def build_task_spec(case: NucleoBenchCase) -> LDMTaskSpec:
             ResponseSpaceSpec(
                 name=response_name,
                 output_kind="json_object",
-                description="One non-empty mutation patch relative to the official start.",
+                description="One non-empty mutation patch relative to the paired start.",
                 schema={
                     "type": "object",
                     "additionalProperties": False,

@@ -16,7 +16,8 @@ driver.
 The task is registered with a draft experiment contract. Its versioned case
 catalog covers the 17 public NucleoBench tasks, all currently marked
 `planned`. The mutation-patch candidate contract and external data preparation
-command are implemented; executable campaigns are not yet qualified.
+command are implemented. A deterministic mock campaign is available for local
+contract verification; official model campaigns are not yet qualified.
 
 The first implementation target is `malinois_k562`. After that case passes
 source preparation, seed evaluation, a tiny campaign, and qualification, the
@@ -51,7 +52,19 @@ uv run --locked --project tasks/nucleobench \
 ```
 
 The dry run is inspection-only. Executable mock and official workflows are not
-available until their corresponding qualification stages are implemented.
+equivalent: the mock verifies repository integration but is not a benchmark
+result.
+
+## Run the Deterministic Mock
+
+```bash
+uv run --locked --project tasks/nucleobench \
+  python scripts/run_ldm_tts.py config/nucleobench/mock.yaml
+```
+
+The run uses the shared `LDMEngine`, candidate admission, batch evaluator,
+budget ledger, checkpoint, event log, result export, trajectory export, and
+data-collection sink without network, model weights, or GPU access.
 
 ## Prepare Malinois K562 Inputs
 

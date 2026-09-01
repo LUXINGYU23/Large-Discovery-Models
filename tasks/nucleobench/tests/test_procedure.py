@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from ldm_tts.cli.runner import build_plan, load_config
 from ldm_tts.registration.experiment import load_experiment_contract
 from tasks.nucleobench.core.cases import CaseCatalogError, load_case_catalog
 from tasks.nucleobench.core.constants import CATALOG_PATH
@@ -13,6 +14,7 @@ from tasks.nucleobench.ldm_task.procedure import main, parse_args
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_ROOT = TASK_ROOT.parents[1] / "config" / "nucleobench"
 
 
 def test_catalog_covers_the_pinned_public_suite() -> None:
@@ -62,6 +64,98 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
 def test_execution_is_rejected_before_qualification() -> None:
     with pytest.raises(SystemExit, match="not qualified"):
         main(["--case-id", "malinois_k562"])
+
+
+def test_mock_config_uses_the_registered_shared_runner() -> None:
+    config_path = CONFIG_ROOT / "mock.yaml"
+    config = load_config(config_path)
+    plan = build_plan(config, config_path)
+
+    assert config["mode"] == "mock"
+    assert config["args"] == {
+        "mock": True,
+        "case-id": "mock_dna",
+        "iterations": 2,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "out-dir": "runs",
+    }
+    assert plan["module"] == "tasks.nucleobench.ldm_task.procedure"
+    assert "--mock" in plan["argv"]
+
+
+def test_mock_campaign_writes_the_complete_shared_engine_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
+    assert (
+        main(
+            [
+                "--mock",
+                "--case-id",
+                "mock_dna",
+                "--iterations",
+                "2",
+                "--reservoir-size",
+                "4",
+                "--evaluations-per-round",
+                "1",
+                "--out-dir",
+                str(tmp_path),
+                "--run-name",
+                "campaign",
+            ]
+        )
+        == 0
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    run_dir = Path(output["run_dir"])
+    expected = {
+        "campaign.json",
+        "config.json",
+        "ldm_task_spec.json",
+        "experiment_contract.json",
+        "budget.json",
+        "status.json",
+        "events.jsonl",
+        "checkpoint.json",
+        "summary.json",
+        "result.json",
+        "trajectory.csv",
+    }
+    assert expected.issubset({path.name for path in run_dir.iterdir()})
+
+    result = json.loads((run_dir / "result.json").read_text())
+    summary = json.loads((run_dir / "summary.json").read_text())
+    status = json.loads((run_dir / "status.json").read_text())
+    budget = json.loads((run_dir / "budget.json").read_text())
+    contract = json.loads((run_dir / "experiment_contract.json").read_text())
+    events = [
+        json.loads(line)
+        for line in (run_dir / "events.jsonl").read_text().splitlines()
+    ]
+
+    assert result["finished"] is True
+    assert result["evaluation_count"] == 2
+    assert summary["observation_count"] == 2
+    assert summary["rounds_run"] == 2
+    assert status["status"] == "completed"
+    assert budget["counters"]["external_evaluations"] == 2
+    assert contract["snapshot"]["sha256"] == output["contract_sha256"]
+    assert [
+        event["payload"]["metadata"]["phase"]
+        for event in events
+        if event["event_type"] == "reservoir_expanded"
+    ] == ["shared_initialization", "active_search"]
+    assert sum(event["event_type"] == "candidate_evaluated" for event in events) == 2
+    assert len((run_dir / "trajectory.csv").read_text().splitlines()) == 3
+
+    ir_path = run_dir / "ldm_data" / "ldm_ir.jsonl"
+    assert ir_path.is_file()
+    assert "AAAAAAAA" not in ir_path.read_text()
 
 
 @pytest.mark.parametrize(

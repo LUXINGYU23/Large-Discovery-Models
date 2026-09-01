@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task_id": "nucleobench",
-  "stage": "registered",
+  "stage": "mock_verified",
   "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
   "contract_profile": "",
   "gates": {
@@ -22,8 +22,14 @@
       ]
     },
     "mock_verified": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/mock.yaml",
+        "tasks/nucleobench/core/mock.py",
+        "tasks/nucleobench/core/workflow.py",
+        "tasks/nucleobench/tests/test_procedure.py",
+        "tasks/nucleobench/resources/verification_record.json"
+      ]
     },
     "contract_verified": {
       "status": "pending",

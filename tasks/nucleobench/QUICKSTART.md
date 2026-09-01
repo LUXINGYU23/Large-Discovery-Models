@@ -2,7 +2,7 @@
 
 The current release stage provides task registration, source provenance, a
 strict 17-case catalog, mutation-patch validation, and external preparation for
-the first case. It does not yet execute an oracle campaign.
+the first case. It does not yet execute an official oracle campaign.
 
 Run these commands from the repository root.
 
@@ -37,6 +37,17 @@ uv run --locked --project tasks/nucleobench \
 This prints the source-pinned case metadata and declarative LDM task contract.
 Commands without `--dry-run` are rejected until an executable campaign profile
 has passed its qualification gates.
+
+## Run the Mock Campaign
+
+```bash
+uv run --locked --project tasks/nucleobench \
+  python scripts/run_ldm_tts.py config/nucleobench/mock.yaml
+```
+
+This deterministic two-round run exercises the shared engine and writes the
+standard campaign, budget, status, event, checkpoint, summary, result,
+trajectory, and data-collection artifacts under `tasks/nucleobench/runs/`.
 
 ## Prepare External Inputs
 

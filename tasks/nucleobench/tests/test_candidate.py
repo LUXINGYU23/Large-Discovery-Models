@@ -16,6 +16,7 @@ from tasks.nucleobench.core.candidate import (
     rebuild_sequence,
 )
 from tasks.nucleobench.core.cases import get_case
+from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
 
 
 def _context() -> MutationContext:
@@ -144,3 +145,28 @@ def test_domain_collects_only_admitted_collectable_patches(tmp_path: Path) -> No
     assert rows[0]["task"]["domain"] == "nucleobench_mutation_patch"
     assert rows[0]["action"]["payload"]["candidates"] == [collected.payload]
     assert "A" * 200 not in (tmp_path / "collection" / "ldm_ir.jsonl").read_text()
+
+
+def test_batch_evaluator_rebuilds_sequences_once_at_the_oracle_boundary() -> None:
+    domain = NucleoBenchCandidateDomain(_context())
+    candidates = [
+        domain.admit(
+            RawProposal(
+                {"mutations": [{"position": position, "base": base}]},
+                "test",
+            )
+        )
+        for position, base in ((0, "C"), (1, "G"))
+    ]
+    assert all(isinstance(candidate, Candidate) for candidate in candidates)
+    received: list[str] = []
+
+    def score(sequences):
+        received.extend(sequences)
+        return [-1.0, -2.0]
+
+    results = NucleoBenchEvaluator(_context(), score).evaluate_batch(candidates)
+
+    assert received == ["C" + "A" * 199, "AG" + "A" * 198]
+    assert [result.metrics["utility"] for result in results] == [1.0, 2.0]
+    assert all("sequence" not in result.artifacts for result in results)
