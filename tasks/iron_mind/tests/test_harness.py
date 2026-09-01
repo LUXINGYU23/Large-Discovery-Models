@@ -18,6 +18,7 @@ from tasks.iron_mind.core.harness import (
     HARNESS_PROFILE_IDS,
     IronMindHarnessExpander,
     _validate_submission,
+    direct_harness_profile,
     harness_profiles,
     write_harness_space_catalog,
 )
@@ -98,6 +99,7 @@ def test_harness_preserves_cross_session_occurrences_for_global_q0() -> None:
         profiles=harness_profiles(1),
         campaign_id="campaign-test",
         first_active_round=0,
+        attach_empirical_q0=True,
         account=counts.append,
     )
 
@@ -125,6 +127,7 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
         profiles=harness_profiles(1),
         campaign_id="campaign-test",
         first_active_round=1,
+        attach_empirical_q0=True,
     )
     old = _observation(domain, payloads[0], round_idx=0, score=1.0)
     latest = _observation(domain, payloads[1], round_idx=1, score=2.0)
@@ -161,6 +164,31 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
         for message in messages
     )
     assert all(turn.history_from_seq == 1 and turn.history_to_seq == 2 for turn in client.batches[0])
+
+
+def test_direct_harness_uses_one_session_and_skips_q0() -> None:
+    domain, payloads = _domain_and_payloads()
+    profiles = direct_harness_profile(1)
+    client = FakeHarnessClient({profiles[0].profile_id: payloads[0]})
+    counts = []
+    expander = IronMindHarnessExpander(
+        client,
+        domain,
+        profiles=profiles,
+        campaign_id="campaign-test",
+        first_active_round=0,
+        attach_empirical_q0=False,
+        account=counts.append,
+    )
+
+    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=1))
+
+    assert len(client.batches[0]) == 1
+    assert len(result.proposals) == 1
+    assert IRON_MIND_Q0_METADATA_KEY not in result.proposals[0].metadata
+    assert result.selection_mode == "reservoir_order"
+    assert result.metadata["sampling_mode"] == "persistent_direct_research_session"
+    assert counts[0] == {"proposal_attempts": 1, "harness_turns": 1}
 
 
 def test_submission_validator_returns_actionable_rejection_reasons() -> None:

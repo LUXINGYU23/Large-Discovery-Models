@@ -39,6 +39,7 @@ HARNESS_PROFILE_IDS = (
     "literature_evidence",
     "design_space_exploration",
 )
+DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "iron_mind_persistent_research_harness"
 HARNESS_FORBIDDEN_PATTERNS = (
     r"iron[\s_-]*mind",
@@ -136,6 +137,23 @@ def harness_profiles(
     )
 
 
+def direct_harness_profile(
+    candidates_per_turn: int,
+    *,
+    resource_root: Path = Path("/resources/profiles"),
+) -> tuple[HarnessProfile, ...]:
+    return (
+        HarnessProfile(
+            DIRECT_HARNESS_PROFILE_ID,
+            resource_root / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
+            candidates_per_turn,
+            agents_sha256=file_sha256(
+                _LOCAL_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md"
+            ),
+        ),
+    )
+
+
 def harness_tool_extensions(
     *, resource_root: Path = Path("/resources/tools")
 ) -> tuple[HarnessToolExtension, ...]:
@@ -159,6 +177,7 @@ class IronMindHarnessExpander:
         profiles: Sequence[HarnessProfile],
         campaign_id: str,
         first_active_round: int,
+        attach_empirical_q0: bool,
         account: Callable[[dict[str, int]], None] | None = None,
     ) -> None:
         if not profiles:
@@ -171,6 +190,7 @@ class IronMindHarnessExpander:
         self.campaign_id = campaign_id
         self.profile_set_sha256 = profile_set_sha256(self.profiles)
         self.first_active_round = first_active_round
+        self.attach_empirical_q0 = attach_empirical_q0
         self.account = account
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
@@ -191,16 +211,28 @@ class IronMindHarnessExpander:
         )
         if self.account is not None:
             self.account(_usage_counts(results))
-        raw_proposals = self._proposals(request, results, evaluated)
+        sampling_mode = (
+            "persistent_parallel_research_sessions"
+            if self.attach_empirical_q0
+            else "persistent_direct_research_session"
+        )
+        raw_proposals = self._proposals(request, results, evaluated, sampling_mode)
         if len(raw_proposals) != expected:
             raise RuntimeError(
                 f"validated harness minibatches must contain exactly {expected} occurrences"
             )
-        proposals = attach_empirical_base_measure(raw_proposals, request, self.domain)
+        proposals = (
+            attach_empirical_base_measure(raw_proposals, request, self.domain)
+            if self.attach_empirical_q0
+            else raw_proposals
+        )
         return ExpansionResult(
             proposals=proposals,
+            selection_mode=(
+                "acquisition" if self.attach_empirical_q0 else "reservoir_order"
+            ),
             metadata={
-                "sampling_mode": "persistent_parallel_research_sessions",
+                "sampling_mode": sampling_mode,
                 "round_idx": request.round_idx,
                 "session_count": len(self.profiles),
                 "candidates_per_session": [
@@ -263,6 +295,7 @@ class IronMindHarnessExpander:
         request: ExpansionRequest,
         results: Sequence[HarnessTurnResult],
         evaluated: set[str],
+        sampling_mode: str,
     ) -> tuple[RawProposal, ...]:
         by_profile = {result.profile_id: result for result in results}
         if len(by_profile) != len(self.profiles):
@@ -299,7 +332,7 @@ class IronMindHarnessExpander:
                         {
                             "collectable": False,
                             "round_idx": request.round_idx,
-                            "sampling_mode": "persistent_parallel_research_sessions",
+                            "sampling_mode": sampling_mode,
                             "harness_lineage": {
                                 "campaign_id": self.campaign_id,
                                 "round_index": request.round_idx,

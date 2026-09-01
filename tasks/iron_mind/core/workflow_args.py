@@ -114,8 +114,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.proposal_max_workers < 1:
         raise SystemExit("--proposal-max-workers must be positive")
-    if args.harness_candidates_per_session < 1 or args.harness_wall_time_seconds < 1:
-        raise SystemExit("Harness candidate and wall-time limits must be positive")
+    if args.search_method == "ldm_harness" and args.harness_candidates_per_session < 1:
+        raise SystemExit("--harness-candidates-per-session must be positive")
+    if args.harness_wall_time_seconds < 1:
+        raise SystemExit("--harness-wall-time-seconds must be positive")
     if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
         raise SystemExit("--harness-response-timeout must be finite and positive")
     try:
@@ -132,11 +134,12 @@ def validate_args(args: argparse.Namespace) -> None:
             )
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
-    _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
-    _validate_non_negative(args.alpha, "--alpha")
-    _validate_non_negative(args.eta, "--eta")
-    if not math.isfinite(args.z_clip) or args.z_clip <= 0:
-        raise SystemExit("--z-clip must be finite and positive")
+    if args.search_method != "harness":
+        _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
+        _validate_non_negative(args.alpha, "--alpha")
+        _validate_non_negative(args.eta, "--eta")
+        if not math.isfinite(args.z_clip) or args.z_clip <= 0:
+            raise SystemExit("--z-clip must be finite and positive")
     if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
         raise SystemExit("--llm-temperature must be finite and between 0 and 2")
     try:
@@ -159,11 +162,11 @@ def _validate_non_negative(value: float, option: str) -> None:
 
 
 def _validate_search_mode(args: argparse.Namespace) -> None:
-    if args.search_method == "harness":
-        raise SystemExit("Standalone Harness is not implemented for Iron Mind yet")
-    if args.search_method == "ldm_harness":
+    if args.search_method in {"ldm_harness", "harness"}:
         if args.proposal_mode != "none":
-            raise SystemExit("--search-method=ldm_harness requires --proposal-mode=none")
+            raise SystemExit(
+                f"--search-method={args.search_method} requires --proposal-mode=none"
+            )
         return
     model_method = args.search_method in {"ldm", "llm"}
     if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:

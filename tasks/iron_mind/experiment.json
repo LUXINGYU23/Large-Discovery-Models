@@ -249,6 +249,54 @@
         "z-clip": 2.0
       }
     },
+    "pilot_evaluation_harness": {
+      "description": "Six-round fixed-budget direct research Harness comparison on source-pinned Iron Mind tables.",
+      "budget": {
+        "outer_iterations": 6,
+        "proposal_attempts": 5,
+        "harness_turns": 5,
+        "valid_search_candidates": 6,
+        "selected_candidates": 6,
+        "external_evaluations": 6,
+        "expensive_evaluation_attempts": 6,
+        "successful_evaluations": 6,
+        "benchmark_jobs": 6
+      },
+      "locked_args": {
+        "proposal-mode": "none",
+        "search-method": "harness",
+        "iterations": 6,
+        "evaluations-per-round": 1,
+        "proposal-samples": 1,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "initialization-mode": "shared_random"
+      }
+    },
+    "pilot_evaluation_extended_harness": {
+      "description": "Twelve-round fixed-budget direct research Harness comparison on source-pinned Iron Mind tables.",
+      "budget": {
+        "outer_iterations": 12,
+        "proposal_attempts": 11,
+        "harness_turns": 11,
+        "valid_search_candidates": 12,
+        "selected_candidates": 12,
+        "external_evaluations": 12,
+        "expensive_evaluation_attempts": 12,
+        "successful_evaluations": 12,
+        "benchmark_jobs": 12
+      },
+      "locked_args": {
+        "proposal-mode": "none",
+        "search-method": "harness",
+        "iterations": 12,
+        "evaluations-per-round": 1,
+        "proposal-samples": 1,
+        "harness-thinking": "max",
+        "harness-wall-time-seconds": 1800,
+        "initialization-mode": "shared_random"
+      }
+    },
     "ldm_harness_official_smoke": {
       "description": "Two-round real capability gate for the persistent Iron Mind research harness.",
       "budget": {

@@ -106,23 +106,31 @@ def build_reaction_task_spec(
     )
 
 
-def build_direct_acquisition() -> AcquisitionSpec:
-    """Describe reservoir-order selection for the direct-LLM baseline."""
+def build_direct_acquisition(search_method: str) -> AcquisitionSpec:
+    """Describe reservoir-order selection for a direct-evaluation method."""
 
     return AcquisitionSpec(
-        name="direct_llm_reservoir_order",
+        name=f"direct_{search_method}_reservoir_order",
         objective_names=(OBJECTIVE_NAME,),
         score_direction="maximize",
-        selection_rule="evaluate every admitted direct LLM candidate in reservoir order",
+        selection_rule=(
+            "evaluate every admitted direct LLM candidate in reservoir order"
+            if search_method == "llm"
+            else "evaluate every admitted Harness candidate in reservoir order"
+        ),
     )
 
 
-def disabled_surrogate() -> SurrogateSpaceSpec:
-    """Describe the absence of a surrogate in direct-LLM campaigns."""
+def disabled_surrogate(search_method: str) -> SurrogateSpaceSpec:
+    """Describe a direct-evaluation method with no surrogate."""
 
     return SurrogateSpaceSpec(
         kind="none",
-        representation="No surrogate for direct LLM baseline.",
+        representation=(
+            "No surrogate for direct LLM baseline."
+            if search_method == "llm"
+            else "No surrogate for direct Harness evaluation."
+        ),
         dimension_policy="none",
     )
 

@@ -39,8 +39,11 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
-    if args.search_method == "ldm_harness":
-        budget["harness_turns"] = search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method in {"ldm_harness", "harness"}:
+        profile_count = (
+            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 1
+        )
+        budget["harness_turns"] = search_rounds * profile_count
     else:
         budget["llm_requests"] = proposal_requests if args.proposal_mode == "openai" else 0
     return budget
@@ -62,6 +65,8 @@ def _proposal_requests(args: Any, search_rounds: int) -> int:
         return 0
     if args.search_method == "ldm_harness":
         return search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method == "harness":
+        return search_rounds
     per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
     return search_rounds * per_round
 
@@ -69,7 +74,7 @@ def _proposal_requests(args: Any, search_rounds: int) -> int:
 def _valid_candidates(args: Any, domain_size: int, initial: int, search_rounds: int) -> int:
     if args.search_method in {"ldm", "ldm_harness"}:
         return initial + search_rounds * args.proposal_samples
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return initial + search_rounds * args.evaluations_per_round
     remaining = max(0, domain_size - initial)
     return initial + sum(

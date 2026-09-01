@@ -73,9 +73,7 @@ class CampaignComponentOptions:
             raise ValueError("Proposal and BO pool sizes must be positive.")
         if self.search_method in {"ldm", "ldm_harness"} and self.proposal_samples <= self.bo_pool_size:
             raise ValueError("LDM proposal samples must exceed the BO pool size.")
-        if self.search_method == "harness":
-            raise ValueError("Standalone Harness is not implemented for Iron Mind yet")
-        if self.search_method == "ldm_harness":
+        if self.search_method in {"ldm_harness", "harness"}:
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
             expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
@@ -85,7 +83,8 @@ class CampaignComponentOptions:
             raise ValueError("Direct model search methods require a proposal client.")
         if self.proposal_max_workers < 1 or self.selection_seed < 0:
             raise ValueError("Worker count must be positive and seed non-negative.")
-        _validate_acquisition_options(self)
+        if self.search_method != "harness":
+            _validate_acquisition_options(self)
         if self.search_method in {"ldm", "llm"}:
             validate_prompt_policy(self.prompt_policy)
 
@@ -112,7 +111,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         (
             selector.describe()
             if selector is not None
-            else task_contracts.build_direct_acquisition()
+            else task_contracts.build_direct_acquisition(options.search_method)
         ),
         proposal_samples=options.proposal_samples,
         bo_pool_size=options.bo_pool_size,
@@ -123,7 +122,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         surrogate=(
             encoder.describe()
             if encoder is not None
-            else task_contracts.disabled_surrogate()
+            else task_contracts.disabled_surrogate(options.search_method)
         ),
         domain_size=finite_domain_size(options.table),
         harness_profile_count=len(options.harness_profiles),
@@ -174,7 +173,7 @@ def build_base_reaction_selector(
 
 
 def _search_components(options: CampaignComponentOptions):
-    if options.search_method == "llm":
+    if options.search_method in {"llm", "harness"}:
         return None, None
     encoder = ReactionOneHotEncoder(options.schema)
     if options.search_method == "bo":
@@ -199,7 +198,7 @@ def _search_components(options: CampaignComponentOptions):
 def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain) -> ReservoirExpander:
     if options.search_method == "bo":
         search: ReservoirExpander = FullReactionDomainExpander(options.table)
-    elif options.search_method == "ldm_harness":
+    elif options.search_method in {"ldm_harness", "harness"}:
         assert options.harness_client is not None
         search = IronMindHarnessExpander(
             options.harness_client,
@@ -207,6 +206,7 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
             profiles=options.harness_profiles,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
+            attach_empirical_q0=options.search_method == "ldm_harness",
             account=options.account_harness_usage,
         )
     else:

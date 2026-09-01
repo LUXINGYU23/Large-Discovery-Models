@@ -40,8 +40,9 @@ from tasks.iron_mind.core.factory import (
 from tasks.iron_mind.core.harness import (
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
+    direct_harness_profile,
     harness_candidate_schema,
-    harness_profiles,
+    harness_profiles as parallel_harness_profiles,
     harness_tool_extensions,
     write_harness_space_catalog,
 )
@@ -87,21 +88,37 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
 
 def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskSpec:
     schema = table.schema
-    encoder = ReactionOneHotEncoder(schema) if args.search_method != "llm" else None
+    encoder = (
+        None
+        if args.search_method in {"llm", "harness"}
+        else ReactionOneHotEncoder(schema)
+    )
     selector = _selector(args, schema, encoder)
     return build_reaction_task_spec(
         schema,
-        selector.describe() if selector is not None else build_direct_acquisition(),
-        proposal_samples=args.proposal_samples,
+        (
+            selector.describe()
+            if selector is not None
+            else build_direct_acquisition(args.search_method)
+        ),
+        proposal_samples=_proposal_samples(args),
         bo_pool_size=args.bo_pool_size,
         proposal_max_workers=args.proposal_max_workers,
         prompt_policy=args.prompt_policy,
         search_method=args.search_method,
         initialization_mode=args.initialization_mode,
-        surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
+        surrogate=(
+            encoder.describe()
+            if encoder is not None
+            else disabled_surrogate(args.search_method)
+        ),
         domain_size=finite_domain_size(table),
         harness_profile_count=(
-            len(HARNESS_PROFILE_IDS) if args.search_method == "ldm_harness" else 0
+            len(HARNESS_PROFILE_IDS)
+            if args.search_method == "ldm_harness"
+            else 1
+            if args.search_method == "harness"
+            else 0
         ),
     )
 
@@ -133,7 +150,7 @@ def _run_campaign(
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
     runtime = _open_runtime(args, table, task_spec, contract, profile_name)
-    if args.search_method == "ldm_harness":
+    if args.search_method in {"ldm_harness", "harness"}:
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
@@ -162,11 +179,7 @@ def _components(args, table, runtime, client, harness_client):
         if args.proposal_mode == "openai"
         else None
     )
-    profiles = (
-        harness_profiles(args.harness_candidates_per_session)
-        if args.search_method == "ldm_harness"
-        else ()
-    )
+    profiles = _harness_profiles(args)
     return build_campaign_components(
         CampaignComponentOptions(
             client=client,
@@ -174,7 +187,7 @@ def _components(args, table, runtime, client, harness_client):
             table=table,
             sink=sink,
             runtime=runtime,
-            proposal_samples=args.proposal_samples,
+            proposal_samples=_proposal_samples(args),
             bo_pool_size=args.bo_pool_size,
             search_method=args.search_method,
             initialization_mode=args.initialization_mode,
@@ -189,7 +202,9 @@ def _components(args, table, runtime, client, harness_client):
             harness_client=harness_client,
             harness_profiles=profiles,
             account_harness_usage=(
-                runtime.consume_many if args.search_method == "ldm_harness" else None
+                runtime.consume_many
+                if args.search_method in {"ldm_harness", "harness"}
+                else None
             ),
         )
     )
@@ -249,7 +264,7 @@ def _harness_client(
             args.harness_image,
         )
     )
-    profiles = harness_profiles(args.harness_candidates_per_session)
+    profiles = _harness_profiles(args)
     config = HarnessPoolConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
@@ -425,7 +440,7 @@ def _proposal_client(
 
 
 def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncoder | None):
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return None
     assert encoder is not None
     if args.search_method == "bo":
@@ -450,6 +465,22 @@ def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncode
 def _reservoir_size(args, components) -> int:
     if args.search_method in {"ldm", "ldm_harness"}:
         return args.proposal_samples
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return args.evaluations_per_round
     return components.task_spec.reservoir.max_size or args.proposal_samples
+
+
+def _proposal_samples(args) -> int:
+    return (
+        args.evaluations_per_round
+        if args.search_method == "harness"
+        else args.proposal_samples
+    )
+
+
+def _harness_profiles(args):
+    if args.search_method == "ldm_harness":
+        return parallel_harness_profiles(args.harness_candidates_per_session)
+    if args.search_method == "harness":
+        return direct_harness_profile(args.evaluations_per_round)
+    return ()
