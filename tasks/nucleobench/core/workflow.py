@@ -22,6 +22,7 @@ from ldm_tts.engine.reporting import (
     write_trajectory_csv,
 )
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write, unique_run_dir
+from ldm_tts.harness import DEFAULT_NETWORK_TOOL_BUDGETS, parse_tool_call_budgets
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -31,6 +32,10 @@ from ldm_tts.transport.openai import WIRE_APIS
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.constants import SEARCH_METHODS, TASK_ID
 from tasks.nucleobench.core.factory import build_mock_engine
+from tasks.nucleobench.core.harness import (
+    DIRECT_HARNESS_PROFILE_ID,
+    HARNESS_PROFILE_IDS,
+)
 from tasks.nucleobench.core.mock import MOCK_CASE, build_mock_task_spec
 from tasks.nucleobench.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
@@ -49,6 +54,9 @@ LLM_REASONING_LEVELS = (
     "high",
     "xhigh",
     "max",
+)
+HARNESS_THINKING_LEVELS = tuple(
+    level for level in LLM_REASONING_LEVELS if level != "none"
 )
 
 
@@ -88,6 +96,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-temperature", type=float, default=0.7)
     parser.add_argument("--llm-extra-body-json", default="{}")
     parser.add_argument("--api-key-file", type=Path)
+    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument(
+        "--harness-thinking",
+        choices=HARNESS_THINKING_LEVELS,
+        default="off",
+    )
+    parser.add_argument("--harness-mcp-config", type=Path)
+    parser.add_argument("--harness-cache-dir", type=Path)
+    parser.add_argument("--harness-docker-host")
+    parser.add_argument("--harness-container-user")
+    parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
+    parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
+    parser.add_argument(
+        "--harness-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+    )
+    parser.add_argument(
+        "--no-harness-context7",
+        action="store_false",
+        dest="harness_context7",
+        default=True,
+    )
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
     parser.add_argument("--run-name")
     parser.add_argument("--dry-run", action="store_true")
@@ -108,8 +139,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--llm-timeout must be finite and positive")
     if not math.isfinite(args.llm_temperature) or not 0 <= args.llm_temperature <= 2:
         parser.error("--llm-temperature must be finite and between 0 and 2")
+    if (
+        not math.isfinite(args.harness_response_timeout)
+        or args.harness_response_timeout <= 0
+    ):
+        parser.error("--harness-response-timeout must be finite and positive")
+    if args.harness_wall_time_seconds < 1:
+        parser.error("--harness-wall-time-seconds must be positive")
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = [
+            value
+            for value in DEFAULT_NETWORK_TOOL_BUDGETS
+            if args.harness_context7
+            or not value.startswith(("resolve-library-id=", "query-docs="))
+        ]
     try:
         _parse_extra_body(args.llm_extra_body_json)
+        parse_tool_call_budgets(args.harness_tool_budget)
     except (TypeError, ValueError) as exc:
         parser.error(str(exc))
     if args.mock and args.case_id != MOCK_CASE.case_id:
@@ -158,10 +204,19 @@ def main(argv: list[str] | None = None) -> int:
                 "configured": bool(
                     provider.base_url and provider.model and provider.api_key
                 ),
-                "wire_api": args.llm_wire_api,
-                "reasoning": args.llm_reasoning,
+                "wire_api": (
+                    "responses"
+                    if args.search_method in {"ldm_harness", "harness"}
+                    else args.llm_wire_api
+                ),
+                "reasoning": (
+                    args.harness_thinking
+                    if args.search_method in {"ldm_harness", "harness"}
+                    else args.llm_reasoning
+                ),
             }
         ),
+        "harness": _harness_description(args),
     }
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -237,6 +292,30 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
         key: str(value) if isinstance(value, Path) else value
         for key, value in vars(args).items()
         if key != "api_key_file"
+    }
+
+
+def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.search_method not in {"ldm_harness", "harness"}:
+        return None
+    profiles = (
+        HARNESS_PROFILE_IDS
+        if args.search_method == "ldm_harness"
+        else (DIRECT_HARNESS_PROFILE_ID,)
+    )
+    return {
+        "research_mode": "open_research",
+        "image": args.harness_image,
+        "profile_ids": list(profiles),
+        "session_count": len(profiles),
+        "candidates_per_session": args.evaluations_per_round,
+        "thinking": args.harness_thinking,
+        "wall_time_seconds": args.harness_wall_time_seconds,
+        "response_timeout_seconds": args.harness_response_timeout,
+        "tool_call_budgets": parse_tool_call_budgets(args.harness_tool_budget),
+        "context7_enabled": args.harness_context7,
+        "mcp_configured": args.harness_mcp_config is not None,
+        "skills_loaded": False,
     }
 
 

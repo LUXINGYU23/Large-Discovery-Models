@@ -61,7 +61,11 @@ def build_task_spec(
     if acquisition is None:
         acquisition = (
             AcquisitionSpec(
-                name="direct_evaluation",
+                name=(
+                    "direct_harness_reservoir_order"
+                    if search_method == "harness"
+                    else "direct_evaluation"
+                ),
                 objective_names=("utility",),
                 score_direction="reservoir_order",
                 selection_rule="evaluate the emitted minibatch without surrogate ranking",
@@ -82,27 +86,71 @@ def build_task_spec(
                 ),
             )
         )
-    ldm_method = search_method in {"ldm", "ldm_harness"}
-    response_name = "mutation_patch_batch_json" if ldm_method else "mutation_patch_json"
-    response_spaces = (
-        (_batch_response_space(evaluations_per_round),)
-        if ldm_method
-        else (_single_response_space(),)
-    )
-    reservoir_size = (
-        4 * evaluations_per_round
-        if search_method in {"ldm", "ldm_harness", "bo"}
-        else evaluations_per_round
-    )
-    if ldm_method:
-        request_count = 4
+    if search_method == "ldm":
+        response_name = "mutation_patch_batch_json"
+        response_spaces = (_indexed_batch_response_space(evaluations_per_round),)
+        reservoir_size = 4 * evaluations_per_round
+        proposal_name = "parallel_independent_minibatch_requests"
+        proposal_parameters = {
+            "request_count": 4,
+            "candidates_per_request": evaluations_per_round,
+            "max_workers": min(proposal_max_workers, 4),
+        }
+        model_request_count: int | None = 4
+        session_turn_count: int | None = None
+        candidates_per_model_request: int | None = evaluations_per_round
+    elif search_method == "ldm_harness":
+        response_name = "harness_mutation_patch_batch_json"
+        response_spaces = (_harness_batch_response_space(evaluations_per_round),)
+        reservoir_size = 4 * evaluations_per_round
+        proposal_name = "persistent_parallel_research_sessions"
+        proposal_parameters = {
+            "profile_count": 4,
+            "candidates_per_session": evaluations_per_round,
+            "skills_loaded": False,
+        }
+        model_request_count = None
+        session_turn_count = 4
+        candidates_per_model_request = None
+    elif search_method == "bo":
+        response_name = "mutation_patch_json"
+        response_spaces = (_single_response_space(),)
+        reservoir_size = 4 * evaluations_per_round
+        proposal_name = "bo_mutation_search"
+        proposal_parameters = {
+            "request_count": 0,
+            "candidates_per_request": 1,
+            "max_workers": 0,
+        }
+        model_request_count = 0
+        session_turn_count = None
+        candidates_per_model_request = None
     elif search_method == "llm":
-        request_count = evaluations_per_round
-    elif search_method == "harness":
-        request_count = 1
+        response_name = "mutation_patch_json"
+        response_spaces = (_single_response_space(),)
+        reservoir_size = evaluations_per_round
+        proposal_name = "parallel_independent_single_candidate_requests"
+        proposal_parameters = {
+            "request_count": evaluations_per_round,
+            "candidates_per_request": 1,
+            "max_workers": min(proposal_max_workers, evaluations_per_round),
+        }
+        model_request_count = evaluations_per_round
+        session_turn_count = None
+        candidates_per_model_request = 1
     else:
-        request_count = 0
-    effective_workers = min(proposal_max_workers, request_count) if request_count else 0
+        response_name = "harness_mutation_patch_batch_json"
+        response_spaces = (_harness_batch_response_space(evaluations_per_round),)
+        reservoir_size = evaluations_per_round
+        proposal_name = "persistent_direct_research_session"
+        proposal_parameters = {
+            "profile_count": 1,
+            "candidates_per_session": evaluations_per_round,
+            "skills_loaded": False,
+        }
+        model_request_count = None
+        session_turn_count = 1
+        candidates_per_model_request = None
     return LDMTaskSpec(
         task=TASK_ID,
         candidate_domain=CandidateDomainSpec(
@@ -144,20 +192,10 @@ def build_task_spec(
         ),
         surrogate=surrogate,
         proposal_search=ProposalSearchSpec(
-            name=(
-                "parallel_independent_minibatch_requests"
-                if search_method == "ldm"
-                else "parallel_independent_single_candidate_requests"
-                if search_method == "llm"
-                else f"{search_method}_mutation_search"
-            ),
+            name=proposal_name,
             breadth=reservoir_size,
             evaluation_policy="official model evaluation through the shared LDM engine",
-            parameters={
-                "request_count": request_count,
-                "candidates_per_request": (evaluations_per_round if ldm_method else 1),
-                "max_workers": effective_workers,
-            },
+            parameters=proposal_parameters,
         ),
         metadata={
             "case_id": case.case_id,
@@ -167,10 +205,9 @@ def build_task_spec(
             "target": case.target,
             "max_seconds": case.max_seconds,
             "search_method": search_method,
-            "model_requests_per_round": request_count,
-            "candidates_per_model_request": (
-                evaluations_per_round if ldm_method else 1
-            ),
+            "model_requests_per_round": model_request_count,
+            "model_session_turns_per_round": session_turn_count,
+            "candidates_per_model_request": candidates_per_model_request,
             "search_breadth": reservoir_size,
         },
     )
@@ -206,7 +243,7 @@ def _single_response_space() -> ResponseSpaceSpec:
     )
 
 
-def _batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
+def _indexed_batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
     return ResponseSpaceSpec(
         name="mutation_patch_batch_json",
         output_kind="json_object",
@@ -232,6 +269,32 @@ def _batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
                             },
                             "mutations": _mutation_schema(),
                         },
+                    },
+                }
+            },
+        },
+    )
+
+
+def _harness_batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
+    return ResponseSpaceSpec(
+        name="harness_mutation_patch_batch_json",
+        output_kind="json_object",
+        description="One complete Harness submission containing the requested mutation patches.",
+        schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["candidates"],
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "minItems": candidate_count,
+                    "maxItems": candidate_count,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["mutations"],
+                        "properties": {"mutations": _mutation_schema()},
                     },
                 }
             },
