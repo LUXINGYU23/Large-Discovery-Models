@@ -55,9 +55,7 @@ class MutationContext:
             or not isinstance(self.start_index, int)
             or not 0 <= self.start_index < OFFICIAL_START_COUNT
         ):
-            raise ValueError(
-                f"start_index must be in [0, {OFFICIAL_START_COUNT - 1}]"
-            )
+            raise ValueError(f"start_index must be in [0, {OFFICIAL_START_COUNT - 1}]")
         if len(self.start_sequence) != self.case.sequence_length:
             raise ValueError("start_sequence length does not match the selected case")
         if not set(self.start_sequence).issubset(DNA_BASES):
@@ -71,10 +69,17 @@ class MutationContext:
             raise ValueError("editable_positions must contain only integers")
         if len(positions) != len(set(positions)):
             raise ValueError("editable_positions must not contain duplicates")
-        if any(position < 0 or position >= self.case.sequence_length for position in positions):
-            raise ValueError("editable_positions contains a position outside the sequence")
+        if any(
+            position < 0 or position >= self.case.sequence_length
+            for position in positions
+        ):
+            raise ValueError(
+                "editable_positions contains a position outside the sequence"
+            )
         if len(positions) != self.case.editable_position_count:
-            raise ValueError("editable_positions count does not match the selected case")
+            raise ValueError(
+                "editable_positions count does not match the selected case"
+            )
         object.__setattr__(self, "editable_positions", tuple(sorted(positions)))
 
 
@@ -265,6 +270,7 @@ def _make_candidate(
     source: str,
     proposal_metadata: Mapping[str, Any] | None = None,
 ) -> Candidate:
+    proposal_metadata = proposal_metadata or {}
     metadata = {
         "case_id": context.case.case_id,
         "start_set_digest": context.start_set_digest,
@@ -272,9 +278,27 @@ def _make_candidate(
         "sequence_sha256": prepared.sequence_sha256,
         "hamming_distance": prepared.hamming_distance,
     }
-    q0 = (proposal_metadata or {}).get(NUCLEOBENCH_Q0_METADATA_KEY)
+    q0 = proposal_metadata.get(NUCLEOBENCH_Q0_METADATA_KEY)
     if isinstance(q0, Mapping):
         metadata[NUCLEOBENCH_Q0_METADATA_KEY] = dict(q0)
+    lineage = {
+        key: proposal_metadata[key]
+        for key in (
+            "request_id",
+            "lineage_index",
+            "seed_lineage",
+            "wave_index",
+            "candidate_index",
+            "proposal_index",
+            "prompt_sha256",
+        )
+        if key in proposal_metadata
+    }
+    if lineage:
+        metadata["proposal_lineage"] = lineage
+    harness_lineage = proposal_metadata.get("harness_lineage")
+    if isinstance(harness_lineage, Mapping):
+        metadata["harness_lineage"] = dict(harness_lineage)
     return Candidate(
         candidate_id=f"nucleobench:{prepared.canonical_key}",
         payload=prepared.payload,

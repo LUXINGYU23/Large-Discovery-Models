@@ -353,6 +353,11 @@ def test_direct_llm_refills_rejections_to_a_unique_real_evaluation_batch(
     assert len(client.requests) == 5
     assert len(result.proposals) == len(reservoir.candidates) == 2
     assert result.selection_mode == "reservoir_order"
+    assert (
+        reservoir.candidates[0]
+        .metadata["proposal_lineage"]["request_id"]
+        .startswith("nucleobench-r0004-")
+    )
     assert result.metadata["rejection_counts"] == {
         "historical_duplicate": 1,
         "non_mutable_position": 1,
