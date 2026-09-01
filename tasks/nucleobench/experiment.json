@@ -95,7 +95,8 @@
         "execution-profile": "pilot_evaluation",
         "termination-kind": "rounds",
         "iterations": 12,
-        "initialization-mode": "shared_start"
+        "initialization-mode": "shared_start",
+        "hardware-profile": "n1-highmem-16-cpu"
       }
     },
     "official_benchmark_malinois_k562": {
@@ -108,7 +109,8 @@
         "execution-profile": "official_benchmark",
         "termination-kind": "wall_time",
         "max-seconds": 28800,
-        "initialization-mode": "official_start"
+        "initialization-mode": "official_start",
+        "hardware-profile": "n1-highmem-16-cpu"
       }
     }
   }

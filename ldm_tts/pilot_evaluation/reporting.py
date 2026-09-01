@@ -14,7 +14,6 @@ from typing import Any
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 
-
 METHOD_LABELS = {
     "ldm": "LDM",
     "ldm_harness": "LDM + Research Harness",
@@ -72,13 +71,16 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
         config = _json_object(run_dir / "config.json")
         campaign = _json_object(run_dir / "campaign.json")
         evaluations = int(config["evaluations_per_round"])
-        if len(observations) < evaluations:
+        initialization_evaluations = int(
+            config.get("initialization_evaluations", evaluations)
+        )
+        if initialization_evaluations < 1 or len(observations) < initialization_evaluations:
             raise ValueError(
                 f"checkpoint has fewer observations than its initialization batch: {run_dir}"
             )
         initial_candidate_ids = tuple(
             str(item["candidate"]["candidate_id"])
-            for item in observations[:evaluations]
+            for item in observations[:initialization_evaluations]
         )
         canonical_keys = [
             str(item["candidate"]["canonical_key"])
@@ -96,13 +98,17 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             **_budget_fields(budget),
             "wall_time_seconds": _wall_time(run_dir),
             "evaluations_per_round": evaluations,
-            "expected_evaluations": spec.iterations * evaluations,
-            "evaluation_utilization": len(observations) / (spec.iterations * evaluations),
+            "initialization_evaluations": initialization_evaluations,
+            "expected_evaluations": initialization_evaluations + spec.optimization_rounds * evaluations,
+            "evaluation_utilization": len(observations) / (
+                initialization_evaluations + spec.optimization_rounds * evaluations
+            ),
             "completed_rounds": len(round_rows),
             "proposal_samples": int(config["proposal_samples"]),
             "proposal_candidates_per_request": int(
                 config.get("proposal_candidates_per_request", 1)
             ),
+            "proposal_max_request_waves": int(config.get("proposal_max_request_waves", 1)),
             "harness_candidates_per_session": int(config.get("harness_candidates_per_session", 0)),
             "contract_sha256": str(campaign["contract_sha256"]),
             "initial_candidate_ids": initial_candidate_ids,
@@ -179,7 +185,8 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             expected = _expected_model_proposal_attempts(
                 row, spec.optimization_rounds
             )
-            if actual != expected:
+            maximum = expected * row.get("proposal_max_request_waves", 1)
+            if not expected <= actual <= maximum:
                 errors.append(f"unexpected proposal count for {row['case']}/{row['method']}/{row['seed']}")
         if row["method"] == "ldm_harness":
             per_session = row["harness_candidates_per_session"]
@@ -351,7 +358,7 @@ def _read_trajectory(path: Path) -> list[dict[str, str]]:
 def _budget_fields(budget: dict[str, Any]) -> dict[str, float]:
     counters = budget.get("counters")
     if not isinstance(counters, dict):
-        raise ValueError("budget counters must be an object")
+        raise TypeError("budget counters must be an object")
     return {f"budget_{key}": _finite(value, f"budget {key}") for key, value in counters.items()}
 
 
@@ -359,7 +366,7 @@ def _observations(run_dir: Path) -> list[dict[str, Any]]:
     checkpoint = _json_object(run_dir / "checkpoint.json")
     state = checkpoint.get("state")
     if not isinstance(state, dict) or not isinstance(state.get("observations"), list):
-        raise ValueError(f"invalid checkpoint observations: {run_dir}")
+        raise TypeError(f"invalid checkpoint observations: {run_dir}")
     return state["observations"]
 
 
@@ -385,13 +392,13 @@ def _scalar_at_path(payload: dict[str, Any], path: str) -> float:
 def _json_object(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"expected JSON object: {path}")
+        raise TypeError(f"expected JSON object: {path}")
     return payload
 
 
 def _finite(value: Any, label: str) -> float:
     if isinstance(value, bool):
-        raise ValueError(f"{label} must be numeric")
+        raise TypeError(f"{label} must be numeric")
     result = float(value)
     if not math.isfinite(result):
         raise ValueError(f"{label} must be finite")

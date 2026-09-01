@@ -6,7 +6,6 @@ from pathlib import Path
 
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -80,3 +79,25 @@ def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, t
     assert synthon.method_overrides["harness"][0] == (
         'contract_profile="pilot_evaluation_extended_harness"'
     )
+
+def test_nucleobench_matrix_keeps_one_shared_start_and_five_methods(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("NUCLEOBENCH_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("NUCLEOBENCH_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("NUCLEOBENCH_SOURCE_ROOT", str(tmp_path / "source"))
+    monkeypatch.setenv("NUCLEOBENCH_WORK_ROOT", str(tmp_path / "work"))
+    monkeypatch.setenv("NUCLEOBENCH_START_SET_SHA256", "a" * 64)
+
+    spec = load_pilot_evaluation_spec(
+        REPO_ROOT / "config" / "pilot_evaluation" / "nucleobench.yaml"
+    )
+
+    assert spec.task == "nucleobench"
+    assert spec.methods == ("ldm", "ldm_harness", "bo", "llm", "harness")
+    assert spec.seeds == (0, 1, 2)
+    assert spec.iterations == 12
+    assert spec.initialization_mode == "shared_start"
+    assert spec.trajectory.step_kind == "round"
+    assert spec.trajectory.objective_column == "utility"
+    assert spec.method_overrides["llm"] == ("args.proposal-samples=16",)

@@ -122,6 +122,28 @@ def test_model_proposal_budget_counts_minibatch_requests() -> None:
     assert _expected_model_proposal_attempts(llm, 11) == 176
 
 
+def test_model_proposal_integrity_allows_bounded_refill_requests() -> None:
+    spec = SimpleNamespace(methods=("ldm",), iterations=12, optimization_rounds=11)
+    row = {
+        "case": "case",
+        "method": "ldm",
+        "seed": 0,
+        "completed_rounds": 12,
+        "budget_outer_iterations": 12,
+        "candidate_ids_unique": True,
+        "budget_llm_requests": 47,
+        "budget_proposal_attempts": 47,
+        "proposal_samples": 64,
+        "evaluations_per_round": 16,
+        "proposal_candidates_per_request": 16,
+        "proposal_max_request_waves": 4,
+        "harness_candidates_per_session": 0,
+        "initial_candidate_ids": ("shared",),
+    }
+
+    assert _integrity(spec, [row], [{}] * 12) == {"valid": True, "errors": []}
+
+
 def test_evaluation_index_trajectory_uses_checkpoint_rounds_with_short_batches(
     tmp_path: Path,
 ) -> None:

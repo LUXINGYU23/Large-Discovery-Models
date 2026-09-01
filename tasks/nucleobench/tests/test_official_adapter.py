@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from argparse import Namespace
 import hashlib
 import json
 import subprocess
+from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -269,7 +269,9 @@ def test_recording_model_preserves_output_and_records_only_sequence_digests(
     assert "AAAAAAAA" not in json.dumps(event)
 
 
-def test_official_driver_preserves_raw_outputs_and_finishes_once(tmp_path: Path) -> None:
+def test_official_driver_preserves_raw_outputs_and_finishes_once(
+    tmp_path: Path,
+) -> None:
     designer, model, runtime = _build_designer(tmp_path)
     output_dir = runtime.run_dir / "official"
     all_args = build_official_runner_args(
@@ -306,11 +308,30 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(tmp_path: Path)
         designer=designer,
         all_args=all_args,
         runtime=runtime,
-        case_id="mock_dna",
+        execution={
+            "execution_profile": "qualification",
+            "termination_kind": "rounds",
+            "total_rounds": 3,
+            "active_optimization_rounds": 2,
+            "initialization_evaluations": 1,
+            "benchmark_comparable": False,
+            "case_id": "mock_dna",
+            "start_index": 0,
+            "start_set_digest": MOCK_CONTEXT.start_set_digest,
+            "optimization_seed": 0,
+            "hardware_profile": "test-cpu",
+            "search_method": "bo",
+            "method_preset_sha256": "1" * 64,
+            "max_seconds": None,
+        },
+        oracle_manifest={"schema_version": 1, "oracle": "fixture"},
+        expected_active_steps=2,
     )
 
     raw_output = next(
-        item for item in result["official_outputs"] if item["path"].endswith("results.parquet")
+        item
+        for item in result["official_outputs"]
+        if item["path"].endswith("results.parquet")
     )
     assert raw_output["sha256"] == hashlib.sha256(b"official-raw-output").hexdigest()
     assert json.loads((runtime.run_dir / "result.json").read_text()) == result
@@ -318,12 +339,15 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(tmp_path: Path)
     assert designer.active_steps == 2
     assert model.call_count == 6
     assert MOCK_START_SEQUENCE not in runtime.event_path.read_text()
-    assert sum(
-        event["event_type"] == "campaign_finished" for event in runtime.events()
-    ) == 1
+    assert (
+        sum(event["event_type"] == "campaign_finished" for event in runtime.events())
+        == 1
+    )
 
 
-def test_official_runner_args_require_exactly_one_termination_mode(tmp_path: Path) -> None:
+def test_official_runner_args_require_exactly_one_termination_mode(
+    tmp_path: Path,
+) -> None:
     common = {
         "parsed_args_type": SimpleNamespace,
         "model_name": "malinois",

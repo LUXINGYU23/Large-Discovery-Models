@@ -1,0 +1,30 @@
+schema_version: 1
+name: nucleobench_malinois_k562_pilot
+task: nucleobench
+base_config: ../nucleobench/malinois_k562_pilot_base.yaml
+cases:
+  - id: malinois_k562
+    overrides:
+      - args.case-id="malinois_k562"
+      - args.start-index=0
+methods: [ldm, ldm_harness, bo, llm, harness]
+method_overrides:
+  ldm: []
+  ldm_harness: []
+  bo: []
+  llm:
+    - args.proposal-samples=16
+  harness:
+    - args.proposal-samples=16
+seeds: [0, 1, 2]
+optimization_rounds: 11
+initialization_mode: shared_start
+output_root: ${NUCLEOBENCH_RUNS_ROOT}/pilot_evaluation
+trajectory:
+  step_column: round
+  step_kind: round
+  objective_column: utility
+  direction: maximize
+result_fields:
+  best_found_utility: best_found_utility
+  best_found_energy: best_found_energy

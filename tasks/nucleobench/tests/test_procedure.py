@@ -53,6 +53,12 @@ def test_experiment_contract_is_draft_with_both_termination_profiles() -> None:
         ]
         == "wall_time"
     )
+    assert (
+        contract.profile("official_benchmark_malinois_k562").locked_args[
+            "hardware-profile"
+        ]
+        == "n1-highmem-16-cpu"
+    )
 
 
 def test_dry_run_describes_the_selected_case(capsys) -> None:
@@ -68,6 +74,15 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
     assert payload["ldm_task_spec"]["response_spaces"][0]["name"] == (
         "mutation_patch_batch_json"
     )
+    assert payload["execution"] == {
+        "active_optimization_rounds": 1,
+        "benchmark_comparable": False,
+        "execution_profile": "qualification",
+        "hardware_profile": "n1-highmem-16-cpu",
+        "initialization_evaluations": 1,
+        "termination_kind": "rounds",
+        "total_rounds": 2,
+    }
 
 
 def test_direct_method_contracts_match_the_required_request_shapes() -> None:
@@ -206,9 +221,89 @@ def test_bo_dry_run_does_not_require_or_read_provider_credentials(capsys) -> Non
     }
 
 
-def test_execution_is_rejected_before_qualification() -> None:
+def test_pilot_execution_is_rejected_before_qualification() -> None:
     with pytest.raises(SystemExit, match="not qualified"):
-        main(["--case-id", "malinois_k562"])
+        main(
+            [
+                "--case-id",
+                "malinois_k562",
+                "--execution-profile",
+                "pilot_evaluation",
+                "--termination-kind",
+                "rounds",
+                "--initialization-mode",
+                "shared_start",
+                "--iterations",
+                "12",
+            ]
+        )
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        [
+            "--execution-profile",
+            "official_benchmark",
+            "--termination-kind",
+            "wall_time",
+            "--max-seconds",
+            "28800",
+            "--iterations",
+            "12",
+            "--initialization-mode",
+            "official_start",
+        ],
+        [
+            "--execution-profile",
+            "pilot_evaluation",
+            "--termination-kind",
+            "rounds",
+            "--iterations",
+            "12",
+            "--max-seconds",
+            "28800",
+            "--initialization-mode",
+            "shared_start",
+        ],
+        [
+            "--execution-profile",
+            "pilot_evaluation",
+            "--termination-kind",
+            "wall_time",
+            "--max-seconds",
+            "28800",
+            "--initialization-mode",
+            "shared_start",
+        ],
+    ],
+)
+def test_execution_profiles_reject_mixed_or_mismatched_termination(
+    argv: list[str],
+) -> None:
+    with pytest.raises(SystemExit):
+        parse_args(argv)
+
+
+def test_release_configs_use_one_real_workflow_and_distinct_termination_modes() -> None:
+    names = {
+        "malinois_k562_seed_qualification.yaml": ("qualification", "rounds"),
+        "malinois_k562_tiny_campaign.yaml": ("qualification", "rounds"),
+        "malinois_k562_pilot_base.yaml": ("pilot_evaluation", "rounds"),
+        "malinois_k562_official_base.yaml": ("official_benchmark", "wall_time"),
+    }
+
+    for filename, expected in names.items():
+        config_path = CONFIG_ROOT / filename
+        config = load_config(config_path)
+        plan = build_plan(config, config_path)
+        assert plan["module"] == "tasks.nucleobench.ldm_task.procedure"
+        assert config["args"]["execution-profile"] == expected[0]
+        assert config["args"]["termination-kind"] == expected[1]
+
+    official = load_config(CONFIG_ROOT / "malinois_k562_official_base.yaml")
+    assert "iterations" not in official["args"]
+    assert official["args"]["max-seconds"] == 28800
 
 
 def test_mock_config_uses_the_registered_shared_runner() -> None:
