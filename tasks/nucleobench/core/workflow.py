@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from argparse import Namespace
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.constants import TASK_ID
 from tasks.nucleobench.core.factory import build_mock_engine
 from tasks.nucleobench.core.mock import MOCK_CASE, build_mock_task_spec
+from tasks.nucleobench.core.reporting import inventory_official_outputs
 from tasks.nucleobench.core.task_spec import build_task_spec
 
 
@@ -46,7 +49,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.iterations < 1:
         parser.error("--iterations must be positive")
     if args.mock and args.iterations < 2:
-        parser.error("--iterations must be at least 2 for initialization and active search")
+        parser.error(
+            "--iterations must be at least 2 for initialization and active search"
+        )
     if args.reservoir_size < 1 or args.evaluations_per_round < 1:
         parser.error("reservoir and evaluation counts must be positive")
     if args.mock and args.case_id != MOCK_CASE.case_id:
@@ -79,7 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args.mock:
         raise SystemExit(
-            "NucleoBench official execution is not qualified; run the mock profile or use --dry-run."
+            "NucleoBench official execution is not qualified; "
+            "run the mock profile or use --dry-run."
         )
     return _run_mock(args, contract, profile_name, payload)
 
@@ -150,4 +156,107 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-__all__ = ["describe_ldm_task", "main", "parse_args"]
+def build_official_runner_args(
+    parsed_args_type: type,
+    *,
+    model_name: str,
+    optimization_name: str,
+    start_sequence: str,
+    positions_to_mutate: Sequence[int] | None,
+    output_path: Path,
+    proposals_per_round: int,
+    max_seconds: int | None = None,
+    max_number_of_rounds: int | None = None,
+    model_init_args: Mapping[str, Any] | None = None,
+    optimizer_init_args: Mapping[str, Any] | None = None,
+) -> Any:
+    if (max_seconds is None) == (max_number_of_rounds is None):
+        raise ValueError("official runner requires exactly one termination mode")
+    if max_seconds is not None and max_seconds < 1:
+        raise ValueError("max_seconds must be positive")
+    if max_number_of_rounds is not None and max_number_of_rounds < 1:
+        raise ValueError("max_number_of_rounds must be positive")
+    if proposals_per_round < 1:
+        raise ValueError("proposals_per_round must be positive")
+    main_args = Namespace(
+        model=model_name,
+        optimization=optimization_name,
+        start_sequence=start_sequence,
+        positions_to_mutate=(
+            None if positions_to_mutate is None else list(positions_to_mutate)
+        ),
+        output_path=str(Path(output_path)),
+        optimization_steps_per_output=1,
+        proposals_per_round=proposals_per_round,
+        max_seconds=max_seconds,
+        max_number_of_rounds=max_number_of_rounds,
+        ignore_errors=False,
+        ignore_empty_cmd_args=False,
+    )
+    return parsed_args_type(
+        main_args=main_args,
+        model_init_args=Namespace(**dict(model_init_args or {})),
+        opt_init_args=Namespace(**dict(optimizer_init_args or {})),
+    )
+
+
+def run_official_driver(
+    *,
+    run_loop: Callable[..., Any],
+    model: Callable[[Sequence[str]], Any],
+    designer: Any,
+    all_args: Any,
+    runtime: CampaignRuntime,
+    case_id: str,
+) -> dict[str, Any]:
+    try:
+        run_loop(
+            model=model,
+            opt=designer,
+            all_args=all_args,
+            ignore_errors=False,
+        )
+        official_outputs = inventory_official_outputs(
+            Path(all_args.main_args.output_path),
+            runtime.run_dir,
+        )
+    except Exception as exc:
+        status = json.loads(runtime.status.path.read_text(encoding="utf-8"))
+        if status.get("status") != "failed":
+            runtime.fail(exc)
+        raise
+
+    summary = {
+        **designer.summary(),
+        "stop_reason": "official_driver_finished",
+        "official_output_count": len(official_outputs),
+    }
+    runtime.finish(summary)
+    result = {
+        **build_campaign_result(
+            runtime.run_dir,
+            objective_name="utility",
+            direction="maximize",
+        ),
+        "mode": "official_benchmark",
+        "case_id": case_id,
+        "official_outputs": official_outputs,
+        "artifacts": {
+            "summary": "summary.json",
+            "official_output_root": Path(all_args.main_args.output_path)
+            .resolve()
+            .relative_to(runtime.run_dir.resolve())
+            .as_posix(),
+        },
+    }
+    atomic_json_write(runtime.run_dir / "result.json", result)
+    return result
+
+
+__all__ = [
+    "build_official_runner_args",
+    "describe_ldm_task",
+    "main",
+    "parse_args",
+    "run_official_driver",
+]

@@ -30,7 +30,11 @@ class NucleoBenchEvaluator:
         prepared = []
         sequences = []
         for candidate in candidates:
-            item = prepare_candidate_payload(candidate.payload, self.context)
+            item = prepare_candidate_payload(
+                candidate.payload,
+                self.context,
+                allow_empty=True,
+            )
             if item.canonical_key != candidate.canonical_key:
                 raise ValueError("candidate identity does not match its mutation patch")
             prepared.append(item)
@@ -46,9 +50,12 @@ class NucleoBenchEvaluator:
         for candidate, item, raw_energy in zip(
             candidates, prepared, energies, strict=True
         ):
-            if isinstance(raw_energy, bool) or not isinstance(raw_energy, (int, float)):
+            if isinstance(raw_energy, (bool, str, bytes)):
                 raise ValueError("batch scorer energies must be numeric")
-            energy = float(raw_energy)
+            try:
+                energy = float(raw_energy)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("batch scorer energies must be numeric") from exc
             if not math.isfinite(energy):
                 raise ValueError("batch scorer energies must be finite")
             results.append(

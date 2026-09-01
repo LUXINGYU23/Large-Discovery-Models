@@ -103,19 +103,7 @@ class NucleoBenchCandidateDomain:
                 exc.metadata,
             )
 
-        candidate = Candidate(
-            candidate_id=f"nucleobench:{prepared.canonical_key}",
-            payload=prepared.payload,
-            canonical_key=prepared.canonical_key,
-            source=proposal.source,
-            metadata={
-                "case_id": self.context.case.case_id,
-                "start_set_digest": self.context.start_set_digest,
-                "start_index": self.context.start_index,
-                "sequence_sha256": prepared.sequence_sha256,
-                "hamming_distance": prepared.hamming_distance,
-            },
-        )
+        candidate = _make_candidate(self.context, prepared, proposal.source)
         if proposal.metadata.get("collectable"):
             self._collect(candidate, proposal.metadata)
         return candidate
@@ -158,6 +146,8 @@ class NucleoBenchCandidateDomain:
 def prepare_candidate_payload(
     payload: Any,
     context: MutationContext,
+    *,
+    allow_empty: bool = False,
 ) -> PreparedMutationCandidate:
     """Validate and normalize one start-relative mutation patch."""
 
@@ -167,7 +157,11 @@ def prepare_candidate_payload(
         )
     _require_exact_fields(payload, {"mutations"}, "payload")
     raw_mutations = payload["mutations"]
-    if not isinstance(raw_mutations, list) or not raw_mutations:
+    if not isinstance(raw_mutations, list):
+        raise CandidatePayloadError(
+            "invalid_mutations", "Candidate mutations must be a JSON array."
+        )
+    if not raw_mutations and not allow_empty:
         raise CandidatePayloadError(
             "invalid_mutations", "Candidate mutations must be a non-empty JSON array."
         )
@@ -246,6 +240,37 @@ def prepare_candidate_payload(
     )
 
 
+def make_start_candidate(context: MutationContext) -> Candidate:
+    """Represent the paired start as an internal baseline observation."""
+
+    prepared = prepare_candidate_payload(
+        {"mutations": []},
+        context,
+        allow_empty=True,
+    )
+    return _make_candidate(context, prepared, "official_start")
+
+
+def _make_candidate(
+    context: MutationContext,
+    prepared: PreparedMutationCandidate,
+    source: str,
+) -> Candidate:
+    return Candidate(
+        candidate_id=f"nucleobench:{prepared.canonical_key}",
+        payload=prepared.payload,
+        canonical_key=prepared.canonical_key,
+        source=source,
+        metadata={
+            "case_id": context.case.case_id,
+            "start_set_digest": context.start_set_digest,
+            "start_index": context.start_index,
+            "sequence_sha256": prepared.sequence_sha256,
+            "hamming_distance": prepared.hamming_distance,
+        },
+    )
+
+
 def rebuild_sequence(
     start_sequence: str,
     mutations: Sequence[Mapping[str, Any]],
@@ -306,6 +331,7 @@ __all__ = [
     "MutationContext",
     "NucleoBenchCandidateDomain",
     "PreparedMutationCandidate",
+    "make_start_candidate",
     "prepare_candidate_payload",
     "rebuild_sequence",
 ]

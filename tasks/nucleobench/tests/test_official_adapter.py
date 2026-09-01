@@ -1,16 +1,39 @@
 from __future__ import annotations
 
+from argparse import Namespace
 import hashlib
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from tasks.nucleobench.scripts.prepare_official_data import (
-    prepare_case_data,
-    require_clean_revision,
+from ldm_tts.data import DataCollectionSink
+from ldm_tts.engine import LDMEngine
+from ldm_tts.engine.run_store import CampaignRuntime
+from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
+from tasks.nucleobench.core.designer import (
+    NucleoBenchDesigner,
+    initialize_designer_state,
 )
+from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
+from tasks.nucleobench.core.mock import (
+    MOCK_CONTEXT,
+    MOCK_START_SEQUENCE,
+    build_mock_expander,
+    build_mock_task_spec,
+)
+from tasks.nucleobench.core.oracles.malinois import (
+    RecordingSequenceModel,
+    load_prepared_malinois,
+)
+from tasks.nucleobench.core.source import require_clean_revision
+from tasks.nucleobench.core.workflow import (
+    build_official_runner_args,
+    run_official_driver,
+)
+from tasks.nucleobench.scripts.prepare_official_data import prepare_case_data
 
 
 def _start_sequences() -> list[str]:
@@ -76,6 +99,10 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
     assert json.loads((output / "editable_positions.json").read_text()) == list(
         range(200)
     )
+    prepared = load_prepared_malinois(output, start_index=7)
+    assert prepared.context.start_sequence == _start_sequences()[7]
+    assert prepared.context.editable_positions == tuple(range(200))
+    assert prepared.model_artifact == model.resolve()
 
 
 def test_prepare_case_data_rejects_unverified_or_invalid_inputs(tmp_path: Path) -> None:
@@ -152,3 +179,170 @@ def test_source_revision_check_rejects_dirty_or_mismatched_checkouts(
     (source / "README.md").write_text("dirty\n", encoding="utf-8")
     with pytest.raises(ValueError, match="dirty"):
         require_clean_revision(source, revision)
+
+
+def _build_designer(tmp_path: Path):
+    task_spec = build_mock_task_spec()
+    runtime = CampaignRuntime.open(
+        tmp_path / "campaign",
+        task="nucleobench",
+        task_spec=task_spec,
+    )
+
+    def score(sequences):
+        return [
+            -float(sum(index + 1 for index, base in enumerate(sequence) if base != "A"))
+            for sequence in sequences
+        ]
+
+    model = RecordingSequenceModel(score, runtime)
+    evaluator = NucleoBenchEvaluator(MOCK_CONTEXT, model)
+    state = initialize_designer_state(MOCK_CONTEXT, evaluator, runtime)
+    engine = LDMEngine(
+        task_spec=task_spec,
+        expander=build_mock_expander(),
+        candidate_domain=NucleoBenchCandidateDomain(
+            MOCK_CONTEXT,
+            sink=DataCollectionSink.disabled(),
+        ),
+        evaluator=evaluator,
+        runtime=runtime,
+    )
+    designer = NucleoBenchDesigner(
+        engine=engine,
+        state=state,
+        context=MOCK_CONTEXT,
+        reservoir_size=4,
+        evaluations_per_step=2,
+    )
+    return designer, model, runtime
+
+
+def test_designer_advances_exact_steps_and_get_samples_is_read_only(
+    tmp_path: Path,
+) -> None:
+    designer, model, runtime = _build_designer(tmp_path)
+
+    assert designer.get_samples(1) == [MOCK_START_SEQUENCE]
+    assert runtime.budget.counters["initialization_evaluations"] == 1
+    assert runtime.budget.counters.get("external_evaluations", 0) == 0
+    calls_before = model.call_count
+
+    designer.run(2)
+
+    assert designer.active_steps == 2
+    assert designer.state.next_round == 3
+    assert len(designer.state.observations) == 5
+    assert model.call_count == calls_before + 2
+    calls_before = model.call_count
+    samples = designer.get_samples(3)
+    assert len(samples) == 3
+    assert len(set(samples)) == 3
+    assert all(sequence[1::2] == "AAAA" for sequence in samples)
+    assert samples[0] != MOCK_START_SEQUENCE
+    assert model.call_count == calls_before
+    assert json.loads(runtime.status.path.read_text())["phase"] == (
+        "awaiting_external_driver"
+    )
+    assert [
+        event["payload"]["batch_size"]
+        for event in runtime.events()
+        if event["event_type"] == "official_model_called"
+    ] == [1, 2, 2]
+    assert designer.is_finished() is False
+
+
+def test_recording_model_preserves_output_and_records_only_sequence_digests(
+    tmp_path: Path,
+) -> None:
+    runtime = CampaignRuntime.open(tmp_path / "campaign", task="nucleobench")
+    raw = [-1.25, 2.5]
+    model = RecordingSequenceModel(lambda sequences: raw, runtime)
+
+    assert model(["A" * 8, "C" * 8]) is raw
+
+    event = runtime.events()[-1]
+    assert event["event_type"] == "official_model_called"
+    assert event["payload"]["energies"] == raw
+    assert event["payload"]["utilities"] == [1.25, -2.5]
+    assert len(event["payload"]["sequence_sha256"]) == 2
+    assert "AAAAAAAA" not in json.dumps(event)
+
+
+def test_official_driver_preserves_raw_outputs_and_finishes_once(tmp_path: Path) -> None:
+    designer, model, runtime = _build_designer(tmp_path)
+    output_dir = runtime.run_dir / "official"
+    all_args = build_official_runner_args(
+        SimpleNamespace,
+        model_name="malinois",
+        optimization_name="ldm_tts",
+        start_sequence=MOCK_START_SEQUENCE,
+        positions_to_mutate=list(MOCK_CONTEXT.editable_positions),
+        output_path=output_dir,
+        proposals_per_round=2,
+        max_seconds=60,
+        model_init_args={"target_feature": 0},
+        optimizer_init_args={"reservoir_size": 4},
+    )
+
+    def fake_run_loop(*, model, opt, all_args, ignore_errors):
+        assert ignore_errors is False
+        output = Path(all_args.main_args.output_path)
+        output.mkdir(parents=True)
+        (output / "START.txt").write_text("START", encoding="utf-8")
+        model(opt.get_samples(all_args.main_args.proposals_per_round))
+        opt.run(1)
+        model(opt.get_samples(all_args.main_args.proposals_per_round))
+        opt.run(1)
+        model(opt.get_samples(all_args.main_args.proposals_per_round))
+        nested = output / "ldm_tts_malinois" / "fixture"
+        nested.mkdir(parents=True)
+        (nested / "results.parquet").write_bytes(b"official-raw-output")
+        (output / "SUCCESS.txt").write_text("SUCCESS", encoding="utf-8")
+
+    result = run_official_driver(
+        run_loop=fake_run_loop,
+        model=model,
+        designer=designer,
+        all_args=all_args,
+        runtime=runtime,
+        case_id="mock_dna",
+    )
+
+    raw_output = next(
+        item for item in result["official_outputs"] if item["path"].endswith("results.parquet")
+    )
+    assert raw_output["sha256"] == hashlib.sha256(b"official-raw-output").hexdigest()
+    assert json.loads((runtime.run_dir / "result.json").read_text()) == result
+    assert json.loads(runtime.status.path.read_text())["status"] == "completed"
+    assert designer.active_steps == 2
+    assert model.call_count == 6
+    assert MOCK_START_SEQUENCE not in runtime.event_path.read_text()
+    assert sum(
+        event["event_type"] == "campaign_finished" for event in runtime.events()
+    ) == 1
+
+
+def test_official_runner_args_require_exactly_one_termination_mode(tmp_path: Path) -> None:
+    common = {
+        "parsed_args_type": SimpleNamespace,
+        "model_name": "malinois",
+        "optimization_name": "ldm_tts",
+        "start_sequence": MOCK_START_SEQUENCE,
+        "positions_to_mutate": list(MOCK_CONTEXT.editable_positions),
+        "output_path": tmp_path,
+        "proposals_per_round": 2,
+    }
+    with pytest.raises(ValueError, match="exactly one termination mode"):
+        build_official_runner_args(**common)
+    with pytest.raises(ValueError, match="exactly one termination mode"):
+        build_official_runner_args(
+            **common,
+            max_seconds=60,
+            max_number_of_rounds=2,
+        )
+
+    args = build_official_runner_args(**common, max_number_of_rounds=2)
+    assert isinstance(args.main_args, Namespace)
+    assert args.main_args.max_seconds is None
+    assert args.main_args.max_number_of_rounds == 2

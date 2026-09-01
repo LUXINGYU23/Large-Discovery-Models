@@ -17,7 +17,9 @@ The task is registered with a draft experiment contract. Its versioned case
 catalog covers the 17 public NucleoBench tasks, all currently marked
 `planned`. The mutation-patch candidate contract and external data preparation
 command are implemented. A deterministic mock campaign is available for local
-contract verification; official model campaigns are not yet qualified.
+contract verification. The pinned Malinois loader and official
+`SequenceOptimizer`-compatible adapter are implemented, but official model
+campaigns are not yet qualified.
 
 The first implementation target is `malinois_k562`. After that case passes
 source preparation, seed evaluation, a tiny campaign, and qualification, the
