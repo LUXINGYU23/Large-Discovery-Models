@@ -10,8 +10,8 @@ from ldm_tts.cli.runner import build_plan, load_config
 from ldm_tts.registration.experiment import load_experiment_contract
 from tasks.nucleobench.core.cases import CaseCatalogError, load_case_catalog
 from tasks.nucleobench.core.constants import CATALOG_PATH
+from tasks.nucleobench.core.workflow import describe_ldm_task, resolve_provider_settings
 from tasks.nucleobench.ldm_task.procedure import main, parse_args
-
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_ROOT = TASK_ROOT.parents[1] / "config" / "nucleobench"
@@ -41,12 +41,18 @@ def test_experiment_contract_is_draft_with_both_termination_profiles() -> None:
         "pilot_evaluation_malinois_k562",
         "official_benchmark_malinois_k562",
     }
-    assert contract.profile("pilot_evaluation_malinois_k562").locked_args[
-        "termination-kind"
-    ] == "rounds"
-    assert contract.profile("official_benchmark_malinois_k562").locked_args[
-        "termination-kind"
-    ] == "wall_time"
+    assert (
+        contract.profile("pilot_evaluation_malinois_k562").locked_args[
+            "termination-kind"
+        ]
+        == "rounds"
+    )
+    assert (
+        contract.profile("official_benchmark_malinois_k562").locked_args[
+            "termination-kind"
+        ]
+        == "wall_time"
+    )
 
 
 def test_dry_run_describes_the_selected_case(capsys) -> None:
@@ -59,6 +65,145 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
     assert payload["ldm_task_spec"]["candidate_domain"]["kind"] == (
         "nucleotide_mutation_patch"
     )
+    assert payload["ldm_task_spec"]["response_spaces"][0]["name"] == (
+        "mutation_patch_batch_json"
+    )
+
+
+def test_direct_method_contracts_match_the_required_request_shapes() -> None:
+    ldm = describe_ldm_task(
+        parse_args(
+            [
+                "--case-id",
+                "malinois_k562",
+                "--search-method",
+                "ldm",
+                "--evaluations-per-round",
+                "4",
+                "--proposal-max-workers",
+                "3",
+            ]
+        )
+    )
+    direct = describe_ldm_task(
+        parse_args(
+            [
+                "--case-id",
+                "malinois_k562",
+                "--search-method",
+                "llm",
+                "--evaluations-per-round",
+                "4",
+            ]
+        )
+    )
+
+    assert ldm.reservoir.max_size == 16
+    assert ldm.proposal_search.name == "parallel_independent_minibatch_requests"
+    assert ldm.proposal_search.parameters == {
+        "request_count": 4,
+        "candidates_per_request": 4,
+        "max_workers": 3,
+    }
+    assert ldm.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 4
+    assert direct.reservoir.max_size == 4
+    assert (
+        direct.proposal_search.name == "parallel_independent_single_candidate_requests"
+    )
+    assert direct.proposal_search.parameters["request_count"] == 4
+    assert direct.surrogate.kind == "none"
+
+
+def test_provider_configuration_is_user_defined_and_secret_free(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    key_file = tmp_path / "api_key"
+    key_file.write_text("test-secret", encoding="utf-8")
+    monkeypatch.setenv("LLM_BASE_URL", "https://provider.example")
+    monkeypatch.setenv("LLM_MODEL_NAME", "model-name")
+    args = parse_args(
+        [
+            "--case-id",
+            "malinois_k562",
+            "--dry-run",
+            "--llm-wire-api",
+            "responses",
+            "--llm-reasoning",
+            "max",
+            "--api-key-file",
+            str(key_file),
+        ]
+    )
+
+    provider = resolve_provider_settings(args)
+    assert provider.api_key == "test-secret"
+    assert (
+        main(
+            [
+                "--case-id",
+                "malinois_k562",
+                "--dry-run",
+                "--llm-wire-api",
+                "responses",
+                "--llm-reasoning",
+                "max",
+                "--api-key-file",
+                str(key_file),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert payload["proposal_provider"] == {
+        "configured": True,
+        "reasoning": "max",
+        "required": True,
+        "wire_api": "responses",
+    }
+    assert "test-secret" not in output
+    assert str(key_file) not in output
+
+
+def test_bo_dry_run_does_not_require_or_read_provider_credentials(capsys) -> None:
+    assert (
+        main(
+            [
+                "--case-id",
+                "malinois_k562",
+                "--search-method",
+                "bo",
+                "--api-key-file",
+                "missing-secret-file",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    assert json.loads(capsys.readouterr().out)["proposal_provider"] == {
+        "required": False
+    }
+
+    assert (
+        main(
+            [
+                "--mock",
+                "--case-id",
+                "mock_dna",
+                "--api-key-file",
+                "missing-secret-file",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["proposal_provider"] == {
+        "required": False
+    }
 
 
 def test_execution_is_rejected_before_qualification() -> None:
@@ -113,6 +258,10 @@ def test_mock_campaign_writes_the_complete_shared_engine_artifacts(
 
     output = json.loads(capsys.readouterr().out)
     run_dir = Path(output["run_dir"])
+    assert output["ldm_task_spec"]["response_spaces"][0]["name"] == (
+        "mutation_patch_json"
+    )
+    assert "model_requests_per_round" not in output["ldm_task_spec"]["metadata"]
     expected = {
         "campaign.json",
         "config.json",
@@ -134,8 +283,7 @@ def test_mock_campaign_writes_the_complete_shared_engine_artifacts(
     budget = json.loads((run_dir / "budget.json").read_text())
     contract = json.loads((run_dir / "experiment_contract.json").read_text())
     events = [
-        json.loads(line)
-        for line in (run_dir / "events.jsonl").read_text().splitlines()
+        json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
     ]
 
     assert result["finished"] is True

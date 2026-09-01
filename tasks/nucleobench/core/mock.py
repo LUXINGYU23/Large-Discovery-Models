@@ -58,7 +58,17 @@ def build_mock_expander() -> InitialRoundReservoirExpander:
 
 
 def build_mock_task_spec() -> LDMTaskSpec:
-    task_spec = build_task_spec(MOCK_CASE)
+    task_spec = build_task_spec(MOCK_CASE, search_method="llm")
+    metadata = {
+        key: value
+        for key, value in task_spec.metadata.items()
+        if key
+        not in {
+            "model_requests_per_round",
+            "candidates_per_model_request",
+            "search_breadth",
+        }
+    }
     return replace(
         task_spec,
         acquisition=AcquisitionSpec(
@@ -83,8 +93,9 @@ def build_mock_task_spec() -> LDMTaskSpec:
             name="deterministic_mock_enumeration",
             evaluation_policy="task evaluator boundary with deterministic mock energy",
         ),
+        reservoir=replace(task_spec.reservoir, max_size=None),
         metadata={
-            **task_spec.metadata,
+            **metadata,
             "execution_profile": "mock",
             "search_method": "mock",
         },

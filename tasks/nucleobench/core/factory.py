@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
+from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.optimization.records import AcquisitionSelector
+from ldm_tts.transport import ProposalClient
 from tasks.nucleobench.core.candidate import (
     MutationContext,
     NucleoBenchCandidateDomain,
@@ -22,6 +26,12 @@ from tasks.nucleobench.core.mock import (
     MOCK_CONTEXT,
     build_mock_expander,
     mock_energies,
+)
+from tasks.nucleobench.core.proposals import (
+    DEFAULT_PROPOSAL_MAX_WORKERS,
+    DEFAULT_PROPOSAL_REQUEST_WAVES,
+    DirectMutationProposalExpander,
+    ScoreBlindMutationPoolExpander,
 )
 from tasks.nucleobench.core.selection import AcquisitionTiltedSelector
 
@@ -80,6 +90,39 @@ def build_surrogate_components(
     )
 
 
+def build_proposal_expander(
+    search_method: str,
+    context: MutationContext,
+    *,
+    seed: int,
+    evaluations_per_round: int,
+    client: ProposalClient | None = None,
+    max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
+    max_request_waves: int = DEFAULT_PROPOSAL_REQUEST_WAVES,
+    before_requests: Callable[[int], None] | None = None,
+) -> ReservoirExpander:
+    """Build the task-local BO or direct-model mutation generator."""
+
+    if search_method == "bo":
+        return ScoreBlindMutationPoolExpander(context, seed=seed)
+    if search_method not in {"ldm", "llm"}:
+        raise ValueError(
+            f"proposal expander for search method {search_method!r} is not implemented"
+        )
+    if client is None:
+        raise ValueError(f"search method {search_method!r} requires a proposal client")
+    return DirectMutationProposalExpander(
+        client,
+        NucleoBenchCandidateDomain(context),
+        search_method=search_method,
+        evaluations_per_round=evaluations_per_round,
+        seed=seed,
+        max_workers=max_workers,
+        max_request_waves=max_request_waves,
+        before_requests=before_requests,
+    )
+
+
 def build_ldm_selector(
     base_selector: AcquisitionSelector,
     *,
@@ -105,5 +148,6 @@ def build_ldm_selector(
 __all__ = [
     "build_ldm_selector",
     "build_mock_engine",
+    "build_proposal_expander",
     "build_surrogate_components",
 ]

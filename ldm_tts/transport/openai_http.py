@@ -25,9 +25,26 @@ def chat_completions_url(raw: str) -> str:
         return base
     if base.endswith("/models"):
         return base[: -len("/models")] + "/chat/completions"
+    if base.endswith("/responses"):
+        return base[: -len("/responses")] + "/chat/completions"
     if base.endswith("/v1"):
         return base + "/chat/completions"
     return base + "/v1/chat/completions"
+
+
+def responses_url(raw: str) -> str:
+    """Normalize a base URL or complete OpenAI-compatible endpoint to Responses."""
+
+    base = _normalized_url(raw, "Responses endpoint URL")
+    if base.endswith("/responses"):
+        return base
+    if base.endswith("/chat/completions"):
+        return base[: -len("/chat/completions")] + "/responses"
+    if base.endswith("/models"):
+        return base[: -len("/models")] + "/responses"
+    if base.endswith("/v1"):
+        return base + "/responses"
+    return base + "/v1/responses"
 
 
 def models_url(raw: str) -> str:
@@ -38,6 +55,8 @@ def models_url(raw: str) -> str:
         return base
     if base.endswith("/chat/completions"):
         return base[: -len("/chat/completions")] + "/models"
+    if base.endswith("/responses"):
+        return base[: -len("/responses")] + "/models"
     if base.endswith("/v1"):
         return base + "/models"
     return base + "/models"
@@ -126,6 +145,41 @@ def request_openai_chat_response(
     return result
 
 
+def request_openai_responses_response(
+    *,
+    url: str,
+    model: str,
+    api_key: str,
+    messages: Sequence[Mapping[str, Any]],
+    timeout_seconds: float,
+    max_tokens: int,
+    temperature: float,
+    tools: Sequence[Mapping[str, Any]] = (),
+    tool_choice: Any = None,
+    extra_body: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return one validated raw OpenAI-compatible Responses result."""
+
+    body = _responses_body(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        tools=tools,
+        tool_choice=tool_choice,
+        extra_body=extra_body,
+    )
+    result = _request_json(
+        endpoint=responses_url(url),
+        api_key=api_key,
+        timeout_seconds=timeout_seconds,
+        method="POST",
+        payload=json.dumps(body).encode("utf-8"),
+    )
+    extract_openai_responses_content(result)
+    return result
+
+
 def preflight_openai_chat(
     *,
     url: str,
@@ -155,6 +209,64 @@ def preflight_openai_chat(
     }
 
 
+def preflight_openai_responses(
+    *,
+    url: str,
+    model: str,
+    api_key: str,
+    timeout_seconds: float = 30.0,
+    extra_body: Mapping[str, Any] | None = None,
+    require_model_visibility: bool = False,
+) -> dict[str, Any]:
+    """Probe one minimal Responses result without persisting provider payloads."""
+
+    started = time.monotonic()
+    model_ids = (
+        _model_ids(
+            request_openai_models(
+                url=url,
+                api_key=api_key,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+        if require_model_visibility
+        else ()
+    )
+    if require_model_visibility and model not in model_ids:
+        raise EndpointRequestError(
+            "Requested model is not visible from models endpoint"
+        )
+    prompt = (
+        "Reply with one non-empty JSON object."
+        if extra_body and "text" in extra_body
+        else "Reply with exactly OK."
+    )
+    result = request_openai_responses_response(
+        url=url,
+        model=model,
+        api_key=api_key,
+        messages=[{"role": "user", "content": prompt}],
+        timeout_seconds=timeout_seconds,
+        max_tokens=PREFLIGHT_MAX_TOKENS,
+        temperature=0.0,
+        extra_body=extra_body,
+    )
+    response_model = result.get("model")
+    if not isinstance(response_model, str) or response_model != model:
+        raise EndpointRequestError("Responses model identity does not match request")
+    text, tool_calls = extract_openai_responses_content(result)
+    artifact = {
+        "status": "ok",
+        "request_model": model,
+        "response_model": response_model,
+        "latency_seconds": round(time.monotonic() - started, 6),
+        "response_nonempty": bool(text.strip() or tool_calls),
+    }
+    if require_model_visibility:
+        artifact.update(model_visible=True, model_count=len(model_ids))
+    return artifact
+
+
 def preflight_openai_endpoint(
     *,
     url: str,
@@ -173,7 +285,9 @@ def preflight_openai_endpoint(
         )
     )
     if model not in model_ids:
-        raise EndpointRequestError("Requested model is not visible from models endpoint")
+        raise EndpointRequestError(
+            "Requested model is not visible from models endpoint"
+        )
     prompt = "Reply with exactly OK."
     if extra_body and "response_format" in extra_body:
         prompt = "Reply with one non-empty JSON object."
@@ -189,7 +303,9 @@ def preflight_openai_endpoint(
     )
     response_model = response.get("model")
     if not isinstance(response_model, str) or response_model != model:
-        raise EndpointRequestError("Chat response model identity does not match request")
+        raise EndpointRequestError(
+            "Chat response model identity does not match request"
+        )
     return {
         "status": "ok",
         "request_model": model,
@@ -231,10 +347,58 @@ def _chat_body(
         reserved = set(body) & set(extra_body)
         if reserved:
             raise EndpointRequestError(
-                "extra_body cannot override reserved chat field(s): " + ", ".join(sorted(reserved))
+                "extra_body cannot override reserved chat field(s): "
+                + ", ".join(sorted(reserved))
             )
         body.update(dict(extra_body))
     return body
+
+
+def _responses_body(
+    *,
+    model: str,
+    messages: Sequence[Mapping[str, Any]],
+    max_tokens: int,
+    temperature: float,
+    tools: Sequence[Mapping[str, Any]],
+    tool_choice: Any,
+    extra_body: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "model": model,
+        "input": [dict(message) for message in messages],
+        "temperature": temperature,
+        "max_output_tokens": max_tokens,
+    }
+    if tools:
+        body["tools"] = [_responses_tool(tool) for tool in tools]
+    if tool_choice is not None:
+        body["tool_choice"] = _responses_tool_choice(tool_choice)
+    if extra_body:
+        reserved = set(body) & set(extra_body)
+        if reserved:
+            raise EndpointRequestError(
+                "extra_body cannot override reserved Responses field(s): "
+                + ", ".join(sorted(reserved))
+            )
+        body.update(dict(extra_body))
+    return body
+
+
+def _responses_tool(tool: Mapping[str, Any]) -> dict[str, Any]:
+    function = tool.get("function")
+    if tool.get("type") == "function" and isinstance(function, Mapping):
+        return {"type": "function", **dict(function)}
+    return dict(tool)
+
+
+def _responses_tool_choice(tool_choice: Any) -> Any:
+    if not isinstance(tool_choice, Mapping):
+        return tool_choice
+    function = tool_choice.get("function")
+    if tool_choice.get("type") == "function" and isinstance(function, Mapping):
+        return {"type": "function", "name": function.get("name")}
+    return dict(tool_choice)
 
 
 def _request_json(
@@ -248,7 +412,9 @@ def _request_json(
     headers = {"Content-Type": "application/json"} if payload is not None else {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    request = urllib.request.Request(endpoint, data=payload, headers=headers, method=method)
+    request = urllib.request.Request(
+        endpoint, data=payload, headers=headers, method=method
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -258,7 +424,12 @@ def _request_json(
         if detail:
             message = f"{message}: {detail}"
         raise EndpointRequestError(message) from exc
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+    ) as exc:
         raise EndpointRequestError(
             f"OpenAI-compatible endpoint request failed: {type(exc).__name__}"
         ) from exc
@@ -289,7 +460,9 @@ def _model_ids(result: Any) -> tuple[str, ...]:
     model_ids: list[str] = []
     for item in data:
         if not isinstance(item, Mapping):
-            raise EndpointRequestError("Models response data contains a non-object model")
+            raise EndpointRequestError(
+                "Models response data contains a non-object model"
+            )
         model_id = item.get("id")
         if not isinstance(model_id, str) or not model_id.strip():
             raise EndpointRequestError("Models response model id is missing or invalid")
@@ -315,13 +488,65 @@ def _chat_message(result: Any) -> Mapping[str, Any]:
     return message
 
 
+def extract_openai_responses_content(
+    result: Any,
+) -> tuple[str, tuple[dict[str, Any], ...]]:
+    if not isinstance(result, dict):
+        raise EndpointRequestError("Responses root is not an object")
+    status = result.get("status")
+    if status not in (None, "completed"):
+        raise EndpointRequestError(f"Responses request did not complete: {status!r}")
+    output = result.get("output")
+    if not isinstance(output, list):
+        raise EndpointRequestError("Responses output is not a list")
+    text_parts: list[str] = []
+    tool_calls: list[dict[str, Any]] = []
+    for item in output:
+        if not isinstance(item, Mapping):
+            raise EndpointRequestError("Responses output contains a non-object item")
+        if item.get("type") == "message":
+            content = item.get("content")
+            if not isinstance(content, list):
+                raise EndpointRequestError("Responses message content is not a list")
+            for part in content:
+                if not isinstance(part, Mapping):
+                    raise EndpointRequestError(
+                        "Responses message content contains a non-object part"
+                    )
+                if part.get("type") == "output_text":
+                    text = part.get("text")
+                    if isinstance(text, str) and text:
+                        text_parts.append(text)
+        elif item.get("type") == "function_call":
+            tool_calls.append(
+                {
+                    "id": item.get("call_id") or item.get("id"),
+                    "type": "function",
+                    "function": {
+                        "name": item.get("name"),
+                        "arguments": item.get("arguments", ""),
+                    },
+                }
+            )
+    text = "\n".join(text_parts)
+    if not text.strip() and not tool_calls:
+        raise EndpointRequestError(
+            "Responses output contains neither text nor tool calls"
+        )
+    return text, tuple(tool_calls)
+
+
 __all__ = [
     "EndpointRequestError",
     "chat_completions_url",
+    "extract_openai_responses_content",
     "models_url",
     "preflight_openai_chat",
     "preflight_openai_endpoint",
+    "preflight_openai_responses",
     "request_openai_chat",
     "request_openai_chat_response",
     "request_openai_models",
+    "request_openai_responses_response",
+    "responses_url",
 ]

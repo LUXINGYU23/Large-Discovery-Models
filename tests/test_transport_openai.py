@@ -16,8 +16,11 @@ from ldm_tts.transport.openai import (
     call_with_circuit_breaker,
     chat_completions_url,
     preflight_openai_chat,
+    preflight_openai_responses,
     request_openai_chat,
     request_openai_chat_response,
+    request_openai_responses_response,
+    responses_url,
 )
 
 
@@ -34,7 +37,7 @@ class _FakeResponse:
     def read(self) -> bytes:
         return self._data
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self):
         return self
 
     def __exit__(self, *args: object) -> bool:
@@ -106,6 +109,25 @@ def test_chat_completions_url_rejects_empty() -> None:
         chat_completions_url("   ")
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    (
+        ("https://api.example.com", "https://api.example.com/v1/responses"),
+        ("https://api.example.com/v1", "https://api.example.com/v1/responses"),
+        (
+            "https://api.example.com/v1/responses",
+            "https://api.example.com/v1/responses",
+        ),
+        (
+            "https://api.example.com/v1/chat/completions",
+            "https://api.example.com/v1/responses",
+        ),
+    ),
+)
+def test_responses_url(raw: str, expected: str) -> None:
+    assert responses_url(raw) == expected
+
+
 # --------------------------------------------------------------------------- #
 # request_openai_chat_response
 # --------------------------------------------------------------------------- #
@@ -114,15 +136,15 @@ def test_chat_completions_url_rejects_empty() -> None:
 def test_request_openai_chat_response_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "urllib.request.urlopen",
-        lambda *a, **k: _FakeResponse(
-            {"choices": [{"message": {"content": "hello"}}]}
-        ),
+        lambda *a, **k: _FakeResponse({"choices": [{"message": {"content": "hello"}}]}),
     )
     result = request_openai_chat_response(**_chat_kwargs())
     assert result["choices"][0]["message"]["content"] == "hello"
 
 
-def test_request_openai_chat_response_accepts_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_openai_chat_response_accepts_tool_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "urllib.request.urlopen",
         lambda *a, **k: _FakeResponse(
@@ -131,7 +153,12 @@ def test_request_openai_chat_response_accepts_tool_calls(monkeypatch: pytest.Mon
                     {
                         "message": {
                             "content": "",
-                            "tool_calls": [{"id": "1", "function": {"name": "emit", "arguments": "{}"}}],
+                            "tool_calls": [
+                                {
+                                    "id": "1",
+                                    "function": {"name": "emit", "arguments": "{}"},
+                                }
+                            ],
                         }
                     }
                 ]
@@ -241,6 +268,74 @@ def test_request_openai_chat_response_rejects_reserved_extra_body() -> None:
         request_openai_chat_response(**_chat_kwargs(extra_body={"model": "other"}))
 
 
+def test_request_openai_responses_response_uses_responses_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+
+    def respond(request, timeout):
+        calls.append((request, timeout))
+        return _FakeResponse(
+            {
+                "model": "m",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "OK"}],
+                    }
+                ],
+                "usage": {"total_tokens": 9},
+            }
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", respond)
+    result = request_openai_responses_response(
+        **_chat_kwargs(),
+        extra_body={"reasoning": {"effort": "high"}},
+    )
+
+    body = json.loads(calls[0][0].data)
+    assert calls[0][0].full_url == "https://api.example.com/v1/responses"
+    assert body == {
+        "model": "m",
+        "input": [{"role": "user", "content": "hi"}],
+        "temperature": 0.0,
+        "max_output_tokens": 32,
+        "reasoning": {"effort": "high"},
+    }
+    assert result["status"] == "completed"
+
+
+def test_preflight_openai_responses_returns_only_sanitized_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: _FakeResponse(
+            {
+                "model": "m",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "OK"}],
+                    }
+                ],
+            }
+        ),
+    )
+    artifact = preflight_openai_responses(
+        url="https://api.example.com/v1",
+        model="m",
+        api_key="secret",
+    )
+
+    assert artifact["status"] == "ok"
+    assert artifact["response_nonempty"] is True
+    assert "secret" not in json.dumps(artifact)
+
+
 # --------------------------------------------------------------------------- #
 # request_openai_chat
 # --------------------------------------------------------------------------- #
@@ -254,7 +349,9 @@ def test_request_openai_chat_extracts_content(monkeypatch: pytest.MonkeyPatch) -
     assert request_openai_chat(**_chat_kwargs()) == "OK"
 
 
-def test_request_openai_chat_rejects_empty_content(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_request_openai_chat_rejects_empty_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # A tool-call response passes the lower-level response validation, but
     # request_openai_chat is text-only and must reject the empty content.
     monkeypatch.setattr(
@@ -272,7 +369,9 @@ def test_preflight_openai_chat(monkeypatch: pytest.MonkeyPatch) -> None:
         "urllib.request.urlopen",
         lambda *a, **k: _FakeResponse({"choices": [{"message": {"content": "OK"}}]}),
     )
-    result = preflight_openai_chat(url="https://api.example.com/v1", model="m", api_key="")
+    result = preflight_openai_chat(
+        url="https://api.example.com/v1", model="m", api_key=""
+    )
     assert result["status"] == "ok"
     assert result["response_nonempty"] is True
 
@@ -313,11 +412,22 @@ def test_proposal_client_rejects_invalid_config(overrides: dict[str, object]) ->
         OpenAICompatibleProposalClient(**config)
 
 
+def test_proposal_client_rejects_unknown_wire_api() -> None:
+    with pytest.raises(ValueError, match="wire_api"):
+        OpenAICompatibleProposalClient(
+            url="https://api.example.com/v1",
+            model="m",
+            wire_api="unknown",
+        )
+
+
 def _proposal() -> ProposalRequest:
     return ProposalRequest(messages=({"role": "user", "content": "hi"},))
 
 
-def test_propose_captures_text_tool_calls_and_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_propose_captures_text_tool_calls_and_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "urllib.request.urlopen",
         lambda *a, **k: _FakeResponse(
@@ -328,13 +438,20 @@ def test_propose_captures_text_tool_calls_and_usage(monkeypatch: pytest.MonkeyPa
                         "message": {
                             "content": "",
                             "tool_calls": [
-                                {"id": "1", "function": {"name": "emit", "arguments": "{}"}}
+                                {
+                                    "id": "1",
+                                    "function": {"name": "emit", "arguments": "{}"},
+                                }
                             ],
                         },
                         "finish_reason": "tool_calls",
                     }
                 ],
-                "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
+                },
             }
         ),
     )
@@ -346,6 +463,49 @@ def test_propose_captures_text_tool_calls_and_usage(monkeypatch: pytest.MonkeyPa
     assert response.usage["total_tokens"] == 15
     assert response.metadata["finish_reason"] == "tool_calls"
     assert response.metadata["model"] == "served-model"
+
+
+def test_propose_normalizes_responses_text_and_function_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: _FakeResponse(
+            {
+                "model": "served-model",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "hello"}],
+                    },
+                    {
+                        "type": "function_call",
+                        "call_id": "call-1",
+                        "name": "emit",
+                        "arguments": "{}",
+                    },
+                ],
+                "usage": {"total_tokens": 15},
+            }
+        ),
+    )
+    client = OpenAICompatibleProposalClient(
+        url="https://api.example.com/v1",
+        model="m",
+        wire_api="responses",
+    )
+    response = client.propose(_proposal())
+
+    assert response.text == "hello"
+    assert response.tool_calls == (
+        {
+            "id": "call-1",
+            "type": "function",
+            "function": {"name": "emit", "arguments": "{}"},
+        },
+    )
+    assert response.metadata["wire_api"] == "responses"
 
 
 def test_propose_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -370,7 +530,9 @@ def test_propose_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls["n"] == 2
 
 
-def test_propose_raises_after_retries_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_propose_raises_after_retries_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: dict[str, int] = {"n": 0}
 
     def boom(*args: object, **kwargs: object):
