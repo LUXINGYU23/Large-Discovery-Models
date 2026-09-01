@@ -7,12 +7,20 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
+)
+DEFAULT_NETWORK_TOOL_BUDGETS = (
+    "web_search=4",
+    "fetch_content=8",
+    "get_search_content=8",
+    "resolve-library-id=2",
+    "query-docs=4",
 )
 
 
@@ -128,6 +136,8 @@ class HarnessMcpServer:
             raise ValueError("MCP tools must be a non-empty unique allowlist")
         if any(re.fullmatch(r"[A-Za-z0-9_-]+", name) is None for name in self.tools):
             raise ValueError("MCP tool names must be valid function identifiers")
+        if any(len(f"mcp__{self.server_id}__{name}") > 64 for name in self.tools):
+            raise ValueError("namespaced MCP tool names must not exceed 64 characters")
         if _SHA256_PATTERN.fullmatch(self.config_sha256) is None:
             raise ValueError("MCP config_sha256 must be a lowercase SHA-256 digest")
         if self.transport == "stdio" and (not self.command or self.url is not None or self.headers):
@@ -173,13 +183,43 @@ def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
 @dataclass(frozen=True)
 class HarnessLimits:
     wall_time_seconds: int = 1800
+    tool_call_budgets: Mapping[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.wall_time_seconds < 1:
             raise ValueError("harness wall-time limit must be positive")
+        budgets = dict(self.tool_call_budgets)
+        if any(
+            re.fullmatch(r"[A-Za-z0-9_-]+", name) is None
+            or isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit < 0
+            for name, limit in budgets.items()
+        ):
+            raise ValueError("harness tool budgets require valid names and non-negative integers")
+        if "submit_candidates" in budgets:
+            raise ValueError("submit_candidates cannot have a tool call budget")
+        object.__setattr__(self, "tool_call_budgets", dict(sorted(budgets.items())))
 
-    def to_dict(self) -> dict[str, int]:
-        return {"wallTimeSeconds": self.wall_time_seconds}
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "wallTimeSeconds": self.wall_time_seconds,
+            "toolCallBudgets": dict(self.tool_call_budgets),
+        }
+
+
+def parse_tool_call_budgets(values: Sequence[str]) -> dict[str, int]:
+    budgets: dict[str, int] = {}
+    for value in values:
+        name, separator, raw_limit = value.partition("=")
+        if not separator or re.fullmatch(r"[A-Za-z0-9_-]+", name) is None:
+            raise ValueError("harness tool budgets must use NAME=COUNT")
+        if name in budgets:
+            raise ValueError(f"duplicate harness tool budget: {name}")
+        if not raw_limit.isdigit():
+            raise ValueError(f"harness tool budget for {name} must be a non-negative integer")
+        budgets[name] = int(raw_limit)
+    return dict(HarnessLimits(tool_call_budgets=budgets).tool_call_budgets)
 
 
 @dataclass(frozen=True)
@@ -291,6 +331,18 @@ class HarnessPoolConfig:
             raise ValueError("harness MCP tool names must be unique")
         if set(tool_names) & set(mcp_tool_names):
             raise ValueError("harness task and MCP tool names must not conflict")
+        available_tools = {
+            "read", "write", "bash", "web_search", "fetch_content",
+            "get_search_content", "submit_candidates", *tool_names, *mcp_tool_names,
+        }
+        if self.context7_enabled:
+            available_tools.update(("resolve-library-id", "query-docs"))
+        unknown_budgets = set(self.limits.tool_call_budgets) - available_tools
+        if unknown_budgets:
+            raise ValueError(
+                "harness tool budgets reference unavailable tools: "
+                + ", ".join(sorted(unknown_budgets))
+            )
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
 
@@ -401,7 +453,8 @@ class HarnessTurnResult:
     input_digest: str
     submission_id: str
     candidates: tuple[dict[str, Any], ...]
-    usage: dict[str, int | float]
+    usage: dict[str, Any]
+    tool_budget: dict[str, dict[str, int]]
     artifacts: dict[str, str]
 
 
@@ -455,6 +508,7 @@ class HarnessSubmissionValidation:
 
 __all__ = [
     "PROTOCOL_VERSION",
+    "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",
@@ -471,4 +525,5 @@ __all__ = [
     "canonical_sha256",
     "file_sha256",
     "profile_set_sha256",
+    "parse_tool_call_budgets",
 ]

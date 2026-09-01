@@ -6,6 +6,7 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness import DEFAULT_NETWORK_TOOL_BUDGETS, parse_tool_call_budgets
 from tasks.synthonbench.core.catalog import REACTION_ALLOCATIONS
 from tasks.synthonbench.core.constants import (
     DEFAULT_ACQUISITION_ETA,
@@ -49,6 +50,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             if args.search_method == "ldm"
             else 1
         )
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = [
+            value for value in DEFAULT_NETWORK_TOOL_BUDGETS
+            if args.harness_context7 or not value.startswith(("resolve-library-id=", "query-docs="))
+        ]
     return args
 
 
@@ -126,6 +132,12 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument(
+        "--harness-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one tool per Agent turn; repeat for additional tools.",
+    )
+    parser.add_argument(
         "--no-harness-context7",
         action="store_false",
         dest="harness_context7",
@@ -195,8 +207,11 @@ def _validate_numbers(args: argparse.Namespace) -> None:
 def _validate_provider_options(args: argparse.Namespace) -> None:
     try:
         parse_openai_extra_body_json(args.llm_extra_body_json)
+        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):
+        raise SystemExit("Context7 tools cannot have budgets when Context7 is disabled")
 
 
 def _validate_mode(args: argparse.Namespace) -> None:

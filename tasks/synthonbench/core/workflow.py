@@ -17,6 +17,7 @@ from ldm_tts.harness import (
     HarnessNetworkPolicy,
     HarnessPoolConfig,
     load_harness_mcp_config,
+    parse_tool_call_budgets,
 )
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
@@ -362,6 +363,7 @@ def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> Harn
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,
+            tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget),
         ),
         network_policy=HarnessNetworkPolicy(
             forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,

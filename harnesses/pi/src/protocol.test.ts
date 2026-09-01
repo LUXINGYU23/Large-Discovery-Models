@@ -51,7 +51,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			configSha256: "d".repeat(64),
 		}],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
-		limits: { wallTimeSeconds: 60 },
+		limits: { wallTimeSeconds: 60, toolCallBudgets: { web_search: 4 } },
 		webSearch: {
 			providers: ["parallel-mcp", "exa", "duckduckgo"],
 			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
@@ -96,7 +96,7 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			toolExtensions: [],
 			mcpServers: [],
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
-			limits: { wallTimeSeconds: 60 },
+			limits: { wallTimeSeconds: 60, toolCallBudgets: {} },
 			webSearch: {
 				providers: ["parallel-mcp", "exa", "duckduckgo"],
 				fallbackOn: ["quota", "network"],

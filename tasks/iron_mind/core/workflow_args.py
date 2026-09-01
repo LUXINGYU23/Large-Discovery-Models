@@ -6,6 +6,7 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness import DEFAULT_NETWORK_TOOL_BUDGETS, parse_tool_call_budgets
 from tasks.iron_mind.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     PROMPT_POLICIES,
@@ -85,7 +86,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--harness-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one tool per Agent turn; repeat for additional tools.",
+    )
+    args = parser.parse_args(argv)
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = [
+            value for value in DEFAULT_NETWORK_TOOL_BUDGETS
+            if args.harness_context7 or not value.startswith(("resolve-library-id=", "query-docs="))
+        ]
+    return args
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -105,6 +118,12 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Harness candidate and wall-time limits must be positive")
     if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
         raise SystemExit("--harness-response-timeout must be finite and positive")
+    try:
+        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):
+        raise SystemExit("Context7 tools cannot have budgets when Context7 is disabled")
     if args.search_method == "ldm_harness":
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:

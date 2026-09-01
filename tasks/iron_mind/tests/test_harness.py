@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.harness import HarnessSubmissionRequest, HarnessTurnResult
@@ -20,6 +22,24 @@ from tasks.iron_mind.core.harness import (
     write_harness_space_catalog,
 )
 from tasks.iron_mind.core.workflow import _load_mock_table, _schema_for, describe_ldm_task, parse_args
+from tasks.iron_mind.core.workflow_args import validate_args
+
+
+def test_harness_tool_budgets_are_configurable_and_follow_enabled_tools() -> None:
+    defaults = parse_args(["--mock"])
+    assert "web_search=4" in defaults.harness_tool_budget
+    assert "query-docs=4" in defaults.harness_tool_budget
+
+    without_context7 = parse_args(["--mock", "--no-harness-context7"])
+    assert all("query-docs" not in value for value in without_context7.harness_tool_budget)
+
+    duplicate = parse_args([
+        "--mock",
+        "--harness-tool-budget", "web_search=2",
+        "--harness-tool-budget", "web_search=1",
+    ])
+    with pytest.raises(SystemExit, match="duplicate harness tool budget"):
+        validate_args(duplicate)
 
 
 class FakeHarnessClient:
@@ -50,9 +70,11 @@ class FakeHarnessClient:
                     candidates=candidates,
                     usage={
                         "providerCalls": 2,
-                        "webCalls": 1,
-                        "context7Calls": 0,
+                        "toolCalls": {"web_search": 1, "submit_candidates": 1},
                         "artifactBytes": 50,
+                    },
+                    tool_budget={
+                        "web_search": {"limit": 4, "used": 1, "remaining": 3},
                     },
                     artifacts={"turn": f"turns/{turn.turn_id}"},
                 )
@@ -89,6 +111,7 @@ def test_harness_preserves_cross_session_occurrences_for_global_q0() -> None:
     assert result.metadata["sampling_mode"] == "persistent_parallel_research_sessions"
     assert counts[0] == {"proposal_attempts": 4, "harness_turns": 4}
     assert counts[1]["llm_requests"] == 8
+    assert counts[1]["harness_tool_calls"] == 8
 
 
 def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> None:

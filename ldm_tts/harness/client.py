@@ -335,7 +335,7 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
     _assert_response_keys(value, {
         "profileId", "sessionId", "turnId", "roundIndex", "historyFromSeq",
         "historyToSeq", "historyDigest", "inputDigest", "submission", "usage",
-        "artifacts",
+        "toolBudget", "artifacts",
     })
     submission = value.get("submission")
     usage = value.get("usage")
@@ -347,7 +347,9 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         raise HarnessError("committed harness turn has invalid metadata")
     assert isinstance(submission, dict)
     _assert_response_keys(submission, {"submissionId", "candidates"})
-    _assert_response_keys(usage, {"providerCalls", "webCalls", "context7Calls", "artifactBytes"})
+    _assert_response_keys(usage, {"providerCalls", "toolCalls", "artifactBytes"})
+    tool_calls = _nonnegative_int_mapping(usage["toolCalls"], "toolCalls")
+    tool_budget = _tool_budget(value["toolBudget"], tool_calls)
     _assert_response_keys(artifacts, {"turn", "session"})
     history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
     history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
@@ -364,7 +366,12 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         input_digest=_required_digest(value["inputDigest"], "inputDigest"),
         submission_id=_required_string(submission["submissionId"], "submissionId"),
         candidates=tuple(dict(item) for item in candidates),
-        usage=dict(usage),
+        usage={
+            "providerCalls": _required_nonnegative_int(usage["providerCalls"], "providerCalls"),
+            "toolCalls": tool_calls,
+            "artifactBytes": _required_nonnegative_int(usage["artifactBytes"], "artifactBytes"),
+        },
+        tool_budget=tool_budget,
         artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
     )
 
@@ -392,6 +399,36 @@ def _required_digest(value: Any, name: str) -> str:
     result = _required_string(value, name)
     if len(result) != 64 or any(character not in "0123456789abcdef" for character in result):
         raise HarnessError(f"committed harness turn has invalid {name}")
+    return result
+
+
+def _nonnegative_int_mapping(value: Any, name: str) -> dict[str, int]:
+    if not isinstance(value, dict) or any(
+        not isinstance(key, str)
+        or not key
+        or isinstance(item, bool)
+        or not isinstance(item, int)
+        or item < 0
+        for key, item in value.items()
+    ):
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return dict(value)
+
+
+def _tool_budget(value: Any, tool_calls: dict[str, int]) -> dict[str, dict[str, int]]:
+    if not isinstance(value, dict):
+        raise HarnessError("committed harness turn has invalid toolBudget")
+    result: dict[str, dict[str, int]] = {}
+    for name, raw in value.items():
+        if not isinstance(name, str) or not name or not isinstance(raw, dict):
+            raise HarnessError("committed harness turn has invalid toolBudget")
+        _assert_response_keys(raw, {"limit", "used", "remaining"})
+        limit = _required_nonnegative_int(raw["limit"], f"toolBudget.{name}.limit")
+        used = _required_nonnegative_int(raw["used"], f"toolBudget.{name}.used")
+        remaining = _required_nonnegative_int(raw["remaining"], f"toolBudget.{name}.remaining")
+        if used + remaining != limit or tool_calls.get(name, 0) != used:
+            raise HarnessError("committed harness turn has inconsistent toolBudget")
+        result[name] = {"limit": limit, "used": used, "remaining": remaining}
     return result
 
 

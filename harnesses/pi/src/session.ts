@@ -16,7 +16,7 @@ import {
 import { Type, type TUnsafe } from "typebox";
 import { GondolinController } from "./gondolin.js";
 import { McpToolBridge } from "./mcp.js";
-import { PolicyController } from "./policy.js";
+import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
 import type {
 	HarnessLimits,
 	HarnessProfileConfig,
@@ -46,7 +46,7 @@ type SubmissionParameters = {
 
 interface SavedSubmission {
 	submission: CandidateSubmission;
-	tools: { webCalls: number; context7Calls: number };
+	toolUsage: ToolUsageSnapshot;
 }
 
 export interface CommittedTurn {
@@ -61,10 +61,10 @@ export interface CommittedTurn {
 	submission: CandidateSubmission;
 	usage: {
 		providerCalls: number;
-		webCalls: number;
-		context7Calls: number;
+		toolCalls: Record<string, number>;
 		artifactBytes: number;
 	};
+	toolBudget: ToolUsageSnapshot["toolBudget"];
 	artifacts: {
 		turn: string;
 		session: string | undefined;
@@ -310,7 +310,11 @@ class PersistentProfileSession {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
-		this.policy = new PolicyController(config.networkPolicy, config.webSearch.providers);
+		this.policy = new PolicyController(
+			config.networkPolicy,
+			config.webSearch.providers,
+			config.limits.toolCallBudgets,
+		);
 		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
@@ -481,20 +485,20 @@ class PersistentProfileSession {
 		const savedSubmission = await optionalJson<SavedSubmission>(submissionPath);
 		if (savedSubmission) {
 			const provider = await this.proxy.recoveredTurnSummary(turnRoot, input.turnId);
-			return this.commit(input, savedSubmission.submission, provider, savedSubmission.tools);
+			return this.commit(input, savedSubmission.submission, provider, savedSubmission.toolUsage);
 		}
+		await this.policy.begin(input.forbiddenQueryTerms, join(turnRoot, "tool-budget.json"));
 
 		this.submissions.begin(
 			this.profile.profileId,
 			input.turnId,
 			(value) => atomicJson(submissionPath, {
 				submission: value,
-				tools: this.policy.snapshot(),
+				toolUsage: this.policy.snapshot(),
 			} satisfies SavedSubmission),
 			validate,
 			priorInput !== undefined,
 		);
-		this.policy.begin(input.forbiddenQueryTerms);
 		await this.proxy.beginTurn(
 			this.profile.profileId,
 			this.session.sessionManager.getSessionId(),
@@ -503,9 +507,12 @@ class PersistentProfileSession {
 		);
 		let submission: CandidateSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
-		let policySummary: { webCalls: number; context7Calls: number };
+		let policySummary: ToolUsageSnapshot;
 		try {
-			await this.promptWithTimeout(input.message, this.config.limits);
+			await this.promptWithTimeout(
+				`${input.message}\n\n${this.policy.budgetMessage()}`,
+				this.config.limits,
+			);
 			submission = this.submissions.submission;
 			if (!submission) {
 				const lastMessage = this.session.messages.at(-1);
@@ -601,7 +608,7 @@ class PersistentProfileSession {
 		input: SessionTurnInput,
 		submission: CandidateSubmission,
 		provider: ProviderTurnSummary,
-		tools: { webCalls: number; context7Calls: number },
+		toolUsage: ToolUsageSnapshot,
 	): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const sessionFile = this.session.sessionManager.getSessionFile();
@@ -617,10 +624,10 @@ class PersistentProfileSession {
 			submission,
 			usage: {
 				providerCalls: provider.providerCalls,
-				webCalls: tools.webCalls,
-				context7Calls: tools.context7Calls,
+				toolCalls: toolUsage.toolCalls,
 				artifactBytes: provider.artifactBytes,
 			},
+			toolBudget: toolUsage.toolBudget,
 			artifacts: {
 				turn: relative(this.config.artifactRoot, join(this.profileRoot, "turns", input.turnId)),
 				session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,

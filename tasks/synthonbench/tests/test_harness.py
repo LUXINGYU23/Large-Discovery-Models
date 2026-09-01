@@ -25,6 +25,23 @@ from tasks.synthonbench.core.space_order import (
     ordered_synthon_ids,
 )
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
+from tasks.synthonbench.core.workflow_args import validate_args
+
+
+def test_harness_tool_budgets_are_configurable_and_follow_enabled_tools() -> None:
+    defaults = parse_args(["--mock"])
+    assert "web_search=4" in defaults.harness_tool_budget
+    assert "query-docs=4" in defaults.harness_tool_budget
+
+    without_context7 = parse_args(["--mock", "--no-harness-context7"])
+    assert all("query-docs" not in value for value in without_context7.harness_tool_budget)
+
+    invalid = parse_args([
+        "--mock",
+        "--harness-tool-budget", "submit_candidates=1",
+    ])
+    with pytest.raises(SystemExit, match="submit_candidates"):
+        validate_args(invalid)
 
 
 class FakeHarnessClient:
@@ -86,7 +103,14 @@ class FakeHarnessClient:
                 input_digest=turn.input_digest,
                 submission_id=f"submission-{turn.profile_id}",
                 candidates=tuple(candidates),
-                usage={"providerCalls": 2, "webCalls": 1, "context7Calls": 0, "artifactBytes": 50},
+                usage={
+                    "providerCalls": 2,
+                    "toolCalls": {"web_search": 1, "submit_candidates": 1},
+                    "artifactBytes": 50,
+                },
+                tool_budget={
+                    "web_search": {"limit": 4, "used": 1, "remaining": 3},
+                },
                 artifacts={"turn": f"turns/{turn.turn_id}"},
             ))
         return tuple(results)
@@ -298,6 +322,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     assert budget["counters"]["proposal_attempts"] == 4
     assert budget["counters"]["harness_turns"] == 4
     assert budget["counters"]["llm_requests"] == 8
+    assert budget["counters"]["harness_tool_calls"] == 8
     assert budget["counters"]["benchmark_jobs"] == 1
     checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
     lineage = checkpoint["state"]["observations"][0]["candidate"]["metadata"]["harness_lineage"]

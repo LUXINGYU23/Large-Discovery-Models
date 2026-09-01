@@ -14,6 +14,7 @@ from ldm_tts.harness import (
     HarnessProfile,
     HarnessSubmissionValidation,
     HarnessTurn,
+    parse_tool_call_budgets,
 )
 
 
@@ -62,6 +63,18 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
     }
     assert "webProvider" not in frame
     assert frame["mcpServers"] == []
+    assert frame["limits"] == {"wallTimeSeconds": 1800, "toolCallBudgets": {}}
+
+
+def test_tool_call_budget_parser_rejects_duplicates_and_submit_limits() -> None:
+    assert parse_tool_call_budgets(("web_search=4", "mcp__literature__search=0")) == {
+        "mcp__literature__search": 0,
+        "web_search": 4,
+    }
+    with pytest.raises(ValueError, match="duplicate"):
+        parse_tool_call_budgets(("web_search=4", "web_search=2"))
+    with pytest.raises(ValueError, match="submit_candidates"):
+        parse_tool_call_budgets(("submit_candidates=1",))
 
 
 def test_persistent_harness_client_runs_one_profile_batch(
@@ -119,6 +132,8 @@ def test_persistent_harness_client_runs_one_profile_batch(
     assert result[0].input_digest == turn.input_digest
     assert result[0].candidates == ({"value": "chemist"},)
     assert result[0].usage["providerCalls"] == 1
+    assert result[0].usage["toolCalls"] == {}
+    assert result[0].tool_budget == {}
 
 
 @pytest.mark.parametrize(

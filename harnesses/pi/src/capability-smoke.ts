@@ -169,7 +169,10 @@ async function main(): Promise<void> {
 			deniedHosts: [],
 			forbiddenQueryPatterns: ["benchmark score"],
 		},
-		limits: { wallTimeSeconds: 120 },
+		limits: {
+			wallTimeSeconds: 120,
+			toolCallBudgets: { web_search: 2, fetch_content: 2 },
+		},
 		webSearch: {
 			providers: ["parallel-mcp", "exa", "duckduckgo"],
 			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
@@ -217,7 +220,8 @@ async function main(): Promise<void> {
 		assert(turn);
 		assert.equal(turn.submission.candidates.length, 2);
 		assert.equal(turn.usage.providerCalls, 6);
-		assert.equal(turn.usage.webCalls, 1);
+		assert.equal(turn.usage.toolCalls.web_search, 1);
+		assert.deepEqual(turn.toolBudget.web_search, { limit: 2, used: 1, remaining: 1 });
 		assert(requestBodies[0]?.includes("capability-smoke researcher"));
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });

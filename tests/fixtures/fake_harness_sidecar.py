@@ -57,7 +57,8 @@ for line in sys.stdin:
                     "submissionId": f"{item['turnId']}-submission",
                     "candidates": candidates,
                 },
-                "usage": {"providerCalls": 1, "webCalls": 0, "context7Calls": 0, "artifactBytes": 12},
+                "usage": {"providerCalls": 1, "toolCalls": {}, "artifactBytes": 12},
+                "toolBudget": {},
                 "artifacts": {"turn": f"turns/{item['turnId']}", "session": f"sessions/{item['profileId']}.jsonl"},
             })
         response = {"type": "turn_committed", **common, "turns": turns}

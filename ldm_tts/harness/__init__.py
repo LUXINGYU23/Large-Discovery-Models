@@ -2,6 +2,7 @@
 
 from ldm_tts.harness.client import HarnessClient, HarnessError
 from ldm_tts.harness.protocol import (
+    DEFAULT_NETWORK_TOOL_BUDGETS,
     PROTOCOL_VERSION,
     HarnessLimits,
     HarnessMcpServer,
@@ -19,11 +20,13 @@ from ldm_tts.harness.protocol import (
     canonical_sha256,
     file_sha256,
     profile_set_sha256,
+    parse_tool_call_budgets,
 )
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
 
 __all__ = [
     "PROTOCOL_VERSION",
+    "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessClient",
     "HarnessError",
     "HarnessLimits",
@@ -44,4 +47,5 @@ __all__ = [
     "canonical_sha256",
     "file_sha256",
     "profile_set_sha256",
+    "parse_tool_call_budgets",
 ]

@@ -1,6 +1,6 @@
 import { sha256 } from "./trace.js";
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -57,6 +57,7 @@ export interface NetworkPolicy {
 
 export interface HarnessLimits {
 	wallTimeSeconds: number;
+	toolCallBudgets: Record<string, number>;
 }
 
 export type SearchFallbackKind = "transient" | "quota" | "network" | "invalid-response" | "unsupported";
@@ -357,8 +358,8 @@ function parseMcpServers(value: unknown): McpServerConfig[] {
 		throw new ProtocolError("invalid_frame", "MCP server IDs must be unique");
 	}
 	const toolNames = servers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`));
-	if (new Set(toolNames).size !== toolNames.length) {
-		throw new ProtocolError("invalid_frame", "MCP tool names must be unique");
+	if (new Set(toolNames).size !== toolNames.length || toolNames.some((name) => name.length > 64)) {
+		throw new ProtocolError("invalid_frame", "MCP tool names must be unique and at most 64 characters");
 	}
 	return servers;
 }
@@ -513,7 +514,17 @@ export function parseFrame(line: string): InputFrame {
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
 	const limits = record(data.limits, "limits");
-	exactKeys(limits, ["wallTimeSeconds"], "limits");
+	exactKeys(limits, ["wallTimeSeconds", "toolCallBudgets"], "limits");
+	const toolCallBudgets = record(limits.toolCallBudgets, "limits.toolCallBudgets");
+	for (const [toolName, limit] of Object.entries(toolCallBudgets)) {
+		if (!/^[A-Za-z0-9_-]+$/.test(toolName)) {
+			throw new ProtocolError("invalid_frame", `invalid tool budget name: ${toolName}`);
+		}
+		nonnegativeInteger(limit, `limits.toolCallBudgets.${toolName}`);
+	}
+	if ("submit_candidates" in toolCallBudgets) {
+		throw new ProtocolError("invalid_frame", "submit_candidates cannot have a tool call budget");
+	}
 	const webSearch = record(data.webSearch, "webSearch");
 	exactKeys(webSearch, ["providers", "fallbackOn"], "webSearch");
 	const providers = stringArray(webSearch.providers, "webSearch.providers");
@@ -544,6 +555,24 @@ export function parseFrame(line: string): InputFrame {
 		throw new ProtocolError("invalid_frame", "context7Enabled must be boolean");
 	}
 
+	const profiles = parseProfiles(data.profiles);
+	const toolExtensions = parseToolExtensions(data.toolExtensions);
+	const mcpServers = parseMcpServers(data.mcpServers);
+	const availableTools = new Set([
+		"read", "write", "bash", "web_search", "fetch_content", "get_search_content",
+		"submit_candidates",
+		...toolExtensions.flatMap((extension) => extension.toolNames),
+		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
+		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
+	]);
+	const unavailableBudgets = Object.keys(toolCallBudgets).filter((name) => !availableTools.has(name));
+	if (unavailableBudgets.length > 0) {
+		throw new ProtocolError(
+			"invalid_frame",
+			`tool budgets reference unavailable tools: ${unavailableBudgets.sort().join(", ")}`,
+		);
+	}
+
 	return {
 		...identity,
 		type: "initialize",
@@ -558,9 +587,9 @@ export function parseFrame(line: string): InputFrame {
 		candidateSchema,
 		candidateSchemaSha256,
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
-		profiles: parseProfiles(data.profiles),
-		toolExtensions: parseToolExtensions(data.toolExtensions),
-		mcpServers: parseMcpServers(data.mcpServers),
+		profiles,
+		toolExtensions,
+		mcpServers,
 		networkPolicy: {
 			allowedHosts: stringArray(policy.allowedHosts, "networkPolicy.allowedHosts"),
 			deniedHosts: stringArray(policy.deniedHosts, "networkPolicy.deniedHosts"),
@@ -568,6 +597,12 @@ export function parseFrame(line: string): InputFrame {
 		},
 		limits: {
 			wallTimeSeconds: positiveInteger(limits.wallTimeSeconds, "limits.wallTimeSeconds"),
+			toolCallBudgets: Object.fromEntries(
+				Object.entries(toolCallBudgets).map(([name, limit]) => [
+					name,
+					nonnegativeInteger(limit, `limits.toolCallBudgets.${name}`),
+				]),
+			),
 		},
 		webSearch: {
 			providers,

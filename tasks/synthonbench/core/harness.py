@@ -489,15 +489,15 @@ def _evaluated_history(
 
 
 def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
-    fields = {
-        "llm_requests": "providerCalls",
-        "harness_web_calls": "webCalls",
-        "harness_context7_calls": "context7Calls",
-        "harness_artifact_bytes": "artifactBytes",
-    }
     return {
-        counter: sum(int(result.usage.get(field, 0)) for result in results)
-        for counter, field in fields.items()
+        "llm_requests": sum(int(result.usage["providerCalls"]) for result in results),
+        "harness_tool_calls": sum(
+            sum(int(count) for count in result.usage["toolCalls"].values())
+            for result in results
+        ),
+        "harness_artifact_bytes": sum(
+            int(result.usage["artifactBytes"]) for result in results
+        ),
     }
 
 
