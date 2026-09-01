@@ -16,11 +16,11 @@ _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
 )
 DEFAULT_NETWORK_TOOL_BUDGETS = (
-    "web_search=4",
-    "fetch_content=8",
-    "get_search_content=8",
-    "resolve-library-id=2",
-    "query-docs=4",
+    "web_search=8",
+    "fetch_content=16",
+    "get_search_content=16",
+    "resolve-library-id=4",
+    "query-docs=8",
 )
 
 

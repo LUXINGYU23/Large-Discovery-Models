@@ -32,8 +32,8 @@ from tasks.synthonbench.core.workflow_args import validate_args
 
 def test_harness_tool_budgets_are_configurable_and_follow_enabled_tools() -> None:
     defaults = parse_args(["--mock"])
-    assert "web_search=4" in defaults.harness_tool_budget
-    assert "query-docs=4" in defaults.harness_tool_budget
+    assert "web_search=8" in defaults.harness_tool_budget
+    assert "query-docs=8" in defaults.harness_tool_budget
 
     without_context7 = parse_args(["--mock", "--no-harness-context7"])
     assert all("query-docs" not in value for value in without_context7.harness_tool_budget)
