@@ -10,3 +10,7 @@ Official source checkouts, model weights, start-sequence sets, generated
 manifests, caches, traces, and campaign outputs must be stored outside the Git
 repository. Runtime preparation must record their digests before a case can
 move beyond `planned`.
+
+`python -m tasks.nucleobench.scripts.prepare_official_data` writes the first
+case's external `prepared_manifest.json`; generated manifest instances are not
+tracked here.

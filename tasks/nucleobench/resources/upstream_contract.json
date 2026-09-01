@@ -37,11 +37,48 @@
       "bpnet",
       "rinalmo_mrl",
       "enformer"
+    ],
+    "start_sequence_inputs": [
+      "literal DNA sequence",
+      "local:// file",
+      "enformer:// published start index"
+    ],
+    "editable_position_inputs": [
+      "all positions when omitted",
+      "explicit zero-based positions",
+      "local:// file",
+      "enformer:// published start index"
     ]
   },
+  "case_preparation": {
+    "malinois_k562": {
+      "model_artifact": {
+        "official_uri": "gs://tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
+        "sha256": null
+      },
+      "model_init_args": {
+        "target_feature": 0,
+        "bending_factor": null,
+        "a_min": -2.0,
+        "a_max": 6.0,
+        "target_alpha": 1.0,
+        "flank_length": 200
+      },
+      "start_set": {
+        "required_count": 100,
+        "authoritative_source": null,
+        "sha256": null
+      },
+      "editable_positions": {
+        "mode": "all_positions",
+        "count": 200
+      }
+    }
+  },
   "qualification_blockers": [
-    "Verify and digest the authoritative paired-start source for every case.",
-    "Record complete official model constructor arguments for each prepared case.",
+    "Verify and digest the authoritative paired-start source for every case, including Malinois K562.",
+    "Verify the official Malinois bending_factor and model artifact SHA-256.",
+    "Record complete official model constructor arguments for every remaining case.",
     "Verify formal benchmark seeds and equivalent hardware requirements.",
     "Record source, model, start-set, and editable-mask artifact digests."
   ]

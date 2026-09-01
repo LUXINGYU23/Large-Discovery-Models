@@ -15,8 +15,8 @@ driver.
 
 The task is registered with a draft experiment contract. Its versioned case
 catalog covers the 17 public NucleoBench tasks, all currently marked
-`planned`. No official model campaign or benchmark result is claimed at this
-stage.
+`planned`. The mutation-patch candidate contract and external data preparation
+command are implemented; executable campaigns are not yet qualified.
 
 The first implementation target is `malinois_k562`. After that case passes
 source preparation, seed evaluation, a tiny campaign, and qualification, the
@@ -52,6 +52,32 @@ uv run --locked --project tasks/nucleobench \
 
 The dry run is inspection-only. Executable mock and official workflows are not
 available until their corresponding qualification stages are implemented.
+
+## Prepare Malinois K562 Inputs
+
+Preparation validates a clean checkout at the pinned revision, a JSON array of
+100 unique 200-base starts, the editable positions, and a local copy of the
+official model artifact. It writes only small prepared files and a digest-bound
+manifest to an external directory.
+
+```bash
+uv run --locked --project tasks/nucleobench \
+  python -m tasks.nucleobench.scripts.prepare_official_data \
+  --case malinois_k562 \
+  --source-dir /external/nucleobench/source \
+  --output-dir /external/nucleobench/data/malinois_k562 \
+  --starts-file /external/nucleobench/inputs/malinois_k562_starts.json \
+  --model-artifact /external/nucleobench/models/malinois_artifacts.tar.gz \
+  --model-sha256 <verified-sha256> \
+  --start-set-sha256 <verified-canonical-start-set-sha256> \
+  --bending-factor <verified-official-value>
+```
+
+The model may be obtained from the official URI recorded in
+[`resources/upstream_contract.json`](resources/upstream_contract.json) or from
+a user-selected mirror. The script never stores weights in Git. A prepared
+manifest is an input-integrity record; the case remains `planned` until its
+authoritative starts and complete model arguments pass qualification.
 
 ## Execution Profiles
 
