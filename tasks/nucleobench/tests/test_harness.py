@@ -8,6 +8,7 @@ from pathlib import Path
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation, RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.harness import HarnessSubmissionRequest, HarnessTurnResult
+from tasks.nucleobench.core import workflow
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.constants import NUCLEOBENCH_Q0_METADATA_KEY
 from tasks.nucleobench.core.factory import build_proposal_expander
@@ -403,6 +404,35 @@ def test_harness_dry_run_exposes_reproducible_settings_without_secret(
     assert payload["harness"]["tool_call_budgets"] == {"web_search": 3}
     assert payload["harness"]["context7_enabled"] is False
     assert "test-secret" not in output
+
+
+def test_local_harness_uses_host_identity_and_kvm_group(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(workflow.os, "getuid", lambda: 1001, raising=False)
+    monkeypatch.setattr(workflow.os, "getgid", lambda: 1002, raising=False)
+
+    args = parse_args(["--search-method", "harness"])
+    assert args.harness_container_user == "1001:1002"
+
+    kvm_path = tmp_path / "kvm"
+    kvm_path.touch()
+    assert workflow._local_kvm_group_args(None, kvm_path) == (
+        "--group-add",
+        str(kvm_path.stat().st_gid),
+    )
+
+    remote = parse_args(
+        [
+            "--search-method",
+            "harness",
+            "--harness-docker-host",
+            "tcp://docker.example:2375",
+        ]
+    )
+    assert remote.harness_container_user is None
+    assert workflow._local_kvm_group_args(remote.harness_docker_host, kvm_path) == ()
 
 
 def _expander(

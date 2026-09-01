@@ -61,6 +61,11 @@ uv sync --locked --project tasks/nucleobench --extra official
 The released Malinois configs hide CUDA and use the official CPU reference
 path, including on accelerator-equipped hosts.
 
+For a local Docker daemon on POSIX, Harness containers run as the invoking
+UID:GID and receive the host KVM group. This keeps session traces readable by
+the user while retaining KVM access. Use `--harness-container-user` when a
+remote daemon or a custom identity requires an explicit value.
+
 The dry run is inspection-only. Executable mock and official workflows are not
 equivalent: the mock verifies repository integration but is not a benchmark
 result.

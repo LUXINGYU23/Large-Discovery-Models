@@ -213,6 +213,15 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
         )
     if args.harness_candidates_per_session is None:
         args.harness_candidates_per_session = args.evaluations_per_round
+    if (
+        args.search_method in {"ldm_harness", "harness"}
+        and args.harness_container_user is None
+        and args.harness_docker_host is None
+    ):
+        getuid = getattr(os, "getuid", None)
+        getgid = getattr(os, "getgid", None)
+        if getuid is not None and getgid is not None:
+            args.harness_container_user = f"{getuid()}:{getgid()}"
     args.initialization_evaluations = 1
 
 
@@ -907,6 +916,15 @@ def _harness_profiles(args: argparse.Namespace):
     return ()
 
 
+def _local_kvm_group_args(
+    docker_host: str | None,
+    kvm_path: Path = Path("/dev/kvm"),
+) -> tuple[str, ...]:
+    if docker_host or not kvm_path.exists():
+        return ()
+    return ("--group-add", str(kvm_path.stat().st_gid))
+
+
 def _harness_client(
     args: argparse.Namespace,
     runtime: CampaignRuntime,
@@ -934,6 +952,7 @@ def _harness_client(
     command.extend(("run", "--rm", "-i"))
     if args.harness_container_user:
         command.extend(("--user", args.harness_container_user))
+        command.extend(_local_kvm_group_args(args.harness_docker_host))
     command.extend(
         (
             "--device",
