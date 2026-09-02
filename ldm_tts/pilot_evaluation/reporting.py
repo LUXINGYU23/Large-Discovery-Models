@@ -108,7 +108,9 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             "proposal_candidates_per_request": int(
                 config.get("proposal_candidates_per_request", 1)
             ),
-            "proposal_request_limit": int(config.get("proposal_request_limit", 0)),
+            "proposal_request_limit": _per_round_proposal_limit(
+                budget, spec.optimization_rounds
+            ),
             "harness_candidates_per_session": int(config.get("harness_candidates_per_session", 0)),
             "contract_sha256": str(campaign["contract_sha256"]),
             "initial_candidate_ids": initial_candidate_ids,
@@ -360,6 +362,18 @@ def _budget_fields(budget: dict[str, Any]) -> dict[str, float]:
     if not isinstance(counters, dict):
         raise TypeError("budget counters must be an object")
     return {f"budget_{key}": _finite(value, f"budget {key}") for key, value in counters.items()}
+
+
+def _per_round_proposal_limit(budget: dict[str, Any], rounds: int) -> int:
+    limits = budget.get("limits")
+    if not isinstance(limits, dict):
+        raise TypeError("budget limits must be an object")
+    total = limits.get("proposal_attempts")
+    if isinstance(total, bool) or not isinstance(total, int) or total < 0:
+        raise TypeError("proposal attempt budget must be a non-negative integer")
+    if rounds < 1 or total % rounds:
+        raise ValueError("proposal attempt budget must divide evenly across rounds")
+    return total // rounds
 
 
 def _observations(run_dir: Path) -> list[dict[str, Any]]:

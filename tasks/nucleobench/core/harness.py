@@ -30,7 +30,6 @@ from tasks.nucleobench.core.candidate import (
     PreparedMutationCandidate,
     prepare_candidate_payload,
 )
-from tasks.nucleobench.core.constants import TASK_ID
 from tasks.nucleobench.core.proposals import attach_empirical_base_measure
 
 HARNESS_PROFILE_IDS = (

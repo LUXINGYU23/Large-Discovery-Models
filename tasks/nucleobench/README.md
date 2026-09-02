@@ -38,80 +38,22 @@ The catalog is stored in
 release claim: a case may only move from `planned` after the corresponding
 official artifacts and validation evidence exist.
 
-## Inspect the Registered Contract
+## Usage and Isolation
 
-From the repository root:
+[`QUICKSTART.md`](QUICKSTART.md) is the single operational guide for installing
+the task environment, validating registration, preparing external inputs, and
+running mock or real campaigns.
 
-```bash
-uv sync --locked --project tasks/nucleobench
-uv run --locked --project tasks/nucleobench \
-  python scripts/validate_tasks.py --task nucleobench \
-  --require-qualified --require-stage tiny_campaign_verified
-uv run --locked --project tasks/nucleobench \
-  python -m tasks.nucleobench.ldm_task.procedure \
-  --case-id malinois_k562 --dry-run
-```
+The released Malinois configs use the official CPU reference path. Harness
+sessions receive the paired-start design context rather than official case or
+model identity, and a task-local network policy blocks the registered upstream
+source and model-artifact hosts while leaving public-literature research
+available. For a local Docker daemon on POSIX, the Harness uses the invoking
+UID:GID and host KVM group; `--harness-container-user` overrides that identity.
 
-Real official-oracle runs require Linux and the pinned upstream runtime:
-
-```bash
-uv sync --locked --project tasks/nucleobench --extra official
-```
-
-The released Malinois configs hide CUDA and use the official CPU reference
-path, including on accelerator-equipped hosts.
-
-For a local Docker daemon on POSIX, Harness containers run as the invoking
-UID:GID and receive the host KVM group. This keeps session traces readable by
-the user while retaining KVM access. Use `--harness-container-user` when a
-remote daemon or a custom identity requires an explicit value.
-
-Harness sessions receive the paired-start design context rather than the
-official case or model identity. A task-local network deny list blocks the
-registered upstream source and official model-artifact hosts while leaving
-ordinary public-literature research available.
-
-The dry run is inspection-only. Executable mock and official workflows are not
-equivalent: the mock verifies repository integration but is not a benchmark
-result.
-
-## Run the Deterministic Mock
-
-```bash
-uv run --locked --project tasks/nucleobench \
-  python scripts/run_ldm_tts.py config/nucleobench/mock.yaml
-```
-
-The run uses the shared `LDMEngine`, candidate admission, batch evaluator,
-budget ledger, checkpoint, event log, result export, trajectory export, and
-data-collection sink without network, model weights, or GPU access.
-
-## Prepare Malinois K562 Inputs
-
-Preparation validates a clean checkout at the pinned revision, the official
-Zenodo start table or an equivalent JSON array, the editable positions, and a
-local copy of the official model artifact. It writes only small prepared files
-and a digest-bound manifest to an external directory.
-
-```bash
-uv run --locked --project tasks/nucleobench \
-  python -m tasks.nucleobench.scripts.prepare_official_data \
-  --case malinois_k562 \
-  --source-dir /external/nucleobench/source \
-  --output-dir /external/nucleobench/data/malinois_k562 \
-  --starts-file /external/nucleobench/inputs/start_sequences_df.csv \
-  --model-artifact /external/nucleobench/models/malinois_artifacts.tar.gz \
-  --model-sha256 06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592 \
-  --start-set-sha256 2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5 \
-  --bending-factor 1.0
-```
-
-The official start table is published as `start_sequences_df.csv` in Zenodo
-record `17079936`. The model may be obtained from the official URI recorded in
-[`resources/upstream_contract.json`](resources/upstream_contract.json) or from
-a user-selected mirror. The script never stores weights or starts in Git. A
-prepared manifest is an input-integrity record and is required before any real
-campaign.
+Mock runs exercise repository integration without network access, model
+weights, or official benchmark claims. Official source checkouts, model
+artifacts, prepared inputs, caches, traces, and run outputs remain outside Git.
 
 ## Execution Profiles
 
@@ -123,6 +65,5 @@ proposal, and selection implementation:
   with no method-level round cap.
 
 Pilot results are development diagnostics and are not official benchmark
-results. See [`QUICKSTART.md`](QUICKSTART.md) for the current validation path
-and [`resources/upstream_contract.json`](resources/upstream_contract.json) for
-the pinned protocol boundary.
+results. The pinned protocol boundary is recorded in
+[`resources/upstream_contract.json`](resources/upstream_contract.json).

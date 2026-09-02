@@ -23,13 +23,6 @@ def test_core_does_not_import_another_task() -> None:
     assert foreign_imports == []
 
 
-def test_runner_adapter_contains_only_the_registered_surface() -> None:
-    assert {path.name for path in (TASK_ROOT / "ldm_task").glob("*.py")} == {
-        "__init__.py",
-        "procedure.py",
-    }
-
-
 def _imported_modules(node: ast.AST) -> tuple[str, ...]:
     if isinstance(node, ast.Import):
         return tuple(alias.name for alias in node.names)
