@@ -656,6 +656,8 @@ def _run_real(
         )
         method_digest = _method_preset_sha256(args, task_spec)
         oracle_manifest = _oracle_manifest(args, prepared)
+        expected_active_steps = None
+        termination_args: dict[str, int] | None
         if args.termination_kind == "rounds":
             assert args.iterations is not None
             remaining_steps = args.iterations - state.next_round
@@ -665,36 +667,15 @@ def _run_real(
                 )
             if remaining_steps == 0:
                 report = _finish_completed_resume(runtime)
+                termination_args = None
             else:
-                all_args = build_official_runner_args(
-                    official.parsed_args_type,
-                    model_name=case.model_name,
-                    optimization_name=f"ldm_tts_{args.search_method}",
-                    start_sequence=prepared.context.start_sequence,
-                    positions_to_mutate=prepared.context.editable_positions,
-                    output_path=_official_output_dir(runtime, state.next_round),
-                    proposals_per_round=OFFICIAL_PROPOSALS_PER_ROUND,
-                    max_number_of_rounds=remaining_steps,
-                    model_init_args=prepared.model_init_args,
-                    optimizer_init_args=_optimizer_manifest(args),
-                )
-                report = run_official_driver(
-                    run_loop=official.run_loop,
-                    model=official.model,
-                    designer=designer,
-                    all_args=all_args,
-                    runtime=runtime,
-                    execution=_execution_record(
-                        args,
-                        prepared,
-                        method_digest,
-                        args.iterations - 1,
-                    ),
-                    oracle_manifest=oracle_manifest,
-                    expected_active_steps=args.iterations - 1,
-                )
+                expected_active_steps = args.iterations - 1
+                termination_args = {"max_number_of_rounds": remaining_steps}
         else:
             assert args.max_seconds is not None
+            termination_args = {"max_seconds": args.max_seconds}
+
+        if termination_args is not None:
             all_args = build_official_runner_args(
                 official.parsed_args_type,
                 model_name=case.model_name,
@@ -703,9 +684,9 @@ def _run_real(
                 positions_to_mutate=prepared.context.editable_positions,
                 output_path=_official_output_dir(runtime, state.next_round),
                 proposals_per_round=OFFICIAL_PROPOSALS_PER_ROUND,
-                max_seconds=args.max_seconds,
                 model_init_args=prepared.model_init_args,
                 optimizer_init_args=_optimizer_manifest(args),
+                **termination_args,
             )
             report = run_official_driver(
                 run_loop=official.run_loop,
@@ -714,12 +695,10 @@ def _run_real(
                 all_args=all_args,
                 runtime=runtime,
                 execution=lambda active_steps: _execution_record(
-                    args,
-                    prepared,
-                    method_digest,
-                    active_steps,
+                    args, prepared, method_digest, active_steps
                 ),
                 oracle_manifest=oracle_manifest,
+                expected_active_steps=expected_active_steps,
             )
     except Exception as exc:
         status = json.loads(runtime.status.path.read_text(encoding="utf-8"))

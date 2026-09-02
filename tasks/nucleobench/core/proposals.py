@@ -356,8 +356,7 @@ class DirectMutationProposalExpander:
         with ThreadPoolExecutor(
             max_workers=min(self.max_workers, len(requests))
         ) as executor:
-            futures = [executor.submit(self.client.propose, item) for item in requests]
-            return tuple(future.result() for future in futures)
+            return tuple(executor.map(self.client.propose, requests))
 
 
 def direct_request_limit(search_method: str, evaluations_per_round: int) -> int:
