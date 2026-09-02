@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -52,6 +51,7 @@ from tasks.nucleobench.core.designer import (
     NucleoBenchDesigner,
     initialize_designer_state,
 )
+from tasks.nucleobench.core.digests import canonical_json_sha256, file_digest
 from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
 from tasks.nucleobench.core.factory import (
     build_mock_engine,
@@ -1057,7 +1057,7 @@ def _method_preset_sha256(
         },
         "harness": _harness_description(args),
     }
-    return _canonical_sha256(payload)
+    return canonical_json_sha256(payload)
 
 
 def _oracle_manifest(
@@ -1077,7 +1077,7 @@ def _oracle_manifest(
         },
         "oracle": {
             "model_name": prepared.context.case.model_name,
-            "model_artifact_sha256": _sha256_file(prepared.model_artifact),
+            "model_artifact_sha256": file_digest(prepared.model_artifact),
             "model_init_args": prepared.model_init_args,
         },
         "official_runner": {
@@ -1177,20 +1177,6 @@ def _first_configured(environment: Mapping[str, str], *names: str) -> str:
         if value:
             return value
     return ""
-
-
-def _canonical_sha256(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def build_official_runner_args(

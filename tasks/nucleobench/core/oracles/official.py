@@ -14,9 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from ldm_tts.engine.run_store import CampaignRuntime
-from tasks.nucleobench.core.candidate import MutationContext
+from tasks.nucleobench.core.candidate import (
+    MutationContext,
+    normalize_editable_positions,
+)
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.constants import OFFICIAL_START_COUNT, UPSTREAM_COMMIT
+from tasks.nucleobench.core.digests import canonical_json_sha256, file_digest
 from tasks.nucleobench.core.source import require_clean_revision
 
 
@@ -121,7 +125,7 @@ def load_prepared_case(
     _require_file_digest(starts_path, starts_info)
     starts = _load_json(starts_path)
     _validate_starts(starts, case.sequence_length)
-    start_digest = _canonical_json_sha256(starts)
+    start_digest = canonical_json_sha256(starts)
     if start_digest != starts_info.get("sha256"):
         raise ValueError("prepared start set digest mismatch")
 
@@ -131,7 +135,7 @@ def load_prepared_case(
     positions_payload = _load_json(positions_path)
     if (
         "sha256" in positions_info
-        and _canonical_json_sha256(positions_payload) != positions_info["sha256"]
+        and canonical_json_sha256(positions_payload) != positions_info["sha256"]
     ):
         raise ValueError("prepared editable-position digest mismatch")
     positions = _positions_for_start(
@@ -282,18 +286,13 @@ def _positions_for_start(
         positions = payload[start_index]
     else:
         positions = payload
-    if not isinstance(positions, list) or any(
-        isinstance(position, bool) or not isinstance(position, int)
-        for position in positions
-    ):
-        raise ValueError("editable positions must contain only integers")
-    if len(positions) != expected_count or len(set(positions)) != expected_count:
-        raise ValueError(
-            f"editable positions must contain {expected_count} unique entries"
+    return list(
+        normalize_editable_positions(
+            positions,
+            sequence_length=sequence_length,
+            expected_count=expected_count,
         )
-    if any(position < 0 or position >= sequence_length for position in positions):
-        raise ValueError("editable positions contains a position outside the sequence")
-    return sorted(positions)
+    )
 
 
 def _finite_energies(raw: Any, expected: int) -> tuple[float, ...]:
@@ -325,28 +324,14 @@ def _mapping(parent: Mapping[str, Any], key: str) -> Mapping[str, Any]:
 
 
 def _require_file_digest(path: Path, info: Mapping[str, Any]) -> None:
-    if _sha256_file(path) != info.get("file_sha256", info.get("sha256")):
+    if not path.is_file():
+        raise ValueError(f"prepared artifact does not exist: {path}")
+    if file_digest(path) != info.get("file_sha256", info.get("sha256")):
         raise ValueError(f"prepared artifact digest mismatch: {path}")
 
 
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("ascii")).hexdigest()
-
-
-def _canonical_json_sha256(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    if not path.is_file():
-        raise ValueError(f"prepared artifact does not exist: {path}")
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 __all__ = [

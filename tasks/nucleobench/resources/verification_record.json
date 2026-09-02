@@ -2,7 +2,7 @@
   "schema_version": 2,
   "record_type": "nucleobench_malinois_k562_qualification",
   "task_id": "nucleobench",
-  "verified_on": "2026-09-01",
+  "verified_on": "2026-09-02",
   "official_contract": {
     "source_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
     "package_version": "2.0.10",
@@ -45,7 +45,7 @@
   "local_validation": {
     "task_tests": {
       "status": "passed",
-      "passed": 69
+      "passed": 76
     },
     "mock_campaign": {
       "status": "completed",

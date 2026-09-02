@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import importlib
 import json
 import math
@@ -12,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from tasks.nucleobench.core.candidate import normalize_editable_positions
 from tasks.nucleobench.core.cases import get_case, load_case_catalog
 from tasks.nucleobench.core.constants import (
     OFFICIAL_START_COUNT,
@@ -19,6 +19,7 @@ from tasks.nucleobench.core.constants import (
     UPSTREAM_COMMIT,
     UPSTREAM_URL,
 )
+from tasks.nucleobench.core.digests import canonical_json_sha256, file_digest
 from tasks.nucleobench.core.source import prepare_source_checkout
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -102,7 +103,7 @@ def prepare_case_data(
         case_contract=case_contract,
         artifacts=_mapping(contract, "artifacts"),
     )
-    start_set_sha256 = _canonical_json_sha256(starts)
+    start_set_sha256 = canonical_json_sha256(starts)
     official_start_sha256 = case_contract.get("start_set_sha256")
     expected_start = official_start_sha256 or expected_start_set_sha256
     if not expected_start:
@@ -118,7 +119,7 @@ def prepare_case_data(
         sequence_length=case.sequence_length,
         expected_count=case.editable_position_count,
     )
-    positions_sha256 = _canonical_json_sha256(positions)
+    positions_sha256 = canonical_json_sha256(positions)
     if "editable_positions_sha256" in case_contract:
         _require_expected_digest(
             positions_sha256,
@@ -312,29 +313,16 @@ def _load_editable_positions(
     if len(masks) not in {1, OFFICIAL_START_COUNT}:
         raise ValueError("editable positions must contain one global mask or 100 masks")
     validated = [
-        _validate_position_mask(mask, sequence_length, expected_count) for mask in masks
+        list(
+            normalize_editable_positions(
+                mask,
+                sequence_length=sequence_length,
+                expected_count=expected_count,
+            )
+        )
+        for mask in masks
     ]
     return validated if len(validated) == OFFICIAL_START_COUNT else validated[0]
-
-
-def _validate_position_mask(
-    payload: Any,
-    sequence_length: int,
-    expected_count: int,
-) -> list[int]:
-    if not isinstance(payload, list) or any(
-        isinstance(position, bool) or not isinstance(position, int)
-        for position in payload
-    ):
-        raise ValueError("editable positions must contain only integers")
-    positions = [int(position) for position in payload]
-    if len(positions) != expected_count or len(set(positions)) != expected_count:
-        raise ValueError(
-            f"editable positions must contain {expected_count} unique entries"
-        )
-    if any(position < 0 or position >= sequence_length for position in positions):
-        raise ValueError("editable positions contains a position outside the sequence")
-    return sorted(positions)
 
 
 def _model_init_args(case_id: str, bending_factor: float) -> dict[str, Any]:
@@ -397,7 +385,7 @@ def _verify_model_artifact(
             str(digest["sha256"]), str(contract["sha256"]), "model artifact"
         )
     elif "md5" in contract:
-        actual_md5 = _hash_file(path, "md5")
+        actual_md5 = file_digest(path, "md5")
         if actual_md5 != str(contract["md5"]).lower():
             raise ValueError("model artifact MD5 mismatch")
     else:
@@ -420,12 +408,6 @@ def _mapping(parent: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     return value
 
 
-def _canonical_json_sha256(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-
-
 def _require_expected_digest(actual: str, expected: str, label: str) -> None:
     if actual != expected.lower():
         raise ValueError(f"{label} SHA-256 mismatch: expected {expected}, got {actual}")
@@ -436,16 +418,8 @@ def _digest(path: Path) -> dict[str, int | str]:
         raise ValueError(f"artifact does not exist: {path}")
     return {
         "bytes": path.stat().st_size,
-        "sha256": _hash_file(path, "sha256"),
+        "sha256": file_digest(path),
     }
-
-
-def _hash_file(path: Path, algorithm: str) -> str:
-    digest = hashlib.new(algorithm)
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _write_json(path: Path, value: Any) -> None:

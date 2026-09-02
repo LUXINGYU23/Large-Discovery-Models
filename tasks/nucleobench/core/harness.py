@@ -19,8 +19,6 @@ from ldm_tts.harness import (
     HarnessToolExtension,
     HarnessTurn,
     HarnessTurnResult,
-    canonical_sha256,
-    file_sha256,
     profile_set_sha256,
 )
 from tasks.nucleobench.core.candidate import (
@@ -30,6 +28,7 @@ from tasks.nucleobench.core.candidate import (
     PreparedMutationCandidate,
     prepare_candidate_payload,
 )
+from tasks.nucleobench.core.digests import canonical_json_sha256, file_digest
 from tasks.nucleobench.core.proposals import attach_empirical_base_measure
 
 HARNESS_PROFILE_IDS = (
@@ -137,7 +136,7 @@ def _profile(
         profile_id,
         resource_root / profile_id / "AGENTS.md",
         candidates_per_turn,
-        agents_sha256=file_sha256(local_path),
+        agents_sha256=file_digest(local_path),
     )
 
 
@@ -149,7 +148,7 @@ def harness_tool_extensions(
     return (
         HarnessToolExtension(
             resource_root / local_path.name,
-            file_sha256(local_path),
+            file_digest(local_path),
             HARNESS_TOOL_NAMES,
         ),
     )
@@ -254,7 +253,7 @@ class NucleoBenchHarnessExpander:
         serialized_history = _serialize_observations(history, self.domain.context)
         history_to_seq = len(request.observations)
         history_from_seq = history_to_seq - len(history)
-        history_digest = canonical_sha256(serialized_history)
+        history_digest = canonical_json_sha256(serialized_history)
         forbidden_query_terms = _forbidden_query_terms(request)
         return tuple(
             HarnessTurn(
@@ -410,7 +409,7 @@ def _turn_id(
     history_to_seq: int,
     history_digest: str,
 ) -> str:
-    digest = canonical_sha256(
+    digest = canonical_json_sha256(
         {
             "campaignId": campaign_id,
             "historyDigest": history_digest,

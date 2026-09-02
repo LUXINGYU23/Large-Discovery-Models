@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import replace
 from itertools import product
@@ -23,6 +22,7 @@ from ldm_tts.engine.expansion import (
 )
 from tasks.nucleobench.core.candidate import MutationContext
 from tasks.nucleobench.core.cases import NucleoBenchCase
+from tasks.nucleobench.core.digests import canonical_json_sha256
 from tasks.nucleobench.core.task_spec import build_task_spec
 
 MOCK_START_SEQUENCE = "AAAAAAAA"
@@ -40,9 +40,7 @@ MOCK_CASE = NucleoBenchCase(
 )
 MOCK_CONTEXT = MutationContext(
     case=MOCK_CASE,
-    start_set_digest=hashlib.sha256(
-        json.dumps([MOCK_START_SEQUENCE], separators=(",", ":")).encode()
-    ).hexdigest(),
+    start_set_digest=canonical_json_sha256([MOCK_START_SEQUENCE]),
     start_index=0,
     start_sequence=MOCK_START_SEQUENCE,
     editable_positions=MOCK_EDITABLE_POSITIONS,

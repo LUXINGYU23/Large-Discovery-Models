@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -19,6 +17,7 @@ from ldm_tts.optimization import (
 )
 from ldm_tts.optimization.acquisition import make_acquisition
 from tasks.nucleobench.core.candidate import MutationContext, prepare_candidate_payload
+from tasks.nucleobench.core.digests import canonical_json_sha256
 
 ENCODER_ALGORITHM = "editable_categorical_hamming_v1"
 ENCODER_PATH = "tasks.nucleobench.core.hamming_gp:NucleotideHammingEncoder"
@@ -39,9 +38,7 @@ class NucleotideHammingEncoder:
             "start_index": context.start_index,
             "editable_positions": list(context.editable_positions),
         }
-        digest = hashlib.sha256(
-            json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
+        digest = canonical_json_sha256(identity)
         self.version = f"{ENCODER_ALGORITHM}:{digest[:16]}"
 
     def describe(self) -> SurrogateSpaceSpec:

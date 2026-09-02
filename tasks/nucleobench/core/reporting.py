@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -16,6 +15,7 @@ from ldm_tts.engine.reporting import (
     write_trajectory_csv,
 )
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write
+from tasks.nucleobench.core.digests import file_digest
 
 _EXECUTION_PROFILES = frozenset(
     {"qualification", "pilot_evaluation", "official_benchmark"}
@@ -42,7 +42,7 @@ def inventory_official_outputs(output_dir: Path, run_dir: Path) -> list[dict[str
         {
             "path": path.relative_to(run_dir).as_posix(),
             "bytes": path.stat().st_size,
-            "sha256": _sha256_file(path),
+            "sha256": file_digest(path),
         }
         for path in files
     ]
@@ -286,14 +286,6 @@ def _positive_int(value: Any, name: str) -> int:
     if result < 1:
         raise ValueError(f"{name} must be a positive integer")
     return result
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 __all__ = ["inventory_official_outputs", "write_campaign_reports"]

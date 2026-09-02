@@ -93,6 +93,26 @@ class PreparedMutationCandidate:
     hamming_distance: int
 
 
+def normalize_editable_positions(
+    payload: Any,
+    *,
+    sequence_length: int,
+    expected_count: int,
+) -> tuple[int, ...]:
+    if not isinstance(payload, list) or any(
+        isinstance(position, bool) or not isinstance(position, int)
+        for position in payload
+    ):
+        raise ValueError("editable positions must contain only integers")
+    if len(payload) != expected_count or len(set(payload)) != expected_count:
+        raise ValueError(
+            f"editable positions must contain {expected_count} unique entries"
+        )
+    if any(position < 0 or position >= sequence_length for position in payload):
+        raise ValueError("editable positions contains a position outside the sequence")
+    return tuple(sorted(payload))
+
+
 @dataclass(frozen=True)
 class NucleoBenchCandidateDomain:
     """Admit mutation patches without storing reconstructed full sequences."""
