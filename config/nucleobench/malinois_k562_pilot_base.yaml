@@ -3,7 +3,7 @@ task: nucleobench
 algorithm: five_method_pilot_evaluation
 mode: real
 description: Twelve-round development comparison for one Malinois K562 paired start.
-contract_profile: pilot_evaluation_malinois_k562
+contract_profile: pilot_evaluation
 args:
   execution-profile: pilot_evaluation
   termination-kind: rounds

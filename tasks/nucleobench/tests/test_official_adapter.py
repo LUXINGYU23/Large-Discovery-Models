@@ -7,13 +7,15 @@ import subprocess
 from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write
-from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
+from tasks.nucleobench.core.candidate import MutationContext, NucleoBenchCandidateDomain
+from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.designer import (
     NucleoBenchDesigner,
     initialize_designer_state,
@@ -25,9 +27,12 @@ from tasks.nucleobench.core.mock import (
     build_mock_expander,
     build_mock_task_spec,
 )
-from tasks.nucleobench.core.oracles.malinois import (
+from tasks.nucleobench.core.oracles import official as official_module
+from tasks.nucleobench.core.oracles.official import (
+    PreparedCase,
     RecordingSequenceModel,
-    load_prepared_malinois,
+    load_official_case,
+    load_prepared_case,
 )
 from tasks.nucleobench.core.source import require_clean_revision
 from tasks.nucleobench.core.workflow import (
@@ -35,6 +40,7 @@ from tasks.nucleobench.core.workflow import (
     build_official_runner_args,
     run_official_driver,
 )
+from tasks.nucleobench.scripts import prepare_official_data as prepare_module
 from tasks.nucleobench.scripts.prepare_official_data import prepare_case_data
 
 
@@ -67,19 +73,70 @@ def _start_set_sha256(sequences: list[str]) -> str:
     ).hexdigest()
 
 
-def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> None:
-    starts, model, positions = _write_inputs(tmp_path)
-    output = tmp_path / "prepared"
-    model_sha256 = hashlib.sha256(model.read_bytes()).hexdigest()
+def _set_test_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    model: Path,
+    starts: list[str],
+    source: Path | None = None,
+) -> None:
+    artifacts = {
+        "model": {
+            "bytes": model.stat().st_size,
+            "sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+        }
+    }
+    start_source = None
+    if source is not None:
+        artifacts["starts"] = {
+            "bytes": source.stat().st_size,
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
+        start_source = {
+            "kind": "csv_block",
+            "artifact": "starts",
+            "sequence_column": "0",
+            "first_index": 1300,
+            "last_index": 1399,
+        }
+    contract = tmp_path / "upstream_contract.json"
+    contract.write_text(
+        json.dumps(
+            {
+                "artifacts": artifacts,
+                "case_preparation": {
+                    "malinois_k562": {
+                        "start_source": start_source,
+                        "start_set_sha256": _start_set_sha256(starts),
+                        "model_artifact": "model",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(prepare_module, "CONTRACT_PATH", contract)
 
+
+def test_prepare_case_data_writes_a_digest_bound_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    starts, model, positions = _write_inputs(tmp_path)
+    _set_test_contract(
+        monkeypatch,
+        tmp_path,
+        model=model,
+        starts=_start_sequences(),
+    )
+    output = tmp_path / "prepared"
     manifest = prepare_case_data(
         case_id="malinois_k562",
         starts_path=starts,
         model_artifact=model,
         output_dir=output,
         editable_positions_path=positions,
-        expected_model_sha256=model_sha256,
-        expected_start_set_sha256=_start_set_sha256(_start_sequences()),
         bending_factor=1.0,
     )
 
@@ -92,7 +149,10 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
         "sha256": hashlib.sha256(starts.read_bytes()).hexdigest(),
     }
     assert manifest["editable_positions"]["count"] == 200
-    assert manifest["model_artifact"]["sha256"] == model_sha256
+    assert (
+        manifest["model_artifact"]["sha256"]
+        == hashlib.sha256(model.read_bytes()).hexdigest()
+    )
     assert manifest["model_init_args"] == {
         "a_max": 6.0,
         "a_min": -2.0,
@@ -106,7 +166,11 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
     assert json.loads((output / "editable_positions.json").read_text()) == list(
         range(200)
     )
-    prepared = load_prepared_malinois(output, start_index=7)
+    prepared = load_prepared_case(
+        output,
+        case_id="malinois_k562",
+        start_index=7,
+    )
     assert prepared.context.start_sequence == _start_sequences()[7]
     assert prepared.context.editable_positions == tuple(range(200))
     assert prepared.model_artifact == model.resolve()
@@ -114,6 +178,7 @@ def test_prepare_case_data_writes_a_digest_bound_manifest(tmp_path: Path) -> Non
 
 def test_prepare_case_data_extracts_the_official_malinois_csv(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, model, positions = _write_inputs(tmp_path)
     starts = _start_sequences()
@@ -126,6 +191,13 @@ def test_prepare_case_data_extracts_the_official_malinois_csv(
             (source_index, sequence)
             for source_index, sequence in enumerate(starts, start=1300)
         )
+    _set_test_contract(
+        monkeypatch,
+        tmp_path,
+        model=model,
+        starts=starts,
+        source=source,
+    )
 
     output = tmp_path / "prepared-csv"
     manifest = prepare_case_data(
@@ -134,32 +206,40 @@ def test_prepare_case_data_extracts_the_official_malinois_csv(
         model_artifact=model,
         output_dir=output,
         editable_positions_path=positions,
-        expected_model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
-        expected_start_set_sha256=_start_set_sha256(starts),
         bending_factor=1.0,
     )
 
     assert json.loads((output / "starts.json").read_text()) == starts
     assert manifest["start_set"]["source_file"]["name"] == source.name
-    assert manifest["start_set"]["source_file"]["sha256"] == hashlib.sha256(
-        source.read_bytes()
-    ).hexdigest()
+    assert (
+        manifest["start_set"]["source_file"]["sha256"]
+        == hashlib.sha256(source.read_bytes()).hexdigest()
+    )
 
 
-def test_prepare_case_data_rejects_unverified_or_invalid_inputs(tmp_path: Path) -> None:
+def test_prepare_case_data_rejects_unverified_or_invalid_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     starts, model, positions = _write_inputs(tmp_path)
+    _set_test_contract(
+        monkeypatch,
+        tmp_path,
+        model=model,
+        starts=_start_sequences(),
+    )
 
-    with pytest.raises(ValueError, match="model artifact SHA-256 mismatch"):
+    model.write_bytes(b"modified-after-contract")
+    with pytest.raises(ValueError, match="model artifact size"):
         prepare_case_data(
             case_id="malinois_k562",
             starts_path=starts,
             model_artifact=model,
             output_dir=tmp_path / "bad-model",
             editable_positions_path=positions,
-            expected_model_sha256="0" * 64,
-            expected_start_set_sha256=_start_set_sha256(_start_sequences()),
             bending_factor=1.0,
         )
+    model.write_bytes(b"source-pinned-model")
 
     duplicate_starts = tmp_path / "duplicate-starts.json"
     duplicate_starts.write_text(json.dumps(["A" * 200] * 100), encoding="utf-8")
@@ -170,8 +250,6 @@ def test_prepare_case_data_rejects_unverified_or_invalid_inputs(tmp_path: Path) 
             model_artifact=model,
             output_dir=tmp_path / "bad-starts",
             editable_positions_path=positions,
-            expected_model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
-            expected_start_set_sha256="0" * 64,
             bending_factor=1.0,
         )
 
@@ -184,10 +262,172 @@ def test_prepare_case_data_rejects_unverified_or_invalid_inputs(tmp_path: Path) 
             model_artifact=model,
             output_dir=tmp_path / "bad-positions",
             editable_positions_path=invalid_positions,
-            expected_model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
-            expected_start_set_sha256=_start_set_sha256(_start_sequences()),
             bending_factor=1.0,
         )
+
+
+def test_prepared_case_selects_the_paired_editable_mask(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    alphabet = "ACGT"
+    starts = []
+    for index in range(100):
+        value = index
+        suffix = []
+        for _ in range(4):
+            suffix.append(alphabet[value % 4])
+            value //= 4
+        starts.append("AAAA" + "".join(reversed(suffix)))
+    positions = [[index % 7, index % 7 + 1] for index in range(100)]
+    model = tmp_path / "model.bin"
+    model.write_bytes(b"model")
+    prepared_dir = tmp_path / "prepared-paired"
+    prepared_dir.mkdir()
+    starts_path = prepared_dir / "starts.json"
+    positions_path = prepared_dir / "editable_positions.json"
+    starts_path.write_text(json.dumps(starts), encoding="utf-8")
+    positions_path.write_text(json.dumps(positions), encoding="utf-8")
+    starts_digest = _start_set_sha256(starts)
+    manifest = {
+        "case_id": "fixture",
+        "benchmark_source": {"revision": official_module.UPSTREAM_COMMIT},
+        "start_set": {
+            "path": starts_path.name,
+            "sha256": starts_digest,
+            "file_sha256": hashlib.sha256(starts_path.read_bytes()).hexdigest(),
+        },
+        "editable_positions": {
+            "path": positions_path.name,
+            "file_sha256": hashlib.sha256(positions_path.read_bytes()).hexdigest(),
+        },
+        "model_artifact": {
+            "path": str(model),
+            "sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+        },
+        "model_init_args": {},
+    }
+    (prepared_dir / "prepared_manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        official_module,
+        "get_case",
+        lambda _case_id: SimpleNamespace(
+            case_id="fixture",
+            sequence_length=8,
+            editable_position_count=2,
+        ),
+    )
+
+    prepared = load_prepared_case(prepared_dir, case_id="fixture", start_index=11)
+
+    assert prepared.context.start_sequence == starts[11]
+    assert prepared.context.editable_positions == tuple(positions[11])
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "malinois_hepg2",
+        "bpnet_ctcf",
+        "rinalmo_mrl",
+        "enformer_muscle_not_liver",
+    ],
+)
+def test_official_loader_dispatches_every_model_family(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case_id: str,
+) -> None:
+    case = get_case(case_id)
+    artifact = tmp_path / "model.bin"
+    artifact.write_bytes(b"model")
+    context = MutationContext(
+        case=case,
+        start_set_digest="0" * 64,
+        start_index=0,
+        start_sequence="A" * case.sequence_length,
+        editable_positions=tuple(range(case.editable_position_count)),
+    )
+    init_args = dict(case.model_selector)
+    if case.model_family == "malinois":
+        init_args.update(
+            bending_factor=1.0,
+            a_min=-2.0,
+            a_max=6.0,
+            target_alpha=1.0,
+            flank_length=200,
+        )
+    elif case.model_family == "enformer":
+        init_args.update(spatial_bins_to_aggregate=None, run_sanity_checks=True)
+    prepared = PreparedCase(context, artifact, init_args)
+    constructed: list[dict[str, object]] = []
+
+    class FakeModel:
+        def __init__(self, **kwargs):
+            constructed.append(kwargs)
+
+        def __call__(self, sequences):
+            return [0.0] * len(sequences)
+
+    def official_resolver(_source_dir: Path, name: str):
+        if name == "docker_entrypoint":
+            return SimpleNamespace(run_loop=Mock())
+        if name == "nucleobench.common.argparse_lib":
+            return SimpleNamespace(ParsedArgs=SimpleNamespace)
+        if name.endswith("bpnet.load_model"):
+            return SimpleNamespace(
+                CountWrapper=lambda value: ("count", value),
+                ControlWrapper=lambda value: ("control", value),
+            )
+        class_name = {
+            "malinois": "Malinois",
+            "bpnet": "BPNet",
+            "rinalmo": "RinalmoMRL",
+            "enformer": "Enformer",
+        }[case.model_family]
+        return SimpleNamespace(**{class_name: FakeModel})
+
+    fake_torch = SimpleNamespace(
+        load=lambda *_args, **_kwargs: "raw-model",
+        device=lambda value: value,
+        cuda=SimpleNamespace(is_available=lambda: False),
+    )
+    fake_lightning = SimpleNamespace(
+        LightningModel=SimpleNamespace(
+            load_from_checkpoint=lambda *_args, **_kwargs: "checkpoint"
+        )
+    )
+    real_import = official_module.importlib.import_module
+    monkeypatch.setattr(official_module, "require_clean_revision", Mock())
+    monkeypatch.setattr(official_module, "_official_module", official_resolver)
+    monkeypatch.setattr(
+        official_module.importlib,
+        "import_module",
+        lambda name: (
+            fake_torch
+            if name == "torch"
+            else fake_lightning
+            if name == "grelu.lightning"
+            else real_import(name)
+        ),
+    )
+    runtime = CampaignRuntime.open(tmp_path / "run", task="nucleobench")
+
+    loaded = load_official_case(tmp_path / "source", prepared, runtime)
+
+    assert isinstance(loaded.model, RecordingSequenceModel)
+    assert len(constructed) == 1
+    if case.model_family == "bpnet":
+        assert constructed[0]["protein"] == case.target
+        assert constructed[0]["override_model"][0] == "count"
+    elif case.model_family == "rinalmo":
+        assert constructed[0] == {"override_weights_local_path": str(artifact)}
+    elif case.model_family == "enformer":
+        assert constructed[0]["override_model"] == "checkpoint"
+    else:
+        assert constructed[0]["target_feature"] == 1
 
 
 def test_source_revision_check_rejects_dirty_or_mismatched_checkouts(
@@ -313,9 +553,7 @@ def test_recording_model_preserves_output_and_records_only_sequence_digests(
 def test_recording_model_continues_trace_counters_after_resume(tmp_path: Path) -> None:
     run_dir = tmp_path / "campaign"
     runtime = CampaignRuntime.open(run_dir, task="nucleobench")
-    RecordingSequenceModel(lambda sequences: [1.0] * len(sequences), runtime)(
-        ["A" * 8]
-    )
+    RecordingSequenceModel(lambda sequences: [1.0] * len(sequences), runtime)(["A" * 8])
 
     resumed = CampaignRuntime.open(run_dir, task="nucleobench", resume=True)
     RecordingSequenceModel(lambda sequences: [1.0] * len(sequences), resumed)(

@@ -71,10 +71,10 @@ from tasks.nucleobench.core.harness import (
     write_harness_sequence_context,
 )
 from tasks.nucleobench.core.mock import MOCK_CASE, build_mock_task_spec
-from tasks.nucleobench.core.oracles.malinois import (
-    PreparedMalinoisCase,
-    load_official_malinois,
-    load_prepared_malinois,
+from tasks.nucleobench.core.oracles.official import (
+    PreparedCase,
+    load_official_case,
+    load_prepared_case,
 )
 from tasks.nucleobench.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
@@ -162,7 +162,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-wire-api", choices=WIRE_APIS, default="chat_completions")
     parser.add_argument("--llm-reasoning", choices=LLM_REASONING_LEVELS, default="off")
     parser.add_argument("--llm-timeout", type=float, default=120.0)
-    parser.add_argument("--llm-max-tokens", type=int, default=2_048)
+    parser.add_argument("--llm-max-tokens", type=int, default=262_144)
     parser.add_argument("--llm-temperature", type=float, default=0.7)
     parser.add_argument("--llm-extra-body-json", default="{}")
     parser.add_argument("--api-key-file", type=Path)
@@ -380,11 +380,11 @@ def main(argv: list[str] | None = None) -> int:
         not args.dry_run
         and not args.mock
         and args.execution_profile in {"pilot_evaluation", "official_benchmark"}
-        and contract.qualification != "qualified"
+        and (contract.qualification != "qualified" or case.state != "qualified")
     ):
         raise SystemExit(
-            "NucleoBench pilot and official execution are not qualified; "
-            "complete qualification first."
+            f"NucleoBench case {case.case_id!r} is not qualified for pilot or "
+            "official execution. Run the case qualification gates first."
         )
     provider = (
         resolve_provider_settings(args)
@@ -538,10 +538,6 @@ def _run_real(
     provider: ProviderSettings | None,
     payload: dict[str, Any],
 ) -> int:
-    if case.case_id != "malinois_k562":
-        raise SystemExit(
-            "Only malinois_k562 is implemented in the first NucleoBench release."
-        )
     if args.source_dir is None or args.prepared_dir is None:
         raise SystemExit(
             "Real NucleoBench execution requires --source-dir and --prepared-dir."
@@ -560,15 +556,19 @@ def _run_real(
             f"--max-seconds={case.max_seconds}."
         )
     expected_profile = {
-        "pilot_evaluation": "pilot_evaluation_malinois_k562",
-        "official_benchmark": "official_benchmark_malinois_k562",
+        "pilot_evaluation": "pilot_evaluation",
+        "official_benchmark": "official_benchmark",
     }.get(args.execution_profile)
     if expected_profile is not None and profile_name != expected_profile:
         raise SystemExit(
             f"{args.execution_profile} requires contract profile {expected_profile!r}."
         )
 
-    prepared = load_prepared_malinois(args.prepared_dir, start_index=args.start_index)
+    prepared = load_prepared_case(
+        args.prepared_dir,
+        case_id=case.case_id,
+        start_index=args.start_index,
+    )
     if prepared.context.start_set_digest != expected_digest:
         raise SystemExit(
             "Prepared start-set digest does not match the configured digest."
@@ -629,7 +629,7 @@ def _run_real(
             return _pause_endpoint(runtime, args, payload, str(exc))
 
     try:
-        official = load_official_malinois(args.source_dir, prepared, runtime)
+        official = load_official_case(args.source_dir, prepared, runtime)
         state = _campaign_state(runtime, args.resume_from is not None)
         evaluator = NucleoBenchEvaluator(prepared.context, official.model)
         if not state.observations:
@@ -716,7 +716,7 @@ def _run_real(
 
 def _real_engine(
     args: argparse.Namespace,
-    prepared: PreparedMalinoisCase,
+    prepared: PreparedCase,
     task_spec: LDMTaskSpec,
     evaluator: NucleoBenchEvaluator,
     runtime: CampaignRuntime,
@@ -904,7 +904,7 @@ def _harness_client(
     args: argparse.Namespace,
     runtime: CampaignRuntime,
     provider: ProviderSettings,
-    prepared: PreparedMalinoisCase,
+    prepared: PreparedCase,
     profiles: Sequence[HarnessProfile],
 ) -> HarnessClient:
     mcp = load_harness_mcp_config(args.harness_mcp_config)
@@ -1011,7 +1011,7 @@ def _pause_endpoint(
 
 def _execution_record(
     args: argparse.Namespace,
-    prepared: PreparedMalinoisCase,
+    prepared: PreparedCase,
     method_digest: str,
     active_steps: int,
 ) -> dict[str, Any]:
@@ -1062,7 +1062,7 @@ def _method_preset_sha256(
 
 def _oracle_manifest(
     args: argparse.Namespace,
-    prepared: PreparedMalinoisCase,
+    prepared: PreparedCase,
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,

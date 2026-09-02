@@ -24,7 +24,7 @@
       "sequence_length": 200,
       "editable_position_count": 200,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "malinois_sknsh",
@@ -35,7 +35,7 @@
       "sequence_length": 200,
       "editable_position_count": 200,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_atac",
@@ -46,7 +46,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_ctcf",
@@ -57,7 +57,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_e2f3",
@@ -68,7 +68,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_elf4",
@@ -79,7 +79,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_gata2",
@@ -90,7 +90,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_junb",
@@ -101,7 +101,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_max",
@@ -112,7 +112,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_mecom",
@@ -123,7 +123,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_myc",
@@ -134,7 +134,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_otx1",
@@ -145,7 +145,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_rad21",
@@ -156,7 +156,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "bpnet_sox6",
@@ -167,7 +167,7 @@
       "sequence_length": 3000,
       "editable_position_count": 3000,
       "max_seconds": 28800,
-      "state": "planned"
+      "state": "prepared"
     },
     {
       "case_id": "rinalmo_mrl",
@@ -189,7 +189,7 @@
       "sequence_length": 196608,
       "editable_position_count": 256,
       "max_seconds": 43200,
-      "state": "planned"
+      "state": "prepared"
     }
   ]
 }

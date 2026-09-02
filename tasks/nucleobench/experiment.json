@@ -85,32 +85,25 @@
   },
   "budget": {},
   "profiles": {
-    "pilot_evaluation_malinois_k562": {
-      "description": "Twelve-round development comparison for the Malinois K562 case.",
+    "pilot_evaluation": {
+      "description": "Twelve-round development comparison for a qualified NucleoBench case.",
       "budget": {
         "outer_iterations": 12
       },
       "locked_args": {
-        "case-id": "malinois_k562",
         "execution-profile": "pilot_evaluation",
         "termination-kind": "rounds",
         "iterations": 12,
-        "initialization-mode": "shared_start",
-        "hardware-profile": "n1-highmem-16-cpu"
+        "initialization-mode": "shared_start"
       }
     },
-    "official_benchmark_malinois_k562": {
-      "description": "Official wall-time-limited Malinois K562 campaign.",
-      "budget": {
-        "max_seconds": 28800
-      },
+    "official_benchmark": {
+      "description": "Official wall-time-limited campaign for a qualified NucleoBench case.",
+      "budget": {},
       "locked_args": {
-        "case-id": "malinois_k562",
         "execution-profile": "official_benchmark",
         "termination-kind": "wall_time",
-        "max-seconds": 28800,
-        "initialization-mode": "official_start",
-        "hardware-profile": "n1-highmem-16-cpu"
+        "initialization-mode": "official_start"
       }
     }
   }

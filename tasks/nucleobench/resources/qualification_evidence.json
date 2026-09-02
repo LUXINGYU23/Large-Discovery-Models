@@ -39,7 +39,7 @@
         "tasks/nucleobench/tests/test_official_adapter.py",
         "tasks/nucleobench/resources/verification_record.json"
       ],
-      "description": "The official source, Malinois K562 starts, model artifact, constructor arguments, editable mask, and runner protocol are digest-pinned."
+      "description": "The official source and runner are pinned. Public starts, editable masks, and model artifacts are digest-bound for the 16 published paired-start cases; RiNALMo remains blocked on its unpublished paired-start set."
     },
     "seed_evaluated": {
       "status": "passed",

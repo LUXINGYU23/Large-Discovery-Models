@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source": {
     "url": "https://github.com/move37-labs/nucleobench",
     "revision": "a6d8b040a4fa80b18266ee5416c904d01f842428",
@@ -15,12 +15,7 @@
     "case_count": 17,
     "paired_start_count": 100,
     "reference_hardware": "Google Cloud n1-highmem-16 CPU",
-    "families": {
-      "malinois": 3,
-      "bpnet": 12,
-      "rinalmo": 1,
-      "enformer": 1
-    }
+    "families": {"malinois": 3, "bpnet": 12, "rinalmo": 1, "enformer": 1}
   },
   "verified_contracts": {
     "optimizer_interface": [
@@ -29,73 +24,74 @@
       "SequenceOptimizer.is_finished()"
     ],
     "runner": "docker_entrypoint.run_loop",
-    "termination_modes": [
-      "max_number_of_rounds",
-      "max_seconds"
-    ],
-    "model_registry": [
-      "malinois",
-      "bpnet",
-      "rinalmo_mrl",
-      "enformer"
-    ],
-    "start_sequence_inputs": [
-      "literal DNA sequence",
-      "local:// file",
-      "enformer:// published start index"
-    ],
-    "editable_position_inputs": [
-      "all positions when omitted",
-      "explicit zero-based positions",
-      "local:// file",
-      "enformer:// published start index"
-    ]
+    "termination_modes": ["max_number_of_rounds", "max_seconds"],
+    "model_registry": ["malinois", "bpnet", "rinalmo_mrl", "enformer"]
   },
-  "case_preparation": {
-    "malinois_k562": {
-      "model_artifact": {
-        "official_uri": "gs://tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
-        "https_uri": "https://storage.googleapis.com/tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
-        "bytes": 51736581,
-        "md5": "375142a714e7df73c463b46113a65210",
-        "sha256": "06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592"
-      },
-      "model_init_args": {
-        "target_feature": 0,
-        "bending_factor": 1.0,
-        "a_min": -2.0,
-        "a_max": 6.0,
-        "target_alpha": 1.0,
-        "flank_length": 200
-      },
-      "start_set": {
-        "required_count": 100,
-        "authoritative_source": {
-          "concept_doi": "10.5281/zenodo.15775703",
-          "record_id": 17079936,
-          "record_url": "https://zenodo.org/records/17079936",
-          "file": "start_sequences_df.csv",
-          "bytes": 23288093,
-          "md5": "64dc535d88ea659d52b5a39956b896fe",
-          "sha256": "4c0e9e5a2811e41a152bc7ecffe2641cef5bc9f4f15675d3c988f793a28d409c"
-        },
-        "extraction": {
-          "sequence_column": "0",
-          "source_row_indices": [1300, 1399],
-          "sequence_length": 200
-        },
-        "sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5"
-      },
-      "editable_positions": {
-        "mode": "all_positions",
-        "count": 200
-      }
+  "artifacts": {
+    "published_start_table": {
+      "url": "https://zenodo.org/records/17079936/files/start_sequences_df.csv?download=1",
+      "bytes": 23288093,
+      "md5": "64dc535d88ea659d52b5a39956b896fe",
+      "sha256": "4c0e9e5a2811e41a152bc7ecffe2641cef5bc9f4f15675d3c988f793a28d409c"
+    },
+    "enformer_start_table": {
+      "url": "https://zenodo.org/records/17079936/files/start_sequences_enformer.parquet?download=1",
+      "bytes": 8018181,
+      "md5": "e223f77c372c4a6d5031e24ef9d8686d",
+      "sha256": "577b6bee41363383fcdd4901722a2cc8aeb2f31eddc296d0ffdf04dbf81115d1"
+    },
+    "malinois_model": {
+      "url": "https://storage.googleapis.com/tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz",
+      "bytes": 51736581,
+      "md5": "375142a714e7df73c463b46113a65210",
+      "sha256": "06e926e42304b8207138f1fb871ec19e0654dcdb6b26a62ed23fe1e9ac8cc592"
+    },
+    "bpnet_atac_model": {"url": "https://zenodo.org/records/14604495/files/ATAC.torch", "bytes": 25722774, "md5": "30fa85c5e75ed5f0ba2e6cb1c2ecf723", "sha256": "c1bd579134543f87a5c21dd614b4301afad6d37b0cb13b713773542bf50ff73d"},
+    "bpnet_ctcf_model": {"url": "https://zenodo.org/records/14604495/files/CTCF.torch", "bytes": 502166, "md5": "030b31f70c3676bd67207f504b51c7f8", "sha256": "6b9d9831b968ed51ad0d54837afccaad0589427575a0d5911ca42e2938a56e12"},
+    "bpnet_e2f3_model": {"url": "https://zenodo.org/records/14604495/files/E2F3.torch", "bytes": 490134, "md5": "32058fd94d12c00be2d816b1ac2c6a59", "sha256": "9aeadccf0baeee446df463aa47d4adc73638edf68b94b5cdb7c0657fce6ee1e4"},
+    "bpnet_elf4_model": {"url": "https://zenodo.org/records/14604495/files/ELF4.torch", "bytes": 492118, "md5": "6b10a4036f921999e25fd770e71e24df", "sha256": "ed14a784db338e526ee22489f81730a8ed84d17f421bda5beaa7e30d0502e565"},
+    "bpnet_gata2_model": {"url": "https://zenodo.org/records/14604495/files/GATA2.torch", "bytes": 505584, "md5": "f622b03d8a0bf6a60b9adf2e1a010352", "sha256": "5ade34b7a191e42dd11e6f1f543b72a316cb7e7e0e92f9d85dad40afbd1106b8"},
+    "bpnet_junb_model": {"url": "https://zenodo.org/records/14604495/files/JUNB.torch", "bytes": 473542, "md5": "6172c035f1e9d13ae1612092c76636d6", "sha256": "b724d4dc7357bc8d9d66edbc950ba22f34af5dfbf4c055738fa05f5926341b00"},
+    "bpnet_max_model": {"url": "https://zenodo.org/records/14604495/files/MAX.torch", "bytes": 513020, "md5": "ef8cfc983567e74a1c4b1a7eee2cc9c5", "sha256": "05c40f5245507a16cd87dc08708471d642309e00950d17a2d404554103faa9f1"},
+    "bpnet_mecom_model": {"url": "https://zenodo.org/records/14604495/files/MECOM.torch", "bytes": 488240, "md5": "233367b0d7879f052bcf5f6c96138544", "sha256": "4f4dedf12c6181a1152df5a280af04214b9b8d94e8f68c22245fc1584db661a0"},
+    "bpnet_myc_model": {"url": "https://zenodo.org/records/14604495/files/MYC.torch", "bytes": 492092, "md5": "6663d95b1299ae1433881a7a51884d14", "sha256": "57baf2790a15c49d549fd8af1a69dcc9a232ac04ca672029ca4d45cb3718067f"},
+    "bpnet_otx1_model": {"url": "https://zenodo.org/records/14604495/files/OTX1.torch", "bytes": 473414, "md5": "90a21a26ccb15e41d4a568d426cd5c3f", "sha256": "0571ff648862898272c830296fed0ab59e32ae2c36c0ee821998f85ad7ad254d"},
+    "bpnet_rad21_model": {"url": "https://zenodo.org/records/14604495/files/RAD21.torch", "bytes": 551152, "md5": "46bd12e1270aa7da7183d86f1a280a1c", "sha256": "922d6bce64c57bfb1cf312c149c7b1d95818f08d1a0a9572bec942cfd5cfed48"},
+    "bpnet_sox6_model": {"url": "https://zenodo.org/records/14604495/files/SOX6.torch", "bytes": 491974, "md5": "2f84331d179edc9f6979c565faef4b83", "sha256": "16ea241b198cd7f288778cc6764e62f0548968f28f3546b295faa3d5c3233053"},
+    "rinalmo_model": {
+      "url": "https://zenodo.org/records/15043668/files/rinalmo_giga_mrl_ft.pt",
+      "bytes": 2604105222,
+      "md5": "4587c61c79bbf700fa78229740d35ce0"
+    },
+    "enformer_model": {
+      "repository": "Genentech/enformer-model",
+      "revision": "eaadc28563b1532e3ac3e8fa52bad73f32dac2bf",
+      "file": "human.ckpt",
+      "bytes": 986737142,
+      "sha256": "030e706b7b64c744be2c363b73e822694cf404164e8720cafb5940cf81da4db6"
     }
   },
+  "case_preparation": {
+    "malinois_k562": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 1300, "last_index": 1399}, "start_set_sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5", "model_artifact": "malinois_model"},
+    "malinois_hepg2": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 1300, "last_index": 1399}, "start_set_sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5", "model_artifact": "malinois_model"},
+    "malinois_sknsh": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 1300, "last_index": 1399}, "start_set_sha256": "2b76fcdeaa0821b94cca642531145d6ee82aada4d378156d027ef92833ef33f5", "model_artifact": "malinois_model"},
+    "bpnet_atac": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 0, "last_index": 99}, "start_set_sha256": "e2317d1332371a2006816bb365755a5b9bc42246f4d30370a22e4b2673a6eb01", "model_artifact": "bpnet_atac_model"},
+    "bpnet_ctcf": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 100, "last_index": 199}, "start_set_sha256": "4f28e1c6db7336ccc50c41abe89bfd75c18dfd76b6f39c13f729c595a56f3e5a", "model_artifact": "bpnet_ctcf_model"},
+    "bpnet_e2f3": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 200, "last_index": 299}, "start_set_sha256": "69fcd7874e200e498937fd1d459dbcf25f3889d170cc269a1098f394e2efe188", "model_artifact": "bpnet_e2f3_model"},
+    "bpnet_elf4": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 300, "last_index": 399}, "start_set_sha256": "00885a2510a4c1b39fdb9733f5086a9ce5774a836ac7dd4e59d270a75951b744", "model_artifact": "bpnet_elf4_model"},
+    "bpnet_gata2": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 400, "last_index": 499}, "start_set_sha256": "c24826b1a1bb9e88477d8822de2c9c675490e545c5b6a3ab1416188ad7111f4c", "model_artifact": "bpnet_gata2_model"},
+    "bpnet_junb": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 500, "last_index": 599}, "start_set_sha256": "bd670c771e5e39498ee6b1d9f92b5b7008ed20ed0d0c11185e1a477bf023215c", "model_artifact": "bpnet_junb_model"},
+    "bpnet_max": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 600, "last_index": 699}, "start_set_sha256": "ef5f595e7234f9ac083c557602e3c35fd11bd9a111f0e42cdc1d463d742c0eb4", "model_artifact": "bpnet_max_model"},
+    "bpnet_mecom": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 700, "last_index": 799}, "start_set_sha256": "221640c4d60a2555b4f4cf18434902393b4309535b10a01bb25bde5343600968", "model_artifact": "bpnet_mecom_model"},
+    "bpnet_myc": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 800, "last_index": 899}, "start_set_sha256": "87b5d7520f418f630ccb40f554ce646b61a979ae7d9d3047d07e7629f9c988a3", "model_artifact": "bpnet_myc_model"},
+    "bpnet_otx1": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 900, "last_index": 999}, "start_set_sha256": "3d3da24ffc6c1418ed4019ae1e3a2377b15886b68f89848467f1f6c4d21f7690", "model_artifact": "bpnet_otx1_model"},
+    "bpnet_rad21": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 1000, "last_index": 1099}, "start_set_sha256": "5e203a0e725202d2022a3e220eebe433609e7b7768451c4da200022eff783610", "model_artifact": "bpnet_rad21_model"},
+    "bpnet_sox6": {"start_source": {"kind": "csv_block", "artifact": "published_start_table", "sequence_column": "0", "first_index": 1100, "last_index": 1199}, "start_set_sha256": "4a1001691bf07929d45c7b88bf9628e7d24adc04df1fef40fe32685232da2596", "model_artifact": "bpnet_sox6_model"},
+    "rinalmo_mrl": {"start_source": null, "model_artifact": "rinalmo_model"},
+    "enformer_muscle_not_liver": {"start_source": {"kind": "parquet", "artifact": "enformer_start_table"}, "start_set_sha256": "3c50dcf8e7ae30328cf45d6f37d11fb0cf1e4f89f9d2516a7b0abd00b64c3ffd", "editable_positions_sha256": "028b29645faa3962f1c8d0ddb15eaf8bed3e114a5298203b84f22c3bce0bb3a6", "model_artifact": "enformer_model"}
+  },
   "qualification_blockers": [
-    "Verify and digest the authoritative paired-start source for every remaining case, including the RiNALMo task added after the published Zenodo start table.",
-    "Record complete official model constructor arguments for every remaining case.",
-    "Verify the exact benchmark seed values and the hardware-equivalence policy for non-reference infrastructure.",
-    "Record model, start-set, and editable-mask artifact digests for every remaining case."
+    "The source-pinned RiNALMo case has no authoritative 100-sequence paired-start artifact in the published benchmark data; it remains planned until upstream publishes that input or an explicit benchmark revision defines it.",
+    "Prepared cases still require seed evaluation and tiny campaign qualification before pilot or official execution."
   ]
 }

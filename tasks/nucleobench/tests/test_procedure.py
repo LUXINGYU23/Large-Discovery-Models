@@ -54,7 +54,20 @@ def test_catalog_covers_the_pinned_public_suite() -> None:
     }
     states = {case.case_id: case.state for case in cases}
     assert states["malinois_k562"] == "qualified"
-    assert set(states.values()) == {"planned", "qualified"}
+    assert states["rinalmo_mrl"] == "planned"
+    assert set(states.values()) == {"planned", "prepared", "qualified"}
+    assert sum(state == "prepared" for state in states.values()) == 15
+
+    upstream = json.loads(
+        (TASK_ROOT / "resources" / "upstream_contract.json").read_text(encoding="utf-8")
+    )
+    assert set(upstream["case_preparation"]) == set(states)
+    assert all(
+        "start_set_sha256" in upstream["case_preparation"][case_id]
+        for case_id, state in states.items()
+        if state in {"prepared", "qualified"}
+    )
+    assert "start_set_sha256" not in upstream["case_preparation"]["rinalmo_mrl"]
 
 
 def test_experiment_contract_is_qualified_with_both_termination_profiles() -> None:
@@ -63,27 +76,13 @@ def test_experiment_contract_is_qualified_with_both_termination_profiles() -> No
 
     assert contract.qualification == "qualified"
     assert set(contract.evaluation["datasets"]) == case_ids
-    assert set(contract.profiles) == {
-        "pilot_evaluation_malinois_k562",
-        "official_benchmark_malinois_k562",
-    }
+    assert set(contract.profiles) == {"pilot_evaluation", "official_benchmark"}
     assert (
-        contract.profile("pilot_evaluation_malinois_k562").locked_args[
-            "termination-kind"
-        ]
-        == "rounds"
+        contract.profile("pilot_evaluation").locked_args["termination-kind"] == "rounds"
     )
     assert (
-        contract.profile("official_benchmark_malinois_k562").locked_args[
-            "termination-kind"
-        ]
+        contract.profile("official_benchmark").locked_args["termination-kind"]
         == "wall_time"
-    )
-    assert (
-        contract.profile("official_benchmark_malinois_k562").locked_args[
-            "hardware-profile"
-        ]
-        == "n1-highmem-16-cpu"
     )
 
 
@@ -109,6 +108,35 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
         "termination_kind": "rounds",
         "total_rounds": 2,
     }
+
+
+def test_every_declared_case_builds_the_same_dry_run_workflow(capsys) -> None:
+    for case in load_case_catalog():
+        assert main(["--case-id", case.case_id, "--dry-run"]) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["case_id"] == case.case_id
+        assert payload["ldm_task_spec"]["metadata"]["model_family"] == (
+            case.model_family
+        )
+        assert payload["ldm_task_spec"]["metadata"]["case_state"] == case.state
+
+
+def test_unqualified_case_cannot_run_pilot_or_official_execution() -> None:
+    with pytest.raises(SystemExit, match="bpnet_atac.*not qualified"):
+        main(
+            [
+                "--case-id",
+                "bpnet_atac",
+                "--execution-profile",
+                "pilot_evaluation",
+                "--termination-kind",
+                "rounds",
+                "--iterations",
+                "12",
+                "--initialization-mode",
+                "shared_start",
+            ]
+        )
 
 
 def test_direct_method_contracts_match_the_required_request_shapes() -> None:

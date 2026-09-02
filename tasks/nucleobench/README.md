@@ -13,16 +13,16 @@ driver.
 
 ## Current Status
 
-The experiment contract and `malinois_k562` case are qualified through the
-`tiny_campaign_verified` gate. Qualification used the source-pinned official
-start set and Malinois model for a seed evaluation, a direct LDM tiny campaign,
-a four-session LDM Harness tiny campaign, a one-session direct Harness tiny
-campaign, and a no-duplicate-evaluation resume check. The other 16 public cases
-remain `planned`.
+One workflow now supports all four official model families. The two remaining
+Malinois cases, all 12 BPNet cases, and Enformer have digest-pinned public start
+and model artifacts and are marked `prepared`. `malinois_k562` remains the only
+case qualified through a real seed evaluation and tiny campaigns. Prepared
+cases must pass those same gates before Pilot Evaluation or official execution.
 
-The same task package will be extended to the remaining cases without
-duplicating the workflow or optimization methods. No 12-round Pilot Evaluation
-or official wall-time result is included in this qualification claim.
+The source-pinned RiNALMo oracle loader is implemented, but the published
+NucleoBench artifacts do not define its 100 paired starts. That case therefore
+remains `planned`. No 12-round Pilot Evaluation or official wall-time result is
+included in these status claims.
 
 ## Case Families
 
@@ -35,8 +35,9 @@ or official wall-time result is included in this qualification claim.
 
 The catalog is stored in
 [`resources/cases/catalog.json`](resources/cases/catalog.json). Its state is a
-release claim: a case may only move from `planned` after the corresponding
-official artifacts and validation evidence exist.
+release claim: `prepared` means that the source-pinned inputs and loader are
+defined, while `qualified` additionally requires real oracle and tiny-campaign
+evidence.
 
 ## Usage and Isolation
 
@@ -44,7 +45,8 @@ official artifacts and validation evidence exist.
 the task environment, validating registration, preparing external inputs, and
 running mock or real campaigns.
 
-The released Malinois configs use the official CPU reference path. Harness
+The released K562 configs use the official CPU reference path. Other cases may
+use the device behavior of their unchanged official model wrapper. Harness
 sessions receive the paired-start design context rather than official case or
 model identity, and a task-local network policy blocks the registered upstream
 source and model-artifact hosts while leaving public-literature research
@@ -57,8 +59,8 @@ artifacts, prepared inputs, caches, traces, and run outputs remain outside Git.
 
 ## Execution Profiles
 
-The contract separates two drivers that share the same candidate, surrogate,
-proposal, and selection implementation:
+The contract separates two case-independent profiles that share the same
+candidate, surrogate, proposal, and selection implementation:
 
 - `pilot_evaluation`: 12 total rounds for fast three-seed method comparison.
 - `official_benchmark`: the unchanged official runner terminates by wall time,

@@ -10,13 +10,16 @@ This directory contains small, versioned protocol inputs only:
 Official source checkouts, model weights, start-sequence sets, generated
 manifests, caches, traces, and campaign outputs must be stored outside the Git
 repository. Runtime preparation must record their digests before a case can
-move beyond `planned`. `malinois_k562` is currently the only qualified case.
+move beyond `planned`. `malinois_k562` is currently the only qualified case;
+15 additional published cases are prepared.
 
-For Malinois, the contract records the official model artifact and the
-`start_sequences_df.csv` table from Zenodo record `17079936`, including raw
-file hashes, the 100-sequence extraction rule, and the canonical start-set
-hash. Mirrors are acceptable only when their bytes match those digests.
+The contract records the shared Malinois artifact, all 12 BPNet artifacts, the
+Enformer checkpoint, the RiNALMo weights, the published CSV and Enformer
+Parquet start tables, exact case row blocks, canonical start-set hashes, and
+Enformer's per-start editable-mask hash. Mirrors are acceptable only when their
+bytes match those digests.
 
-`python -m tasks.nucleobench.scripts.prepare_official_data` writes the first
-case's external `prepared_manifest.json`; generated manifest instances are not
-tracked here.
+`python -m tasks.nucleobench.scripts.prepare_official_data` writes an external
+`prepared_manifest.json` for any declared case. The RiNALMo case remains
+planned because the official paired-start input is not present in the published
+benchmark artifacts. Generated manifest instances are not tracked here.
