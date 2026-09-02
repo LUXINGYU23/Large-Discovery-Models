@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 from ldm_tts.transport import ProposalRequest, ProposalResponse
 from ldm_tts.transport.openai_http import (
     EndpointRequestError,
+    EndpointRequestTimeout,
     chat_completions_url,
     extract_openai_responses_content,
     models_url,
@@ -198,10 +199,23 @@ class OpenAICompatibleProposalClient:
 
     def propose(self, request: ProposalRequest) -> ProposalResponse:
         started = time.monotonic()
+        deadline = started + self.timeout_seconds
         last_error: EndpointRequestError | None = None
         for attempt in range(1, self.max_retries + 2):
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                last_error = EndpointRequestTimeout(
+                    "OpenAI-compatible endpoint request timed out after "
+                    f"{self.timeout_seconds:g} seconds"
+                )
+                break
             try:
-                raw = self._request(request)
+                raw = self._request(request, timeout_seconds=remaining_seconds)
+                if time.monotonic() > deadline:
+                    raise EndpointRequestTimeout(
+                        "OpenAI-compatible endpoint request timed out after "
+                        f"{self.timeout_seconds:g} seconds"
+                    )
                 if self.wire_api == "responses":
                     text, tool_calls = extract_openai_responses_content(raw)
                     finish_reason = raw.get("status")
@@ -229,14 +243,24 @@ class OpenAICompatibleProposalClient:
                 )
             except EndpointRequestError as exc:
                 last_error = exc
-                if isinstance(exc, EndpointCircuitOpen) or attempt > self.max_retries:
+                if isinstance(exc, (EndpointCircuitOpen, EndpointRequestTimeout)) or attempt > self.max_retries:
                     break
                 if self.retry_backoff_seconds:
-                    self.sleep(self.retry_backoff_seconds * attempt)
+                    remaining_seconds = deadline - time.monotonic()
+                    if remaining_seconds <= 0:
+                        break
+                    self.sleep(
+                        min(self.retry_backoff_seconds * attempt, remaining_seconds)
+                    )
         assert last_error is not None
         raise last_error
 
-    def _request(self, request: ProposalRequest) -> dict[str, Any]:
+    def _request(
+        self,
+        request: ProposalRequest,
+        *,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
         operation = (
             request_openai_responses_response
             if self.wire_api == "responses"
@@ -249,7 +273,7 @@ class OpenAICompatibleProposalClient:
             model=self.model,
             api_key=self.api_key,
             messages=request.messages,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=timeout_seconds,
             max_tokens=self.max_tokens,
             temperature=self.temperature,
             tools=request.tools,
@@ -273,6 +297,7 @@ __all__ = [
     "EndpointCircuitBreaker",
     "EndpointCircuitOpen",
     "EndpointRequestError",
+    "EndpointRequestTimeout",
     "OpenAICompatibleProposalClient",
     "call_with_circuit_breaker",
     "chat_completions_url",

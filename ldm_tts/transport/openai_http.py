@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
-import urllib.error
-import urllib.request
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+import aiohttp
 
 PREFLIGHT_MAX_TOKENS = 64
 HTTP_ERROR_DETAIL_MAX_CHARS = 500
@@ -15,6 +16,10 @@ HTTP_ERROR_DETAIL_MAX_CHARS = 500
 
 class EndpointRequestError(RuntimeError):
     """Raised when an endpoint request fails or returns an invalid response."""
+
+
+class EndpointRequestTimeout(EndpointRequestError):
+    """Raised when an endpoint request exceeds its total deadline."""
 
 
 def chat_completions_url(raw: str) -> str:
@@ -409,39 +414,56 @@ def _request_json(
     method: str,
     payload: bytes | None,
 ) -> Any:
+    return asyncio.run(
+        _request_json_async(
+            endpoint=endpoint,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+            method=method,
+            payload=payload,
+        )
+    )
+
+
+async def _request_json_async(
+    *,
+    endpoint: str,
+    api_key: str,
+    timeout_seconds: float,
+    method: str,
+    payload: bytes | None,
+) -> Any:
     headers = {"Content-Type": "application/json"} if payload is not None else {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    request = urllib.request.Request(
-        endpoint, data=payload, headers=headers, method=method
-    )
+    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
     try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = _http_error_detail(exc)
-        message = f"HTTP {exc.code} from OpenAI-compatible endpoint"
-        if detail:
-            message = f"{message}: {detail}"
-        raise EndpointRequestError(message) from exc
-    except (
-        urllib.error.URLError,
-        TimeoutError,
-        json.JSONDecodeError,
-        UnicodeDecodeError,
-    ) as exc:
+        async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+            async with session.request(
+                method, endpoint, data=payload, headers=headers
+            ) as response:
+                raw = await response.read()
+                if response.status >= 400:
+                    detail = _http_error_detail(raw)
+                    message = f"HTTP {response.status} from OpenAI-compatible endpoint"
+                    if detail:
+                        message = f"{message}: {detail}"
+                    raise EndpointRequestError(message)
+                return json.loads(raw.decode("utf-8"))
+    except asyncio.TimeoutError as exc:
+        raise EndpointRequestTimeout(
+            "OpenAI-compatible endpoint request timed out after "
+            f"{timeout_seconds:g} seconds"
+        ) from exc
+    except (aiohttp.ClientError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise EndpointRequestError(
             f"OpenAI-compatible endpoint request failed: {type(exc).__name__}"
         ) from exc
 
 
-def _http_error_detail(exc: urllib.error.HTTPError) -> str:
+def _http_error_detail(raw: bytes | str) -> str:
     """Return a bounded, human-readable excerpt from an HTTP error body."""
 
-    try:
-        raw = exc.read()
-    except OSError:
-        return ""
     body = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
     body = body.strip()
     if not body:
@@ -538,6 +560,7 @@ def extract_openai_responses_content(
 
 __all__ = [
     "EndpointRequestError",
+    "EndpointRequestTimeout",
     "chat_completions_url",
     "extract_openai_responses_content",
     "models_url",
