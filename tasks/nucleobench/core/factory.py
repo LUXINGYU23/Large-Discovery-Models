@@ -35,7 +35,6 @@ from tasks.nucleobench.core.mock import (
 )
 from tasks.nucleobench.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
-    DEFAULT_PROPOSAL_REQUEST_WAVES,
     DirectMutationProposalExpander,
     ScoreBlindMutationPoolExpander,
 )
@@ -108,7 +107,6 @@ def build_proposal_expander(
     campaign_id: str = "",
     first_active_round: int = 1,
     max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
-    max_request_waves: int = DEFAULT_PROPOSAL_REQUEST_WAVES,
     before_requests: Callable[[int], None] | None = None,
     account: Callable[[dict[str, int]], None] | None = None,
 ) -> ReservoirExpander:
@@ -162,7 +160,6 @@ def build_proposal_expander(
         evaluations_per_round=evaluations_per_round,
         seed=seed,
         max_workers=max_workers,
-        max_request_waves=max_request_waves,
         before_requests=before_requests,
     )
 

@@ -77,8 +77,8 @@ from tasks.nucleobench.core.oracles.malinois import (
 )
 from tasks.nucleobench.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
-    DEFAULT_PROPOSAL_REQUEST_WAVES,
     build_openai_mutation_client,
+    direct_request_limit,
 )
 from tasks.nucleobench.core.reporting import (
     inventory_official_outputs,
@@ -139,9 +139,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--proposal-candidates-per-request", type=int)
     parser.add_argument(
         "--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS
-    )
-    parser.add_argument(
-        "--proposal-max-request-waves", type=int, default=DEFAULT_PROPOSAL_REQUEST_WAVES
     )
     parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--start-index", type=int, default=0)
@@ -213,6 +210,11 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
         )
     if args.harness_candidates_per_session is None:
         args.harness_candidates_per_session = args.evaluations_per_round
+    args.proposal_request_limit = (
+        direct_request_limit(args.search_method, args.evaluations_per_round)
+        if args.search_method in {"ldm", "llm"}
+        else 0
+    )
     if (
         args.search_method in {"ldm_harness", "harness"}
         and args.harness_container_user is None
@@ -232,7 +234,6 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         "proposal_samples",
         "proposal_candidates_per_request",
         "proposal_max_workers",
-        "proposal_max_request_waves",
         "gp_min_history_for_fit",
         "gp_max_observations",
         "gp_global_best_observations",
@@ -756,7 +757,6 @@ def _real_engine(
         campaign_id=runtime.run_id,
         first_active_round=1,
         max_workers=args.proposal_max_workers,
-        max_request_waves=args.proposal_max_request_waves,
         before_requests=(
             (lambda count: runtime.consume("llm_requests", count))
             if args.search_method in {"ldm", "llm"}
@@ -844,13 +844,8 @@ def _campaign_budget(
         "expensive_evaluation_attempts": evaluated,
         "successful_evaluations": evaluated,
     }
-    if args.search_method == "ldm":
-        request_limit = active_rounds * 4 * args.proposal_max_request_waves
-        limits.update(proposal_attempts=request_limit, llm_requests=request_limit)
-    elif args.search_method == "llm":
-        request_limit = (
-            active_rounds * args.evaluations_per_round * args.proposal_max_request_waves
-        )
+    if args.search_method in {"ldm", "llm"}:
+        request_limit = active_rounds * args.proposal_request_limit
         limits.update(proposal_attempts=request_limit, llm_requests=request_limit)
     elif args.search_method == "ldm_harness":
         turns = active_rounds * len(HARNESS_PROFILE_IDS)
@@ -1068,7 +1063,7 @@ def _method_preset_sha256(
             "samples": args.proposal_samples,
             "candidates_per_request": args.proposal_candidates_per_request,
             "max_workers": args.proposal_max_workers,
-            "max_request_waves": args.proposal_max_request_waves,
+            "request_limit": args.proposal_request_limit,
         },
         "provider": {
             "base_url": args.llm_url,

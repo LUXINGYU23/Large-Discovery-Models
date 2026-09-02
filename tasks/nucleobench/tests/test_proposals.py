@@ -326,6 +326,8 @@ def test_direct_llm_refills_rejections_to_a_unique_real_evaluation_batch(
             )
         elif wave == 1:
             payload = _payload(0)
+        elif wave < 4:
+            payload = {"mutations": [{"position": 1, "base": "C"}]}
         else:
             payload = _payload(lineage + 1)
         return _response_payload([payload])
@@ -343,14 +345,13 @@ def test_direct_llm_refills_rejections_to_a_unique_real_evaluation_batch(
         domain,
         search_method="llm",
         evaluations_per_round=2,
-        max_request_waves=3,
     ).expand(request)
     reservoir = ReservoirBuilder(domain).build(
         result.proposals,
         evaluated_keys=(historical.canonical_key,),
     )
 
-    assert len(client.requests) == 5
+    assert len(client.requests) == 7
     assert len(result.proposals) == len(reservoir.candidates) == 2
     assert result.selection_mode == "reservoir_order"
     assert (
@@ -360,9 +361,10 @@ def test_direct_llm_refills_rejections_to_a_unique_real_evaluation_batch(
     )
     assert result.metadata["rejection_counts"] == {
         "historical_duplicate": 1,
-        "non_mutable_position": 1,
+        "non_mutable_position": 3,
         "same_round_duplicate": 1,
     }
+    assert result.metadata["request_limit"] == 8
     assert NUCLEOBENCH_Q0_METADATA_KEY not in result.proposals[0].metadata
     assert sink.paths is not None
     assert len(sink.paths.ir_path.read_text(encoding="utf-8").splitlines()) == 2
@@ -377,15 +379,15 @@ def test_generation_exhaustion_reports_precise_reasons_and_attempts() -> None:
         NucleoBenchCandidateDomain(_context()),
         search_method="llm",
         evaluations_per_round=1,
-        max_request_waves=2,
     )
 
-    with pytest.raises(ProposalGenerationError, match="still missing") as error:
+    with pytest.raises(ProposalGenerationError, match="request budget") as error:
         expander.expand(ExpansionRequest(round_idx=1, reservoir_size=1))
 
-    assert len(error.value.attempts) == 2
-    assert error.value.metadata["rejection_counts"] == {"unchanged_base": 2}
+    assert len(error.value.attempts) == 4
+    assert error.value.metadata["rejection_counts"] == {"unchanged_base": 4}
     assert error.value.metadata["missing_occurrence_count"] == 1
+    assert error.value.metadata["request_limit"] == 4
 
 
 def test_openai_client_configuration_is_generic_and_secret_free() -> None:

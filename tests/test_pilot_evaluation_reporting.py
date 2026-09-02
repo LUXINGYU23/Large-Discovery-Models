@@ -136,7 +136,7 @@ def test_model_proposal_integrity_allows_bounded_refill_requests() -> None:
         "proposal_samples": 64,
         "evaluations_per_round": 16,
         "proposal_candidates_per_request": 16,
-        "proposal_max_request_waves": 4,
+        "proposal_request_limit": 16,
         "harness_candidates_per_session": 0,
         "initial_candidate_ids": ("shared",),
     }

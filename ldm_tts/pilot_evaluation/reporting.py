@@ -108,7 +108,7 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             "proposal_candidates_per_request": int(
                 config.get("proposal_candidates_per_request", 1)
             ),
-            "proposal_max_request_waves": int(config.get("proposal_max_request_waves", 1)),
+            "proposal_request_limit": int(config.get("proposal_request_limit", 0)),
             "harness_candidates_per_session": int(config.get("harness_candidates_per_session", 0)),
             "contract_sha256": str(campaign["contract_sha256"]),
             "initial_candidate_ids": initial_candidate_ids,
@@ -185,7 +185,7 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             expected = _expected_model_proposal_attempts(
                 row, spec.optimization_rounds
             )
-            maximum = expected * row.get("proposal_max_request_waves", 1)
+            maximum = spec.optimization_rounds * row["proposal_request_limit"]
             if not expected <= actual <= maximum:
                 errors.append(f"unexpected proposal count for {row['case']}/{row['method']}/{row['seed']}")
         if row["method"] == "ldm_harness":

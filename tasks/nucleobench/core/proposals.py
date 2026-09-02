@@ -33,7 +33,7 @@ from tasks.nucleobench.core.prompting import (
 
 DIRECT_LDM_REQUEST_COUNT = 4
 DEFAULT_PROPOSAL_MAX_WORKERS = 4
-DEFAULT_PROPOSAL_REQUEST_WAVES = 4
+DIRECT_PROPOSAL_REQUEST_BUDGET_FACTOR = 4
 PROPOSAL_SOURCE = "nucleobench_direct_model"
 TRANSIENT_MAX_RETRIES = 3
 TRANSIENT_RETRY_BACKOFF_SECONDS = 10.0
@@ -56,7 +56,7 @@ class ProposalResponseError(ValueError):
 
 
 class ProposalGenerationError(RuntimeError):
-    """Raised after the configured request waves cannot fill the reservoir."""
+    """Raised after the direct proposal request budget cannot fill the reservoir."""
 
     def __init__(
         self,
@@ -96,7 +96,6 @@ class DirectMutationProposalExpander:
         evaluations_per_round: int,
         seed: int = 0,
         max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
-        max_request_waves: int = DEFAULT_PROPOSAL_REQUEST_WAVES,
         before_requests: Callable[[int], None] | None = None,
     ) -> None:
         if search_method not in {"ldm", "llm"}:
@@ -107,15 +106,14 @@ class DirectMutationProposalExpander:
             raise ValueError("evaluations_per_round must be positive")
         if seed < 0:
             raise ValueError("seed must be non-negative")
-        if max_workers < 1 or max_request_waves < 1:
-            raise ValueError("proposal workers and request waves must be positive")
+        if max_workers < 1:
+            raise ValueError("proposal workers must be positive")
         self.client = client
         self.domain = domain
         self.search_method = search_method
         self.evaluations_per_round = evaluations_per_round
         self.seed = seed
         self.max_workers = max_workers
-        self.max_request_waves = max_request_waves
         self.before_requests = before_requests
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
@@ -133,15 +131,19 @@ class DirectMutationProposalExpander:
         attempts: list[ProposalResponse] = []
         errors: list[dict[str, Any]] = []
         request_count = 0
+        request_limit = direct_request_limit(
+            self.search_method, self.evaluations_per_round
+        )
+        wave_index = 0
 
-        for wave_index in range(self.max_request_waves):
+        while request_count < request_limit:
             specs = tuple(
                 self._request_spec(
                     request, lineage, target - len(accepted[lineage]), wave_index
                 )
                 for lineage, target in enumerate(targets)
                 if len(accepted[lineage]) < target
-            )
+            )[: request_limit - request_count]
             if not specs:
                 break
             proposal_requests = tuple(
@@ -249,6 +251,7 @@ class DirectMutationProposalExpander:
                     )
                     if self.search_method == "llm":
                         accepted_direct_keys.add(prepared.canonical_key)
+            wave_index += 1
 
         missing = sum(
             target - len(accepted[index]) for index, target in enumerate(targets)
@@ -259,14 +262,14 @@ class DirectMutationProposalExpander:
             target_count=target_count,
             request_count=request_count,
             max_workers=self.max_workers,
-            max_request_waves=self.max_request_waves,
+            request_limit=request_limit,
             errors=errors,
             missing_count=missing,
         )
         if missing:
             raise ProposalGenerationError(
-                f"Direct proposal generation exhausted {self.max_request_waves} request "
-                f"waves with {missing} of {target_count} occurrences still missing.",
+                f"Direct proposal generation exhausted its {request_limit}-request "
+                f"budget with {missing} of {target_count} occurrences still missing.",
                 attempts=attempts,
                 metadata=metadata,
             )
@@ -355,6 +358,18 @@ class DirectMutationProposalExpander:
         ) as executor:
             futures = [executor.submit(self.client.propose, item) for item in requests]
             return tuple(future.result() for future in futures)
+
+
+def direct_request_limit(search_method: str, evaluations_per_round: int) -> int:
+    if evaluations_per_round < 1:
+        raise ValueError("evaluations_per_round must be positive")
+    if search_method == "ldm":
+        initial_request_count = DIRECT_LDM_REQUEST_COUNT
+    elif search_method == "llm":
+        initial_request_count = evaluations_per_round
+    else:
+        raise ValueError(f"direct request limit is not defined for {search_method!r}")
+    return initial_request_count * DIRECT_PROPOSAL_REQUEST_BUDGET_FACTOR
 
 
 def parse_mutation_response(
@@ -549,7 +564,7 @@ def _expansion_metadata(
     target_count: int,
     request_count: int,
     max_workers: int,
-    max_request_waves: int,
+    request_limit: int,
     errors: Sequence[Mapping[str, Any]],
     missing_count: int,
 ) -> dict[str, Any]:
@@ -568,7 +583,7 @@ def _expansion_metadata(
         "missing_occurrence_count": missing_count,
         "request_count": request_count,
         "max_workers": max_workers,
-        "max_request_waves": max_request_waves,
+        "request_limit": request_limit,
         "rejection_counts": dict(reason_counts),
         "rejections": [dict(item) for item in errors],
     }
@@ -738,8 +753,8 @@ def _pool_seed(seed: int, request: ExpansionRequest, evaluated: set[str]) -> int
 
 __all__ = [
     "DEFAULT_PROPOSAL_MAX_WORKERS",
-    "DEFAULT_PROPOSAL_REQUEST_WAVES",
     "DIRECT_LDM_REQUEST_COUNT",
+    "DIRECT_PROPOSAL_REQUEST_BUDGET_FACTOR",
     "DirectMutationProposalExpander",
     "ParsedMutationResponse",
     "ProposalGenerationError",
@@ -747,5 +762,6 @@ __all__ = [
     "ScoreBlindMutationPoolExpander",
     "attach_empirical_base_measure",
     "build_openai_mutation_client",
+    "direct_request_limit",
     "parse_mutation_response",
 ]

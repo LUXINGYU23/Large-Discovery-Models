@@ -15,7 +15,6 @@ args:
   evaluations-per-round: 16
   proposal-samples: 64
   proposal-max-workers: 4
-  proposal-max-request-waves: 4
   acquisition-beta: 1.0
   gp-noise-variance: 1.0e-4
   gp-jitter: 1.0e-8
