@@ -54,7 +54,6 @@ from tasks.nucleobench.core.designer import (
 from tasks.nucleobench.core.digests import canonical_json_sha256, file_digest
 from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
 from tasks.nucleobench.core.factory import (
-    build_mock_engine,
     build_proposal_expander,
     build_surrogate_components,
 )
@@ -70,7 +69,13 @@ from tasks.nucleobench.core.harness import (
     harness_tool_extensions,
     write_harness_sequence_context,
 )
-from tasks.nucleobench.core.mock import MOCK_CASE, build_mock_task_spec
+from tasks.nucleobench.core.mock import (
+    MOCK_CASE,
+    MOCK_CONTEXT,
+    build_mock_expander,
+    build_mock_task_spec,
+    mock_energies,
+)
 from tasks.nucleobench.core.oracles.official import (
     PreparedCase,
     load_official_case,
@@ -497,7 +502,14 @@ def _run_mock(
     )
     snapshot_experiment_contract(contract, run_dir, profile=profile_name)
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
-    result = build_mock_engine(runtime, sink, task_spec).run(
+    engine = LDMEngine(
+        task_spec=task_spec,
+        expander=build_mock_expander(),
+        candidate_domain=NucleoBenchCandidateDomain(MOCK_CONTEXT, sink=sink),
+        evaluator=NucleoBenchEvaluator(MOCK_CONTEXT, mock_energies),
+        runtime=runtime,
+    )
+    result = engine.run(
         LDMEngineConfig(
             iterations=args.iterations,
             reservoir_size=args.reservoir_size,

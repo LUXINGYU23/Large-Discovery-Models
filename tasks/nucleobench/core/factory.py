@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from ldm_tts.contracts import LDMTaskSpec
-from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
-from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.harness import HarnessClient, HarnessProfile
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
@@ -17,7 +13,6 @@ from tasks.nucleobench.core.candidate import (
     NucleoBenchCandidateDomain,
 )
 from tasks.nucleobench.core.constants import DIRECT_SEARCH_METHODS, SEARCH_METHODS
-from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
 from tasks.nucleobench.core.hamming_gp import (
     HammingGPUCBConfig,
     HammingGPUCBSelector,
@@ -28,32 +23,12 @@ from tasks.nucleobench.core.harness import (
     HARNESS_PROFILE_IDS,
     NucleoBenchHarnessExpander,
 )
-from tasks.nucleobench.core.mock import (
-    MOCK_CONTEXT,
-    build_mock_expander,
-    mock_energies,
-)
 from tasks.nucleobench.core.proposals import (
     DEFAULT_PROPOSAL_MAX_WORKERS,
     DirectMutationProposalExpander,
     ScoreBlindMutationPoolExpander,
 )
 from tasks.nucleobench.core.selection import AcquisitionTiltedSelector
-
-
-def build_mock_engine(
-    runtime: CampaignRuntime,
-    sink: DataCollectionSink,
-    task_spec: LDMTaskSpec,
-) -> LDMEngine:
-    domain = NucleoBenchCandidateDomain(MOCK_CONTEXT, sink=sink)
-    return LDMEngine(
-        task_spec=task_spec,
-        expander=build_mock_expander(),
-        candidate_domain=domain,
-        evaluator=NucleoBenchEvaluator(MOCK_CONTEXT, mock_energies),
-        runtime=runtime,
-    )
 
 
 def build_surrogate_components(
@@ -85,13 +60,14 @@ def build_surrogate_components(
     )
     if search_method == "bo":
         return encoder, base
-    return encoder, build_ldm_selector(
+    return encoder, AcquisitionTiltedSelector(
         base,
-        evaluations_per_round=evaluations_per_round,
-        seed=seed,
         alpha=alpha,
         eta=eta,
         z_clip=z_clip,
+        seed=seed,
+        pool_size=3 * evaluations_per_round,
+        proposal_sample_count=4 * evaluations_per_round,
     )
 
 
@@ -164,31 +140,7 @@ def build_proposal_expander(
     )
 
 
-def build_ldm_selector(
-    base_selector: AcquisitionSelector,
-    *,
-    evaluations_per_round: int,
-    seed: int,
-    alpha: float,
-    eta: float,
-    z_clip: float,
-) -> AcquisitionTiltedSelector:
-    """Apply the shared 4B proposal and 3B maintained-pool policy."""
-
-    return AcquisitionTiltedSelector(
-        base_selector,
-        alpha=alpha,
-        eta=eta,
-        z_clip=z_clip,
-        seed=seed,
-        pool_size=3 * evaluations_per_round,
-        proposal_sample_count=4 * evaluations_per_round,
-    )
-
-
 __all__ = [
-    "build_ldm_selector",
-    "build_mock_engine",
     "build_proposal_expander",
     "build_surrogate_components",
 ]
