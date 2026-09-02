@@ -51,7 +51,7 @@ class NucleoBenchEvaluator:
             candidates, prepared, energies, strict=True
         ):
             if isinstance(raw_energy, (bool, str, bytes)):
-                raise ValueError("batch scorer energies must be numeric")
+                raise TypeError("batch scorer energies must be numeric")
             try:
                 energy = float(raw_energy)
             except (TypeError, ValueError) as exc:

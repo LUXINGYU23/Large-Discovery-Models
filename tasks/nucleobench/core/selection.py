@@ -127,10 +127,7 @@ class AcquisitionTiltedSelector:
         predictions = _ordered_predictions(pool.candidates, base.predictions)
         q0 = _base_masses(pool.candidates)
         acquisition = np.asarray(
-            [
-                _finite_acquisition(prediction)
-                for prediction in predictions
-            ],
+            [_finite_acquisition(prediction) for prediction in predictions],
             dtype=float,
         )
         normalized = _robust_z(acquisition, self.config.z_clip)
@@ -192,7 +189,9 @@ class AcquisitionTiltedSelector:
                 ],
                 "bo_pool_size": len(pool.candidates),
                 "configured_bo_pool_size": self.config.pool_size,
-                "bo_pool_candidate_ids": [item.candidate_id for item in pool.candidates],
+                "bo_pool_candidate_ids": [
+                    item.candidate_id for item in pool.candidates
+                ],
                 "pool_maintenance": pool.method,
                 "pool_seed": pool.seed,
                 "base_selection": dict(base.metadata),
@@ -209,7 +208,9 @@ def _maintain_pool(
     if {_valid_occurrence_count(item) for item in candidates} != {occurrences}:
         raise ValueError("candidate q0 occurrence totals are inconsistent")
     if occurrences > config.proposal_sample_count:
-        raise ValueError("valid proposal occurrences exceed configured proposal samples")
+        raise ValueError(
+            "valid proposal occurrences exceed configured proposal samples"
+        )
     if len(candidates) <= config.pool_size:
         return _EmpiricalPool(
             candidates,
@@ -256,7 +257,9 @@ def _base_masses(candidates: Sequence[Candidate]) -> np.ndarray:
 
 
 def _occurrence_count(candidate: Candidate) -> int:
-    return _positive_integer(_q0_record(candidate).get("occurrence_count"), "occurrence_count")
+    return _positive_integer(
+        _q0_record(candidate).get("occurrence_count"), "occurrence_count"
+    )
 
 
 def _valid_occurrence_count(candidate: Candidate) -> int:
@@ -269,7 +272,9 @@ def _valid_occurrence_count(candidate: Candidate) -> int:
 def _q0_record(candidate: Candidate) -> Mapping[str, object]:
     record = candidate.metadata.get(NUCLEOBENCH_Q0_METADATA_KEY)
     if not isinstance(record, Mapping):
-        raise TypeError(f"candidate {candidate.candidate_id!r} has no empirical q0 record")
+        raise TypeError(
+            f"candidate {candidate.candidate_id!r} has no empirical q0 record"
+        )
     return record
 
 

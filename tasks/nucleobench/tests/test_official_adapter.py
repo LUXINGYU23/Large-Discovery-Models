@@ -428,6 +428,9 @@ def test_official_loader_dispatches_every_model_family(
         assert constructed[0]["override_model"] == "checkpoint"
     else:
         assert constructed[0]["target_feature"] == 1
+        fake_torch.cuda.is_available = lambda: True
+        with pytest.raises(RuntimeError, match="requires CPU execution"):
+            load_official_case(tmp_path / "source", prepared, runtime)
 
 
 def test_source_revision_check_rejects_dirty_or_mismatched_checkouts(

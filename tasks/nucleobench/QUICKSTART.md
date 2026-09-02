@@ -113,8 +113,10 @@ uv run --locked --project tasks/nucleobench --extra official \
   config/nucleobench/malinois_k562_tiny_campaign.yaml
 ```
 
-The released K562 configs select the CPU reference path. The provider URL,
-API key, and model remain user-defined.
+The pinned Malinois wrapper must run with `CUDA_VISIBLE_DEVICES` empty because
+its CUDA output path cannot return the NumPy values required by the official
+runner. Enformer uses CUDA when available. The provider URL, API key, and model
+remain user-defined.
 
 Prepared but unqualified cases may run the `qualification` profile directly by
 passing their case ID, prepared directory, source checkout, and prepared

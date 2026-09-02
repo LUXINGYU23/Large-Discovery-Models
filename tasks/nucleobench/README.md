@@ -45,13 +45,14 @@ evidence.
 the task environment, validating registration, preparing external inputs, and
 running mock or real campaigns.
 
-The released K562 configs use the official CPU reference path. Other cases may
-use the device behavior of their unchanged official model wrapper. Harness
-sessions receive the paired-start design context rather than official case or
-model identity, and a task-local network policy blocks the registered upstream
-source and model-artifact hosts while leaving public-literature research
-available. For a local Docker daemon on POSIX, the Harness uses the invoking
-UID:GID and host KVM group; `--harness-container-user` overrides that identity.
+Malinois uses the official CPU path; the pinned wrapper cannot convert its CUDA
+output directly to the NumPy values expected by the official runner. Enformer
+uses CUDA when available. Harness sessions receive the paired-start design
+context rather than official case or model identity, and a task-local network
+policy blocks the registered upstream source and model-artifact hosts while
+leaving public-literature research available. For a local Docker daemon on
+POSIX, the Harness uses the invoking UID:GID and host KVM group;
+`--harness-container-user` overrides that identity.
 
 Mock runs exercise repository integration without network access, model
 weights, or official benchmark claims. Official source checkouts, model

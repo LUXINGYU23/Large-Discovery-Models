@@ -71,7 +71,9 @@ class NucleotideHammingEncoder:
             allow_empty=True,
         )
         if prepared.canonical_key != candidate.canonical_key:
-            raise ValueError("candidate identity does not match the configured paired start")
+            raise ValueError(
+                "candidate identity does not match the configured paired start"
+            )
         mutations = {
             int(item["position"]): str(item["base"])
             for item in prepared.payload["mutations"]
@@ -116,10 +118,11 @@ class HammingGPUCBConfig:
         if self.max_observations < self.min_history_for_fit:
             raise ValueError("max_observations must cover the GP fit threshold")
         if not 1 <= self.global_best_observations <= self.max_observations:
-            raise ValueError("global_best_observations must lie within the working-set cap")
+            raise ValueError(
+                "global_best_observations must lie within the working-set cap"
+            )
         if not self.length_scale_grid or any(
-            not math.isfinite(value) or value <= 0.0
-            for value in self.length_scale_grid
+            not math.isfinite(value) or value <= 0.0 for value in self.length_scale_grid
         ):
             raise ValueError("length_scale_grid must contain finite positive values")
 
@@ -363,13 +366,17 @@ def _validate_representations(
     for candidate in candidates:
         feature = representations.get(candidate.candidate_id)
         if feature is None:
-            raise ValueError(f"missing surrogate representation for {candidate.candidate_id}")
+            raise ValueError(
+                f"missing surrogate representation for {candidate.candidate_id}"
+            )
         _validate_vector(feature, dimension, version)
 
 
 def _validate_vector(vector: SurrogateVector, dimension: int, version: str) -> None:
     if vector.version != version or len(vector.values) != dimension:
-        raise ValueError("Hamming GP representation does not match the configured encoder")
+        raise ValueError(
+            "Hamming GP representation does not match the configured encoder"
+        )
     _code_matrix(vector.values)
 
 
@@ -379,7 +386,11 @@ def _code_matrix(values: Sequence[float] | np.ndarray) -> np.ndarray:
         array = array[None, :]
     if array.ndim != 2 or not array.shape[1] or not np.all(np.isfinite(array)):
         raise ValueError("categorical Hamming codes must be a finite non-empty matrix")
-    if np.any(array < 0.0) or np.any(array > 3.0) or not np.allclose(array, np.rint(array)):
+    if (
+        np.any(array < 0.0)
+        or np.any(array > 3.0)
+        or not np.allclose(array, np.rint(array))
+    ):
         raise ValueError("categorical Hamming codes must be integers in [0, 3]")
     return array
 

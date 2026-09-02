@@ -37,9 +37,7 @@ def require_clean_revision(source_dir: Path, expected_revision: str) -> None:
     source_dir = Path(source_dir).resolve()
     _require_checkout(source_dir)
     _require_clean(source_dir)
-    actual = _run(
-        ["git", "-C", str(source_dir), "rev-parse", "HEAD"]
-    ).stdout.strip()
+    actual = _run(["git", "-C", str(source_dir), "rev-parse", "HEAD"]).stdout.strip()
     if actual != expected_revision:
         raise ValueError(
             f"official source revision mismatch: expected {expected_revision}, got {actual}"

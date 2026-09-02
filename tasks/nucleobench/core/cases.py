@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from tasks.nucleobench.core.constants import (
     CASE_STATES,
@@ -16,7 +17,6 @@ from tasks.nucleobench.core.constants import (
     OFFICIAL_START_COUNT,
     UPSTREAM_COMMIT,
 )
-
 
 CASE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 CATALOG_FIELDS = {

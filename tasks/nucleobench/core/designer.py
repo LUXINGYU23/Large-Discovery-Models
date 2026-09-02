@@ -28,7 +28,9 @@ class NucleoBenchDesigner:
         max_empty_reservoir_rounds: int = 3,
     ) -> None:
         if reservoir_size < 1 or evaluations_per_step < 1:
-            raise ValueError("designer reservoir and evaluation counts must be positive")
+            raise ValueError(
+                "designer reservoir and evaluation counts must be positive"
+            )
         self.engine = engine
         self.state = state
         self.context = context

@@ -176,6 +176,12 @@ def load_official_case(
     argparse_lib = _official_module(source_dir, "nucleobench.common.argparse_lib")
     case = prepared.context.case
     if case.model_family == "malinois":
+        torch = importlib.import_module("torch")
+        if torch.cuda.is_available():
+            raise RuntimeError(
+                "the pinned Malinois wrapper requires CPU execution; set "
+                "CUDA_VISIBLE_DEVICES to an empty value"
+            )
         module = _official_module(source_dir, "nucleobench.models.malinois.model_def")
         model = module.Malinois(
             model_artifact=str(prepared.model_artifact),

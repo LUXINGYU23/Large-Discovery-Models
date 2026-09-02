@@ -114,7 +114,9 @@ def test_gp_working_set_is_capped_and_keeps_the_global_best() -> None:
             encoder.encode(candidate).values,
             feature_version=encoder.version,
         )
-        for candidate, score in zip(candidates, (100.0, 1.0, 2.0, 3.0, 4.0, 5.0), strict=True)
+        for candidate, score in zip(
+            candidates, (100.0, 1.0, 2.0, 3.0, 4.0, 5.0), strict=True
+        )
     )
     selector = HammingGPUCBSelector(
         objective_name="utility",
@@ -128,9 +130,10 @@ def test_gp_working_set_is_capped_and_keeps_the_global_best() -> None:
     )
 
     selector.fit(history)
-    result = selector.select(candidates[-2:], {
-        item.candidate_id: encoder.encode(item) for item in candidates[-2:]
-    })
+    result = selector.select(
+        candidates[-2:],
+        {item.candidate_id: encoder.encode(item) for item in candidates[-2:]},
+    )
 
     summary = result.metadata["surrogate"]
     assert summary["history_size"] == 6
@@ -192,7 +195,12 @@ def test_ldm_selector_preserves_q0_and_is_seeded() -> None:
 
     def select() -> BOSelectionResult:
         selector = AcquisitionTiltedSelector(
-            _FixedSelector({item.candidate_id: float(index) for index, item in enumerate(candidates)}),
+            _FixedSelector(
+                {
+                    item.candidate_id: float(index)
+                    for index, item in enumerate(candidates)
+                }
+            ),
             alpha=1.0,
             eta=0.0,
             z_clip=5.0,
@@ -208,8 +216,12 @@ def test_ldm_selector_preserves_q0_and_is_seeded() -> None:
     metadata = {item.candidate_id: item.metadata for item in first.predictions}
 
     assert first.selected_candidate_ids == second.selected_candidate_ids
-    assert metadata[candidates[0].candidate_id]["selection_probability"] == pytest.approx(0.75)
-    assert metadata[candidates[1].candidate_id]["selection_probability"] == pytest.approx(0.25)
+    assert metadata[candidates[0].candidate_id][
+        "selection_probability"
+    ] == pytest.approx(0.75)
+    assert metadata[candidates[1].candidate_id][
+        "selection_probability"
+    ] == pytest.approx(0.25)
 
 
 def test_ldm_selector_maintains_the_three_b_pool_before_gp_scoring() -> None:
