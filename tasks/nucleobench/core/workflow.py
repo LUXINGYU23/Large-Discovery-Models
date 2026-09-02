@@ -62,6 +62,7 @@ from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.harness import (
     DIRECT_HARNESS_PROFILE_ID,
     HARNESS_CANDIDATE_SCHEMA,
+    HARNESS_DENIED_HOSTS,
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
@@ -986,6 +987,7 @@ def _harness_client(
                 tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget),
             ),
             network_policy=HarnessNetworkPolicy(
+                denied_hosts=HARNESS_DENIED_HOSTS,
                 forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
             ),
             context7_enabled=args.harness_context7,
@@ -1143,6 +1145,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "wall_time_seconds": args.harness_wall_time_seconds,
         "response_timeout_seconds": args.harness_response_timeout,
         "tool_call_budgets": parse_tool_call_budgets(args.harness_tool_budget),
+        "denied_hosts": list(HARNESS_DENIED_HOSTS),
         "context7_enabled": args.harness_context7,
         "mcp_configured": args.harness_mcp_config is not None,
         "skills_loaded": False,

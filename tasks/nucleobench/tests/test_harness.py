@@ -14,6 +14,7 @@ from tasks.nucleobench.core.constants import NUCLEOBENCH_Q0_METADATA_KEY
 from tasks.nucleobench.core.factory import build_proposal_expander
 from tasks.nucleobench.core.harness import (
     DIRECT_HARNESS_PROFILE_ID,
+    HARNESS_DENIED_HOSTS,
     HARNESS_PROFILE_IDS,
     HARNESS_TOOL_NAMES,
     NucleoBenchHarnessExpander,
@@ -154,6 +155,17 @@ def test_turn_uses_previous_round_delta_and_complete_evaluated_exclusion() -> No
         for message in messages
     )
     assert all(
+        message["case"]
+        == {
+            "target": MOCK_CONTEXT.case.target,
+            "sequence_length": MOCK_CONTEXT.case.sequence_length,
+            "editable_position_count": len(MOCK_CONTEXT.editable_positions),
+        }
+        and "task" not in message
+        and "time_budget" not in message
+        for message in messages
+    )
+    assert all(
         message["novelty_contract"]
         == {
             "evaluated_candidates_are_forbidden": True,
@@ -285,9 +297,6 @@ def test_harness_resources_task_contract_and_factory_are_task_local(
 
     assert set(context) == {"schema_version", "case", "paired_start"}
     assert set(context["case"]) == {
-        "case_id",
-        "model_family",
-        "model_name",
         "target",
         "sequence_length",
         "editable_position_count",
@@ -303,6 +312,7 @@ def test_harness_resources_task_contract_and_factory_are_task_local(
     assert all(len(profile.agents_sha256) == 64 for profile in profiles)
     assert extensions[0].tool_names == HARNESS_TOOL_NAMES
     assert len(extensions[0].sha256) == 64
+    assert "storage.googleapis.com" in HARNESS_DENIED_HOSTS
 
     ldm_spec = build_task_spec(
         MOCK_CONTEXT.case,
@@ -402,6 +412,7 @@ def test_harness_dry_run_exposes_reproducible_settings_without_secret(
     assert payload["harness"]["profile_ids"] == list(HARNESS_PROFILE_IDS)
     assert payload["harness"]["candidates_per_session"] == 3
     assert payload["harness"]["tool_call_budgets"] == {"web_search": 3}
+    assert payload["harness"]["denied_hosts"] == list(HARNESS_DENIED_HOSTS)
     assert payload["harness"]["context7_enabled"] is False
     assert "test-secret" not in output
 

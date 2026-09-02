@@ -49,6 +49,12 @@ HARNESS_FORBIDDEN_TERMS = (
     "nucleobench",
     "move37-labs/nucleobench",
 )
+HARNESS_DENIED_HOSTS = (
+    "api.github.com",
+    "github.com",
+    "raw.githubusercontent.com",
+    "storage.googleapis.com",
+)
 HARNESS_CANDIDATE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -89,9 +95,6 @@ def write_harness_sequence_context(context: MutationContext, output_path: Path) 
         {
             "schema_version": 1,
             "case": {
-                "case_id": context.case.case_id,
-                "model_family": context.case.model_family,
-                "model_name": context.case.model_name,
                 "target": context.case.target,
                 "sequence_length": context.case.sequence_length,
                 "editable_position_count": len(context.editable_positions),
@@ -444,15 +447,12 @@ def _turn_message(
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
-        "task": TASK_ID,
         "round_index": request.round_idx,
         "history_from_seq": history_from_seq,
         "history_to_seq": history_to_seq,
         "history_digest": history_digest,
         "case": {
-            "case_id": context.case.case_id,
             "target": context.case.target,
-            "model_family": context.case.model_family,
             "sequence_length": context.case.sequence_length,
             "editable_position_count": len(context.editable_positions),
         },
@@ -473,16 +473,10 @@ def _turn_message(
             "candidate_count": profile.candidates_per_turn,
             "candidate_schema": HARNESS_CANDIDATE_SCHEMA,
         },
-        "time_budget": {
-            "hard_wall_time_minutes": 30,
-            "end_open_ended_research_by_minute": 20,
-            "first_submission_by_minute": 25,
-            "remaining_time_use": "repair_rejected_entries_only",
-        },
         "constraints": [
             "Use zero-based positions and only the exact editable positions exposed by the structured tools.",
             "Every replacement base must differ from the paired start base at that position.",
-            "Do not search for NucleoBench, its repository, benchmark data, model weights, evaluation tables, or hidden scores.",
+            "Do not seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.",
             "Campaign measurements are the only measured objective values; do not present a prediction as a measurement.",
             "Research public target biology and sequence-regulatory evidence, and use scratch code in the isolated sandbox when useful.",
             "Only candidates in evaluated_candidates are forbidden. Earlier proposals absent from that list remain eligible.",
@@ -492,7 +486,7 @@ def _turn_message(
         ],
     }
     return (
-        "Continue your persistent NucleoBench sequence-design research role. Use your "
+        "Continue your persistent sequence-design research role. Use your "
         "session history, new measurements, public evidence, scratch analysis, and the "
         "structured paired-start tools. Submit a complete validated minibatch before the "
         "turn deadline.\n\n"

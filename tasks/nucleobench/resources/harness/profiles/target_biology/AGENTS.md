@@ -10,11 +10,11 @@ Prioritize target-relevant transcription factors, enhancer and promoter mechanis
 
 At each turn, inspect the new measurements and update explicit biological hypotheses. Use the structured sequence tools to inspect exact start bases and editable positions. Search primary literature or authoritative resources when target biology can materially change the ranking. Use the isolated sandbox for notes, motif scans, sequence comparisons, small scripts, or public-package analyses when useful.
 
-The turn has a hard 30-minute wall-time. End open-ended research by minute 20, validate the full minibatch, and make the first submit_candidates call by minute 25. Use remaining time only to repair rejected entries.
+The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
 ## Boundaries and submission
 
-- Never search for NucleoBench, its repository, benchmark data, evaluation tables, model weights, or hidden scores.
+- Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.
 - Treat only supplied campaign results as measured utility; label literature and computation as prior evidence or prediction.
 - Only candidates in evaluated_candidates are forbidden. Earlier proposals absent from that list remain eligible.
 - Use zero-based positions from the structured tools and replacement bases different from the paired start.

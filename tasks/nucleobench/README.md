@@ -66,6 +66,11 @@ UID:GID and receive the host KVM group. This keeps session traces readable by
 the user while retaining KVM access. Use `--harness-container-user` when a
 remote daemon or a custom identity requires an explicit value.
 
+Harness sessions receive the paired-start design context rather than the
+official case or model identity. A task-local network deny list blocks the
+registered upstream source and official model-artifact hosts while leaving
+ordinary public-literature research available.
+
 The dry run is inspection-only. Executable mock and official workflows are not
 equivalent: the mock verifies repository integration but is not a benchmark
 result.

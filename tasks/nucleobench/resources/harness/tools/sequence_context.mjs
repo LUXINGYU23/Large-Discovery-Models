@@ -6,13 +6,13 @@ if (!contextPath) throw new Error("LDM_NUCLEOBENCH_CONTEXT is required");
 
 const context = JSON.parse(readFileSync(contextPath, "utf8"));
 if (context.schema_version !== 1 || !context.case || !context.paired_start) {
-	throw new Error("invalid NucleoBench sequence context");
+	throw new Error("invalid sequence-design context");
 }
 const pairedStart = context.paired_start;
 const startSequence = pairedStart.start_sequence;
 const editablePositions = pairedStart.editable_positions;
 if (typeof startSequence !== "string" || !Array.isArray(editablePositions)) {
-	throw new Error("invalid NucleoBench paired start");
+	throw new Error("invalid paired start");
 }
 const editable = new Set(editablePositions);
 
@@ -77,9 +77,9 @@ function validatePatch(mutations) {
 export default function sequenceContextTools(pi) {
 	pi.registerTool({
 		name: "get_task_context",
-		label: "Get NucleoBench task context",
-		description: "Return public case identity and paired-start metadata without model weights or scores.",
-		promptSnippet: "get_task_context: inspect the configured sequence-design case and paired-start identity",
+		label: "Get sequence-design task context",
+		description: "Return paired-start metadata and the public biological target.",
+		promptSnippet: "get_task_context: inspect the configured sequence-design context",
 		parameters: { type: "object", properties: {}, additionalProperties: false },
 		async execute() {
 			return jsonResult({
