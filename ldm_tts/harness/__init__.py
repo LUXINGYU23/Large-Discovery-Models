@@ -3,6 +3,22 @@
 from ldm_tts.harness.client import HarnessClient, HarnessError
 from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
+from ldm_tts.harness.policy import (
+    POLICY_CAPABILITIES,
+    CompiledOptimizationPolicy,
+    OptimizationPolicyAdapter,
+    PolicyCapabilityContract,
+    PolicyResearchController,
+    PolicyRoundInput,
+    policy_mcp_server,
+    policy_submission_contract,
+)
+from ldm_tts.harness.policy_execution import (
+    DockerPolicyExecutor,
+    PolicyExecutionError,
+    PolicyExecutionResult,
+    PolicyExecutor,
+)
 from ldm_tts.harness.protocol import (
     DEFAULT_NETWORK_TOOL_BUDGETS,
     HarnessArtifactRule,
@@ -22,33 +38,22 @@ from ldm_tts.harness.protocol import (
     HarnessTurnResult,
     HarnessWebSearch,
     canonical_sha256,
+    directory_sha256,
     file_sha256,
-    profile_set_sha256,
     parse_tool_call_budgets,
-)
-from ldm_tts.harness.policy import (
-    CompiledOptimizationPolicy,
-    OptimizationPolicyAdapter,
-    PolicyCapabilityContract,
-    PolicyResearchController,
-    PolicyRoundInput,
-    policy_mcp_server,
-    policy_submission_contract,
-)
-from ldm_tts.harness.policy_execution import (
-    DockerPolicyExecutor,
-    PolicyExecutionError,
-    PolicyExecutionResult,
-    PolicyExecutor,
+    profile_set_sha256,
 )
 
 __all__ = [
     "DEFAULT_NETWORK_TOOL_BUDGETS",
+    "POLICY_CAPABILITIES",
+    "CompiledOptimizationPolicy",
+    "DockerPolicyExecutor",
+    "HarnessArtifactRule",
     "HarnessClient",
     "HarnessError",
-    "HarnessArtifactRule",
-    "HarnessLimits",
     "HarnessGuestRuntime",
+    "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",
     "HarnessNetworkPolicy",
@@ -62,8 +67,7 @@ __all__ = [
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
-    "CompiledOptimizationPolicy",
-    "DockerPolicyExecutor",
+    "HarnessWebSearch",
     "OptimizationPolicyAdapter",
     "PolicyCapabilityContract",
     "PolicyExecutionError",
@@ -72,13 +76,13 @@ __all__ = [
     "PolicyResearchController",
     "PolicyRoundInput",
     "ResolvedHarnessMcpConfig",
-    "load_harness_mcp_config",
-    "HarnessWebSearch",
     "canonical_sha256",
+    "directory_sha256",
     "file_sha256",
-    "profile_set_sha256",
+    "load_harness_guest_runtime",
+    "load_harness_mcp_config",
+    "parse_tool_call_budgets",
     "policy_mcp_server",
     "policy_submission_contract",
-    "parse_tool_call_budgets",
-    "load_harness_guest_runtime",
+    "profile_set_sha256",
 ]

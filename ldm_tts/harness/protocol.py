@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -36,6 +37,26 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def directory_sha256(path: Path) -> str:
+    root = Path(path).resolve()
+    files: list[dict[str, str]] = []
+
+    def visit(directory: Path) -> None:
+        with os.scandir(directory) as entries:
+            for entry in sorted(entries, key=lambda item: os.fsencode(item.name)):
+                entry_path = Path(entry.path)
+                if entry.is_dir(follow_symlinks=False):
+                    visit(entry_path)
+                elif entry.is_file(follow_symlinks=False):
+                    files.append({
+                        "path": entry_path.relative_to(root).as_posix(),
+                        "sha256": file_sha256(entry_path),
+                    })
+
+    visit(root)
+    return canonical_sha256(files)
 
 
 @dataclass(frozen=True)
@@ -627,25 +648,26 @@ class HarnessSubmissionValidation:
 
 __all__ = [
     "DEFAULT_NETWORK_TOOL_BUDGETS",
-    "HarnessLimits",
     "HarnessGuestRuntime",
     "HarnessArtifactRule",
+    "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
     "HarnessSubmissionContract",
-    "HarnessWebSearch",
+    "HarnessSubmissionError",
+    "HarnessSubmissionRequest",
+    "HarnessSubmissionValidation",
+    "HarnessSubmittedArtifact",
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
-    "HarnessSubmittedArtifact",
-    "HarnessSubmissionRequest",
-    "HarnessSubmissionError",
-    "HarnessSubmissionValidation",
+    "HarnessWebSearch",
     "canonical_sha256",
+    "directory_sha256",
     "file_sha256",
-    "profile_set_sha256",
     "parse_tool_call_budgets",
+    "profile_set_sha256",
 ]

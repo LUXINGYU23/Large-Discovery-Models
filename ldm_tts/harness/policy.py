@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
@@ -34,7 +34,6 @@ from ldm_tts.harness.protocol import (
     canonical_sha256,
     file_sha256,
 )
-
 
 POLICY_API_VERSION = 1
 POLICY_CAPABILITIES = frozenset({"prior_mean@1", "ldm_weights@1"})
@@ -173,6 +172,7 @@ class CompiledOptimizationPolicy:
     eta: float
     source: Literal["artifact", "previous", "default"]
     degraded: bool
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.source not in {"artifact", "previous", "default"}:
@@ -196,6 +196,7 @@ class CompiledOptimizationPolicy:
             "query_prior_mean",
             _readonly_array(self.query_prior_mean, dimensions=1, name="query_prior_mean"),
         )
+        object.__setattr__(self, "metadata", _json_mapping(self.metadata, "metadata"))
 
 
 class OptimizationPolicyAdapter(Protocol):
@@ -219,7 +220,9 @@ class OptimizationPolicyAdapter(Protocol):
     ) -> Sequence[HarnessSubmissionError]: ...
 
 
-def policy_submission_contract() -> HarnessSubmissionContract:
+def policy_submission_contract(
+    max_validation_attempts: int = 3,
+) -> HarnessSubmissionContract:
     return HarnessSubmissionContract(
         contract_id="optimization_policy",
         tool_name="submit_optimization_policy",
@@ -243,7 +246,7 @@ def policy_submission_contract() -> HarnessSubmissionContract:
             allowed_suffixes=(".py",),
             max_bytes=POLICY_ARTIFACT_MAX_BYTES,
         ),),
-        max_validation_attempts=3,
+        max_validation_attempts=max_validation_attempts,
     )
 
 
@@ -346,39 +349,34 @@ class PolicyResearchController:
             result = results[0]
             self._account(result)
             if result.submission_status != "accepted":
-                policy = self._fallback(round_input, round_directory, active)
-                self._persist_result(
-                    round_directory,
-                    input_digest,
-                    policy,
+                policy = _annotate_policy(
+                    self._fallback(round_input, round_directory, active),
                     action="fallback",
                     status="submission_rejected",
                     submission_digest=result.submission_digest,
                     validation_errors=result.validation_errors,
                     turn=result,
                 )
+                self._persist_result(round_directory, input_digest, policy)
                 return policy
-            policy = self._apply_submission(
-                result,
-                round_input,
-                round_directory,
-                input_digest,
-                active,
-                validated,
-            )
-            self._persist_result(
-                round_directory,
-                input_digest,
-                policy,
+            policy = _annotate_policy(
+                self._apply_submission(
+                    result,
+                    round_input,
+                    round_directory,
+                    input_digest,
+                    active,
+                    validated,
+                ),
                 action=str(result.submission["action"]),
                 status="accepted",
                 submission_digest=result.submission_digest,
                 validation_errors=(),
                 turn=result,
             )
+            self._persist_result(round_directory, input_digest, policy)
             return policy
         except (HarnessError, PolicyExecutionError, OSError, ValueError) as exc:
-            policy = self._fallback(round_input, round_directory, active)
             errors = (
                 exc.errors
                 if isinstance(exc, PolicyExecutionError)
@@ -389,16 +387,15 @@ class PolicyResearchController:
                     "Inspect the policy Harness trace and retry this campaign round.",
                 ),)
             )
-            self._persist_result(
-                round_directory,
-                input_digest,
-                policy,
+            policy = _annotate_policy(
+                self._fallback(round_input, round_directory, active),
                 action="fallback",
                 status="runtime_fallback",
                 submission_digest=None,
                 validation_errors=errors,
                 turn=None,
             )
+            self._persist_result(round_directory, input_digest, policy)
             return policy
 
     def _validate_round_input(self, round_input: PolicyRoundInput) -> None:
@@ -799,6 +796,7 @@ class PolicyResearchController:
             eta=float(self.contract.default_eta),
             source="default",
             degraded=degraded,
+            metadata={"prior_clip_count": 0},
         )
 
     def _task_errors(
@@ -894,12 +892,6 @@ class PolicyResearchController:
         directory: Path,
         input_digest: str,
         policy: CompiledOptimizationPolicy,
-        *,
-        action: str,
-        status: str,
-        submission_digest: str | None,
-        validation_errors: Sequence[HarnessSubmissionError],
-        turn: HarnessTurnResult | None,
     ) -> None:
         _atomic_npz(
             directory / "compiled.npz",
@@ -907,11 +899,9 @@ class PolicyResearchController:
             query_prior_mean=policy.query_prior_mean,
         )
         payload: dict[str, Any] = {
+            **dict(policy.metadata),
             "round_index": int(directory.name.rsplit("_", 1)[1]),
             "input_sha256": input_digest,
-            "action": action,
-            "status": status,
-            "submission_sha256": submission_digest,
             "epoch_id": policy.epoch_id,
             "artifact_sha256": policy.artifact_digest,
             "source": policy.source,
@@ -921,20 +911,8 @@ class PolicyResearchController:
             "eta": policy.eta,
             "history_to_seq": len(policy.history_prior_mean),
             "query_size": len(policy.query_prior_mean),
-            "validation_errors": [error.to_dict() for error in validation_errors],
             "compiled_arrays_sha256": file_sha256(directory / "compiled.npz"),
         }
-        if turn is not None:
-            payload["harness_turn"] = {
-                "profile_id": turn.profile_id,
-                "session_id": turn.session_id,
-                "turn_id": turn.turn_id,
-                "replayed": turn.replayed,
-                "submission_id": turn.submission_id,
-                "usage": turn.usage,
-                "tool_budget": turn.tool_budget,
-                "artifacts": turn.artifacts,
-            }
         _atomic_json(directory / "result.json", payload)
 
     def _load_result(
@@ -961,6 +939,18 @@ class PolicyResearchController:
                 eta=float(value["eta"]),
                 source=value["source"],
                 degraded=value["degraded"],
+                metadata={
+                    key: value[key]
+                    for key in (
+                        "action",
+                        "status",
+                        "submission_sha256",
+                        "validation_errors",
+                        "harness_turn",
+                        "prior_clip_count",
+                    )
+                    if key in value
+                },
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("persisted policy result is invalid") from exc
@@ -1092,7 +1082,38 @@ def _compiled_policy(
         eta=execution.eta,
         source=source,
         degraded=degraded,
+        metadata={"prior_clip_count": execution.prior_clip_count},
     )
+
+
+def _annotate_policy(
+    policy: CompiledOptimizationPolicy,
+    *,
+    action: str,
+    status: str,
+    submission_digest: str | None,
+    validation_errors: Sequence[HarnessSubmissionError],
+    turn: HarnessTurnResult | None,
+) -> CompiledOptimizationPolicy:
+    metadata: dict[str, Any] = {
+        **dict(policy.metadata),
+        "action": action,
+        "status": status,
+        "submission_sha256": submission_digest,
+        "validation_errors": [error.to_dict() for error in validation_errors],
+    }
+    if turn is not None:
+        metadata["harness_turn"] = {
+            "profile_id": turn.profile_id,
+            "session_id": turn.session_id,
+            "turn_id": turn.turn_id,
+            "replayed": turn.replayed,
+            "submission_id": turn.submission_id,
+            "usage": turn.usage,
+            "tool_budget": turn.tool_budget,
+            "artifacts": turn.artifacts,
+        }
+    return replace(policy, metadata=metadata)
 
 
 def _retry(error: HarnessSubmissionError) -> HarnessSubmissionValidation:
@@ -1109,12 +1130,12 @@ def _submission_error(
 
 
 __all__ = [
-    "CompiledOptimizationPolicy",
-    "OptimizationPolicyAdapter",
     "POLICY_API_VERSION",
     "POLICY_ARTIFACT_MAX_BYTES",
     "POLICY_ARTIFACT_NAME",
     "POLICY_CAPABILITIES",
+    "CompiledOptimizationPolicy",
+    "OptimizationPolicyAdapter",
     "PolicyCapabilityContract",
     "PolicyResearchController",
     "PolicyRoundInput",

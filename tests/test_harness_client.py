@@ -18,6 +18,9 @@ from ldm_tts.harness import (
     HarnessSubmissionValidation,
     HarnessSubmittedArtifact,
     HarnessTurn,
+    canonical_sha256,
+    directory_sha256,
+    file_sha256,
     parse_tool_call_budgets,
 )
 
@@ -59,7 +62,7 @@ def _candidate_contract(
     )
 
 
-def test_submission_contract_digest_covers_the_transmitted_json_bytes(tmp_path: Path) -> None:
+def test_submission_contract_digest_covers_transmitted_json(tmp_path: Path) -> None:
     contract = _candidate_contract()
     config = HarnessPoolConfig(
         artifact_root=tmp_path,
@@ -103,6 +106,34 @@ def test_submission_contract_digest_covers_the_transmitted_json_bytes(tmp_path: 
     assert "webProvider" not in frame
     assert frame["mcpServers"] == []
     assert frame["limits"] == {"wallTimeSeconds": 1800, "toolCallBudgets": {}}
+
+
+def test_directory_digest_uses_stable_utf8_filename_order(tmp_path: Path) -> None:
+    skill_root = tmp_path / "skill"
+    (skill_root / "agents").mkdir(parents=True)
+    (skill_root / "references").mkdir()
+    (skill_root / "SKILL.md").write_text("skill", encoding="utf-8")
+    (skill_root / "agents" / "openai.yaml").write_text("agent", encoding="utf-8")
+    (skill_root / "references" / "notes.md").write_text("notes", encoding="utf-8")
+
+    expected = canonical_sha256(
+        [
+            {
+                "path": "SKILL.md",
+                "sha256": file_sha256(skill_root / "SKILL.md"),
+            },
+            {
+                "path": "agents/openai.yaml",
+                "sha256": file_sha256(skill_root / "agents" / "openai.yaml"),
+            },
+            {
+                "path": "references/notes.md",
+                "sha256": file_sha256(skill_root / "references" / "notes.md"),
+            },
+        ]
+    )
+
+    assert directory_sha256(skill_root) == expected
 
 
 def test_tool_call_budget_parser_rejects_duplicates_and_terminal_limits() -> None:

@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
+
+import numpy as np
 
 from ldm_tts.contracts import Candidate, SurrogateSpaceSpec
 from ldm_tts.optimization import SurrogateVector
-
-from tasks.iron_mind.core.candidate import CandidatePayloadError, normalize_candidate_payload
+from tasks.iron_mind.core.candidate import (
+    CandidatePayloadError,
+    normalize_candidate_payload,
+)
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, ReactionValue
-
 
 ENCODER_ALGORITHM = "reaction_one_hot_v1"
 ENCODER_PATH = "tasks.iron_mind.core.surrogate:ReactionOneHotEncoder"
@@ -86,6 +89,23 @@ def reaction_encoder_version(schema: ReactionDatasetSchema) -> str:
             f"schema_sha256={schema.schema_sha256}",
         )
     )
+
+
+def decode_reaction_one_hot(
+    values: Sequence[float], schema: ReactionDatasetSchema
+) -> tuple[int, ...]:
+    vector = np.asarray(values, dtype=float)
+    if vector.shape != (schema.one_hot_dimension,) or not np.all(np.isfinite(vector)):
+        raise ValueError("Reaction one-hot vector does not match the schema.")
+    codes, offset = [], 0
+    for factor in schema.factors:
+        segment = vector[offset : offset + len(factor.options)]
+        active = np.flatnonzero(np.isclose(segment, 1.0))
+        if len(active) != 1 or not np.isclose(segment.sum(), 1.0):
+            raise ValueError("Reaction one-hot vector requires one active option per factor.")
+        codes.append(int(active[0]))
+        offset += len(factor.options)
+    return tuple(codes)
 
 
 def _schema_ordered_conditions(

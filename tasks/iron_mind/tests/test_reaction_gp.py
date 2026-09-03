@@ -191,3 +191,84 @@ def test_selector_replays_a_fixed_reservoir_deterministically() -> None:
     second = selector.select(candidates, vectors).to_dict()
 
     assert first == second
+
+
+def test_zero_prior_is_numerically_identical_to_the_static_gp() -> None:
+    schema = _schema()
+    encoder = ReactionOneHotEncoder(schema)
+    observed = _candidate(schema, "observed", base="A", solvent="X")
+    candidates = (
+        _candidate(schema, "a", base="A", solvent="Y"),
+        _candidate(schema, "b", base="B", solvent="X"),
+    )
+    history = [
+        BOObservation.scalar(
+            observed.candidate_id,
+            4.0,
+            encoder.encode(observed).values,
+            feature_version=encoder.version,
+        )
+    ]
+    vectors = {item.candidate_id: encoder.encode(item) for item in candidates}
+    static = ReactionCategoricalGPUCBSelector(
+        schema=schema,
+        objective_name="reaction_score",
+        feature_version=encoder.version,
+    )
+    residual = ReactionCategoricalGPUCBSelector(
+        schema=schema,
+        objective_name="reaction_score",
+        feature_version=encoder.version,
+    )
+
+    static.fit(history)
+    residual.fit(history, history_prior_mean=np.zeros(1))
+    static_result = static.select(candidates, vectors)
+    residual_result = residual.select(candidates, vectors, query_prior_mean=np.zeros(2))
+
+    assert static_result.to_dict() == residual_result.to_dict()
+
+
+def test_nonzero_prior_is_fitted_as_a_standardized_residual_and_added_back() -> None:
+    schema = _schema()
+    encoder = ReactionOneHotEncoder(schema)
+    observed = _candidate(schema, "observed", base="A", solvent="X")
+    query = _candidate(schema, "query", base="A", solvent="Y")
+    selector = ReactionCategoricalGPUCBSelector(
+        schema=schema,
+        objective_name="reaction_score",
+        feature_version=encoder.version,
+    )
+    selector.fit(
+        [
+            BOObservation.scalar(
+                observed.candidate_id,
+                4.0,
+                encoder.encode(observed).values,
+                feature_version=encoder.version,
+            )
+        ],
+        history_prior_mean=(0.5,),
+        mean_source="compiled:artifact",
+        artifact_digest="a" * 64,
+    )
+
+    result = selector.select(
+        (query,),
+        {query.candidate_id: encoder.encode(query)},
+        query_prior_mean=(0.25,),
+    )
+
+    prediction = result.predictions[0]
+    summary = result.metadata["surrogate"]
+    assert summary["residual_target_mean"] == pytest.approx(-0.5)
+    assert prediction.scalar_mean == pytest.approx(
+        summary["target_mean"]
+        + summary["target_scale"]
+        * (
+            prediction.metadata["prior_mean_standardized"]
+            + prediction.metadata["residual_mean_standardized"]
+        )
+    )
+    assert summary["mean_source"] == "compiled:artifact"
+    assert summary["mean_artifact_sha256"] == "a" * 64

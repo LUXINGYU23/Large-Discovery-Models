@@ -3,35 +3,42 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.harness import HarnessClient, HarnessProfile
+from ldm_tts.harness import HarnessClient, HarnessProfile, PolicyResearchController
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
-
 from tasks.iron_mind.core import task_spec as task_contracts
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
 from tasks.iron_mind.core.constants import OBJECTIVE_NAME
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.harness import IronMindHarnessExpander
-from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
+from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
+from tasks.iron_mind.core.optimization_policy import IronMindOptimizationPolicyAdapter
 from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
-from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS, IronMindProposalExpander
+from tasks.iron_mind.core.proposals import (
+    DEFAULT_PROPOSAL_MAX_WORKERS,
+    IronMindProposalExpander,
+)
 from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
 from tasks.iron_mind.core.search import (
-    FullReactionDomainExpander,
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
     INITIALIZATION_MODES,
-    IronMindInitializationExpander,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
     SEARCH_METHODS,
+    FullReactionDomainExpander,
+    IronMindInitializationExpander,
     finite_domain_size,
 )
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
@@ -62,6 +69,8 @@ class CampaignComponentOptions:
     harness_profiles: tuple[HarnessProfile, ...] = ()
     harness_candidates_per_profile: int = 0
     account_harness_usage: Callable[[dict[str, int]], None] | None = None
+    policy_controller: PolicyResearchController | None = None
+    policy_adapter: IronMindOptimizationPolicyAdapter | None = None
 
     def __post_init__(self) -> None:
         if self.table.schema != self.schema:
@@ -72,9 +81,12 @@ class CampaignComponentOptions:
             raise ValueError(f"Unknown initialization mode: {self.initialization_mode!r}.")
         if self.proposal_samples < 1 or self.bo_pool_size < 1:
             raise ValueError("Proposal and BO pool sizes must be positive.")
-        if self.search_method in {"ldm", "ldm_harness"} and self.proposal_samples <= self.bo_pool_size:
+        if (
+            self.search_method in ACQUISITION_TILTED_METHODS
+            and self.proposal_samples <= self.bo_pool_size
+        ):
             raise ValueError("LDM proposal samples must exceed the BO pool size.")
-        if self.search_method in {"ldm_harness", "harness"}:
+        if self.search_method in PERSISTENT_HARNESS_METHODS:
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
             if self.harness_candidates_per_profile < 1:
@@ -84,6 +96,11 @@ class CampaignComponentOptions:
                 raise ValueError("proposal_samples must equal the harness minibatch total")
         elif self.search_method in {"ldm", "llm"} and self.client is None:
             raise ValueError("Direct model search methods require a proposal client.")
+        if self.search_method == COMPILED_POLICY_METHOD:
+            if self.policy_controller is None or self.policy_adapter is None:
+                raise ValueError("Compiled Harness LDM requires a policy controller and adapter")
+        elif self.policy_controller is not None or self.policy_adapter is not None:
+            raise ValueError("Policy components are only valid for compiled Harness LDM")
         if self.proposal_max_workers < 1 or self.selection_seed < 0:
             raise ValueError("Worker count must be positive and seed non-negative.")
         if self.search_method != "harness":
@@ -159,6 +176,9 @@ def build_reaction_selector(**kwargs) -> AcquisitionTiltedSelector:
         seed=kwargs["seed"],
         pool_size=kwargs["pool_size"],
         proposal_sample_count=kwargs["proposal_sample_count"],
+        policy_controller=kwargs.get("policy_controller"),
+        policy_adapter=kwargs.get("policy_adapter"),
+        policy_mode=kwargs.get("policy_mode", False),
     )
 
 
@@ -195,13 +215,16 @@ def _search_components(options: CampaignComponentOptions):
         pool_size=options.bo_pool_size,
         proposal_sample_count=options.proposal_samples,
         feature_version=encoder.version,
+        policy_controller=options.policy_controller,
+        policy_adapter=options.policy_adapter,
+        policy_mode=options.search_method == COMPILED_POLICY_METHOD,
     )
 
 
 def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain) -> ReservoirExpander:
     if options.search_method == "bo":
         search: ReservoirExpander = FullReactionDomainExpander(options.table)
-    elif options.search_method in {"ldm_harness", "harness"}:
+    elif options.search_method in PERSISTENT_HARNESS_METHODS:
         assert options.harness_client is not None
         search = IronMindHarnessExpander(
             options.harness_client,
@@ -210,7 +233,7 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
             candidates_per_profile=options.harness_candidates_per_profile,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
-            attach_empirical_q0=options.search_method == "ldm_harness",
+            attach_empirical_q0=options.search_method in PARALLEL_HARNESS_METHODS,
             account=options.account_harness_usage,
         )
     else:
@@ -229,7 +252,7 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
         initializer=IronMindInitializationExpander(
             options.table,
             seed=options.selection_seed,
-            attach_q0=options.search_method in {"ldm", "ldm_harness"},
+            attach_q0=options.search_method in ACQUISITION_TILTED_METHODS,
         ),
         search_expander=search,
         initial_reservoir_size=1,

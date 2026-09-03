@@ -194,10 +194,13 @@ def test_policy_controller_replace_keep_disable_and_resume(tmp_path: Path) -> No
     replayed = controller.resolve(_round(3))
 
     assert replaced.source == "artifact" and replaced.epoch_id == "epoch_001"
+    assert replaced.metadata["action"] == "replace"
+    assert replaced.metadata["harness_turn"]["session_id"] == "session-1"
     assert kept.source == "previous" and kept.epoch_id == replaced.epoch_id
     assert np.all(kept.query_prior_mean == 2.0)
     assert disabled.source == "default" and not disabled.degraded
     assert replayed.source == "default" and client.calls == 3
+    assert replayed.metadata["action"] == "disable"
     assert [round_index for _, round_index in executor.calls] == [1, 2]
     assert json.loads((tmp_path / "active_policy.json").read_text())["epoch_id"] is None
 

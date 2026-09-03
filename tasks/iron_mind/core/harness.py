@@ -32,9 +32,12 @@ from tasks.iron_mind.core.candidate import (
     PreparedCandidatePayload,
     prepare_candidate_payload,
 )
-from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.iron_mind.core.constants import (
+    FORBIDDEN_QUERY_TERMS,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
 from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
-
 
 HARNESS_PROFILE_IDS = (
     "mechanistic_chemistry",
@@ -44,16 +47,6 @@ HARNESS_PROFILE_IDS = (
 )
 DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "iron_mind_persistent_research_harness"
-HARNESS_FORBIDDEN_PATTERNS = (
-    r"iron[\s_-]*mind",
-    r"gomesgroup[/\\]iron-mind-public",
-)
-HARNESS_FORBIDDEN_TERMS = (
-    "iron mind",
-    "iron-mind-public",
-    "gomesgroup/iron-mind-public",
-    "476c555e45e2556e2ee4b24c726e774c2bfb7762",
-)
 HARNESS_TOOL_NAMES = (
     "describe_reaction_space",
     "search_reaction_conditions",
@@ -425,7 +418,7 @@ def _turn_id(
 
 
 def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
-    terms = set(HARNESS_FORBIDDEN_TERMS)
+    terms = set(FORBIDDEN_QUERY_TERMS)
     for observation in request.observations:
         terms.add(observation.candidate_id)
         terms.add(observation.canonical_key)
@@ -629,13 +622,12 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 
 
 __all__ = [
-    "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",
     "IronMindHarnessExpander",
-    "harness_submission_contract",
-    "harness_profiles",
     "harness_guest_runtime",
+    "harness_profiles",
+    "harness_submission_contract",
     "harness_tool_extensions",
     "write_harness_space_catalog",
 ]

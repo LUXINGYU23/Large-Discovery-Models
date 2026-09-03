@@ -103,7 +103,11 @@ async function directorySha256(root: string): Promise<string> {
 	const files: Array<{ path: string; sha256: string }> = [];
 	async function visit(directory: string): Promise<void> {
 		const entries = await readdir(directory, { withFileTypes: true });
-		for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+		entries.sort((left, right) => Buffer.compare(
+			Buffer.from(left.name),
+			Buffer.from(right.name),
+		));
+		for (const entry of entries) {
 			const path = join(directory, entry.name);
 			if (entry.isDirectory()) await visit(path);
 			else if (entry.isFile()) files.push({

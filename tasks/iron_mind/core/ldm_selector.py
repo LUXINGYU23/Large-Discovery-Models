@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
+from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
 from ldm_tts.optimization.records import (
     AcquisitionSelector,
     BOObservation,
@@ -16,9 +17,9 @@ from ldm_tts.optimization.records import (
     SurrogateVector,
 )
 from tasks.iron_mind.core.ldm_policy import (
-    AcquisitionTiltConfig,
     DEFAULT_ETA,
     DEFAULT_Z_CLIP,
+    AcquisitionTiltConfig,
     effective_sample_size,
     gumbel_top_k,
     probability_entropy,
@@ -26,6 +27,7 @@ from tasks.iron_mind.core.ldm_policy import (
     softmax_probabilities,
     tilted_logits,
 )
+from tasks.iron_mind.core.optimization_policy import IronMindOptimizationPolicyAdapter
 from tasks.iron_mind.core.proposal_pool import (
     EmpiricalPool,
     candidate_set_seed,
@@ -33,6 +35,7 @@ from tasks.iron_mind.core.proposal_pool import (
     maintain_empirical_pool,
     proposal_base_measure_records,
 )
+from tasks.iron_mind.core.reaction_gp import ReactionCategoricalGPUCBSelector
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,9 @@ class AcquisitionTiltedSelector:
         seed: int = 0,
         pool_size: int | None = None,
         proposal_sample_count: int | None = None,
+        policy_controller: PolicyResearchController | None = None,
+        policy_adapter: IronMindOptimizationPolicyAdapter | None = None,
+        policy_mode: bool = False,
     ) -> None:
         self.base_selector = base_selector
         self.config = AcquisitionTiltConfig(
@@ -68,10 +74,35 @@ class AcquisitionTiltedSelector:
             pool_size=pool_size,
             proposal_sample_count=proposal_sample_count,
         )
+        if (policy_controller is None) != (policy_adapter is None):
+            raise ValueError("compiled policy controller and adapter must be configured together")
+        if policy_controller is not None and not isinstance(
+            base_selector, ReactionCategoricalGPUCBSelector
+        ):
+            raise TypeError("compiled Iron Mind policies require the categorical GP selector")
+        self.policy_controller = policy_controller
+        self.policy_adapter = policy_adapter
+        self.policy_mode = policy_mode or policy_controller is not None
+        self.history: tuple[BOObservation, ...] = ()
         self.history_size = 0
 
     def describe(self) -> AcquisitionSpec:
         base = self.base_selector.describe()
+        parameters = {
+            "base_acquisition": base.name,
+            "base_acquisition_parameters": dict(base.parameters),
+            "base_measure": "empirical_proposal_frequency",
+            "alpha_base_measure": self.config.alpha,
+            "eta_acquisition_tilt": self.config.eta,
+            "normalization": "robust_z",
+            "z_clip": self.config.z_clip,
+            "sampling": "gumbel_top_k_without_replacement",
+            "seed": self.config.seed,
+            "pool_size": self.config.pool_size,
+            "proposal_sample_count": self.config.proposal_sample_count,
+        }
+        if self.policy_mode:
+            parameters["optimization_policy"] = "persistent_harness_compiled"
         return AcquisitionSpec(
             name=f"{base.name}_tilted",
             objective_names=base.objective_names,
@@ -80,24 +111,14 @@ class AcquisitionTiltedSelector:
                 "sample without replacement from empirical proposal mass tilted by "
                 "robust-z acquisition scores"
             ),
-            parameters={
-                "base_acquisition": base.name,
-                "base_acquisition_parameters": dict(base.parameters),
-                "base_measure": "empirical_proposal_frequency",
-                "alpha_base_measure": self.config.alpha,
-                "eta_acquisition_tilt": self.config.eta,
-                "normalization": "robust_z",
-                "z_clip": self.config.z_clip,
-                "sampling": "gumbel_top_k_without_replacement",
-                "seed": self.config.seed,
-                "pool_size": self.config.pool_size,
-                "proposal_sample_count": self.config.proposal_sample_count,
-            },
+            parameters=parameters,
         )
 
     def fit(self, history: Sequence[BOObservation]) -> None:
+        self.history = tuple(history)
         self.history_size = len(history)
-        self.base_selector.fit(history)
+        if self.policy_controller is None:
+            self.base_selector.fit(history)
 
     def select(
         self,
@@ -116,7 +137,20 @@ class AcquisitionTiltedSelector:
             self.config,
             self.history_size,
         )
-        state = self._score_pool(pool, representations)
+        policy: CompiledOptimizationPolicy | None = None
+        if self.policy_controller is not None and self.history:
+            base_result, policy = self._compiled_base_result(pool, representations)
+            alpha, eta = policy.alpha, policy.eta
+        else:
+            if self.policy_controller is not None:
+                self.base_selector.fit(self.history)
+            base_result = self.base_selector.select(
+                pool.candidates,
+                representations,
+                count=len(pool.candidates),
+            )
+            alpha, eta = self.config.alpha, self.config.eta
+        state = self._score_pool(pool, base_result, alpha=alpha, eta=eta)
         selection_seed = candidate_set_seed(
             self.config.seed,
             self.history_size,
@@ -128,33 +162,84 @@ class AcquisitionTiltedSelector:
             min(count, len(pool.candidates)),
             np.random.default_rng(selection_seed),
         )
+        metadata = _selection_metadata(
+            state,
+            pool,
+            replace(self.config, alpha=alpha, eta=eta),
+            selection_seed=selection_seed,
+        )
+        if policy is not None:
+            metadata["compiled_policy"] = {
+                "epoch_id": policy.epoch_id,
+                "artifact_sha256": policy.artifact_digest,
+                "source": policy.source,
+                "degraded": policy.degraded,
+                "stage": policy.stage,
+                "alpha": policy.alpha,
+                "eta": policy.eta,
+                **dict(policy.metadata),
+            }
         return BOSelectionResult(
             selected_candidate_ids=tuple(pool.candidates[index].candidate_id for index in indices),
             predictions=_annotate_predictions(state),
             fallback_reason=state.base_result.fallback_reason,
-            metadata=_selection_metadata(
-                state,
-                pool,
-                self.config,
-                selection_seed=selection_seed,
-            ),
+            metadata=metadata,
         )
 
-    def _score_pool(
+    def _compiled_base_result(
         self,
         pool: EmpiricalPool,
         representations: Mapping[str, SurrogateVector],
-    ) -> _TiltState:
-        base = self.base_selector.select(
+    ) -> tuple[BOSelectionResult, CompiledOptimizationPolicy]:
+        assert isinstance(self.base_selector, ReactionCategoricalGPUCBSelector)
+        assert self.policy_controller is not None and self.policy_adapter is not None
+        self.base_selector.fit(self.history)
+        baseline = self.base_selector.select(
             pool.candidates,
             representations,
             count=len(pool.candidates),
         )
+        ordered_baseline = _ordered_predictions(pool.candidates, baseline.predictions)
+        round_input = self.policy_adapter.build_selection_round(
+            history=self.history,
+            candidates=pool.candidates,
+            representations=representations,
+            q0=empirical_base_masses(pool.candidates),
+            baseline_predictions=ordered_baseline,
+            valid_proposal_occurrences=pool.valid_proposal_occurrences,
+        )
+        policy = self.policy_controller.resolve(round_input)
+        self.base_selector.fit(
+            self.history,
+            history_prior_mean=policy.history_prior_mean,
+            mean_source=f"compiled:{policy.source}",
+            artifact_digest=policy.artifact_digest,
+        )
+        result = self.base_selector.select(
+            pool.candidates,
+            representations,
+            count=len(pool.candidates),
+            query_prior_mean=policy.query_prior_mean,
+        )
+        return result, policy
+
+    def _score_pool(
+        self,
+        pool: EmpiricalPool,
+        base: BOSelectionResult,
+        *,
+        alpha: float,
+        eta: float,
+    ) -> _TiltState:
         predictions = _ordered_predictions(pool.candidates, base.predictions)
         q0 = empirical_base_masses(pool.candidates)
         acquisition = _acquisition_scores(predictions)
         normalized = robust_z(acquisition, clip=self.config.z_clip)
-        logits = tilted_logits(q0, acquisition, config=self.config)
+        logits = tilted_logits(
+            q0,
+            acquisition,
+            config=replace(self.config, alpha=alpha, eta=eta),
+        )
         return _TiltState(
             base,
             predictions,

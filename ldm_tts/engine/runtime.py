@@ -455,6 +455,7 @@ class LDMEngine:
                         else None
                     )
                 ),
+                metadata={"round_idx": observation.round_idx},
             )
             for observation in observations
             if observation.evaluation.succeeded

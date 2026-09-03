@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from ldm_tts.registration.dependencies import (
     DependencyCheck,
@@ -27,7 +28,7 @@ from tasks.iron_mind.core.schema import (
     load_reaction_schema_from_config,
     load_reaction_schemas,
 )
-
+from tasks.iron_mind.core.search import PERSISTENT_HARNESS_METHODS
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
@@ -102,10 +103,10 @@ def _provider_checks(
         api_env=API_KEY_ENV_NAMES,
         required=True,
     )
-    if arg_value(dict(args), "search-method", default="ldm") not in {
-        "ldm_harness",
-        "harness",
-    }:
+    if (
+        arg_value(dict(args), "search-method", default="ldm")
+        not in PERSISTENT_HARNESS_METHODS
+    ):
         return checks
     raw_key_path = arg_value(dict(args), "harness-api-key-file")
     if not raw_key_path:

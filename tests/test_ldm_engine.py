@@ -25,7 +25,7 @@ from ldm_tts.contracts import (
     SurrogateSpaceSpec,
 )
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, unique_run_dir
-from ldm_tts.optimization.records import BOObservation, SurrogateVector
+from ldm_tts.optimization.records import BOObservation, BOSelectionResult, SurrogateVector
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
 from ldm_tts.engine.expansion import DirectEmissionExpander, ExpansionRequest
@@ -449,6 +449,45 @@ def test_ldm_engine_enforces_task_contract_and_runs_encoded_selection(tmp_path: 
             evaluator=CallableCandidateEvaluator(lambda candidate: {"score": 1.0}),
             runtime=wrong_runtime,
         )
+
+
+def test_ldm_engine_projects_authoritative_round_index_into_bo_history(tmp_path: Path) -> None:
+    class CapturingSelector:
+        def __init__(self) -> None:
+            self.history = ()
+
+        def describe(self):
+            return AcquisitionSpec("capture", ("score",), "maximize", "capture")
+
+        def fit(self, history):
+            self.history = tuple(history)
+
+        def select(self, candidates, representations, *, count=1):
+            del representations
+            return BOSelectionResult((candidates[0].candidate_id,))
+
+    selector = CapturingSelector()
+    spec = replace(integer_task_spec(), surrogate=IntegerEncoder().describe())
+    engine = LDMEngine(
+        task_spec=spec,
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(proposals=(RawProposal(2, "mock"),))
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": 2.0}),
+        runtime=CampaignRuntime.open(tmp_path / "round-metadata", task="integer_search"),
+        selector=selector,
+        surrogate_encoder=IntegerEncoder(),
+    )
+    previous = Observation(
+        Candidate("integer-1", 1, "1"),
+        EvaluationResult("integer-1", "succeeded", {"score": 1.0}),
+        round_idx=4,
+    )
+
+    engine._select((previous,), (Candidate("integer-2", 2, "2"),), 1)
+
+    assert selector.history[0].metadata == {"round_idx": 4}
 
 
 def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path: Path) -> None:
