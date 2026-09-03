@@ -35,22 +35,20 @@ from tasks.iron_mind.core.schema import ReactionDatasetSchema
 from tasks.iron_mind.core.surrogate import decode_reaction_one_hot
 
 POLICY_PROFILE_ID = "policy_architect"
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_HARNESS_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
 _LOCAL_PROFILE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "resources"
-    / "harness"
+    _HARNESS_RESOURCE_ROOT
     / "profiles"
     / POLICY_PROFILE_ID
     / "AGENTS.md"
 )
-_LOCAL_SKILL_ROOT = _REPOSITORY_ROOT / "skills" / "compile-ldm-policy"
+_LOCAL_SKILL_ROOT = _HARNESS_RESOURCE_ROOT / "skills" / "compile-ldm-policy"
 
 
 def policy_harness_profile(
     *,
     profile_root: Path = Path("/resources/profiles"),
-    skill_root: Path = Path("/skills/compile-ldm-policy"),
+    skill_root: Path = Path("/resources/skills/compile-ldm-policy"),
 ) -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(

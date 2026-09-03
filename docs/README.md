@@ -36,7 +36,7 @@ technical and operational contracts.
 
 - [Ready-to-run Delta-Infra examples](../ready2run_examples/README.md)
 - [Agent skills](../skills/README.md): `collect-ldm-data`, `register-ldm-task`,
-  `run-ldm-task`, and `compile-ldm-policy`.
+  and `run-ldm-task`.
 
 ## Project Policies
 

@@ -254,8 +254,10 @@ deduplication. There is no profile-balanced correction or per-session `q0`.
 
 The `ldm_harness` profile set loads four committed `AGENTS.md` files and the
 direct `harness` method loads one comprehensive profile under
-`resources/harness/profiles/`; neither loads skills. Pi provides web retrieval,
-Context7, and a separate Gondolin microVM for each session. The guest has root
+`resources/harness/profiles/`; candidate-generation profiles do not load
+skills. The compiled-policy method additionally loads its task-local policy
+Skill from `resources/harness/skills/`. Pi provides web retrieval, Context7,
+and a separate Gondolin microVM for each session. The guest has root
 shell, file, package-installation, and unrestricted HTTP(S) access; the host
 repository and official task data are not mounted. Benchmark names, repository
 paths, datasets, and hidden scores remain blocked from research queries and

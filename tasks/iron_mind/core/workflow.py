@@ -97,7 +97,6 @@ from tasks.iron_mind.core.workflow_support import (
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
 MOCK_ORACLE_PATH = TASK_ROOT / "resources" / "mock_oracle.csv"
-POLICY_SKILL_ROOT = TASK_ROOT.parents[1] / "skills" / "compile-ldm-policy"
 
 
 def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
@@ -362,7 +361,6 @@ def _policy_harness_client(
     harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
     mounts = (
         (harness_resources, "/resources", True),
-        (POLICY_SKILL_ROOT.resolve(), "/skills/compile-ldm-policy", True),
         ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
         (
             (TASK_ROOT / "resources" / "README.md").resolve(),

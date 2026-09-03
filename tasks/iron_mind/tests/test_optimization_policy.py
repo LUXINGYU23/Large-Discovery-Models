@@ -275,7 +275,7 @@ def test_compiled_method_declares_policy_pool_and_separate_budget() -> None:
     )
     profile = policy_harness_profile()[0]
     assert profile.profile_id == "policy_architect"
-    assert profile.skill_dirs[0].as_posix() == "/skills/compile-ldm-policy"
+    assert profile.skill_dirs[0].as_posix() == "/resources/skills/compile-ldm-policy"
     assert len(profile.skill_dir_sha256[0]) == 64
 
 
@@ -324,7 +324,8 @@ def test_policy_sidecar_mounts_only_public_task_resources(tmp_path) -> None:
 
     command = " ".join(client.command)
     assert "mock_oracle.csv" not in command
-    assert "/skills/compile-ldm-policy" in command
+    assert "dst=/resources,readonly" in command
+    assert "dst=/skills" not in command
     assert "/public/reaction_schemas.json" in command
     assert client.config.submission_contract.tool_name == "submit_optimization_policy"
     assert client.config.profiles[0].skill_dirs

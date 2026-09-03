@@ -305,9 +305,10 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
     assert spec.proposal_search.parameters["policy_skills_loaded"] is True
     profile = policy_harness_profile()[0]
     assert profile.profile_id == "policy_architect"
-    assert profile.skill_dirs[0].as_posix() == "/skills/compile-ldm-policy"
+    assert profile.skill_dirs[0].as_posix() == "/resources/skills/compile-ldm-policy"
     assert len(profile.skill_dir_sha256[0]) == 64
-    assert "/skills/compile-ldm-policy" in command
+    assert "dst=/resources,readonly" in command
+    assert "dst=/skills" not in command
     assert "/public/verification_record.json" in command
     assert "score_table" not in command
     assert client.config.submission_contract.tool_name == "submit_optimization_policy"

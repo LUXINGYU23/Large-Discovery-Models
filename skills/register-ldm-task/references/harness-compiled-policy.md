@@ -30,9 +30,10 @@ optimization policy in addition to the existing proposal Harness.
    acquisition, and numerical safeguards remain fixed.
 4. Prove zero-prior parity: a zero prior with default `alpha` and `eta` must
    reproduce the existing `ldm_harness` predictions and selection distribution.
-5. Add one task-owned `policy_architect/AGENTS.md` and mount the repository
-   `compile-ldm-policy` skill read-only. Keep task knowledge in these resources,
-   not in shared Harness code.
+5. Add one task-owned `policy_architect/AGENTS.md` and one task-owned
+   `resources/harness/skills/compile-ldm-policy/` skill. Load both through the
+   policy profile from the task's read-only `/resources` mount; do not put
+   task runtime skills in the repository-level developer `skills/` directory.
 
 The current release supports only `prior_mean@1` and `ldm_weights@1`. Add a new
 versioned capability and task adapter path before exposing another editable

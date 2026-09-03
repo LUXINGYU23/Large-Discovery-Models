@@ -66,8 +66,9 @@ session. The policy terminal contract accepts `replace`, `keep`, or `disable`.
 `replace` must reference a complete `optimization_policy.py`; source code is
 never embedded in the terminal JSON payload.
 
-The policy pool includes the repository `compile-ldm-policy` skill and the
-built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
+The policy pool loads its task-owned `compile-ldm-policy` skill from
+`resources/harness/skills/` and includes the built-in `ldm_policy` MCP server.
+Its `inspect_policy_contract`,
 `validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
 the authoritative feature contract and repair a draft before submission. These
 tools are advisory: after immutable snapshotting, task-owned Python executes the

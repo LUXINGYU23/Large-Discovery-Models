@@ -183,7 +183,7 @@ Versioned task inputs belong under:
 ```text
 tasks/<task_id>/resources/harness/
 |-- profiles/<profile_id>/AGENTS.md
-|-- profiles/<profile_id>/skills/   # optional
+|-- skills/<skill_id>/SKILL.md      # optional task-runtime skills
 |-- image/guest-image.json
 |-- image/Dockerfile
 |-- image/lock/
