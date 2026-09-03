@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
@@ -25,6 +24,7 @@ from ldm_tts.harness import (
     policy_mcp_server,
     policy_submission_contract,
 )
+from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -206,7 +206,10 @@ def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
                     executor=DockerPolicyExecutor(
                         image=args.harness_sidecar_image,
                         docker_host=args.harness_docker_host or "",
-                        container_user=_harness_container_user(args),
+                        container_user=resolve_container_user(
+                            args.harness_container_user,
+                            args.harness_docker_host,
+                        ),
                     ),
                     root=(runtime.run_dir / "policy_harness").resolve(),
                     account=runtime.consume_many,
@@ -565,9 +568,11 @@ def _harness_command(
     if args.harness_docker_host:
         command.extend(("--host", args.harness_docker_host))
     command.extend(("run", "--rm", "-i"))
-    container_user = _harness_container_user(args)
-    if container_user:
-        command.extend(("--user", container_user))
+    container_user = resolve_container_user(
+        args.harness_container_user,
+        args.harness_docker_host,
+    )
+    command.extend(docker_identity_args(container_user, args.harness_docker_host))
     command.extend(("--device", "/dev/kvm"))
     runtime_environment = {
         "HOME": "/runtime-home",
@@ -594,14 +599,6 @@ def _harness_command(
         ))
     command.append(args.harness_sidecar_image)
     return command
-
-
-def _harness_container_user(args) -> str:
-    if args.harness_container_user:
-        return args.harness_container_user
-    if hasattr(os, "getuid") and hasattr(os, "getgid"):
-        return f"{os.getuid()}:{os.getgid()}"
-    return ""
 
 
 def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,

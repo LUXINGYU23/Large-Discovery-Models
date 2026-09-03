@@ -221,7 +221,8 @@ complete local image with matching recipe metadata and asset checksums; absent
 or mismatched images fail before the sidecar starts.
 
 On POSIX hosts the task runner passes its current UID:GID to the sidecar so
-bind-mounted artifacts and cache remain writable. Use
+bind-mounted artifacts and cache remain writable. When local KVM is present,
+the runner also grants that mapped user the device's supplemental group. Use
 `--harness-container-user` only to override that mapping.
 
 Harness artifacts are written below `<run_dir>/harness/`:

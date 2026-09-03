@@ -40,6 +40,7 @@ from ldm_tts.harness import (
     policy_mcp_server,
     policy_submission_contract,
 )
+from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.optimization.records import AcquisitionSelector, SurrogateEncoder
 from ldm_tts.registration.experiment import (
     ExperimentContract,
@@ -249,12 +250,10 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
     if (
         args.search_method in PERSISTENT_HARNESS_METHODS
         and args.harness_container_user is None
-        and args.harness_docker_host is None
     ):
-        getuid = getattr(os, "getuid", None)
-        getgid = getattr(os, "getgid", None)
-        if getuid is not None and getgid is not None:
-            args.harness_container_user = f"{getuid()}:{getgid()}"
+        container_user = resolve_container_user(None, args.harness_docker_host)
+        if container_user:
+            args.harness_container_user = container_user
     args.initialization_evaluations = 1
     if args.search_method == COMPILED_POLICY_METHOD:
         if args.policy_tool_budget is None:
@@ -712,7 +711,10 @@ def _run_real(
                     executor=DockerPolicyExecutor(
                         image=args.harness_sidecar_image,
                         docker_host=args.harness_docker_host or "",
-                        container_user=_harness_container_user(args),
+                        container_user=resolve_container_user(
+                            args.harness_container_user,
+                            args.harness_docker_host,
+                        ),
                     ),
                     root=(runtime.run_dir / "policy_harness").resolve(),
                     account=runtime.consume_many,
@@ -1161,9 +1163,11 @@ def _harness_command(
     if args.harness_docker_host:
         command.extend(("--host", args.harness_docker_host))
     command.extend(("run", "--rm", "-i"))
-    container_user = _harness_container_user(args)
-    if container_user:
-        command.extend(("--user", container_user))
+    container_user = resolve_container_user(
+        args.harness_container_user,
+        args.harness_docker_host,
+    )
+    command.extend(docker_identity_args(container_user, args.harness_docker_host))
     command.extend(("--device", "/dev/kvm"))
     runtime_environment = {
         "HOME": "/runtime-home",
@@ -1191,14 +1195,6 @@ def _harness_command(
         )
     command.append(args.harness_sidecar_image)
     return command
-
-
-def _harness_container_user(args: argparse.Namespace) -> str:
-    if args.harness_container_user:
-        return args.harness_container_user
-    if hasattr(os, "getuid") and hasattr(os, "getgid"):
-        return f"{os.getuid()}:{os.getgid()}"
-    return ""
 
 
 def _missing_provider(provider: ProviderSettings) -> str:
