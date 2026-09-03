@@ -43,7 +43,7 @@ from tasks.iron_mind.core.harness import (
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
     harness_guest_runtime,
-    harness_candidate_schema,
+    harness_submission_contract,
     harness_profiles as parallel_harness_profiles,
     harness_tool_extensions,
     write_harness_space_catalog,
@@ -203,6 +203,7 @@ def _components(args, table, runtime, client, harness_client):
             prompt_policy=args.prompt_policy,
             harness_client=harness_client,
             harness_profiles=profiles,
+            harness_candidates_per_profile=_harness_candidates_per_profile(args),
             account_harness_usage=(
                 runtime.consume_many
                 if args.search_method in {"ldm_harness", "harness"}
@@ -290,14 +291,20 @@ def _harness_client(
         task_id=TASK_ID,
         case_id=args.dataset_id,
         seed=args.campaign_index,
-        candidate_schema=harness_candidate_schema(table.schema),
+        submission_contract=harness_submission_contract(
+            table.schema,
+            _harness_candidates_per_profile(args),
+        ),
         guest_runtime=harness_guest_runtime(),
         tool_extensions=harness_tool_extensions(),
         mcp_servers=mcp.servers,
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,
-            tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget),
+            tool_call_budgets=parse_tool_call_budgets(
+                args.harness_tool_budget,
+                excluded_tools=("submit_candidates",),
+            ),
         ),
         network_policy=HarnessNetworkPolicy(
             forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
@@ -497,7 +504,15 @@ def _proposal_samples(args) -> int:
 
 def _harness_profiles(args):
     if args.search_method == "ldm_harness":
-        return parallel_harness_profiles(args.harness_candidates_per_session)
+        return parallel_harness_profiles()
     if args.search_method == "harness":
-        return direct_harness_profile(args.evaluations_per_round)
+        return direct_harness_profile()
     return ()
+
+
+def _harness_candidates_per_profile(args) -> int:
+    if args.search_method == "ldm_harness":
+        return args.harness_candidates_per_session
+    if args.search_method == "harness":
+        return args.evaluations_per_round
+    return 0

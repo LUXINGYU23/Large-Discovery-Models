@@ -1,17 +1,22 @@
 """Persistent research harness client contracts."""
 
 from ldm_tts.harness.client import HarnessClient, HarnessError
+from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
+from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
 from ldm_tts.harness.protocol import (
     DEFAULT_NETWORK_TOOL_BUDGETS,
+    HarnessArtifactRule,
     HarnessLimits,
     HarnessMcpServer,
     HarnessMcpValue,
     HarnessNetworkPolicy,
     HarnessPoolConfig,
     HarnessProfile,
-    HarnessSubmissionRejection,
+    HarnessSubmissionContract,
+    HarnessSubmissionError,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
+    HarnessSubmittedArtifact,
     HarnessToolExtension,
     HarnessTurn,
     HarnessTurnResult,
@@ -21,13 +26,12 @@ from ldm_tts.harness.protocol import (
     profile_set_sha256,
     parse_tool_call_budgets,
 )
-from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
-from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
 
 __all__ = [
     "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessClient",
     "HarnessError",
+    "HarnessArtifactRule",
     "HarnessLimits",
     "HarnessGuestRuntime",
     "HarnessMcpServer",
@@ -35,9 +39,11 @@ __all__ = [
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
-    "HarnessSubmissionRejection",
+    "HarnessSubmissionContract",
+    "HarnessSubmissionError",
     "HarnessSubmissionRequest",
     "HarnessSubmissionValidation",
+    "HarnessSubmittedArtifact",
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",

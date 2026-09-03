@@ -74,6 +74,7 @@ class CampaignComponentOptions:
     before_requests: Callable[[int], None] | None = None
     harness_client: HarnessClient | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
+    harness_candidates_per_profile: int = 0
     account_harness_usage: Callable[[dict[str, int]], None] | None = None
 
     def __post_init__(self) -> None:
@@ -96,7 +97,9 @@ class CampaignComponentOptions:
         if self.search_method in {"ldm_harness", "harness"}:
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
-            expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
+            if self.harness_candidates_per_profile < 1:
+                raise ValueError("Harness candidate count per profile must be positive")
+            expected = len(self.harness_profiles) * self.harness_candidates_per_profile
             if self.proposal_samples != expected:
                 raise ValueError("proposal_samples must equal the harness minibatch total")
         elif self.search_method in {"ldm", "llm"} and self.client is None:
@@ -239,6 +242,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
             domain,
             target=options.target,
             profiles=options.harness_profiles,
+            candidates_per_profile=options.harness_candidates_per_profile,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
             attach_empirical_q0=options.search_method == "ldm_harness",

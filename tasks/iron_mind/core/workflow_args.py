@@ -121,7 +121,10 @@ def validate_args(args: argparse.Namespace) -> None:
     if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
         raise SystemExit("--harness-response-timeout must be finite and positive")
     try:
-        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
+        tool_budgets = parse_tool_call_budgets(
+            args.harness_tool_budget,
+            excluded_tools=("submit_candidates",),
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):

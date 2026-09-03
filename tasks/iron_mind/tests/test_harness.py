@@ -8,7 +8,11 @@ import pytest
 
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation
 from ldm_tts.engine.expansion import ExpansionRequest
-from ldm_tts.harness import HarnessSubmissionRequest, HarnessTurnResult
+from ldm_tts.harness import (
+    HarnessSubmissionRequest,
+    HarnessTurnResult,
+    canonical_sha256,
+)
 from tasks.iron_mind.core.candidate import (
     IRON_MIND_Q0_METADATA_KEY,
     IronMindCandidateDomain,
@@ -53,10 +57,12 @@ class FakeHarnessClient:
         results = []
         for turn in turns:
             candidates = (self.candidates_by_profile[turn.profile_id],)
+            submission = {"candidates": list(candidates)}
             validation = submission_validator(
-                HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, candidates)
+                HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, submission)
             )
-            assert validation.accepted
+            assert validation.decision == "accept"
+            submission_digest = canonical_sha256({"artifacts": [], "submission": submission})
             results.append(
                 HarnessTurnResult(
                     profile_id=turn.profile_id,
@@ -67,8 +73,13 @@ class FakeHarnessClient:
                     history_to_seq=turn.history_to_seq,
                     history_digest=turn.history_digest,
                     input_digest=turn.input_digest,
+                    replayed=False,
+                    submission_status="accepted",
                     submission_id=f"submission-{turn.profile_id}",
-                    candidates=candidates,
+                    submission_digest=submission_digest,
+                    submission=submission,
+                    submitted_artifacts=(),
+                    validation_errors=(),
                     usage={
                         "providerCalls": 2,
                         "toolCalls": {"web_search": 1, "submit_candidates": 1},
@@ -96,7 +107,8 @@ def test_harness_preserves_cross_session_occurrences_for_global_q0() -> None:
     expander = IronMindHarnessExpander(
         client,
         domain,
-        profiles=harness_profiles(1),
+        profiles=harness_profiles(),
+        candidates_per_profile=1,
         campaign_id="campaign-test",
         first_active_round=0,
         attach_empirical_q0=True,
@@ -124,7 +136,8 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
     expander = IronMindHarnessExpander(
         client,
         domain,
-        profiles=harness_profiles(1),
+        profiles=harness_profiles(),
+        candidates_per_profile=1,
         campaign_id="campaign-test",
         first_active_round=1,
         attach_empirical_q0=True,
@@ -140,10 +153,8 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
     assert all(message["message_type"] == "history_delta" for message in messages)
     assert all(len(message["new_measured_observations"]) == 1 for message in messages)
     assert all(len(message["evaluated_candidates"]) == 2 for message in messages)
-    assert all(
-        message["novelty_contract"]["required_not_evaluated_candidate_count"] == 1
-        for message in messages
-    )
+    assert all("required_not_evaluated_candidate_count" not in message["novelty_contract"] for message in messages)
+    assert all("submission_contract" not in message for message in messages)
     assert all(
         message["novelty_contract"]["prior_unmeasured_submissions_may_be_reproposed"]
         for message in messages
@@ -168,13 +179,14 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
 
 def test_direct_harness_uses_one_session_and_skips_q0() -> None:
     domain, payloads = _domain_and_payloads()
-    profiles = direct_harness_profile(1)
+    profiles = direct_harness_profile()
     client = FakeHarnessClient({profiles[0].profile_id: payloads[0]})
     counts = []
     expander = IronMindHarnessExpander(
         client,
         domain,
         profiles=profiles,
+        candidates_per_profile=1,
         campaign_id="campaign-test",
         first_active_round=0,
         attach_empirical_q0=False,
@@ -205,20 +217,20 @@ def test_submission_validator_returns_actionable_rejection_reasons() -> None:
             HARNESS_PROFILE_IDS[0],
             "turn-1",
             1,
-            (payloads[0], invalid, payloads[1], payloads[1]),
+            {"candidates": [payloads[0], invalid, payloads[1], payloads[1]]},
         ),
         domain,
         {evaluated},
     )
 
-    assert [item.code for item in validation.rejections] == [
+    assert [item.code for item in validation.errors] == [
         "historical_duplicate",
         "invalid_candidate",
         "same_session_duplicate",
     ]
-    assert "already evaluated" in validation.rejections[0].message
-    assert "unknown_option" in validation.rejections[1].message
-    assert "duplicates index 2" in validation.rejections[2].message
+    assert "already evaluated" in validation.errors[0].message
+    assert "unknown_option" in validation.errors[1].message
+    assert "duplicates index 2" in validation.errors[2].message
 
 
 def test_catalog_and_task_spec_expose_space_without_oracle_scores(tmp_path) -> None:

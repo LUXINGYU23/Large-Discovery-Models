@@ -15,8 +15,10 @@ from typing import Any
 
 from ldm_tts.harness.protocol import (
     HarnessPoolConfig,
+    HarnessSubmissionError,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
+    HarnessSubmittedArtifact,
     HarnessTurn,
     HarnessTurnResult,
     canonical_sha256,
@@ -113,15 +115,23 @@ class HarnessClient:
         expected = {turn.profile_id: turn for turn in turns}
         if len(expected) != len(turns):
             raise ValueError("harness turn profile IDs must be unique")
-        accepted_submissions: dict[str, str] = {}
+        terminal_validations: dict[str, tuple[str, str]] = {}
 
         def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
             turn = expected.get(request.profile_id)
             if turn is None or request.turn_id != turn.turn_id:
                 raise HarnessError("harness submission validation request does not match the turn batch")
             validation = submission_validator(request)
-            if validation.accepted:
-                accepted_submissions[request.profile_id] = canonical_sha256(request.candidates)
+            maximum = self.config.submission_contract.max_validation_attempts
+            if (
+                validation.decision == "retry"
+                and maximum is not None
+                and request.attempt_index >= maximum
+            ):
+                validation = HarnessSubmissionValidation("reject_turn", validation.errors)
+            if validation.decision != "retry":
+                status = "accepted" if validation.decision == "accept" else "rejected"
+                terminal_validations[request.profile_id] = (status, request.digest)
             return validation
 
         payload = self._request(
@@ -147,9 +157,14 @@ class HarnessClient:
                 or result.input_digest != turn.input_digest
             ):
                 raise HarnessError("harness response does not match the requested turn")
-            if accepted_submissions.get(result.profile_id) != canonical_sha256(result.candidates):
+            validation = terminal_validations.get(result.profile_id)
+            if not result.replayed and validation != (
+                result.submission_status,
+                result.submission_digest,
+            ):
                 raise HarnessError(
-                    f"harness committed candidates without matching task validation: {result.profile_id}"
+                    "harness committed a submission without matching task validation: "
+                    + result.profile_id
                 )
         return results
 
@@ -278,30 +293,31 @@ class HarnessClient:
     ) -> None:
         _assert_response_keys(response, {
             "type", "requestId", "protocolVersion", "campaignId", "validationId",
-            "profileId", "turnId", "attemptIndex", "candidates",
+            "profileId", "turnId", "attemptIndex", "submission", "artifacts",
+            "submissionDigest",
         })
-        candidates = response["candidates"]
-        if not isinstance(candidates, list) or not candidates or any(
-            not isinstance(candidate, dict) for candidate in candidates
-        ):
-            raise HarnessError("harness submission validation request has invalid candidates")
+        submission = response["submission"]
+        if not isinstance(submission, dict):
+            raise HarnessError("harness submission validation request has invalid payload")
+        artifacts = _parse_submitted_artifacts(response["artifacts"])
         request = HarnessSubmissionRequest(
             profile_id=_required_string(response["profileId"], "profileId"),
             turn_id=_required_string(response["turnId"], "turnId"),
             attempt_index=_required_positive_int(response["attemptIndex"], "attemptIndex"),
-            candidates=tuple(dict(candidate) for candidate in candidates),
+            submission=dict(submission),
+            artifacts=artifacts,
         )
+        submission_digest = _required_digest(response["submissionDigest"], "submissionDigest")
+        if request.digest != submission_digest:
+            raise HarnessError("harness submission digest mismatch before validation")
         validation = validator(request)
         if not isinstance(validation, HarnessSubmissionValidation):
             raise HarnessError("submission validator returned an invalid result")
-        if any(rejection.index >= len(candidates) for rejection in validation.rejections):
-            raise HarnessError("submission validator returned an out-of-range rejection index")
         self._send_frame({
             **self._frame(response["requestId"], "submission_validation_result"),
             "validationId": _required_string(response["validationId"], "validationId"),
-            "accepted": validation.accepted,
-            "rejected": [rejection.to_dict() for rejection in validation.rejections],
-            "requiredReplacements": len(validation.rejections),
+            "submissionDigest": submission_digest,
+            **validation.to_dict(),
         })
 
     def _frame(
@@ -385,23 +401,40 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         raise HarnessError("committed harness turn must be an object")
     _assert_response_keys(value, {
         "profileId", "sessionId", "turnId", "roundIndex", "historyFromSeq",
-        "historyToSeq", "historyDigest", "inputDigest", "submission", "usage",
-        "toolBudget", "artifacts",
+        "historyToSeq", "historyDigest", "inputDigest", "replayed",
+        "submissionStatus", "submissionId", "submissionDigest", "submission",
+        "submittedArtifacts", "validationErrors", "usage", "toolBudget", "artifacts",
     })
     submission = value.get("submission")
     usage = value.get("usage")
     artifacts = value.get("artifacts")
-    candidates = submission.get("candidates") if isinstance(submission, dict) else None
-    if not isinstance(candidates, list) or any(not isinstance(item, dict) for item in candidates):
-        raise HarnessError("committed harness turn has invalid candidates")
+    if not isinstance(submission, dict):
+        raise HarnessError("committed harness turn has invalid submission")
     if not isinstance(usage, dict) or not isinstance(artifacts, dict):
         raise HarnessError("committed harness turn has invalid metadata")
-    assert isinstance(submission, dict)
-    _assert_response_keys(submission, {"submissionId", "candidates"})
     _assert_response_keys(usage, {"providerCalls", "toolCalls", "artifactBytes"})
     tool_calls = _nonnegative_int_mapping(usage["toolCalls"], "toolCalls")
     tool_budget = _tool_budget(value["toolBudget"], tool_calls)
     _assert_response_keys(artifacts, {"turn", "session"})
+    submitted_artifacts = _parse_submitted_artifacts(value["submittedArtifacts"])
+    validation_errors = _parse_submission_errors(value["validationErrors"])
+    submission_status = value["submissionStatus"]
+    if submission_status not in {"accepted", "rejected"}:
+        raise HarnessError("committed harness turn has invalid submissionStatus")
+    if submission_status == "accepted" and validation_errors:
+        raise HarnessError("accepted harness turn cannot contain validation errors")
+    if submission_status == "rejected" and not validation_errors:
+        raise HarnessError("rejected harness turn must contain validation errors")
+    submission_digest = _required_digest(value["submissionDigest"], "submissionDigest")
+    computed_digest = canonical_sha256({
+        "artifacts": [artifact.to_dict() for artifact in submitted_artifacts],
+        "submission": submission,
+    })
+    if submission_digest != computed_digest:
+        raise HarnessError("committed harness turn has inconsistent submissionDigest")
+    replayed = value["replayed"]
+    if not isinstance(replayed, bool):
+        raise HarnessError("committed harness turn has invalid replayed")
     history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
     history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
     if history_to_seq < history_from_seq:
@@ -415,8 +448,13 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         history_to_seq=history_to_seq,
         history_digest=_required_digest(value["historyDigest"], "historyDigest"),
         input_digest=_required_digest(value["inputDigest"], "inputDigest"),
-        submission_id=_required_string(submission["submissionId"], "submissionId"),
-        candidates=tuple(dict(item) for item in candidates),
+        replayed=replayed,
+        submission_status=submission_status,
+        submission_id=_required_string(value["submissionId"], "submissionId"),
+        submission_digest=submission_digest,
+        submission=dict(submission),
+        submitted_artifacts=submitted_artifacts,
+        validation_errors=validation_errors,
         usage={
             "providerCalls": _required_nonnegative_int(usage["providerCalls"], "providerCalls"),
             "toolCalls": tool_calls,
@@ -425,6 +463,56 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         tool_budget=tool_budget,
         artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
     )
+
+
+def _parse_submitted_artifacts(value: Any) -> tuple[HarnessSubmittedArtifact, ...]:
+    if not isinstance(value, list):
+        raise HarnessError("harness submittedArtifacts must be an array")
+    artifacts: list[HarnessSubmittedArtifact] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise HarnessError("harness submitted artifact must be an object")
+        _assert_response_keys(raw, {
+            "pathPointer", "relativePath", "snapshotPath", "sha256", "sizeBytes",
+        })
+        try:
+            artifact = HarnessSubmittedArtifact(
+                path_pointer=_required_string(raw["pathPointer"], "pathPointer"),
+                relative_path=_required_string(raw["relativePath"], "relativePath"),
+                snapshot_path=_required_string(raw["snapshotPath"], "snapshotPath"),
+                sha256=_required_digest(raw["sha256"], "sha256"),
+                size_bytes=_required_nonnegative_int(raw["sizeBytes"], "sizeBytes"),
+            )
+        except ValueError as exc:
+            raise HarnessError(str(exc)) from exc
+        artifacts.append(artifact)
+    if len({artifact.path_pointer for artifact in artifacts}) != len(artifacts):
+        raise HarnessError("harness submitted artifact pointers must be unique")
+    return tuple(artifacts)
+
+
+def _parse_submission_errors(value: Any) -> tuple[HarnessSubmissionError, ...]:
+    if not isinstance(value, list):
+        raise HarnessError("harness validationErrors must be an array")
+    errors: list[HarnessSubmissionError] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise HarnessError("harness validation error must be an object")
+        _assert_response_keys(raw, {"path", "code", "message", "hint"})
+        path = raw["path"]
+        hint = raw["hint"]
+        if not isinstance(path, str) or not isinstance(hint, str):
+            raise HarnessError("harness validation error path and hint must be strings")
+        try:
+            errors.append(HarnessSubmissionError(
+                path=path,
+                code=_required_string(raw["code"], "code"),
+                message=_required_string(raw["message"], "message"),
+                hint=hint,
+            ))
+        except ValueError as exc:
+            raise HarnessError(str(exc)) from exc
+    return tuple(errors)
 
 
 def _required_string(value: Any, name: str) -> str:

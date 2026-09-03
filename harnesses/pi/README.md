@@ -2,7 +2,7 @@
 
 This directory contains the pinned Node sidecar used by persistent LDM research
 sessions. It owns Pi session lifecycle, Gondolin-isolated file and shell tools,
-web extensions, terminal candidate submission, and raw model-provider transport
+web extensions, terminal structured submission, and raw model-provider transport
 capture. Task validation, optimization history, `q0`, GP inference, acquisition,
 and evaluation remain in Python.
 
@@ -42,15 +42,21 @@ The sidecar declares its package SemVer at startup; the client binds every
 subsequent JSONL request and response to that release and one campaign. Turn
 inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
-Committed turns are idempotent and partial submissions recover from their saved
-candidate batch and measured usage.
+Committed turns are idempotent and partial turns recover from their saved
+submission, artifact descriptors, and measured usage.
 
-During `run_turn`, `submit_candidates` is provisional until the Python caller
-answers a `submission_validation_requested` frame. Acceptance persists the
-batch and allows commit. Rejection is recorded as a model-visible Pi tool error
-with indexed task-provided reasons; the same session must correct and resubmit
-within the original wall-time window. The protocol is task-neutral: candidate
-identity and domain validation remain in the task-owned Python callback.
+During `run_turn`, the terminal tool named by `HarnessSubmissionContract` is
+provisional until the Python caller answers a
+`submission_validation_requested` frame. `retry` returns task-provided
+JSON-Pointer errors to the same session; `accept` commits the turn, while
+`reject_turn` records a terminal failure for caller fallback. The protocol is
+task-neutral: payload meaning and domain validation remain in the task-owned
+Python callback.
+
+Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
+escapes, unsupported suffixes, missing files, and oversized files, then stores
+an immutable per-attempt snapshot before task validation. Wire records contain
+artifact descriptors and digests, never duplicate source text.
 
 Pi sessions use a 262,144-token model context window with built-in automatic
 compaction enabled. The release configuration reserves 16,384 tokens for the
@@ -80,7 +86,7 @@ Each run stores only:
 Each turn has a wall-time limit and may define hard limits for individual tools.
 The Agent sees its initial tool budget and the remaining count after every
 call. Unlisted tools are unlimited and a zero limit disables a tool.
-`submit_candidates` cannot be limited. A started tool execution consumes one
+The configured terminal tool cannot be limited. A started tool execution consumes one
 call even when it fails; policy and budget rejections do not. Reservations are
 persisted before execution, so an interrupted turn resumes with the same used
 counts. If a provider stream ends before a committed batch, the sidecar

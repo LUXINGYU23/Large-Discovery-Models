@@ -16,7 +16,20 @@ export interface HarnessProfileConfig {
 	agentsSha256: string;
 	skillDirs: string[];
 	skillDirSha256: string[];
-	candidatesPerTurn: number;
+}
+
+export interface HarnessArtifactRuleConfig {
+	pathPointer: string;
+	allowedSuffixes: string[];
+	maxBytes: number;
+}
+
+export interface HarnessSubmissionContractConfig {
+	contractId: string;
+	toolName: string;
+	payloadSchema: Record<string, unknown>;
+	artifactRules: HarnessArtifactRuleConfig[];
+	maxValidationAttempts: number | null;
 }
 
 export interface HarnessToolExtensionConfig {
@@ -89,8 +102,8 @@ export interface InitializeFrame extends CommonFrame {
 	taskId: string;
 	caseId: string;
 	seed: number;
-	candidateSchema: Record<string, unknown>;
-	candidateSchemaSha256: string;
+	submissionContract: HarnessSubmissionContractConfig;
+	submissionContractSha256: string;
 	guestRuntime: GuestRuntimeConfig;
 	profileSetSha256: string;
 	profiles: HarnessProfileConfig[];
@@ -119,30 +132,41 @@ export interface RunTurnFrame extends CommonFrame {
 	turns: SessionTurnInput[];
 }
 
-export interface SubmissionRejection {
-	index: number;
+export interface SubmittedArtifact {
+	pathPointer: string;
+	relativePath: string;
+	snapshotPath: string;
+	sha256: string;
+	sizeBytes: number;
+}
+
+export interface SubmissionError {
+	path: string;
 	code: string;
 	message: string;
+	hint: string;
 }
 
 export interface SubmissionValidationResultFrame extends CommonFrame {
 	type: "submission_validation_result";
 	validationId: string;
-	accepted: boolean;
-	rejected: SubmissionRejection[];
-	requiredReplacements: number;
+	submissionDigest: string;
+	decision: "accept" | "retry" | "reject_turn";
+	errors: SubmissionError[];
 }
 
 export interface SubmissionValidationRequest {
 	profileId: string;
 	turnId: string;
 	attemptIndex: number;
-	candidates: Array<Record<string, unknown>>;
+	submission: Record<string, unknown>;
+	artifacts: SubmittedArtifact[];
+	submissionDigest: string;
 }
 
 export interface SubmissionValidationDecision {
-	accepted: boolean;
-	rejected: SubmissionRejection[];
+	decision: "accept" | "retry" | "reject_turn";
+	errors: SubmissionError[];
 }
 
 export type SubmissionValidator = (
@@ -251,7 +275,7 @@ function parseProfiles(value: unknown): HarnessProfileConfig[] {
 		const name = `profiles[${index}]`;
 		const data = record(item, name);
 		exactKeys(data, [
-			"profileId", "agentsPath", "agentsSha256", "skillDirs", "skillDirSha256", "candidatesPerTurn",
+			"profileId", "agentsPath", "agentsSha256", "skillDirs", "skillDirSha256",
 		], name);
 		const profileId = string(data.profileId, `${name}.profileId`);
 		if (!/^[a-z][a-z0-9_]*$/.test(profileId)) {
@@ -270,7 +294,6 @@ function parseProfiles(value: unknown): HarnessProfileConfig[] {
 			agentsSha256: digest(data.agentsSha256, `${name}.agentsSha256`),
 			skillDirs,
 			skillDirSha256,
-			candidatesPerTurn: positiveInteger(data.candidatesPerTurn, `${name}.candidatesPerTurn`),
 		};
 	});
 	if (new Set(profiles.map((profile) => profile.profileId)).size !== profiles.length) {
@@ -303,6 +326,68 @@ function parseToolExtensions(value: unknown): HarnessToolExtensionConfig[] {
 		throw new ProtocolError("invalid_frame", "tool names must be unique across extensions");
 	}
 	return extensions;
+}
+
+function jsonPointer(value: unknown, name: string): string {
+	const result = string(value, name);
+	if (!result.startsWith("/")) {
+		throw new ProtocolError("invalid_frame", `${name} must be a non-root JSON Pointer`);
+	}
+	return result;
+}
+
+function parseSubmissionContract(
+	value: unknown,
+	name: string,
+): HarnessSubmissionContractConfig {
+	const data = record(value, name);
+	exactKeys(data, [
+		"contractId", "toolName", "payloadSchema", "artifactRules", "maxValidationAttempts",
+	], name);
+	const contractId = string(data.contractId, `${name}.contractId`);
+	if (!/^[a-z][a-z0-9_]*$/.test(contractId)) {
+		throw new ProtocolError("invalid_frame", `${name}.contractId must be a lowercase identifier`);
+	}
+	const toolName = string(data.toolName, `${name}.toolName`);
+	if (!/^[A-Za-z0-9_-]+$/.test(toolName)) {
+		throw new ProtocolError("invalid_frame", `${name}.toolName must be a function identifier`);
+	}
+	const payloadSchema = record(data.payloadSchema, `${name}.payloadSchema`);
+	if (payloadSchema.type !== "object" || payloadSchema.additionalProperties !== false) {
+		throw new ProtocolError("invalid_frame", `${name}.payloadSchema must be a strict JSON object schema`);
+	}
+	if (!Array.isArray(data.artifactRules)) {
+		throw new ProtocolError("invalid_frame", `${name}.artifactRules must be an array`);
+	}
+	const artifactRules = data.artifactRules.map((raw, index) => {
+		const ruleName = `${name}.artifactRules[${index}]`;
+		const rule = record(raw, ruleName);
+		exactKeys(rule, ["pathPointer", "allowedSuffixes", "maxBytes"], ruleName);
+		const allowedSuffixes = stringArray(rule.allowedSuffixes, `${ruleName}.allowedSuffixes`);
+		if (
+			allowedSuffixes.length === 0
+			|| new Set(allowedSuffixes).size !== allowedSuffixes.length
+			|| allowedSuffixes.some((suffix) => !suffix.startsWith(".") || suffix.includes("/") || suffix.includes("\\"))
+		) {
+			throw new ProtocolError("invalid_frame", `${ruleName}.allowedSuffixes must contain unique file suffixes`);
+		}
+		return {
+			pathPointer: jsonPointer(rule.pathPointer, `${ruleName}.pathPointer`),
+			allowedSuffixes,
+			maxBytes: positiveInteger(rule.maxBytes, `${ruleName}.maxBytes`),
+		};
+	});
+	if (new Set(artifactRules.map((rule) => rule.pathPointer)).size !== artifactRules.length) {
+		throw new ProtocolError("invalid_frame", `${name}.artifactRules path pointers must be unique`);
+	}
+	let maxValidationAttempts: number | null = null;
+	if (data.maxValidationAttempts !== null) {
+		maxValidationAttempts = positiveInteger(
+			data.maxValidationAttempts,
+			`${name}.maxValidationAttempts`,
+		);
+	}
+	return { contractId, toolName, payloadSchema, artifactRules, maxValidationAttempts };
 }
 
 function parseInjectedValues(value: unknown, name: string): Record<string, McpInjectedValue> {
@@ -437,45 +522,46 @@ export function parseFrame(line: string): InputFrame {
 	if (identity.type === "submission_validation_result") {
 		exactKeys(data, [
 			"type", "requestId", "protocolVersion", "campaignId", "validationId",
-			"accepted", "rejected", "requiredReplacements",
+			"submissionDigest", "decision", "errors",
 		], "frame");
-		if (typeof data.accepted !== "boolean") {
-			throw new ProtocolError("invalid_frame", "accepted must be boolean");
+		if (!Array.isArray(data.errors)) {
+			throw new ProtocolError("invalid_frame", "errors must be an array");
 		}
-		if (!Array.isArray(data.rejected)) {
-			throw new ProtocolError("invalid_frame", "rejected must be an array");
+		const decision = string(data.decision, "decision");
+		if (!["accept", "retry", "reject_turn"].includes(decision)) {
+			throw new ProtocolError("invalid_frame", "unsupported submission validation decision");
 		}
-		const rejected = data.rejected.map((item, index) => {
-			const name = `rejected[${index}]`;
-			const rejection = record(item, name);
-			exactKeys(rejection, ["index", "code", "message"], name);
-			const code = string(rejection.code, `${name}.code`);
+		const errors = data.errors.map((item, index) => {
+			const name = `errors[${index}]`;
+			const error = record(item, name);
+			exactKeys(error, ["path", "code", "message", "hint"], name);
+			if (typeof error.path !== "string" || (error.path !== "" && !error.path.startsWith("/"))) {
+				throw new ProtocolError("invalid_frame", `${name}.path must be a JSON Pointer`);
+			}
+			const code = string(error.code, `${name}.code`);
 			if (!/^[a-z][a-z0-9_]*$/.test(code)) {
 				throw new ProtocolError("invalid_frame", `${name}.code must be a lowercase identifier`);
 			}
+			if (typeof error.hint !== "string") {
+				throw new ProtocolError("invalid_frame", `${name}.hint must be a string`);
+			}
 			return {
-				index: nonnegativeInteger(rejection.index, `${name}.index`),
+				path: error.path,
 				code,
-				message: string(rejection.message, `${name}.message`),
+				message: string(error.message, `${name}.message`),
+				hint: error.hint,
 			};
 		});
-		if (new Set(rejected.map((item) => item.index)).size !== rejected.length) {
-			throw new ProtocolError("invalid_frame", "submission rejection indices must be unique");
-		}
-		const requiredReplacements = nonnegativeInteger(
-			data.requiredReplacements,
-			"requiredReplacements",
-		);
-		if (requiredReplacements !== rejected.length || data.accepted !== (rejected.length === 0)) {
+		if ((decision === "accept") !== (errors.length === 0)) {
 			throw new ProtocolError("invalid_frame", "submission validation result is inconsistent");
 		}
 		return {
 			...identity,
 			type: "submission_validation_result",
 			validationId: string(data.validationId, "validationId"),
-			accepted: data.accepted,
-			rejected,
-			requiredReplacements,
+			submissionDigest: digest(data.submissionDigest, "submissionDigest"),
+			decision: decision as "accept" | "retry" | "reject_turn",
+			errors,
 		};
 	}
 	if (identity.type === "run_turn") {
@@ -522,24 +608,24 @@ export function parseFrame(line: string): InputFrame {
 
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
-		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaJson", "candidateSchemaSha256", "profileSetSha256",
+		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
 		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
 	], "frame");
-	const candidateSchemaJson = string(data.candidateSchemaJson, "candidateSchemaJson");
-	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
-	if (sha256(candidateSchemaJson) !== candidateSchemaSha256) {
-		throw new ProtocolError("invalid_frame", "candidateSchema digest mismatch");
+	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
+	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
+	if (sha256(submissionContractJson) !== submissionContractSha256) {
+		throw new ProtocolError("invalid_frame", "submissionContract digest mismatch");
 	}
-	let parsedCandidateSchema: unknown;
+	let parsedSubmissionContract: unknown;
 	try {
-		parsedCandidateSchema = JSON.parse(candidateSchemaJson);
+		parsedSubmissionContract = JSON.parse(submissionContractJson);
 	} catch {
-		throw new ProtocolError("invalid_frame", "candidateSchemaJson is not valid JSON");
+		throw new ProtocolError("invalid_frame", "submissionContractJson is not valid JSON");
 	}
-	const candidateSchema = record(parsedCandidateSchema, "candidateSchemaJson");
-	if (candidateSchema.type !== "object" || candidateSchema.additionalProperties !== false) {
-		throw new ProtocolError("invalid_frame", "candidateSchema must be a strict JSON object schema");
-	}
+	const submissionContract = parseSubmissionContract(
+		parsedSubmissionContract,
+		"submissionContractJson",
+	);
 	const guestRuntime = parseGuestRuntime(data.guestRuntime);
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
@@ -552,8 +638,11 @@ export function parseFrame(line: string): InputFrame {
 		}
 		nonnegativeInteger(limit, `limits.toolCallBudgets.${toolName}`);
 	}
-	if ("submit_candidates" in toolCallBudgets) {
-		throw new ProtocolError("invalid_frame", "submit_candidates cannot have a tool call budget");
+	if (submissionContract.toolName in toolCallBudgets) {
+		throw new ProtocolError(
+			"invalid_frame",
+			`${submissionContract.toolName} cannot have a tool call budget`,
+		);
 	}
 	const webSearch = record(data.webSearch, "webSearch");
 	exactKeys(webSearch, ["providers", "fallbackOn"], "webSearch");
@@ -590,11 +679,13 @@ export function parseFrame(line: string): InputFrame {
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
 		"read", "write", "bash", "web_search", "fetch_content", "get_search_content",
-		"submit_candidates",
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 	]);
+	if (availableTools.has(submissionContract.toolName)) {
+		throw new ProtocolError("invalid_frame", "terminal tool conflicts with another available tool");
+	}
 	const unavailableBudgets = Object.keys(toolCallBudgets).filter((name) => !availableTools.has(name));
 	if (unavailableBudgets.length > 0) {
 		throw new ProtocolError(
@@ -614,8 +705,8 @@ export function parseFrame(line: string): InputFrame {
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),
-		candidateSchema,
-		candidateSchemaSha256,
+		submissionContract,
+		submissionContractSha256,
 		guestRuntime,
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
 		profiles,

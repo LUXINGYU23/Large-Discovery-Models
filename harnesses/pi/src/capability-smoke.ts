@@ -107,11 +107,11 @@ async function main(): Promise<void> {
 		} else if (call === 3) {
 			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
 		} else if (call === 4) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r1", synthon_ids: ["a", "b"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
 		} else if (call === 5) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r5", synthon_ids: ["i", "j"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
 		} else if (call === 6) {
@@ -119,7 +119,7 @@ async function main(): Promise<void> {
 		} else if (call === 7) {
 			writeEvents(response, failureEvents(call, "stream_read_error"));
 		} else if (call === 8) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r3", synthon_ids: ["e", "f"] }, { reaction_id: "r4", synthon_ids: ["g", "h"] }],
 			})));
 		} else {
@@ -139,7 +139,6 @@ async function main(): Promise<void> {
 		agentsSha256: sha256(agents),
 		skillDirs: [],
 		skillDirSha256: [],
-		candidatesPerTurn: 2,
 	};
 	const candidateSchema = {
 		type: "object",
@@ -149,6 +148,20 @@ async function main(): Promise<void> {
 		},
 		required: ["reaction_id", "synthon_ids"],
 		additionalProperties: false,
+	};
+	const submissionContract = {
+		contractId: "candidate_batch",
+		toolName: "submit_research",
+		payloadSchema: {
+			type: "object",
+			properties: {
+				candidates: { type: "array", items: candidateSchema, minItems: 2, maxItems: 2 },
+			},
+			required: ["candidates"],
+			additionalProperties: false,
+		},
+		artifactRules: [],
+		maxValidationAttempts: null,
 	};
 	const config: InitializeFrame = {
 		type: "initialize",
@@ -163,12 +176,11 @@ async function main(): Promise<void> {
 		taskId: recipe.taskId,
 		caseId: "local-smoke",
 		seed: 1,
-		candidateSchema,
-		candidateSchemaSha256: canonicalSha256(candidateSchema),
+		submissionContract,
+		submissionContractSha256: canonicalSha256(submissionContract),
 		guestRuntime: recipe.guestRuntime,
 		profileSetSha256: canonicalSha256([{
 			agentsSha256: profile.agentsSha256,
-			candidatesPerTurn: profile.candidatesPerTurn,
 			profileId: profile.profileId,
 			skillDirSha256: profile.skillDirSha256,
 		}]),
@@ -194,15 +206,16 @@ async function main(): Promise<void> {
 	const validate = async (request: { turnId: string; attemptIndex: number }) => {
 		if (request.turnId === "capability_turn" && request.attemptIndex === 1) {
 			return {
-				accepted: false,
-				rejected: [{
-					index: 0,
+				decision: "retry" as const,
+				errors: [{
+					path: "/candidates/0",
 					code: "historical_duplicate",
 					message: "Candidate r1 was already evaluated; replace index 0.",
+					hint: "Replace the rejected candidate and resubmit.",
 				}],
 			};
 		}
-		return { accepted: true, rejected: [] };
+		return { decision: "accept" as const, errors: [] };
 	};
 	try {
 		await pool.initialize();
@@ -229,7 +242,7 @@ async function main(): Promise<void> {
 			forbiddenQueryTerms: ["candidate-secret-id"],
 		}], validate);
 		assert(turn);
-		assert.equal(turn.submission.candidates.length, 2);
+		assert.equal((turn.submission.candidates as unknown[]).length, 2);
 		assert.equal(turn.usage.providerCalls, 6);
 		assert.equal(turn.usage.toolCalls.web_search, 1);
 		assert.deepEqual(turn.toolBudget.web_search, { limit: 2, used: 1, remaining: 1 });
@@ -237,7 +250,7 @@ async function main(): Promise<void> {
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });
 		assert.equal(payloads[0]?.tool_choice, "required");
-		const submissionChoice = { type: "function", name: "submit_candidates" };
+		const submissionChoice = { type: "function", name: "submit_research" };
 		assert.equal(payloads[1]?.tool_choice, undefined);
 		assert.equal(payloads[2]?.tool_choice, undefined);
 		assert.equal(payloads[3]?.tool_choice, undefined);
@@ -257,11 +270,13 @@ async function main(): Promise<void> {
 		};
 		const [recovered] = await pool.runTurns([recoveryInput], validate);
 		assert(recovered);
-		assert.equal(recovered.submission.candidates.length, 2);
+		assert.equal((recovered.submission.candidates as unknown[]).length, 2);
 		assert.equal(recovered.usage.providerCalls, 3);
 		assert.deepEqual((JSON.parse(requestBodies[7] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
 		const [replayed] = await pool.runTurns([recoveryInput], validate);
-		assert.deepEqual(replayed, recovered);
+		assert(replayed);
+		assert.equal(replayed.submissionDigest, recovered.submissionDigest);
+		assert.equal(replayed.replayed, true);
 		assert.equal(call, 9);
 		await assert.rejects(
 			pool.runTurns(
@@ -285,7 +300,7 @@ async function main(): Promise<void> {
 		assert.equal(readResult.isError, false, JSON.stringify(readResult.content));
 		assert.match(JSON.stringify(readResult.content), /sandbox-network-ok/);
 		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-network-ok");
-		assert.match(session, /submit_candidates/);
+		assert.match(session, /submit_research/);
 		assert.match(session, /historical_duplicate/);
 		assert.match(session, /already evaluated; replace index 0/);
 		assert.match(session, /previous provider stream ended/);

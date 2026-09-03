@@ -39,13 +39,12 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   `tasks/<task_id>/core/`.
 - Put versioned `AGENTS.md` profiles, optional skill directories, and optional
   structured task tools under `tasks/<task_id>/resources/harness/`.
-- Record SHA-256 identities for profiles, skills, candidate schemas, and tool
+- Record SHA-256 identities for profiles, skills, submission contracts, and tool
   sources; mount these resources read-only.
-- Provide the sidecar with the task's strict candidate JSON Schema, including
-  required fields, value constraints, and `additionalProperties: false`. The
-  sidecar must expose that schema through `submit_candidates` and require the
-  exact profile minibatch size; task validation remains the authoritative
-  admission boundary.
+- Provide the sidecar with one strict `HarnessSubmissionContract`. Its payload
+  schema owns the terminal tool name, required fields, value constraints,
+  `additionalProperties: false`, and exact profile minibatch size. Task
+  validation remains the authoritative admission boundary.
 - Build deterministic `HarnessTurn` identities from campaign, profile, round,
   and history range/digest.
 - Send newly measured observations for reasoning and a compact authoritative
@@ -55,8 +54,10 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   persistent sessions must not invent a private exclusion set.
 - Validate every provisional submission through the same parser and canonical
   identity used by Campaign admission.
-- Return one stable, actionable `HarnessSubmissionRejection` for each rejected
-  index and accept only a complete valid minibatch.
+- Return one stable, actionable `HarnessSubmissionError` with a JSON Pointer,
+  code, message, and repair hint for each invalid entry. Return `retry` until a
+  complete valid minibatch is available; use `reject_turn` only when the
+  contract's validation-attempt limit closes the turn.
 - Turn instructions must translate the hard wall-time into explicit research,
   validation, and first-submission milestones. "Reserve enough time" is not a
   reliable delivery contract for an autonomous Agent; qualify the slowest role

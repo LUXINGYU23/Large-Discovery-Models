@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
@@ -23,9 +23,16 @@ import type {
 	HarnessProfileConfig,
 	InitializeFrame,
 	SessionTurnInput,
+	SubmissionError,
+	SubmittedArtifact,
 	SubmissionValidator,
 } from "./protocol.js";
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
+import {
+	snapshotSubmissionArtifacts,
+	verifySubmissionRecord,
+	type TerminalSubmission,
+} from "./submission.js";
 import { atomicJson, canonicalSha256, sha256 } from "./trace.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,17 +43,8 @@ const COMPACTION_SETTINGS = {
 	keepRecentTokens: 20_000,
 };
 
-interface CandidateSubmission {
-	submissionId: string;
-	candidates: Array<Record<string, unknown>>;
-}
-
-type SubmissionParameters = {
-	candidates: Array<Record<string, unknown>>;
-};
-
 interface SavedSubmission {
-	submission: CandidateSubmission;
+	submission: TerminalSubmission;
 	toolUsage: ToolUsageSnapshot;
 }
 
@@ -59,7 +57,13 @@ export interface CommittedTurn {
 	historyToSeq: number;
 	historyDigest: string;
 	inputDigest: string;
-	submission: CandidateSubmission;
+	replayed: boolean;
+	submissionStatus: "accepted" | "rejected";
+	submissionId: string;
+	submissionDigest: string;
+	submission: Record<string, unknown>;
+	submittedArtifacts: SubmittedArtifact[];
+	validationErrors: SubmissionError[];
 	usage: {
 		providerCalls: number;
 		toolCalls: Record<string, number>;
@@ -74,7 +78,7 @@ export interface CommittedTurn {
 
 function isInside(root: string, value: string): boolean {
 	const path = relative(resolve(root), resolve(value));
-	return path === "" || (!path.startsWith("..") && !path.startsWith("/"));
+	return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
 function packageRoot(packageName: string): string {
@@ -133,7 +137,12 @@ async function runtimePackages(): Promise<Record<string, string>> {
 	};
 }
 
-function sessionTools(context7Enabled: boolean, taskTools: string[], mcpTools: string[] = []): string[] {
+function sessionTools(
+	context7Enabled: boolean,
+	taskTools: string[],
+	terminalTool: string,
+	mcpTools: string[] = [],
+): string[] {
 	return [
 		"read",
 		"write",
@@ -144,7 +153,7 @@ function sessionTools(context7Enabled: boolean, taskTools: string[], mcpTools: s
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
 		...mcpTools,
-		"submit_candidates",
+		terminalTool,
 	];
 }
 
@@ -155,44 +164,37 @@ function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[
 }
 
 class SubmissionController {
-	private readonly parameters: TUnsafe<SubmissionParameters>;
+	private readonly parameters: TUnsafe<Record<string, unknown>>;
 	private providerRequests = 0;
 	private attemptIndex = 0;
 	private submissionRequired = false;
 	private profileId = "";
 	private turnId = "";
-	private value: CandidateSubmission | undefined;
-	private persist: ((submission: CandidateSubmission) => Promise<void>) | undefined;
+	private turnRoot = "";
+	private value: TerminalSubmission | undefined;
+	private persist: ((submission: TerminalSubmission) => Promise<void>) | undefined;
 	private validate: SubmissionValidator | undefined;
 
 	constructor(
-		private readonly expected: number,
-		candidateSchema: Record<string, unknown>,
+		private readonly config: InitializeFrame,
+		private readonly workspace: string,
 	) {
-		this.parameters = Type.Unsafe<SubmissionParameters>({
-			type: "object",
-			properties: {
-				candidates: {
-					type: "array",
-					items: candidateSchema,
-					minItems: expected,
-					maxItems: expected,
-				},
-			},
-			required: ["candidates"],
-			additionalProperties: false,
-		});
+		this.parameters = Type.Unsafe<Record<string, unknown>>(
+			config.submissionContract.payloadSchema,
+		);
 	}
 
 	begin(
 		profileId: string,
 		turnId: string,
-		persist: (submission: CandidateSubmission) => Promise<void>,
+		turnRoot: string,
+		persist: (submission: TerminalSubmission) => Promise<void>,
 		validate: SubmissionValidator,
 		recovering: boolean,
 	): void {
 		this.profileId = profileId;
 		this.turnId = turnId;
+		this.turnRoot = turnRoot;
 		this.providerRequests = 0;
 		this.attemptIndex = 0;
 		this.submissionRequired = recovering;
@@ -201,7 +203,7 @@ class SubmissionController {
 		this.validate = validate;
 	}
 
-	get submission(): CandidateSubmission | undefined {
+	get submission(): TerminalSubmission | undefined {
 		return this.value;
 	}
 
@@ -221,7 +223,7 @@ class SubmissionController {
 				if (this.submissionRequired) {
 					return {
 						...payload,
-						tool_choice: { type: "function", name: "submit_candidates" },
+						tool_choice: { type: "function", name: this.config.submissionContract.toolName },
 					};
 				}
 				if (this.providerRequests > 1) return payload;
@@ -233,66 +235,94 @@ class SubmissionController {
 		};
 	}
 
-	tool(): ToolDefinition<TUnsafe<SubmissionParameters>> {
+	tool(): ToolDefinition<TUnsafe<Record<string, unknown>>> {
+		const toolName = this.config.submissionContract.toolName;
 		return {
-			name: "submit_candidates",
-			label: "Submit candidates",
-			description: "Submit the complete ordered candidate minibatch. Rejected entries must be replaced and resubmitted.",
-			promptSnippet: "submit_candidates: submit the complete ordered candidate minibatch",
+			name: toolName,
+			label: "Submit result",
+			description: "Submit the complete structured result. Validation errors must be repaired before resubmission.",
+			promptSnippet: `${toolName}: submit the complete structured result`,
 			parameters: this.parameters,
 			executionMode: "sequential",
 			execute: async (_toolCallId, params) => {
-				if (this.value) throw new Error("submit_candidates may be called only once per turn");
+				if (this.value) throw new Error(`${toolName} may be called only once per turn`);
 				this.submissionRequired = true;
 				this.attemptIndex += 1;
-				if (params.candidates.length !== this.expected) {
-					throw new Error(
-						`Candidate minibatch rejected: submit_candidates requires exactly ${this.expected} candidates; `
-						+ `received ${params.candidates.length}. Add replacements and resubmit the complete minibatch.`,
-					);
-				}
-				const invalidIndex = params.candidates.findIndex(
-					(candidate) => !candidate || typeof candidate !== "object" || Array.isArray(candidate),
-				);
-				if (invalidIndex >= 0) {
-					throw new Error(`Candidate minibatch rejected: candidate at index ${invalidIndex} must be an object.`);
-				}
 				if (!this.validate) throw new Error("submission validator is not initialized");
+				const submission = { ...params };
+				const attemptRoot = join(
+					this.turnRoot,
+					"attempts",
+					this.attemptIndex.toString().padStart(4, "0"),
+				);
+				let artifacts: SubmittedArtifact[];
+				try {
+					artifacts = await snapshotSubmissionArtifacts(
+						this.config.submissionContract.artifactRules,
+						this.workspace,
+						this.config.artifactRoot,
+						this.turnRoot,
+						this.attemptIndex,
+						submission,
+					);
+				} catch (error) {
+					await rm(attemptRoot, { recursive: true, force: true });
+					throw error;
+				}
+				const submissionDigest = canonicalSha256({ artifacts, submission });
 				const decision = await this.validate({
 					profileId: this.profileId,
 					turnId: this.turnId,
 					attemptIndex: this.attemptIndex,
-					candidates: params.candidates,
+					submission,
+					artifacts,
+					submissionDigest,
 				});
-				if (decision.accepted !== (decision.rejected.length === 0)) {
+				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
 					throw new Error("submission validator returned an inconsistent decision");
 				}
-				if (!decision.accepted) {
+				await atomicJson(join(attemptRoot, "validation.json"), {
+					attemptIndex: this.attemptIndex,
+					decision: decision.decision,
+					errors: decision.errors,
+					submission,
+					submissionDigest,
+					artifacts,
+				});
+				if (decision.decision === "retry") {
 					throw new Error(
-						"Candidate minibatch rejected by the task validator. Replace every rejected entry, "
-						+ `preserve the other entries, and resubmit the complete ${this.expected}-candidate minibatch. `
-						+ `Rejection report: ${JSON.stringify({
-							accepted: false,
-							rejected: decision.rejected,
-							required_replacements: decision.rejected.length,
-						})}`,
+						"Submission rejected by the task validator. Repair the reported paths and resubmit. "
+						+ `Validation report: ${JSON.stringify(decision)}`,
 					);
 				}
-				const submission: CandidateSubmission = {
-					submissionId: `${this.turnId}-submission`,
-					candidates: params.candidates,
+				const terminal: TerminalSubmission = {
+					submissionStatus: decision.decision === "accept" ? "accepted" : "rejected",
+					submissionId: `${this.turnId}-submission-${this.attemptIndex}`,
+					submissionDigest,
+					submission,
+					submittedArtifacts: artifacts,
+					validationErrors: decision.errors,
 				};
 				if (!this.persist) throw new Error("submission turn is not initialized");
-				await this.persist(submission);
-				this.value = submission;
+				await this.persist(terminal);
+				this.value = terminal;
 				this.submissionRequired = false;
 				return {
-					content: [{ type: "text", text: "Candidate minibatch accepted. End this turn now." }],
-					details: { submissionId: this.value.submissionId, count: params.candidates.length },
+					content: [{
+						type: "text",
+						text: decision.decision === "accept"
+							? "Submission accepted. End this turn now."
+							: "Submission rejected and the turn is closed.",
+					}],
+					details: {
+						submissionId: terminal.submissionId,
+						status: terminal.submissionStatus,
+					},
 				};
 			},
 		};
 	}
+
 }
 
 class PersistentProfileSession {
@@ -329,10 +359,7 @@ class PersistentProfileSession {
 			namedSecrets,
 			`ldm-pi-${config.campaignId}-${profile.profileId}`,
 		);
-		this.submissions = new SubmissionController(
-			profile.candidatesPerTurn,
-			config.candidateSchema,
-		);
+		this.submissions = new SubmissionController(config, this.workspace);
 	}
 
 	async initialize(): Promise<void> {
@@ -454,6 +481,7 @@ class PersistentProfileSession {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
 			),
 		});
@@ -476,9 +504,10 @@ class PersistentProfileSession {
 			) {
 				throw new Error(`committed turn digest mismatch: ${input.turnId}`);
 			}
+			await verifySubmissionRecord(priorCommit, this.config.artifactRoot);
 			this.acceptCursor(input, true);
 			this.historyCursor = input.historyToSeq;
-			return priorCommit;
+			return { ...priorCommit, replayed: true };
 		}
 		this.acceptCursor(input, false);
 
@@ -493,13 +522,14 @@ class PersistentProfileSession {
 		const savedSubmission = await optionalJson<SavedSubmission>(submissionPath);
 		if (savedSubmission) {
 			const provider = await this.proxy.recoveredTurnSummary(turnRoot, input.turnId);
-			return this.commit(input, savedSubmission.submission, provider, savedSubmission.toolUsage);
+			return this.commit(input, savedSubmission.submission, provider, savedSubmission.toolUsage, true);
 		}
 		await this.policy.begin(input.forbiddenQueryTerms, join(turnRoot, "tool-budget.json"));
 
 		this.submissions.begin(
 			this.profile.profileId,
 			input.turnId,
+			turnRoot,
 			(value) => atomicJson(submissionPath, {
 				submission: value,
 				toolUsage: this.policy.snapshot(),
@@ -513,7 +543,7 @@ class PersistentProfileSession {
 			input.turnId,
 			turnRoot,
 		);
-		let submission: CandidateSubmission | undefined;
+		let submission: TerminalSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
 		let policySummary: ToolUsageSnapshot;
 		try {
@@ -527,7 +557,9 @@ class PersistentProfileSession {
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error") {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
-				throw new Error(`session ${this.profile.profileId} ended without submit_candidates`);
+				throw new Error(
+					`session ${this.profile.profileId} ended without ${this.config.submissionContract.toolName}`,
+				);
 			}
 		} finally {
 			providerSummary = await this.proxy.endTurn(this.profile.profileId);
@@ -541,7 +573,6 @@ class PersistentProfileSession {
 		const sessionFile = this.session.sessionManager.getSessionFile();
 		return {
 			profileId: this.profile.profileId,
-			candidatesPerTurn: this.profile.candidatesPerTurn,
 			agentsSha256: this.agentsSha256,
 			skills: this.skillDirSha256.map((value, index) => ({ directoryIndex: index, sha256: value })),
 			sessionId: this.session.sessionManager.getSessionId(),
@@ -612,8 +643,8 @@ class PersistentProfileSession {
 				await session.prompt(
 					interrupted
 						? "The previous provider stream ended before your submission was accepted. "
-							+ "Do not research again. Call submit_candidates now for the same assigned items using your prior analysis."
-						: "The research phase is complete. Call submit_candidates now with the complete ordered minibatch. "
+							+ `Do not research again. Call ${this.config.submissionContract.toolName} now using your prior analysis.`
+						: `The research phase is complete. Call ${this.config.submissionContract.toolName} now with the complete structured result. `
 							+ "Do not perform more research or add narrative output.",
 					options,
 				);
@@ -635,11 +666,13 @@ class PersistentProfileSession {
 
 	private async commit(
 		input: SessionTurnInput,
-		submission: CandidateSubmission,
+		submission: TerminalSubmission,
 		provider: ProviderTurnSummary,
 		toolUsage: ToolUsageSnapshot,
+		replayed = false,
 	): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
+		await verifySubmissionRecord(submission, this.config.artifactRoot);
 		const sessionFile = this.session.sessionManager.getSessionFile();
 		const commit: CommittedTurn = {
 			profileId: this.profile.profileId,
@@ -650,7 +683,8 @@ class PersistentProfileSession {
 			historyToSeq: input.historyToSeq,
 			historyDigest: input.historyDigest,
 			inputDigest: input.inputDigest,
-			submission,
+			replayed,
+			...submission,
 			usage: {
 				providerCalls: provider.providerCalls,
 				toolCalls: toolUsage.toolCalls,
@@ -717,7 +751,6 @@ export class PiSessionPool {
 		const guestRuntime = await resolveGuestRuntime(this.config.taskId, this.config.guestRuntime);
 		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
 			agentsSha256: profile.agentsSha256,
-			candidatesPerTurn: profile.candidatesPerTurn,
 			profileId: profile.profileId,
 			skillDirSha256: profile.skillDirSha256,
 		})));
@@ -762,7 +795,13 @@ export class PiSessionPool {
 			thinking: this.config.thinking,
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
-			candidateSchemaSha256: this.config.candidateSchemaSha256,
+			submissionContractSha256: this.config.submissionContractSha256,
+			submissionContract: {
+				contractId: this.config.submissionContract.contractId,
+				toolName: this.config.submissionContract.toolName,
+				artifactRules: this.config.submissionContract.artifactRules,
+				maxValidationAttempts: this.config.submissionContract.maxValidationAttempts,
+			},
 			guestRuntime: {
 				imageRef: guestRuntime.imageRef,
 				recipeSha256: guestRuntime.recipeSha256,
@@ -781,17 +820,13 @@ export class PiSessionPool {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
 			),
 			toolExtensions: this.config.toolExtensions,
 			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),
 			topology: {
 				profileCount: this.config.profiles.length,
-				candidatesPerTurn: this.config.profiles.map((profile) => profile.candidatesPerTurn),
-				totalCandidatesPerRound: this.config.profiles.reduce(
-					(total, profile) => total + profile.candidatesPerTurn,
-					0,
-				),
 			},
 			packages: await runtimePackages(),
 			profiles: [...this.sessions.values()].map((session) => session.manifestEntry()),

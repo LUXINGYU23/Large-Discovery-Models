@@ -217,7 +217,10 @@ def _validate_numbers(args: argparse.Namespace) -> None:
 def _validate_provider_options(args: argparse.Namespace) -> None:
     try:
         parse_openai_extra_body_json(args.llm_extra_body_json)
-        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
+        tool_budgets = parse_tool_call_budgets(
+            args.harness_tool_budget,
+            excluded_tools=("submit_candidates",),
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):

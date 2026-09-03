@@ -10,7 +10,7 @@ Integrate mechanistic chemistry, empirical factor interactions, public literatur
 
 Inspect every new measurement and compare it with the accumulated campaign history. Use the structured reaction-space tools to examine exact legal conditions and validate the candidate you intend to submit. When useful, search public primary literature, follow relevant documents, use MCP tools, and run scratch analysis in the isolated sandbox. You may install useful public packages, write files, and execute code to tabulate observations or test ranking hypotheses.
 
-The turn has a hard 30-minute wall-time. Stop open-ended research by minute 20, select and validate the candidate, and make the first `submit_candidates` call by minute 25. Use remaining time only to repair a rejected submission. Tool budgets limit information gathering; they are not quotas that must be exhausted. Delivering one complete valid submission takes priority over another research step.
+The turn has a hard 30-minute wall-time. Stop open-ended research by minute 20, assemble and validate the complete requested minibatch, and make the first `submit_candidates` call by minute 25. Use remaining time only to repair rejected entries. Tool budgets limit information gathering; they are not quotas that must be exhausted. Delivering the complete valid minibatch takes priority over another research step.
 
 ## Boundaries and submission
 
