@@ -1,6 +1,6 @@
 import { sha256 } from "./trace.js";
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -60,6 +60,13 @@ export interface HarnessLimits {
 	toolCallBudgets: Record<string, number>;
 }
 
+export interface GuestRuntimeConfig {
+	imageRef: string;
+	recipeSha256: string;
+	rootfsSize: string;
+	installPolicy: "session_overlay";
+}
+
 export type SearchFallbackKind = "transient" | "quota" | "network" | "invalid-response" | "unsupported";
 
 export interface WebSearchConfig {
@@ -85,6 +92,7 @@ export interface InitializeFrame extends CommonFrame {
 	seed: number;
 	candidateSchema: Record<string, unknown>;
 	candidateSchemaSha256: string;
+	guestRuntime: GuestRuntimeConfig;
 	profileSetSha256: string;
 	profiles: HarnessProfileConfig[];
 	toolExtensions: HarnessToolExtensionConfig[];
@@ -212,6 +220,28 @@ function nonnegativeInteger(value: unknown, name: string): number {
 		throw new ProtocolError("invalid_frame", `${name} must be a non-negative integer`);
 	}
 	return value as number;
+}
+
+function parseGuestRuntime(value: unknown): GuestRuntimeConfig {
+	const data = record(value, "guestRuntime");
+	exactKeys(data, ["imageRef", "recipeSha256", "rootfsSize", "installPolicy"], "guestRuntime");
+	const imageRef = string(data.imageRef, "guestRuntime.imageRef");
+	if (!/^ldm\/[a-z][a-z0-9-]*:[a-f0-9]{12}$/.test(imageRef)) {
+		throw new ProtocolError("invalid_frame", "guestRuntime.imageRef must be a logical ldm image ref");
+	}
+	const rootfsSize = string(data.rootfsSize, "guestRuntime.rootfsSize");
+	if (!/^[1-9][0-9]*[KMGT]$/.test(rootfsSize)) {
+		throw new ProtocolError("invalid_frame", "guestRuntime.rootfsSize must be a positive size");
+	}
+	if (data.installPolicy !== "session_overlay") {
+		throw new ProtocolError("invalid_frame", "guestRuntime.installPolicy is unsupported");
+	}
+	return {
+		imageRef,
+		recipeSha256: digest(data.recipeSha256, "guestRuntime.recipeSha256"),
+		rootfsSize,
+		installPolicy: "session_overlay",
+	};
 }
 
 function parseProfiles(value: unknown): HarnessProfileConfig[] {
@@ -494,7 +524,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "candidateSchemaJson", "candidateSchemaSha256", "profileSetSha256",
-		"profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
 	], "frame");
 	const candidateSchemaJson = string(data.candidateSchemaJson, "candidateSchemaJson");
 	const candidateSchemaSha256 = digest(data.candidateSchemaSha256, "candidateSchemaSha256");
@@ -511,6 +541,7 @@ export function parseFrame(line: string): InputFrame {
 	if (candidateSchema.type !== "object" || candidateSchema.additionalProperties !== false) {
 		throw new ProtocolError("invalid_frame", "candidateSchema must be a strict JSON object schema");
 	}
+	const guestRuntime = parseGuestRuntime(data.guestRuntime);
 	const policy = record(data.networkPolicy, "networkPolicy");
 	exactKeys(policy, ["allowedHosts", "deniedHosts", "forbiddenQueryPatterns"], "networkPolicy");
 	const limits = record(data.limits, "limits");
@@ -586,6 +617,7 @@ export function parseFrame(line: string): InputFrame {
 		seed: nonnegativeInteger(data.seed, "seed"),
 		candidateSchema,
 		candidateSchemaSha256,
+		guestRuntime,
 		profileSetSha256: digest(data.profileSetSha256, "profileSetSha256"),
 		profiles,
 		toolExtensions,

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:task-guest": "npm run build && node dist/build-task-guest.js",
+    "smoke:task-guest": "npm run build && node dist/smoke-task-guest.js",
     "smoke:capabilities": "npm run build && node dist/capability-smoke.js",
     "start": "node dist/main.js",
     "test": "npm run build && node --test dist/*.test.js",

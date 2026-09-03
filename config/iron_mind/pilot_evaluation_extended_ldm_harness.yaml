@@ -22,7 +22,7 @@ args:
   harness-thinking: max
   harness-wall-time-seconds: 1800
   harness-response-timeout: 2100
-  harness-image: ldm-pi-harness:latest
+  harness-sidecar-image: ldm-pi-harness:latest
   harness-cache-dir: ${IRON_MIND_WORK_ROOT}/gondolin-cache
   campaign-index: 0
   data-dir: ${IRON_MIND_DATA_ROOT}

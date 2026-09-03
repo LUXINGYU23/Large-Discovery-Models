@@ -44,6 +44,7 @@ The public `ldm_tts.harness` package provides:
 | Type | Purpose |
 | --- | --- |
 | `HarnessPoolConfig` | Campaign, provider, profile, candidate schema, tools, MCP servers, network policy, and limits. |
+| `HarnessGuestRuntime` | Task-owned digest-addressed Gondolin image, COW rootfs size, and install policy. |
 | `HarnessProfile` | One persistent Agent identity, `AGENTS.md`, optional skill directories, candidate count, and content digests. |
 | `HarnessToolExtension` | A digest-verified task tool module and its exported tool names. |
 | `HarnessMcpServer` | One allowlisted stdio or Streamable HTTP MCP server. |
@@ -145,6 +146,10 @@ Versioned task inputs belong under:
 tasks/<task_id>/resources/harness/
 |-- profiles/<profile_id>/AGENTS.md
 |-- profiles/<profile_id>/skills/   # optional
+|-- image/guest-image.json
+|-- image/Dockerfile
+|-- image/lock/
+|-- image/smoke.sh
 `-- tools/                           # optional task-local structured tools
 ```
 
@@ -153,13 +158,41 @@ tool sources. Mount task inputs read-only. The sidecar receives the strict
 candidate JSON Schema and exact minibatch count; Python remains the
 authoritative scientific validator.
 
+## Task Guest Runtime
+
+Each Harness task owns a `resources/harness/image/` recipe. Its descriptor
+names the pinned Dockerfile inputs, COW rootfs size, and smoke script. The
+descriptor digest becomes the only image reference accepted by the protocol.
+
+Build and smoke the selected task guest before a campaign:
+
+```bash
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task <task_id> --cache-dir /path/to/harness-cache
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task <task_id> --cache-dir /path/to/harness-cache
+```
+
+Guest building requires Docker, `e2fsprogs`, `cpio`, and `lz4` on a Linux host.
+Guest smoke additionally requires Linux KVM and the host-architecture QEMU
+system emulator. The selected cache holds `images/`, task build records, temporary build state,
+Gondolin session state, and session COW overlays. A campaign resolves only a
+complete local image with matching recipe metadata and asset checksums; absent
+or mismatched images fail before the sidecar starts.
+
+On POSIX hosts the task runner passes its current UID:GID to the sidecar so
+bind-mounted artifacts and cache remain writable. Use
+`--harness-container-user` only to override that mapping.
+
 Harness artifacts are written below `<run_dir>/harness/`:
 
 - native Pi session JSONL with messages, tool calls, and tool results;
 - redacted raw provider requests and responses plus their compact index;
 - turn input, provisional submission, validation, and commit records;
 - a manifest with provider identity, profiles, MCP configuration digests,
-  effective tool budgets, usage, and session lineage.
+  effective tool budgets, usage, session lineage, resolved guest, and an
+  environment snapshot captured before guest shutdown.
 
 The native Pi session is the only full conversation record. Python does not
 duplicate model or MCP transcripts. These files are raw research traces, not
@@ -170,8 +203,8 @@ canonical `ldm-2.0` accepted-action records.
 Use a protocol-faithful fake sidecar to test session identity, strict
 cardinality, rejection and correction, budget accounting, MCP allowlists, and
 lineage without Docker or credentials. Before a real claim, run the sidecar
-tests and one capability smoke with the selected Responses endpoint, container
-isolation, profiles, and tools. For `ldm_harness`, verify that accepted
+tests, the task guest smoke, and one capability smoke with the selected
+Responses endpoint, container isolation, profiles, and tools. For `ldm_harness`, verify that accepted
 occurrences enter `q0`, surrogate, and acquisition selection. For `harness`,
 verify that the accepted minibatch goes directly to the official evaluator and
 that no surrogate or selector is instantiated.

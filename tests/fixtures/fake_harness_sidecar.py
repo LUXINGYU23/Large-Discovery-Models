@@ -23,6 +23,12 @@ for line in sys.stdin:
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
+        assert frame["guestRuntime"] == {
+            "imageRef": "ldm/fixture-research:aaaaaaaaaaaa",
+            "recipeSha256": "a" * 64,
+            "rootfsSize": "4G",
+            "installPolicy": "session_overlay",
+        }
         profiles = [item["profileId"] for item in frame["profiles"]]
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":

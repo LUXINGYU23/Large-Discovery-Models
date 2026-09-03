@@ -10,7 +10,9 @@ from pathlib import Path
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-PROTOCOL_VERSION = 6
+from ldm_tts.harness.guest_runtime import HarnessGuestRuntime
+
+PROTOCOL_VERSION = 7
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
@@ -285,6 +287,7 @@ class HarnessPoolConfig:
     case_id: str
     seed: int
     candidate_schema: dict[str, Any]
+    guest_runtime: HarnessGuestRuntime
     tool_extensions: tuple[HarnessToolExtension, ...] = ()
     mcp_servers: tuple[HarnessMcpServer, ...] = ()
     thinking: str = "off"
@@ -384,6 +387,7 @@ class HarnessPoolConfig:
             "seed": self.seed,
             "candidateSchemaJson": self.candidate_schema_json,
             "candidateSchemaSha256": self.candidate_schema_sha256,
+            "guestRuntime": self.guest_runtime.to_dict(),
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
@@ -510,6 +514,7 @@ __all__ = [
     "PROTOCOL_VERSION",
     "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessLimits",
+    "HarnessGuestRuntime",
     "HarnessMcpServer",
     "HarnessMcpValue",
     "HarnessNetworkPolicy",

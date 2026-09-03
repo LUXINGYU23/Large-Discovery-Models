@@ -26,6 +26,12 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		seed: 1,
 		candidateSchemaJson,
 		candidateSchemaSha256: sha256(candidateSchemaJson),
+		guestRuntime: {
+			imageRef: "ldm/synthonbench-research:aaaaaaaaaaaa",
+			recipeSha256: "a".repeat(64),
+			rootfsSize: "8G",
+			installPolicy: "session_overlay",
+		},
 		profileSetSha256: "c".repeat(64),
 		profiles: [{
 			profileId: "target_sar",
@@ -63,6 +69,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.candidateSchema, candidateSchema);
 		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
+		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
 });
@@ -84,6 +91,12 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			seed: 1,
 			candidateSchemaJson: '{"additionalProperties":false,"properties":{},"type":"object"}',
 			candidateSchemaSha256: "b".repeat(64),
+			guestRuntime: {
+				imageRef: "ldm/fixture-research:aaaaaaaaaaaa",
+				recipeSha256: "a".repeat(64),
+				rootfsSize: "4G",
+				installPolicy: "session_overlay",
+			},
 			profileSetSha256: "c".repeat(64),
 			profiles: [{
 				profileId: "chemist",
@@ -104,6 +117,18 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			context7Enabled: true,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
+	);
+});
+
+test("parseFrame rejects protocol v6 before sidecar initialization", () => {
+	assert.throws(
+		() => parseFrame(JSON.stringify({
+			type: "initialize",
+			requestId: "init-v6",
+			protocolVersion: 6,
+			campaignId: "campaign-1",
+		})),
+		(error: unknown) => error instanceof ProtocolError && error.code === "protocol_mismatch",
 	);
 });
 

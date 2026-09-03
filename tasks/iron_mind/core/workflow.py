@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,7 @@ from tasks.iron_mind.core.harness import (
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
+    harness_guest_runtime,
     harness_candidate_schema,
     harness_profiles as parallel_harness_profiles,
     harness_tool_extensions,
@@ -239,20 +241,34 @@ def _harness_client(
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
     cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
     domain = IronMindCandidateDomain(table.schema, table)
     write_harness_space_catalog(domain, artifact_root / "reaction_space.json")
     command = ["docker"]
     if args.harness_docker_host:
         command.extend(("--host", args.harness_docker_host))
     command.extend(("run", "--rm", "-i"))
-    if args.harness_container_user:
-        command.extend(("--user", args.harness_container_user))
+    container_user = args.harness_container_user
+    if not container_user and hasattr(os, "getuid") and hasattr(os, "getgid"):
+        container_user = f"{os.getuid()}:{os.getgid()}"
+    if container_user:
+        command.extend(("--user", container_user))
     command.extend(
         (
             "--device",
             "/dev/kvm",
             "--env",
             "HOME=/runtime-home",
+            "--env",
+            "XDG_CACHE_HOME=/runtime-home/.cache",
+            "--env",
+            "GONDOLIN_IMAGE_STORE=/runtime-home/.cache/gondolin/images",
+            "--env",
+            "GONDOLIN_SESSIONS_DIR=/runtime-home/.cache/gondolin/sessions",
+            "--env",
+            "LDM_HARNESS_CACHE_ROOT=/runtime-home/.cache/gondolin",
+            "--env",
+            "TMPDIR=/runtime-home/.cache/gondolin/runtime-overlays",
             "--env",
             "LDM_IRON_MIND_CATALOG=/artifacts/reaction_space.json",
             "--mount",
@@ -261,7 +277,7 @@ def _harness_client(
             f"type=bind,src={resource_root},dst=/resources,readonly",
             "--mount",
             f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
-            args.harness_image,
+            args.harness_sidecar_image,
         )
     )
     profiles = _harness_profiles(args)
@@ -275,6 +291,7 @@ def _harness_client(
         case_id=args.dataset_id,
         seed=args.campaign_index,
         candidate_schema=harness_candidate_schema(table.schema),
+        guest_runtime=harness_guest_runtime(),
         tool_extensions=harness_tool_extensions(),
         mcp_servers=mcp.servers,
         thinking=args.harness_thinking,

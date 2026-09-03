@@ -216,19 +216,31 @@ Build the Pi sidecar and run the two-round real capability gate before a larger
 Harness experiment:
 
 ```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
   scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml
+  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 ```
 
-The sidecar requires Linux KVM. Set `--harness-api-key-file` to use an ignored,
-protected key file instead of `LLM_API_KEY`. Harness traces are written below
-`<run_dir>/harness/`; profiles, tools, schemas, requests, responses, sessions,
-and submissions are content-addressed in the run artifacts.
+Guest building requires Docker, `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest
+smoke additionally requires the host-architecture QEMU system emulator; the
+sidecar requires Linux KVM at campaign time. Set `--harness-api-key-file` to use
+an ignored, protected key file instead of `LLM_API_KEY`. Harness traces are
+written below `<run_dir>/harness/`; profiles, tools, schemas, requests,
+responses, sessions, submissions, and the resolved guest environment are
+recorded in the run artifacts.
 
 Pi provides web retrieval, Context7, and an isolated Gondolin microVM with root
 shell, file, package-installation, and unrestricted HTTP(S) access. The host

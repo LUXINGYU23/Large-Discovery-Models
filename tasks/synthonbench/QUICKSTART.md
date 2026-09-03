@@ -55,18 +55,30 @@ concurrent requests with 16 indexed candidates in each response. If the selected
 not support that extension, set `--llm-extra-body-json '{}'` or supply its own
 compatible JSON body.
 
-To use the persistent four-profile harness, build its image and run the
-committed smoke profile after preparing official data:
+To use the persistent four-profile harness, build and smoke its task guest,
+then build the sidecar and run the committed smoke profile after preparing
+official data:
 
 ```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task synthonbench --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task synthonbench --cache-dir "$HARNESS_CACHE_DIR"
+
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/synthonbench \
   python scripts/run_ldm_tts.py \
-  config/synthonbench/ldm_harness_surrogate_smoke.yaml
+  config/synthonbench/ldm_harness_surrogate_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 ```
 
-Docker must have access to Linux KVM. The profile creates four persistent
+Guest building requires Docker, `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest
+smoke additionally requires the host-architecture QEMU system emulator. Docker
+must have access to Linux KVM at campaign time. The profile creates four persistent
 sessions, requests 16 candidates from each, and feeds all 64 occurrences into
 the existing LDM `q0 + GP-UCB acquisition tilt` path. Each session chooses its
 own reaction types and exact tuples through structured official SynthonSpace

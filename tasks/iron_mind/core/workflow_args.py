@@ -64,7 +64,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=tuple(sorted(PROMPT_POLICIES)),
         default=DEFAULT_PROMPT_POLICY,
     )
-    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument("--harness-candidates-per-session", type=int, default=16)
     parser.add_argument(
         "--harness-thinking",

@@ -10,11 +10,20 @@ import pytest
 from ldm_tts.harness import (
     HarnessClient,
     HarnessError,
+    HarnessGuestRuntime,
     HarnessPoolConfig,
     HarnessProfile,
     HarnessSubmissionValidation,
     HarnessTurn,
     parse_tool_call_budgets,
+)
+
+
+TEST_GUEST_RUNTIME = HarnessGuestRuntime(
+    image_ref="ldm/fixture-research:aaaaaaaaaaaa",
+    recipe_sha256="a" * 64,
+    rootfs_size="4G",
+    install_policy="session_overlay",
 )
 
 
@@ -40,6 +49,7 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         case_id="case-1",
         seed=1,
         candidate_schema=schema,
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
 
     frame = config.initialize_frame("initialize-1")
@@ -51,6 +61,7 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         schema_json.encode("utf-8")
     ).hexdigest()
     assert "candidateSchema" not in frame
+    assert frame["guestRuntime"] == TEST_GUEST_RUNTIME.to_dict()
     assert frame["webSearch"] == {
         "providers": ["parallel-mcp", "exa", "duckduckgo"],
         "fallbackOn": [
@@ -102,6 +113,7 @@ def test_persistent_harness_client_runs_one_profile_batch(
             "required": ["value"],
             "additionalProperties": False,
         },
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
     monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-secret")
@@ -166,6 +178,7 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
             "required": ["value"],
             "additionalProperties": False,
         },
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
     monkeypatch.setenv(environment_variable, "1")
     client = HarnessClient(

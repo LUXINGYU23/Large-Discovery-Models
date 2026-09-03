@@ -12,6 +12,7 @@ from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient,
+    HarnessGuestRuntime,
     HarnessProfile,
     HarnessSubmissionRejection,
     HarnessSubmissionRequest,
@@ -21,6 +22,7 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     canonical_sha256,
     file_sha256,
+    load_harness_guest_runtime,
     profile_set_sha256,
 )
 from tasks.iron_mind.core.candidate import (
@@ -59,6 +61,7 @@ HARNESS_TOOL_NAMES = (
 _LOCAL_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
 _LOCAL_PROFILE_ROOT = _LOCAL_RESOURCE_ROOT / "profiles"
 _LOCAL_TOOL_PATH = _LOCAL_RESOURCE_ROOT / "tools" / "reaction_space.mjs"
+_LOCAL_IMAGE_ROOT = _LOCAL_RESOURCE_ROOT / "image"
 
 
 def harness_candidate_schema(schema) -> dict[str, object]:
@@ -164,6 +167,10 @@ def harness_tool_extensions(
             HARNESS_TOOL_NAMES,
         ),
     )
+
+
+def harness_guest_runtime() -> HarnessGuestRuntime:
+    return load_harness_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
 
 
 class IronMindHarnessExpander:
@@ -586,6 +593,7 @@ __all__ = [
     "IronMindHarnessExpander",
     "harness_candidate_schema",
     "harness_profiles",
+    "harness_guest_runtime",
     "harness_tool_extensions",
     "write_harness_space_catalog",
 ]

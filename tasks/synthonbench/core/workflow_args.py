@@ -117,7 +117,7 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         default=DEFAULT_LLM_EXTRA_BODY_JSON,
         help="Provider-specific JSON object merged into the OpenAI-compatible request body.",
     )
-    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument("--harness-candidates-per-session", type=int, default=16)
     parser.add_argument(
         "--harness-thinking",

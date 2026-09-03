@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
-import { RealFSProvider, VM, createHttpHooks } from "@earendil-works/gondolin";
+import type { VM } from "@earendil-works/gondolin";
 import {
 	createBashTool,
 	createReadTool,
@@ -10,8 +11,10 @@ import {
 	type WriteOperations,
 } from "@earendil-works/pi-coding-agent";
 import type { NetworkPolicy } from "./protocol.js";
+import type { ResolvedGuestRuntime } from "./guest-image.js";
 
 const GUEST_WORKSPACE = "/workspace";
+const INVENTORY_LIMIT_BYTES = 256 * 1024;
 
 function hostMatches(hostname: string, configured: string): boolean {
 	const host = hostname.toLowerCase().replace(/\.$/, "");
@@ -108,6 +111,7 @@ export class GondolinController {
 	constructor(
 		private readonly hostWorkspace: string,
 		private readonly networkPolicy: NetworkPolicy,
+		private readonly guestRuntime: ResolvedGuestRuntime,
 	) {}
 
 	createExtension(): ExtensionFactory {
@@ -119,9 +123,10 @@ export class GondolinController {
 
 			const ensureVm = async (): Promise<VM> => {
 				if (this.vm) return this.vm;
-				if (!this.starting) {
-					this.starting = (async () => {
-						const { httpHooks, env } = createHttpHooks({
+			if (!this.starting) {
+				this.starting = (async () => {
+					const { createHttpHooks, RealFSProvider, VM } = await import("@earendil-works/gondolin");
+					const { httpHooks, env } = createHttpHooks({
 							...(this.networkPolicy.allowedHosts.length > 0
 								? { allowedHosts: this.networkPolicy.allowedHosts }
 								: {}),
@@ -135,6 +140,8 @@ export class GondolinController {
 						});
 						const created = await VM.create({
 							sessionLabel: `ldm-harness-${path.basename(hostWorkspace)}`,
+							sandbox: { imagePath: this.guestRuntime.assetDir },
+							rootfs: { mode: "cow", size: this.guestRuntime.rootfsSize },
 							httpHooks,
 							env,
 							vfs: { mounts: { [GUEST_WORKSPACE]: new RealFSProvider(hostWorkspace) } },
@@ -151,10 +158,6 @@ export class GondolinController {
 			pi.on("session_start", async () => {
 				await ensureVm();
 			});
-			pi.on("session_shutdown", async () => {
-				await this.close();
-			});
-
 			pi.registerTool({
 				...localRead,
 				async execute(id, params, signal, onUpdate) {
@@ -185,10 +188,68 @@ export class GondolinController {
 		};
 	}
 
+	async environmentSnapshot(): Promise<Record<string, unknown> | undefined> {
+		if (!this.vm) return undefined;
+		return {
+			guestRuntime: {
+				imageRef: this.guestRuntime.imageRef,
+				recipeSha256: this.guestRuntime.recipeSha256,
+				buildId: this.guestRuntime.buildId,
+				manifestSha256: this.guestRuntime.manifestSha256,
+				architecture: this.guestRuntime.architecture,
+				rootfsSize: this.guestRuntime.rootfsSize,
+				installPolicy: this.guestRuntime.installPolicy,
+			},
+			inventories: {
+				pipFreeze: await this.inventory("python -m pip freeze --all"),
+				micromambaExplicit: await this.inventory(
+					"if command -v micromamba >/dev/null 2>&1; then micromamba list --explicit; else exit 127; fi",
+				),
+				aptManual: await this.inventory(
+					"if command -v apt-mark >/dev/null 2>&1; then apt-mark showmanual; else exit 127; fi",
+				),
+			},
+		};
+	}
+
 	async close(): Promise<void> {
 		const active = this.vm;
 		this.vm = undefined;
 		if (!active) return;
 		await active.close();
 	}
+
+	private async inventory(command: string): Promise<Record<string, unknown>> {
+		if (!this.vm) return { command, error: "guest was not started" };
+		try {
+			const result = await this.vm.exec(["/bin/sh", "-lc", command], {
+				cwd: GUEST_WORKSPACE,
+				env: {
+					HOME: "/root",
+					PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+				},
+			});
+			return {
+				command,
+				exitCode: result.exitCode,
+				stdout: compactOutput(result.stdout),
+				stderr: compactOutput(result.stderr),
+			};
+		} catch (error) {
+			return { command, error: (error as Error).message };
+		}
+	}
+}
+
+function compactOutput(value: string): Record<string, unknown> {
+	const bytes = Buffer.from(value);
+	if (bytes.length <= INVENTORY_LIMIT_BYTES) {
+		return { value, bytes: bytes.length, truncated: false };
+	}
+	return {
+		value: bytes.subarray(0, INVENTORY_LIMIT_BYTES).toString("utf8"),
+		bytes: bytes.length,
+		truncated: true,
+		sha256: createHash("sha256").update(bytes).digest("hex"),
+	};
 }

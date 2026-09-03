@@ -21,3 +21,7 @@ The turn has a hard 30-minute wall-time. Stop open-ended research by minute 20, 
 - Validate the exact complete condition with `validate_reaction_candidate` before submission.
 - Submit exactly the candidate count requested in the turn contract.
 - If rejected, use the returned index, code, and reason to replace the rejected entry and resubmit without restarting the research phase.
+
+## Guest runtime
+
+Check dependencies before installing them, and install only what the current investigation needs. Do not upgrade the base operating system or alter benchmark infrastructure. Keep package caches and temporary environments outside `/workspace`; save only reusable scripts, compact data summaries, and research conclusions to `/workspace/research`.

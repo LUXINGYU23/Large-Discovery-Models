@@ -253,14 +253,24 @@ environment- or file-backed secret references. Configure tool limits with
 [`docs/research-harness.md`](../../docs/research-harness.md) for the schema,
 default network budgets, and accounting rules.
 
-Build the pinned sidecar image once:
+Build and smoke the task guest once, then build the pinned sidecar image:
 
 ```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task synthonbench --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task synthonbench --cache-dir "$HARNESS_CACHE_DIR"
+
 docker build -t ldm-pi-harness:latest harnesses/pi
 ```
 
-Linux KVM must be available to Docker. Keep the Gondolin cache and all run data
-outside the repository, then run the committed two-round smoke profile:
+Guest building requires Docker, `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest
+smoke additionally requires the host-architecture QEMU system emulator; Linux
+KVM must be available to Docker at campaign time. Keep the guest cache and all
+run data outside the repository, then run the committed two-round smoke profile:
 
 ```bash
 export SYNTHONBENCH_WORK_ROOT=/path/to/synthonbench-workdir
@@ -274,7 +284,8 @@ export LLM_API_KEY=your-secret
 
 uv run --locked --project tasks/synthonbench \
   python scripts/run_ldm_tts.py \
-  config/synthonbench/ldm_harness_surrogate_smoke.yaml
+  config/synthonbench/ldm_harness_surrogate_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 ```
 
 Instead of an API-key environment variable, pass
@@ -293,8 +304,8 @@ the sidecar once over stdin and are excluded from commands, container
 environment variables, manifests, sessions, and captured provider bodies.
 The run manifest records the campaign/task/case identity, seed, model and wire
 API, 262,144-token context window, Pi automatic-compaction settings, wall-time limit,
-network policy, tool set, pinned package versions, profile resource digests, and
-the profile-to-session mapping.
+network policy, tool set, pinned package versions, profile resource digests,
+resolved guest metadata, an environment snapshot, and the profile-to-session mapping.
 
 If a Responses stream ends with the known interrupted-stream error before
 terminal submission, the same session continues submission-only recovery using

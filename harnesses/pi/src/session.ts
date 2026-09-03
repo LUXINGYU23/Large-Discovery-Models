@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TUnsafe } from "typebox";
 import { GondolinController } from "./gondolin.js";
+import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
 import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
 import type {
@@ -305,6 +306,7 @@ class PersistentProfileSession {
 		private readonly profile: HarnessProfileConfig,
 		private readonly config: InitializeFrame,
 		private readonly proxy: ProviderProxy,
+		guestRuntime: ResolvedGuestRuntime,
 		namedSecrets: Readonly<Record<string, string>>,
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
@@ -315,7 +317,7 @@ class PersistentProfileSession {
 			config.webSearch.providers,
 			config.limits.toolCallBudgets,
 		);
-		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
+		this.gondolin = new GondolinController(this.workspace, config.networkPolicy, guestRuntime);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
 			namedSecrets,
@@ -539,6 +541,10 @@ class PersistentProfileSession {
 			sessionId: this.session.sessionManager.getSessionId(),
 			session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,
 			workspace: relative(this.config.artifactRoot, this.workspace),
+			environmentSnapshot: relative(
+				this.config.artifactRoot,
+				join(this.profileRoot, "environment_snapshot.json"),
+			),
 		};
 	}
 
@@ -547,13 +553,30 @@ class PersistentProfileSession {
 	}
 
 	async close(): Promise<void> {
-		if (this.session) {
-			await this.session.abort();
-			this.session.dispose();
-			this.session = undefined;
+		try {
+			if (this.session) {
+				await this.session.abort();
+				this.session.dispose();
+				this.session = undefined;
+			}
+		} finally {
+			try {
+				const snapshot = await this.gondolin.environmentSnapshot();
+				await atomicJson(join(this.profileRoot, "environment_snapshot.json"), snapshot ?? {
+					status: "guest_not_started",
+				});
+			} catch (error) {
+				await atomicJson(join(this.profileRoot, "environment_snapshot.json"), {
+					error: (error as Error).message,
+				});
+			} finally {
+				try {
+					await this.gondolin.close();
+				} finally {
+					await this.mcp.close();
+				}
+			}
 		}
-		await this.mcp.close();
-		await this.gondolin.close();
 	}
 
 	private async promptWithTimeout(message: string, limits: HarnessLimits): Promise<void> {
@@ -685,6 +708,7 @@ export class PiSessionPool {
 
 	async initialize(): Promise<void> {
 		await mkdir(this.config.artifactRoot, { recursive: true });
+		const guestRuntime = await resolveGuestRuntime(this.config.taskId, this.config.guestRuntime);
 		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
 			agentsSha256: profile.agentsSha256,
 			candidatesPerTurn: profile.candidatesPerTurn,
@@ -709,7 +733,13 @@ export class PiSessionPool {
 		);
 		await this.proxy.start();
 		for (const profile of this.config.profiles) {
-			const session = new PersistentProfileSession(profile, this.config, this.proxy, this.namedSecrets);
+			const session = new PersistentProfileSession(
+				profile,
+				this.config,
+				this.proxy,
+				guestRuntime,
+				this.namedSecrets,
+			);
 			this.sessions.set(profile.profileId, session);
 		}
 		await Promise.all([...this.sessions.values()].map((session) => session.initialize()));
@@ -727,6 +757,15 @@ export class PiSessionPool {
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
 			candidateSchemaSha256: this.config.candidateSchemaSha256,
+			guestRuntime: {
+				imageRef: guestRuntime.imageRef,
+				recipeSha256: guestRuntime.recipeSha256,
+				buildId: guestRuntime.buildId,
+				manifestSha256: guestRuntime.manifestSha256,
+				architecture: guestRuntime.architecture,
+				rootfsSize: guestRuntime.rootfsSize,
+				installPolicy: guestRuntime.installPolicy,
+			},
 			profileSetSha256,
 			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
 			networkPolicy: this.config.networkPolicy,

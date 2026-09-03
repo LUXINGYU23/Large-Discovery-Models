@@ -23,6 +23,7 @@ from ldm_tts.harness.protocol import (
     parse_tool_call_budgets,
 )
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
+from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
 
 __all__ = [
     "PROTOCOL_VERSION",
@@ -30,6 +31,7 @@ __all__ = [
     "HarnessClient",
     "HarnessError",
     "HarnessLimits",
+    "HarnessGuestRuntime",
     "HarnessMcpServer",
     "HarnessMcpValue",
     "HarnessNetworkPolicy",
@@ -48,4 +50,5 @@ __all__ = [
     "file_sha256",
     "profile_set_sha256",
     "parse_tool_call_budgets",
+    "load_harness_guest_runtime",
 ]

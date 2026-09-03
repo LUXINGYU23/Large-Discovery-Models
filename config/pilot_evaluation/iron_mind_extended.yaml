@@ -18,7 +18,7 @@ method_overrides:
     - args.harness-thinking="max"
     - args.harness-wall-time-seconds=1800
     - args.harness-response-timeout=2100
-    - args.harness-image="ldm-pi-harness:latest"
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
     - args.harness-cache-dir="${IRON_MIND_WORK_ROOT}/gondolin-cache"
   bo: []
   llm:
@@ -30,7 +30,7 @@ method_overrides:
     - args.harness-thinking="max"
     - args.harness-wall-time-seconds=1800
     - args.harness-response-timeout=2100
-    - args.harness-image="ldm-pi-harness:latest"
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
     - args.harness-cache-dir="${IRON_MIND_WORK_ROOT}/gondolin-cache"
 seeds: [0, 1, 2]
 optimization_rounds: 11

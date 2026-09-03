@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PiSessionPool } from "./session.js";
 import { PROTOCOL_VERSION, type InitializeFrame } from "./protocol.js";
 import { canonicalSha256, sha256 } from "./trace.js";
+import { configureGuestCache } from "./guest-image.js";
+import { loadTaskGuestRecipe, parseTaskGuestCommand } from "./task-guest-recipe.js";
 
 function usage() {
 	return {
@@ -73,7 +74,15 @@ function writeEvents(response: import("node:http").ServerResponse, events: unkno
 }
 
 async function main(): Promise<void> {
-	const root = await mkdtemp(join(tmpdir(), "ldm-pi-capability-"));
+	const command = parseTaskGuestCommand(process.argv.slice(2));
+	const cacheRoot = configureGuestCache(command.cacheDir);
+	process.env.TMPDIR = join(cacheRoot, "runtime-overlays");
+	await Promise.all([
+		mkdir(process.env.TMPDIR, { recursive: true }),
+		mkdir(join(cacheRoot, "build-tmp"), { recursive: true }),
+	]);
+	const recipe = await loadTaskGuestRecipe(command.taskId);
+	const root = await mkdtemp(join(cacheRoot, "build-tmp", "ldm-pi-capability-"));
 	const secret = "capability-smoke-secret";
 	let call = 0;
 	const requestBodies: string[] = [];
@@ -150,11 +159,12 @@ async function main(): Promise<void> {
 		wireApi: "responses",
 		model: "fake-responses-model",
 		thinking: "max",
-		taskId: "capability",
+		taskId: recipe.taskId,
 		caseId: "local-smoke",
 		seed: 1,
 		candidateSchema,
 		candidateSchemaSha256: canonicalSha256(candidateSchema),
+		guestRuntime: recipe.guestRuntime,
 		profileSetSha256: canonicalSha256([{
 			agentsSha256: profile.agentsSha256,
 			candidatesPerTurn: profile.candidatesPerTurn,
@@ -290,6 +300,7 @@ async function main(): Promise<void> {
 			contextWindow?: unknown;
 			compaction?: unknown;
 			profiles?: Array<{ sessionId?: unknown }>;
+			guestRuntime?: { imageRef?: unknown };
 		};
 		assert.equal(manifest.campaignId, config.campaignId);
 		assert.equal(manifest.profileSetSha256, config.profileSetSha256);
@@ -300,6 +311,7 @@ async function main(): Promise<void> {
 			keepRecentTokens: 20_000,
 		});
 		assert.equal(manifest.profiles?.[0]?.sessionId, turn.sessionId);
+		assert.equal(manifest.guestRuntime?.imageRef, recipe.guestRuntime.imageRef);
 
 		const recoveryRoot = join(root, "harness", "sessions", "target_sar", "turns", "capability_recovery_turn");
 		const recoveryIndex = await readFile(join(recoveryRoot, "provider_index.jsonl"), "utf8");

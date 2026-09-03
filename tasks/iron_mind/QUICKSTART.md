@@ -113,18 +113,30 @@ reactions.
 
 ## 5. Verify the Harness Backend
 
-Harness runs require Docker and Linux KVM. Build the pinned Pi sidecar, then
-run the two-round capability gate:
+Harness runs require Docker and Linux KVM. Build and smoke the task guest, then
+build the pinned Pi sidecar and run the two-round capability gate:
 
 ```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
   scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml
+  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 ```
+
+Guest building requires `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest smoke
+additionally requires the host-architecture QEMU system emulator and Linux KVM.
 
 To read the API key from a protected file, add
 `--set args.harness-api-key-file=/absolute/path/to/key`. The sidecar stores raw
