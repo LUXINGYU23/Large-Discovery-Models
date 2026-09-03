@@ -148,6 +148,12 @@ function sessionTools(context7Enabled: boolean, taskTools: string[], mcpTools: s
 	];
 }
 
+function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[] {
+	return servers.flatMap((server) =>
+		server.tools.map((tool) => "mcp__" + server.serverId + "__" + tool),
+	);
+}
+
 class SubmissionController {
 	private readonly parameters: TUnsafe<SubmissionParameters>;
 	private providerRequests = 0;
@@ -448,7 +454,7 @@ class PersistentProfileSession {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
-				this.mcp.toolNames(),
+				configuredMcpToolNames(this.config.mcpServers),
 			),
 		});
 		this.session = session;
@@ -775,9 +781,7 @@ export class PiSessionPool {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
-				this.config.mcpServers.flatMap((server) => server.tools.map(
-					(tool) => `mcp__${server.serverId}__${tool}`,
-				)),
+				configuredMcpToolNames(this.config.mcpServers),
 			),
 			toolExtensions: this.config.toolExtensions,
 			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),

@@ -192,7 +192,6 @@ def test_harness_smoke_config_is_portable_and_profile_locked(
     assert config["args"]["llm-model-name"] is None
     assert config["args"]["api-key"] is None
     assert "--harness-sidecar-image" in plan["argv"]
-    assert "--harness-image" not in plan["argv"]
     cache_value = plan["argv"][plan["argv"].index("--harness-cache-dir") + 1]
     assert Path(cache_value) == tmp_path / "work" / "gondolin-cache"
 

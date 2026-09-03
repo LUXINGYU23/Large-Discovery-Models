@@ -46,12 +46,6 @@ export class McpToolBridge {
 		}
 	}
 
-	toolNames(): string[] {
-		return this.connections.flatMap((connection) =>
-			connection.tools.map((tool) => piToolName(connection.config.serverId, tool.name))
-		);
-	}
-
 	toolDefinitions(): Array<ToolDefinition<TUnsafe<Record<string, unknown>>>> {
 		return this.connections.flatMap((connection) => connection.tools.map((tool) => ({
 			name: piToolName(connection.config.serverId, tool.name),

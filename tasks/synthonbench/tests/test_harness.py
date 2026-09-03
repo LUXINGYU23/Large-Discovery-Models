@@ -258,7 +258,7 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
         FakeHarnessClient(candidate={"reaction_id": "r1", "synthon_ids": [1, 11]}),
         SynthonCandidateDomain(space, ("r1",), "kif11"),
         target="kif11",
-        profiles=harness_profiles(1, resource_root=Path("profiles")),
+        profiles=harness_profiles(1),
         campaign_id="test-campaign",
         first_active_round=0,
         attach_empirical_q0=True,
@@ -294,7 +294,7 @@ def test_harness_task_spec_declares_persistent_four_profile_sampling() -> None:
 def test_direct_harness_submits_one_distinct_sixteen_candidate_minibatch() -> None:
     space = _space()
     domain = SynthonCandidateDomain(space, ("r1",), "kif11")
-    profiles = direct_harness_profile(16, resource_root=Path("profiles"))
+    profiles = direct_harness_profile(16)
     candidates = [
         {"reaction_id": "r1", "synthon_ids": list(ids)}
         for ids in list(product(range(1, 7), range(11, 14)))[:16]
@@ -443,7 +443,7 @@ def _expander(client) -> SynthonHarnessExpander:
         client,
         domain,
         target="kif11",
-        profiles=harness_profiles(1, resource_root=Path("profiles")),
+        profiles=harness_profiles(1),
         campaign_id="test-campaign",
         first_active_round=0,
         attach_empirical_q0=True,

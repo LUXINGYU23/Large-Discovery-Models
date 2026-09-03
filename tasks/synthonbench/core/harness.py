@@ -76,6 +76,7 @@ _LOCAL_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harn
 _LOCAL_PROFILE_ROOT = _LOCAL_RESOURCE_ROOT / "profiles"
 _LOCAL_TOOL_PATH = _LOCAL_RESOURCE_ROOT / "tools" / "synthon_space.mjs"
 _LOCAL_IMAGE_ROOT = _LOCAL_RESOURCE_ROOT / "image"
+_CONTAINER_PROFILE_ROOT = Path("/resources/profiles")
 
 
 def write_harness_space_catalog(
@@ -120,15 +121,11 @@ def _reaction_metadata(path: Path | None) -> dict[str, dict[str, str]]:
         }
 
 
-def harness_profiles(
-    candidates_per_turn: int,
-    *,
-    resource_root: Path = Path("/resources/profiles"),
-) -> tuple[HarnessProfile, ...]:
+def harness_profiles(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
     return tuple(
         HarnessProfile(
             profile_id,
-            resource_root / profile_id / "AGENTS.md",
+            _CONTAINER_PROFILE_ROOT / profile_id / "AGENTS.md",
             candidates_per_turn,
             agents_sha256=file_sha256(_LOCAL_PROFILE_ROOT / profile_id / "AGENTS.md"),
         )
@@ -136,15 +133,11 @@ def harness_profiles(
     )
 
 
-def direct_harness_profile(
-    candidates_per_turn: int,
-    *,
-    resource_root: Path = Path("/resources/profiles"),
-) -> tuple[HarnessProfile, ...]:
+def direct_harness_profile(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(
             DIRECT_HARNESS_PROFILE_ID,
-            resource_root / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
+            _CONTAINER_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
             candidates_per_turn,
             agents_sha256=file_sha256(
                 _LOCAL_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md"
@@ -153,12 +146,10 @@ def direct_harness_profile(
     )
 
 
-def harness_tool_extensions(
-    *, resource_root: Path = Path("/resources/tools")
-) -> tuple[HarnessToolExtension, ...]:
+def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
     return (
         HarnessToolExtension(
-            resource_root / "synthon_space.mjs",
+            Path("/resources/tools/synthon_space.mjs"),
             file_sha256(_LOCAL_TOOL_PATH),
             HARNESS_TOOL_NAMES,
         ),
