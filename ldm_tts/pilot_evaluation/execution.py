@@ -19,6 +19,7 @@ from ldm_tts.pilot_evaluation.reporting import write_evaluation_reports
 
 
 _MANIFEST_NAME = "evaluation_manifest.json"
+_COMPILED_METHOD = "ldm_harness_compiled"
 
 
 @dataclass(frozen=True)
@@ -202,14 +203,56 @@ def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _Eval
         status="completed",
         run_dir=str(run.run_dir.relative_to(spec.output_root)),
     )
-    if run.method in {"ldm_harness", "harness"}:
-        entry["harness"] = _harness_provenance(run.run_dir, spec.output_root)
+    if run.method == _COMPILED_METHOD:
+        entry["harness"] = _compiled_harness_provenance(
+            run.run_dir,
+            spec.output_root,
+        )
+    elif run.method in {"ldm_harness", "harness"}:
+        entry["harness"] = _harness_manifest_provenance(
+            run.run_dir / "harness" / "manifest.json",
+            spec.output_root,
+        )
 
 
-def _harness_provenance(run_dir: Path, output_root: Path) -> dict[str, Any]:
-    path = run_dir / "harness" / "manifest.json"
+def _compiled_harness_provenance(
+    run_dir: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    proposal = _harness_manifest_provenance(
+        run_dir / "harness" / "manifest.json",
+        output_root,
+    )
+    policy = _harness_manifest_provenance(
+        run_dir / "policy_harness" / "manifest.json",
+        output_root,
+    )
+    for field in ("campaign_id", "task_id", "seed"):
+        if proposal[field] is None or proposal[field] != policy[field]:
+            raise ValueError(
+                f"compiled Harness proposal/policy {field} identities differ: {run_dir}"
+            )
+    if policy["case_id"] != f"{proposal['case_id']}:optimization_policy":
+        raise ValueError(f"compiled Harness policy case identity is invalid: {run_dir}")
+    for field in ("backend", "base_url", "wire_api", "model", "thinking"):
+        if proposal[field] != policy[field]:
+            raise ValueError(
+                f"compiled Harness proposal/policy {field} settings differ: {run_dir}"
+            )
+    if len(proposal["profiles"] or ()) != 4 or len(policy["profiles"] or ()) != 1:
+        raise ValueError(
+            "compiled Harness requires four proposal profiles and one policy profile: "
+            f"{run_dir}"
+        )
+    return {"topology": "dual_pool", "proposal": proposal, "policy": policy}
+
+
+def _harness_manifest_provenance(
+    path: Path,
+    output_root: Path,
+) -> dict[str, Any]:
     if not path.is_file():
-        raise ValueError(f"completed Harness campaign lacks its manifest: {run_dir}")
+        raise ValueError(f"completed Harness campaign lacks its manifest: {path.parent}")
     manifest = _read_json(path)
     limits = manifest.get("limits")
     if not isinstance(limits, dict):
@@ -217,18 +260,27 @@ def _harness_provenance(run_dir: Path, output_root: Path) -> dict[str, Any]:
     return {
         "artifact": str(path.relative_to(output_root)),
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "protocol_version": manifest.get("protocolVersion"),
+        "campaign_id": manifest.get("campaignId"),
+        "task_id": manifest.get("taskId"),
+        "case_id": manifest.get("caseId"),
+        "seed": manifest.get("seed"),
         "backend": manifest.get("backend"),
         "base_url": manifest.get("baseUrl"),
+        "wire_api": manifest.get("wireApi"),
         "model": manifest.get("model"),
         "thinking": manifest.get("thinking"),
+        "profile_set_sha256": manifest.get("profileSetSha256"),
         "profiles": manifest.get("profiles"),
+        "guest_runtime": manifest.get("guestRuntime"),
+        "submission_contract": manifest.get("submissionContract"),
         "mcp_servers": manifest.get("mcpServers"),
         "tool_call_budgets": limits.get("toolCallBudgets"),
     }
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "ldm_harness", "harness"}:
+    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

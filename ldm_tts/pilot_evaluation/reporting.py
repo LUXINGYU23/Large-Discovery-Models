@@ -18,32 +18,64 @@ from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 METHOD_LABELS = {
     "ldm": "LDM",
     "ldm_harness": "LDM + Research Harness",
+    "ldm_harness_compiled": "Harness-Compiled LDM",
     "bo": "Bayesian Optimization",
     "llm": "Direct LLM",
     "harness": "Direct Research Harness",
 }
+_COMPILED_METHOD = "ldm_harness_compiled"
+_REPORT_BUDGET_COUNTERS = (
+    "outer_iterations",
+    "llm_requests",
+    "proposal_attempts",
+    "harness_turns",
+    "harness_tool_calls",
+    "harness_validation_submissions",
+    "harness_artifact_bytes",
+    "harness_wall_time_seconds",
+    "policy_harness_turns",
+    "policy_provider_requests",
+    "policy_tool_calls",
+    "policy_validation_submissions",
+    "policy_artifact_bytes",
+    "policy_wall_time_seconds",
+    "valid_search_candidates",
+    "selected_candidates",
+    "external_evaluations",
+    "expensive_evaluation_attempts",
+    "successful_evaluations",
+    "benchmark_jobs",
+)
 
 
 def write_evaluation_reports(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> None:
     """Validate completed child artifacts and export task-neutral evaluation outputs."""
 
     runs = _run_records(spec, manifest)
-    rows, trajectories = _collect(spec, runs)
+    rows, trajectories, policy_rounds = _collect(spec, runs)
     integrity = _integrity(spec, rows, trajectories)
     if not integrity["valid"]:
-        _write_outputs(spec, rows, trajectories, {"verdict": "invalid", "integrity": integrity})
+        _write_outputs(
+            spec,
+            rows,
+            trajectories,
+            policy_rounds,
+            {"verdict": "invalid", "integrity": integrity},
+        )
         manifest.update(state="invalid", integrity=integrity)
         atomic_json_write(spec.output_root / "evaluation_manifest.json", manifest)
         raise RuntimeError("pilot evaluation integrity validation failed")
     aggregates = _aggregate(rows)
     verdict = _verdict(rows, aggregates, spec.trajectory.direction)
-    _write_outputs(spec, rows, trajectories, verdict)
+    _write_outputs(spec, rows, trajectories, policy_rounds, verdict)
     manifest.update(state="completed", integrity=integrity)
     manifest.pop("error", None)
     manifest["reports"] = {
         "summary": "summary.csv", "summary_json": "summary.json", "trajectories": "trajectories.csv",
         "plot": "best_so_far.png", "verdict": "summary.json",
     }
+    if policy_rounds:
+        manifest["reports"]["compiled_policy_rounds"] = "compiled_policy_rounds.csv"
     atomic_json_write(spec.output_root / "evaluation_manifest.json", manifest)
 
 
@@ -55,9 +87,17 @@ def _run_records(spec, manifest) -> list[tuple[str, dict[str, Any]]]:
     return sorted(manifest["runs"].items())
 
 
-def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _collect(
+    spec,
+    records,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     rows: list[dict[str, Any]] = []
     trajectories: list[dict[str, Any]] = []
+    policy_rounds: list[dict[str, Any]] = []
     for key, record in records:
         if record.get("status") != "completed":
             raise ValueError(f"incomplete child campaign: {key}")
@@ -108,9 +148,17 @@ def _collect(spec, records) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
             "initial_candidate_ids": initial_candidate_ids,
             "candidate_ids_unique": len(canonical_keys) == len(set(canonical_keys)),
         }
+        if method == _COMPILED_METHOD:
+            compiled = _compiled_policy_records(
+                run_dir,
+                case,
+                int(seed_text.removeprefix("seed_")),
+            )
+            row.update(_compiled_policy_summary(compiled))
+            policy_rounds.extend(compiled)
         rows.append(row)
         trajectories.extend(round_rows)
-    return rows, trajectories
+    return rows, trajectories, policy_rounds
 
 
 def _round_rows(spec, run_dir, case, method, seed, observations) -> list[dict[str, Any]]:
@@ -181,17 +229,26 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             )
             if actual != expected:
                 errors.append(f"unexpected proposal count for {row['case']}/{row['method']}/{row['seed']}")
-        if row["method"] == "ldm_harness":
+        if row["method"] in {"ldm_harness", _COMPILED_METHOD}:
             per_session = row["harness_candidates_per_session"]
             if per_session < 1 or row["proposal_samples"] % per_session:
                 errors.append(
-                    f"invalid LDM Harness minibatch for {row['case']}/{row['seed']}"
+                    f"invalid LDM Harness minibatch for {row['case']}/{row['method']}/{row['seed']}"
                 )
             else:
                 turns = spec.optimization_rounds * (row["proposal_samples"] // per_session)
                 if row["budget_proposal_attempts"] != turns or row["budget_harness_turns"] != turns:
                     errors.append(
-                        f"unexpected LDM Harness turn count for {row['case']}/{row['seed']}"
+                        f"unexpected LDM Harness turn count for {row['case']}/{row['method']}/{row['seed']}"
+                    )
+            if row["method"] == _COMPILED_METHOD:
+                if row.get("budget_policy_harness_turns", 0) != spec.optimization_rounds:
+                    errors.append(
+                        f"unexpected compiled policy turn count for {row['case']}/{row['seed']}"
+                    )
+                if row.get("policy_rounds", 0) != spec.optimization_rounds:
+                    errors.append(
+                        f"unexpected compiled policy result count for {row['case']}/{row['seed']}"
                     )
         if row["method"] == "harness":
             if row["proposal_samples"] != row["evaluations_per_round"]:
@@ -245,19 +302,14 @@ def _verdict(rows, aggregates, direction: str) -> dict[str, Any]:
     better = operator.gt if direction == "maximize" else operator.lt
     for case in sorted({item["case"] for item in rows}):
         summary = {item["method"]: item for item in aggregates if item["case"] == case}
-        verdict, wins = _method_verdict(rows, case, summary, "ldm", better)
-        result = {"case": case, "verdict": verdict, "ldm_seed_wins": wins}
-        if "ldm_harness" in summary:
-            harness_ldm_verdict, harness_ldm_wins = _method_verdict(
-                rows, case, summary, "ldm_harness", better
-            )
-            result.update(
-                ldm_harness_verdict=harness_ldm_verdict,
-                ldm_harness_seed_wins=harness_ldm_wins,
-            )
-        if "harness" in summary:
-            harness_verdict, harness_wins = _method_verdict(rows, case, summary, "harness", better)
-            result.update(harness_verdict=harness_verdict, harness_seed_wins=harness_wins)
+        result = {"case": case}
+        for method in ("ldm", "ldm_harness", _COMPILED_METHOD, "harness"):
+            if method not in summary:
+                continue
+            verdict, wins = _method_verdict(rows, case, summary, method, better)
+            verdict_key = "verdict" if method == "ldm" else f"{method}_verdict"
+            wins_key = "ldm_seed_wins" if method == "ldm" else f"{method}_seed_wins"
+            result.update({verdict_key: verdict, wins_key: wins})
         cases.append(result)
     return {"schema_version": 1, "cases": cases, "aggregates": aggregates}
 
@@ -290,9 +342,276 @@ def _method_verdict(rows, case, summary, method, better):
     return "mixed", wins
 
 
-def _write_outputs(spec, rows, trajectories, summary) -> None:
+def _compiled_policy_records(
+    run_dir: Path,
+    case: str,
+    seed: int,
+) -> list[dict[str, Any]]:
+    selections = _json_object(run_dir / "selection_record.json").get("selections")
+    if not isinstance(selections, list):
+        raise ValueError(f"compiled policy selection record is invalid: {run_dir}")
+    records = []
+    for event in selections:
+        if not isinstance(event, dict) or not isinstance(event.get("payload"), dict):
+            raise ValueError(f"compiled policy selection event is invalid: {run_dir}")
+        payload = event["payload"]
+        metadata = payload.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        policy = metadata.get("compiled_policy")
+        if policy is None:
+            continue
+        if not isinstance(policy, dict):
+            raise ValueError(f"compiled policy metadata is invalid: {run_dir}")
+        round_index = event.get("iteration")
+        if isinstance(round_index, bool) or not isinstance(round_index, int):
+            raise ValueError(f"compiled policy round index is invalid: {run_dir}")
+        records.append(
+            _compiled_policy_record(
+                run_dir,
+                case,
+                seed,
+                round_index,
+                metadata,
+                policy,
+            )
+        )
+    return sorted(records, key=lambda item: item["round"])
+
+
+def _compiled_policy_record(
+    run_dir: Path,
+    case: str,
+    seed: int,
+    round_index: int,
+    metadata: dict[str, Any],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    round_dir = run_dir / "policy_harness" / "rounds" / f"round_{round_index:03d}"
+    persisted = _json_object(round_dir / "result.json")
+    round_manifest = _json_object(round_dir / "manifest.json")
+    if persisted.get("input_sha256") != round_manifest.get("input_sha256"):
+        raise ValueError(f"compiled policy input digest mismatch: {round_dir}")
+    for field in (
+        "epoch_id",
+        "artifact_sha256",
+        "source",
+        "degraded",
+        "stage",
+        "alpha",
+        "eta",
+    ):
+        if not _equivalent(policy.get(field), persisted.get(field)):
+            raise ValueError(
+                f"compiled policy selector/result {field} mismatch: {round_dir}"
+            )
+    turn = policy.get("harness_turn")
+    if turn is not None:
+        _validate_policy_turn(run_dir, persisted, turn)
+    if turn is None:
+        usage = {}
+    elif not isinstance(turn, dict) or not isinstance(turn.get("usage"), dict):
+        raise ValueError("compiled policy Harness usage is invalid")
+    else:
+        usage = turn["usage"]
+    tool_calls = usage.get("toolCalls", {})
+    if not isinstance(tool_calls, dict):
+        raise ValueError("compiled policy toolCalls must be an object")
+    validation_errors = policy.get("validation_errors", [])
+    if not isinstance(validation_errors, list):
+        raise ValueError("compiled policy validation_errors must be an array")
+    validation_submissions = int(usage.get("validationSubmissions", 0))
+    validation_failures = validation_submissions - int(
+        policy.get("status") == "accepted"
+    )
+    base = metadata.get("base_selection")
+    if not isinstance(base, dict):
+        base = {}
+    baseline = policy.get("baseline_prediction_diagnostics")
+    compiled = policy.get("compiled_prediction_diagnostics")
+    return {
+        "case": case,
+        "method": _COMPILED_METHOD,
+        "method_label": METHOD_LABELS[_COMPILED_METHOD],
+        "seed": seed,
+        "round": round_index,
+        "action": str(policy.get("action", "")),
+        "status": str(policy.get("status", "")),
+        "source": str(policy.get("source", "")),
+        "epoch_id": policy.get("epoch_id"),
+        "artifact_sha256": policy.get("artifact_sha256"),
+        "degraded": bool(policy.get("degraded", False)),
+        "stage": str(policy.get("stage", "")),
+        "alpha": _optional_finite(policy.get("alpha"), "compiled alpha"),
+        "eta": _optional_finite(policy.get("eta"), "compiled eta"),
+        "prior_clip_count": int(policy.get("prior_clip_count", 0)),
+        "validation_error_count": len(validation_errors),
+        "validation_submission_count": validation_submissions,
+        "validation_failure_count": max(validation_failures, 0),
+        "provider_request_count": int(usage.get("providerCalls", 0)),
+        "tool_call_count": sum(int(value) for value in tool_calls.values()),
+        "artifact_bytes": int(usage.get("artifactBytes", 0)),
+        "gp_mean_source": str(base.get("mean_source", "")),
+        "gp_prior_clip_count": int(base.get("prior_mean_clip_count", 0)),
+        "gp_residual_target_mean": _optional_finite(
+            base.get("residual_target_mean"),
+            "residual target mean",
+        ),
+        "gp_residual_target_std": _optional_finite(
+            base.get("residual_target_std"),
+            "residual target std",
+        ),
+        "baseline_prediction_mean": _diagnostic_value(baseline, "mean_mean"),
+        "baseline_prediction_std": _diagnostic_value(baseline, "mean_std"),
+        "compiled_prediction_mean": _diagnostic_value(compiled, "mean_mean"),
+        "compiled_prediction_std": _diagnostic_value(compiled, "mean_std"),
+        "baseline_acquisition_mean": _diagnostic_value(
+            baseline,
+            "acquisition_mean",
+        ),
+        "baseline_acquisition_std": _diagnostic_value(
+            baseline,
+            "acquisition_std",
+        ),
+        "compiled_acquisition_mean": _diagnostic_value(
+            compiled,
+            "acquisition_mean",
+        ),
+        "compiled_acquisition_std": _diagnostic_value(
+            compiled,
+            "acquisition_std",
+        ),
+        "baseline_compiled_top10_overlap": _optional_finite(
+            policy.get("baseline_compiled_top10_overlap"),
+            "baseline/compiled top-10 overlap",
+        ),
+        "q0_entropy": _optional_finite(
+            metadata.get("base_probability_entropy"),
+            "q0 entropy",
+        ),
+        "tilted_entropy": _optional_finite(
+            metadata.get("probability_entropy"),
+            "tilted entropy",
+        ),
+        "tilted_ess": _optional_finite(
+            metadata.get("probability_effective_sample_size"),
+            "tilted effective sample size",
+        ),
+        "tilted_kl_from_q0": _optional_finite(
+            metadata.get("tilted_kl_from_q0"),
+            "tilted KL from q0",
+        ),
+        "q0_tilted_topk_overlap": _optional_finite(
+            metadata.get("q0_tilted_topk_overlap"),
+            "q0/tilted top-k overlap",
+        ),
+    }
+
+
+def _validate_policy_turn(
+    run_dir: Path,
+    persisted: dict[str, Any],
+    turn: Any,
+) -> None:
+    if not isinstance(turn, dict) or not isinstance(turn.get("turn_id"), str):
+        raise ValueError(f"compiled policy Harness turn metadata is invalid: {run_dir}")
+    committed = _json_object(
+        run_dir
+        / "policy_harness"
+        / "turns"
+        / turn["turn_id"]
+        / "turn_committed.json"
+    )
+    expected = {
+        "turnId": turn["turn_id"],
+        "sessionId": turn.get("session_id"),
+        "submissionDigest": persisted.get("submission_sha256"),
+    }
+    if any(committed.get(field) != value for field, value in expected.items()):
+        raise ValueError(
+            "compiled policy committed turn does not match selector metadata: "
+            f"{run_dir}"
+        )
+
+
+def _compiled_policy_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    if not records:
+        return {
+            "policy_rounds": 0,
+            "policy_degraded_rounds": 0,
+            "policy_fallback_rounds": 0,
+            "policy_validation_failures": 0,
+            "policy_prior_clip_count": 0,
+        }
+    last = records[-1]
+    return {
+        "policy_rounds": len(records),
+        "policy_degraded_rounds": sum(bool(item["degraded"]) for item in records),
+        "policy_fallback_rounds": sum(item["action"] == "fallback" for item in records),
+        "policy_validation_failures": sum(
+            int(item["validation_failure_count"]) for item in records
+        ),
+        "policy_prior_clip_count": sum(int(item["prior_clip_count"]) for item in records),
+        "policy_last_action": last["action"],
+        "policy_last_source": last["source"],
+        "policy_last_epoch_id": last["epoch_id"],
+        "policy_last_stage": last["stage"],
+        "policy_last_alpha": last["alpha"],
+        "policy_last_eta": last["eta"],
+        "policy_mean_q0_entropy": _mean_present(records, "q0_entropy"),
+        "policy_mean_tilted_entropy": _mean_present(records, "tilted_entropy"),
+        "policy_mean_tilted_ess": _mean_present(records, "tilted_ess"),
+        "policy_mean_tilted_kl_from_q0": _mean_present(
+            records,
+            "tilted_kl_from_q0",
+        ),
+        "policy_mean_q0_tilted_topk_overlap": _mean_present(
+            records,
+            "q0_tilted_topk_overlap",
+        ),
+        "policy_mean_baseline_compiled_top10_overlap": _mean_present(
+            records,
+            "baseline_compiled_top10_overlap",
+        ),
+    }
+
+
+def _diagnostic_value(value: Any, key: str) -> float | None:
+    return (
+        _optional_finite(value.get(key), f"prediction diagnostic {key}")
+        if isinstance(value, dict)
+        else None
+    )
+
+
+def _mean_present(records: list[dict[str, Any]], key: str) -> float | None:
+    values = [float(item[key]) for item in records if item.get(key) is not None]
+    return statistics.fmean(values) if values else None
+
+
+def _optional_finite(value: Any, label: str) -> float | None:
+    return None if value is None else _finite(value, label)
+
+
+def _equivalent(left: Any, right: Any) -> bool:
+    if (
+        not isinstance(left, bool)
+        and not isinstance(right, bool)
+        and isinstance(left, (int, float))
+        and isinstance(right, (int, float))
+    ):
+        return math.isclose(float(left), float(right), rel_tol=0.0, abs_tol=1.0e-12)
+    return left == right
+
+
+def _write_outputs(spec, rows, trajectories, policy_rounds, summary) -> None:
     _write_csv(spec.output_root / "summary.csv", rows)
     _write_csv(spec.output_root / "trajectories.csv", trajectories)
+    if policy_rounds:
+        _write_csv(
+            spec.output_root / "compiled_policy_rounds.csv",
+            policy_rounds,
+        )
     atomic_json_write(spec.output_root / "summary.json", summary)
     _plot(spec, trajectories)
 
@@ -352,7 +671,11 @@ def _budget_fields(budget: dict[str, Any]) -> dict[str, float]:
     counters = budget.get("counters")
     if not isinstance(counters, dict):
         raise ValueError("budget counters must be an object")
-    return {f"budget_{key}": _finite(value, f"budget {key}") for key, value in counters.items()}
+    names = set(counters) | set(_REPORT_BUDGET_COUNTERS)
+    return {
+        f"budget_{key}": _finite(counters.get(key, 0), f"budget {key}")
+        for key in sorted(names)
+    }
 
 
 def _observations(run_dir: Path) -> list[dict[str, Any]]:

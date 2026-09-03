@@ -116,11 +116,15 @@ class HarnessClient:
         if len(expected) != len(turns):
             raise ValueError("harness turn profile IDs must be unique")
         terminal_validations: dict[str, tuple[str, str]] = {}
+        validation_submissions: dict[str, int] = {}
 
         def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
             turn = expected.get(request.profile_id)
             if turn is None or request.turn_id != turn.turn_id:
-                raise HarnessError("harness submission validation request does not match the turn batch")
+                raise HarnessError(
+                    "harness submission validation request does not match the turn batch"
+                )
+            validation_submissions[request.profile_id] = request.attempt_index
             validation = submission_validator(request)
             maximum = self.config.submission_contract.max_validation_attempts
             if (
@@ -144,10 +148,17 @@ class HarnessClient:
         if not isinstance(raw_turns, list):
             raise HarnessError("harness response is missing committed turns")
         results = tuple(_parse_turn_result(item) for item in raw_turns)
-        if {result.profile_id for result in results} != set(expected) or len(results) != len(turns):
+        if (
+            {result.profile_id for result in results} != set(expected)
+            or len(results) != len(turns)
+        ):
             raise HarnessError("harness response does not match the requested profiles")
         for result in results:
             turn = expected[result.profile_id]
+            result.usage["validationSubmissions"] = validation_submissions.get(
+                result.profile_id,
+                0,
+            )
             if (
                 result.turn_id != turn.turn_id
                 or result.round_index != turn.round_index

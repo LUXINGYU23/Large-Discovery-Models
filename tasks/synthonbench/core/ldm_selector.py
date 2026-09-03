@@ -159,6 +159,7 @@ class AcquisitionTiltedSelector:
             pool,
             replace(self.config, alpha=alpha, eta=eta),
             seed,
+            count,
         )
         if policy is not None:
             metadata["compiled_policy"] = {
@@ -211,6 +212,24 @@ class AcquisitionTiltedSelector:
             count=len(pool.candidates),
             query_prior_mean=policy.query_prior_mean,
         )
+        compiled_predictions = _ordered_predictions(pool.candidates, result.predictions)
+        policy = replace(
+            policy,
+            metadata={
+                **dict(policy.metadata),
+                "baseline_prediction_diagnostics": _prediction_diagnostics(
+                    ordered_baseline
+                ),
+                "compiled_prediction_diagnostics": _prediction_diagnostics(
+                    compiled_predictions
+                ),
+                "baseline_compiled_top10_overlap": _ranking_overlap(
+                    ordered_baseline,
+                    compiled_predictions,
+                    10,
+                ),
+            },
+        )
         return result, policy
 
     def _score_pool(
@@ -257,6 +276,46 @@ def _acquisition_scores(predictions: Sequence[BOPrediction]) -> np.ndarray:
     return scores
 
 
+def _prediction_diagnostics(
+    predictions: Sequence[BOPrediction],
+) -> dict[str, float]:
+    means = np.asarray([item.scalar_mean for item in predictions], dtype=float)
+    acquisition = _acquisition_scores(predictions)
+    return {
+        "mean_mean": float(means.mean()),
+        "mean_std": float(means.std()),
+        "acquisition_mean": float(acquisition.mean()),
+        "acquisition_std": float(acquisition.std()),
+    }
+
+
+def _ranking_overlap(
+    baseline: Sequence[BOPrediction],
+    compiled: Sequence[BOPrediction],
+    count: int,
+) -> float:
+    size = min(count, len(baseline), len(compiled))
+    if size == 0:
+        return 0.0
+    baseline_top = {
+        item.candidate_id
+        for item in sorted(
+            baseline,
+            key=lambda item: float(item.acquisition_score),
+            reverse=True,
+        )[:size]
+    }
+    compiled_top = {
+        item.candidate_id
+        for item in sorted(
+            compiled,
+            key=lambda item: float(item.acquisition_score),
+            reverse=True,
+        )[:size]
+    }
+    return len(baseline_top & compiled_top) / size
+
+
 def _annotate_predictions(state: _TiltState) -> tuple[BOPrediction, ...]:
     return tuple(
         replace(prediction, metadata={
@@ -273,8 +332,13 @@ def _annotate_predictions(state: _TiltState) -> tuple[BOPrediction, ...]:
     )
 
 
-def _selection_metadata(state: _TiltState, pool: EmpiricalPool,
-                        config: AcquisitionTiltConfig, seed: int) -> dict[str, object]:
+def _selection_metadata(
+    state: _TiltState,
+    pool: EmpiricalPool,
+    config: AcquisitionTiltConfig,
+    seed: int,
+    top_k_count: int,
+) -> dict[str, object]:
     return {
         "selection_mode": "acquisition_tilted_sampling",
         "base_measure": "empirical_proposal_frequency",
@@ -294,10 +358,32 @@ def _selection_metadata(state: _TiltState, pool: EmpiricalPool,
         "pool_maintenance": pool.maintenance_method,
         "pool_seed": pool.maintenance_seed,
         "selection_q0_scope": "conditioned_on_maintained_bo_pool",
+        "base_probability_entropy": probability_entropy(state.q0),
         "probability_entropy": probability_entropy(state.probabilities),
         "probability_effective_sample_size": effective_sample_size(state.probabilities),
+        "tilted_kl_from_q0": _probability_kl(state.probabilities, state.q0),
+        "q0_tilted_topk_overlap": _distribution_top_k_overlap(
+            state.q0,
+            state.probabilities,
+            top_k_count,
+        ),
         "base_selection": dict(state.base_result.metadata),
     }
+
+
+def _probability_kl(probabilities: np.ndarray, base: np.ndarray) -> float:
+    return float(np.sum(probabilities * (np.log(probabilities) - np.log(base))))
+
+
+def _distribution_top_k_overlap(
+    left: np.ndarray,
+    right: np.ndarray,
+    count: int,
+) -> float:
+    size = min(max(count, 1), len(left))
+    left_top = set(np.argsort(-left, kind="stable")[:size])
+    right_top = set(np.argsort(-right, kind="stable")[:size])
+    return len(left_top & right_top) / size
 
 
 __all__ = ["AcquisitionTiltedSelector"]

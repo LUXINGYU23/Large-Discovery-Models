@@ -54,6 +54,15 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         dynamic["policy_harness_turns"] = search_rounds
+    else:
+        dynamic.update(
+            policy_harness_turns=0,
+            policy_provider_requests=0,
+            policy_tool_calls=0,
+            policy_validation_submissions=0,
+            policy_artifact_bytes=0,
+            policy_wall_time_seconds=0,
+        )
     if args.search_method not in PERSISTENT_HARNESS_METHODS:
         dynamic["llm_requests"] = llm_requests
     return {**dynamic, **dict(profile_budget or {})}

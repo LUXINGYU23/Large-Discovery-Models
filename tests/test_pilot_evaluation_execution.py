@@ -105,24 +105,41 @@ def test_harness_methods_build_distinct_child_plans(monkeypatch, tmp_path: Path)
         for run in _select_runs(
             spec,
             cases=("reductive_amination",),
-            methods=("ldm_harness", "harness"),
+            methods=("ldm_harness", "ldm_harness_compiled", "harness"),
             seeds=(0,),
         )
     }
 
     ldm_harness = _child_plan(spec, base, runs["ldm_harness"], resume=False)
+    compiled = _child_plan(
+        spec,
+        base,
+        runs["ldm_harness_compiled"],
+        resume=False,
+    )
     direct_harness = _child_plan(spec, base, runs["harness"], resume=False)
 
     assert ldm_harness["contract_profile"] == "pilot_evaluation_ldm_harness"
+    assert compiled["contract_profile"] == "pilot_evaluation_ldm_harness_compiled"
     assert direct_harness["contract_profile"] == "pilot_evaluation_harness"
     assert _option(ldm_harness["argv"], "--search-method") == "ldm_harness"
+    assert _option(compiled["argv"], "--search-method") == "ldm_harness_compiled"
     assert _option(direct_harness["argv"], "--search-method") == "harness"
     assert _option(ldm_harness["argv"], "--proposal-samples") == "64"
+    assert _option(compiled["argv"], "--proposal-samples") == "64"
+    assert _options(compiled["argv"], "--policy-capability") == [
+        "ldm_weights@1",
+        "prior_mean@1",
+    ]
     assert _option(direct_harness["argv"], "--proposal-samples") == "1"
 
 
 def _option(argv: list[str], name: str) -> str:
     return argv[argv.index(name) + 1]
+
+
+def _options(argv: list[str], name: str) -> list[str]:
+    return [argv[index + 1] for index, value in enumerate(argv) if value == name]
 
 
 def _base_config() -> dict[str, object]:

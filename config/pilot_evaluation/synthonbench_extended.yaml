@@ -8,7 +8,7 @@ cases:
       - args.scale="1M"
       - args.target="kif11"
       - args.oracle-kind="surrogate"
-methods: [ldm, ldm_harness, bo, llm, harness]
+methods: [ldm, ldm_harness, ldm_harness_compiled, bo, llm, harness]
 method_overrides:
   ldm: []
   ldm_harness:
@@ -19,6 +19,17 @@ method_overrides:
     - args.harness-response-timeout=2100
     - args.harness-sidecar-image="ldm-pi-harness:latest"
     - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
+  ldm_harness_compiled:
+    - contract_profile="pilot_evaluation_extended_ldm_harness_compiled"
+    - args.harness-candidates-per-session=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
+    - args.policy-capability=["ldm_weights@1","prior_mean@1"]
+    - args.policy-tool-budget=["web_search=8","fetch_content=16","get_search_content=16","resolve-library-id=4","query-docs=8"]
+    - args.policy-max-submission-attempts=3
   bo: []
   llm:
     - contract_profile="pilot_evaluation_extended_direct_llm"

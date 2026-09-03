@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -191,7 +192,7 @@ class IronMindHarnessExpander:
         campaign_id: str,
         first_active_round: int,
         attach_empirical_q0: bool,
-        account: Callable[[dict[str, int]], None] | None = None,
+        account: Callable[[dict[str, int | float]], None] | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("Iron Mind harness requires at least one profile")
@@ -219,6 +220,7 @@ class IronMindHarnessExpander:
         turns = self._turns(request, evaluated_candidates)
         if self.account is not None:
             self.account({"proposal_attempts": len(turns), "harness_turns": len(turns)})
+        started = time.perf_counter()
         results = self.client.run_turn(
             turns,
             submission_validator=lambda submission: _validate_submission(
@@ -226,7 +228,10 @@ class IronMindHarnessExpander:
             ),
         )
         if self.account is not None:
-            self.account(_usage_counts(results))
+            self.account({
+                **_usage_counts(results),
+                "harness_wall_time_seconds": time.perf_counter() - started,
+            })
         sampling_mode = (
             "persistent_parallel_research_sessions"
             if self.attach_empirical_q0
@@ -587,6 +592,10 @@ def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
         "llm_requests": sum(int(result.usage["providerCalls"]) for result in results),
         "harness_tool_calls": sum(
             sum(int(count) for count in result.usage["toolCalls"].values())
+            for result in results
+        ),
+        "harness_validation_submissions": sum(
+            int(result.usage.get("validationSubmissions", 0))
             for result in results
         ),
         "harness_artifact_bytes": sum(

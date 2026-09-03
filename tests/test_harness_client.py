@@ -221,6 +221,7 @@ def test_persistent_harness_client_runs_one_profile_batch(
     assert result[0].submission_status == "accepted"
     assert result[0].usage["providerCalls"] == 1
     assert result[0].usage["toolCalls"] == {}
+    assert result[0].usage["validationSubmissions"] == 1
     assert result[0].tool_budget == {}
 
 

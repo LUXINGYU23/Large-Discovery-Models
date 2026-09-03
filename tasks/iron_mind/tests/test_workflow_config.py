@@ -223,3 +223,42 @@ def test_direct_harness_pilot_profiles_use_one_candidate_session(
         assert config["args"]["proposal-samples"] == 1
         assert config["args"]["evaluations-per-round"] == 1
         assert profile.budget["harness_turns"] == iterations - 1
+
+
+def test_compiled_harness_pilot_profiles_lock_the_fifth_policy_session(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("IRON_MIND_WORK_ROOT", str(tmp_path / "work"))
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for config_name, profile_name, iterations in (
+        (
+            "pilot_evaluation_ldm_harness_compiled.yaml",
+            "pilot_evaluation_ldm_harness_compiled",
+            6,
+        ),
+        (
+            "pilot_evaluation_extended_ldm_harness_compiled.yaml",
+            "pilot_evaluation_extended_ldm_harness_compiled",
+            12,
+        ),
+    ):
+        config_path = CONFIG_ROOT / config_name
+        config = load_config(config_path)
+        plan = build_plan(config, config_path)
+        profile = contract.profile(profile_name)
+
+        assert plan["contract_profile"] == profile_name
+        assert config["args"]["search-method"] == "ldm_harness_compiled"
+        assert config["args"]["proposal-samples"] == 64
+        assert config["args"]["harness-candidates-per-session"] == 16
+        assert config["args"]["policy-capability"] == [
+            "ldm_weights@1",
+            "prior_mean@1",
+        ]
+        assert config["args"]["policy-max-submission-attempts"] == 3
+        assert profile.budget["harness_turns"] == 4 * (iterations - 1)
+        assert profile.budget["policy_harness_turns"] == iterations - 1

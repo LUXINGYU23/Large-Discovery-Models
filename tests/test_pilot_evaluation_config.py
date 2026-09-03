@@ -16,7 +16,14 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
     spec = load_pilot_evaluation_spec(REPO_ROOT / "config" / "pilot_evaluation" / "iron_mind.yaml")
 
     assert spec.task == "iron_mind"
-    assert spec.methods == ("ldm", "ldm_harness", "bo", "llm", "harness")
+    assert spec.methods == (
+        "ldm",
+        "ldm_harness",
+        "ldm_harness_compiled",
+        "bo",
+        "llm",
+        "harness",
+    )
     assert len(spec.cases) == 2
     assert spec.seeds == (0, 1, 2)
     assert spec.iterations == 6
@@ -27,6 +34,9 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
     assert spec.method_overrides["harness"][0] == (
         'contract_profile="pilot_evaluation_harness"'
     )
+    assert spec.method_overrides["ldm_harness_compiled"][0] == (
+        'contract_profile="pilot_evaluation_ldm_harness_compiled"'
+    )
 
 
 def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_path) -> None:
@@ -35,7 +45,14 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
     spec = load_pilot_evaluation_spec(REPO_ROOT / "config" / "pilot_evaluation" / "synthonbench.yaml")
 
     assert spec.trajectory.step_kind == "evaluation_index"
-    assert spec.methods == ("ldm", "ldm_harness", "bo", "llm", "harness")
+    assert spec.methods == (
+        "ldm",
+        "ldm_harness",
+        "ldm_harness_compiled",
+        "bo",
+        "llm",
+        "harness",
+    )
     assert spec.result_fields["best_found_utility"] == "best_found_utility"
     assert spec.method_overrides["llm"][-4:] == (
         "args.proposal-samples=16",
@@ -49,6 +66,9 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
     assert spec.method_overrides["harness"][0] == (
         'contract_profile="pilot_evaluation_harness"'
     )
+    assert spec.method_overrides["ldm_harness_compiled"][0] == (
+        'contract_profile="pilot_evaluation_ldm_harness_compiled"'
+    )
 
 
 def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, tmp_path) -> None:
@@ -59,8 +79,15 @@ def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, t
     synthon = load_pilot_evaluation_spec(REPO_ROOT / "config" / "pilot_evaluation" / "synthonbench_extended.yaml")
 
     assert iron.iterations == synthon.iterations == 12
-    assert iron.methods == ("ldm", "ldm_harness", "bo", "llm", "harness")
-    assert synthon.methods == ("ldm", "ldm_harness", "bo", "llm", "harness")
+    assert iron.methods == (
+        "ldm",
+        "ldm_harness",
+        "ldm_harness_compiled",
+        "bo",
+        "llm",
+        "harness",
+    )
+    assert synthon.methods == iron.methods
     assert iron.method_overrides["llm"][0] == 'contract_profile="pilot_evaluation_extended_direct_llm"'
     assert synthon.method_overrides["llm"][0] == 'contract_profile="pilot_evaluation_extended_direct_llm"'
     assert synthon.method_overrides["llm"][-3:] == (
@@ -79,4 +106,10 @@ def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, t
     )
     assert synthon.method_overrides["harness"][0] == (
         'contract_profile="pilot_evaluation_extended_harness"'
+    )
+    assert iron.method_overrides["ldm_harness_compiled"][0] == (
+        'contract_profile="pilot_evaluation_extended_ldm_harness_compiled"'
+    )
+    assert synthon.method_overrides["ldm_harness_compiled"][0] == (
+        'contract_profile="pilot_evaluation_extended_ldm_harness_compiled"'
     )

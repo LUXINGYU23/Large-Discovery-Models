@@ -58,7 +58,7 @@ def test_harness_provenance_keeps_only_redacted_release_fields(tmp_path: Path) -
         encoding="utf-8",
     )
 
-    provenance = execution._harness_provenance(run_dir, tmp_path)
+    provenance = execution._harness_manifest_provenance(manifest_path, tmp_path)
 
     assert provenance["model"] == "research-model"
     assert provenance["profiles"] == [{"profileId": "direct_research"}]
@@ -67,3 +67,90 @@ def test_harness_provenance_keeps_only_redacted_release_fields(tmp_path: Path) -
     ]
     assert provenance["tool_call_budgets"] == {"web_search": 4}
     assert "must-not-be-copied" not in repr(provenance)
+
+
+def test_compiled_harness_provenance_validates_the_dual_pool_identity(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "campaigns" / "case" / "ldm_harness_compiled" / "seed_0"
+    _write_harness_manifest(
+        run_dir / "harness" / "manifest.json",
+        case_id="case-1",
+        profiles=4,
+        contract_id="candidates",
+    )
+    _write_harness_manifest(
+        run_dir / "policy_harness" / "manifest.json",
+        case_id="case-1:optimization_policy",
+        profiles=1,
+        contract_id="optimization_policy",
+    )
+
+    provenance = execution._compiled_harness_provenance(run_dir, tmp_path)
+
+    assert provenance["topology"] == "dual_pool"
+    assert provenance["proposal"]["case_id"] == "case-1"
+    assert provenance["policy"]["case_id"] == "case-1:optimization_policy"
+    assert provenance["proposal"]["wire_api"] == "responses"
+    assert provenance["policy"]["submission_contract"]["contractId"] == (
+        "optimization_policy"
+    )
+
+
+def test_compiled_harness_provenance_rejects_mismatched_pool_identity(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "campaigns" / "case" / "ldm_harness_compiled" / "seed_0"
+    _write_harness_manifest(
+        run_dir / "harness" / "manifest.json",
+        case_id="case-1",
+        profiles=4,
+        contract_id="candidates",
+    )
+    _write_harness_manifest(
+        run_dir / "policy_harness" / "manifest.json",
+        case_id="wrong:optimization_policy",
+        profiles=1,
+        contract_id="optimization_policy",
+    )
+
+    with pytest.raises(ValueError, match="policy case identity"):
+        execution._compiled_harness_provenance(run_dir, tmp_path)
+
+
+def _write_harness_manifest(
+    path: Path,
+    *,
+    case_id: str,
+    profiles: int,
+    contract_id: str,
+) -> None:
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "protocolVersion": "1.2.3",
+                "campaignId": "campaign-1",
+                "taskId": "fixture",
+                "caseId": case_id,
+                "seed": 0,
+                "backend": "pi",
+                "baseUrl": "https://provider.example/v1",
+                "wireApi": "responses",
+                "model": "research-model",
+                "thinking": "max",
+                "profileSetSha256": "a" * 64,
+                "profiles": [
+                    {"profileId": f"profile-{index}"} for index in range(profiles)
+                ],
+                "guestRuntime": {
+                    "imageRef": "fixture:latest",
+                    "manifestSha256": "b" * 64,
+                },
+                "submissionContract": {"contractId": contract_id},
+                "mcpServers": [],
+                "limits": {"toolCallBudgets": {"web_search": 8}},
+            }
+        ),
+        encoding="utf-8",
+    )

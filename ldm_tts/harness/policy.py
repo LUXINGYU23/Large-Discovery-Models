@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
@@ -296,7 +297,7 @@ class PolicyResearchController:
         executor: PolicyExecutor,
         root: Path,
         profile_id: str = "policy_architect",
-        account: Callable[[Mapping[str, int]], None] | None = None,
+        account: Callable[[Mapping[str, int | float]], None] | None = None,
     ) -> None:
         if not profile_id:
             raise ValueError("policy profile_id must not be empty")
@@ -343,11 +344,13 @@ class PolicyResearchController:
             )
 
         try:
+            started = time.perf_counter()
             results = self.client.run_turn((turn,), submission_validator=validate)
+            elapsed = time.perf_counter() - started
             if len(results) != 1:
                 raise HarnessError("policy harness must commit exactly one turn")
             result = results[0]
-            self._account(result)
+            self._account(result, elapsed)
             if result.submission_status != "accepted":
                 policy = _annotate_policy(
                     self._fallback(round_input, round_directory, active),
@@ -955,14 +958,18 @@ class PolicyResearchController:
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("persisted policy result is invalid") from exc
 
-    def _account(self, result: HarnessTurnResult) -> None:
+    def _account(self, result: HarnessTurnResult, wall_time_seconds: float) -> None:
         if self.account is None or result.replayed:
             return
         self.account({
             "policy_harness_turns": 1,
             "policy_provider_requests": int(result.usage["providerCalls"]),
             "policy_tool_calls": sum(result.usage["toolCalls"].values()),
+            "policy_validation_submissions": int(
+                result.usage.get("validationSubmissions", 0)
+            ),
             "policy_artifact_bytes": int(result.usage["artifactBytes"]),
+            "policy_wall_time_seconds": wall_time_seconds,
         })
 
 

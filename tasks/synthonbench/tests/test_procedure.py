@@ -230,6 +230,10 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         "harness-candidates-per-session", "harness-thinking",
         "harness-wall-time-seconds",
     }
+    compiled = {
+        "policy-capability", "policy-tool-budget",
+        "policy-max-submission-attempts",
+    }
     direct_harness = {
         "proposal-samples", "harness-thinking", "harness-wall-time-seconds",
     }
@@ -239,6 +243,8 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         required = (
             direct_harness
             if method == "harness"
+            else common | harness | compiled
+            if method == "ldm_harness_compiled"
             else common | harness
             if method == "ldm_harness"
             else common | direct
@@ -265,6 +271,26 @@ def test_direct_harness_profiles_lock_one_sixteen_candidate_session() -> None:
         assert args["proposal-samples"] == 16
         assert args["evaluations-per-round"] == 16
         assert profile.budget["harness_turns"] == iterations - 1
+
+
+def test_compiled_harness_profiles_lock_four_proposal_sessions_and_one_policy_session() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name, iterations in (
+        ("pilot_evaluation_ldm_harness_compiled", 6),
+        ("pilot_evaluation_extended_ldm_harness_compiled", 12),
+    ):
+        profile = contract.profile(profile_name)
+        args = profile.locked_args
+
+        assert args["search-method"] == "ldm_harness_compiled"
+        assert args["proposal-mode"] == "none"
+        assert args["proposal-samples"] == 64
+        assert args["harness-candidates-per-session"] == 16
+        assert args["policy-capability"] == ["ldm_weights@1", "prior_mean@1"]
+        assert args["policy-max-submission-attempts"] == 3
+        assert profile.budget["harness_turns"] == 4 * (iterations - 1)
+        assert profile.budget["policy_harness_turns"] == iterations - 1
 
 
 def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
@@ -303,6 +329,7 @@ def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
     for profile_name in (
         "pilot_evaluation_extended",
         "pilot_evaluation_extended_ldm_harness",
+        "pilot_evaluation_extended_ldm_harness_compiled",
         "pilot_evaluation_extended_direct_llm",
     ):
         args = contract.profile(profile_name).locked_args

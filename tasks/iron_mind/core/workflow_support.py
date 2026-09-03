@@ -54,8 +54,25 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
         budget["harness_turns"] = search_rounds * profile_count
         if args.search_method == COMPILED_POLICY_METHOD:
             budget["policy_harness_turns"] = search_rounds
+        else:
+            budget.update(
+                policy_harness_turns=0,
+                policy_provider_requests=0,
+                policy_tool_calls=0,
+                policy_validation_submissions=0,
+                policy_artifact_bytes=0,
+                policy_wall_time_seconds=0,
+            )
     else:
         budget["llm_requests"] = proposal_requests if args.proposal_mode == "openai" else 0
+        budget.update(
+            policy_harness_turns=0,
+            policy_provider_requests=0,
+            policy_tool_calls=0,
+            policy_validation_submissions=0,
+            policy_artifact_bytes=0,
+            policy_wall_time_seconds=0,
+        )
     return budget
 
 
