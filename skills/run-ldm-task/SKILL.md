@@ -11,7 +11,8 @@ Preserve task configuration unless the user asks for an edit. Use temporary
 profile.
 
 Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
-`nanogpt`, `small_molecule`, `antibody`, `iron_mind`, or `synthonbench`. For
+`nanogpt`, `small_molecule`, `antibody`, `iron_mind`, `synthonbench`, or
+`nucleobench`. For
 another task, read its `tasks/<task_id>/README.md` and `task.json` instead of
 inventing flags.
 
@@ -36,7 +37,8 @@ inventing flags.
      the shared lifecycle, budget, event, checkpoint, status, and summary
      artifacts. All built-in tasks (`nanogpt`, `small_molecule`, `antibody`,
      `llm_kv_adaptive_quantization`, `causal_discovery_discrete`,
-     `ai4bio_mutation_effect_prediction`, `iron_mind`, and `synthonbench`) are
+     `ai4bio_mutation_effect_prediction`, `iron_mind`, `synthonbench`, and
+     `nucleobench`) are
      engine-native.
    - **Task-owned runtime**: a task-specific loop is not engine-native; follow
      its README and do not claim shared lifecycle, budget, or resume behavior.

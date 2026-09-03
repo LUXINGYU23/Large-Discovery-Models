@@ -97,7 +97,8 @@ in-session rejection and refill to deliver their complete accepted minibatch.
 4. Add config and execution coverage, run `--dry-run`, and verify a task-local
    mock campaign for every registered method before real endpoint evaluation.
 
-Iron Mind and SynthonBench are the reference matrices:
+Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
 
 - `config/pilot_evaluation/iron_mind.yaml`
 - `config/pilot_evaluation/synthonbench.yaml`
+- `config/pilot_evaluation/nucleobench.yaml`

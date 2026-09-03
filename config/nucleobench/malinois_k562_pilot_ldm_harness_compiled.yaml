@@ -1,0 +1,55 @@
+name: nucleobench_malinois_k562_pilot_ldm_harness_compiled
+task: nucleobench
+algorithm: harness_compiled_ldm
+mode: real
+description: Twelve-round Harness-Compiled LDM pilot for one Malinois K562 paired start.
+contract_profile: pilot_evaluation
+args:
+  execution-profile: pilot_evaluation
+  termination-kind: rounds
+  initialization-mode: shared_start
+  case-id: malinois_k562
+  search-method: ldm_harness_compiled
+  proposal-mode: none
+  iterations: 12
+  evaluations-per-round: 16
+  proposal-samples: 64
+  acquisition-beta: 1.0
+  gp-noise-variance: 1.0e-4
+  gp-jitter: 1.0e-8
+  gp-target-std-floor: 0.1
+  gp-min-history-for-fit: 4
+  gp-max-observations: 256
+  gp-global-best-observations: 64
+  alpha: 1.0
+  eta: 1.0
+  z-clip: 5.0
+  campaign-index: 0
+  start-index: 0
+  source-dir: ${NUCLEOBENCH_SOURCE_ROOT}
+  prepared-dir: ${NUCLEOBENCH_DATA_ROOT}/malinois_k562
+  expected-start-set-sha256: ${NUCLEOBENCH_START_SET_SHA256}
+  hardware-profile: n1-highmem-16-cpu
+  llm-url: null
+  llm-model-name: null
+  api-key-file: ${NUCLEOBENCH_API_KEY_FILE}
+  harness-candidates-per-session: 16
+  harness-thinking: max
+  harness-wall-time-seconds: 1800
+  harness-response-timeout: 2100
+  harness-sidecar-image: ldm-pi-harness:latest
+  harness-cache-dir: ${NUCLEOBENCH_WORK_ROOT}/gondolin-cache
+  policy-capability:
+    - ldm_weights@1
+    - prior_mean@1
+  policy-tool-budget:
+    - web_search=8
+    - fetch_content=16
+    - get_search_content=16
+    - resolve-library-id=4
+    - query-docs=8
+  policy-max-submission-attempts: 3
+  out-dir: ${NUCLEOBENCH_RUNS_ROOT}/pilot_evaluation_ldm_harness_compiled
+env:
+  CUDA_VISIBLE_DEVICES: ""
+  LDM_DATA_COLLECTION_ENABLED: "1"

@@ -28,12 +28,12 @@ from tasks.synthonbench.core.policy_features import (
 from tasks.synthonbench.core.proposal_pool import empirical_base_masses
 from tasks.synthonbench.core.tanimoto_gp import PRIOR_MEAN_CLIP, TARGET_STD_FLOOR
 
-POLICY_PROFILE_ID = "policy_architect"
+_POLICY_PROFILE_ID = "policy_architect"
 _HARNESS_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
 _LOCAL_PROFILE_PATH = (
     _HARNESS_RESOURCE_ROOT
     / "profiles"
-    / POLICY_PROFILE_ID
+    / _POLICY_PROFILE_ID
     / "AGENTS.md"
 )
 _LOCAL_SKILL_ROOT = _HARNESS_RESOURCE_ROOT / "skills" / "compile-ldm-policy"
@@ -46,8 +46,8 @@ def policy_harness_profile(
 ) -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(
-            POLICY_PROFILE_ID,
-            profile_root / POLICY_PROFILE_ID / "AGENTS.md",
+            _POLICY_PROFILE_ID,
+            profile_root / _POLICY_PROFILE_ID / "AGENTS.md",
             skill_dirs=(skill_root,),
             agents_sha256=file_sha256(_LOCAL_PROFILE_PATH),
             skill_dir_sha256=(directory_sha256(_LOCAL_SKILL_ROOT),),
@@ -118,25 +118,6 @@ class SynthonOptimizationPolicyAdapter:
 
     def capability_contract(self) -> PolicyCapabilityContract:
         return self._contract
-
-    def build_round_input(
-        self,
-        *,
-        round_index: int,
-        history_features: np.ndarray,
-        history_utilities: np.ndarray,
-        query_features: np.ndarray,
-        research_snapshot: Mapping[str, Any],
-        execution_context: Mapping[str, Any],
-    ) -> PolicyRoundInput:
-        return PolicyRoundInput(
-            round_index=round_index,
-            history_features=history_features,
-            history_utilities=history_utilities,
-            query_features=query_features,
-            research_snapshot=research_snapshot,
-            execution_context=execution_context,
-        )
 
     def build_selection_round(
         self,
@@ -238,7 +219,7 @@ class SynthonOptimizationPolicyAdapter:
                 "default_eta": self._contract.default_eta,
             },
         }
-        return self.build_round_input(
+        return PolicyRoundInput(
             round_index=round_index,
             history_features=history_features,
             history_utilities=history_utilities,
@@ -379,7 +360,6 @@ def _probability_summary(q0: np.ndarray) -> dict[str, float | int]:
 
 
 __all__ = [
-    "POLICY_PROFILE_ID",
     "SynthonOptimizationPolicyAdapter",
     "policy_harness_profile",
 ]

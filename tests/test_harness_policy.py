@@ -38,9 +38,6 @@ class FakeAdapter:
             default_eta=2.0,
         )
 
-    def build_round_input(self, **values) -> PolicyRoundInput:
-        return PolicyRoundInput(**values)
-
     def validate_task_execution(self, execution, _round_input):
         if execution.stage == "invalid":
             return (HarnessSubmissionError(

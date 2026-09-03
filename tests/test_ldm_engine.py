@@ -8,6 +8,7 @@ import pytest
 
 from ldm_tts.contracts import (
     AcquisitionSpec,
+    BatchCandidateEvaluator,
     Candidate,
     CandidateDomainSpec,
     CandidateRejection,
@@ -374,6 +375,57 @@ def test_ldm_engine_runs_complete_lifecycle_and_persists_authoritative_state(
         and event["payload"]["drop_counts"] == {"duplicate": 1}
         for event in runtime.events()
     )
+
+
+def test_ldm_engine_batches_supported_evaluators_and_can_defer_finalization(
+    tmp_path: Path,
+) -> None:
+    class RecordingBatchEvaluator:
+        def __init__(self) -> None:
+            self.batches: list[tuple[str, ...]] = []
+
+        def evaluate(self, candidate: Candidate) -> EvaluationResult:
+            return self.evaluate_batch((candidate,))[0]
+
+        def evaluate_batch(
+            self, candidates: list[Candidate] | tuple[Candidate, ...]
+        ) -> tuple[EvaluationResult, ...]:
+            self.batches.append(tuple(item.candidate_id for item in candidates))
+            return tuple(
+                EvaluationResult(
+                    candidate.candidate_id,
+                    "succeeded",
+                    {"score": float(candidate.payload)},
+                )
+                for candidate in candidates
+            )
+
+    evaluator = RecordingBatchEvaluator()
+    assert isinstance(evaluator, BatchCandidateEvaluator)
+    runtime = CampaignRuntime.open(tmp_path / "batched", task="integer_search")
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=(RawProposal(1, "mock"), RawProposal(2, "mock")),
+                selection_mode="reservoir_order",
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=evaluator,
+        runtime=runtime,
+    )
+
+    result = engine.run(
+        LDMEngineConfig(iterations=1, reservoir_size=2, evaluations_per_round=2),
+        finalize_runtime=False,
+    )
+
+    assert evaluator.batches == [("integer-1", "integer-2")]
+    assert [item.metrics["score"] for item in result.state.observations] == [1.0, 2.0]
+    status = json.loads((runtime.run_dir / "status.json").read_text())
+    assert status["status"] == "running"
+    assert status["phase"] == "awaiting_external_driver"
 
 
 def test_ldm_engine_classifies_evaluator_failures_and_stops_at_external_budget(

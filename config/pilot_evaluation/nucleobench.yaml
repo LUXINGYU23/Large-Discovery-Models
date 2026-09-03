@@ -1,0 +1,51 @@
+schema_version: 1
+name: nucleobench_malinois_k562_pilot
+task: nucleobench
+base_config: ../nucleobench/malinois_k562_pilot_base.yaml
+cases:
+  - id: malinois_k562
+    overrides:
+      - args.case-id="malinois_k562"
+      - args.start-index=0
+methods: [ldm, ldm_harness, ldm_harness_compiled, bo, llm, harness]
+method_overrides:
+  ldm: []
+  ldm_harness:
+    - args.harness-candidates-per-session=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${NUCLEOBENCH_WORK_ROOT}/gondolin-cache"
+  ldm_harness_compiled:
+    - args.harness-candidates-per-session=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${NUCLEOBENCH_WORK_ROOT}/gondolin-cache"
+    - args.policy-capability=["ldm_weights@1","prior_mean@1"]
+    - args.policy-tool-budget=["web_search=8","fetch_content=16","get_search_content=16","resolve-library-id=4","query-docs=8"]
+    - args.policy-max-submission-attempts=3
+  bo: []
+  llm:
+    - args.proposal-samples=16
+  harness:
+    - args.proposal-samples=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${NUCLEOBENCH_WORK_ROOT}/gondolin-cache"
+seeds: [0, 1, 2]
+optimization_rounds: 11
+initialization_mode: shared_start
+output_root: ${NUCLEOBENCH_RUNS_ROOT}/pilot_evaluation
+trajectory:
+  step_column: round
+  step_kind: round
+  objective_column: utility
+  direction: maximize
+result_fields:
+  best_found_utility: best_found_utility
+  best_found_energy: best_found_energy

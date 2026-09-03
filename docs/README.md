@@ -30,6 +30,7 @@ technical and operational contracts.
 - [Discrete causal discovery](../tasks/causal_discovery_discrete/README.md)
 - [Iron Mind](../tasks/iron_mind/README.md)
 - [SynthonBench](../tasks/synthonbench/README.md)
+- [NucleoBench](../tasks/nucleobench/README.md)
 - [Task registration](../tasks/README.md)
 
 ## Runbooks And Agent Skills

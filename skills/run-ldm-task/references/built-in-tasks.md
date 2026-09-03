@@ -8,6 +8,7 @@
 - [Antibody](#antibody)
 - [Iron Mind](#iron-mind)
 - [SynthonBench](#synthonbench)
+- [NucleoBench](#nucleobench)
 
 ## Common Rules
 
@@ -221,3 +222,45 @@ kernel, uncertainty, acquisition, pool, and official evaluator remain fixed.
 Inspect `<run_dir>/policy_harness/` and the matrix
 `compiled_policy_rounds.csv`; policy tool budgets are separate from proposal
 tool budgets.
+
+## NucleoBench
+
+Files:
+
+```text
+tasks/nucleobench/README.md
+tasks/nucleobench/QUICKSTART.md
+config/nucleobench/mock.yaml
+config/nucleobench/malinois_k562_tiny_campaign.yaml
+config/nucleobench/malinois_k562_pilot_ldm_harness_compiled.yaml
+config/pilot_evaluation/nucleobench.yaml
+```
+
+Direct and Harness methods use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
+`LLM_API_KEY`. Direct methods can select Chat Completions or Responses; the
+committed real profiles use Responses. Harness methods require the Pi sidecar,
+Linux KVM, the built task guest, and external cache and run roots. An ignored
+protected key file may be selected with `--api-key-file`.
+
+NucleoBench exposes the shared `LDMEngine` through the source-pinned official
+`SequenceOptimizer` lifecycle. Candidates are mutation patches relative to
+one paired official start. Direct LDM makes four independent minibatch requests;
+Harness LDM advances four persistent sequence-research roles. Invalid and
+historically evaluated patches are repaired before commit, while cross-lineage
+agreement remains empirical `q0` mass. The task maintains a `3B` pool, fits
+its exact normalized-Hamming GP-UCB, applies the LDM acquisition tilt, and
+batch-evaluates selected sequences through the official model wrapper.
+
+Direct research Harness uses one persistent session and evaluates its accepted
+minibatch without `q0`, GP, or acquisition. Harness-Compiled LDM adds one
+independent `policy_architect` session whose task-local Skill may set the
+residual-GP prior mean and LDM `alpha`/`eta`; the kernel, variance, UCB,
+pool, candidate budget, and evaluator remain fixed.
+
+Follow `tasks/nucleobench/QUICKSTART.md` to validate the mock path, prepare
+digest-pinned external starts and model artifacts, build and smoke the task
+guest, run the qualified Malinois K562 tiny campaign, and inspect the
+six-method three-seed Pilot Evaluation. Proposal traces are under
+`<run_dir>/harness/`, compiled-policy traces under
+`<run_dir>/policy_harness/`, and optimization state in the shared campaign
+artifacts.

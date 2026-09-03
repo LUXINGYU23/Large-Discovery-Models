@@ -71,6 +71,36 @@ def test_synthonbench_matrix_declares_batch_trajectory_mapping(monkeypatch, tmp_
     )
 
 
+def test_nucleobench_matrix_uses_current_six_method_contract(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("NUCLEOBENCH_RUNS_ROOT", str(tmp_path / "nucleo_runs"))
+    monkeypatch.setenv("NUCLEOBENCH_WORK_ROOT", str(tmp_path / "nucleo_work"))
+
+    spec = load_pilot_evaluation_spec(
+        REPO_ROOT / "config" / "pilot_evaluation" / "nucleobench.yaml"
+    )
+
+    assert spec.task == "nucleobench"
+    assert spec.methods == (
+        "ldm",
+        "ldm_harness",
+        "ldm_harness_compiled",
+        "bo",
+        "llm",
+        "harness",
+    )
+    assert spec.seeds == (0, 1, 2)
+    assert spec.iterations == 12
+    assert spec.trajectory.step_kind == "round"
+    assert spec.method_overrides["llm"] == ("args.proposal-samples=16",)
+    assert spec.method_overrides["harness"][0] == "args.proposal-samples=16"
+    assert "args.harness-candidates-per-session=16" in spec.method_overrides[
+        "ldm_harness"
+    ]
+    assert 'args.policy-capability=["ldm_weights@1","prior_mean@1"]' in (
+        spec.method_overrides["ldm_harness_compiled"]
+    )
+
+
 def test_extended_matrices_use_the_separate_twelve_round_profiles(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "iron_runs"))
     monkeypatch.setenv("SYNTHONBENCH_RUNS_ROOT", str(tmp_path / "syn_runs"))

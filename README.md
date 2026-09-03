@@ -72,10 +72,11 @@ in evidence rather than model confidence alone.
 | `causal_discovery_discrete` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Bounded discrete causal-graph discovery evaluated on five pinned Bayesian-network datasets through MLS-Bench. | [Clean-room quick start](tasks/causal_discovery_discrete/QUICKSTART.md) | [Task guide](tasks/causal_discovery_discrete/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [recorded Delta campaign](ready2run_examples/run_customized_causal_discovery_discrete/) |
 | `iron_mind` | Source-pinned reaction conditions for the official Iron Mind benchmark datasets. | [Clean-room quick start](tasks/iron_mind/QUICKSTART.md) | [Task guide](tasks/iron_mind/README.md) |
 | `synthonbench` | Official reaction and ordered-synthon tuples, with direct and persistent research-Harness proposal backends. | [Clean-room quick start](tasks/synthonbench/QUICKSTART.md) | [Task guide](tasks/synthonbench/README.md) |
+| `nucleobench` | Source-pinned regulatory nucleotide sequence design with direct, persistent-Harness, and compiled-policy LDM methods. | [Clean-room quick start](tasks/nucleobench/QUICKSTART.md) | [Task guide](tasks/nucleobench/README.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The eight built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The nine built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
@@ -83,13 +84,13 @@ scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
 predictor and five-network discrete causal-discovery evaluations. Run the
 documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all eight
+Task registration and conventional layout validation pass for all nine
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
 not benchmark-qualified implementations. The AI4Bio mutation-effect and
 discrete causal-discovery tasks have source-pinned qualified contracts and
-machine-readable evidence through `campaign_qualified`. Iron Mind and
-SynthonBench have source-pinned qualified contracts with evidence through
+machine-readable evidence through `campaign_qualified`. Iron Mind,
+SynthonBench, and NucleoBench have source-pinned qualified contracts with evidence through
 `tiny_campaign_verified`. AI4Bio includes an
 official one-iteration campaign and separately labeled 3- and 20-iteration
 extended-budget runs. Discrete causal discovery includes a separately labeled
@@ -523,6 +524,7 @@ The task adapters instantiate the same roles with different domain objects:
 | `antibody` | Valid fixed-length CDRH3 sequences. | Direct sequence emission or DSL-policy-guided sequence generation. | Fixed categorical sequence representation; direct-only modes use none. | Minimize Absolut binding energy for the selected antigen. |
 | `iron_mind` | Valid source-pinned reaction-condition combinations. | Independent direct condition proposals. | Task-local factor-aware GP representation. | Read the official benchmark reaction score. |
 | `synthonbench` | Valid official reaction ID plus ordered synthon-ID tuples. | Independent direct proposals or four persistent Pi research sessions. | Reaction-aware Nyström/FITC count-Tanimoto representation. | Run the official SynthonBench surrogate or Glide oracle. |
+| `nucleobench` | Start-relative nucleotide mutation patches over an official editable mask. | Independent direct proposals, four persistent Pi research sessions, or score-blind mutation search. | Exact normalized-Hamming categorical GP. | Evaluate rebuilt sequences through the source-pinned NucleoBench model wrapper. |
 
 The shared code keeps orchestration, config loading, task-space specs, response
 parsing, trajectory metadata, and common tests in one place. Task adapters keep
@@ -563,7 +565,8 @@ resume, and summaries. A task supplies adapters at the scientific seams:
 `events.jsonl`, `checkpoint.json`, `ldm_task_spec.json`, and `summary.json`
 contract. Every built-in task — `nanogpt`, `small_molecule`, `antibody`,
 `llm_kv_adaptive_quantization`, `causal_discovery_discrete`, and
-`ai4bio_mutation_effect_prediction`, `iron_mind`, and `synthonbench` — calls
+`ai4bio_mutation_effect_prediction`, `iron_mind`, `synthonbench`, and
+`nucleobench` — calls
 `run_campaign` or the shared `LDMEngine` interface and
 delegates lifecycle ownership to it; the tasks keep exporting their historical
 trajectory files (for example `small_molecule`'s `history.json`/`rounds.jsonl`

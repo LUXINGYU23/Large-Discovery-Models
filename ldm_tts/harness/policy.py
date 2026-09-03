@@ -203,17 +203,6 @@ class CompiledOptimizationPolicy:
 class OptimizationPolicyAdapter(Protocol):
     def capability_contract(self) -> PolicyCapabilityContract: ...
 
-    def build_round_input(
-        self,
-        *,
-        round_index: int,
-        history_features: np.ndarray,
-        history_utilities: np.ndarray,
-        query_features: np.ndarray,
-        research_snapshot: Mapping[str, Any],
-        execution_context: Mapping[str, Any],
-    ) -> PolicyRoundInput: ...
-
     def validate_task_execution(
         self,
         execution: PolicyExecutionResult,
