@@ -33,7 +33,11 @@ from tasks.synthonbench.core.candidate import (
     SynthonCandidateDomain,
     prepare_candidate_payload,
 )
-from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.synthonbench.core.constants import (
+    FORBIDDEN_QUERY_TERMS,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
 from tasks.synthonbench.core.prompting import serialize_observations
 from tasks.synthonbench.core.proposal_base_measure import attach_empirical_base_measure
 from tasks.synthonbench.core.space_order import ordered_positions, ordered_reactions, ordered_synthon_ids
@@ -46,15 +50,6 @@ HARNESS_PROFILE_IDS = (
 )
 DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "synthonbench_persistent_research_harness"
-HARNESS_FORBIDDEN_PATTERNS = (
-    r"synthon\s*bench",
-    r"mireklzicar[/\\]synthonbench",
-)
-HARNESS_FORBIDDEN_TERMS = (
-    "synthonbench",
-    "mireklzicar/synthonbench",
-    "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
-)
 HARNESS_CANDIDATE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -412,7 +407,7 @@ def _turn_id(
 
 
 def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
-    terms = set(HARNESS_FORBIDDEN_TERMS)
+    terms = set(FORBIDDEN_QUERY_TERMS)
     for observation in request.observations:
         terms.add(observation.candidate_id)
         terms.add(observation.canonical_key)
@@ -615,7 +610,6 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 __all__ = [
     "HARNESS_CANDIDATE_SCHEMA",
     "DIRECT_HARNESS_PROFILE_ID",
-    "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",
     "SynthonHarnessExpander",

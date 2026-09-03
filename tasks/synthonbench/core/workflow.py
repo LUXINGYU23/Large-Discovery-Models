@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,16 @@ from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
 from ldm_tts.harness import (
+    DockerPolicyExecutor,
     HarnessClient,
     HarnessLimits,
     HarnessNetworkPolicy,
     HarnessPoolConfig,
+    PolicyResearchController,
     load_harness_mcp_config,
     parse_tool_call_budgets,
+    policy_mcp_server,
+    policy_submission_contract,
 )
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
@@ -32,7 +37,7 @@ from tasks.synthonbench.core.data import (
     load_mock_benchmark,
     load_official_benchmark,
 )
-from tasks.synthonbench.core.constants import TASK_ID
+from tasks.synthonbench.core.constants import FORBIDDEN_QUERY_PATTERNS, TASK_ID
 from tasks.synthonbench.core.factory import (
     CampaignComponentOptions,
     build_base_synthon_selector,
@@ -40,7 +45,6 @@ from tasks.synthonbench.core.factory import (
     build_synthon_selector,
 )
 from tasks.synthonbench.core.harness import (
-    HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
     harness_guest_runtime,
@@ -50,10 +54,20 @@ from tasks.synthonbench.core.harness import (
     write_harness_space_catalog,
 )
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
+from tasks.synthonbench.core.optimization_policy import (
+    SynthonOptimizationPolicyAdapter,
+    policy_harness_profile,
+)
+from tasks.synthonbench.core.policy_features import SynthonPolicyFeatureEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
 from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.reporting import write_campaign_reports
+from tasks.synthonbench.core.search import (
+    COMPILED_POLICY_METHOD,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
+)
 from tasks.synthonbench.core.task_spec import (
     build_direct_acquisition,
     build_synthon_task_spec,
@@ -69,6 +83,7 @@ from tasks.synthonbench.core.workflow_support import (
 )
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
+POLICY_SKILL_ROOT = TASK_ROOT.parents[1] / "skills" / "compile-ldm-policy"
 
 
 def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmark | None = None) -> LDMTaskSpec:
@@ -97,7 +112,7 @@ def describe_ldm_task(args: argparse.Namespace, benchmark: LoadedSynthonBenchmar
         initialization_mode=args.initialization_mode,
         harness_profile_count=(
             len(HARNESS_PROFILE_IDS)
-            if args.search_method == "ldm_harness"
+            if args.search_method in PARALLEL_HARNESS_METHODS
             else 1
             if args.search_method == "harness"
             else 0
@@ -143,29 +158,74 @@ def _run_campaign(args, benchmark, task_spec, contract, profile_name: str,
                   payload: dict[str, Any]) -> int:
     provider = (
         provider_settings(args)
-        if args.proposal_mode == "openai" or args.search_method in {"ldm_harness", "harness"}
+        if args.proposal_mode == "openai"
+        or args.search_method in PERSISTENT_HARNESS_METHODS
         else None
     )
     if provider is not None:
         args.llm_url, args.llm_model_name = provider.base_url, provider.model
     runtime = _open_runtime(args, task_spec, contract, profile_name)
-    if args.search_method in {"ldm_harness", "harness"}:
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
             pause_endpoint(runtime, args, payload, missing)
             return 2
-        harness_client = _harness_client(args, runtime, provider, benchmark)
-        try:
-            harness_client.start()
-            components = _components(args, benchmark, runtime, None, harness_client)
+        mcp = load_harness_mcp_config(args.harness_mcp_config)
+        with ExitStack() as stack:
+            harness_client = stack.enter_context(
+                _proposal_harness_client(args, runtime, provider, benchmark, mcp)
+            )
+            policy_controller = None
+            policy_adapter = None
+            if args.search_method == COMPILED_POLICY_METHOD:
+                policy_adapter = SynthonOptimizationPolicyAdapter(
+                    SynthonPolicyFeatureEncoder(
+                        benchmark.task.space,
+                        benchmark.task.allowed_reactions,
+                    ),
+                    target=benchmark.target,
+                    seed=args.campaign_index,
+                    acquisition_beta=args.acquisition_beta,
+                    gp_signal_std=args.gp_signal_std,
+                    gp_mean_std=args.gp_mean_std,
+                    gp_observation_noise_std=args.gp_observation_noise_std,
+                    gp_reaction_weight=args.gp_reaction_weight,
+                    fingerprint_bits=args.fingerprint_bits,
+                    gp_landmarks=args.gp_landmarks,
+                    gp_kernel_jitter=args.gp_kernel_jitter,
+                    default_alpha=args.alpha,
+                    default_eta=args.eta,
+                    enabled_capabilities=tuple(args.policy_capability),
+                )
+                policy_client = stack.enter_context(
+                    _policy_harness_client(args, runtime, provider, benchmark, mcp)
+                )
+                policy_controller = PolicyResearchController(
+                    client=policy_client,
+                    adapter=policy_adapter,
+                    executor=DockerPolicyExecutor(
+                        image=args.harness_sidecar_image,
+                        docker_host=args.harness_docker_host or "",
+                        container_user=_harness_container_user(args),
+                    ),
+                    root=(runtime.run_dir / "policy_harness").resolve(),
+                    account=runtime.consume_many,
+                )
+            components = _components(
+                args,
+                benchmark,
+                runtime,
+                None,
+                harness_client,
+                policy_controller,
+                policy_adapter,
+            )
             return _finish_campaign(args, benchmark, components, runtime, payload)
-        finally:
-            harness_client.close()
     client = _proposal_client(args, provider)
     if provider is not None and not preflight_endpoint(client, runtime, args, payload, provider):
         return 2
-    components = _components(args, benchmark, runtime, client, None)
+    components = _components(args, benchmark, runtime, client, None, None, None)
     return _finish_campaign(args, benchmark, components, runtime, payload)
 
 
@@ -250,6 +310,7 @@ def _selector(args, encoder: SynthonNystromEncoder | None):
         z_clip=args.z_clip,
         bo_pool_size=args.bo_pool_size,
         proposal_samples=args.proposal_samples,
+        policy_mode=args.search_method == COMPILED_POLICY_METHOD,
     )
 
 
@@ -259,7 +320,15 @@ def _reservoir_size(args) -> int:
     return args.bo_search_samples if args.search_method == "bo" else args.proposal_samples
 
 
-def _components(args, benchmark, runtime, client, harness_client):
+def _components(
+    args,
+    benchmark,
+    runtime,
+    client,
+    harness_client,
+    policy_controller,
+    policy_adapter,
+):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
         (lambda count: runtime.consume("llm_requests", count))
@@ -302,9 +371,11 @@ def _components(args, benchmark, runtime, client, harness_client):
         harness_candidates_per_profile=_harness_candidates_per_profile(args),
         account_harness_usage=(
             runtime.consume_many
-            if args.search_method in {"ldm_harness", "harness"}
+            if args.search_method in PERSISTENT_HARNESS_METHODS
             else None
         ),
+        policy_controller=policy_controller,
+        policy_adapter=policy_adapter,
     ))
 
 
@@ -321,18 +392,16 @@ def _missing_harness_provider(provider) -> str:
     return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
 
 
-def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> HarnessClient:
-    mcp = load_harness_mcp_config(args.harness_mcp_config)
+def _proposal_harness_client(
+    args,
+    runtime: CampaignRuntime,
+    provider,
+    benchmark,
+    mcp,
+) -> HarnessClient:
     artifact_root = (runtime.run_dir / "harness").resolve()
-    cache_root = (
-        args.harness_cache_dir.expanduser().resolve()
-        if args.harness_cache_dir is not None
-        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
-    )
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
-    cache_root.mkdir(parents=True, exist_ok=True)
-    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
     write_harness_space_catalog(
         benchmark.task.space,
         benchmark.task.allowed_reactions,
@@ -343,29 +412,6 @@ def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> Harn
             else None
         ),
     )
-    command = ["docker"]
-    if args.harness_docker_host:
-        command.extend(("--host", args.harness_docker_host))
-    command.extend(("run", "--rm", "-i"))
-    container_user = args.harness_container_user
-    if not container_user and hasattr(os, "getuid") and hasattr(os, "getgid"):
-        container_user = f"{os.getuid()}:{os.getgid()}"
-    if container_user:
-        command.extend(("--user", container_user))
-    command.extend((
-        "--device", "/dev/kvm",
-        "--env", "HOME=/runtime-home",
-        "--env", "XDG_CACHE_HOME=/runtime-home/.cache",
-        "--env", "GONDOLIN_IMAGE_STORE=/runtime-home/.cache/gondolin/images",
-        "--env", "GONDOLIN_SESSIONS_DIR=/runtime-home/.cache/gondolin/sessions",
-        "--env", "LDM_HARNESS_CACHE_ROOT=/runtime-home/.cache/gondolin",
-        "--env", "TMPDIR=/runtime-home/.cache/gondolin/runtime-overlays",
-        "--env", "LDM_SYNTHON_SPACE_CATALOG=/artifacts/synthon_space.json",
-        "--mount", f"type=bind,src={artifact_root},dst=/artifacts",
-        "--mount", f"type=bind,src={resource_root},dst=/resources,readonly",
-        "--mount", f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
-        args.harness_sidecar_image,
-    ))
     profiles = _harness_profiles(args)
     config = HarnessPoolConfig(
         artifact_root=Path("/artifacts"),
@@ -391,17 +437,173 @@ def _harness_client(args, runtime: CampaignRuntime, provider, benchmark) -> Harn
             ),
         ),
         network_policy=HarnessNetworkPolicy(
-            forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
+            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
         ),
         context7_enabled=args.harness_context7,
     )
     return HarnessClient(
-        command,
+        _harness_command(
+            args,
+            artifact_root,
+            _harness_cache_root(args),
+            environment={
+                "LDM_SYNTHON_SPACE_CATALOG": "/artifacts/synthon_space.json"
+            },
+            mounts=((resource_root, "/resources", True),),
+        ),
         api_key=provider.api_key,
         config=config,
         named_secrets=mcp.named_secrets,
         response_timeout_seconds=args.harness_response_timeout,
     )
+
+
+def _policy_harness_client(
+    args,
+    runtime: CampaignRuntime,
+    provider,
+    benchmark,
+    mcp,
+) -> HarnessClient:
+    artifact_root = (runtime.run_dir / "policy_harness").resolve()
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    write_harness_space_catalog(
+        benchmark.task.space,
+        benchmark.task.allowed_reactions,
+        artifact_root / "synthon_space.json",
+        reactions_path=(
+            benchmark.data_dir / "spaces" / "reactions.tsv"
+            if benchmark.data_dir is not None
+            else None
+        ),
+    )
+    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
+    mounts = (
+        (harness_resources, "/resources", True),
+        (POLICY_SKILL_ROOT.resolve(), "/skills/compile-ldm-policy", True),
+        ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
+        (
+            (TASK_ROOT / "resources" / "README.md").resolve(),
+            "/public/resources_README.md",
+            True,
+        ),
+        (
+            (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
+            "/public/upstream_contract.json",
+            True,
+        ),
+        (
+            (TASK_ROOT / "resources" / "verification_record.json").resolve(),
+            "/public/verification_record.json",
+            True,
+        ),
+    )
+    config = HarnessPoolConfig(
+        artifact_root=Path("/artifacts"),
+        base_url=provider.base_url,
+        model=provider.model,
+        profiles=policy_harness_profile(),
+        campaign_id=runtime.run_id,
+        task_id=TASK_ID,
+        case_id=f"{args.oracle_kind}:{args.scale}:{args.target}:optimization_policy",
+        seed=args.campaign_index,
+        submission_contract=policy_submission_contract(
+            args.policy_max_submission_attempts
+        ),
+        guest_runtime=harness_guest_runtime(),
+        tool_extensions=harness_tool_extensions(),
+        mcp_servers=(*mcp.servers, policy_mcp_server()),
+        thinking=args.harness_thinking,
+        limits=HarnessLimits(
+            wall_time_seconds=args.harness_wall_time_seconds,
+            tool_call_budgets=parse_tool_call_budgets(
+                args.policy_tool_budget,
+                excluded_tools=("submit_optimization_policy",),
+            ),
+        ),
+        network_policy=HarnessNetworkPolicy(
+            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
+        ),
+        context7_enabled=args.harness_context7,
+    )
+    return HarnessClient(
+        _harness_command(
+            args,
+            artifact_root,
+            _harness_cache_root(args),
+            environment={
+                "LDM_SYNTHON_SPACE_CATALOG": "/artifacts/synthon_space.json"
+            },
+            mounts=mounts,
+        ),
+        api_key=provider.api_key,
+        config=config,
+        named_secrets=mcp.named_secrets,
+        response_timeout_seconds=args.harness_response_timeout,
+    )
+
+
+def _harness_cache_root(args) -> Path:
+    root = (
+        args.harness_cache_dir.expanduser().resolve()
+        if args.harness_cache_dir is not None
+        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _harness_command(
+    args,
+    artifact_root: Path,
+    cache_root: Path,
+    *,
+    environment: dict[str, str],
+    mounts: tuple[tuple[Path, str, bool], ...],
+) -> list[str]:
+    cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
+    command = ["docker"]
+    if args.harness_docker_host:
+        command.extend(("--host", args.harness_docker_host))
+    command.extend(("run", "--rm", "-i"))
+    container_user = _harness_container_user(args)
+    if container_user:
+        command.extend(("--user", container_user))
+    command.extend(("--device", "/dev/kvm"))
+    runtime_environment = {
+        "HOME": "/runtime-home",
+        "XDG_CACHE_HOME": "/runtime-home/.cache",
+        "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
+        "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
+        "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
+        "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
+        **environment,
+    }
+    for name, value in sorted(runtime_environment.items()):
+        command.extend(("--env", f"{name}={value}"))
+    command.extend((
+        "--mount",
+        f"type=bind,src={artifact_root},dst=/artifacts",
+        "--mount",
+        f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
+    ))
+    for source, destination, readonly in mounts:
+        suffix = ",readonly" if readonly else ""
+        command.extend((
+            "--mount",
+            f"type=bind,src={source},dst={destination}{suffix}",
+        ))
+    command.append(args.harness_sidecar_image)
+    return command
+
+
+def _harness_container_user(args) -> str:
+    if args.harness_container_user:
+        return args.harness_container_user
+    if hasattr(os, "getuid") and hasattr(os, "getgid"):
+        return f"{os.getuid()}:{os.getgid()}"
+    return ""
 
 
 def _finish_campaign(args, benchmark, components, runtime: CampaignRuntime,
@@ -436,7 +638,7 @@ def _proposal_samples(args) -> int:
 
 
 def _harness_profiles(args):
-    if args.search_method == "ldm_harness":
+    if args.search_method in PARALLEL_HARNESS_METHODS:
         return harness_profiles()
     if args.search_method == "harness":
         return direct_harness_profile()
@@ -444,7 +646,7 @@ def _harness_profiles(args):
 
 
 def _harness_candidates_per_profile(args) -> int:
-    if args.search_method == "ldm_harness":
+    if args.search_method in PARALLEL_HARNESS_METHODS:
         return args.harness_candidates_per_session
     if args.search_method == "harness":
         return args.evaluations_per_round

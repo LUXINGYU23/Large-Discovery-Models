@@ -35,3 +35,12 @@ DEFAULT_LLM_EXTRA_BODY_JSON = '{"thinking":{"type":"disabled"}}'
 
 Q0_METADATA_KEY = "synthonbench_empirical_q0"
 DATA_MANIFEST_NAME = "synthonbench_manifest.json"
+FORBIDDEN_QUERY_PATTERNS = (
+    r"synthon\s*bench",
+    r"mireklzicar[/\\]synthonbench",
+)
+FORBIDDEN_QUERY_TERMS = (
+    "synthonbench",
+    "mireklzicar/synthonbench",
+    OFFICIAL_SOURCE_COMMIT,
+)

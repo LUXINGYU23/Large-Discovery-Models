@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from itertools import product
 from pathlib import Path
 
@@ -350,7 +351,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     monkeypatch,
     capsys,
 ) -> None:
-    def fake_client(_args, _runtime, _provider, benchmark):
+    def fake_client(_args, _runtime, _provider, benchmark, _mcp):
         reaction_id = ordered_reactions(benchmark.task.allowed_reactions)[0]
         candidate = {
             "reaction_id": reaction_id,
@@ -359,9 +360,12 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
                 for position in ordered_positions(benchmark.task.space, reaction_id)
             ],
         }
-        return FakeHarnessClient(candidate=candidate)
+        return nullcontext(FakeHarnessClient(candidate=candidate))
 
-    monkeypatch.setattr("tasks.synthonbench.core.workflow._harness_client", fake_client)
+    monkeypatch.setattr(
+        "tasks.synthonbench.core.workflow._proposal_harness_client",
+        fake_client,
+    )
 
     assert main([
         "--mock",
@@ -399,7 +403,7 @@ def test_mock_direct_harness_evaluates_all_sixteen_submissions(
     monkeypatch,
     capsys,
 ) -> None:
-    def fake_client(_args, _runtime, _provider, benchmark):
+    def fake_client(_args, _runtime, _provider, benchmark, _mcp):
         candidates = []
         for reaction_id in ordered_reactions(benchmark.task.allowed_reactions):
             choices = [
@@ -415,9 +419,12 @@ def test_mock_direct_harness_evaluates_all_sixteen_submissions(
             )
             if len(candidates) >= 16:
                 break
-        return FakeHarnessClient(candidates=candidates[:16])
+        return nullcontext(FakeHarnessClient(candidates=candidates[:16]))
 
-    monkeypatch.setattr("tasks.synthonbench.core.workflow._harness_client", fake_client)
+    monkeypatch.setattr(
+        "tasks.synthonbench.core.workflow._proposal_harness_client",
+        fake_client,
+    )
 
     assert main([
         "--mock",
