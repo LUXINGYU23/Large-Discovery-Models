@@ -1,13 +1,12 @@
 import { sha256 } from "./trace.js";
-
-export const PROTOCOL_VERSION = 7;
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 interface CommonFrame {
 	type: string;
 	requestId: string;
-	protocolVersion: number;
+	protocolVersion: string;
 	campaignId: string;
 }
 
@@ -395,13 +394,13 @@ function parseMcpServers(value: unknown): McpServerConfig[] {
 }
 
 function common(data: Record<string, unknown>): Omit<CommonFrame, "type"> & { type: string } {
-	if (data.protocolVersion !== PROTOCOL_VERSION) {
-		throw new ProtocolError("protocol_mismatch", `expected protocol ${PROTOCOL_VERSION}`);
+	if (data.protocolVersion !== SIDECAR_RELEASE_VERSION) {
+		throw new ProtocolError("protocol_mismatch", `expected protocol ${SIDECAR_RELEASE_VERSION}`);
 	}
 	return {
 		type: string(data.type, "type"),
 		requestId: string(data.requestId, "requestId"),
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: string(data.campaignId, "campaignId"),
 	};
 }

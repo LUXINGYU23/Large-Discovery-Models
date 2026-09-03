@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PROTOCOL_VERSION, ProtocolError, parseFrame } from "./protocol.js";
+import { ProtocolError, parseFrame } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { sha256 } from "./trace.js";
 
 test("parseFrame accepts the explicit responses configuration", () => {
@@ -14,7 +15,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "initialize",
 		requestId: "init-1",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		artifactRoot: "/run/harness",
 		baseUrl: "https://provider.example",
@@ -79,7 +80,7 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 		() => parseFrame(JSON.stringify({
 			type: "initialize",
 			requestId: "init-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			artifactRoot: "/run/harness",
 			baseUrl: "https://provider.example",
@@ -120,12 +121,12 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 	);
 });
 
-test("parseFrame rejects protocol v6 before sidecar initialization", () => {
+test("parseFrame rejects a different sidecar release version", () => {
 	assert.throws(
 		() => parseFrame(JSON.stringify({
 			type: "initialize",
-			requestId: "init-v6",
-			protocolVersion: 6,
+			requestId: "init-other-release",
+			protocolVersion: "0.0.0",
 			campaignId: "campaign-1",
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "protocol_mismatch",
@@ -136,7 +137,7 @@ test("parseFrame requires named secret bootstrap values", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "bootstrap_secret",
 		requestId: "secret-1",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		apiKey: "provider-secret",
 		namedSecrets: { "mcp.remote.header.auth": "mcp-secret" },
@@ -152,7 +153,7 @@ test("parseFrame rejects path traversal turn identifiers", () => {
 		() => parseFrame(JSON.stringify({
 			type: "run_turn",
 			requestId: "turn-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			turns: [{
 				profileId: "target_sar",
@@ -175,7 +176,7 @@ test("parseFrame rejects unknown fields instead of silently ignoring them", () =
 		() => parseFrame(JSON.stringify({
 			type: "close",
 			requestId: "close-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			unexpectedField: true,
 		})),
@@ -187,7 +188,7 @@ test("parseFrame accepts a consistent submission validation result", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "submission_validation_result",
 		requestId: "turn-1",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		validationId: "validation-1",
 		accepted: false,
@@ -209,7 +210,7 @@ test("parseFrame rejects inconsistent submission validation results", () => {
 		() => parseFrame(JSON.stringify({
 			type: "submission_validation_result",
 			requestId: "turn-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			validationId: "validation-1",
 			accepted: true,

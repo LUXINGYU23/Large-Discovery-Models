@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+from importlib.metadata import version
 
 
 profiles: list[str] = []
+print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
 for line in sys.stdin:
     frame = json.loads(line)
     request_id = frame["requestId"]

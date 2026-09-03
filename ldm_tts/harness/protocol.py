@@ -11,8 +11,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ldm_tts.harness.guest_runtime import HarnessGuestRuntime
-
-PROTOCOL_VERSION = 7
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
@@ -366,17 +364,8 @@ class HarnessPoolConfig:
     def candidate_schema_sha256(self) -> str:
         return hashlib.sha256(self.candidate_schema_json.encode("utf-8")).hexdigest()
 
-    def common_frame(self, request_id: str, frame_type: str) -> dict[str, Any]:
+    def initialize_payload(self) -> dict[str, Any]:
         return {
-            "type": frame_type,
-            "requestId": request_id,
-            "protocolVersion": PROTOCOL_VERSION,
-            "campaignId": self.campaign_id,
-        }
-
-    def initialize_frame(self, request_id: str) -> dict[str, Any]:
-        return {
-            **self.common_frame(request_id, "initialize"),
             "artifactRoot": str(self.artifact_root),
             "baseUrl": self.base_url,
             "wireApi": "responses",
@@ -511,7 +500,6 @@ class HarnessSubmissionValidation:
 
 
 __all__ = [
-    "PROTOCOL_VERSION",
     "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessLimits",
     "HarnessGuestRuntime",

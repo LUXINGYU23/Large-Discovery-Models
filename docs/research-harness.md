@@ -19,7 +19,7 @@ surrogate, or evaluator.
 shared Campaign / LDMEngine
   -> task-owned ReservoirExpander
      -> ldm_tts.harness.HarnessClient
-        -> versioned JSONL sidecar protocol
+        -> sidecar-release JSONL protocol
            -> persistent Pi session
            -> isolated shell and file tools
            -> web, Context7, task-local, and configured MCP tools

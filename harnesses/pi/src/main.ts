@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
 import {
-	PROTOCOL_VERSION,
 	ProtocolError,
 	parseFrame,
 	type InputFrame,
@@ -9,6 +8,7 @@ import {
 	type SubmissionValidationRequest,
 	type SubmissionValidationResultFrame,
 } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { Redactor } from "./trace.js";
 
 let apiKey: string | undefined;
@@ -70,7 +70,7 @@ function respondTo(
 	respond({
 		type,
 		requestId: frame.requestId,
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: frame.campaignId,
 		...fields,
 	});
@@ -98,6 +98,8 @@ process.on("SIGTERM", () => {
 process.on("SIGINT", () => {
 	void close().finally(() => process.exit(130));
 });
+
+respond({ type: "ready", protocolVersion: SIDECAR_RELEASE_VERSION });
 
 async function handle(frame: CommandFrame): Promise<boolean> {
 	if (frame.type === "bootstrap_secret") {
@@ -168,7 +170,7 @@ for await (const line of lines) {
 		respond({
 			type: "error",
 			requestId,
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: requestCampaignId ?? campaignId,
 			error: { code: errorCode(error), message: redactor.text((error as Error).message) },
 		});

@@ -3,7 +3,6 @@
 from ldm_tts.harness.client import HarnessClient, HarnessError
 from ldm_tts.harness.protocol import (
     DEFAULT_NETWORK_TOOL_BUDGETS,
-    PROTOCOL_VERSION,
     HarnessLimits,
     HarnessMcpServer,
     HarnessMcpValue,
@@ -26,7 +25,6 @@ from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_confi
 from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
 
 __all__ = [
-    "PROTOCOL_VERSION",
     "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessClient",
     "HarnessError",

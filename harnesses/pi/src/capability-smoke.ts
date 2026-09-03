@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PiSessionPool } from "./session.js";
-import { PROTOCOL_VERSION, type InitializeFrame } from "./protocol.js";
+import { type InitializeFrame } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { canonicalSha256, sha256 } from "./trace.js";
 import { configureGuestCache } from "./guest-image.js";
 import { loadTaskGuestRecipe, parseTaskGuestCommand } from "./task-guest-recipe.js";
@@ -152,7 +153,7 @@ async function main(): Promise<void> {
 	const config: InitializeFrame = {
 		type: "initialize",
 		requestId: "initialize",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "capability-campaign",
 		artifactRoot: join(root, "harness"),
 		baseUrl: `http://127.0.0.1:${address.port}/v1`,

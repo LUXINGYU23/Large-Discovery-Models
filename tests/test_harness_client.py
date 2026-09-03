@@ -52,7 +52,7 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         guest_runtime=TEST_GUEST_RUNTIME,
     )
 
-    frame = config.initialize_frame("initialize-1")
+    frame = config.initialize_payload()
 
     schema_json = frame["candidateSchemaJson"]
     assert isinstance(schema_json, str)
@@ -61,6 +61,8 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         schema_json.encode("utf-8")
     ).hexdigest()
     assert "candidateSchema" not in frame
+    assert "protocolVersion" not in frame
+    assert "requestId" not in frame
     assert frame["guestRuntime"] == TEST_GUEST_RUNTIME.to_dict()
     assert frame["webSearch"] == {
         "providers": ["parallel-mcp", "exa", "duckduckgo"],

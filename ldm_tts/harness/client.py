@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import subprocess
 import threading
 import time
@@ -13,7 +14,6 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from ldm_tts.harness.protocol import (
-    PROTOCOL_VERSION,
     HarnessPoolConfig,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
@@ -23,6 +23,10 @@ from ldm_tts.harness.protocol import (
 )
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
+_SEMVER_PATTERN = re.compile(
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+)
 
 
 class HarnessError(RuntimeError):
@@ -56,6 +60,7 @@ class HarnessClient:
         self._responses: queue.Queue[str] = queue.Queue()
         self._stderr: deque[str] = deque(maxlen=40)
         self._request_index = 0
+        self._protocol_version: str | None = None
 
     def start(self) -> None:
         if self._process is not None:
@@ -80,6 +85,7 @@ class HarnessClient:
         threading.Thread(target=self._read_stdout, args=(process.stdout,), daemon=True).start()
         threading.Thread(target=self._read_stderr, args=(process.stderr,), daemon=True).start()
         try:
+            self._protocol_version = self._wait_for_ready()
             self._request(
                 "bootstrap_secret",
                 {"apiKey": self._api_key, "namedSecrets": self._named_secrets},
@@ -88,7 +94,10 @@ class HarnessClient:
             self._api_key = ""
             self._named_secrets.clear()
             request_id = self._next_request_id()
-            self._exchange(self.config.initialize_frame(request_id), "initialized")
+            self._exchange(
+                self._frame(request_id, "initialize", self.config.initialize_payload()),
+                "initialized",
+            )
         except BaseException:
             self.close()
             raise
@@ -149,22 +158,27 @@ class HarnessClient:
         if process is None:
             self._api_key = ""
             self._named_secrets.clear()
+            self._protocol_version = None
             return
         try:
             if process.poll() is None:
-                try:
-                    self._request("close", {}, "closed", timeout_seconds=30)
-                except HarnessError:
+                if self._protocol_version is None:
                     _terminate(process)
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
+                else:
+                    try:
+                        self._request("close", {}, "closed", timeout_seconds=30)
+                    except HarnessError:
+                        _terminate(process)
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=10)
         finally:
             self._process = None
             self._api_key = ""
             self._named_secrets.clear()
+            self._protocol_version = None
 
     def __enter__(self) -> "HarnessClient":
         self.start()
@@ -184,7 +198,7 @@ class HarnessClient:
     ) -> dict[str, Any]:
         request_id = self._next_request_id()
         return self._exchange(
-            {**self.config.common_frame(request_id, frame_type), **fields},
+            self._frame(request_id, frame_type, fields),
             expected_type,
             timeout_seconds=timeout_seconds,
             submission_validator=submission_validator,
@@ -223,7 +237,7 @@ class HarnessClient:
             if not isinstance(response, dict) or response.get("requestId") != frame["requestId"]:
                 raise HarnessError("harness sidecar response requestId mismatch")
             if (
-                response.get("protocolVersion") != PROTOCOL_VERSION
+                response.get("protocolVersion") != self._protocol_version
                 or response.get("campaignId") != self.config.campaign_id
             ):
                 raise HarnessError("harness sidecar response protocol identity mismatch")
@@ -283,12 +297,49 @@ class HarnessClient:
         if any(rejection.index >= len(candidates) for rejection in validation.rejections):
             raise HarnessError("submission validator returned an out-of-range rejection index")
         self._send_frame({
-            **self.config.common_frame(response["requestId"], "submission_validation_result"),
+            **self._frame(response["requestId"], "submission_validation_result"),
             "validationId": _required_string(response["validationId"], "validationId"),
             "accepted": validation.accepted,
             "rejected": [rejection.to_dict() for rejection in validation.rejections],
             "requiredReplacements": len(validation.rejections),
         })
+
+    def _frame(
+        self,
+        request_id: str,
+        frame_type: str,
+        fields: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if self._protocol_version is None:
+            raise HarnessError("harness sidecar did not declare a release version")
+        return {
+            "type": frame_type,
+            "requestId": request_id,
+            "protocolVersion": self._protocol_version,
+            "campaignId": self.config.campaign_id,
+            **dict(fields or {}),
+        }
+
+    def _wait_for_ready(self) -> str:
+        process = self._process
+        if process is None:
+            raise HarnessError("harness client is not started")
+        timeout = min(self.response_timeout_seconds, 30)
+        try:
+            line = self._responses.get(timeout=timeout)
+        except queue.Empty as exc:
+            raise self._process_error("harness sidecar did not declare a release version") from exc
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise HarnessError("harness sidecar returned invalid JSON") from exc
+        _assert_response_keys(response, {"type", "protocolVersion"})
+        if response.get("type") != "ready":
+            raise HarnessError("harness sidecar did not declare a release version")
+        version = response.get("protocolVersion")
+        if not isinstance(version, str) or _SEMVER_PATTERN.fullmatch(version) is None:
+            raise HarnessError("harness sidecar declared an invalid release version")
+        return version
 
     def _send_frame(self, frame: dict[str, Any]) -> None:
         process = self._process
