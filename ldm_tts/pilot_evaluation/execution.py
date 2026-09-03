@@ -172,8 +172,21 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     })
     manifest["runs"][run.key] = entry
     _write_manifest(spec, manifest)
-    preflight_plan(plan)
-    return_code = run_plan(plan)
+    try:
+        preflight_plan(plan)
+        return_code = run_plan(plan)
+    except Exception as error:
+        entry.update({
+            "status": "failed",
+            "updated_at_unix": time.time(),
+            "error": {
+                "type": type(error).__name__,
+                "message": str(error),
+            },
+        })
+        manifest["state"] = "failed"
+        _write_manifest(spec, manifest)
+        raise
     entry["status"] = "completed" if return_code == 0 and _child_complete(run.run_dir) else "failed"
     entry["return_code"] = return_code
     entry["updated_at_unix"] = time.time()

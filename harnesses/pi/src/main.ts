@@ -94,12 +94,16 @@ async function close(): Promise<void> {
 	if (closing) return;
 	closing = true;
 	validations.rejectAll(new Error("harness sidecar is closing"));
-	await pool?.close();
+	const activePool = pool;
 	pool = undefined;
-	apiKey = undefined;
-	namedSecrets = undefined;
-	campaignId = undefined;
-	redactor = new Redactor([]);
+	try {
+		await activePool?.close();
+	} finally {
+		apiKey = undefined;
+		namedSecrets = undefined;
+		campaignId = undefined;
+		redactor = new Redactor([]);
+	}
 }
 
 process.on("SIGTERM", () => {
@@ -206,9 +210,14 @@ for await (const line of lines) {
 		try {
 			if (!(await handle(frame))) lines.close();
 		} catch (error) {
+			const failure = {
+				code: errorCode(error),
+				message: redactor.text((error as Error).message),
+			};
 			validations.rejectAll(error as Error);
+			if (frame.type === "run_turn") await close();
 			respondTo(frame, "error", {
-				error: { code: errorCode(error), message: redactor.text((error as Error).message) },
+				error: failure,
 			});
 		}
 	})();

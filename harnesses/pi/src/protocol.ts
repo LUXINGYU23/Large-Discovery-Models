@@ -161,6 +161,7 @@ export interface SubmissionValidationRequest {
 	attemptIndex: number;
 	submission: Record<string, unknown>;
 	artifacts: SubmittedArtifact[];
+	submissionJson: string;
 	submissionDigest: string;
 }
 

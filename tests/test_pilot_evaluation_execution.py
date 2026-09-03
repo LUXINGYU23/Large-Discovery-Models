@@ -80,6 +80,31 @@ def test_reporting_failure_marks_manifest_failed(tmp_path: Path, monkeypatch) ->
     }
 
 
+def test_child_exception_marks_manifest_failed(tmp_path: Path, monkeypatch) -> None:
+    base_path = tmp_path / "base.yaml"
+    evaluation_path = tmp_path / "evaluation.yaml"
+    output_root = tmp_path / "evaluation"
+    _write_yaml(base_path, _base_config())
+    _write_yaml(evaluation_path, _evaluation_config(base_path, output_root))
+
+    def fail_child(_plan) -> int:
+        raise RuntimeError("harness protocol failed")
+
+    monkeypatch.setattr("ldm_tts.pilot_evaluation.execution.run_plan", fail_child)
+
+    with pytest.raises(RuntimeError, match="harness protocol failed"):
+        run_evaluation(load_pilot_evaluation_spec(evaluation_path), resume=False, dry_run=False)
+
+    manifest = _json(output_root / "evaluation_manifest.json")
+    run = manifest["runs"]["mock/ldm/seed_0"]
+    assert manifest["state"] == "failed"
+    assert run["status"] == "failed"
+    assert run["error"] == {
+        "type": "RuntimeError",
+        "message": "harness protocol failed",
+    }
+
+
 def test_matrix_rejects_a_task_label_that_differs_from_its_base_config(tmp_path: Path) -> None:
     base_path = tmp_path / "base.yaml"
     evaluation_path = tmp_path / "evaluation.yaml"

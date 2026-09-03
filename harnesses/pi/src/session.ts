@@ -33,7 +33,7 @@ import {
 	verifySubmissionRecord,
 	type TerminalSubmission,
 } from "./submission.js";
-import { atomicJson, canonicalSha256, sha256 } from "./trace.js";
+import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MODEL_CONTEXT_WINDOW = 262_144;
@@ -60,6 +60,7 @@ export interface CommittedTurn {
 	replayed: boolean;
 	submissionStatus: "accepted" | "rejected";
 	submissionId: string;
+	submissionJson: string;
 	submissionDigest: string;
 	submission: Record<string, unknown>;
 	submittedArtifacts: SubmittedArtifact[];
@@ -273,13 +274,15 @@ class SubmissionController {
 					await rm(attemptRoot, { recursive: true, force: true });
 					throw error;
 				}
-				const submissionDigest = canonicalSha256({ artifacts, submission });
+				const submissionJson = canonicalJson({ artifacts, submission });
+				const submissionDigest = sha256(submissionJson);
 				const decision = await this.validate({
 					profileId: this.profileId,
 					turnId: this.turnId,
 					attemptIndex: this.attemptIndex,
 					submission,
 					artifacts,
+					submissionJson,
 					submissionDigest,
 				});
 				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
@@ -290,6 +293,7 @@ class SubmissionController {
 					decision: decision.decision,
 					errors: decision.errors,
 					submission,
+					submissionJson,
 					submissionDigest,
 					artifacts,
 				});
@@ -306,6 +310,7 @@ class SubmissionController {
 					submission,
 					submittedArtifacts: artifacts,
 					validationErrors: decision.errors,
+					submissionJson,
 				};
 				if (!this.persist) throw new Error("submission turn is not initialized");
 				await this.persist(terminal);
@@ -851,8 +856,9 @@ export class PiSessionPool {
 	}
 
 	async close(): Promise<void> {
+		const proxyClose = this.proxy.close();
 		await Promise.allSettled([...this.sessions.values()].map((session) => session.close()));
 		this.sessions.clear();
-		await this.proxy.close();
+		await proxyClose;
 	}
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import queue
@@ -21,7 +22,6 @@ from ldm_tts.harness.protocol import (
     HarnessSubmittedArtifact,
     HarnessTurn,
     HarnessTurnResult,
-    canonical_sha256,
 )
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
@@ -305,22 +305,27 @@ class HarnessClient:
         _assert_response_keys(response, {
             "type", "requestId", "protocolVersion", "campaignId", "validationId",
             "profileId", "turnId", "attemptIndex", "submission", "artifacts",
-            "submissionDigest",
+            "submissionJson", "submissionDigest",
         })
         submission = response["submission"]
         if not isinstance(submission, dict):
             raise HarnessError("harness submission validation request has invalid payload")
         artifacts = _parse_submitted_artifacts(response["artifacts"])
+        submission_digest = _required_digest(response["submissionDigest"], "submissionDigest")
+        _verify_submission_json(
+            response["submissionJson"],
+            submission_digest,
+            submission,
+            response["artifacts"],
+        )
         request = HarnessSubmissionRequest(
             profile_id=_required_string(response["profileId"], "profileId"),
             turn_id=_required_string(response["turnId"], "turnId"),
             attempt_index=_required_positive_int(response["attemptIndex"], "attemptIndex"),
             submission=dict(submission),
             artifacts=artifacts,
+            submission_digest=submission_digest,
         )
-        submission_digest = _required_digest(response["submissionDigest"], "submissionDigest")
-        if request.digest != submission_digest:
-            raise HarnessError("harness submission digest mismatch before validation")
         validation = validator(request)
         if not isinstance(validation, HarnessSubmissionValidation):
             raise HarnessError("submission validator returned an invalid result")
@@ -413,7 +418,7 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
     _assert_response_keys(value, {
         "profileId", "sessionId", "turnId", "roundIndex", "historyFromSeq",
         "historyToSeq", "historyDigest", "inputDigest", "replayed",
-        "submissionStatus", "submissionId", "submissionDigest", "submission",
+        "submissionStatus", "submissionId", "submissionJson", "submissionDigest", "submission",
         "submittedArtifacts", "validationErrors", "usage", "toolBudget", "artifacts",
     })
     submission = value.get("submission")
@@ -437,12 +442,12 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
     if submission_status == "rejected" and not validation_errors:
         raise HarnessError("rejected harness turn must contain validation errors")
     submission_digest = _required_digest(value["submissionDigest"], "submissionDigest")
-    computed_digest = canonical_sha256({
-        "artifacts": [artifact.to_dict() for artifact in submitted_artifacts],
-        "submission": submission,
-    })
-    if submission_digest != computed_digest:
-        raise HarnessError("committed harness turn has inconsistent submissionDigest")
+    _verify_submission_json(
+        value["submissionJson"],
+        submission_digest,
+        submission,
+        value["submittedArtifacts"],
+    )
     replayed = value["replayed"]
     if not isinstance(replayed, bool):
         raise HarnessError("committed harness turn has invalid replayed")
@@ -474,6 +479,29 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         tool_budget=tool_budget,
         artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
     )
+
+
+def _verify_submission_json(
+    value: Any,
+    digest: str,
+    submission: Any,
+    artifacts: Any,
+) -> None:
+    if not isinstance(value, str):
+        raise HarnessError("harness submissionJson must be a string")
+    if hashlib.sha256(value.encode("utf-8")).hexdigest() != digest:
+        raise HarnessError("harness submissionJson digest mismatch")
+    try:
+        envelope = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise HarnessError("harness submissionJson is invalid JSON") from error
+    if (
+        not isinstance(envelope, dict)
+        or set(envelope) != {"artifacts", "submission"}
+        or envelope["submission"] != submission
+        or envelope["artifacts"] != artifacts
+    ):
+        raise HarnessError("harness submissionJson does not match the submitted payload")
 
 
 def _parse_submitted_artifacts(value: Any) -> tuple[HarnessSubmittedArtifact, ...]:

@@ -7,7 +7,7 @@ import {
 	snapshotSubmissionArtifacts,
 	verifySubmissionRecord,
 } from "./submission.js";
-import { canonicalSha256 } from "./trace.js";
+import { canonicalJson, sha256 } from "./trace.js";
 
 const RULE = {
 	pathPointer: "/artifact_path",
@@ -40,9 +40,11 @@ test("artifact snapshots are immutable and digest-bound", async () => {
 			1,
 			submission,
 		);
-		const submissionDigest = canonicalSha256({ artifacts, submission });
+		const submissionJson = canonicalJson({ artifacts, submission });
+		const submissionDigest = sha256(submissionJson);
 		await verifySubmissionRecord({
 			submissionStatus: "accepted",
+			submissionJson,
 			submissionDigest,
 			submission,
 			submittedArtifacts: artifacts,
@@ -57,6 +59,7 @@ test("artifact snapshots are immutable and digest-bound", async () => {
 		await assert.rejects(
 			verifySubmissionRecord({
 				submissionStatus: "accepted",
+				submissionJson,
 				submissionDigest: "0".repeat(64),
 				submission,
 				submittedArtifacts: artifacts,
@@ -71,6 +74,7 @@ test("artifact snapshots are immutable and digest-bound", async () => {
 		await assert.rejects(
 			verifySubmissionRecord({
 				submissionStatus: "accepted",
+				submissionJson,
 				submissionDigest,
 				submission,
 				submittedArtifacts: artifacts,
@@ -81,6 +85,27 @@ test("artifact snapshots are immutable and digest-bound", async () => {
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
+});
+
+test("submission JSON orders mixed-case condition keys deterministically", () => {
+	assert.equal(
+		canonicalJson({
+			artifacts: [],
+			submission: {
+				candidates: [{
+					dataset_id: "reductive_amination",
+					conditions: {
+						substrate: "S1",
+						solvent: "NMP",
+						reaction_concentration_mM: 100,
+						TTIP_equiv: 2,
+						AcOH_equiv: 1,
+					},
+				}],
+			},
+		}),
+		'{"artifacts":[],"submission":{"candidates":[{"conditions":{"AcOH_equiv":1,"TTIP_equiv":2,"reaction_concentration_mM":100,"solvent":"NMP","substrate":"S1"},"dataset_id":"reductive_amination"}]}}',
+	);
 });
 
 test("artifact rules allow submissions without an artifact reference", async () => {

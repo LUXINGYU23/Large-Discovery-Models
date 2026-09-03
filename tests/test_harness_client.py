@@ -270,7 +270,7 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
 
     with client, pytest.raises(
         HarnessError,
-        match="matching task validation|inconsistent submissionDigest",
+        match="matching task validation|submissionJson does not match",
     ):
         client.run_turn(
             (turn,),

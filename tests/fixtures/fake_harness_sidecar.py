@@ -13,13 +13,13 @@ profiles: list[str] = []
 print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
 
 
-def submission_digest(submission, artifacts) -> str:
+def submission_record(submission, artifacts) -> tuple[str, str]:
     body = json.dumps(
         {"artifacts": artifacts, "submission": submission},
         sort_keys=True,
         separators=(",", ":"),
-    ).encode()
-    return hashlib.sha256(body).hexdigest()
+    )
+    return body, hashlib.sha256(body.encode()).hexdigest()
 
 
 for line in sys.stdin:
@@ -54,7 +54,7 @@ for line in sys.stdin:
             decision = {"decision": "accept", "errors": []}
             while not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
                 attempt_index += 1
-                digest = submission_digest(submission, artifacts)
+                submission_json, digest = submission_record(submission, artifacts)
                 print(json.dumps({
                     "type": "submission_validation_requested",
                     **common,
@@ -64,6 +64,7 @@ for line in sys.stdin:
                     "attemptIndex": attempt_index,
                     "submission": submission,
                     "artifacts": artifacts,
+                    "submissionJson": submission_json,
                     "submissionDigest": digest,
                 }), flush=True)
                 validation = json.loads(next(sys.stdin))
@@ -73,7 +74,7 @@ for line in sys.stdin:
                 if decision["decision"] != "retry":
                     break
                 submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
-            digest = submission_digest(submission, artifacts)
+            submission_json, digest = submission_record(submission, artifacts)
             if os.environ.get("HARNESS_TEST_CHANGE_AFTER_VALIDATION"):
                 submission = {"candidates": [{"value": "changed"}]}
             turns.append({
@@ -90,6 +91,7 @@ for line in sys.stdin:
                     "rejected" if decision["decision"] == "reject_turn" else "accepted"
                 ),
                 "submissionId": f"{item['turnId']}-submission-{max(attempt_index, 1)}",
+                "submissionJson": submission_json,
                 "submissionDigest": digest,
                 "submission": submission,
                 "submittedArtifacts": artifacts,

@@ -608,6 +608,7 @@ class HarnessSubmissionRequest:
     attempt_index: int
     submission: Mapping[str, Any]
     artifacts: tuple[HarnessSubmittedArtifact, ...] = ()
+    submission_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_id or not self.turn_id:
@@ -616,10 +617,17 @@ class HarnessSubmissionRequest:
             raise ValueError("harness submission attempt_index must be positive")
         if not isinstance(self.submission, Mapping):
             raise ValueError("harness submission payload must be a mapping")
+        if (
+            self.submission_digest is not None
+            and _SHA256_PATTERN.fullmatch(self.submission_digest) is None
+        ):
+            raise ValueError("harness submission_digest must be a lowercase SHA-256 digest")
         object.__setattr__(self, "submission", dict(self.submission))
 
     @property
     def digest(self) -> str:
+        if self.submission_digest is not None:
+            return self.submission_digest
         return canonical_sha256({
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
             "submission": dict(self.submission),

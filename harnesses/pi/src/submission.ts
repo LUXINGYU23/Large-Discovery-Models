@@ -5,11 +5,12 @@ import type {
 	SubmissionError,
 	SubmittedArtifact,
 } from "./protocol.js";
-import { canonicalSha256, sha256 } from "./trace.js";
+import { canonicalJson, sha256 } from "./trace.js";
 
 export interface TerminalSubmission {
 	submissionStatus: "accepted" | "rejected";
 	submissionId: string;
+	submissionJson: string;
 	submissionDigest: string;
 	submission: Record<string, unknown>;
 	submittedArtifacts: SubmittedArtifact[];
@@ -94,10 +95,14 @@ export async function snapshotSubmissionArtifacts(
 }
 
 export async function verifySubmissionRecord(
-	value: Pick<TerminalSubmission, "submissionStatus" | "submissionDigest" | "submission" | "submittedArtifacts" | "validationErrors">,
+	value: Pick<TerminalSubmission, "submissionStatus" | "submissionJson" | "submissionDigest" | "submission" | "submittedArtifacts" | "validationErrors">,
 	artifactRoot: string,
 ): Promise<void> {
-	if (canonicalSha256({ artifacts: value.submittedArtifacts, submission: value.submission }) !== value.submissionDigest) {
+	const expectedJson = canonicalJson({
+		artifacts: value.submittedArtifacts,
+		submission: value.submission,
+	});
+	if (value.submissionJson !== expectedJson || sha256(value.submissionJson) !== value.submissionDigest) {
 		throw new Error("terminal submission digest mismatch");
 	}
 	if ((value.submissionStatus === "accepted") !== (value.validationErrors.length === 0)) {
