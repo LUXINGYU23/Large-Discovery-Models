@@ -27,6 +27,7 @@ export async function snapshotSubmissionArtifacts(
 	const artifacts: SubmittedArtifact[] = [];
 	for (const [index, rule] of rules.entries()) {
 		const rawPath = pointerValue(submission, rule.pathPointer);
+		if (rawPath === undefined) continue;
 		if (typeof rawPath !== "string" || !rawPath) {
 			throw artifactError(rule.pathPointer, "invalid_artifact_path", "Artifact path must be a non-empty string.");
 		}

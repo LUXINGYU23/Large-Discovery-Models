@@ -83,6 +83,18 @@ test("artifact snapshots are immutable and digest-bound", async () => {
 	}
 });
 
+test("artifact rules allow submissions without an artifact reference", async () => {
+	const { root, workspace, turnRoot } = await fixture();
+	try {
+		assert.deepEqual(
+			await snapshotSubmissionArtifacts([RULE], workspace, root, turnRoot, 1, { action: "keep" }),
+			[],
+		);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("artifact snapshots reject traversal, invalid suffixes, and oversized files", async () => {
 	const { root, workspace, turnRoot } = await fixture();
 	try {

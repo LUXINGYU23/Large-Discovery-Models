@@ -26,6 +26,21 @@ from ldm_tts.harness.protocol import (
     profile_set_sha256,
     parse_tool_call_budgets,
 )
+from ldm_tts.harness.policy import (
+    CompiledOptimizationPolicy,
+    OptimizationPolicyAdapter,
+    PolicyCapabilityContract,
+    PolicyResearchController,
+    PolicyRoundInput,
+    policy_mcp_server,
+    policy_submission_contract,
+)
+from ldm_tts.harness.policy_execution import (
+    DockerPolicyExecutor,
+    PolicyExecutionError,
+    PolicyExecutionResult,
+    PolicyExecutor,
+)
 
 __all__ = [
     "DEFAULT_NETWORK_TOOL_BUDGETS",
@@ -47,12 +62,23 @@ __all__ = [
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
+    "CompiledOptimizationPolicy",
+    "DockerPolicyExecutor",
+    "OptimizationPolicyAdapter",
+    "PolicyCapabilityContract",
+    "PolicyExecutionError",
+    "PolicyExecutionResult",
+    "PolicyExecutor",
+    "PolicyResearchController",
+    "PolicyRoundInput",
     "ResolvedHarnessMcpConfig",
     "load_harness_mcp_config",
     "HarnessWebSearch",
     "canonical_sha256",
     "file_sha256",
     "profile_set_sha256",
+    "policy_mcp_server",
+    "policy_submission_contract",
     "parse_tool_call_budgets",
     "load_harness_guest_runtime",
 ]
