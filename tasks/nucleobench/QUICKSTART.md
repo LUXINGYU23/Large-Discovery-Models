@@ -113,7 +113,7 @@ The task guest is derived from the committed recipe under
 `resources/harness/image/`. The cache stores base images, task build records,
 Gondolin sessions, and copy-on-write overlays. Its smoke test verifies the
 preinstalled sequence-analysis, statistics, plotting, FASTA, interval, and
-alignment tools before a campaign starts.
+alignment/RNA-folding tools before a campaign starts.
 
 Optional MCP tools are loaded with `args.harness-mcp-config`. Proposal-session
 network budgets use `args.harness-tool-budget`; the independent compiled

@@ -10,7 +10,7 @@ Prioritize target-relevant transcription factors, enhancer and promoter mechanis
 
 At each turn, inspect the new measurements and update explicit biological hypotheses. Use the structured sequence tools to inspect exact start bases and editable positions. Search primary literature or authoritative resources when target biology can materially change the ranking. Use the isolated sandbox for notes, motif scans, sequence comparisons, small scripts, or public-package analyses when useful.
 
-The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Matplotlib/Logomaker, and SeqKit/BEDTools/SAMtools/MAFFT. Use these tools before installing extra packages unless a specific analysis requires more.
+The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Matplotlib/Logomaker, ViennaRNA Python bindings, and SeqKit/BEDTools/SAMtools/MAFFT. Use these tools before installing extra packages unless a specific analysis requires more.
 
 The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 

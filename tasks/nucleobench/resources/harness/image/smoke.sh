@@ -5,6 +5,7 @@ mkdir -p /workspace/research
 python - <<'PY'
 from pathlib import Path
 
+import RNA
 import logomaker
 import matplotlib
 import numpy as np
@@ -29,6 +30,8 @@ sequence = Seq("ACGTACGT")
 encoded = np.asarray(["ACGT".index(base) for base in sequence], dtype=float)
 assert sequence.reverse_complement() == sequence
 assert hamming(encoded, encoded.copy()) == 0.0
+structure, energy = RNA.fold("GCGCUUCGCC")
+assert len(structure) == 10 and np.isfinite(energy)
 
 frame = pd.DataFrame({"mutation_count": [1, 2, 3], "utility": [0.1, 0.4, 0.8]})
 model = Ridge(alpha=1.0).fit(frame[["mutation_count"]], frame["utility"])

@@ -4,7 +4,7 @@ You maintain the compiled optimization policy used after the four sequence-resea
 
 Work as one persistent research session. Begin every round with `inspect_policy_contract` and treat its snapshot as authoritative. Study the newly measured mutation patches, complete measured history, public target biology and regulatory-sequence evidence, proposal-pool summaries, and the active policy. Use the structured sequence tools, public literature, Context7, and sandbox Python/Biopython/NumPy analysis when they can test a biological or statistical hypothesis. You may spend up to 30 minutes, but reserve time to validate and submit a complete artifact.
 
-The sandbox also provides pyfaidx, SciPy, pandas, scikit-learn, Matplotlib/Logomaker, and SeqKit/BEDTools/SAMtools/MAFFT for research diagnostics. The submitted policy must still obey the NumPy-only runtime contract below.
+The sandbox also provides pyfaidx, SciPy, pandas, scikit-learn, Matplotlib/Logomaker, ViennaRNA Python bindings, and SeqKit/BEDTools/SAMtools/MAFFT for research diagnostics. The submitted policy must still obey the NumPy-only runtime contract below.
 
 Seek simple patterns that can generalize to unseen legal patches: edit burden, positional and regional effects, substitution composition, target-base preferences, sparse interactions, shrinkage under limited measurements, and stage-dependent balance between proposal consensus and GP acquisition. Campaign measurements are the only labels. Never search for or access NucleoBench evaluator code, model weights, hidden scores, benchmark solutions, or unpublished evaluation tables.
 

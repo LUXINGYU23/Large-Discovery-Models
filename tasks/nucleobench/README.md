@@ -137,8 +137,9 @@ The task guest is content-addressed from
 `resources/harness/image/guest-image.json` and must be built before a real
 Harness campaign. It includes Biopython, pyfaidx, NumPy, SciPy, pandas,
 scikit-learn, Matplotlib, Seaborn, Logomaker, and the SeqKit, BEDTools,
-SAMtools, and MAFFT command-line tools. The official evaluator package, model
-weights, and benchmark data remain outside the research guest.
+SAMtools, and MAFFT command-line tools, plus ViennaRNA Python bindings. The
+official evaluator package, model weights, and benchmark data remain outside
+the research guest.
 
 See [the quick start](QUICKSTART.md) for commands and
 [the shared Harness guide](../../docs/research-harness.md) for MCP, budgets,
