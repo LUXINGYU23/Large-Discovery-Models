@@ -113,24 +113,39 @@ reactions.
 
 ## 5. Verify the Harness Backend
 
-Harness runs require Docker and Linux KVM. Build the pinned Pi sidecar, then
-run the two-round capability gate:
+Harness runs require Docker and Linux KVM. Build and smoke the task guest, then
+build the pinned Pi sidecar and run the two-round capability gate:
 
 ```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/check_task_dependencies.py config/iron_mind/harness_smoke.yaml --no-optional
+  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/run_ldm_tts.py config/iron_mind/harness_smoke.yaml
+  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 ```
+
+Guest building requires `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest smoke
+additionally requires the host-architecture QEMU system emulator and Linux KVM.
 
 To read the API key from a protected file, add
 `--set args.harness-api-key-file=/absolute/path/to/key`. The sidecar stores raw
 session and redacted provider traces below the campaign's `harness/` directory.
+Use `--set args.harness-mcp-config=/absolute/path/to/mcp.yaml` for allowlisted
+MCP tools. Per-tool turn limits are configured with `harness-tool-budget` in a
+runner YAML; see `docs/research-harness.md` for the schema and defaults.
 
-## 6. Run the Four-Method Pilot Evaluation
+## 6. Run the Five-Method Pilot Evaluation
 
 After the official data and endpoint are ready, run the fixed six-round matrix:
 
@@ -143,7 +158,9 @@ uv run --locked --project tasks/iron_mind python \
 ```
 
 The BO comparator is offline after data preparation. Direct LDM, Harness LDM,
-and direct LLM use the generic endpoint variables from step 2. The Harness
-children also use the image and KVM setup from step 5. The output root is
+direct LLM, and direct research Harness use the generic endpoint variables from
+step 2. The two Harness children also use the image and KVM setup from step 5.
+The direct research Harness keeps one session and evaluates its one accepted
+candidate without GP selection. The output root is
 `$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted matrix with
 `--resume` after confirming the repository and configurations are unchanged.

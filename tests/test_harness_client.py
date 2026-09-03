@@ -10,10 +10,20 @@ import pytest
 from ldm_tts.harness import (
     HarnessClient,
     HarnessError,
+    HarnessGuestRuntime,
     HarnessPoolConfig,
     HarnessProfile,
     HarnessSubmissionValidation,
     HarnessTurn,
+    parse_tool_call_budgets,
+)
+
+
+TEST_GUEST_RUNTIME = HarnessGuestRuntime(
+    image_ref="ldm/fixture-research:aaaaaaaaaaaa",
+    recipe_sha256="a" * 64,
+    rootfs_size="4G",
+    install_policy="session_overlay",
 )
 
 
@@ -39,9 +49,10 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         case_id="case-1",
         seed=1,
         candidate_schema=schema,
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
 
-    frame = config.initialize_frame("initialize-1")
+    frame = config.initialize_payload()
 
     schema_json = frame["candidateSchemaJson"]
     assert isinstance(schema_json, str)
@@ -50,6 +61,9 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         schema_json.encode("utf-8")
     ).hexdigest()
     assert "candidateSchema" not in frame
+    assert "protocolVersion" not in frame
+    assert "requestId" not in frame
+    assert frame["guestRuntime"] == TEST_GUEST_RUNTIME.to_dict()
     assert frame["webSearch"] == {
         "providers": ["parallel-mcp", "exa", "duckduckgo"],
         "fallbackOn": [
@@ -61,6 +75,19 @@ def test_candidate_schema_digest_covers_the_transmitted_json_bytes(tmp_path: Pat
         ],
     }
     assert "webProvider" not in frame
+    assert frame["mcpServers"] == []
+    assert frame["limits"] == {"wallTimeSeconds": 1800, "toolCallBudgets": {}}
+
+
+def test_tool_call_budget_parser_rejects_duplicates_and_submit_limits() -> None:
+    assert parse_tool_call_budgets(("web_search=4", "mcp__literature__search=0")) == {
+        "mcp__literature__search": 0,
+        "web_search": 4,
+    }
+    with pytest.raises(ValueError, match="duplicate"):
+        parse_tool_call_budgets(("web_search=4", "web_search=2"))
+    with pytest.raises(ValueError, match="submit_candidates"):
+        parse_tool_call_budgets(("submit_candidates=1",))
 
 
 def test_persistent_harness_client_runs_one_profile_batch(
@@ -88,12 +115,15 @@ def test_persistent_harness_client_runs_one_profile_batch(
             "required": ["value"],
             "additionalProperties": False,
         },
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
+    monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-secret")
     client = HarnessClient(
         (sys.executable, "-u", str(fixture)),
         api_key="test-secret",
         config=config,
+        named_secrets={"mcp.fixture.env.token": "mcp-secret"},
         response_timeout_seconds=5,
     )
     turn = HarnessTurn(
@@ -116,6 +146,8 @@ def test_persistent_harness_client_runs_one_profile_batch(
     assert result[0].input_digest == turn.input_digest
     assert result[0].candidates == ({"value": "chemist"},)
     assert result[0].usage["providerCalls"] == 1
+    assert result[0].usage["toolCalls"] == {}
+    assert result[0].tool_budget == {}
 
 
 @pytest.mark.parametrize(
@@ -148,6 +180,7 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
             "required": ["value"],
             "additionalProperties": False,
         },
+        guest_runtime=TEST_GUEST_RUNTIME,
     )
     monkeypatch.setenv(environment_variable, "1")
     client = HarnessClient(

@@ -6,6 +6,7 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness import DEFAULT_NETWORK_TOOL_BUDGETS, parse_tool_call_budgets
 from tasks.synthonbench.core.catalog import REACTION_ALLOCATIONS
 from tasks.synthonbench.core.constants import (
     DEFAULT_ACQUISITION_ETA,
@@ -46,9 +47,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.proposal_candidates_per_request is None:
         args.proposal_candidates_per_request = (
             min(DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST, args.proposal_samples)
-            if args.search_method == "ldm" and args.proposal_backend == "direct"
+            if args.search_method == "ldm"
             else 1
         )
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = [
+            value for value in DEFAULT_NETWORK_TOOL_BUDGETS
+            if args.harness_context7 or not value.startswith(("resolve-library-id=", "query-docs="))
+        ]
     return args
 
 
@@ -95,7 +101,6 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--eta", type=float, default=DEFAULT_ACQUISITION_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--prompt-policy", choices=PROMPT_POLICIES, default=DEFAULT_PROMPT_POLICY)
-    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
 
 
 def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
@@ -112,7 +117,7 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         default=DEFAULT_LLM_EXTRA_BODY_JSON,
         help="Provider-specific JSON object merged into the OpenAI-compatible request body.",
     )
-    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument("--harness-candidates-per-session", type=int, default=16)
     parser.add_argument(
         "--harness-thinking",
@@ -120,11 +125,18 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         default="max",
     )
     parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
     parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
+    parser.add_argument(
+        "--harness-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one tool per Agent turn; repeat for additional tools.",
+    )
     parser.add_argument(
         "--no-harness-context7",
         action="store_false",
@@ -147,14 +159,14 @@ def _validate_counts(args: argparse.Namespace) -> None:
     positive = ("proposal_samples", "bo_pool_size", "bo_search_samples", "proposal_candidates_per_request",
                 "proposal_max_workers", "evaluations_per_round",
                 "slate_size", "fingerprint_bits", "gp_landmarks", "llm_max_tokens",
-                "harness_candidates_per_session", "harness_wall_time_seconds")
+                "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
-    if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
+    if args.search_method in {"ldm", "ldm_harness"} and args.proposal_samples <= args.bo_pool_size:
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
-    if args.search_method != "llm" and args.evaluations_per_round > args.bo_pool_size:
+    if args.search_method not in {"llm", "harness"} and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
-    if args.proposal_backend == "direct" and args.search_method in {"ldm", "llm"}:
+    if args.search_method in {"ldm", "llm"}:
         breadth = (
             args.proposal_samples
             if args.search_method == "ldm"
@@ -165,7 +177,9 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "the direct proposal breadth must divide evenly by "
                 "--proposal-candidates-per-request"
             )
-    if args.proposal_backend == "harness":
+    if args.search_method == "ldm_harness":
+        if args.harness_candidates_per_session < 1:
+            raise SystemExit("--harness-candidates-per-session must be positive")
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:
             raise SystemExit(
@@ -174,37 +188,48 @@ def _validate_counts(args: argparse.Namespace) -> None:
 
 
 def _validate_numbers(args: argparse.Namespace) -> None:
-    positive = (
-        "gp_kernel_jitter",
-        "gp_signal_std",
-        "gp_observation_noise_std",
-        "z_clip",
-        "llm_timeout",
-        "audit_timeout",
-        "harness_response_timeout",
-    )
+    positive = ["audit_timeout", "harness_response_timeout"]
+    if args.search_method != "harness":
+        positive.extend((
+            "gp_kernel_jitter",
+            "gp_signal_std",
+            "gp_observation_noise_std",
+            "z_clip",
+            "llm_timeout",
+        ))
     if any(not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0 for name in positive):
         raise SystemExit("GP scales, timeouts, and --z-clip must be finite and positive")
-    nonnegative = ("acquisition_beta", "alpha", "eta", "gp_mean_std", "gp_reaction_weight")
-    if any(not math.isfinite(getattr(args, name)) or getattr(args, name) < 0 for name in nonnegative):
-        raise SystemExit("acquisition-beta, alpha, and eta must be finite and non-negative")
-    if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
-        raise SystemExit("--llm-temperature must be finite and between 0 and 2")
+    if args.search_method != "harness":
+        nonnegative = (
+            "acquisition_beta", "alpha", "eta", "gp_mean_std", "gp_reaction_weight"
+        )
+        if any(
+            not math.isfinite(getattr(args, name)) or getattr(args, name) < 0
+            for name in nonnegative
+        ):
+            raise SystemExit(
+                "acquisition-beta, alpha, and eta must be finite and non-negative"
+            )
+        if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
+            raise SystemExit("--llm-temperature must be finite and between 0 and 2")
 
 
 def _validate_provider_options(args: argparse.Namespace) -> None:
     try:
         parse_openai_extra_body_json(args.llm_extra_body_json)
+        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):
+        raise SystemExit("Context7 tools cannot have budgets when Context7 is disabled")
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
-    if args.proposal_backend == "harness":
-        if args.search_method != "ldm":
-            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+    if args.search_method in {"ldm_harness", "harness"}:
         if args.proposal_mode != "none":
-            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+            raise SystemExit(
+                f"--search-method={args.search_method} requires --proposal-mode=none"
+            )
         if not args.mock and (args.data_dir is None or args.source_dir is None):
             raise SystemExit("real SynthonBench campaigns require --data-dir and --source-dir")
         if args.oracle_kind == "glide" and args.scale != "1M":

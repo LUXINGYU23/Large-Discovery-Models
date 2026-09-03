@@ -35,12 +35,11 @@ def build_synthon_task_spec(
     prompt_policy: str,
     search_method: str = "ldm",
     initialization_mode: str = "none",
-    proposal_backend: str = "direct",
     harness_profile_count: int = 0,
 ) -> LDMTaskSpec:
     """Describe finite tuple, response, and method-specific acquisition semantics."""
 
-    if encoder is None and search_method != "llm":
+    if encoder is None and search_method not in {"llm", "harness"}:
         raise ValueError("BO-based SynthonBench methods require a surrogate encoder")
     search_breadth = _search_breadth(
         search_method,
@@ -50,10 +49,13 @@ def build_synthon_task_spec(
     )
     direct_batch_size = (
         proposal_candidates_per_request
-        if proposal_backend == "direct" and search_method in {"ldm", "llm"}
+        if search_method in {"ldm", "llm"}
         else 1
     )
     response_space = _response_space(direct_batch_size)
+    response_spaces = (response_space,)
+    if initialization_mode == "shared_random" and response_space.name != "synthon_tuple_json":
+        response_spaces += (_response_space(1),)
     return LDMTaskSpec(
         task=TASK_ID,
         candidate_domain=CandidateDomainSpec(
@@ -69,69 +71,86 @@ def build_synthon_task_spec(
                 "Official fixed-oracle SynthonBench utility.",
             ),
         ),
-        response_spaces=(response_space,),
+        response_spaces=response_spaces,
         acquisition=acquisition,
         reservoir=_reservoir_spec(
             samples=search_breadth,
             workers=proposal_max_workers,
             method=search_method,
             initialization=initialization_mode,
-            backend=proposal_backend,
             candidates_per_request=direct_batch_size,
             response_space=response_space.name,
         ),
-        surrogate=encoder.describe() if encoder is not None else disabled_surrogate(),
+        surrogate=(
+            encoder.describe()
+            if encoder is not None
+            else disabled_surrogate(search_method)
+        ),
         proposal_search=_proposal_search(
             search_method,
             search_breadth,
             proposal_max_workers,
-            proposal_backend,
             harness_profile_count,
             direct_batch_size,
         ),
         metadata={
             "search_method": search_method,
             "initialization_mode": initialization_mode,
-            "proposal_backend": proposal_backend,
             "proposal_samples": proposal_samples,
             "model_requests_per_round": (
                 0
                 if search_method == "bo"
                 else None
-                if proposal_backend == "harness"
+                if search_method in {"ldm_harness", "harness"}
                 else math.ceil(search_breadth / direct_batch_size)
             ),
             "candidates_per_model_request": (
-                None if proposal_backend == "harness" or search_method == "bo" else direct_batch_size
+                None
+                if search_method in {"ldm_harness", "harness", "bo"}
+                else direct_batch_size
             ),
             "model_session_turns_per_round": (
-                harness_profile_count if proposal_backend == "harness" else 0
+                harness_profile_count
+                if search_method in {"ldm_harness", "harness"}
+                else 0
             ),
             "search_breadth": search_breadth,
             "bo_pool_size": bo_pool_size,
             "bo_search_samples": bo_search_samples,
-            "slate_size": None if proposal_backend == "harness" else slate_size,
-            "reaction_allocation": None if proposal_backend == "harness" else reaction_allocation,
+            "slate_size": None if search_method in {"ldm_harness", "harness"} else slate_size,
+            "reaction_allocation": (
+                None if search_method in {"ldm_harness", "harness"} else reaction_allocation
+            ),
             "prompt_policy": (
-                "task_local_agents" if proposal_backend == "harness" else prompt_policy
+                "task_local_agents"
+                if search_method in {"ldm_harness", "harness"}
+                else prompt_policy
             ),
         },
     )
 
 
-def build_direct_acquisition() -> AcquisitionSpec:
+def build_direct_acquisition(search_method: str) -> AcquisitionSpec:
     return AcquisitionSpec(
-        name="direct_llm_reservoir_order",
+        name=f"direct_{search_method}_reservoir_order",
         objective_names=(OBJECTIVE_NAME,),
         score_direction="maximize",
-        selection_rule="evaluate every admitted direct LLM candidate in reservoir order",
+        selection_rule=(
+            "evaluate every admitted direct LLM candidate in reservoir order"
+            if search_method == "llm"
+            else "evaluate every admitted Harness candidate in reservoir order"
+        ),
     )
 
 
-def disabled_surrogate() -> SurrogateSpaceSpec:
+def disabled_surrogate(search_method: str) -> SurrogateSpaceSpec:
     return SurrogateSpaceSpec(
         kind="none",
-        representation="No surrogate for direct LLM baseline.",
+        representation=(
+            "No surrogate for direct LLM baseline."
+            if search_method == "llm"
+            else "No surrogate for direct Harness evaluation."
+        ),
         dimension_policy="none",
     )
 
@@ -142,7 +161,6 @@ def _reservoir_spec(
     workers: int,
     method: str,
     initialization: str,
-    backend: str,
     candidates_per_request: int,
     response_space: str,
 ) -> ReservoirSpec:
@@ -157,7 +175,7 @@ def _reservoir_spec(
         ))
     if method == "bo":
         description = "Score-blind random unseen product pool for base GP-UCB."
-    elif backend == "harness":
+    elif method in {"ldm_harness", "harness"}:
         description = "Collect exact official-space tuples generated by persistent research sessions."
     else:
         requests = math.ceil(samples / candidates_per_request)
@@ -185,7 +203,6 @@ def _proposal_search(
     method: str,
     breadth: int,
     workers: int,
-    backend: str,
     harness_profile_count: int,
     candidates_per_request: int,
 ) -> ProposalSearchSpec:
@@ -208,13 +225,21 @@ def _proposal_search(
                 "max_workers": min(workers, request_count),
             },
         )
-    if backend == "harness":
+    if method in {"ldm_harness", "harness"}:
         if harness_profile_count < 1 or breadth % harness_profile_count:
             raise ValueError("harness breadth must divide evenly across profiles")
         return ProposalSearchSpec(
-            name="persistent_parallel_research_sessions",
+            name=(
+                "persistent_parallel_research_sessions"
+                if method == "ldm_harness"
+                else "persistent_direct_research_session"
+            ),
             breadth=breadth,
-            evaluation_policy="empirical_q0_maintained_acquisition_tilted",
+            evaluation_policy=(
+                "empirical_q0_maintained_acquisition_tilted"
+                if method == "ldm_harness"
+                else "reservoir_order_direct_evaluation"
+            ),
             parameters={
                 "profile_count": harness_profile_count,
                 "candidates_per_session": breadth // harness_profile_count,
@@ -245,7 +270,7 @@ def _search_breadth(
 ) -> int:
     if method == "bo":
         return bo_search_samples
-    return evaluations_per_round if method == "llm" else proposal_samples
+    return evaluations_per_round if method in {"llm", "harness"} else proposal_samples
 
 
 def _response_space(candidates_per_request: int) -> ResponseSpaceSpec:

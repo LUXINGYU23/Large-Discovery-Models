@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
 import {
-	PROTOCOL_VERSION,
 	ProtocolError,
 	parseFrame,
 	type InputFrame,
@@ -9,9 +8,11 @@ import {
 	type SubmissionValidationRequest,
 	type SubmissionValidationResultFrame,
 } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { Redactor } from "./trace.js";
 
 let apiKey: string | undefined;
+let namedSecrets: Record<string, string> | undefined;
 let campaignId: string | undefined;
 let pool: PiSessionPool | undefined;
 let redactor = new Redactor([]);
@@ -69,7 +70,7 @@ function respondTo(
 	respond({
 		type,
 		requestId: frame.requestId,
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: frame.campaignId,
 		...fields,
 	});
@@ -86,6 +87,9 @@ async function close(): Promise<void> {
 	await pool?.close();
 	pool = undefined;
 	apiKey = undefined;
+	namedSecrets = undefined;
+	campaignId = undefined;
+	redactor = new Redactor([]);
 }
 
 process.on("SIGTERM", () => {
@@ -95,20 +99,23 @@ process.on("SIGINT", () => {
 	void close().finally(() => process.exit(130));
 });
 
+respond({ type: "ready", protocolVersion: SIDECAR_RELEASE_VERSION });
+
 async function handle(frame: CommandFrame): Promise<boolean> {
 	if (frame.type === "bootstrap_secret") {
-		if (apiKey || pool) throw new ProtocolError("invalid_state", "bootstrap_secret is accepted exactly once before initialize");
+		if (apiKey || namedSecrets || pool) throw new ProtocolError("invalid_state", "bootstrap_secret is accepted exactly once before initialize");
 		apiKey = frame.apiKey;
+		namedSecrets = frame.namedSecrets;
 		campaignId = frame.campaignId;
-		redactor = new Redactor([apiKey]);
+		redactor = new Redactor([apiKey, ...Object.values(namedSecrets)]);
 		respondTo(frame, "secret_bootstrapped");
 		return true;
 	}
 	if (frame.campaignId !== campaignId) throw new ProtocolError("invalid_state", "campaignId changed after bootstrap");
 	if (frame.type === "initialize") {
-		if (!apiKey) throw new ProtocolError("invalid_state", "bootstrap_secret must precede initialize");
+		if (!apiKey || !namedSecrets) throw new ProtocolError("invalid_state", "bootstrap_secret must precede initialize");
 		if (pool) throw new ProtocolError("invalid_state", "sidecar is already initialized");
-		pool = new PiSessionPool(frame, apiKey);
+		pool = new PiSessionPool(frame, apiKey, namedSecrets);
 		try {
 			await pool.initialize();
 		} catch (error) {
@@ -117,6 +124,7 @@ async function handle(frame: CommandFrame): Promise<boolean> {
 			throw error;
 		}
 		apiKey = undefined;
+		namedSecrets = undefined;
 		respondTo(frame, "initialized", {
 			profiles: frame.profiles.map((profile) => profile.profileId),
 			manifest: "manifest.json",
@@ -162,7 +170,7 @@ for await (const line of lines) {
 		respond({
 			type: "error",
 			requestId,
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: requestCampaignId ?? campaignId,
 			error: { code: errorCode(error), message: redactor.text((error as Error).message) },
 		});

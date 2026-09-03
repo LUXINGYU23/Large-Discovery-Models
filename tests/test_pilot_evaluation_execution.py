@@ -9,7 +9,8 @@ import pytest
 import yaml
 
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
-from ldm_tts.pilot_evaluation.execution import run_evaluation
+from ldm_tts.pilot_evaluation.execution import _child_plan, _select_runs, run_evaluation
+from ldm_tts.cli.runner import load_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,39 @@ def test_matrix_rejects_a_task_label_that_differs_from_its_base_config(tmp_path:
 
     with pytest.raises(ValueError, match="must match base config task"):
         run_evaluation(load_pilot_evaluation_spec(evaluation_path), resume=False, dry_run=True)
+
+
+def test_harness_methods_build_distinct_child_plans(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("IRON_MIND_WORK_ROOT", str(tmp_path / "work"))
+    spec = load_pilot_evaluation_spec(
+        REPO_ROOT / "config" / "pilot_evaluation" / "iron_mind.yaml"
+    )
+    base = load_config(spec.base_config)
+    runs = {
+        run.method: run
+        for run in _select_runs(
+            spec,
+            cases=("reductive_amination",),
+            methods=("ldm_harness", "harness"),
+            seeds=(0,),
+        )
+    }
+
+    ldm_harness = _child_plan(spec, base, runs["ldm_harness"], resume=False)
+    direct_harness = _child_plan(spec, base, runs["harness"], resume=False)
+
+    assert ldm_harness["contract_profile"] == "pilot_evaluation_ldm_harness"
+    assert direct_harness["contract_profile"] == "pilot_evaluation_harness"
+    assert _option(ldm_harness["argv"], "--search-method") == "ldm_harness"
+    assert _option(direct_harness["argv"], "--search-method") == "harness"
+    assert _option(ldm_harness["argv"], "--proposal-samples") == "64"
+    assert _option(direct_harness["argv"], "--proposal-samples") == "1"
+
+
+def _option(argv: list[str], name: str) -> str:
+    return argv[argv.index(name) + 1]
 
 
 def _base_config() -> dict[str, object]:

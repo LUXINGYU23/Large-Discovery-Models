@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+from importlib.metadata import version
 
 
 profiles: list[str] = []
+print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
 for line in sys.stdin:
     frame = json.loads(line)
     request_id = frame["requestId"]
@@ -19,10 +21,16 @@ for line in sys.stdin:
     if frame["type"] == "bootstrap_secret":
         response = (
             {"type": "error", **common, "error": {"message": "secret inherited"}}
-            if os.environ.get("HARNESS_TEST_SECRET")
+            if os.environ.get("HARNESS_TEST_SECRET") or os.environ.get("HARNESS_MCP_SECRET")
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
+        assert frame["guestRuntime"] == {
+            "imageRef": "ldm/fixture-research:aaaaaaaaaaaa",
+            "recipeSha256": "a" * 64,
+            "rootfsSize": "4G",
+            "installPolicy": "session_overlay",
+        }
         profiles = [item["profileId"] for item in frame["profiles"]]
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
@@ -57,7 +65,8 @@ for line in sys.stdin:
                     "submissionId": f"{item['turnId']}-submission",
                     "candidates": candidates,
                 },
-                "usage": {"providerCalls": 1, "webCalls": 0, "context7Calls": 0, "artifactBytes": 12},
+                "usage": {"providerCalls": 1, "toolCalls": {}, "artifactBytes": 12},
+                "toolBudget": {},
                 "artifacts": {"turn": f"turns/{item['turnId']}", "session": f"sessions/{item['profileId']}.jsonl"},
             })
         response = {"type": "turn_committed", **common, "turns": turns}

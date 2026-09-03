@@ -16,7 +16,7 @@ from tasks.iron_mind.core.data import FrozenReactionTable
 
 
 INITIALIZATION_MODES = ("none", "shared_random")
-SEARCH_METHODS = ("ldm", "bo", "llm")
+SEARCH_METHODS = ("ldm", "ldm_harness", "bo", "llm", "harness")
 
 
 class IronMindInitializationExpander:

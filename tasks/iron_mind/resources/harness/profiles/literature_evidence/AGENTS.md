@@ -23,3 +23,7 @@ The turn has a hard 30-minute wall-time. End open-ended source work by minute 20
 - Validate candidates with `validate_reaction_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch.
 - If rejected, use the exact indices and reasons to replace only rejected entries, then resubmit the complete minibatch.
+
+## Guest runtime
+
+Check dependencies before installing them, and install only what the current investigation needs. Do not upgrade the base operating system or alter benchmark infrastructure. Keep package caches and temporary environments outside `/workspace`; save only reusable scripts, compact data summaries, and research conclusions to `/workspace/research`.

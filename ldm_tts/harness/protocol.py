@@ -7,12 +7,20 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-PROTOCOL_VERSION = 4
+from ldm_tts.harness.guest_runtime import HarnessGuestRuntime
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 _SEARCH_FALLBACK_KINDS = frozenset(
     {"transient", "quota", "network", "invalid-response", "unsupported"}
+)
+DEFAULT_NETWORK_TOOL_BUDGETS = (
+    "web_search=8",
+    "fetch_content=16",
+    "get_search_content=16",
+    "resolve-library-id=4",
+    "query-docs=8",
 )
 
 
@@ -81,6 +89,85 @@ class HarnessToolExtension:
         return {"path": str(self.path), "sha256": self.sha256, "toolNames": list(self.tool_names)}
 
 
+@dataclass(frozen=True)
+class HarnessMcpValue:
+    value: str | None = None
+    secret_name: str | None = None
+    secret_source: str | None = None
+    prefix: str = ""
+
+    def __post_init__(self) -> None:
+        if (self.value is None) == (self.secret_name is None):
+            raise ValueError("MCP values require exactly one literal or secret")
+        if self.secret_name is not None and not self.secret_source:
+            raise ValueError("MCP secret values require a source description")
+        if self.value is not None and (self.secret_source is not None or self.prefix):
+            raise ValueError("MCP literal values cannot declare secret metadata")
+
+    def to_dict(self) -> dict[str, str]:
+        if self.value is not None:
+            return {"value": self.value}
+        assert self.secret_name is not None and self.secret_source is not None
+        return {
+            "secretName": self.secret_name,
+            "secretSource": self.secret_source,
+            "prefix": self.prefix,
+        }
+
+
+@dataclass(frozen=True)
+class HarnessMcpServer:
+    server_id: str
+    transport: str
+    tools: tuple[str, ...]
+    config_sha256: str
+    command: str | None = None
+    args: tuple[str, ...] = ()
+    env: tuple[tuple[str, HarnessMcpValue], ...] = ()
+    url: str | None = None
+    headers: tuple[tuple[str, HarnessMcpValue], ...] = ()
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.server_id) is None:
+            raise ValueError("MCP server_id must be a lowercase identifier")
+        if self.transport not in {"stdio", "streamable_http"}:
+            raise ValueError("unsupported MCP transport")
+        if not self.tools or len(set(self.tools)) != len(self.tools):
+            raise ValueError("MCP tools must be a non-empty unique allowlist")
+        if any(re.fullmatch(r"[A-Za-z0-9_-]+", name) is None for name in self.tools):
+            raise ValueError("MCP tool names must be valid function identifiers")
+        if any(len(f"mcp__{self.server_id}__{name}") > 64 for name in self.tools):
+            raise ValueError("namespaced MCP tool names must not exceed 64 characters")
+        if _SHA256_PATTERN.fullmatch(self.config_sha256) is None:
+            raise ValueError("MCP config_sha256 must be a lowercase SHA-256 digest")
+        if self.transport == "stdio" and (not self.command or self.url is not None or self.headers):
+            raise ValueError("stdio MCP servers require command and prohibit HTTP fields")
+        if self.transport == "streamable_http" and (
+            not self.url or self.command is not None or self.args or self.env
+        ):
+            raise ValueError("HTTP MCP servers require url and prohibit stdio fields")
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "serverId": self.server_id,
+            "transport": self.transport,
+            "tools": list(self.tools),
+            "configSha256": self.config_sha256,
+        }
+        if self.transport == "stdio":
+            result.update(
+                command=self.command,
+                args=list(self.args),
+                env={name: value.to_dict() for name, value in self.env},
+            )
+        else:
+            result.update(
+                url=self.url,
+                headers={name: value.to_dict() for name, value in self.headers},
+            )
+        return result
+
+
 def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
     return canonical_sha256([
         {
@@ -96,13 +183,43 @@ def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
 @dataclass(frozen=True)
 class HarnessLimits:
     wall_time_seconds: int = 1800
+    tool_call_budgets: Mapping[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.wall_time_seconds < 1:
             raise ValueError("harness wall-time limit must be positive")
+        budgets = dict(self.tool_call_budgets)
+        if any(
+            re.fullmatch(r"[A-Za-z0-9_-]+", name) is None
+            or isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit < 0
+            for name, limit in budgets.items()
+        ):
+            raise ValueError("harness tool budgets require valid names and non-negative integers")
+        if "submit_candidates" in budgets:
+            raise ValueError("submit_candidates cannot have a tool call budget")
+        object.__setattr__(self, "tool_call_budgets", dict(sorted(budgets.items())))
 
-    def to_dict(self) -> dict[str, int]:
-        return {"wallTimeSeconds": self.wall_time_seconds}
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "wallTimeSeconds": self.wall_time_seconds,
+            "toolCallBudgets": dict(self.tool_call_budgets),
+        }
+
+
+def parse_tool_call_budgets(values: Sequence[str]) -> dict[str, int]:
+    budgets: dict[str, int] = {}
+    for value in values:
+        name, separator, raw_limit = value.partition("=")
+        if not separator or re.fullmatch(r"[A-Za-z0-9_-]+", name) is None:
+            raise ValueError("harness tool budgets must use NAME=COUNT")
+        if name in budgets:
+            raise ValueError(f"duplicate harness tool budget: {name}")
+        if not raw_limit.isdigit():
+            raise ValueError(f"harness tool budget for {name} must be a non-negative integer")
+        budgets[name] = int(raw_limit)
+    return dict(HarnessLimits(tool_call_budgets=budgets).tool_call_budgets)
 
 
 @dataclass(frozen=True)
@@ -168,7 +285,9 @@ class HarnessPoolConfig:
     case_id: str
     seed: int
     candidate_schema: dict[str, Any]
+    guest_runtime: HarnessGuestRuntime
     tool_extensions: tuple[HarnessToolExtension, ...] = ()
+    mcp_servers: tuple[HarnessMcpServer, ...] = ()
     thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
@@ -201,6 +320,30 @@ class HarnessPoolConfig:
         tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
         if len(set(tool_names)) != len(tool_names):
             raise ValueError("harness tool names must be unique across extensions")
+        server_ids = [server.server_id for server in self.mcp_servers]
+        if len(set(server_ids)) != len(server_ids):
+            raise ValueError("harness MCP server IDs must be unique")
+        mcp_tool_names = [
+            f"mcp__{server.server_id}__{name}"
+            for server in self.mcp_servers
+            for name in server.tools
+        ]
+        if len(set(mcp_tool_names)) != len(mcp_tool_names):
+            raise ValueError("harness MCP tool names must be unique")
+        if set(tool_names) & set(mcp_tool_names):
+            raise ValueError("harness task and MCP tool names must not conflict")
+        available_tools = {
+            "read", "write", "bash", "web_search", "fetch_content",
+            "get_search_content", "submit_candidates", *tool_names, *mcp_tool_names,
+        }
+        if self.context7_enabled:
+            available_tools.update(("resolve-library-id", "query-docs"))
+        unknown_budgets = set(self.limits.tool_call_budgets) - available_tools
+        if unknown_budgets:
+            raise ValueError(
+                "harness tool budgets reference unavailable tools: "
+                + ", ".join(sorted(unknown_budgets))
+            )
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
 
@@ -221,17 +364,8 @@ class HarnessPoolConfig:
     def candidate_schema_sha256(self) -> str:
         return hashlib.sha256(self.candidate_schema_json.encode("utf-8")).hexdigest()
 
-    def common_frame(self, request_id: str, frame_type: str) -> dict[str, Any]:
+    def initialize_payload(self) -> dict[str, Any]:
         return {
-            "type": frame_type,
-            "requestId": request_id,
-            "protocolVersion": PROTOCOL_VERSION,
-            "campaignId": self.campaign_id,
-        }
-
-    def initialize_frame(self, request_id: str) -> dict[str, Any]:
-        return {
-            **self.common_frame(request_id, "initialize"),
             "artifactRoot": str(self.artifact_root),
             "baseUrl": self.base_url,
             "wireApi": "responses",
@@ -242,9 +376,11 @@ class HarnessPoolConfig:
             "seed": self.seed,
             "candidateSchemaJson": self.candidate_schema_json,
             "candidateSchemaSha256": self.candidate_schema_sha256,
+            "guestRuntime": self.guest_runtime.to_dict(),
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
+            "mcpServers": [server.to_dict() for server in self.mcp_servers],
             "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
             "webSearch": self.web_search.to_dict(),
@@ -310,7 +446,8 @@ class HarnessTurnResult:
     input_digest: str
     submission_id: str
     candidates: tuple[dict[str, Any], ...]
-    usage: dict[str, int | float]
+    usage: dict[str, Any]
+    tool_budget: dict[str, dict[str, int]]
     artifacts: dict[str, str]
 
 
@@ -363,8 +500,11 @@ class HarnessSubmissionValidation:
 
 
 __all__ = [
-    "PROTOCOL_VERSION",
+    "DEFAULT_NETWORK_TOOL_BUDGETS",
     "HarnessLimits",
+    "HarnessGuestRuntime",
+    "HarnessMcpServer",
+    "HarnessMcpValue",
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
@@ -378,4 +518,5 @@ __all__ = [
     "canonical_sha256",
     "file_sha256",
     "profile_set_sha256",
+    "parse_tool_call_budgets",
 ]

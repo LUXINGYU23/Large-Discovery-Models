@@ -16,13 +16,31 @@ Build the release image from the repository root:
 docker build -t ldm-pi-harness:latest harnesses/pi
 ```
 
+Before the first Harness run for a task, build its task-owned guest into a
+user-selected cache and run its offline smoke script:
+
+```bash
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task synthonbench --cache-dir /path/to/harness-cache
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task synthonbench --cache-dir /path/to/harness-cache
+```
+
+The build command requires Docker, `e2fsprogs`, `cpio`, and `lz4` on a Linux
+host. Guest smoke additionally requires Linux KVM and the host-architecture
+QEMU system emulator. The build turns the task's pinned Docker recipe into a
+digest-addressed Gondolin image. The runtime resolves only that local image; it
+neither builds nor downloads a guest during a campaign.
+
 The Python task runner starts the image over stdin/stdout JSONL. API keys are
 sent once through the bootstrap frame and are not placed in container arguments,
 environment variables, manifests, or session files. Do not invoke the sidecar
 manually for normal experiments.
 
-The strict JSONL protocol binds every request and response to one protocol
-version and campaign. Turn inputs include a monotonic history range and digest;
+The sidecar declares its package SemVer at startup; the client binds every
+subsequent JSONL request and response to that release and one campaign. Turn
+inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
 Committed turns are idempotent and partial submissions recover from their saved
 candidate batch and measured usage.
@@ -46,23 +64,36 @@ names outside the route are rejected with a model-visible structured reason;
 they are never silently substituted. The default route is `parallel-mcp`,
 `exa`, then `duckduckgo`; all are usable without a task-owned search API key.
 
+The sidecar can also load explicitly allowlisted MCP tools over stdio or
+Streamable HTTP. Python resolves environment- or file-backed secrets before
+bootstrap; only secret references and redacted configuration digests are
+persisted. MCP tools are exposed as `mcp__<server_id>__<tool_name>`. Server
+lifecycle, protocol failures, and calls are recorded in the native Pi session.
+
 Each run stores only:
 
 - native Pi session JSONL with messages, tool calls, and tool results;
 - redacted raw model-provider request and response bodies plus `provider_index.jsonl`;
 - `input.json`, `submission.json`, and `turn_committed.json` for recovery and lineage;
-- one run `manifest.json`.
+- one run `manifest.json`, including the resolved guest and its environment snapshot.
 
-Agents may make as many provider and tool calls and write as much trace data as
-needed within the configured wall-time limit. Provider, web, Context7, and
-artifact usage is measured but never used to stop a turn. If a provider stream
-ends before a committed batch, the sidecar continues submission-only recovery
-within the same wall-time window and retains every raw attempt.
+Each turn has a wall-time limit and may define hard limits for individual tools.
+The Agent sees its initial tool budget and the remaining count after every
+call. Unlisted tools are unlimited and a zero limit disables a tool.
+`submit_candidates` cannot be limited. A started tool execution consumes one
+call even when it fails; policy and budget rejections do not. Reservations are
+persisted before execution, so an interrupted turn resumes with the same used
+counts. If a provider stream ends before a committed batch, the sidecar
+continues submission-only recovery within the same wall-time window and retains
+every raw attempt.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
-artifacts, read-only task profiles, and the Gondolin image cache explicitly.
-Tasks may also register digest-verified, read-only tool extensions; their tool
-names and source digests are recorded in the run manifest.
+artifacts, read-only task profiles, and the selected guest cache explicitly.
+The cache contains the immutable image store, build records, transient build
+state, Gondolin session state, and per-session COW overlays; it is outside the
+repository and may be removed when no campaign needs the images. Tasks may also register
+digest-verified, read-only tool extensions; their tool names and source digests
+are recorded in the run manifest.
 
 The Gondolin guest grants its Agent root-level shell and file access inside the
 isolated microVM and unrestricted outbound HTTP(S) when a task leaves the host

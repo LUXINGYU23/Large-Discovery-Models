@@ -7,7 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from ldm_tts.pilot_evaluation.reporting import (
+    METHOD_LABELS,
     _expected_model_proposal_attempts,
+    _integrity,
     _round_rows,
     _verdict,
 )
@@ -59,6 +61,47 @@ def test_harness_receives_its_own_baseline_verdict() -> None:
 
     assert result["cases"][0]["harness_verdict"] == "promising"
     assert result["cases"][0]["harness_seed_wins"] == 3
+
+
+def test_harness_methods_have_distinct_release_labels_and_budget_semantics() -> None:
+    spec = SimpleNamespace(
+        methods=("ldm_harness", "harness"),
+        iterations=12,
+        optimization_rounds=11,
+    )
+    common = {
+        "case": "case",
+        "seed": 0,
+        "completed_rounds": 12,
+        "budget_outer_iterations": 12,
+        "candidate_ids_unique": True,
+        "budget_llm_requests": 0,
+        "initial_candidate_ids": ("shared",),
+    }
+    rows = [
+        {
+            **common,
+            "method": "ldm_harness",
+            "proposal_samples": 64,
+            "evaluations_per_round": 16,
+            "harness_candidates_per_session": 16,
+            "budget_proposal_attempts": 44,
+            "budget_harness_turns": 44,
+        },
+        {
+            **common,
+            "method": "harness",
+            "proposal_samples": 16,
+            "evaluations_per_round": 16,
+            "harness_candidates_per_session": 16,
+            "budget_proposal_attempts": 11,
+            "budget_harness_turns": 11,
+        },
+    ]
+
+    assert _integrity(spec, rows, [{}] * 24) == {"valid": True, "errors": []}
+    assert METHOD_LABELS["ldm_harness"] == "LDM + Research Harness"
+    assert METHOD_LABELS["harness"] == "Direct Research Harness"
 
 
 def test_model_proposal_budget_counts_minibatch_requests() -> None:

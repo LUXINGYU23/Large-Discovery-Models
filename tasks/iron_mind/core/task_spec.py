@@ -33,18 +33,15 @@ def build_reaction_task_spec(
     initialization_mode: str = "none",
     surrogate: SurrogateSpaceSpec | None = None,
     domain_size: int | None = None,
-    proposal_backend: str = "direct",
     harness_profile_count: int = 0,
 ) -> LDMTaskSpec:
     """Describe one fixed-schema reaction search with method-specific semantics."""
 
     if search_method not in SEARCH_METHODS or initialization_mode not in INITIALIZATION_MODES:
         raise ValueError("Unknown Iron Mind search or initialization method.")
-    if proposal_backend not in {"direct", "harness"}:
-        raise ValueError("proposal_backend must be direct or harness")
     if proposal_samples < 1 or bo_pool_size < 1 or proposal_max_workers < 1:
         raise ValueError("Proposal, pool, and worker counts must be positive.")
-    if search_method == "ldm" and bo_pool_size >= proposal_samples:
+    if search_method in {"ldm", "ldm_harness"} and bo_pool_size >= proposal_samples:
         raise ValueError("LDM BO pool must be smaller than proposal samples.")
     active_surrogate = surrogate or ReactionOneHotEncoder(schema).describe()
     validated_prompt_policy = validate_prompt_policy(prompt_policy)
@@ -66,7 +63,6 @@ def build_reaction_task_spec(
             method=search_method,
             initialization=initialization_mode,
             domain_size=domain_size,
-            backend=proposal_backend,
         ),
         surrogate=active_surrogate,
         proposal_search=_proposal_search(
@@ -74,7 +70,6 @@ def build_reaction_task_spec(
             proposal_samples,
             proposal_max_workers,
             domain_size,
-            proposal_backend,
             harness_profile_count,
         ),
         metadata={
@@ -85,44 +80,57 @@ def build_reaction_task_spec(
             "proposal_samples": proposal_samples,
             "bo_pool_size": bo_pool_size,
             "proposal_max_workers": proposal_max_workers,
-            "proposal_backend": proposal_backend,
             "proposal_transport": (
                 "openai_responses_persistent_sessions"
-                if proposal_backend == "harness"
+                if search_method in {"ldm_harness", "harness"}
                 else "openai_chat_completions_single_choice"
             ),
             "sampling_mode": (
                 "persistent_parallel_research_sessions"
-                if proposal_backend == "harness"
+                if search_method == "ldm_harness"
+                else "persistent_direct_research_session"
+                if search_method == "harness"
                 else "local_concurrent_independent_requests"
             ),
             "prompt_policy": (
-                "task_local_agents" if proposal_backend == "harness" else validated_prompt_policy
+                "task_local_agents"
+                if search_method in {"ldm_harness", "harness"}
+                else validated_prompt_policy
             ),
             "prompt_version": (
-                "task_local_agents" if proposal_backend == "harness" else validated_prompt_policy
+                "task_local_agents"
+                if search_method in {"ldm_harness", "harness"}
+                else validated_prompt_policy
             ),
         },
     )
 
 
-def build_direct_acquisition() -> AcquisitionSpec:
-    """Describe reservoir-order selection for the direct-LLM baseline."""
+def build_direct_acquisition(search_method: str) -> AcquisitionSpec:
+    """Describe reservoir-order selection for a direct-evaluation method."""
 
     return AcquisitionSpec(
-        name="direct_llm_reservoir_order",
+        name=f"direct_{search_method}_reservoir_order",
         objective_names=(OBJECTIVE_NAME,),
         score_direction="maximize",
-        selection_rule="evaluate every admitted direct LLM candidate in reservoir order",
+        selection_rule=(
+            "evaluate every admitted direct LLM candidate in reservoir order"
+            if search_method == "llm"
+            else "evaluate every admitted Harness candidate in reservoir order"
+        ),
     )
 
 
-def disabled_surrogate() -> SurrogateSpaceSpec:
-    """Describe the absence of a surrogate in direct-LLM campaigns."""
+def disabled_surrogate(search_method: str) -> SurrogateSpaceSpec:
+    """Describe a direct-evaluation method with no surrogate."""
 
     return SurrogateSpaceSpec(
         kind="none",
-        representation="No surrogate for direct LLM baseline.",
+        representation=(
+            "No surrogate for direct LLM baseline."
+            if search_method == "llm"
+            else "No surrogate for direct Harness evaluation."
+        ),
         dimension_policy="none",
     )
 
@@ -132,7 +140,6 @@ def _proposal_search(
     samples: int,
     workers: int,
     domain_size: int | None,
-    backend: str,
     harness_profile_count: int,
 ) -> ProposalSearchSpec:
     if method == "bo":
@@ -149,13 +156,21 @@ def _proposal_search(
             evaluation_policy="reservoir_order_direct_evaluation",
             parameters={"max_workers": workers, "one_candidate_per_request": True},
         )
-    if backend == "harness":
+    if method in {"ldm_harness", "harness"}:
         if harness_profile_count < 1 or samples % harness_profile_count:
             raise ValueError("harness breadth must divide evenly across profiles")
         return ProposalSearchSpec(
-            name="persistent_parallel_research_sessions",
+            name=(
+                "persistent_parallel_research_sessions"
+                if method == "ldm_harness"
+                else "persistent_direct_research_session"
+            ),
             breadth=samples,
-            evaluation_policy="q0_maintained_acquisition_tilted",
+            evaluation_policy=(
+                "q0_maintained_acquisition_tilted"
+                if method == "ldm_harness"
+                else "reservoir_order_direct_evaluation"
+            ),
             parameters={
                 "profile_count": harness_profile_count,
                 "candidates_per_session": samples // harness_profile_count,
@@ -179,7 +194,6 @@ def _reaction_reservoir_spec(
     method: str,
     initialization: str,
     domain_size: int | None,
-    backend: str,
 ) -> ReservoirSpec:
     expansions = []
     if initialization == "shared_random":
@@ -196,7 +210,7 @@ def _reaction_reservoir_spec(
         "Expose all unseen official conditions to GP-UCB."
         if method == "bo"
         else "Collect exact legal conditions generated by persistent research sessions."
-        if backend == "harness"
+        if method in {"ldm_harness", "harness"}
         else f"Launch {samples} independent one-candidate requests with at most {workers} workers."
     )
     expansions.append(

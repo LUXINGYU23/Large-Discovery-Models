@@ -30,3 +30,7 @@ Continue investigating while another research step is likely to change a decisio
 - Validate exact `reaction_id` plus ordered `synthon_ids` tuples with `validate_synthon_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch. If it is rejected, use the reported indices and reasons to replace only the rejected entries, then resubmit the complete minibatch.
 - If research tools fail, make the best evidence-based selection from the supplied observations and structures.
+
+## Guest runtime
+
+Check dependencies before installing them, and install only what the current investigation needs. Do not upgrade the base operating system or alter benchmark infrastructure. Keep package caches and temporary environments outside `/workspace`; save only reusable scripts, compact data summaries, and research conclusions to `/workspace/research`.

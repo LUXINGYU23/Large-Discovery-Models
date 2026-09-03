@@ -12,6 +12,7 @@ from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient,
+    HarnessGuestRuntime,
     HarnessProfile,
     HarnessSubmissionRejection,
     HarnessSubmissionRequest,
@@ -21,6 +22,7 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     canonical_sha256,
     file_sha256,
+    load_harness_guest_runtime,
     profile_set_sha256,
 )
 from tasks.iron_mind.core.candidate import (
@@ -39,6 +41,7 @@ HARNESS_PROFILE_IDS = (
     "literature_evidence",
     "design_space_exploration",
 )
+DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "iron_mind_persistent_research_harness"
 HARNESS_FORBIDDEN_PATTERNS = (
     r"iron[\s_-]*mind",
@@ -58,6 +61,8 @@ HARNESS_TOOL_NAMES = (
 _LOCAL_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
 _LOCAL_PROFILE_ROOT = _LOCAL_RESOURCE_ROOT / "profiles"
 _LOCAL_TOOL_PATH = _LOCAL_RESOURCE_ROOT / "tools" / "reaction_space.mjs"
+_LOCAL_IMAGE_ROOT = _LOCAL_RESOURCE_ROOT / "image"
+_CONTAINER_PROFILE_ROOT = Path("/resources/profiles")
 
 
 def harness_candidate_schema(schema) -> dict[str, object]:
@@ -120,15 +125,11 @@ def write_harness_space_catalog(domain: IronMindCandidateDomain, output_path: Pa
     )
 
 
-def harness_profiles(
-    candidates_per_turn: int,
-    *,
-    resource_root: Path = Path("/resources/profiles"),
-) -> tuple[HarnessProfile, ...]:
+def harness_profiles(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
     return tuple(
         HarnessProfile(
             profile_id,
-            resource_root / profile_id / "AGENTS.md",
+            _CONTAINER_PROFILE_ROOT / profile_id / "AGENTS.md",
             candidates_per_turn,
             agents_sha256=file_sha256(_LOCAL_PROFILE_ROOT / profile_id / "AGENTS.md"),
         )
@@ -136,16 +137,31 @@ def harness_profiles(
     )
 
 
-def harness_tool_extensions(
-    *, resource_root: Path = Path("/resources/tools")
-) -> tuple[HarnessToolExtension, ...]:
+def direct_harness_profile(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
+    return (
+        HarnessProfile(
+            DIRECT_HARNESS_PROFILE_ID,
+            _CONTAINER_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
+            candidates_per_turn,
+            agents_sha256=file_sha256(
+                _LOCAL_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md"
+            ),
+        ),
+    )
+
+
+def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
     return (
         HarnessToolExtension(
-            resource_root / "reaction_space.mjs",
+            Path("/resources/tools/reaction_space.mjs"),
             file_sha256(_LOCAL_TOOL_PATH),
             HARNESS_TOOL_NAMES,
         ),
     )
+
+
+def harness_guest_runtime() -> HarnessGuestRuntime:
+    return load_harness_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
 
 
 class IronMindHarnessExpander:
@@ -159,6 +175,7 @@ class IronMindHarnessExpander:
         profiles: Sequence[HarnessProfile],
         campaign_id: str,
         first_active_round: int,
+        attach_empirical_q0: bool,
         account: Callable[[dict[str, int]], None] | None = None,
     ) -> None:
         if not profiles:
@@ -171,6 +188,7 @@ class IronMindHarnessExpander:
         self.campaign_id = campaign_id
         self.profile_set_sha256 = profile_set_sha256(self.profiles)
         self.first_active_round = first_active_round
+        self.attach_empirical_q0 = attach_empirical_q0
         self.account = account
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
@@ -191,16 +209,28 @@ class IronMindHarnessExpander:
         )
         if self.account is not None:
             self.account(_usage_counts(results))
-        raw_proposals = self._proposals(request, results, evaluated)
+        sampling_mode = (
+            "persistent_parallel_research_sessions"
+            if self.attach_empirical_q0
+            else "persistent_direct_research_session"
+        )
+        raw_proposals = self._proposals(request, results, evaluated, sampling_mode)
         if len(raw_proposals) != expected:
             raise RuntimeError(
                 f"validated harness minibatches must contain exactly {expected} occurrences"
             )
-        proposals = attach_empirical_base_measure(raw_proposals, request, self.domain)
+        proposals = (
+            attach_empirical_base_measure(raw_proposals, request, self.domain)
+            if self.attach_empirical_q0
+            else raw_proposals
+        )
         return ExpansionResult(
             proposals=proposals,
+            selection_mode=(
+                "acquisition" if self.attach_empirical_q0 else "reservoir_order"
+            ),
             metadata={
-                "sampling_mode": "persistent_parallel_research_sessions",
+                "sampling_mode": sampling_mode,
                 "round_idx": request.round_idx,
                 "session_count": len(self.profiles),
                 "candidates_per_session": [
@@ -263,6 +293,7 @@ class IronMindHarnessExpander:
         request: ExpansionRequest,
         results: Sequence[HarnessTurnResult],
         evaluated: set[str],
+        sampling_mode: str,
     ) -> tuple[RawProposal, ...]:
         by_profile = {result.profile_id: result for result in results}
         if len(by_profile) != len(self.profiles):
@@ -299,7 +330,7 @@ class IronMindHarnessExpander:
                         {
                             "collectable": False,
                             "round_idx": request.round_idx,
-                            "sampling_mode": "persistent_parallel_research_sessions",
+                            "sampling_mode": sampling_mode,
                             "harness_lineage": {
                                 "campaign_id": self.campaign_id,
                                 "round_index": request.round_idx,
@@ -509,15 +540,15 @@ def _evaluated_history(
 
 
 def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
-    fields = {
-        "llm_requests": "providerCalls",
-        "harness_web_calls": "webCalls",
-        "harness_context7_calls": "context7Calls",
-        "harness_artifact_bytes": "artifactBytes",
-    }
     return {
-        counter: sum(int(result.usage.get(field, 0)) for result in results)
-        for counter, field in fields.items()
+        "llm_requests": sum(int(result.usage["providerCalls"]) for result in results),
+        "harness_tool_calls": sum(
+            sum(int(count) for count in result.usage["toolCalls"].values())
+            for result in results
+        ),
+        "harness_artifact_bytes": sum(
+            int(result.usage["artifactBytes"]) for result in results
+        ),
     }
 
 
@@ -553,6 +584,7 @@ __all__ = [
     "IronMindHarnessExpander",
     "harness_candidate_schema",
     "harness_profiles",
+    "harness_guest_runtime",
     "harness_tool_extensions",
     "write_harness_space_catalog",
 ]

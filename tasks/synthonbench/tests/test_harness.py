@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from tasks.synthonbench.core.harness import (
     HARNESS_CANDIDATE_SCHEMA,
     SynthonHarnessExpander,
     _validate_submission,
+    direct_harness_profile,
     harness_profiles,
 )
 from tasks.synthonbench.core.space_order import (
@@ -25,6 +27,23 @@ from tasks.synthonbench.core.space_order import (
     ordered_synthon_ids,
 )
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
+from tasks.synthonbench.core.workflow_args import validate_args
+
+
+def test_harness_tool_budgets_are_configurable_and_follow_enabled_tools() -> None:
+    defaults = parse_args(["--mock"])
+    assert "web_search=8" in defaults.harness_tool_budget
+    assert "query-docs=8" in defaults.harness_tool_budget
+
+    without_context7 = parse_args(["--mock", "--no-harness-context7"])
+    assert all("query-docs" not in value for value in without_context7.harness_tool_budget)
+
+    invalid = parse_args([
+        "--mock",
+        "--harness-tool-budget", "submit_candidates=1",
+    ])
+    with pytest.raises(SystemExit, match="submit_candidates"):
+        validate_args(invalid)
 
 
 class FakeHarnessClient:
@@ -32,10 +51,12 @@ class FakeHarnessClient:
         self,
         *,
         candidate: dict[str, object] | None = None,
+        candidates: list[dict[str, object]] | None = None,
         initial_by_profile: dict[str, dict[str, object]] | None = None,
         replacement_by_profile: dict[str, dict[str, object]] | None = None,
     ) -> None:
         self.candidate = candidate or {"reaction_id": "r1", "synthon_ids": [3, 13]}
+        self.candidates = candidates
         self.initial_by_profile = initial_by_profile or {}
         self.replacement_by_profile = replacement_by_profile or {}
         self.batches = []
@@ -53,10 +74,13 @@ class FakeHarnessClient:
         for turn in turns:
             payload = json.loads(turn.message.split("\n\n", 1)[1])
             candidate = self.initial_by_profile.get(turn.profile_id, self.candidate)
-            candidates = [
-                {**candidate}
-                for _ in range(payload["submission_contract"]["candidate_count"])
-            ]
+            requested = payload["submission_contract"]["candidate_count"]
+            candidates = (
+                [{**item} for item in self.candidates]
+                if self.candidates is not None
+                else [{**candidate} for _ in range(requested)]
+            )
+            assert len(candidates) == requested
             validation = submission_validator(HarnessSubmissionRequest(
                 turn.profile_id,
                 turn.turn_id,
@@ -86,7 +110,14 @@ class FakeHarnessClient:
                 input_digest=turn.input_digest,
                 submission_id=f"submission-{turn.profile_id}",
                 candidates=tuple(candidates),
-                usage={"providerCalls": 2, "webCalls": 1, "context7Calls": 0, "artifactBytes": 50},
+                usage={
+                    "providerCalls": 2,
+                    "toolCalls": {"web_search": 1, "submit_candidates": 1},
+                    "artifactBytes": 50,
+                },
+                tool_budget={
+                    "web_search": {"limit": 4, "used": 1, "remaining": 3},
+                },
                 artifacts={"turn": f"turns/{turn.turn_id}"},
             ))
         return tuple(results)
@@ -227,9 +258,10 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
         FakeHarnessClient(candidate={"reaction_id": "r1", "synthon_ids": [1, 11]}),
         SynthonCandidateDomain(space, ("r1",), "kif11"),
         target="kif11",
-        profiles=harness_profiles(1, resource_root=Path("profiles")),
+        profiles=harness_profiles(1),
         campaign_id="test-campaign",
         first_active_round=0,
+        attach_empirical_q0=True,
     )
 
     result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=4))
@@ -245,7 +277,7 @@ def test_cross_profile_consensus_increases_shared_occurrence_probability() -> No
 def test_harness_task_spec_declares_persistent_four_profile_sampling() -> None:
     args = parse_args([
         "--mock",
-        "--proposal-backend", "harness",
+        "--search-method", "ldm_harness",
         "--proposal-mode", "none",
     ])
 
@@ -257,6 +289,53 @@ def test_harness_task_spec_declares_persistent_four_profile_sampling() -> None:
     assert spec.proposal_search.parameters["skills_loaded"] is False
     assert spec.metadata["model_requests_per_round"] is None
     assert spec.metadata["model_session_turns_per_round"] == 4
+
+
+def test_direct_harness_submits_one_distinct_sixteen_candidate_minibatch() -> None:
+    space = _space()
+    domain = SynthonCandidateDomain(space, ("r1",), "kif11")
+    profiles = direct_harness_profile(16)
+    candidates = [
+        {"reaction_id": "r1", "synthon_ids": list(ids)}
+        for ids in list(product(range(1, 7), range(11, 14)))[:16]
+    ]
+    client = FakeHarnessClient(candidates=candidates)
+    counts = []
+    expander = SynthonHarnessExpander(
+        client,
+        domain,
+        target="kif11",
+        profiles=profiles,
+        campaign_id="test-campaign",
+        first_active_round=0,
+        attach_empirical_q0=False,
+        account=counts.append,
+    )
+
+    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=16))
+
+    assert len(client.batches[0]) == 1
+    assert len(result.proposals) == 16
+    assert [proposal.payload for proposal in result.proposals] == candidates
+    assert all(Q0_METADATA_KEY not in proposal.metadata for proposal in result.proposals)
+    assert result.selection_mode == "reservoir_order"
+    assert result.metadata["sampling_mode"] == "persistent_direct_research_session"
+    assert counts[0] == {"proposal_attempts": 1, "harness_turns": 1}
+
+
+def test_direct_harness_task_spec_has_no_surrogate_or_selector() -> None:
+    spec = describe_ldm_task(parse_args([
+        "--mock",
+        "--search-method", "harness",
+        "--proposal-mode", "none",
+        "--evaluations-per-round", "16",
+    ]))
+
+    assert spec.proposal_search.name == "persistent_direct_research_session"
+    assert spec.proposal_search.breadth == 16
+    assert spec.proposal_search.parameters["profile_count"] == 1
+    assert spec.acquisition.name == "direct_harness_reservoir_order"
+    assert spec.surrogate.kind == "none"
 
 
 def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
@@ -279,7 +358,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
 
     assert main([
         "--mock",
-        "--proposal-backend", "harness",
+        "--search-method", "ldm_harness",
         "--proposal-mode", "none",
         "--proposal-samples", "4",
         "--harness-candidates-per-session", "1",
@@ -298,6 +377,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     assert budget["counters"]["proposal_attempts"] == 4
     assert budget["counters"]["harness_turns"] == 4
     assert budget["counters"]["llm_requests"] == 8
+    assert budget["counters"]["harness_tool_calls"] == 8
     assert budget["counters"]["benchmark_jobs"] == 1
     checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
     lineage = checkpoint["state"]["observations"][0]["candidate"]["metadata"]["harness_lineage"]
@@ -307,6 +387,55 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     }
 
 
+def test_mock_direct_harness_evaluates_all_sixteen_submissions(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def fake_client(_args, _runtime, _provider, benchmark):
+        candidates = []
+        for reaction_id in ordered_reactions(benchmark.task.allowed_reactions):
+            choices = [
+                ordered_synthon_ids(benchmark.task.space, reaction_id, position)
+                for position in ordered_positions(benchmark.task.space, reaction_id)
+            ]
+            candidates.extend(
+                {
+                    "reaction_id": reaction_id,
+                    "synthon_ids": list(synthon_ids),
+                }
+                for synthon_ids in product(*choices)
+            )
+            if len(candidates) >= 16:
+                break
+        return FakeHarnessClient(candidates=candidates[:16])
+
+    monkeypatch.setattr("tasks.synthonbench.core.workflow._harness_client", fake_client)
+
+    assert main([
+        "--mock",
+        "--search-method", "harness",
+        "--proposal-mode", "none",
+        "--proposal-samples", "16",
+        "--evaluations-per-round", "16",
+        "--iterations", "1",
+        "--llm-url", "http://provider.invalid/v1",
+        "--llm-model-name", "fake-model",
+        "--api-key", "fake-key",
+        "--out-dir", str(tmp_path),
+        "--run-name", "direct_harness_mock",
+    ]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    run_dir = Path(payload["run_dir"])
+    budget = json.loads((run_dir / "budget.json").read_text(encoding="utf-8"))
+    counters = budget["counters"]
+    assert counters["proposal_attempts"] == 1
+    assert counters["harness_turns"] == 1
+    assert counters["benchmark_jobs"] == 16
+    assert counters["successful_evaluations"] == 16
+
+
 def _expander(client) -> SynthonHarnessExpander:
     space = _space()
     domain = SynthonCandidateDomain(space, ("r1",), "kif11")
@@ -314,9 +443,10 @@ def _expander(client) -> SynthonHarnessExpander:
         client,
         domain,
         target="kif11",
-        profiles=harness_profiles(1, resource_root=Path("profiles")),
+        profiles=harness_profiles(1),
         campaign_id="test-campaign",
         first_active_round=0,
+        attach_empirical_q0=True,
     )
 
 

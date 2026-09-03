@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from ldm_tts.registration.experiment import load_experiment_contract
 
 from tasks.iron_mind.core.workflow import describe_ldm_task, main, parse_args
+from tasks.iron_mind.core import factory
 
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -159,11 +161,42 @@ def test_describe_ldm_task_separates_proposal_samples_from_the_bo_pool() -> None
     ]
 
 
-def test_task_spec_declares_plain_bo_and_direct_llm_without_changing_the_engine() -> None:
+def test_task_spec_declares_bo_and_direct_methods() -> None:
     bo = describe_ldm_task(parse_args(["--mock", "--search-method", "bo", "--proposal-mode", "none"]))
     llm = describe_ldm_task(parse_args(["--mock", "--search-method", "llm"]))
+    harness = describe_ldm_task(
+        parse_args(
+            [
+                "--mock",
+                "--search-method",
+                "harness",
+                "--proposal-mode",
+                "none",
+                "--initialization-mode",
+                "shared_random",
+            ]
+        )
+    )
 
     assert bo.proposal_search.name == "full_finite_domain_bo"
     assert bo.acquisition.name == "ucb"
     assert llm.proposal_search.name == "parallel_independent_direct_llm"
     assert llm.surrogate.kind == "none"
+    assert harness.proposal_search.name == "persistent_direct_research_session"
+    assert harness.proposal_search.breadth == 1
+    assert harness.proposal_search.parameters["profile_count"] == 1
+    assert harness.reservoir.max_size == 1
+    assert harness.acquisition.name == "direct_harness_reservoir_order"
+    assert harness.surrogate.kind == "none"
+
+
+def test_direct_harness_factory_does_not_build_a_surrogate(monkeypatch) -> None:
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("standalone Harness must not construct a surrogate")
+
+    monkeypatch.setattr(factory, "ReactionOneHotEncoder", fail_if_called)
+
+    assert factory._search_components(SimpleNamespace(search_method="harness")) == (
+        None,
+        None,
+    )

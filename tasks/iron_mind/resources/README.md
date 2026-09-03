@@ -7,8 +7,8 @@ to validate the Iron Mind task:
   data hashes, and schema metadata.
 - `reaction_schemas.json` and `mock_oracle.csv`: self-contained mock
   fixtures.
-- `harness/`: digest-pinned persistent Agent profiles and the structured
-  source-pinned reaction-space tool.
+- `harness/`: digest-pinned multi-Agent LDM and single-Agent direct-research
+  profiles plus the structured source-pinned reaction-space tool.
 - `qualification_evidence.json` and `verification_record.json`: release
   validation summaries.
 

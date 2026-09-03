@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PROTOCOL_VERSION, ProtocolError, parseFrame } from "./protocol.js";
+import { ProtocolError, parseFrame } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { sha256 } from "./trace.js";
 
 test("parseFrame accepts the explicit responses configuration", () => {
@@ -14,7 +15,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "initialize",
 		requestId: "init-1",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		artifactRoot: "/run/harness",
 		baseUrl: "https://provider.example",
@@ -26,6 +27,12 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		seed: 1,
 		candidateSchemaJson,
 		candidateSchemaSha256: sha256(candidateSchemaJson),
+		guestRuntime: {
+			imageRef: "ldm/synthonbench-research:aaaaaaaaaaaa",
+			recipeSha256: "a".repeat(64),
+			rootfsSize: "8G",
+			installPolicy: "session_overlay",
+		},
 		profileSetSha256: "c".repeat(64),
 		profiles: [{
 			profileId: "target_sar",
@@ -36,8 +43,22 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			candidatesPerTurn: 16,
 		}],
 		toolExtensions: [],
+		mcpServers: [{
+			serverId: "literature",
+			transport: "streamable_http",
+			url: "https://mcp.example/mcp",
+			headers: {
+				Authorization: {
+					secretName: "mcp.literature.header.auth",
+					secretSource: "secret_env:LITERATURE_TOKEN",
+					prefix: "Bearer ",
+				},
+			},
+			tools: ["search"],
+			configSha256: "d".repeat(64),
+		}],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
-		limits: { wallTimeSeconds: 60 },
+		limits: { wallTimeSeconds: 60, toolCallBudgets: { web_search: 4 } },
 		webSearch: {
 			providers: ["parallel-mcp", "exa", "duckduckgo"],
 			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
@@ -49,6 +70,8 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.candidateSchema, candidateSchema);
 		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
+		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
+		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
 });
 
@@ -57,7 +80,7 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 		() => parseFrame(JSON.stringify({
 			type: "initialize",
 			requestId: "init-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			artifactRoot: "/run/harness",
 			baseUrl: "https://provider.example",
@@ -69,6 +92,12 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			seed: 1,
 			candidateSchemaJson: '{"additionalProperties":false,"properties":{},"type":"object"}',
 			candidateSchemaSha256: "b".repeat(64),
+			guestRuntime: {
+				imageRef: "ldm/fixture-research:aaaaaaaaaaaa",
+				recipeSha256: "a".repeat(64),
+				rootfsSize: "4G",
+				installPolicy: "session_overlay",
+			},
 			profileSetSha256: "c".repeat(64),
 			profiles: [{
 				profileId: "chemist",
@@ -79,8 +108,9 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 				candidatesPerTurn: 1,
 			}],
 			toolExtensions: [],
+			mcpServers: [],
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
-			limits: { wallTimeSeconds: 60 },
+			limits: { wallTimeSeconds: 60, toolCallBudgets: {} },
 			webSearch: {
 				providers: ["parallel-mcp", "exa", "duckduckgo"],
 				fallbackOn: ["quota", "network"],
@@ -91,12 +121,39 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 	);
 });
 
+test("parseFrame rejects a different sidecar release version", () => {
+	assert.throws(
+		() => parseFrame(JSON.stringify({
+			type: "initialize",
+			requestId: "init-other-release",
+			protocolVersion: "0.0.0",
+			campaignId: "campaign-1",
+		})),
+		(error: unknown) => error instanceof ProtocolError && error.code === "protocol_mismatch",
+	);
+});
+
+test("parseFrame requires named secret bootstrap values", () => {
+	const frame = parseFrame(JSON.stringify({
+		type: "bootstrap_secret",
+		requestId: "secret-1",
+		protocolVersion: SIDECAR_RELEASE_VERSION,
+		campaignId: "campaign-1",
+		apiKey: "provider-secret",
+		namedSecrets: { "mcp.remote.header.auth": "mcp-secret" },
+	}));
+	assert.equal(frame.type, "bootstrap_secret");
+	if (frame.type === "bootstrap_secret") {
+		assert.equal(frame.namedSecrets["mcp.remote.header.auth"], "mcp-secret");
+	}
+});
+
 test("parseFrame rejects path traversal turn identifiers", () => {
 	assert.throws(
 		() => parseFrame(JSON.stringify({
 			type: "run_turn",
 			requestId: "turn-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			turns: [{
 				profileId: "target_sar",
@@ -119,9 +176,9 @@ test("parseFrame rejects unknown fields instead of silently ignoring them", () =
 		() => parseFrame(JSON.stringify({
 			type: "close",
 			requestId: "close-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
-			legacyFallback: true,
+			unexpectedField: true,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
 	);
@@ -131,7 +188,7 @@ test("parseFrame accepts a consistent submission validation result", () => {
 	const frame = parseFrame(JSON.stringify({
 		type: "submission_validation_result",
 		requestId: "turn-1",
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		validationId: "validation-1",
 		accepted: false,
@@ -153,7 +210,7 @@ test("parseFrame rejects inconsistent submission validation results", () => {
 		() => parseFrame(JSON.stringify({
 			type: "submission_validation_result",
 			requestId: "turn-1",
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			validationId: "validation-1",
 			accepted: true,

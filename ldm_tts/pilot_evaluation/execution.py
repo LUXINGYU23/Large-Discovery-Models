@@ -141,7 +141,7 @@ def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, A
         apply_override(config, override)
     for override in spec.method_overrides[run.method]:
         apply_override(config, override)
-    _set(config, "args.search-method", "ldm" if run.method == "harness" else run.method)
+    _set(config, "args.search-method", run.method)
     _set(config, "args.proposal-mode", _proposal_mode(config, run.method))
     _set(config, "args.initialization-mode", spec.initialization_mode)
     _set(config, "args.iterations", spec.iterations)
@@ -156,7 +156,7 @@ def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, A
 def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     entry = manifest["runs"].get(run.key, {})
     if _child_complete(run.run_dir):
-        entry.update({"status": "completed", "run_dir": str(run.run_dir.relative_to(spec.output_root))})
+        _mark_completed(entry, spec, run)
         manifest["runs"][run.key] = entry
         _write_manifest(spec, manifest)
         return
@@ -176,6 +176,8 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     entry["status"] = "completed" if return_code == 0 and _child_complete(run.run_dir) else "failed"
     entry["return_code"] = return_code
     entry["updated_at_unix"] = time.time()
+    if entry["status"] == "completed":
+        _mark_completed(entry, spec, run)
     _write_manifest(spec, manifest)
     if entry["status"] != "completed":
         manifest["state"] = "failed"
@@ -195,8 +197,38 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
     )
 
 
+def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _EvaluationRun) -> None:
+    entry.update(
+        status="completed",
+        run_dir=str(run.run_dir.relative_to(spec.output_root)),
+    )
+    if run.method in {"ldm_harness", "harness"}:
+        entry["harness"] = _harness_provenance(run.run_dir, spec.output_root)
+
+
+def _harness_provenance(run_dir: Path, output_root: Path) -> dict[str, Any]:
+    path = run_dir / "harness" / "manifest.json"
+    if not path.is_file():
+        raise ValueError(f"completed Harness campaign lacks its manifest: {run_dir}")
+    manifest = _read_json(path)
+    limits = manifest.get("limits")
+    if not isinstance(limits, dict):
+        raise ValueError(f"Harness manifest lacks limits: {path}")
+    return {
+        "artifact": str(path.relative_to(output_root)),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "backend": manifest.get("backend"),
+        "base_url": manifest.get("baseUrl"),
+        "model": manifest.get("model"),
+        "thinking": manifest.get("thinking"),
+        "profiles": manifest.get("profiles"),
+        "mcp_servers": manifest.get("mcpServers"),
+        "tool_call_budgets": limits.get("toolCallBudgets"),
+    }
+
+
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "harness"}:
+    if method in {"bo", "ldm_harness", "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

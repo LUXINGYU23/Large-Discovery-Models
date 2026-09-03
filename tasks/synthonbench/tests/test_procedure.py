@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from ldm_tts.registration.experiment import (
     load_experiment_contract,
     validate_profile_args,
 )
 from tasks.synthonbench.core import dependencies as dependency_checks
+from tasks.synthonbench.core import factory
 from tasks.synthonbench.core.workflow import describe_ldm_task, main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +19,9 @@ REPO_ROOT = TASK_ROOT.parents[1]
 
 
 def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> None:
-    spec = describe_ldm_task(parse_args(["--mock"]))
+    spec = describe_ldm_task(parse_args([
+        "--mock", "--initialization-mode", "shared_random",
+    ]))
 
     assert spec.task == "synthonbench"
     assert spec.candidate_domain.kind == "reaction_synthon_tuple"
@@ -33,6 +37,10 @@ def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> Non
     assert spec.metadata["candidates_per_model_request"] == 16
     assert spec.response_spaces[0].name == "synthon_tuple_batch_json"
     assert spec.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 16
+    assert [space.name for space in spec.response_spaces] == [
+        "synthon_tuple_batch_json",
+        "synthon_tuple_json",
+    ]
     assert spec.metadata["bo_pool_size"] == 32
     assert spec.acquisition.name == "ucb_tilted"
     assert spec.acquisition.parameters["pool_size"] == 32
@@ -66,6 +74,17 @@ def test_direct_llm_contract_returns_the_official_complete_tuple() -> None:
     assert spec.surrogate.kind == "none"
 
 
+def test_direct_harness_factory_does_not_build_a_surrogate(monkeypatch) -> None:
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("standalone Harness must not construct a surrogate")
+
+    monkeypatch.setattr(factory, "SynthonNystromEncoder", fail_if_called)
+
+    assert factory._search_components(
+        SimpleNamespace(search_method="harness"), ()
+    ) == (None, None)
+
+
 def test_proposal_defaults_disable_thinking() -> None:
     args = parse_args(["--mock"])
 
@@ -79,7 +98,7 @@ def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
     key_file = tmp_path / "api_key"
     key_file.write_text("test-secret", encoding="utf-8")
     args = {
-        "proposal-backend": "harness",
+        "search-method": "ldm_harness",
         "harness-api-key-file": str(key_file),
         "llm-url": "https://provider.example",
         "llm-model-name": "model",
@@ -99,7 +118,7 @@ def test_harness_preflight_requires_a_nonempty_key_file(tmp_path: Path) -> None:
 
 def test_harness_preflight_accepts_the_standard_api_key_environment() -> None:
     args = {
-        "proposal-backend": "harness",
+        "search-method": "ldm_harness",
         "llm-url": "https://provider.example",
         "llm-model-name": "model",
     }
@@ -211,18 +230,41 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
         "harness-candidates-per-session", "harness-thinking",
         "harness-wall-time-seconds",
     }
+    direct_harness = {
+        "proposal-samples", "harness-thinking", "harness-wall-time-seconds",
+    }
 
     for profile in contract.profiles.values():
-        required = common | (
-            harness
-            if profile.locked_args.get("proposal-backend") == "harness"
-            else direct
+        method = profile.locked_args.get("search-method")
+        required = (
+            direct_harness
+            if method == "harness"
+            else common | harness
+            if method == "ldm_harness"
+            else common | direct
         )
         assert required <= set(profile.locked_args)
         filename = "pilot_evaluation_base.yaml" if profile.name == "pilot_evaluation" else f"{profile.name}.yaml"
         config_path = REPO_ROOT / "config" / "synthonbench" / filename
         config = _load_yaml(config_path)
         validate_profile_args(contract, profile.name, config["args"])
+
+
+def test_direct_harness_profiles_lock_one_sixteen_candidate_session() -> None:
+    contract = load_experiment_contract(TASK_ROOT / "experiment.json")
+
+    for profile_name, iterations in (
+        ("pilot_evaluation_harness", 6),
+        ("pilot_evaluation_extended_harness", 12),
+    ):
+        profile = contract.profile(profile_name)
+        args = profile.locked_args
+
+        assert args["search-method"] == "harness"
+        assert args["proposal-mode"] == "none"
+        assert args["proposal-samples"] == 16
+        assert args["evaluations-per-round"] == 16
+        assert profile.budget["harness_turns"] == iterations - 1
 
 
 def test_ldm_pilot_evaluation_profiles_preserve_one_batch_of_oversampling_headroom() -> None:
@@ -260,7 +302,7 @@ def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
 
     for profile_name in (
         "pilot_evaluation_extended",
-        "pilot_evaluation_extended_harness",
+        "pilot_evaluation_extended_ldm_harness",
         "pilot_evaluation_extended_direct_llm",
     ):
         args = contract.profile(profile_name).locked_args
