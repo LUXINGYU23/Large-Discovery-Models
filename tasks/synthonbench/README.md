@@ -14,7 +14,7 @@ ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
-core/              tuple validation, prompts, Tanimoto GP, LDM policy, oracle adapter
+core/              tuple validation, prompts, Tanimoto GP, compiled-policy adapter, oracle adapter
 scripts/           source-pinned official data preparation
 resources/         immutable upstream and qualification contracts
 tests/             task-local contract and algorithm tests
@@ -55,8 +55,9 @@ lifecycle:
 4. Estimate the empirical proposal measure from valid unseen occurrences:
    `q0(x) = count(x) / valid_occurrences`.
 5. If more than `K` unique candidates survive, retain a `q0`-weighted Gumbel
-   sample of size `K`. The full-budget, qualification, and pilot-evaluation
-   profiles use `K=32`. Only this maintained BO pool is scored.
+   sample of size `K`. The full-budget, qualification, and six-round Pilot
+   Evaluation profiles use `K=32`; the twelve-round confirmation uses `K=48`.
+   Only this maintained BO pool is scored.
 6. Build a task-local product proxy by summing raw-connector Count-Morgan
    fingerprints for the ordered synthons. A fixed, reaction-balanced set of
    public tuple landmarks defines a Nyström/FITC count-Tanimoto GP, which
@@ -66,6 +67,12 @@ lifecycle:
    Gumbel-top-k.
 8. Send each selected unseen tuple to official `GlobalSynthonTask.score()`.
    One selected tuple is one charged official oracle call.
+
+`ldm_harness_compiled` preserves this candidate and evaluation lifecycle. It
+adds one independent persistent policy session before step 7; the accepted
+policy may provide a prior mean for the unchanged residual GP and round-specific
+`alpha` and `eta`, but it cannot change the proposal reservoir, kernel,
+variance, acquisition, pool, evaluator, or official-call budget.
 
 The public slots are necessary because full reaction catalogs contain
 thousands of synthons and cannot be faithfully serialized into one LLM prompt.
@@ -105,6 +112,14 @@ The default representation uses 2,048 Count-Morgan bins, 256 landmarks, a
 `1e-8` kernel jitter, and a unit signal, mean, and observation-noise scale.
 These are declared in every committed profile and can be changed explicitly
 for a separate experiment.
+
+For Harness-Compiled LDM, the task also builds a separate public policy feature
+row: reaction one-hot values, reaction slot count and product-space capacity,
+slot-presence flags, and standardized RDKit descriptors for each released
+synthon. It neither assembles products nor reads oracle data. The compiled
+prior is subtracted from standardized measured utilities before fitting the
+same Nyström/FITC GP and is added back to query predictions. A zero prior
+reproduces the fixed-mean path.
 
 ## Tracks
 
@@ -183,8 +198,9 @@ with `--llm-extra-body-json '{}'` or their own request body.
 
 The default `ldm` method uses four independent Chat Completions calls, each
 returning 16 candidates. The direct-LLM comparator retains independent
-one-candidate calls. Both persistent Harness methods use the OpenAI Responses
-wire format through Pi; their endpoint must support that API.
+one-candidate calls. Proposal, policy, and direct research Harness sessions use
+the OpenAI Responses wire format through Pi; their endpoint must support that
+API.
 `--proposal-samples` controls total occurrences and
 `--proposal-candidates-per-request` controls the fixed response minibatch; the
 direct proposal breadth must divide evenly by the minibatch size.
@@ -204,6 +220,9 @@ read-only snapshot of the official SynthonSpace before submitting one
 combined 64 raw occurrences enter the
 same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
 LDM acquisition tilt used by the direct backend.
+
+`ldm_harness_compiled` retains those four proposal sessions and adds one
+independent persistent `policy_architect` session before LDM selection.
 
 The direct `harness` method creates one persistent comprehensive-research
 session and requests exactly 16 distinct legal tuples per active round. All 16
@@ -314,6 +333,44 @@ reaches the turn wall-time limit. Every provider attempt remains in the raw
 trace; the runner never switches to the direct backend or invents replacement
 candidates.
 
+## Harness-Compiled Policy
+
+Each active `ldm_harness_compiled` round first collects the same 64 valid unseen
+proposal occurrences as `ldm_harness`. The policy session then receives the
+measured tuple history, released reaction and synthon descriptions, proposal
+and `q0` summaries, baseline acquisition summaries, and a versioned numeric
+feature contract. It submits `replace`, `keep`, or `disable`; `replace`
+references a complete `optimization_policy.py` rather than embedding source in
+JSON.
+
+The current policy API exposes exactly two capabilities:
+
+- `prior_mean@1` returns standardized means from reaction context, slot
+  presence, and released-synthon descriptor rows. Candidate identity, SMILES,
+  row order, `q0`, acquisition values, selection probabilities, and hidden
+  labels are unavailable to the function.
+- `ldm_weights@1` returns a stage label and finite non-negative `alpha` and
+  `eta` for `q0^alpha * exp(eta * robust_z(UCB))`.
+
+The Count-Morgan proxy, Nyström landmarks, count-Tanimoto kernel, FITC variance,
+noise, UCB rule, maintained pool, Gumbel sampling, official evaluator, and
+evaluation budget remain fixed. The task fits that GP to residual targets after
+subtracting the compiled prior and adds the prior back to predictions. A zero
+prior with the configured default weights is equivalent to `ldm_harness`.
+
+The policy Agent can research and use the built-in policy MCP to inspect,
+validate, and evaluate drafts. The accepted immutable snapshot is executed
+again outside the host interpreter in a read-only, network-disabled container.
+Formal profiles permit three submission attempts. A failed round reuses the
+previous valid epoch when it still validates on current inputs, otherwise it
+uses the static zero-prior/default-weight policy and marks the round degraded.
+
+Policy research uses the same user-configured endpoint, model, Responses wire
+API, thinking level, and wall-time setting as proposal research. Configure its
+tool limits independently with `--policy-tool-budget`. Candidate traces remain
+under `<run_dir>/harness/`; policy sessions, round inputs, validations, accepted
+epochs, and compiled outputs are written under `<run_dir>/policy_harness/`.
+
 ## Real Runs
 
 After preparation and endpoint configuration:
@@ -344,13 +401,13 @@ Each completed run writes:
 
 ## Fixed-Round Pilot Evaluation
 
-`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, five-method
+`config/pilot_evaluation/synthonbench.yaml` runs a three-seed, six-method
 comparison on the official 1M KIF11 surrogate track: direct LDM, Harness LDM,
-pure BO, direct LLM, and direct research Harness. One product-uniform shared
-initialization batch and five optimization batches make six outer rounds. Each
-round targets 16 official calls. Direct API methods do not replace invalid,
-previously evaluated, or duplicate generated candidates; Harness sessions
-repair rejected entries before committing each minibatch.
+Harness-Compiled LDM, pure BO, direct LLM, and direct research Harness. One
+product-uniform shared initialization batch and five optimization batches make
+six outer rounds. Each round targets 16 official calls. Direct API methods do
+not replace invalid, previously evaluated, or duplicate generated candidates;
+Harness sessions repair rejected entries before committing each minibatch.
 
 `config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
@@ -359,12 +416,17 @@ posterior-convergence checks, not a replacement for the fixed six-batch screen.
 
 Direct-API LDM uses four independent concurrent requests with 16 indexed public
 proposal slots per response, producing 64 raw occurrences for empirical `q0`,
-a 32-candidate maintained pool, `beta=0.5`, `eta=1`, and acquisition z-clipping
-at 2, together with the
-task-local reaction-aware Nyström count-Tanimoto GP over standardized
-utilities. Harness LDM uses the same 4-by-16 proposal shape through four persistent
-research sessions, each submitting 16 independently researched official-space
-tuples, then uses the same `q0`, pool maintenance, GP, and acquisition tilt.
+together with the task-local reaction-aware Nyström count-Tanimoto GP over
+standardized utilities. The six-round profile locks a 32-candidate maintained
+pool, `beta=0.5`, `alpha=1`, `eta=1`, and acquisition z-clipping at 2. The
+twelve-round confirmation keeps the same 64 proposal occurrences and 16 real
+evaluations per round, but locks a 48-candidate pool, `alpha=1`, `eta=3`, and
+z-clipping at 5. Harness LDM uses the same 4-by-16 proposal shape through four
+persistent research sessions, each submitting 16 independently researched
+official-space tuples, then uses the same `q0`, pool maintenance, GP, and
+acquisition tilt. Harness-Compiled LDM uses that identical proposal path and
+adds one independent policy session that may replace the residual-GP prior mean
+and schedule `alpha`/`eta` through a validated policy artifact.
 Pure BO uses the same GP-UCB but receives a fresh score-blind pool of 64 unseen
 official tuples per batch and makes no model requests. Direct LLM sampling
 issues 16 independent finite-choice requests per optimization batch and
@@ -378,12 +440,12 @@ the 16 requests distinct, and anchors from evaluated history are excluded.
 Direct research Harness asks one persistent comprehensive Agent for 16 distinct
 official tuples and evaluates the complete accepted minibatch without GP
 selection.
-The committed six-round and extended profiles request maximum reasoning effort for
-both direct methods and the Harness. Direct methods use the Chat Completions
-`reasoning_effort` field, while the Harness uses Pi's Responses API
-thinking-level mapping. Direct LDM starts all four minibatch requests
-concurrently. The direct-LLM comparator queues its 16 single-candidate requests
-through the same four-worker limit. Transient
+The committed six-round and extended profiles request maximum reasoning effort
+for both direct methods and all Harness sessions. Direct methods use the Chat
+Completions `reasoning_effort` field, while proposal and policy Harnesses use
+Pi's Responses API thinking-level mapping. Direct LDM starts all four minibatch
+requests concurrently. The direct-LLM comparator queues its 16 single-candidate
+requests through the same four-worker limit. Transient
 provider failures receive bounded backoff retries for the same logical
 proposal. The max-reasoning pilot profiles allow up to 600 seconds per direct
 request because reasoning latency can substantially exceed short-completion
@@ -404,9 +466,9 @@ uv run --locked --project tasks/synthonbench python \
 ```
 
 The result directory contains standard child artifacts plus a portable matrix
-manifest, round-level trajectories, CSV/JSON summaries, and a best-so-far
-plot. Endpoint settings remain user-defined OpenAI-compatible environment
-variables; the BO children do not require them.
+manifest, round-level trajectories, CSV/JSON summaries, a best-so-far plot, and
+`compiled_policy_rounds.csv`. Endpoint settings remain user-defined
+OpenAI-compatible environment variables; the BO children do not require them.
 For a source archive rather than a Git checkout, set
 `LDM_PILOT_EVALUATION_COMMIT` to the archive release commit so the manifest records
 explicit provenance.

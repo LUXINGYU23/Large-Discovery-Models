@@ -90,6 +90,12 @@ distinct legal tuples, and evaluates all 16 without `q0`, GP, or acquisition.
 Both methods accept `--harness-mcp-config`; per-tool turn limits are configured
 with `harness-tool-budget` in runner YAML. See `docs/research-harness.md`.
 
+Harness-Compiled LDM reuses the four proposal sessions and adds one independent
+`policy_architect` session. It writes proposal traces below `harness/` and
+policy traces, immutable `optimization_policy.py` epochs, and round results
+below `policy_harness/`. Configure policy-session tool limits separately with
+`policy-tool-budget`.
+
 ## 4. Check and Run the Surrogate Oracle Track
 
 ```bash
@@ -106,7 +112,7 @@ Replace the config with `glide_1m_qualification.yaml` for the Glide
 ligand-efficiency track. The full batch-16 10,000-call profiles are documented
 in `README.md`.
 
-## 5. Run the Five-Method Pilot Evaluation
+## 5. Run the Six-Method Pilot Evaluation
 
 With the 1M surrogate data prepared, run:
 
@@ -118,10 +124,17 @@ uv run --locked --project tasks/synthonbench python \
   scripts/run_pilot_evaluation.py config/pilot_evaluation/synthonbench.yaml
 ```
 
-The matrix runs direct-API LDM, persistent-agent Harness LDM, offline task-local
-BO, direct LLM sampling, and single-Agent direct research Harness on three seeds
-with the same initial 16 official calls. Output is written under
+The matrix runs direct-API LDM, persistent-agent Harness LDM,
+Harness-Compiled LDM, offline task-local BO, direct LLM sampling, and
+single-Agent direct research Harness on three seeds with the same initial 16
+official calls. Harness-Compiled LDM adds one policy session that may set the
+residual-GP prior mean and LDM `alpha`/`eta`. Output is written under
 `$SYNTHONBENCH_RUNS_ROOT/pilot_evaluation/`. Use `--resume` only with the same
 repository revision and configuration files. The committed evaluation profiles
 request maximum reasoning effort for every model-backed method and use the same
 user-configured endpoint and model.
+
+Before starting a full real matrix, confirm the resolved case, methods, seeds,
+round and evaluation counts, endpoint, model, wire API, thinking level,
+direct-request concurrency, proposal and policy tool budgets, output root, and
+resume policy.

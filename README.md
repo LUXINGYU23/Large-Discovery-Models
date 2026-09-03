@@ -324,6 +324,10 @@ Completions probe does not certify a Responses-based Harness. See the
 [Research Harness integration guide](docs/research-harness.md) and
 [Pi sidecar contract](harnesses/pi/README.md).
 
+Harness-Compiled LDM uses separate proposal and policy Harness pools. Preflight
+both manifests, profile sets, submission contracts, MCP tools, artifact roots,
+and tool budgets before a real run.
+
 Small-molecule real runs need additional task dependency paths:
 
 ```bash
@@ -611,9 +615,9 @@ The codebase has five layers:
 | --- | --- | --- |
 | Shared runner | `ldm_tts.cli.runner`, `scripts/run_ldm_tts.py` | Load configs, build commands, run suites, and provide dry-runs. |
 | Shared algorithms | `ldm_tts/` | Describe task spaces, traverse proposal states, implement acquisition scoring and budgets, parse responses, and serialize traces. |
-| Research Harness | `ldm_tts.harness`, `harnesses/pi` | Run versioned persistent Agent sessions, isolated tools, provisional candidate submission, and redacted transport capture. |
+| Research Harness | `ldm_tts.harness`, `harnesses/pi` | Run versioned persistent Agent sessions, isolated tools, task-defined provisional submissions, compiled policy artifacts, and redacted transport capture. |
 | Task adapters | `tasks/<task>/ldm_task/procedure.py` | Provide a thin, stable entry point for the shared runner. |
-| Task implementations | `tasks/<task>/core/` | Own prompts, direct or Harness proposal adapters, candidate validation, surrogate representations, domain scoring, resume behavior, and output writing. |
+| Task implementations | `tasks/<task>/core/` | Own prompts, direct or Harness proposal adapters, candidate and policy validation, surrogate representations, domain scoring, resume behavior, and output writing. |
 
 Key shared packages:
 
@@ -627,7 +631,7 @@ Key shared packages:
 | `ldm_tts.optimization.records` | Lightweight BO records and protocols. |
 | `ldm_tts.engine` | Campaign orchestration, reservoir expansion, budgets, events, checkpoints, and run artifacts. |
 | `ldm_tts.transport` | Proposal transport interface, OpenAI-compatible adapter, and response parsing. |
-| `ldm_tts.harness` | Persistent research-Harness protocol, client, profiles, turns, submission validation, and lineage records. |
+| `ldm_tts.harness` | Persistent research-Harness protocol, clients, profiles, generic submissions, compiled-policy control, isolated execution, and lineage records. |
 | `ldm_tts.registration` | Manifest discovery, experiment contracts, scaffolding, and generic dependency-check primitives. |
 | `ldm_tts.data` | Runtime collection, ldm-2.0 intermediate records, rendering, and expert augmentation. |
 | `ldm_tts.cli` | Configuration expansion and command-line campaign execution. |

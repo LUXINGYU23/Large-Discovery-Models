@@ -2,9 +2,9 @@
 
 This directory contains the pinned Node sidecar used by persistent LDM research
 sessions. It owns Pi session lifecycle, Gondolin-isolated file and shell tools,
-web extensions, terminal structured submission, and raw model-provider transport
-capture. Task validation, optimization history, `q0`, GP inference, acquisition,
-and evaluation remain in Python.
+web extensions, task-defined terminal submission, and raw model-provider
+transport capture. Task validation, optimization history, `q0`, GP inference,
+acquisition, and evaluation remain in Python.
 
 For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
@@ -57,6 +57,27 @@ Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
 escapes, unsupported suffixes, missing files, and oversized files, then stores
 an immutable per-attempt snapshot before task validation. Wire records contain
 artifact descriptors and digests, never duplicate source text.
+
+## Compiled Optimization Policies
+
+Harness-Compiled LDM uses the same sidecar twice: one task-defined pool owns
+candidate-proposal sessions, and a separate pool owns one persistent policy
+session. The policy terminal contract accepts `replace`, `keep`, or `disable`.
+`replace` must reference a complete `optimization_policy.py`; source code is
+never embedded in the terminal JSON payload.
+
+The policy pool includes the repository `compile-ldm-policy` skill and the
+built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
+`validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
+the authoritative feature contract and repair a draft before submission. These
+tools are advisory: after immutable snapshotting, task-owned Python executes the
+accepted artifact again in a separate read-only, network-disabled container
+with bounded CPU, memory, processes, and time. The host interpreter never
+imports or executes Agent-authored code.
+
+Candidate and policy clients have independent manifests, sessions, turn state,
+tool budgets, and usage counters. Reference tasks store them under
+`<run_dir>/harness/` and `<run_dir>/policy_harness/` respectively.
 
 Pi sessions use a 262,144-token model context window with built-in automatic
 compaction enabled. The release configuration reserves 16,384 tokens for the

@@ -1,12 +1,13 @@
 # Research Harness Integration
 
 The research Harness lets a persistent Agent inspect optimization history, use
-tools, work in an isolated sandbox, and submit task candidates. It is available
-through two distinct search methods:
+tools, work in an isolated sandbox, and make a task-defined terminal
+submission. It is available through three search methods:
 
 | Method | Candidate generation | Selection before evaluation |
 | --- | --- | --- |
-| `ldm_harness` | Multiple task-defined persistent Agents submit an over-sampled reservoir. | The task estimates empirical `q0`, fits its surrogate, and applies the LDM acquisition policy. |
+| `ldm_harness` | Multiple task-defined persistent Agents submit an over-sampled reservoir. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
+| `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
 Iron Mind and SynthonBench are the reference integrations. The shared Harness
@@ -18,16 +19,22 @@ surrogate, or evaluator.
 ```text
 shared Campaign / LDMEngine
   -> task-owned ReservoirExpander
-     -> ldm_tts.harness.HarnessClient
+     -> proposal HarnessClient and persistent Pi sessions
         -> sidecar-release JSONL protocol
-           -> persistent Pi session
            -> isolated shell and file tools
            -> web, Context7, task-local, and configured MCP tools
         <- provisional structured submission
      -> task-owned validation
         -> retry with JSON-Pointer errors and continue the same turn
         -> or accept and commit the turn
-  -> ldm_harness: task surrogate and acquisition selector
+  -> ldm_harness_compiled only:
+     -> independent policy HarnessClient and persistent policy session
+        <- complete optimization_policy.py plus replace/keep/disable action
+     -> immutable artifact snapshot
+     -> isolated policy runner and task-owned validation
+     -> accepted policy epoch or deterministic fallback
+  -> ldm_harness: fixed task surrogate and acquisition selector
+  -> ldm_harness_compiled: task residual GP and compiled LDM weights
   -> harness: stable reservoir order
   -> authoritative task evaluator and Observation history
 ```
@@ -55,6 +62,9 @@ The public `ldm_tts.harness` package provides:
 | `HarnessClient` | Sidecar lifecycle, secret bootstrap, protocol validation, and turn execution. |
 | `HarnessSubmissionValidation` | Task-owned `accept`, `retry`, or `reject_turn` decision with actionable errors. |
 | `HarnessTurnResult` | Committed generic submission, artifact descriptors, session lineage, and measured usage. |
+| `PolicyCapabilityContract` | Versioned task feature schema and enabled compiled-policy capabilities. |
+| `PolicyResearchController` | Policy rounds, artifact validation, epoch state, resume, and deterministic fallback. |
+| `PolicyExecutor` | Isolated execution boundary for accepted policy artifacts. |
 
 The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
 session lifecycle, automatic context compaction, isolated file and shell tools,
@@ -97,7 +107,9 @@ provider captures.
 ## Tool Budgets
 
 `--harness-tool-budget NAME=COUNT` sets a hard per-Agent, per-optimization-turn
-limit. In a runner YAML, use a list when configuring more than one tool:
+limit for proposal sessions. Tasks with an independent compiled-policy session
+use `--policy-tool-budget NAME=COUNT` for that session. In a runner YAML, use a
+list when configuring more than one tool:
 
 ```yaml
 args:
@@ -105,6 +117,9 @@ args:
     - web_search=4
     - fetch_content=8
     - mcp__literature__search=2
+  policy-tool-budget:
+    - web_search=8
+    - fetch_content=16
 ```
 
 The default network budgets are eight `web_search` calls, sixteen
@@ -123,8 +138,9 @@ turn cannot reset or double-spend its budget.
 
 A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 
-1. Start one `HarnessClient` for the campaign and close it in a `finally` block.
-2. Define the profile set and one strict submission contract for each search method.
+1. Start one `HarnessClient` per independent pool and close each in a `finally`
+   block.
+2. Define one profile set and strict submission contract per pool.
 3. Build deterministic turns from campaign, profile, round, and history identity.
 4. Send newly measured observations and the authoritative evaluated-candidate
    exclusion snapshot.
@@ -133,12 +149,32 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 6. Return stable JSON-Pointer paths, rejection codes, messages, and repair hints
    so the Agent can repair the same submission in-session.
 7. Refill until the complete valid minibatch is accepted.
-8. Preserve meaningful same-round occurrences before estimating `q0` for
-   `ldm_harness`; require distinct real evaluations for direct `harness`.
-9. Record Harness turns and measured provider/tool usage in the campaign budget.
+8. Preserve meaningful same-round occurrences before estimating `q0` for both
+   Harness-backed LDM methods; require distinct real evaluations for direct
+   `harness`.
+9. Record each pool's turns and measured provider/tool usage separately in the
+   campaign budget.
 
 Only candidates in the authoritative evaluated set are historical repeats.
 Candidates proposed in an earlier turn but never evaluated remain eligible.
+
+For `ldm_harness_compiled`, the task must additionally:
+
+1. Keep the policy session, submission contract, feature encoder, and adapter
+   separate from candidate generation.
+2. Expose task-local numeric features that do not encode candidate identity,
+   row order, hidden labels, `q0`, acquisition values, or selection outcomes.
+3. Preserve the task's kernel, variance, noise, acquisition, pool maintenance,
+   evaluator, and candidate budget. The current release permits only
+   `prior_mean@1` and `ldm_weights@1`.
+4. Fit the unchanged task GP to residual targets after subtracting the compiled
+   prior mean. A zero prior and default weights must reproduce `ldm_harness`.
+5. Accept only a complete `optimization_policy.py` through immutable artifact
+   snapshotting. Execute it outside the host interpreter with read-only inputs,
+   no network, and bounded CPU, memory, processes, and time.
+6. Support `replace`, `keep`, and `disable`. If a turn fails after repair, reuse
+   the previous valid epoch when it remains valid; otherwise use static task
+   defaults and mark the round degraded.
 
 ## Resources And Artifacts
 
@@ -201,16 +237,27 @@ The native Pi session is the only full conversation record. Python does not
 duplicate model or MCP transcripts. These files are raw research traces, not
 canonical `ldm-2.0` accepted-action records.
 
+`ldm_harness_compiled` writes the independent policy session below
+`<run_dir>/policy_harness/`. It stores round inputs and digests, validation
+attempts, immutable policy snapshots, accepted epochs, compiled arrays, the
+active-policy pointer, and each round result. Pilot Evaluation also exports
+`compiled_policy_rounds.csv` with actions, fallback/degraded status, policy
+weights, validation and usage counts, and selection diagnostics.
+
 ## Qualification
 
 Use a protocol-faithful fake sidecar to test session identity, strict
 cardinality, rejection and correction, budget accounting, MCP allowlists, and
 lineage without Docker or credentials. Before a real claim, run the sidecar
 tests, the task guest smoke, and one capability smoke with the selected
-Responses endpoint, container isolation, profiles, and tools. For `ldm_harness`, verify that accepted
-occurrences enter `q0`, surrogate, and acquisition selection. For `harness`,
-verify that the accepted minibatch goes directly to the official evaluator and
-that no surrogate or selector is instantiated.
+Responses endpoint, container isolation, profiles, and tools. For
+`ldm_harness`, verify that accepted occurrences enter `q0`, surrogate, and
+acquisition selection. For `ldm_harness_compiled`, additionally verify separate
+proposal and policy manifests, artifact digest and path safety, same-session
+validation repair, zero-prior parity, residual-GP behavior, policy epoch resume,
+fallback accounting, and isolated execution. For `harness`, verify that the
+accepted minibatch goes directly to the official evaluator and that no
+surrogate or selector is instantiated.
 
 See the [Pi sidecar contract](../harnesses/pi/README.md) and the task README for
 runtime-specific commands.

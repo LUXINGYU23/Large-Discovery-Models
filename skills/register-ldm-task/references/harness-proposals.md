@@ -4,6 +4,9 @@ Read [`docs/research-harness.md`](../../../docs/research-harness.md) before
 implementing a persistent proposal backend. That document is authoritative for
 the shared interface, ownership boundary, resources, traces, and qualification.
 Use this reference only as the task-registration checklist.
+For an independent policy-artifact session, use
+[harness-compiled-policy.md](harness-compiled-policy.md) instead of extending
+the candidate submission schema with policy fields.
 
 ## Choose The Backend Deliberately
 

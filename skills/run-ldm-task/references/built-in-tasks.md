@@ -142,12 +142,13 @@ tasks/iron_mind/README.md
 tasks/iron_mind/QUICKSTART.md
 config/iron_mind/mock.yaml
 config/iron_mind/ldm_harness_smoke.yaml
+config/iron_mind/pilot_evaluation_ldm_harness_compiled.yaml
 config/pilot_evaluation/iron_mind.yaml
 ```
 
 All model-backed methods use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY`.
 Direct sampling uses Chat Completions. Harness methods use the Pi Responses
-sidecar and additionally requires Docker, Linux KVM, a built Harness image, and
+sidecar and additionally require Docker, Linux KVM, a built Harness image, and
 writable external run/cache roots. A protected API-key file may be selected by
 `--harness-api-key-file`.
 
@@ -161,12 +162,20 @@ and frozen evaluator as direct LDM. The direct research Harness instead uses
 one persistent session to choose the evaluated condition without `q0`, GP, or
 acquisition.
 
+Harness-Compiled LDM keeps the four proposal sessions and adds one independent
+`policy_architect` session. Its complete `optimization_policy.py` may supply a
+standardized prior mean for the task-local residual GP and schedule LDM
+`alpha`/`eta`; candidate generation, kernel, variance, UCB, pool, and evaluator
+remain fixed. Inspect `<run_dir>/policy_harness/` for the separate manifest,
+turns, validations, accepted epochs, and degraded/fallback state.
+
 Follow `tasks/iron_mind/QUICKSTART.md`: validate the mock path, prepare the
 official source-pinned data, build the sidecar, run `ldm_harness_smoke.yaml`, and
-only then run the five-method Pilot Evaluation. Inspect `<run_dir>/harness/` for
-session/provider traces and the normal campaign artifacts for optimization
-history and results. Optional MCP servers and per-tool turn budgets use the
-shared Harness configuration in `docs/research-harness.md`.
+only then run the six-method Pilot Evaluation. Inspect `<run_dir>/harness/` for
+proposal traces, `<run_dir>/policy_harness/` for compiled-policy traces, and the
+normal campaign artifacts for optimization history and results. Optional MCP
+servers and separate proposal/policy tool budgets use the shared Harness
+configuration in `docs/research-harness.md`.
 
 ## SynthonBench
 
@@ -177,12 +186,13 @@ tasks/synthonbench/README.md
 tasks/synthonbench/QUICKSTART.md
 config/synthonbench/mock.yaml
 config/synthonbench/ldm_harness_surrogate_smoke.yaml
+config/synthonbench/pilot_evaluation_ldm_harness_compiled.yaml
 ```
 
 Direct methods use the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
 `LLM_API_KEY` settings. Harness methods use the same provider identity but run
 the Pi sidecar over the OpenAI Responses wire format. They additionally
-requires Docker, Linux KVM, the configured Harness image, writable run and cache
+require Docker, Linux KVM, the configured Harness image, writable run and cache
 directories, and read-only task profiles/tools. An ignored protected key file
 may be selected by the task config instead of placing a key in process
 arguments.
@@ -202,3 +212,12 @@ uses one persistent comprehensive session and evaluates its complete 16-tuple
 minibatch without `q0`, GP, or acquisition. Inspect `<run_dir>/harness/`
 alongside the shared campaign artifacts. Optional MCP servers and per-tool turn
 budgets use `docs/research-harness.md`.
+
+Harness-Compiled LDM retains the four proposal sessions and adds one independent
+policy session. The task-local policy feature encoder uses released reaction,
+slot, capacity, and synthon-descriptor data. Its complete Python artifact may
+set the residual-GP prior mean and LDM `alpha`/`eta`, while the Nyström/FITC
+kernel, uncertainty, acquisition, pool, and official evaluator remain fixed.
+Inspect `<run_dir>/policy_harness/` and the matrix
+`compiled_policy_rounds.csv`; policy tool budgets are separate from proposal
+tool budgets.

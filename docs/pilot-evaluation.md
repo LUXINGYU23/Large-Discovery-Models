@@ -1,12 +1,13 @@
 # Fixed-Budget Pilot Evaluation
 
 The Pilot Evaluation pipeline runs a small, reproducible comparison before a
-full benchmark campaign. A registered task may expose five methods:
+full benchmark campaign. A registered task may expose six methods:
 
 | Method | Candidate source | Pre-evaluation selection |
 | --- | --- | --- |
 | `ldm` | Direct model API | Task LDM surrogate and acquisition |
 | `ldm_harness` | Multiple persistent research Agents | Task LDM surrogate and acquisition |
+| `ldm_harness_compiled` | Multiple persistent proposal Agents plus one policy Agent | Task residual GP and compiled LDM weights |
 | `bo` | Task-local score-blind search space | Task BO surrogate and acquisition |
 | `llm` | Direct model API | None; evaluate the requested minibatch |
 | `harness` | One persistent research Agent | None; evaluate the requested minibatch |
@@ -63,13 +64,18 @@ The output root contains:
 - `trajectories.csv`: normalized round-level best-so-far values;
 - `summary.json`: aggregate statistics and method verdicts;
 - `best_so_far.png`: mean best-so-far trajectories with formal method labels.
+- `compiled_policy_rounds.csv`: policy actions, epochs, weights, validation,
+  usage, degraded/fallback state, and selection diagnostics when the compiled
+  method is present.
 
 Integrity checks require complete rounds, shared initialization, unique real
 evaluations, zero model calls from BO, and method-specific proposal budgets.
 `ldm_harness` must execute one turn per profile and optimization round. Direct
 `harness` must execute one turn per optimization round and submit exactly the
-real-evaluation minibatch. Harness children must retain a sidecar manifest; the
-top-level manifest records its digest and selected non-secret provenance.
+real-evaluation minibatch. `ldm_harness_compiled` must also execute one policy
+turn per optimization round and retain separate proposal and policy manifests.
+The top-level manifest records their digests and selected non-secret
+provenance.
 
 Direct model methods may yield fewer valid evaluations when their fixed request
 budget produces malformed or repeated candidates. Harness methods instead use
@@ -82,6 +88,9 @@ in-session rejection and refill to deliver their complete accepted minibatch.
    artifacts.
 2. Add real task profiles under `config/<task>/`. Keep provider settings
    user-defined and enforce scientific settings through `experiment.json`.
+   A compiled method also needs a task-local feature and policy adapter,
+   residual-GP path, independent policy profile, isolated artifact runner, and
+   explicit policy budgets.
 3. Add `config/pilot_evaluation/<task>.yaml` with cases, exactly three seeds,
    method profiles, trajectory columns, and optional result fields. Do not add
    task-specific branches to `ldm_tts.pilot_evaluation`.
