@@ -71,10 +71,19 @@ The policy pool loads its task-owned `compile-ldm-policy` skill from
 Its `inspect_policy_contract`,
 `validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
 the authoritative feature contract and repair a draft before submission. These
-tools are advisory: after immutable snapshotting, task-owned Python executes the
-accepted artifact again in a separate read-only, network-disabled container
-with bounded CPU, memory, processes, and time. The host interpreter never
-imports or executes Agent-authored code.
+tools are advisory. Inspection returns the exact task-supplied `mean_context`
+and `weight_context` in addition to the public research snapshot, so generated
+code does not have to guess target scaling or available keys. Draft evaluation
+executes the file on current authoritative arrays and reports prior ranges,
+clipping, and explicitly in-sample residual diagnostics. Those diagnostics can
+identify scale, sign, and gross-fit errors; they are not an estimate of future
+optimization performance.
+
+After immutable snapshotting, task-owned Python executes the accepted artifact
+again in a separate read-only, network-disabled container with bounded CPU,
+memory, processes, and time. The host interpreter never imports or executes
+Agent-authored code. Terminal payloads are exact: `replace` includes only
+`action` and `artifact_path`; `keep` and `disable` include only `action`.
 
 Candidate and policy clients have independent manifests, sessions, turn state,
 tool budgets, and usage counters. Reference tasks store them under

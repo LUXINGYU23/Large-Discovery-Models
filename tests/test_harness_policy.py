@@ -251,6 +251,14 @@ def test_policy_contract_and_builtin_mcp_are_generic() -> None:
 
     assert contract.tool_name == "submit_optimization_policy"
     assert contract.max_validation_attempts == 3
+    assert contract.payload_schema["allOf"] == [{
+        "if": {
+            "properties": {"action": {"const": "replace"}},
+            "required": ["action"],
+        },
+        "then": {"required": ["artifact_path"]},
+        "else": {"not": {"required": ["artifact_path"]}},
+    }]
     assert server.server_id == "ldm_policy"
     assert server.tools == (
         "inspect_policy_contract",

@@ -16,10 +16,13 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 	await mkdir(round, { recursive: true });
 	await writeFile(join(workspace, "optimization_policy.py"), "POLICY_API_VERSION = 1\n");
 	await writeFile(join(round, "contract.json"), JSON.stringify({ feature_names: ["a", "b"] }));
-	await writeFile(join(round, "research_snapshot.json"), JSON.stringify({
-		task_objective: "fixture",
-		reference_diagnostics: { baseline_score: 0.5 },
+	await writeFile(join(round, "input.json"), JSON.stringify({
+		execution_context: {
+			mean_context: { target_location: 2, target_scale: 0.5 },
+			weight_context: { history_size: 4 },
+		},
 	}));
+	await writeFile(join(round, "research_snapshot.json"), JSON.stringify({ task_objective: "fixture" }));
 	await writeFile(join(root, "active_round.json"), JSON.stringify({
 		round_index: 1,
 		round_path: "rounds/round_001",
@@ -32,7 +35,7 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 const command = process.argv[2];
 console.log(JSON.stringify(command === "inspect"
   ? { status: "ok", inspection: { policy_api_version: 1 } }
-  : { status: "ok", stage: "test", alpha: 1, eta: 2, prior_summary: {} }));
+  : { status: "ok", stage: "test", alpha: 1, eta: 2, draft_diagnostics: { draft_prior_rmse: 0.25 } }));
 `);
 	const entrypoint = fileURLToPath(new URL("./policy-mcp.js", import.meta.url));
 	const config: McpServerConfig = {
@@ -73,10 +76,17 @@ console.log(JSON.stringify(command === "inspect"
 			{} as never,
 		);
 		assert.equal((inspect.details as any).structuredContent.round_index, 1);
-		assert.equal((validation.details as any).structuredContent.status, "ok");
 		assert.deepEqual(
-			(evaluation.details as any).structuredContent.reference_diagnostics,
-			{ baseline_score: 0.5 },
+			(inspect.details as any).structuredContent.execution_context,
+			{
+				mean_context: { target_location: 2, target_scale: 0.5 },
+				weight_context: { history_size: 4 },
+			},
+		);
+		assert.equal((validation.details as any).structuredContent.status, "ok");
+		assert.equal(
+			(evaluation.details as any).structuredContent.draft_diagnostics.draft_prior_rmse,
+			0.25,
 		);
 		await assert.rejects(
 			(tools[1] as ToolDefinition).execute(

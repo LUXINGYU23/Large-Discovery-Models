@@ -176,6 +176,25 @@ For `ldm_harness_compiled`, the task must additionally:
    the previous valid epoch when it remains valid; otherwise use static task
    defaults and mark the round degraded.
 
+The policy interface uses two different utility scales deliberately. Measured
+`history_utilities` remain raw task values. The task supplies
+`target_location` and positive `target_scale`, and the policy returns a
+conditional mean on the standardized scale:
+
+```text
+z(x) = (utility(x) - target_location) / target_scale
+prior_mean(x) = E[z(x) | public task features and supported evidence].
+```
+
+The unchanged task GP is fitted to `z - prior_mean` and adds the mean back to
+its posterior. The policy mean is not a maximum, rank, probability of
+optimality, or acquisition score. `inspect_policy_contract` exposes the exact
+execution contexts used by the runner. `evaluate_policy_draft` reports current
+history RMSE, residual, correlation, prior range, and clipping as explicitly
+in-sample diagnostics; it does not claim calibration or held-out predictive
+performance. Task-local profile and Skill instructions must state the exact
+feature semantics, identifiability limits, and evidence hierarchy.
+
 ## Resources And Artifacts
 
 Versioned task inputs belong under:

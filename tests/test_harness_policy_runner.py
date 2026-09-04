@@ -29,7 +29,11 @@ def _round_input(path: Path) -> None:
     (path / "input.json").write_text(
         json.dumps({
             "execution_context": {
-                "mean_context": {"round_index": 2},
+                "mean_context": {
+                    "round_index": 2,
+                    "target_location": 2.0,
+                    "target_scale": 1.0,
+                },
                 "weight_context": {"round_index": 2},
             }
         }),
@@ -38,7 +42,7 @@ def _round_input(path: Path) -> None:
     np.savez_compressed(
         path / "arrays.npz",
         history_features=np.asarray([[1.0, 0.0], [0.0, 1.0]]),
-        history_utilities=np.asarray([1.0, -1.0]),
+        history_utilities=np.asarray([3.0, 1.0]),
         query_features=np.asarray([[1.0, 1.0], [2.0, -1.0]]),
     )
 
@@ -66,7 +70,10 @@ CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}
 def compute_prior_mean(history_features, history_utilities, query_features, context):
     if len(history_features) == 0:
         return np.zeros(len(query_features))
-    coefficients = np.linalg.pinv(history_features) @ history_utilities
+    standardized = (
+        history_utilities - context["target_location"]
+    ) / context["target_scale"]
+    coefficients = np.linalg.pinv(history_features) @ standardized
     return query_features @ coefficients
 
 def choose_ldm_weights(context):
@@ -91,6 +98,13 @@ def choose_ldm_weights(context):
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert result["stage"] == "focused"
     assert result["alpha"] == 0.8
+    diagnostics = result["draft_diagnostics"]
+    assert diagnostics["scope"] == "in_sample_prior_fit_only"
+    assert diagnostics["history_count"] == 2
+    assert np.isclose(diagnostics["zero_prior_rmse"], 1.0)
+    assert np.isclose(diagnostics["draft_prior_rmse"], 0.0)
+    assert np.isclose(diagnostics["draft_minus_zero_rmse"], -1.0)
+    assert np.isclose(diagnostics["prior_target_pearson"], 1.0)
     with np.load(output / "arrays.npz", allow_pickle=False) as arrays:
         assert arrays["history_prior_mean"].shape == (2,)
         assert arrays["query_prior_mean"].shape == (2,)

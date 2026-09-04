@@ -111,6 +111,16 @@ validated policy can provide:
 - a standardized prior mean, with the unchanged Hamming GP fitted to residuals;
 - the current round's non-negative `alpha` and `eta`.
 
+History utilities remain raw task values; the adapter supplies their current
+location and scale, and the policy returns standardized conditional
+expectations. Prior features are aggregate patch summaries: edit burden,
+position and adjacency statistics, GC/transition and target-base composition,
+and eight editable-region bins. They do not identify an exact sequence, motif,
+or edited position. The task-local policy instructions describe the resulting
+compositional collinearity and require regularized, coarse effects rather than
+trying to reproduce the full Hamming representation. Draft fit diagnostics are
+explicitly in-sample.
+
 The policy role and its task-local Skill live under
 `resources/harness/`. Accepted policy epochs and validation records are
 stored under `<run_dir>/policy_harness/`.

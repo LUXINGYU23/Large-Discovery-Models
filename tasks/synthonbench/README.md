@@ -354,6 +354,14 @@ The current policy API exposes exactly two capabilities:
 - `ldm_weights@1` returns a stage label and finite non-negative `alpha` and
   `eta` for `q0^alpha * exp(eta * robust_z(UCB))`.
 
+History utilities remain on the raw benchmark scale; the adapter supplies the
+current location and scale, and the policy returns standardized conditional
+expectations. Mean features contain reaction family, slot count and capacity,
+slot-presence masks, and globally standardized descriptors of released source
+synthons. They are not assembled-product descriptors. Task instructions call
+out correlated reaction/slot groups, missing-slot semantics, and the need for
+shrinkage. Draft fit diagnostics are in-sample checks, not predictive evidence.
+
 The Count-Morgan proxy, Nyström landmarks, count-Tanimoto kernel, FITC variance,
 noise, UCB rule, maintained pool, Gumbel sampling, official evaluator, and
 evaluation budget remain fixed. The task fits that GP to residual targets after

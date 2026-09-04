@@ -218,6 +218,10 @@ def policy_submission_contract(
         tool_name="submit_optimization_policy",
         payload_schema={
             "type": "object",
+            "description": (
+                "Use exactly one action shape: replace with artifact_path, "
+                "or keep/disable with action only."
+            ),
             "properties": {
                 "action": {
                     "type": "string",
@@ -226,10 +230,19 @@ def policy_submission_contract(
                 "artifact_path": {
                     "type": "string",
                     "enum": [POLICY_ARTIFACT_NAME],
+                    "description": "Include only when action is replace.",
                 },
             },
             "required": ["action"],
             "additionalProperties": False,
+            "allOf": [{
+                "if": {
+                    "properties": {"action": {"const": "replace"}},
+                    "required": ["action"],
+                },
+                "then": {"required": ["artifact_path"]},
+                "else": {"not": {"required": ["artifact_path"]}},
+            }],
         },
         artifact_rules=(HarnessArtifactRule(
             path_pointer="/artifact_path",
@@ -496,13 +509,28 @@ class PolicyResearchController:
                 "sha256": input_digest,
             },
             "active_policy": _active_summary(active),
-            "required_action": "Research, validate, then submit replace, keep, or disable.",
+            "snapshot_access": (
+                "Use inspect_policy_contract for authoritative content and execution "
+                "contexts. Snapshot paths are host-side lineage references, not guest "
+                "workspace paths."
+            ),
+            "required_action": "Research, validate, then submit exactly one terminal action.",
+            "terminal_actions": {
+                "replace": {
+                    "action": "replace",
+                    "artifact_path": POLICY_ARTIFACT_NAME,
+                },
+                "keep": {"action": "keep"},
+                "disable": {"action": "disable"},
+            },
         }
         if first_turn:
             message["policy_contract"] = self.contract.to_dict()
             message["responsibility"] = (
-                "Design prior_mean and LDM alpha/eta only. Do not select candidates, "
-                "call the oracle, or modify fixed task GP components."
+                "Design a standardized conditional prior mean and LDM alpha/eta only. "
+                "History utilities are raw task values; normalize them with the supplied "
+                "target location and scale. Do not select candidates, call the oracle, "
+                "or modify fixed task GP components."
             )
         turn_id = (
             f"{self.contract.task_id}-{self.profile_id}-"

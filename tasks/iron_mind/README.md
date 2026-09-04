@@ -277,6 +277,14 @@ The current policy API exposes exactly two capabilities:
 - `ldm_weights@1` selects a stage label and finite non-negative `alpha` and
   `eta` for `q0^alpha * exp(eta * robust_z(UCB))`.
 
+History utilities are raw task values; the adapter supplies their current
+location and scale, and the generated mean returns standardized conditional
+expectations. Its features are schema-ordered one-hot factor groups. Policy
+instructions therefore require reference coding, within-group centering, or
+regularization and reject unsupported interpretation of confounded main effects
+or interactions. Draft evaluation reports in-sample scale/sign/fit diagnostics
+only; it does not provide predictive validation.
+
 Candidate identity, row order, `q0`, acquisition values, selection
 probabilities, and hidden scores are unavailable to the prior-mean function.
 The categorical kernel, model-mismatch variance, observation noise, UCB rule,

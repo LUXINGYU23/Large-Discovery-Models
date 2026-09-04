@@ -40,6 +40,7 @@ interface RoundSnapshot {
 	pointer: ActiveRound;
 	directory: string;
 	contract: Record<string, unknown>;
+	input: Record<string, unknown>;
 	research: Record<string, unknown>;
 }
 
@@ -80,16 +81,12 @@ function createPolicyServer(config = environmentConfig()): McpServer {
 			const artifact = await draftArtifact(config.workspace, artifact_path);
 			const output = await mkdtemp(join(config.workspace, ".policy-eval-"));
 			try {
-				const result = await runPolicy(config, [
+				return response(await runPolicy(config, [
 					"execute",
 					"--artifact", artifact,
 					"--input", snapshot.directory,
 					"--output", output,
-				]);
-				return response({
-					...result,
-					reference_diagnostics: snapshot.research.reference_diagnostics ?? {},
-				});
+				]));
 			} finally {
 				await rm(output, { recursive: true, force: true });
 			}
@@ -105,6 +102,7 @@ async function inspectSnapshot(config: PolicyMcpConfig): Promise<Record<string, 
 		input_sha256: snapshot.pointer.input_sha256,
 		contract_sha256: snapshot.pointer.contract_sha256,
 		contract: snapshot.contract,
+		execution_context: snapshot.input.execution_context,
 		research_snapshot: snapshot.research,
 		active_policy: snapshot.pointer.active_policy,
 	};
@@ -126,6 +124,7 @@ async function loadSnapshot(config: PolicyMcpConfig): Promise<RoundSnapshot> {
 		pointer,
 		directory,
 		contract: await jsonFile(join(directory, "contract.json")),
+		input: await jsonFile(join(directory, "input.json")),
 		research: await jsonFile(join(directory, "research_snapshot.json")),
 	};
 }

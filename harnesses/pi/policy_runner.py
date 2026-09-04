@@ -313,6 +313,81 @@ def _summary(values: np.ndarray) -> dict[str, float | int | None]:
     }
 
 
+def _draft_diagnostics(
+    history_utilities: np.ndarray,
+    history_prior: np.ndarray,
+    mean_context: dict[str, Any],
+) -> dict[str, Any]:
+    if not len(history_utilities):
+        return {
+            "scope": "in_sample_prior_fit_only",
+            "history_count": 0,
+            "zero_prior_rmse": None,
+            "draft_prior_rmse": None,
+            "draft_minus_zero_rmse": None,
+            "prior_target_pearson": None,
+            "standardized_history_utility": _summary(history_utilities),
+            "history_prior_residual": _summary(history_utilities),
+        }
+
+    location = _context_number(
+        mean_context,
+        "target_location",
+        float(np.mean(history_utilities)),
+    )
+    fallback_scale = float(np.std(history_utilities))
+    if fallback_scale <= 0.0:
+        fallback_scale = 1.0
+    scale = _context_number(
+        mean_context,
+        "target_scale",
+        fallback_scale,
+        positive=True,
+    )
+    standardized = (history_utilities - location) / scale
+    residual = standardized - history_prior
+    zero_rmse = float(np.sqrt(np.mean(standardized**2)))
+    draft_rmse = float(np.sqrt(np.mean(residual**2)))
+    return {
+        "scope": "in_sample_prior_fit_only",
+        "history_count": len(history_utilities),
+        "target_location": location,
+        "target_scale": scale,
+        "zero_prior_rmse": zero_rmse,
+        "draft_prior_rmse": draft_rmse,
+        "draft_minus_zero_rmse": draft_rmse - zero_rmse,
+        "prior_target_pearson": _pearson(history_prior, standardized),
+        "standardized_history_utility": _summary(standardized),
+        "history_prior_residual": _summary(residual),
+    }
+
+
+def _context_number(
+    context: dict[str, Any],
+    name: str,
+    default: float,
+    *,
+    positive: bool = False,
+) -> float:
+    try:
+        value = float(context.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    if not np.isfinite(value) or (positive and value <= 0.0):
+        return default
+    return value
+
+
+def _pearson(left: np.ndarray, right: np.ndarray) -> float | None:
+    if (
+        len(left) < 2
+        or float(np.std(left)) <= 1.0e-12
+        or float(np.std(right)) <= 1.0e-12
+    ):
+        return None
+    return float(np.corrcoef(left, right)[0, 1])
+
+
 def execute_artifact(
     artifact: Path,
     input_directory: Path,
@@ -470,6 +545,11 @@ def execute_artifact(
             "history": _summary(history_prior),
             "query": _summary(query_prior),
         },
+        "draft_diagnostics": _draft_diagnostics(
+            history_utilities,
+            history_prior,
+            mean_context,
+        ),
         "inspection": inspection,
     }
     (output_directory / "result.json").write_text(
