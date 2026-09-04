@@ -1,12 +1,19 @@
-FROM node:24.7.0-bookworm-slim AS build
+FROM node:24.7.0-bookworm-slim AS dependencies
 
 ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --registry=${NPM_REGISTRY}
+
+FROM dependencies AS build
+
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build && npm prune --omit=dev
+RUN npm run build
+
+FROM dependencies AS production-dependencies
+
+RUN npm prune --omit=dev --no-audit --no-fund --offline
 
 FROM node:24.7.0-bookworm-slim
 
@@ -18,8 +25,8 @@ RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=build /app/package.json /app/package-lock.json ./
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=production-dependencies /app/package.json /app/package-lock.json ./
+COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY policy_runner.py ./policy_runner.py
 

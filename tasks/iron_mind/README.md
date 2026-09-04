@@ -304,6 +304,9 @@ API, thinking level, and turn wall time as the proposal Harness. Its tool limits
 are configured independently with `--policy-tool-budget`. Proposal traces stay
 under `<run_dir>/harness/`; policy sessions, round inputs, validations, accepted
 epochs, and compiled outputs stay under `<run_dir>/policy_harness/`.
+The task-local profile and Skill remain the versioned sources; the sidecar
+digest-verifies and exposes only their per-session snapshot read-only inside the
+guest so Pi can load the full Skill and relative references.
 
 ## Prepare the Official Data
 

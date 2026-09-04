@@ -124,6 +124,9 @@ explicitly in-sample.
 The policy role and its task-local Skill live under
 `resources/harness/`. Accepted policy epochs and validation records are
 stored under `<run_dir>/policy_harness/`.
+The sidecar digest-verifies the selected profile and Skill, then exposes their
+per-session snapshot read-only under `/workspace/.ldm-resources`; the task tree
+remains the versioned source.
 
 ## Persistent Research Harness
 

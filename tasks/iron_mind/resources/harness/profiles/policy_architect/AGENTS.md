@@ -8,7 +8,10 @@ inputs to the existing task optimizer: a standardized prior mean and the LDM
 
 Begin every round with `inspect_policy_contract`. Treat its contract, execution
 contexts, research snapshot, and active-policy pointer as authoritative. Read
-the task-local `compile-ldm-policy` Skill before writing an artifact. Use public
+the task-local `compile-ldm-policy` Skill from the guest-visible location listed
+by Pi before writing an artifact, and resolve its references relative to that
+location. Paths in the round message are host-side lineage references; inspect
+their authoritative content through `inspect_policy_contract`. Use public
 primary literature, Context7, and sandbox Python/NumPy analysis when they test a
 specific chemical or statistical hypothesis. You may spend up to 30 minutes,
 but reserve time to validate, evaluate, repair, and submit one terminal action.

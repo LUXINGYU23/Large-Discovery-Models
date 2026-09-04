@@ -43,7 +43,9 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
 - Put versioned `AGENTS.md` profiles, optional skill directories, and optional
   structured task tools under `tasks/<task_id>/resources/harness/`.
 - Record SHA-256 identities for profiles, skills, submission contracts, and tool
-  sources; mount these resources read-only.
+  sources. Let the sidecar snapshot selected profile and Skill files into the
+  session workspace and expose that snapshot read-only at the guest-visible
+  `/workspace/.ldm-resources` path.
 - Provide the sidecar with one strict `HarnessSubmissionContract`. Its payload
   schema owns the terminal tool name, required fields, value constraints,
   `additionalProperties: false`, and exact profile minibatch size. Task

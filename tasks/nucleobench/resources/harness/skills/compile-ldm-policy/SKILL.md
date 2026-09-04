@@ -9,6 +9,8 @@ Produce one complete `optimization_policy.py` for the current campaign round.
 You are a belief compiler: translate task evidence into a small auditable mean
 function and two LDM weights. The task remains responsible for numerical GP
 inference, acquisition, sampling, candidate validation, and evaluation.
+This package is a digest-bound, read-only snapshot inside the session guest.
+Resolve every referenced file relative to the Skill location advertised by Pi.
 
 ## Required workflow
 

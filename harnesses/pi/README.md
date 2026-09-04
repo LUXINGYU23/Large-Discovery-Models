@@ -67,8 +67,11 @@ session. The policy terminal contract accepts `replace`, `keep`, or `disable`.
 never embedded in the terminal JSON payload.
 
 The policy pool loads its task-owned `compile-ldm-policy` skill from
-`resources/harness/skills/` and includes the built-in `ldm_policy` MCP server.
-Its `inspect_policy_contract`,
+`resources/harness/skills/`. The sidecar verifies its digest, snapshots the
+selected package into the session workspace, and advertises its read-only guest
+path under `/workspace/.ldm-resources`; this lets Pi load the full Skill and its
+relative references without mounting the repository. The pool also includes
+the built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
 `validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
 the authoritative feature contract and repair a draft before submission. These
 tools are advisory. Inspection returns the exact task-supplied `mean_context`
@@ -125,7 +128,7 @@ continues submission-only recovery within the same wall-time window and retains
 every raw attempt.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
-artifacts, read-only task profiles, and the selected guest cache explicitly.
+artifacts, read-only task resources, and the selected guest cache explicitly.
 The cache contains the immutable image store, build records, transient build
 state, Gondolin session state, and per-session COW overlays; it is outside the
 repository and may be removed when no campaign needs the images. Tasks may also register

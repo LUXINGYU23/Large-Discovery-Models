@@ -211,10 +211,15 @@ tasks/<task_id>/resources/harness/
 ```
 
 Record content digests for profile instructions, skills, submission contracts,
-and tool sources. Mount task inputs read-only. The contract carries the strict
-payload JSON Schema and exact minibatch count; Python remains the authoritative
-scientific validator. Artifact rules snapshot referenced files before task
-validation and expose only relative path, size, and digest metadata on the wire.
+and tool sources. Before a session starts, the sidecar verifies the selected
+`AGENTS.md` and Skill digests, snapshots only those resources under the session
+workspace, and exposes the snapshot read-only at `/workspace/.ldm-resources` in
+the guest. Pi advertises guest-visible Skill paths so progressive `read` calls
+and relative references stay inside the sandbox. The task tree remains the
+versioned source of truth. The contract carries the strict payload JSON Schema
+and exact minibatch count; Python remains the authoritative scientific
+validator. Artifact rules snapshot referenced files before task validation and
+expose only relative path, size, and digest metadata on the wire.
 
 ## Task Guest Runtime
 

@@ -36,8 +36,11 @@ optimization policy in addition to the existing proposal Harness.
    reproduce the existing `ldm_harness` predictions and selection distribution.
 5. Add one task-owned `policy_architect/AGENTS.md` and one task-owned
    `resources/harness/skills/compile-ldm-policy/` skill. Load both through the
-   policy profile from the task's read-only `/resources` mount; do not put
-   task runtime skills in the repository-level developer `skills/` directory.
+   policy profile from the task's read-only `/resources` mount. The sidecar
+   digest-verifies and snapshots the selected files into its session workspace;
+   Pi must advertise the read-only guest path under
+   `/workspace/.ldm-resources`, not the sidecar-only source path. Do not put task
+   runtime skills in the repository-level developer `skills/` directory.
    Document what every feature means, which groups are collinear or masked,
    what scientific structures cannot be represented, and that raw utility must
    be standardized before fitting the prior mean.

@@ -8,7 +8,10 @@ by the active policy contract.
 
 Begin every round with `inspect_policy_contract`. Treat its contract, execution
 contexts, research snapshot, and active-policy pointer as authoritative. Read
-the task-local `compile-ldm-policy` Skill before writing an artifact. Use the
+the task-local `compile-ldm-policy` Skill from the guest-visible location listed
+by Pi before writing an artifact, and resolve its references relative to that
+location. Paths in the round message are host-side lineage references; inspect
+their authoritative content through `inspect_policy_contract`. Use the
 structured sequence tools, public primary literature, Context7, and sandbox
 Python/Biopython/NumPy analysis when they test a concrete biological or
 statistical hypothesis. The guest also provides pyfaidx, SciPy, pandas,

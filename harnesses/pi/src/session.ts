@@ -1,8 +1,9 @@
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
+	createSyntheticSourceInfo,
 	createAgentSession,
 	DefaultResourceLoader,
 	ModelRuntime,
@@ -14,7 +15,7 @@ import {
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TUnsafe } from "typebox";
-import { GondolinController } from "./gondolin.js";
+import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
 import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
 import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
@@ -36,6 +37,7 @@ import {
 import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const RESOURCE_DIRECTORY = ".ldm-resources";
 const MODEL_CONTEXT_WINDOW = 262_144;
 const COMPACTION_SETTINGS = {
 	enabled: true,
@@ -91,6 +93,12 @@ function selectedSkills(skills: Skill[], directories: string[]): Skill[] {
 	return skills.filter((skill) => directories.some((directory) => isInside(directory, skill.filePath)));
 }
 
+function guestResourcePath(hostResourceRoot: string, value: string): string {
+	if (!isInside(hostResourceRoot, value)) throw new Error(`resource path escaped snapshot: ${value}`);
+	const suffix = relative(hostResourceRoot, value).split(sep).join(posix.sep);
+	return suffix ? posix.join(GUEST_RESOURCE_ROOT, suffix) : GUEST_RESOURCE_ROOT;
+}
+
 async function optionalJson<T>(path: string): Promise<T | undefined> {
 	try {
 		return JSON.parse(await readFile(path, "utf8")) as T;
@@ -115,10 +123,23 @@ async function directorySha256(root: string): Promise<string> {
 				path: relative(root, path).replaceAll("\\", "/"),
 				sha256: sha256(await readFile(path)),
 			});
+			else throw new Error(`unsupported skill resource entry: ${path}`);
 		}
 	}
 	await visit(root);
 	return canonicalSha256(files);
+}
+
+async function copyDirectory(source: string, target: string): Promise<void> {
+	await mkdir(target, { recursive: true });
+	const entries = await readdir(source, { withFileTypes: true });
+	for (const entry of entries) {
+		const sourcePath = join(source, entry.name);
+		const targetPath = join(target, entry.name);
+		if (entry.isDirectory()) await copyDirectory(sourcePath, targetPath);
+		else if (entry.isFile()) await copyFile(sourcePath, targetPath);
+		else throw new Error(`unsupported skill resource entry: ${sourcePath}`);
+	}
 }
 
 async function runtimePackages(): Promise<Record<string, string>> {
@@ -337,6 +358,7 @@ class SubmissionController {
 class PersistentProfileSession {
 	private readonly profileRoot: string;
 	private readonly workspace: string;
+	private readonly resourceRoot: string;
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
 	private readonly gondolin: GondolinController;
@@ -356,13 +378,19 @@ class PersistentProfileSession {
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
+		this.resourceRoot = join(this.workspace, RESOURCE_DIRECTORY);
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
 		this.policy = new PolicyController(
 			config.networkPolicy,
 			config.webSearch.providers,
 			config.limits.toolCallBudgets,
 		);
-		this.gondolin = new GondolinController(this.workspace, config.networkPolicy, guestRuntime);
+		this.gondolin = new GondolinController(
+			this.workspace,
+			this.resourceRoot,
+			config.networkPolicy,
+			guestRuntime,
+		);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
 			namedSecrets,
@@ -383,6 +411,7 @@ class PersistentProfileSession {
 		if (this.skillDirSha256.some((value, index) => value !== this.profile.skillDirSha256[index])) {
 			throw new Error(`skill directory digest mismatch for profile ${this.profile.profileId}`);
 		}
+		const skillDirectories = await this.snapshotResources(agents);
 		for (const extension of this.config.toolExtensions) {
 			if (sha256(await readFile(extension.path)) !== extension.sha256) {
 				throw new Error(`tool extension digest mismatch: ${extension.path}`);
@@ -446,7 +475,6 @@ class PersistentProfileSession {
 			extensionPaths.push(join(packageRoot("@upstash/context7-pi"), "extensions", "context7.ts"));
 		}
 		extensionPaths.push(...this.config.toolExtensions.map((extension) => extension.path));
-		const skillDirectories = this.profile.skillDirs.map((directory) => resolve(directory));
 		const loader = new DefaultResourceLoader({
 			cwd: this.workspace,
 			agentDir: agentDirectory,
@@ -462,11 +490,24 @@ class PersistentProfileSession {
 			noThemes: true,
 			noContextFiles: true,
 			skillsOverride: ({ skills, diagnostics }) => ({
-				skills: selectedSkills(skills, skillDirectories),
+				skills: selectedSkills(skills, skillDirectories).map((skill) => {
+					const filePath = guestResourcePath(this.resourceRoot, skill.filePath);
+					const baseDir = posix.dirname(filePath);
+					return {
+						...skill,
+						filePath,
+						baseDir,
+						sourceInfo: createSyntheticSourceInfo(filePath, {
+							source: "task-local",
+							scope: "project",
+							baseDir,
+						}),
+					};
+				}),
 				diagnostics,
 			}),
 			agentsFilesOverride: () => ({
-				agentsFiles: [{ path: this.profile.agentsPath, content: agents }],
+				agentsFiles: [{ path: posix.join(GUEST_RESOURCE_ROOT, "AGENTS.md"), content: agents }],
 			}),
 			appendSystemPromptOverride: () => [],
 		});
@@ -496,6 +537,24 @@ class PersistentProfileSession {
 		});
 		this.session = session;
 		this.historyCursor = await this.recoverHistoryCursor();
+	}
+
+	private async snapshotResources(agents: string): Promise<string[]> {
+		await rm(this.resourceRoot, { recursive: true, force: true });
+		await mkdir(this.resourceRoot, { recursive: true });
+		const agentsPath = join(this.resourceRoot, "AGENTS.md");
+		await writeFile(agentsPath, agents, "utf8");
+		const skillDirectories: string[] = [];
+		for (const [index, configuredDirectory] of this.profile.skillDirs.entries()) {
+			const source = resolve(configuredDirectory);
+			const target = join(this.resourceRoot, "skills", String(index), basename(source));
+			await copyDirectory(source, target);
+			if (await directorySha256(target) !== this.skillDirSha256[index]) {
+				throw new Error(`skill snapshot digest mismatch for profile ${this.profile.profileId}`);
+			}
+			skillDirectories.push(target);
+		}
+		return skillDirectories;
 	}
 
 	async runTurn(input: SessionTurnInput, validate: SubmissionValidator): Promise<CommittedTurn> {

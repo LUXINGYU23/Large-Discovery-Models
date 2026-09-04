@@ -266,6 +266,8 @@ minutes per turn. Network tools have task defaults and any tool, including an
 MCP tool, can receive a hard per-turn budget. The Agent sees initial and
 remaining counts. Unlisted tools are unlimited. The default Pi context is 256K
 tokens with built-in automatic compaction.
+Selected profile and Skill files are digest-verified and snapshotted read-only
+under `/workspace/.ldm-resources`; the task tree remains their versioned source.
 
 Load an MCP configuration with `--harness-mcp-config`. The strict YAML accepts
 stdio and Streamable HTTP servers with explicit tool allowlists and
