@@ -29,6 +29,7 @@ COPY --from=production-dependencies /app/package.json /app/package-lock.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY policy_runner.py ./policy_runner.py
+RUN chmod 0644 package.json package-lock.json policy_runner.py
 
 USER node
 ENTRYPOINT ["node", "dist/main.js"]
