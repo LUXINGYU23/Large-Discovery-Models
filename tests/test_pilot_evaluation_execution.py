@@ -117,6 +117,30 @@ def test_matrix_rejects_a_task_label_that_differs_from_its_base_config(tmp_path:
         run_evaluation(load_pilot_evaluation_spec(evaluation_path), resume=False, dry_run=True)
 
 
+def test_dry_run_redacts_api_key_file_path(tmp_path: Path, capsys) -> None:
+    base_path = tmp_path / "base.yaml"
+    evaluation_path = tmp_path / "evaluation.yaml"
+    key_path = tmp_path / "private" / "api-key"
+    base = _base_config()
+    base["args"]["harness-api-key-file"] = str(key_path)
+    _write_yaml(base_path, base)
+    _write_yaml(evaluation_path, _evaluation_config(base_path, tmp_path / "evaluation"))
+
+    assert run_evaluation(
+        load_pilot_evaluation_spec(evaluation_path),
+        resume=False,
+        dry_run=True,
+    ) == 0
+
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert str(key_path) not in output
+    assert all(
+        _option(plan["argv"], "--harness-api-key-file") == "***"
+        for plan in payload["plans"]
+    )
+
+
 def test_harness_methods_build_distinct_child_plans(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
     monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))

@@ -12,7 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from ldm_tts.cli.runner import apply_override, build_plan, load_config, preflight_plan, run_plan
+from ldm_tts.cli.runner import (
+    apply_override,
+    build_plan,
+    load_config,
+    plan_for_json,
+    preflight_plan,
+    run_plan,
+)
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 from ldm_tts.pilot_evaluation.reporting import write_evaluation_reports
@@ -55,7 +62,8 @@ def run_evaluation(
     manifest = _open_manifest(spec, base, resume=resume, dry_run=dry_run)
     plans = [_child_plan(spec, base, item, resume=resume) for item in selected]
     if dry_run:
-        print(json.dumps({"manifest": manifest, "plans": plans}, indent=2, sort_keys=True))
+        public_plans = [plan_for_json(plan) for plan in plans]
+        print(json.dumps({"manifest": manifest, "plans": public_plans}, indent=2, sort_keys=True))
         return 0
     for item, plan in zip(selected, plans, strict=True):
         _run_child(manifest, spec, item, plan, resume=resume)
