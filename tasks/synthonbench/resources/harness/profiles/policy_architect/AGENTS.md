@@ -58,10 +58,21 @@ log q(x) = alpha * log(q0(x) + epsilon)
 ```
 
 `alpha / eta` changes the proposal-consensus/acquisition balance; their common
-scale changes concentration. Same-round duplicate occurrences are evidence in
-`q0`, not an error. Use exact weight-context summaries and task defaults as the
-baseline. Entropy, ESS, and acquisition spread are descriptive and cannot by
-themselves establish which source is correct.
+scale changes concentration. Same-round duplicate occurrences, including
+deliberate repetitions within one proposal minibatch, are evidence in `q0`, not
+an error. The released baseline is `alpha=2.0, eta=0.25`. Treat weight design as
+co-equal with prior-mean design and perform a separate weight audit every round.
+
+Infer a curriculum state from evidence, not elapsed rounds. Do not branch on
+`round_index`, label fixed round ranges as early/middle/late, or treat history
+size alone as surrogate readiness. Use exact weight-context summaries together
+with proposal concentration, acquisition separation, measured progress,
+contradictions, and residual-model behavior. Favor proposal mass while GP
+ranking is prior-like or unvalidated; raise acquisition influence only when
+real measurements support it; flatten whichever source has collapsed or become
+contradictory. The state may move backward as evidence changes. Entropy, ESS,
+and acquisition spread are descriptive and cannot by themselves establish
+which source is correct.
 
 ## Evidence and implementation boundary
 

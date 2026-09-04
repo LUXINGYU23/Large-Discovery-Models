@@ -140,20 +140,19 @@ def test_unqualified_case_cannot_run_pilot_or_official_execution() -> None:
 
 
 def test_direct_method_contracts_match_the_required_request_shapes() -> None:
-    ldm = describe_ldm_task(
-        parse_args(
-            [
-                "--case-id",
-                "malinois_k562",
-                "--search-method",
-                "ldm",
-                "--evaluations-per-round",
-                "4",
-                "--proposal-max-workers",
-                "3",
-            ]
-        )
+    ldm_args = parse_args(
+        [
+            "--case-id",
+            "malinois_k562",
+            "--search-method",
+            "ldm",
+            "--evaluations-per-round",
+            "4",
+            "--proposal-max-workers",
+            "3",
+        ]
     )
+    ldm = describe_ldm_task(ldm_args)
     direct = describe_ldm_task(
         parse_args(
             [
@@ -175,6 +174,8 @@ def test_direct_method_contracts_match_the_required_request_shapes() -> None:
         "max_workers": 3,
     }
     assert ldm.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 4
+    assert ldm_args.alpha == 2.0
+    assert ldm_args.eta == 0.25
     assert direct.reservoir.max_size == 4
     assert (
         direct.proposal_search.name == "parallel_independent_single_candidate_requests"

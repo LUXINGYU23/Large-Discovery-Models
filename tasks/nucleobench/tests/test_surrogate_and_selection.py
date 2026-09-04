@@ -335,6 +335,7 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     )
 
     assert round_input.round_index == 1
+    assert "round_index" not in round_input.execution_context["weight_context"]
     assert round_input.history_features.shape == (1, len(features.feature_names))
     assert round_input.query_features.shape == (2, len(features.feature_names))
     assert np.isfinite(round_input.query_features).all()

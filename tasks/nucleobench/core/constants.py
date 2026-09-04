@@ -6,6 +6,8 @@ from pathlib import Path
 
 TASK_ID = "nucleobench"
 NUCLEOBENCH_Q0_METADATA_KEY = "nucleobench_empirical_q0"
+DEFAULT_LDM_ALPHA = 2.0
+DEFAULT_LDM_ETA = 0.25
 COMPILED_POLICY_METHOD = "ldm_harness_compiled"
 PARALLEL_HARNESS_METHODS = frozenset(("ldm_harness", COMPILED_POLICY_METHOD))
 PERSISTENT_HARNESS_METHODS = frozenset((*PARALLEL_HARNESS_METHODS, "harness"))
@@ -60,6 +62,8 @@ __all__ = [
     "CASE_STATES",
     "CATALOG_PATH",
     "COMPILED_POLICY_METHOD",
+    "DEFAULT_LDM_ALPHA",
+    "DEFAULT_LDM_ETA",
     "DIRECT_SEARCH_METHODS",
     "FAMILY_PROTOCOLS",
     "NUCLEOBENCH_Q0_METADATA_KEY",

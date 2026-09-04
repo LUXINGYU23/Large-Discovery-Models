@@ -176,7 +176,8 @@ def test_harness_second_turn_sends_only_the_previous_round_measurements() -> Non
         "evaluated_candidates_are_forbidden": True,
         "prior_unmeasured_submissions_may_be_reproposed": True,
         "same_round_cross_session_agreement_is_allowed": True,
-        "same_session_duplicates_are_forbidden": True,
+        "same_session_repeated_occurrences_are_allowed": True,
+        "repeated_occurrences_contribute_to_empirical_q0": True,
         "validate_before_submission": True,
     } for message in messages)
     assert all(turn.history_from_seq == 1 and turn.history_to_seq == 2 for turn in client.batches[0])
@@ -213,14 +214,32 @@ def test_submission_validator_returns_actionable_reasons() -> None:
         ),
         domain,
         {"r1|1_11"},
+        allow_repeated_occurrences=True,
     )
 
     assert [item.code for item in validation.errors] == [
-        "historical_duplicate", "invalid_candidate", "same_session_duplicate",
+        "historical_duplicate", "invalid_candidate",
     ]
     assert "already evaluated" in validation.errors[0].message
     assert "synthon ID 999" in validation.errors[1].message
-    assert "duplicates index 2" in validation.errors[2].message
+
+    direct_validation = _validate_submission(
+        HarnessSubmissionRequest(
+            "direct_research",
+            "turn-2",
+            1,
+            {"candidates": [
+                {"reaction_id": "r1", "synthon_ids": [2, 12]},
+                {"reaction_id": "r1", "synthon_ids": [2, 12]},
+            ]},
+        ),
+        domain,
+        set(),
+        allow_repeated_occurrences=False,
+    )
+    assert [item.code for item in direct_validation.errors] == [
+        "same_session_duplicate"
+    ]
 
 
 def test_harness_rejects_history_and_refills_before_q0() -> None:
@@ -255,29 +274,32 @@ def test_harness_rejects_history_and_refills_before_q0() -> None:
     )
 
 
-def test_cross_profile_consensus_increases_shared_occurrence_probability() -> None:
+def test_within_and_cross_profile_consensus_increases_occurrence_probability() -> None:
     space = SynthonSpace([
         Synthon(1, 1, "r1", "CC"),
         Synthon(11, 2, "r1", "N"),
     ])
     expander = SynthonHarnessExpander(
-        FakeHarnessClient(candidate={"reaction_id": "r1", "synthon_ids": [1, 11]}),
+        FakeHarnessClient(candidates=[
+            {"reaction_id": "r1", "synthon_ids": [1, 11]},
+            {"reaction_id": "r1", "synthon_ids": [1, 11]},
+        ]),
         SynthonCandidateDomain(space, ("r1",), "kif11"),
         target="kif11",
         profiles=harness_profiles(),
-        candidates_per_profile=1,
+        candidates_per_profile=2,
         campaign_id="test-campaign",
         first_active_round=0,
         attach_empirical_q0=True,
     )
 
-    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=4))
+    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=8))
 
-    assert len(result.proposals) == 4
+    assert len(result.proposals) == 8
     for proposal in result.proposals:
         q0 = proposal.metadata[Q0_METADATA_KEY]
-        assert q0["occurrence_count"] == 4
-        assert q0["valid_occurrence_count"] == 4
+        assert q0["occurrence_count"] == 8
+        assert q0["valid_occurrence_count"] == 8
         assert q0["probability"] == pytest.approx(1.0)
 
 

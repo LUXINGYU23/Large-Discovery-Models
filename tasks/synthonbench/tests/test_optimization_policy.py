@@ -167,6 +167,7 @@ def test_policy_adapter_separates_research_data_from_deployed_mean_inputs() -> N
     )
 
     assert round_input.round_index == 1
+    assert "round_index" not in round_input.execution_context["weight_context"]
     assert round_input.history_features.shape == (1, policy_features.dimension)
     assert round_input.query_features.shape == (2, policy_features.dimension)
     assert round_input.research_snapshot["new_measured_observations"][0][

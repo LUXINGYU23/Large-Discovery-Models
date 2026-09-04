@@ -55,6 +55,8 @@ from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.cases import NucleoBenchCase, get_case
 from tasks.nucleobench.core.constants import (
     COMPILED_POLICY_METHOD,
+    DEFAULT_LDM_ALPHA,
+    DEFAULT_LDM_ETA,
     PARALLEL_HARNESS_METHODS,
     PERSISTENT_HARNESS_METHODS,
     SEARCH_METHODS,
@@ -178,8 +180,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gp-min-history-for-fit", type=int, default=4)
     parser.add_argument("--gp-max-observations", type=int, default=256)
     parser.add_argument("--gp-global-best-observations", type=int, default=64)
-    parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument("--eta", type=float, default=1.0)
+    parser.add_argument("--alpha", type=float, default=DEFAULT_LDM_ALPHA)
+    parser.add_argument("--eta", type=float, default=DEFAULT_LDM_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--llm-url")
     parser.add_argument("--llm-model-name")

@@ -20,7 +20,7 @@ from tasks.iron_mind.core.constants import OBJECTIVE_NAME
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
 from tasks.iron_mind.core.harness import IronMindHarnessExpander
-from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ALPHA, DEFAULT_ETA
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.optimization_policy import IronMindOptimizationPolicyAdapter
 from tasks.iron_mind.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
@@ -60,7 +60,7 @@ class CampaignComponentOptions:
     proposal_max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS
     before_requests: Callable[[int], None] | None = None
     acquisition_beta: float = 1.0
-    acquisition_alpha: float = 1.0
+    acquisition_alpha: float = DEFAULT_ALPHA
     acquisition_eta: float = DEFAULT_ETA
     acquisition_z_clip: float = 5.0
     selection_seed: int = 0

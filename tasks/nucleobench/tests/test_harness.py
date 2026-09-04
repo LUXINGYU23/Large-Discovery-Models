@@ -102,12 +102,13 @@ class FakeHarnessClient:
         return tuple(results)
 
 
-def test_parallel_sessions_preserve_cross_profile_consensus_for_q0() -> None:
+def test_parallel_sessions_preserve_within_and_cross_profile_consensus_for_q0() -> None:
     payloads = _payloads()
     attempts = {
         profile_id: [[payloads[0], payloads[index + 1]]]
         for index, profile_id in enumerate(HARNESS_PROFILE_IDS)
     }
+    attempts[HARNESS_PROFILE_IDS[0]] = [[payloads[0], payloads[0]]]
     client = FakeHarnessClient(attempts)
     usage = []
 
@@ -118,13 +119,13 @@ def test_parallel_sessions_preserve_cross_profile_consensus_for_q0() -> None:
     assert len(result.proposals) == 8
     assert len(client.batches[0]) == 4
     shared = [item for item in result.proposals if item.payload == payloads[0]]
-    assert len(shared) == 4
+    assert len(shared) == 5
     assert all(
         item.metadata[NUCLEOBENCH_Q0_METADATA_KEY]
         == {
-            "occurrence_count": 4,
+            "occurrence_count": 5,
             "valid_occurrence_count": 8,
-            "probability": 0.5,
+            "probability": 0.625,
         }
         for item in shared
     )
@@ -175,6 +176,10 @@ def test_turn_uses_previous_round_delta_and_complete_evaluated_exclusion() -> No
         message["novelty_contract"]["prior_unmeasured_submissions_may_be_reproposed"]
         for message in messages
     )
+    assert all(
+        message["novelty_contract"]["same_session_repeated_occurrences_are_allowed"]
+        for message in messages
+    )
     assert all(message["sequence_tools"] == list(HARNESS_TOOL_NAMES) for message in messages)
     assert all(
         turn.history_from_seq == 1 and turn.history_to_seq == 2
@@ -212,6 +217,7 @@ def test_submission_validation_returns_actionable_mutation_reasons() -> None:
         ),
         MOCK_CONTEXT,
         {historical.canonical_key},
+        allow_repeated_occurrences=True,
     )
 
     assert [item.code for item in validation.errors] == [
@@ -219,11 +225,24 @@ def test_submission_validation_returns_actionable_mutation_reasons() -> None:
         "duplicate_position",
         "non_mutable_position",
         "unchanged_base",
-        "same_session_duplicate",
         "invalid_candidate",
     ]
     assert all(item.path.startswith("/candidates/") for item in validation.errors)
-    assert "duplicates index 4" in validation.errors[4].message
+
+    direct_validation = _validate_submission(
+        HarnessSubmissionRequest(
+            DIRECT_HARNESS_PROFILE_ID,
+            "turn-2",
+            1,
+            {"candidates": [payloads[4], payloads[4]]},
+        ),
+        MOCK_CONTEXT,
+        set(),
+        allow_repeated_occurrences=False,
+    )
+    assert [item.code for item in direct_validation.errors] == [
+        "same_session_duplicate"
+    ]
 
 
 def test_history_rejection_is_repaired_before_commit_and_q0() -> None:

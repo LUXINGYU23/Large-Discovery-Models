@@ -14,6 +14,8 @@ from tasks.nucleobench.core.candidate import (
 )
 from tasks.nucleobench.core.constants import (
     COMPILED_POLICY_METHOD,
+    DEFAULT_LDM_ALPHA,
+    DEFAULT_LDM_ETA,
     DIRECT_SEARCH_METHODS,
     PARALLEL_HARNESS_METHODS,
     PERSISTENT_HARNESS_METHODS,
@@ -45,8 +47,8 @@ def build_surrogate_components(
     evaluations_per_round: int,
     seed: int = 0,
     gp_config: HammingGPUCBConfig | None = None,
-    alpha: float = 1.0,
-    eta: float = 1.0,
+    alpha: float = DEFAULT_LDM_ALPHA,
+    eta: float = DEFAULT_LDM_ETA,
     z_clip: float = 5.0,
     policy_controller: PolicyResearchController | None = None,
     policy_adapter: NucleoOptimizationPolicyAdapter | None = None,

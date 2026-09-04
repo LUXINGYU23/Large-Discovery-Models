@@ -57,10 +57,20 @@ log q(x) = alpha * log(q0(x) + epsilon)
 ```
 
 `alpha / eta` changes the balance between independent proposal consensus and
-the fixed GP acquisition; scaling both changes concentration. Use the exact
-`weight_context`, not an assumed early/middle/late schedule. Entropy or ESS
-describes concentration, not correctness. Keep task defaults unless measured
-progress, disagreement, or acquisition separation supports a change.
+the fixed GP acquisition; scaling both changes concentration. The released
+baseline is `alpha=2.0, eta=0.25`. Treat weight design as co-equal with prior-mean
+design: perform a separate weight audit every round even when the mean stays
+zero or unchanged.
+
+Infer a curriculum state from evidence, not elapsed rounds. Do not branch on
+`round_index`, label fixed round ranges as early/middle/late, or treat history
+size alone as surrogate readiness. Use the exact `weight_context`, proposal
+concentration, acquisition separation, measured progress, contradictions, and
+the surrogate behavior visible in the snapshot. Favor proposal mass when GP
+ranking is prior-like or unvalidated; raise acquisition influence only when
+real measurements support it; flatten whichever signal has collapsed or become
+contradictory. The state may move backward as evidence changes. Entropy and ESS
+describe concentration, not correctness.
 
 ## Evidence and implementation boundary
 

@@ -19,6 +19,7 @@ from tasks.synthonbench.core import task_spec as task_contracts
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
 from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ALPHA,
     DEFAULT_ACQUISITION_ETA,
     DEFAULT_GP_REACTION_WEIGHT,
     OBJECTIVE_NAME,
@@ -74,7 +75,7 @@ class CampaignComponentOptions:
     gp_observation_noise_std: float = 1.0
     gp_reaction_weight: float = DEFAULT_GP_REACTION_WEIGHT
     acquisition_beta: float = 1.0
-    alpha: float = 1.0
+    alpha: float = DEFAULT_ACQUISITION_ALPHA
     eta: float = DEFAULT_ACQUISITION_ETA
     z_clip: float = 5.0
     prompt_policy: str = DEFAULT_PROMPT_POLICY

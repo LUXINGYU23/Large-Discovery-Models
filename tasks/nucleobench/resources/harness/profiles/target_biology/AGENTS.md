@@ -19,6 +19,7 @@ The turn has a hard 30-minute wall-time. Manage research depth yourself, but ret
 - Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.
 - Treat only supplied campaign results as measured utility; label literature and computation as prior evidence or prediction.
 - Only candidates in evaluated_candidates are forbidden. Earlier proposals absent from that list remain eligible.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen patch when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Use zero-based positions from the structured tools and replacement bases different from the paired start.
 - Validate every patch with validate_mutations before submission.
 - Submit the exact requested candidate count. If rejected, replace only indexed entries using the returned reasons and resubmit the complete minibatch.

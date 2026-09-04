@@ -63,7 +63,9 @@ official execution.
 
 For the committed Pilot Evaluation, `B=16`. LDM proposal methods therefore
 collect 64 valid occurrences per active round and maintain a BO pool of up to
-48 unique candidates.
+48 unique candidates. Fixed LDM methods use `alpha=2` and `eta=0.25`;
+Harness-Compiled LDM starts from those values and may adapt them from current
+proposal, surrogate, and measurement evidence.
 
 ## LDM Semantics
 
@@ -76,8 +78,8 @@ algorithm:
    candidates already present in authoritative measured history. Refill the
    affected lineage or Harness submission until all 64 required occurrences
    are valid.
-3. Preserve equal candidates proposed by different lineages or sessions as
-   separate same-round occurrences. Their frequency defines
+3. Preserve deliberate equal candidates proposed within or across lineages and
+   sessions as separate same-round occurrences. Their frequency defines
    `q0(x) = count(x) / valid_occurrences`.
 4. Canonicalize the occurrence reservoir. If more than `3B` unique candidates
    remain, retain a `q0`-weighted Gumbel sample of size `3B`.

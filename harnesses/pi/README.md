@@ -141,3 +141,12 @@ allow/deny lists empty. The guest sees only its session workspace, not the host
 repository, benchmark data, oracle, credentials, or other sessions. Task query
 rules that prevent benchmark leakage remain independent from sandbox network
 permissions.
+
+### Guest Runtime Contract
+
+Every session receives the same runtime note: `/workspace` is a research
+workspace rather than a repository checkout, files are edited through Pi's
+registered `read` and `write` tools, and task or MCP tools are invoked directly.
+`apply_patch` is not a guest command, and task-tool implementation runtimes such
+as Node.js are not part of the guest contract. Guest `git` is reserved for
+cloning useful public research material when network policy permits it.

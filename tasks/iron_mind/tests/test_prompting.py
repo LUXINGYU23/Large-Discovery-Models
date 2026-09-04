@@ -101,6 +101,7 @@ def test_portfolio_prompt_includes_objective_history_role_and_focus() -> None:
     assert "evidence_exploitation" in content
     assert '"slot_focus"' not in content
     assert "Required slot focus (hard allocation):" in content
+    assert "contributes another empirical q0 occurrence" in content
     assert "known-condition" in content
 
 

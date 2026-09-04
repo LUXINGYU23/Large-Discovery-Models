@@ -300,9 +300,15 @@ def _response_space(candidates_per_request: int) -> ResponseSpaceSpec:
     if candidates_per_request > 1:
         batch_item = {
             **tuple_schema,
-            "required": ["proposal_index", "reaction_id", "synthon_ids"],
+            "required": [
+                "proposal_index",
+                "source_proposal_index",
+                "reaction_id",
+                "synthon_ids",
+            ],
             "properties": {
                 "proposal_index": {"type": "integer", "minimum": 0},
+                "source_proposal_index": {"type": "integer", "minimum": 0},
                 **tuple_schema["properties"],
             },
         }
@@ -311,8 +317,9 @@ def _response_space(candidates_per_request: int) -> ResponseSpaceSpec:
             output_kind="json_object",
             parser="tasks.synthonbench.core.proposal_parsing:parse_synthon_batch_response",
             description=(
-                f"Exactly {candidates_per_request} source-valid reaction-component tuples, "
-                "one for each supplied proposal slot."
+                f"Exactly {candidates_per_request} indexed proposal occurrences, each "
+                "constructed from a supplied source slot; source slots and legal tuples "
+                "may be reused to express empirical proposal mass."
             ),
             schema={
                 "type": "object",

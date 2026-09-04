@@ -44,6 +44,10 @@ const COMPACTION_SETTINGS = {
 	reserveTokens: 16_384,
 	keepRecentTokens: 20_000,
 };
+const GUEST_RUNTIME_INSTRUCTIONS = `## Guest runtime
+- /workspace is an isolated writable research workspace, not a checkout of the project repository. Do not use git status to inspect the project. Git is available only for cloning public research material when useful.
+- Use the registered read and write tools for files. apply_patch is not available in the guest.
+- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.`;
 
 interface SavedSubmission {
 	submission: TerminalSubmission;
@@ -509,7 +513,7 @@ class PersistentProfileSession {
 			agentsFilesOverride: () => ({
 				agentsFiles: [{ path: posix.join(GUEST_RESOURCE_ROOT, "AGENTS.md"), content: agents }],
 			}),
-			appendSystemPromptOverride: () => [],
+			appendSystemPromptOverride: () => [GUEST_RUNTIME_INSTRUCTIONS],
 		});
 		await loader.reload();
 		const extensionErrors = loader.getExtensions().errors;

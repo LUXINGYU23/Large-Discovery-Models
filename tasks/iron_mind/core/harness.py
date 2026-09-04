@@ -224,7 +224,10 @@ class IronMindHarnessExpander:
         results = self.client.run_turn(
             turns,
             submission_validator=lambda submission: _validate_submission(
-                submission, self.domain, evaluated
+                submission,
+                self.domain,
+                evaluated,
+                allow_repeated_occurrences=self.attach_empirical_q0,
             ),
         )
         if self.account is not None:
@@ -297,6 +300,7 @@ class IronMindHarnessExpander:
                     request,
                     observations=serialized_history,
                     evaluated_candidates=evaluated_candidates,
+                    allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
                     history_from_seq=history_from_seq,
                     history_to_seq=history_to_seq,
@@ -347,7 +351,10 @@ class IronMindHarnessExpander:
                         "committed harness candidate failed authoritative validation: "
                         f"{result.profile_id}[{index}]: {exc}"
                     ) from exc
-                if prepared.canonical_key in profile_keys:
+                if (
+                    not self.attach_empirical_q0
+                    and prepared.canonical_key in profile_keys
+                ):
                     raise RuntimeError(
                         "committed harness profile contains a duplicate occurrence: "
                         f"{result.profile_id}[{index}]"
@@ -435,6 +442,7 @@ def _turn_message(
     *,
     observations: Sequence[dict[str, object]],
     evaluated_candidates: Sequence[dict[str, object]],
+    allow_repeated_occurrences: bool,
     initial: bool,
     history_from_seq: int,
     history_to_seq: int,
@@ -455,7 +463,8 @@ def _turn_message(
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
             "same_round_cross_session_agreement_is_allowed": True,
-            "same_session_duplicates_are_forbidden": True,
+            "same_session_repeated_occurrences_are_allowed": allow_repeated_occurrences,
+            "repeated_occurrences_contribute_to_empirical_q0": allow_repeated_occurrences,
             "validate_before_submission": True,
         },
         "reaction_space_tools": list(HARNESS_TOOL_NAMES),
@@ -472,11 +481,16 @@ def _turn_message(
             "Campaign measurements are the only measured objective values; do not present predictions as measurements.",
             "The isolated sandbox contains no authoritative task data; use the structured tools for the legal condition space and measurements.",
             "Research autonomously when useful: search public literature, inspect public documents, and run scratch analysis code in the sandbox.",
-            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "End open-ended research by minute 20 and make the first complete validated submission by minute 25; delivering the minibatch takes priority over further research.",
             "Never submit a candidate listed in evaluated_candidates.",
             "A candidate proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
-            "Historical repeats, invalid candidates, and duplicates within your own minibatch will be rejected with exact reasons.",
+            (
+                "Your minibatch is an ordered multiset of proposal occurrences. You may allocate multiple slots to the same legal, historically unseen candidate when your evidence justifies extra empirical q0 mass; use multiplicity deliberately rather than as filler."
+                if allow_repeated_occurrences
+                else "Your directly evaluated minibatch must contain distinct candidates."
+            ),
+            "Historical repeats and invalid candidates will be rejected with exact reasons.",
             "If rejected, replace the reported entries and resubmit the complete minibatch without restarting the research phase.",
         ],
     }
@@ -504,6 +518,8 @@ def _validate_submission(
     submission: HarnessSubmissionRequest,
     domain: IronMindCandidateDomain,
     evaluated: set[str],
+    *,
+    allow_repeated_occurrences: bool,
 ) -> HarnessSubmissionValidation:
     candidates = submission.submission.get("candidates")
     if not isinstance(candidates, list):
@@ -555,7 +571,7 @@ def _validate_submission(
             )
             continue
         first_index = first_index_by_key.get(prepared.canonical_key)
-        if first_index is not None:
+        if not allow_repeated_occurrences and first_index is not None:
             errors.append(
                 HarnessSubmissionError(
                     path,
@@ -566,7 +582,7 @@ def _validate_submission(
                 )
             )
             continue
-        first_index_by_key[prepared.canonical_key] = index
+        first_index_by_key.setdefault(prepared.canonical_key, index)
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors

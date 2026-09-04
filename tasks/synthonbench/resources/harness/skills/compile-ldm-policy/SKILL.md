@@ -25,16 +25,21 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
    measurements, then exact released task facts, then transferable literature,
    and finally clearly labeled mechanistic speculation. Direct contradictory
    measurements override a generic literature prior.
-4. Use the sandbox, public tools, and literature to test useful hypotheses.
+4. Audit the LDM weights as a first-class decision, independently of whether the
+   prior mean changes. Infer an evidence-defined curriculum state from proposal
+   concentration, surrogate readiness and acquisition separation, and measured
+   progress or contradiction. Never switch stages from round number or history
+   size alone.
+5. Use the sandbox, public tools, and literature to test useful hypotheses.
    Prefer a zero mean or a shrunken additive model until the observations support
    more structure. Do not confuse in-sample fit with predictive evidence.
-5. Write a complete deterministic NumPy-only `optimization_policy.py` in the
+6. Write a complete deterministic NumPy-only `optimization_policy.py` in the
    session workspace. Research scripts may use the task guest, but submitted
    code must obey the restricted runtime contract.
-6. Call `validate_policy_draft`, then `evaluate_policy_draft`. Interpret its
+7. Call `validate_policy_draft`, then `evaluate_policy_draft`. Interpret its
    draft diagnostics as descriptive in-sample checks only. Repair exact errors
    and rerun both tools when the file changes materially.
-7. Submit `replace` only for a justified, validated file. Use `keep` after
+8. Submit `replace` only for a justified, validated file. Use `keep` after
    evaluating the active file on the new snapshot when its assumptions still
    hold. Use `disable` when the zero-mean/default-weight task baseline is better
    justified. A policy need not change every round.
@@ -56,7 +61,9 @@ log q(x) = alpha * log(q0(x) + epsilon)
 
 `alpha` controls proposal-frequency evidence; `eta` controls task-GP acquisition
 evidence. Their ratio changes the balance and their common scale changes the
-concentration. Both must be finite and non-negative.
+concentration. Both must be finite and non-negative. The released baseline is
+`alpha=2.0, eta=0.25`; treat it as the comparison anchor, not a mandatory value
+for every evidence state.
 
 ## Artifact interface
 
@@ -68,8 +75,17 @@ def compute_prior_mean(history_features, history_utilities, query_features, cont
     ...
 
 def choose_ldm_weights(context):
-    return {"stage": "...", "alpha": 1.0, "eta": 1.0}
+    return {
+        "stage": "evidence_baseline",
+        "alpha": float(context["default_alpha"]),
+        "eta": float(context["default_eta"]),
+    }
 ```
+
+When evidence supports adaptation, replace this baseline return with a
+deterministic rule over the supplied diagnostics. Stage names describe the
+current evidence state. Do not branch on `round_index` or use a fixed
+early/middle/late round schedule.
 
 The mean must be finite, deterministic, query-order equivariant, batch
 independent, and valid for empty and one-point histories. It must not use

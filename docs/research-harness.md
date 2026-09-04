@@ -227,6 +227,22 @@ Each Harness task owns a `resources/harness/image/` recipe. Its descriptor
 names the pinned Dockerfile inputs, COW rootfs size, and smoke script. The
 descriptor digest becomes the only image reference accepted by the protocol.
 
+### Guest Runtime Contract
+
+Every session receives the same runtime contract. `/workspace` is an isolated
+research workspace, not a checkout of the project repository. Agents edit files
+through Pi's registered `read` and `write` tools; `apply_patch` is not available
+inside the guest. Task and MCP tools are registered structured tools and must be
+called directly rather than by running their implementation files. A task guest
+must not assume that an implementation runtime such as Node.js is installed.
+`git` may be used only to clone useful public research material when the task's
+network policy permits it, not to inspect the workspace as a repository.
+
+Task-specific runtime dependencies belong in that task's guest-image lockfile
+and smoke test. The Pi sidecar injects this contract into every Agent session;
+its implementation-level wording is documented in
+[`harnesses/pi/README.md`](../harnesses/pi/README.md#guest-runtime-contract).
+
 Build and smoke the selected task guest before a campaign:
 
 ```bash

@@ -216,12 +216,14 @@ def test_prompts_use_full_short_context_and_bounded_long_windows() -> None:
         request_id="request-1",
         lineage_index=0,
         wave_index=0,
-        same_round_agreement_allowed=True,
+        allow_repeated_occurrences=True,
     )
     short_text = short_messages[1]["content"]
     assert '"kind":"full_start_sequence"' in short_text
     assert short.start_sequence in short_text
     assert '"candidate_count":2' in short_text
+    assert '"same_request_repeated_occurrences_are_allowed":true' in short_text
+    assert "ordered multiset" in short_text
 
     long_case = replace(
         get_case("bpnet_ctcf"),
@@ -242,13 +244,14 @@ def test_prompts_use_full_short_context_and_bounded_long_windows() -> None:
         request_id="request-2",
         lineage_index=3,
         wave_index=0,
-        same_round_agreement_allowed=False,
+        allow_repeated_occurrences=False,
     )
     long_text = long_messages[1]["content"]
     assert '"kind":"editable_windows"' in long_text
     assert "A" * 3_000 not in long_text
     assert len(long_text) < 12_000
     assert "api_key" not in short_text + long_text
+    assert '"same_request_repeated_occurrences_are_allowed":false' in long_text
 
 
 def test_strict_response_parser_keeps_valid_batch_peers() -> None:
@@ -280,7 +283,10 @@ def test_ldm_uses_four_stable_concurrent_lineages_and_preserves_q0_occurrences()
 ):
     def operation(request: ProposalRequest) -> dict:
         lineage = int(request.metadata["lineage_index"])
-        payloads = [_payload(lineage), _payload(lineage + 1)]
+        payloads = [
+            _payload(lineage),
+            _payload(lineage if lineage == 0 else lineage + 1),
+        ]
         return _response_payload(payloads)
 
     client = ConcurrentProposalClient(operation)
@@ -304,6 +310,7 @@ def test_ldm_uses_four_stable_concurrent_lineages_and_preserves_q0_occurrences()
     ]
     q0 = [item.metadata[NUCLEOBENCH_Q0_METADATA_KEY] for item in result.proposals]
     assert [item["valid_occurrence_count"] for item in q0] == [8] * 8
+    assert q0[0]["occurrence_count"] == q0[1]["occurrence_count"] == 2
     assert max(item["occurrence_count"] for item in q0) > 1
 
 

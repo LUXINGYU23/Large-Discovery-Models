@@ -187,7 +187,6 @@ class IronMindOptimizationPolicyAdapter:
                 "target_scale": target_scale,
             },
             "weight_context": {
-                "round_index": round_index,
                 "seed": self.seed,
                 "history_size": len(history),
                 "unique_candidate_count": len(candidates),

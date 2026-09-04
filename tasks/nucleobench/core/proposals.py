@@ -326,7 +326,7 @@ class DirectMutationProposalExpander:
             request_id=spec.request_id,
             lineage_index=self.seed * 10_000 + spec.lineage_index,
             wave_index=spec.wave_index,
-            same_round_agreement_allowed=self.search_method == "ldm",
+            allow_repeated_occurrences=self.search_method == "ldm",
             additional_exclusions=additional_exclusions,
         )
         return ProposalRequest(

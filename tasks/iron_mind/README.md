@@ -109,9 +109,8 @@ The evaluated condition is sampled without replacement from
 
 `--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
-different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=1` for the official 20-evaluation protocol; the fixed pilot-evaluation
-profiles use the calibrated values documented below. `--z-clip` defaults to 5.
+different quantities. Released configurations use `beta=1`, `alpha=2`, and
+`eta=0.25`. `--z-clip` defaults to 5.
 The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
 
@@ -205,10 +204,12 @@ session must not maintain a private exclusion set.
 
 The structured tools expose factor definitions and complete legal condition
 combinations from the source-pinned table, but never oracle scores. Python
-performs authoritative validation before a turn commits. Invalid candidates,
-historical repeats, and duplicates within one session are returned to the Agent
-with indexed reasons and must be replaced. Agreement across different sessions
-is retained as repeated occurrences before empirical `q0` is calculated.
+performs authoritative validation before a turn commits. Invalid candidates and
+historical repeats are returned to the Agent with indexed reasons and must be
+replaced. An LDM proposal minibatch is an ordered multiset: deliberate repeated
+occurrences within or across sessions allocate more empirical `q0` mass to that
+candidate. The direct `harness` method still requires distinct candidates because
+it evaluates every submitted item without a `q0` selection stage.
 
 The direct `harness` method uses one persistent comprehensive-research session.
 It submits one legal unseen condition per active round, and that condition is
@@ -397,7 +398,7 @@ Harness LDM uses four concurrent persistent sessions with 16 candidates each.
 Harness-Compiled LDM uses the same proposal sessions and adds one independent
 policy session per campaign. All three use empirical `q0`, a 32-candidate
 maintained pool, `beta=1`, and acquisition z-clipping at 2. The two fixed LDM
-methods use `alpha=1` and `eta=1`; the compiled method starts from those values
+methods use `alpha=2` and `eta=0.25`; the compiled method starts from those values
 and may replace them through its validated policy artifact. The smaller pool
 preserves oversampling headroom when independent sessions agree on the same
 candidate. Pure BO

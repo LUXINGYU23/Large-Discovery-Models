@@ -19,6 +19,7 @@ from tasks.iron_mind.core.candidate import (
     prepare_candidate_payload,
 )
 from tasks.iron_mind.core.harness import (
+    DIRECT_HARNESS_PROFILE_ID,
     HARNESS_PROFILE_IDS,
     IronMindHarnessExpander,
     _validate_submission,
@@ -56,7 +57,8 @@ class FakeHarnessClient:
         self.batches.append(turns)
         results = []
         for turn in turns:
-            candidates = (self.candidates_by_profile[turn.profile_id],)
+            configured = self.candidates_by_profile[turn.profile_id]
+            candidates = configured if isinstance(configured, list) else [configured]
             submission = {"candidates": list(candidates)}
             validation = submission_validator(
                 HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, submission)
@@ -94,13 +96,13 @@ class FakeHarnessClient:
         return tuple(results)
 
 
-def test_harness_preserves_cross_session_occurrences_for_global_q0() -> None:
+def test_harness_preserves_within_and_cross_session_occurrences_for_q0() -> None:
     domain, payloads = _domain_and_payloads()
     candidates = {
-        HARNESS_PROFILE_IDS[0]: payloads[0],
-        HARNESS_PROFILE_IDS[1]: payloads[0],
-        HARNESS_PROFILE_IDS[2]: payloads[1],
-        HARNESS_PROFILE_IDS[3]: payloads[2],
+        HARNESS_PROFILE_IDS[0]: [payloads[0], payloads[0]],
+        HARNESS_PROFILE_IDS[1]: [payloads[0], payloads[1]],
+        HARNESS_PROFILE_IDS[2]: [payloads[1], payloads[2]],
+        HARNESS_PROFILE_IDS[3]: [payloads[2], payloads[2]],
     }
     client = FakeHarnessClient(candidates)
     counts = []
@@ -108,20 +110,20 @@ def test_harness_preserves_cross_session_occurrences_for_global_q0() -> None:
         client,
         domain,
         profiles=harness_profiles(),
-        candidates_per_profile=1,
+        candidates_per_profile=2,
         campaign_id="campaign-test",
         first_active_round=0,
         attach_empirical_q0=True,
         account=counts.append,
     )
 
-    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=4))
+    result = expander.expand(ExpansionRequest(round_idx=0, reservoir_size=8))
 
-    assert len(result.proposals) == 4
+    assert len(result.proposals) == 8
     assert [
         item.metadata[IRON_MIND_Q0_METADATA_KEY]["probability"]
         for item in result.proposals
-    ] == [0.5, 0.5, 0.25, 0.25]
+    ] == [0.375, 0.375, 0.375, 0.25, 0.25, 0.375, 0.375, 0.375]
     assert result.metadata["sampling_mode"] == "persistent_parallel_research_sessions"
     assert counts[0] == {"proposal_attempts": 4, "harness_turns": 4}
     assert counts[1]["llm_requests"] == 8
@@ -157,6 +159,14 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
     assert all("submission_contract" not in message for message in messages)
     assert all(
         message["novelty_contract"]["prior_unmeasured_submissions_may_be_reproposed"]
+        for message in messages
+    )
+    assert all(
+        message["novelty_contract"]["same_session_repeated_occurrences_are_allowed"]
+        for message in messages
+    )
+    assert all(
+        message["novelty_contract"]["repeated_occurrences_contribute_to_empirical_q0"]
         for message in messages
     )
     assert all(message["reaction_space_tools"] == [
@@ -221,16 +231,30 @@ def test_submission_validator_returns_actionable_rejection_reasons() -> None:
         ),
         domain,
         {evaluated},
+        allow_repeated_occurrences=True,
     )
 
     assert [item.code for item in validation.errors] == [
         "historical_duplicate",
         "invalid_candidate",
-        "same_session_duplicate",
     ]
     assert "already evaluated" in validation.errors[0].message
     assert "unknown_option" in validation.errors[1].message
-    assert "duplicates index 2" in validation.errors[2].message
+
+    direct_validation = _validate_submission(
+        HarnessSubmissionRequest(
+            DIRECT_HARNESS_PROFILE_ID,
+            "turn-2",
+            1,
+            {"candidates": [payloads[1], payloads[1]]},
+        ),
+        domain,
+        set(),
+        allow_repeated_occurrences=False,
+    )
+    assert [item.code for item in direct_validation.errors] == [
+        "same_session_duplicate"
+    ]
 
 
 def test_catalog_and_task_spec_expose_space_without_oracle_scores(tmp_path) -> None:

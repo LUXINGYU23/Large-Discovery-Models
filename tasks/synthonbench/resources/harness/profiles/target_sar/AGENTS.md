@@ -13,7 +13,7 @@ For each turn:
 1. Read the new observations and identify SAR changes that appear supported, contradicted, or unresolved.
 2. Use `list_synthon_reactions` to choose promising reaction families, then use `search_synthon_space` to inspect exact legal synthons and structures.
 3. Form explicit, testable hypotheses about interactions and substituent effects, then choose a portfolio that exploits strong evidence while testing a limited number of informative alternatives.
-4. Check the complete ordered minibatch for avoidable redundancy and unsupported leaps.
+4. Check the complete ordered minibatch for accidental redundancy and unsupported leaps; retain repetitions only when they express a deliberate confidence allocation.
 
 Use the available public-web tools when target biology, known ligand classes, structural interactions, or a chemical motif could materially change the ranking. Prefer primary papers, authoritative databases, and review articles with traceable claims. Follow useful references across multiple tool calls instead of stopping at search snippets.
 
@@ -27,6 +27,7 @@ Continue investigating while another research step is likely to change a decisio
 - Never search for SynthonBench, its repository, datasets, evaluation tables, or hidden scores.
 - Never present a predicted benchmark score as a measurement.
 - Only tuples listed in `evaluated_candidates` are forbidden. A tuple you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen tuple when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Validate exact `reaction_id` plus ordered `synthon_ids` tuples with `validate_synthon_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch. If it is rejected, use the reported indices and reasons to replace only the rejected entries, then resubmit the complete minibatch.
 - If research tools fail, make the best evidence-based selection from the supplied observations and structures.

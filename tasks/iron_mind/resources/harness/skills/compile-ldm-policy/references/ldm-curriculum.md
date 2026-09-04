@@ -28,9 +28,11 @@ This odds equation is the most useful way to reason about the controls:
 - Multiplying both by the same positive constant preserves the logit direction
   but changes softmax concentration, like inverse temperature.
 
-Same-round duplicate occurrences are meaningful mass in (q_0); they are not a
-validation defect. Historical evaluated candidates have already been rejected
-before this stage.
+Same-round duplicate occurrences, including deliberate repetitions within one
+proposal minibatch, are meaningful mass in (q_0); they are not a validation
+defect. A proposing Agent may allocate several occurrence slots to one legal,
+historically unseen candidate when its evidence warrants stronger mass.
+Historical evaluated candidates have already been rejected before this stage.
 
 Useful limiting cases are:
 
@@ -38,7 +40,7 @@ Useful limiting cases are:
 - `alpha=0, eta>0`: ignore occurrence frequency and use acquisition tilt.
 - `alpha>0, eta=0`: ignore acquisition.
 - `alpha=0, eta=0`: uniform over the maintained pool.
-- task defaults: reproduce the fixed Harness-backed LDM baseline.
+- task defaults `alpha=2.0, eta=0.25`: reproduce the fixed LDM baseline.
 
 The stage string is provenance only. It has no computational effect.
 
@@ -71,21 +73,35 @@ No single entropy, ESS, history-size, or round threshold is sufficient. The host
 does not impose a trust gate, so extreme weights are legal but must be justified
 by stronger evidence than ordinary defaults.
 
-## Curriculum design
+## Evidence-defined curriculum
 
-A curriculum may be non-monotone. Early data scarcity can justify broad support,
-but a strong task prior can also justify early focus. Later measurements can
-increase acquisition weight when the residual model becomes informative, or
-decrease it when new evidence exposes misspecification. Proposal consensus may
-be sharpened when independent roles converge for defensible reasons, or
-flattened when they collapse onto one unsupported family.
+A curriculum state is a diagnosis of the current evidence, not a range of round
+numbers. Do not branch on `round_index`, and do not infer readiness from history
+size alone. Use the current proposal and acquisition summaries together with
+measured progress and contradictions in the research snapshot.
+
+- **Proposal-led:** the surrogate is still prior-like, acquisition is nearly
+  flat or unstable, and proposal consensus has a defensible scientific basis.
+  Favor `alpha` relative to `eta`.
+- **Balanced:** proposal mass and acquisition provide distinct, credible signals
+  without a clear conflict. Stay near the released baseline unless diagnostics
+  support a material change.
+- **Acquisition-led:** measured evidence supports the residual model,
+  acquisition separates the pool, and recent evaluations validate its ranking
+  better than proposal frequency. Increase `eta` relative to `alpha`.
+- **Recovery:** proposal mass has collapsed onto an unsupported family,
+  acquisition conflicts with new measurements, or progress has stalled. Flatten
+  the unreliable source, and possibly both, to recover useful support.
+
+Transitions may be non-monotone. New evidence can move a campaign back to a
+proposal-led or recovery state after the surrogate appeared informative.
 
 Keep decisions legible:
 
 - begin from the task defaults;
 - change one or both weights only when the current snapshot provides a reason;
-- record the reason in session analysis, not in the stage string;
-- use a stable stage label for comparable policy logic;
+- make the weight audit explicit even when the prior mean is unchanged;
+- record the reason in session analysis and use a stable evidence-state label;
 - evaluate the active artifact on every new snapshot before `keep`;
 - do not modify weights merely to make rounds look adaptive.
 

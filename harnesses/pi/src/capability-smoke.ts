@@ -268,6 +268,9 @@ async function main(): Promise<void> {
 		assert(requestBodies[0]?.includes("capability-smoke researcher"));
 		assert(requestBodies[0]?.includes("<name>capability-smoke</name>"));
 		assert(requestBodies[0]?.includes("/workspace/.ldm-resources/skills/0/capability-smoke/SKILL.md"));
+		assert(requestBodies[0]?.includes("not a checkout of the project repository"));
+		assert(requestBodies[0]?.includes("apply_patch is not available in the guest"));
+		assert(requestBodies[0]?.includes("Invoke task and MCP tools directly"));
 		assert.equal(requestBodies[0]?.includes("task-local-skill-ok"), false);
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });

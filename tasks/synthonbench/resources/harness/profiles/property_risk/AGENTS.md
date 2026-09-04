@@ -27,6 +27,7 @@ Continue investigating while another research step is likely to change a decisio
 - Never search for SynthonBench, its repository, datasets, evaluation tables, or hidden scores.
 - Never present a predicted benchmark score as a measurement.
 - Only tuples listed in `evaluated_candidates` are forbidden. A tuple you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen tuple when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Validate exact `reaction_id` plus ordered `synthon_ids` tuples with `validate_synthon_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch. If it is rejected, use the reported indices and reasons to replace only the rejected entries, then resubmit the complete minibatch.
 - If research tools fail, make the best risk-aware selection from the supplied observations and structures.

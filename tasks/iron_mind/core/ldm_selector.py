@@ -17,6 +17,7 @@ from ldm_tts.optimization.records import (
     SurrogateVector,
 )
 from tasks.iron_mind.core.ldm_policy import (
+    DEFAULT_ALPHA,
     DEFAULT_ETA,
     DEFAULT_Z_CLIP,
     AcquisitionTiltConfig,
@@ -55,7 +56,7 @@ class AcquisitionTiltedSelector:
         self,
         base_selector: AcquisitionSelector,
         *,
-        alpha: float = 1.0,
+        alpha: float = DEFAULT_ALPHA,
         eta: float = DEFAULT_ETA,
         z_clip: float = DEFAULT_Z_CLIP,
         seed: int = 0,

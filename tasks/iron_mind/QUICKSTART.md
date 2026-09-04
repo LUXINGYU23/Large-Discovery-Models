@@ -74,8 +74,9 @@ one-candidate requests with up to 64 local workers, estimates empirical `q0`,
 maintains a 32-candidate BO pool, and samples one reaction condition from the
 GP-UCB-tilted LDM policy.
 That one external evaluation is the Iron Mind-compatible batch size.
-Malformed or duplicate responses are recorded and can reduce the admitted
-reservoir.
+Malformed responses are recorded and can reduce the admitted reservoir. Equal
+valid responses remain separate proposal occurrences for empirical `q0` and are
+canonicalized only when the BO pool is built.
 
 The default `portfolio_v1` prompt assigns a distinct factor focus to every
 request and records the policy, slot role, focus, and prompt digest in the run

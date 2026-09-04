@@ -29,8 +29,8 @@ args:
   gp-observation-noise-std: 1.0
   gp-reaction-weight: 1.0
   acquisition-beta: 1.0
-  alpha: 1.0
-  eta: 1.0
+  alpha: 2.0
+  eta: 0.25
   z-clip: 5.0
   data-dir: ${SYNTHONBENCH_DATA_ROOT}
   source-dir: ${SYNTHONBENCH_SOURCE_ROOT}

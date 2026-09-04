@@ -222,6 +222,7 @@ def test_batch_parser_preserves_valid_peers_and_reports_the_failed_slot() -> Non
     candidates = [
         {
             "proposal_index": plan.proposal_index,
+            "source_proposal_index": plan.proposal_index,
             "reaction_id": plan.reaction_id,
             "synthon_ids": [slot[0].synthon_id for slot in plan.slot_options],
         }
@@ -237,6 +238,32 @@ def test_batch_parser_preserves_valid_peers_and_reports_the_failed_slot() -> Non
     assert [item.proposal_index for item in parsed.proposals] == [0]
     assert parsed.errors[0].proposal_index == 1
     assert "assigned reaction slate" in parsed.errors[0].message
+
+
+def test_batch_parser_accepts_deliberate_repeated_occurrences() -> None:
+    plans = tuple(
+        _catalog(seed=0).build_plan(round_idx=0, proposal_index=index)
+        for index in range(2)
+    )
+    source = plans[0]
+    payload = {
+        "source_proposal_index": source.proposal_index,
+        "reaction_id": source.reaction_id,
+        "synthon_ids": [slot[0].synthon_id for slot in source.slot_options],
+    }
+    candidates = [
+        {"proposal_index": plan.proposal_index, **payload}
+        for plan in plans
+    ]
+
+    parsed = parse_synthon_batch_response(
+        json.dumps({"candidates": candidates}),
+        plans,
+    )
+
+    assert not parsed.errors
+    assert [item.source_proposal_index for item in parsed.proposals] == [0, 0]
+    assert parsed.proposals[0].payload == parsed.proposals[1].payload
 
 
 def test_batch_parser_requires_the_exact_candidate_count() -> None:
@@ -381,6 +408,7 @@ def _response_from_request(request: ProposalRequest) -> ProposalResponse:
         "candidates": [
             {
                 "proposal_index": plan["proposal_index"],
+                "source_proposal_index": plan["proposal_index"],
                 "reaction_id": plan["reaction_id"],
                 "synthon_ids": [ids[0] for ids in plan["slot_synthon_ids"]],
             }

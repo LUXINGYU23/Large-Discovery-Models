@@ -244,12 +244,13 @@ file is not exposed to the agent shell. Every submitted tuple is validated
 again against the official Python object before entering LDM.
 
 Each session must submit 16 legal candidates absent from the authoritative
-evaluated snapshot. Evaluated repeats, invalid tuples, and duplicates within one
-session minibatch are rejected before commit with their indices and exact
-reasons; the same Pi session replaces them until its quota is full. A candidate
-proposed in an earlier turn but not evaluated remains eligible. Equal candidates
-proposed by different sessions remain separate raw occurrences, so independent
-agent agreement increases that candidate's empirical `q0` before reservoir
+evaluated snapshot. Evaluated repeats and invalid tuples are rejected before
+commit with their indices and exact reasons; the same Pi session replaces them
+until its quota is full. A candidate proposed in an earlier turn but not evaluated
+remains eligible. An LDM minibatch is an ordered multiset, so a session may assign
+multiple slots to one strong candidate. Equal candidates proposed within or
+across sessions remain separate raw occurrences, so deliberate emphasis and
+independent agent agreement increase that candidate's empirical `q0` before reservoir
 deduplication. There is no profile-balanced correction or per-session `q0`.
 
 The `ldm_harness` profile set loads four committed `AGENTS.md` files and the
@@ -418,8 +419,10 @@ comparison on the official 1M KIF11 surrogate track: direct LDM, Harness LDM,
 Harness-Compiled LDM, pure BO, direct LLM, and direct research Harness. One
 product-uniform shared initialization batch and five optimization batches make
 six outer rounds. Each round targets 16 official calls. Direct API methods do
-not replace invalid, previously evaluated, or duplicate generated candidates;
-Harness sessions repair rejected entries before committing each minibatch.
+not replace invalid or previously evaluated outputs. Direct LDM preserves equal
+generated candidates as proposal occurrences for empirical `q0`; direct LLM
+evaluates only unique unseen outputs. Harness sessions repair rejected entries
+before committing each minibatch.
 
 `config/pilot_evaluation/synthonbench_extended.yaml` preserves the same method,
 seed, and candidate-budget settings but uses eleven optimization batches
@@ -430,9 +433,9 @@ Direct-API LDM uses four independent concurrent requests with 16 indexed public
 proposal slots per response, producing 64 raw occurrences for empirical `q0`,
 together with the task-local reaction-aware Nyström count-Tanimoto GP over
 standardized utilities. The six-round profile locks a 32-candidate maintained
-pool, `beta=0.5`, `alpha=1`, `eta=1`, and acquisition z-clipping at 2. The
+pool, `beta=0.5`, `alpha=2`, `eta=0.25`, and acquisition z-clipping at 2. The
 twelve-round confirmation keeps the same 64 proposal occurrences and 16 real
-evaluations per round, but locks a 48-candidate pool, `alpha=1`, `eta=3`, and
+evaluations per round, but locks a 48-candidate pool, `alpha=2`, `eta=0.25`, and
 z-clipping at 5. Harness LDM uses the same 4-by-16 proposal shape through four
 persistent research sessions, each submitting 16 independently researched
 official-space tuples, then uses the same `q0`, pool maintenance, GP, and

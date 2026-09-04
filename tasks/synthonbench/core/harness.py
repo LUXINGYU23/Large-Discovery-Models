@@ -227,7 +227,10 @@ class SynthonHarnessExpander:
         results = self.client.run_turn(
             turns,
             submission_validator=lambda submission: _validate_submission(
-                submission, self.domain, evaluated
+                submission,
+                self.domain,
+                evaluated,
+                allow_repeated_occurrences=self.attach_empirical_q0,
             ),
         )
         if self.account is not None:
@@ -302,6 +305,7 @@ class SynthonHarnessExpander:
                     target=self.target,
                     observations=serialized_history,
                     evaluated_candidates=evaluated_candidates,
+                    allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
                     history_from_seq=history_from_seq,
                     history_to_seq=history_to_seq,
@@ -350,7 +354,10 @@ class SynthonHarnessExpander:
                         f"committed harness candidate failed authoritative validation: "
                         f"{result.profile_id}[{index}]: {exc}"
                     ) from exc
-                if prepared.product_id in profile_keys:
+                if (
+                    not self.attach_empirical_q0
+                    and prepared.product_id in profile_keys
+                ):
                     raise RuntimeError(
                         f"committed harness profile contains a duplicate occurrence: "
                         f"{result.profile_id}[{index}]"
@@ -425,6 +432,7 @@ def _turn_message(
     target: str,
     observations: Sequence[dict[str, object]],
     evaluated_candidates: Sequence[dict[str, object]],
+    allow_repeated_occurrences: bool,
     initial: bool,
     history_from_seq: int,
     history_to_seq: int,
@@ -445,7 +453,8 @@ def _turn_message(
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
             "same_round_cross_session_agreement_is_allowed": True,
-            "same_session_duplicates_are_forbidden": True,
+            "same_session_repeated_occurrences_are_allowed": allow_repeated_occurrences,
+            "repeated_occurrences_contribute_to_empirical_q0": allow_repeated_occurrences,
             "validate_before_submission": True,
         },
         "synthon_space_tools": list(HARNESS_TOOL_NAMES),
@@ -456,13 +465,18 @@ def _turn_message(
             "Do not estimate or claim benchmark scores as measurements.",
             "The isolated sandbox contains no authoritative task data; use the structured tools for the official space and supplied measurements.",
             "Research autonomously when it can improve the choices: search public literature, inspect public documents, and write or run scratch analysis code in the sandbox.",
-            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "Use the reaction summary to narrow the turn to roughly two to six evidence-backed reaction directions; do not enumerate the entire SynthonSpace without a specific reason.",
             "Use tools iteratively when useful, but leave enough of the 30-minute turn window to validate and submit the complete minibatch.",
             "If a tool fails or gives no decisive evidence, continue from the supplied data rather than withholding a candidate.",
             "Never submit an exact reaction_id plus ordered synthon_ids tuple listed in evaluated_candidates.",
             "A tuple proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
-            "Historical repeats, invalid tuples, and duplicates within your own minibatch will be rejected with exact reasons.",
+            (
+                "Your minibatch is an ordered multiset of proposal occurrences. You may allocate multiple slots to the same legal, historically unseen tuple when your evidence justifies extra empirical q0 mass; use multiplicity deliberately rather than as filler."
+                if allow_repeated_occurrences
+                else "Your directly evaluated minibatch must contain distinct tuples."
+            ),
+            "Historical repeats and invalid tuples will be rejected with exact reasons.",
             "If submission is rejected, replace the reported entries and resubmit the complete minibatch; do not repeat the research phase.",
         ],
     }
@@ -490,6 +504,8 @@ def _validate_submission(
     submission: HarnessSubmissionRequest,
     domain: SynthonCandidateDomain,
     evaluated: set[str],
+    *,
+    allow_repeated_occurrences: bool,
 ) -> HarnessSubmissionValidation:
     candidates = submission.submission.get("candidates")
     if not isinstance(candidates, list):
@@ -538,7 +554,7 @@ def _validate_submission(
             ))
             continue
         first_index = first_index_by_key.get(prepared.product_id)
-        if first_index is not None:
+        if not allow_repeated_occurrences and first_index is not None:
             errors.append(HarnessSubmissionError(
                 path,
                 "same_session_duplicate",
@@ -547,7 +563,7 @@ def _validate_submission(
                 "Replace only this repeated entry with another unseen legal tuple.",
             ))
             continue
-        first_index_by_key[prepared.product_id] = index
+        first_index_by_key.setdefault(prepared.product_id, index)
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors

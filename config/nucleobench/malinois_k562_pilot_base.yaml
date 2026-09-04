@@ -22,8 +22,8 @@ args:
   gp-min-history-for-fit: 4
   gp-max-observations: 256
   gp-global-best-observations: 64
-  alpha: 1.0
-  eta: 1.0
+  alpha: 2.0
+  eta: 0.25
   z-clip: 5.0
   campaign-index: 0
   start-index: 0

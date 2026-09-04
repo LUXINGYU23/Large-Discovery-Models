@@ -224,6 +224,7 @@ class NucleoBenchHarnessExpander:
                 submission,
                 self.domain.context,
                 evaluated,
+                allow_repeated_occurrences=self.attach_empirical_q0,
             ),
         )
         if self.account is not None:
@@ -290,6 +291,7 @@ class NucleoBenchHarnessExpander:
                     candidate_count=self.candidates_per_profile,
                     observations=serialized_history,
                     evaluated_candidates=evaluated_candidates,
+                    allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
                     history_from_seq=history_from_seq,
                     history_to_seq=history_to_seq,
@@ -345,7 +347,10 @@ class NucleoBenchHarnessExpander:
                         "committed harness candidate failed authoritative validation: "
                         f"{result.profile_id}[{index}]: {exc}"
                     ) from exc
-                if prepared.canonical_key in profile_keys:
+                if (
+                    not self.attach_empirical_q0
+                    and prepared.canonical_key in profile_keys
+                ):
                     raise RuntimeError(
                         "committed harness profile contains a duplicate occurrence: "
                         f"{result.profile_id}[{index}]"
@@ -462,6 +467,7 @@ def _turn_message(
     candidate_count: int,
     observations: Sequence[dict[str, object]],
     evaluated_candidates: Sequence[dict[str, object]],
+    allow_repeated_occurrences: bool,
     initial: bool,
     history_from_seq: int,
     history_to_seq: int,
@@ -487,7 +493,8 @@ def _turn_message(
             "prior_unmeasured_submissions_may_be_reproposed": True,
             "required_not_evaluated_candidate_count": candidate_count,
             "same_round_cross_session_agreement_is_allowed": True,
-            "same_session_duplicates_are_forbidden": True,
+            "same_session_repeated_occurrences_are_allowed": allow_repeated_occurrences,
+            "repeated_occurrences_contribute_to_empirical_q0": allow_repeated_occurrences,
             "validate_before_submission": True,
         },
         "sequence_tools": list(HARNESS_TOOL_NAMES),
@@ -504,7 +511,11 @@ def _turn_message(
             "Campaign measurements are the only measured objective values; do not present a prediction as a measurement.",
             "Research public target biology and sequence-regulatory evidence, and use scratch code in the isolated sandbox when useful.",
             "Only candidates in evaluated_candidates are forbidden. Earlier proposals absent from that list remain eligible.",
-            "Cross-session agreement is allowed, but duplicates within your own submitted minibatch are forbidden.",
+            (
+                "Treat the minibatch as an ordered multiset. You may allocate multiple slots to the same legal, historically unseen patch when your evidence justifies extra empirical q0 mass; use multiplicity deliberately rather than as filler."
+                if allow_repeated_occurrences
+                else "The directly evaluated minibatch must contain distinct patches."
+            ),
             "Validate every candidate with validate_mutations before submission.",
             "If rejected, replace the reported entries using their exact indices, codes, and reasons, then resubmit the complete minibatch.",
         ],
@@ -533,6 +544,8 @@ def _validate_submission(
     submission: HarnessSubmissionRequest,
     context: MutationContext,
     evaluated: set[str],
+    *,
+    allow_repeated_occurrences: bool,
 ) -> HarnessSubmissionValidation:
     candidates = submission.submission.get("candidates")
     if not isinstance(candidates, list):
@@ -592,7 +605,7 @@ def _validate_submission(
             )
             continue
         first_index = first_index_by_key.get(prepared.canonical_key)
-        if first_index is not None:
+        if not allow_repeated_occurrences and first_index is not None:
             errors.append(
                 HarnessSubmissionError(
                     path,
@@ -603,7 +616,7 @@ def _validate_submission(
                 )
             )
             continue
-        first_index_by_key[prepared.canonical_key] = index
+        first_index_by_key.setdefault(prepared.canonical_key, index)
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors

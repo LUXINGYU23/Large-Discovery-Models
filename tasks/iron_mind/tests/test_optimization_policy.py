@@ -137,6 +137,7 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
         [0.0, 1.0, 1.0, 0.0],
     ]
     assert round_input.round_index == 1
+    assert "round_index" not in round_input.execution_context["weight_context"]
     assert round_input.research_snapshot["new_measured_observations"] == [
         {
             "round_index": 0,

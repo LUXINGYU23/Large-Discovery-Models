@@ -75,7 +75,7 @@ def test_prompt_exposes_structures_for_history_and_complete_options() -> None:
     assert '"smiles":"N"' in user
 
 
-def test_batch_prompt_requests_one_indexed_candidate_per_slot() -> None:
+def test_batch_prompt_exposes_occurrence_allocation_and_source_slots() -> None:
     space = _space()
     catalog = SynthonProposalCatalog(
         space,
@@ -98,7 +98,9 @@ def test_batch_prompt_requests_one_indexed_candidate_per_slot() -> None:
     assert '"candidate_count":2' in user
     assert '"proposal_index":0' in user
     assert '"proposal_index":1' in user
-    assert "Include every proposal_index exactly once" in user
+    assert "source_proposal_index" in user
+    assert "ordered multiset" in user
+    assert "output proposal_index exactly once" in user
 
 
 def _space() -> SynthonSpace:

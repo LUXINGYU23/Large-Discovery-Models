@@ -87,6 +87,7 @@ def _portfolio_lines(plan: ProposalSlotPlan) -> tuple[str, ...]:
         "Proposal policy: portfolio_v1.",
         f"Assigned portfolio role: {plan.role}.",
         "Role instruction: " + plan.role_instruction,
+        "Only measured-history candidates are excluded. Agreement with another independent request on the same unseen condition is valid and contributes another empirical q0 occurrence.",
         "Required slot focus (hard allocation): " + _json_text(plan.focus_payload()),
         "Your conditions MUST contain every exact value in the required slot focus.",
     )

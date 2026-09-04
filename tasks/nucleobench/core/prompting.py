@@ -24,7 +24,7 @@ def build_mutation_prompt_messages(
     request_id: str,
     lineage_index: int,
     wave_index: int,
-    same_round_agreement_allowed: bool,
+    allow_repeated_occurrences: bool,
     additional_exclusions: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build one credential-free prompt with an exact mutation-patch contract."""
@@ -58,7 +58,13 @@ def build_mutation_prompt_messages(
             "evaluated_candidates_are_forbidden": True,
             "previously_proposed_but_unmeasured_candidates_are_allowed": True,
             "agreement_with_other_requests_in_this_round_is_allowed": (
-                same_round_agreement_allowed
+                allow_repeated_occurrences
+            ),
+            "same_request_repeated_occurrences_are_allowed": (
+                allow_repeated_occurrences
+            ),
+            "repeated_occurrences_contribute_to_empirical_q0": (
+                allow_repeated_occurrences
             ),
         },
         "submission_contract": _submission_contract(candidate_count),
@@ -70,7 +76,15 @@ def build_mutation_prompt_messages(
         "with a different DNA base. Never submit a patch in evaluated_candidates. "
         "Also avoid any patch in additional_forbidden_candidates. "
         "Candidates proposed in earlier rounds but absent from evaluated_candidates remain "
-        "eligible. Return only the exact JSON structure in submission_contract; do not return "
+        "eligible. "
+        + (
+            "Treat a multi-candidate response as an ordered multiset: you may deliberately "
+            "repeat the same legal unseen patch at multiple proposal_index values when stronger "
+            "confidence warrants more empirical q0 mass, but never repeat it merely as filler. "
+            if allow_repeated_occurrences and candidate_count > 1
+            else "Every directly evaluated candidate must be distinct from the other candidates in this request. "
+        )
+        + "Return only the exact JSON structure in submission_contract; do not return "
         "a full sequence, markdown, prose, reasoning, or extra fields.\n\n"
         + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     )

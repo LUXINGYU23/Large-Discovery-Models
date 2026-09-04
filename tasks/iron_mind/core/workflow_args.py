@@ -12,7 +12,7 @@ from ldm_tts.harness import (
     parse_tool_call_budgets,
 )
 from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
-from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ALPHA, DEFAULT_ETA
 from tasks.iron_mind.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     PROMPT_POLICIES,
@@ -50,7 +50,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
-    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
     parser.add_argument("--eta", type=float, default=DEFAULT_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))

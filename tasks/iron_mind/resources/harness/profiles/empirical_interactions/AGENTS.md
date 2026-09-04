@@ -20,6 +20,7 @@ The turn has a hard 30-minute wall-time. End open-ended analysis by minute 20, f
 - Never search for Iron Mind, its repository, benchmark datasets, evaluation tables, or hidden scores.
 - Never invent measurements or present predictions as observed scores.
 - Only candidates listed in `evaluated_candidates` are forbidden. A candidate you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen condition when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Submit only exact complete candidates accepted by `validate_reaction_candidate`.
 - Call `submit_candidates` with the complete requested minibatch.
 - If rejected, replace only the indexed invalid or repeated entries using the returned reasons, then resubmit the complete minibatch.

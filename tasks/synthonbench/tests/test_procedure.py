@@ -37,6 +37,14 @@ def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> Non
     assert spec.metadata["candidates_per_model_request"] == 16
     assert spec.response_spaces[0].name == "synthon_tuple_batch_json"
     assert spec.response_spaces[0].schema["properties"]["candidates"]["minItems"] == 16
+    assert spec.response_spaces[0].schema["properties"]["candidates"]["items"][
+        "required"
+    ] == [
+        "proposal_index",
+        "source_proposal_index",
+        "reaction_id",
+        "synthon_ids",
+    ]
     assert [space.name for space in spec.response_spaces] == [
         "synthon_tuple_batch_json",
         "synthon_tuple_json",
@@ -49,7 +57,8 @@ def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> Non
     assert spec.surrogate.metadata["kernel"] == "count_tanimoto"
     assert spec.surrogate.metadata["landmark_count"] == 256
     assert spec.surrogate.metadata["reaction_weight"] == 1.0
-    assert spec.acquisition.parameters["eta_acquisition_tilt"] == 1.0
+    assert spec.acquisition.parameters["alpha_base_measure"] == 2.0
+    assert spec.acquisition.parameters["eta_acquisition_tilt"] == 0.25
     assert spec.acquisition.parameters["base_acquisition_parameters"]["surrogate"] == (
         "online_nystrom_fitc_count_tanimoto_gaussian_process"
     )
@@ -334,7 +343,8 @@ def test_extended_profiles_lock_the_confirmed_comparison_parameters() -> None:
     ):
         args = contract.profile(profile_name).locked_args
         assert args["bo-pool-size"] == 48
-        assert args["eta"] == 3.0
+        assert args["alpha"] == 2.0
+        assert args["eta"] == 0.25
         assert args["z-clip"] == 5.0
 
 
