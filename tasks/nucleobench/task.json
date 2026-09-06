@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "nucleobench",
+  "description": "Optimize regulatory nucleotide sequences against source-pinned NucleoBench oracles.",
+  "dependency_checker": "tasks.nucleobench.core.dependencies:check_task_dependencies"
+}

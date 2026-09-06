@@ -11,7 +11,21 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		required: ["value"],
 		additionalProperties: false,
 	};
-	const candidateSchemaJson = '{"additionalProperties":false,"properties":{"value":{"enum":[1.0,0.000001],"type":"number"}},"required":["value"],"type":"object"}';
+	const submissionContract = {
+		contractId: "candidate_batch",
+		toolName: "submit_candidates",
+		payloadSchema: {
+			type: "object",
+			properties: {
+				candidates: { type: "array", minItems: 16, maxItems: 16, items: candidateSchema },
+			},
+			required: ["candidates"],
+			additionalProperties: false,
+		},
+		artifactRules: [],
+		maxValidationAttempts: null,
+	};
+	const submissionContractJson = JSON.stringify(submissionContract);
 	const frame = parseFrame(JSON.stringify({
 		type: "initialize",
 		requestId: "init-1",
@@ -25,8 +39,8 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		taskId: "synthonbench",
 		caseId: "surrogate:1M:kif11",
 		seed: 1,
-		candidateSchemaJson,
-		candidateSchemaSha256: sha256(candidateSchemaJson),
+		submissionContractJson,
+		submissionContractSha256: sha256(submissionContractJson),
 		guestRuntime: {
 			imageRef: "ldm/synthonbench-research:aaaaaaaaaaaa",
 			recipeSha256: "a".repeat(64),
@@ -40,7 +54,6 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			agentsSha256: "a".repeat(64),
 			skillDirs: [],
 			skillDirSha256: [],
-			candidatesPerTurn: 16,
 		}],
 		toolExtensions: [],
 		mcpServers: [{
@@ -68,14 +81,14 @@ test("parseFrame accepts the explicit responses configuration", () => {
 	assert.equal(frame.type, "initialize");
 	if (frame.type === "initialize") {
 		assert.equal(frame.thinking, "max");
-		assert.deepEqual(frame.candidateSchema, candidateSchema);
+		assert.deepEqual(frame.submissionContract, submissionContract);
 		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
 		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
 });
 
-test("parseFrame rejects a candidate schema with a changed digest", () => {
+test("parseFrame rejects a submission contract with a changed digest", () => {
 	assert.throws(
 		() => parseFrame(JSON.stringify({
 			type: "initialize",
@@ -90,8 +103,14 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 			taskId: "fixture",
 			caseId: "case",
 			seed: 1,
-			candidateSchemaJson: '{"additionalProperties":false,"properties":{},"type":"object"}',
-			candidateSchemaSha256: "b".repeat(64),
+			submissionContractJson: JSON.stringify({
+				contractId: "fixture",
+				toolName: "submit_fixture",
+				payloadSchema: { type: "object", properties: {}, additionalProperties: false },
+				artifactRules: [],
+				maxValidationAttempts: null,
+			}),
+			submissionContractSha256: "b".repeat(64),
 			guestRuntime: {
 				imageRef: "ldm/fixture-research:aaaaaaaaaaaa",
 				recipeSha256: "a".repeat(64),
@@ -105,7 +124,6 @@ test("parseFrame rejects a candidate schema with a changed digest", () => {
 				agentsSha256: "a".repeat(64),
 				skillDirs: [],
 				skillDirSha256: [],
-				candidatesPerTurn: 1,
 			}],
 			toolExtensions: [],
 			mcpServers: [],
@@ -191,17 +209,18 @@ test("parseFrame accepts a consistent submission validation result", () => {
 		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: "campaign-1",
 		validationId: "validation-1",
-		accepted: false,
-		rejected: [{
-			index: 2,
+		submissionDigest: "d".repeat(64),
+		decision: "retry",
+		errors: [{
+			path: "/candidates/2",
 			code: "historical_duplicate",
 			message: "The candidate was already evaluated.",
+			hint: "Replace this entry.",
 		}],
-		requiredReplacements: 1,
 	}));
 	assert.equal(frame.type, "submission_validation_result");
 	if (frame.type === "submission_validation_result") {
-		assert.equal(frame.rejected[0]?.code, "historical_duplicate");
+		assert.equal(frame.errors[0]?.code, "historical_duplicate");
 	}
 });
 
@@ -213,9 +232,14 @@ test("parseFrame rejects inconsistent submission validation results", () => {
 			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: "campaign-1",
 			validationId: "validation-1",
-			accepted: true,
-			rejected: [{ index: 0, code: "invalid_candidate", message: "Invalid." }],
-			requiredReplacements: 1,
+			submissionDigest: "d".repeat(64),
+			decision: "accept",
+			errors: [{
+				path: "/candidates/0",
+				code: "invalid_candidate",
+				message: "Invalid.",
+				hint: "Replace this entry.",
+			}],
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",
 	);

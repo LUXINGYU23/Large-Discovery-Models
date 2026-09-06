@@ -6,9 +6,14 @@ import argparse
 import math
 from pathlib import Path
 
-from ldm_tts.harness import DEFAULT_NETWORK_TOOL_BUDGETS, parse_tool_call_budgets
+from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
+from ldm_tts.harness import (
+    POLICY_CAPABILITIES,
+    parse_tool_call_budgets,
+)
 from tasks.synthonbench.core.catalog import REACTION_ALLOCATIONS
 from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ALPHA,
     DEFAULT_ACQUISITION_ETA,
     DEFAULT_BO_POOL_SIZE,
     DEFAULT_BO_SEARCH_SAMPLES,
@@ -32,7 +37,14 @@ from tasks.synthonbench.core.constants import (
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, PROMPT_POLICIES
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
-from tasks.synthonbench.core.search import INITIALIZATION_MODES, SEARCH_METHODS
+from tasks.synthonbench.core.search import (
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
+    INITIALIZATION_MODES,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
+    SEARCH_METHODS,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -55,6 +67,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             value for value in DEFAULT_NETWORK_TOOL_BUDGETS
             if args.harness_context7 or not value.startswith(("resolve-library-id=", "query-docs="))
         ]
+    if args.search_method == COMPILED_POLICY_METHOD:
+        if args.policy_tool_budget is None:
+            args.policy_tool_budget = [
+                value
+                for value in DEFAULT_NETWORK_TOOL_BUDGETS
+                if args.harness_context7
+                or not value.startswith(("resolve-library-id=", "query-docs="))
+            ]
+        if args.policy_capability is None:
+            args.policy_capability = sorted(POLICY_CAPABILITIES)
+        if args.policy_max_submission_attempts is None:
+            args.policy_max_submission_attempts = 3
     return args
 
 
@@ -97,7 +121,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--gp-observation-noise-std", type=float, default=DEFAULT_GP_OBSERVATION_NOISE_STD)
     parser.add_argument("--gp-reaction-weight", type=float, default=DEFAULT_GP_REACTION_WEIGHT)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
-    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--alpha", type=float, default=DEFAULT_ACQUISITION_ALPHA)
     parser.add_argument("--eta", type=float, default=DEFAULT_ACQUISITION_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--prompt-policy", choices=PROMPT_POLICIES, default=DEFAULT_PROMPT_POLICY)
@@ -138,6 +162,19 @@ def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
         help="Limit one tool per Agent turn; repeat for additional tools.",
     )
     parser.add_argument(
+        "--policy-capability",
+        action="append",
+        choices=tuple(sorted(POLICY_CAPABILITIES)),
+        help="Enable one compiled-policy capability; repeat to select both capabilities.",
+    )
+    parser.add_argument(
+        "--policy-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one policy-Agent tool per turn; repeat for additional tools.",
+    )
+    parser.add_argument("--policy-max-submission-attempts", type=int)
+    parser.add_argument(
         "--no-harness-context7",
         action="store_false",
         dest="harness_context7",
@@ -162,7 +199,10 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "harness_wall_time_seconds")
     if any(getattr(args, name) < 1 for name in positive):
         raise SystemExit("proposal, pool, worker, feature, and token counts must be positive")
-    if args.search_method in {"ldm", "ldm_harness"} and args.proposal_samples <= args.bo_pool_size:
+    if (
+        args.search_method in ACQUISITION_TILTED_METHODS
+        and args.proposal_samples <= args.bo_pool_size
+    ):
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.search_method not in {"llm", "harness"} and args.evaluations_per_round > args.bo_pool_size:
         raise SystemExit("--evaluations-per-round cannot exceed --bo-pool-size")
@@ -177,7 +217,7 @@ def _validate_counts(args: argparse.Namespace) -> None:
                 "the direct proposal breadth must divide evenly by "
                 "--proposal-candidates-per-request"
             )
-    if args.search_method == "ldm_harness":
+    if args.search_method in PARALLEL_HARNESS_METHODS:
         if args.harness_candidates_per_session < 1:
             raise SystemExit("--harness-candidates-per-session must be positive")
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
@@ -217,15 +257,49 @@ def _validate_numbers(args: argparse.Namespace) -> None:
 def _validate_provider_options(args: argparse.Namespace) -> None:
     try:
         parse_openai_extra_body_json(args.llm_extra_body_json)
-        tool_budgets = parse_tool_call_budgets(args.harness_tool_budget)
+        tool_budgets = parse_tool_call_budgets(
+            args.harness_tool_budget,
+            excluded_tools=("submit_candidates",),
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):
         raise SystemExit("Context7 tools cannot have budgets when Context7 is disabled")
+    if args.search_method == COMPILED_POLICY_METHOD:
+        _validate_policy_options(args)
+    elif any(
+        value is not None
+        for value in (
+            args.policy_capability,
+            args.policy_tool_budget,
+            args.policy_max_submission_attempts,
+        )
+    ):
+        raise SystemExit("Policy options require --search-method=ldm_harness_compiled")
+
+
+def _validate_policy_options(args: argparse.Namespace) -> None:
+    try:
+        policy_tool_budgets = parse_tool_call_budgets(
+            args.policy_tool_budget,
+            excluded_tools=("submit_optimization_policy",),
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(
+        policy_tool_budgets
+    ):
+        raise SystemExit(
+            "Context7 tools cannot have policy budgets when Context7 is disabled"
+        )
+    if args.policy_max_submission_attempts < 1:
+        raise SystemExit("--policy-max-submission-attempts must be positive")
+    if len(args.policy_capability) != len(set(args.policy_capability)):
+        raise SystemExit("--policy-capability values must be unique")
 
 
 def _validate_mode(args: argparse.Namespace) -> None:
-    if args.search_method in {"ldm_harness", "harness"}:
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
         if args.proposal_mode != "none":
             raise SystemExit(
                 f"--search-method={args.search_method} requires --proposal-mode=none"

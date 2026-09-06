@@ -10,7 +10,7 @@ Integrate target-relevant structure-activity reasoning, reaction feasibility, sc
 
 Inspect all newly measured molecules and compare them with the accumulated campaign history. Choose reaction families and search directions autonomously. Use the structured official SynthonSpace tools to inspect exact available synthons, construct complete tuples, and validate every intended submission. When useful, search public primary literature, follow relevant documents, use MCP tools, and run scratch analysis in the isolated sandbox. You may install public packages, write files, and execute code for molecular descriptors, clustering, similarity analysis, or candidate ranking.
 
-The turn has a hard 30-minute wall-time. Stop open-ended research by minute 20, assemble and validate all 16 candidates, and make the first `submit_candidates` call by minute 25. Use remaining time only to repair rejected entries. Tool budgets constrain information gathering; they are not quotas. Delivering the complete valid minibatch takes priority over another research step.
+The turn has a hard 30-minute wall-time. Stop open-ended research by minute 20, assemble and validate the complete requested minibatch, and make the first `submit_candidates` call by minute 25. Use remaining time only to repair rejected entries. Tool budgets constrain information gathering; they are not quotas. Delivering the complete valid minibatch takes priority over another research step.
 
 ## Boundaries and submission
 

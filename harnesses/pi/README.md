@@ -2,9 +2,9 @@
 
 This directory contains the pinned Node sidecar used by persistent LDM research
 sessions. It owns Pi session lifecycle, Gondolin-isolated file and shell tools,
-web extensions, terminal candidate submission, and raw model-provider transport
-capture. Task validation, optimization history, `q0`, GP inference, acquisition,
-and evaluation remain in Python.
+web extensions, task-defined terminal submission, and raw model-provider
+transport capture. Task validation, optimization history, `q0`, GP inference,
+acquisition, and evaluation remain in Python.
 
 For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
@@ -42,15 +42,81 @@ The sidecar declares its package SemVer at startup; the client binds every
 subsequent JSONL request and response to that release and one campaign. Turn
 inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
-Committed turns are idempotent and partial submissions recover from their saved
-candidate batch and measured usage.
+Committed turns are idempotent and partial turns recover from their saved
+submission, artifact descriptors, and measured usage.
+Initialization pins configuration, profile/tool digests, resolved guest, and
+sidecar implementation. Resume rejects a different identity without rewriting
+the original manifest. Use a new artifact root for a changed configuration.
 
-During `run_turn`, `submit_candidates` is provisional until the Python caller
-answers a `submission_validation_requested` frame. Acceptance persists the
-batch and allows commit. Rejection is recorded as a model-visible Pi tool error
-with indexed task-provided reasons; the same session must correct and resubmit
-within the original wall-time window. The protocol is task-neutral: candidate
-identity and domain validation remain in the task-owned Python callback.
+During `run_turn`, the terminal tool named by `HarnessSubmissionContract` is
+provisional until the Python caller answers a
+`submission_validation_requested` frame. `retry` returns task-provided
+JSON-Pointer errors to the same session, with research and editing tools still
+available for repair; `accept` commits the turn, while
+`reject_turn` records a terminal failure for caller fallback. The protocol is
+task-neutral: payload meaning and domain validation remain in the task-owned
+Python callback.
+
+Execution errors carry `error.turnUsage` entries for available per-profile,
+per-turn provider calls, tool calls, and captured artifact bytes, including
+work completed before a provider failure or wall-time limit. Failed turns do
+not commit or advance history. If the transport exits before delivering usage,
+the client preserves unknown counters rather than reporting zero.
+
+Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
+escapes, unsupported suffixes, missing files, and oversized files, then stores
+an immutable per-attempt snapshot before task validation. Wire records contain
+artifact descriptors and digests, never duplicate source text.
+
+## Compiled Optimization Policies
+
+Harness-Compiled LDM uses the same sidecar twice: one task-defined pool owns
+candidate-proposal sessions, and a separate pool owns one persistent policy
+session. The policy terminal contract accepts `replace`, `keep`, or `disable`.
+`replace` must reference a complete `optimization_policy.py`; source code is
+never embedded in the terminal JSON payload.
+
+The policy pool loads its task-owned `compile-ldm-policy` skill from
+`resources/harness/skills/`. The sidecar verifies its digest, snapshots the
+selected package into the session workspace, and advertises its read-only guest
+path under `/workspace/.ldm-resources`; this lets Pi load the full Skill and its
+relative references without mounting the repository. The pool also includes
+the built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
+`validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
+the authoritative feature contract and repair a draft before submission. These
+tools are advisory. Inspection returns the exact task-supplied `mean_context`
+and `weight_context` in addition to the public research snapshot, so generated
+code does not have to guess target scaling or available keys. Inspection also
+exports read-only arrays to `guest_snapshot.directory`. The runner preserves
+single-objective vectors or multiobjective matrices; objective meaning and GP
+diagnostics are task-owned. A trusted read-only diagnostic module is configured
+through `LDM_POLICY_DIAGNOSTICS` and `LDM_POLICY_DIAGNOSTICS_SHA256`.
+Its digest is verified before loading. See the
+[task hook contract](../../docs/research-harness.md#task-responsibilities).
+Without a task hook, evaluation reports artifact outputs only.
+Draft validation and evaluation use the existing sidecar Python subprocess.
+They do not start another container or microVM.
+
+The three reference tasks' draft-evaluation hooks compare
+chronological measured-history holdouts with training-prefix GP hyperparameters
+frozen, and reports current-pool first-draw distribution changes. These are
+development diagnostics, not an untouched test or a closed-loop counterfactual.
+The weight context also contains exact normalization, candidate predictions,
+measured progress, and errors for predictions frozen before real measurements.
+Measured feedback retains the original pool-relative q0, competition ranks,
+first-draw probability and alpha/eta. Do not compare historical q0 with the
+current pool maximum. A positive residual is underprediction, not validation
+of acquisition ranking; GP holdout error does not evaluate sampling weights.
+
+After immutable snapshotting, task-owned Python executes the accepted artifact
+again in a separate read-only, network-disabled container with bounded CPU,
+memory, processes, and time. The host interpreter never imports or executes
+Agent-authored code. Terminal payloads are exact: `replace` includes only
+`action` and `artifact_path`; `keep` and `disable` include only `action`.
+
+Candidate and policy clients have independent manifests, sessions, turn state,
+tool budgets, and usage counters. Reference tasks store them under
+`<run_dir>/harness/` and `<run_dir>/policy_harness/` respectively.
 
 Pi sessions use a 262,144-token model context window with built-in automatic
 compaction enabled. The release configuration reserves 16,384 tokens for the
@@ -80,15 +146,16 @@ Each run stores only:
 Each turn has a wall-time limit and may define hard limits for individual tools.
 The Agent sees its initial tool budget and the remaining count after every
 call. Unlisted tools are unlimited and a zero limit disables a tool.
-`submit_candidates` cannot be limited. A started tool execution consumes one
+The configured terminal tool cannot be limited. A started tool execution consumes one
 call even when it fails; policy and budget rejections do not. Reservations are
 persisted before execution, so an interrupted turn resumes with the same used
 counts. If a provider stream ends before a committed batch, the sidecar
-continues submission-only recovery within the same wall-time window and retains
-every raw attempt.
+continues the existing work with tools available for repair within the same
+wall-time window and retains every raw attempt. Partial-turn recovery continues
+attempt numbering rather than replacing earlier artifact snapshots.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
-artifacts, read-only task profiles, and the selected guest cache explicitly.
+artifacts, read-only task resources, and the selected guest cache explicitly.
 The cache contains the immutable image store, build records, transient build
 state, Gondolin session state, and per-session COW overlays; it is outside the
 repository and may be removed when no campaign needs the images. Tasks may also register
@@ -101,3 +168,12 @@ allow/deny lists empty. The guest sees only its session workspace, not the host
 repository, benchmark data, oracle, credentials, or other sessions. Task query
 rules that prevent benchmark leakage remain independent from sandbox network
 permissions.
+
+### Guest Runtime Contract
+
+Every session receives the same runtime note: `/workspace` is a research
+workspace rather than a repository checkout, files are edited through Pi's
+registered `read` and `write` tools, and task or MCP tools are invoked directly.
+`apply_patch` is not a guest command, and task-tool implementation runtimes such
+as Node.js are not part of the guest contract. Guest `git` is reserved for
+cloning useful public research material when network policy permits it.

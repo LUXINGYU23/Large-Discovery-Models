@@ -24,6 +24,7 @@ from tasks.synthonbench.core.provider import (
     BASE_URL_ENV_NAMES,
     MODEL_ENV_NAMES,
 )
+from tasks.synthonbench.core.search import PERSISTENT_HARNESS_METHODS
 
 
 def check_task_dependencies(plan: dict[str, Any], *, include_optional: bool = True) -> list[DependencyCheck]:
@@ -82,10 +83,10 @@ def _provider_checks(task: str, args: dict[str, Any], env: dict[str, str]) -> li
         api_env=API_KEY_ENV_NAMES,
         required=True,
     )
-    if arg_value(args, "search-method", default="ldm") not in {
-        "ldm_harness",
-        "harness",
-    }:
+    if (
+        arg_value(args, "search-method", default="ldm")
+        not in PERSISTENT_HARNESS_METHODS
+    ):
         return checks
 
     raw_key_path = arg_value(args, "harness-api-key-file")

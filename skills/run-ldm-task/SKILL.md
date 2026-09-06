@@ -1,6 +1,6 @@
 ---
 name: run-ldm-task
-description: Validate, configure, dry-run, smoke-test, execute, monitor, and summarize an existing manifest-registered LDM task through this repository's config runner. Use when asked to run LDM, run a task config or suite, test an existing task, perform a minimal first real run, verify a direct model or research-Harness backend, resume a task run, or diagnose preflight failures for a registered task.
+description: Validate, configure, dry-run, smoke-test, execute, monitor, and summarize an existing manifest-registered LDM task through this repository's config runner. Use when asked to run LDM, run a task config or suite, test an existing task, perform a minimal first real run, verify a direct model, research-Harness, or Harness-Compiled LDM backend, resume a task run, or diagnose preflight failures for a registered task.
 ---
 
 # Run An Existing LDM Task
@@ -11,8 +11,10 @@ Preserve task configuration unless the user asks for an edit. Use temporary
 profile.
 
 Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
-`nanogpt`, `small_molecule`, `antibody`, or `synthonbench`. For another task, read its
-`tasks/<task_id>/README.md` and `task.json` instead of inventing flags.
+`nanogpt`, `small_molecule`, `antibody`, `iron_mind`, `synthonbench`, or
+`nucleobench`. For
+another task, read its `tasks/<task_id>/README.md` and `task.json` instead of
+inventing flags.
 
 ## Resolve The Run
 
@@ -35,7 +37,8 @@ Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
      the shared lifecycle, budget, event, checkpoint, status, and summary
      artifacts. All built-in tasks (`nanogpt`, `small_molecule`, `antibody`,
      `llm_kv_adaptive_quantization`, `causal_discovery_discrete`,
-     `ai4bio_mutation_effect_prediction`, `iron_mind`, and `synthonbench`) are
+     `ai4bio_mutation_effect_prediction`, `iron_mind`, `synthonbench`, and
+     `nucleobench`) are
      engine-native.
    - **Task-owned runtime**: a task-specific loop is not engine-native; follow
      its README and do not claim shared lifecycle, budget, or resume behavior.
@@ -106,6 +109,12 @@ Harness with only a `/chat/completions` request. Skip endpoint-only probes when
 the declared provider does not require them, while still running its documented
 dependency and contract checks.
 
+For Harness-Compiled LDM, preflight both independent pools. Confirm that the
+proposal pool and policy pool resolve the intended provider, model, wire API,
+thinking level, profiles, submission contracts, guest image, MCP tools, and
+separate tool budgets. The policy pool must expose the built-in policy MCP and
+write to its own artifact root.
+
 For a `hybrid` provider, resolve the selected method's backend from the config,
 `evaluation.settings`, and task README. Do not let an offline BO mode suppress
 the preflight required by an online direct or Harness mode, and do not block an
@@ -128,8 +137,11 @@ exactly. Do not copy an older recipe from this skill over a newer task README:
 3. Run the task-level zero-iteration or dry contract smoke.
 4. Run the documented tiny real budget.
 5. Inspect its summary, trajectory, and failure status.
-6. Run the full config only when the user requested full execution or confirms
-   escalation after the tiny run.
+6. Immediately before a full real launch, present the resolved tasks, methods,
+   cases, seeds, rounds, evaluation counts, endpoint, model, wire API, thinking
+   level, concurrency, proposal and policy tool budgets, output root, and resume
+   policy. Wait for explicit user confirmation even when the earlier request
+   asked to complete the full experiment.
 
 Use `--set` for temporary output directories and budgets so existing artifacts
 are not overwritten. Choose a new run name or trajectory directory unless the
@@ -150,7 +162,10 @@ tasks also re-export their historical trajectory files (see
 [references/built-in-tasks.md](references/built-in-tasks.md)). For a
 Harness-backed run, also inspect the run-local Harness manifest, committed turn
 records, session lineage, redacted provider index, and Harness/provider/tool
-budget counters. For a task-owned runtime, inspect the task-specific artifacts named by its README and
+budget counters. For Harness-Compiled LDM, inspect both `harness/` and
+`policy_harness/`, each compiled round result, accepted epoch and artifact
+digest, action/source/stage, validation failures, degraded/fallback status, and
+separate policy budget counters. For a task-owned runtime, inspect the task-specific artifacts named by its README and
 do not claim shared-engine resume or budget semantics unless the executed path
 actually provides them.
 
@@ -166,6 +181,8 @@ After execution, report:
 - interpreter/project used;
 - dependency and endpoint results;
 - proposal backend, wire API, and Harness profile/session counts when applicable;
+- compiled-policy capabilities, latest action/epoch/stage/weights, and any
+  degraded or fallback rounds when applicable;
 - runtime classification and whether a named contract profile remained active;
 - output, event/trajectory, checkpoint, status, summary, and best-candidate
   paths that apply to that runtime;

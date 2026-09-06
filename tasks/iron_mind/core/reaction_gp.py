@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
-from ldm_tts.optimization import BOObservation, BOPrediction, BOSelectionResult, SurrogateVector
+from ldm_tts.optimization import (
+    BOObservation,
+    BOPrediction,
+    BOSelectionResult,
+    SurrogateVector,
+)
 from ldm_tts.optimization.acquisition import make_acquisition
 from tasks.iron_mind.core.reaction_kernel import (
     ReactionKernelParameters,
@@ -19,11 +25,12 @@ from tasks.iron_mind.core.reaction_kernel import (
     reaction_ard_kernel,
 )
 from tasks.iron_mind.core.schema import ReactionDatasetSchema
-
+from tasks.iron_mind.core.surrogate import decode_reaction_one_hot
 
 MIN_HISTORY_FOR_ARD = 8
 TARGET_STD_FLOOR = 1.0
 DEFAULT_MODEL_MISMATCH_VARIANCE = 0.04
+PRIOR_MEAN_CLIP = 5.0
 
 
 @dataclass(frozen=True)
@@ -61,7 +68,14 @@ class ReactionCategoricalGPUCBSelector:
         )
         self.feature_version = str(feature_version)
         self.history: list[BOObservation] = []
-        self.surrogate = _ReactionCategoricalGPSurrogate(schema, (), self.config)
+        self.surrogate = _ReactionCategoricalGPSurrogate(
+            schema,
+            (),
+            self.config,
+            history_prior_mean=None,
+            mean_source="zero",
+            artifact_digest=None,
+        )
 
     def describe(self) -> AcquisitionSpec:
         return AcquisitionSpec(
@@ -77,12 +91,38 @@ class ReactionCategoricalGPUCBSelector:
             },
         )
 
-    def fit(self, history: Sequence[BOObservation]) -> None:
+    def fit(
+        self,
+        history: Sequence[BOObservation],
+        *,
+        history_prior_mean: Sequence[float] | None = None,
+        mean_source: str = "zero",
+        artifact_digest: str | None = None,
+    ) -> None:
         if any(len(item.objectives) != 1 for item in history):
             raise ValueError("ReactionCategoricalGPUCBSelector requires one objective")
+        if not mean_source.strip():
+            raise ValueError("reaction GP mean_source must not be empty")
         _validate_history_features(history, self.feature_version)
         self.history = list(history)
-        self.surrogate = _ReactionCategoricalGPSurrogate(self.schema, self.history, self.config)
+        self.surrogate = _ReactionCategoricalGPSurrogate(
+            self.schema,
+            self.history,
+            self.config,
+            history_prior_mean=history_prior_mean,
+            mean_source=mean_source,
+            artifact_digest=artifact_digest,
+        )
+
+    def posterior_projection(self, history, features):
+        surrogate = self.surrogate
+        codes = np.asarray([decode_reaction_one_hot(row, self.schema) for row in features])
+        cross = reaction_ard_kernel(codes, surrogate.codes, self.schema, surrogate.parameters)
+        projected = np.linalg.solve(surrogate.cholesky, cross.T)
+        weights = np.linalg.solve(surrogate.cholesky.T, projected).T
+        std = np.sqrt(np.maximum(surrogate.parameters.signal_variance - np.sum(projected**2, axis=0), 1e-12))
+        return {"weights": weights, "std": std,
+                "location_scale": np.asarray([surrogate.y_mean, surrogate.y_scale])}
 
     def select(
         self,
@@ -90,18 +130,26 @@ class ReactionCategoricalGPUCBSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        query_prior_mean: Sequence[float] | None = None,
     ) -> BOSelectionResult:
         if count < 1:
             raise ValueError("selection count must be positive")
         _validate_representations(candidates, representations, self.feature_version)
+        prior, clip_count = _prior_vector(
+            query_prior_mean,
+            len(candidates),
+            "query prior mean",
+        )
+        self.surrogate.query_prior_clip_count = clip_count
         effective_beta = self.config.base_beta
         predictions = tuple(
             self.surrogate.predict(
                 candidate.candidate_id,
                 representations[candidate.candidate_id],
                 effective_beta,
+                float(prior[index]),
             )
-            for candidate in candidates
+            for index, candidate in enumerate(candidates)
         )
         ranked = sorted(
             predictions,
@@ -129,10 +177,16 @@ class _ReactionCategoricalGPSurrogate:
         schema: ReactionDatasetSchema,
         observations: Sequence[BOObservation],
         config: ReactionGPUCBConfig,
+        *,
+        history_prior_mean: Sequence[float] | None,
+        mean_source: str,
+        artifact_digest: str | None,
     ) -> None:
         self.schema = schema
         self.observations = list(observations)
         self.config = config
+        self.mean_source = mean_source
+        self.artifact_digest = artifact_digest
         self.parameters = default_kernel_parameters(schema)
         self.ard_history_threshold = max(
             MIN_HISTORY_FOR_ARD,
@@ -144,6 +198,14 @@ class _ReactionCategoricalGPSurrogate:
         self.codes: np.ndarray | None = None
         self.cholesky: np.ndarray | None = None
         self.alpha: np.ndarray | None = None
+        self.history_prior_mean, self.history_prior_clip_count = _prior_vector(
+            history_prior_mean,
+            len(self.observations),
+            "history prior mean",
+        )
+        self.query_prior_clip_count = 0
+        self.residual_target_mean = 0.0
+        self.residual_target_std = 0.0
         self._fit()
 
     def _fit(self) -> None:
@@ -155,10 +217,12 @@ class _ReactionCategoricalGPSurrogate:
         self.y_mean = float(scores.mean())
         self.y_scale = max(float(scores.std()), self.config.target_std_floor)
         self.codes = np.asarray(
-            [_decode_one_hot(item.feature_vector, self.schema) for item in self.observations],
+            [decode_reaction_one_hot(item.feature_vector, self.schema) for item in self.observations],
             dtype=int,
         )
-        targets = (scores - self.y_mean) / self.y_scale
+        targets = (scores - self.y_mean) / self.y_scale - self.history_prior_mean
+        self.residual_target_mean = float(targets.mean())
+        self.residual_target_std = float(targets.std())
         if len(self.observations) >= self.ard_history_threshold:
             self.parameters = learn_kernel_parameters(
                 self.codes,
@@ -182,18 +246,29 @@ class _ReactionCategoricalGPSurrogate:
         candidate_id: str,
         feature: SurrogateVector,
         beta: float,
+        prior_mean: float,
     ) -> BOPrediction:
         if not self.observations:
-            mean, std = 0.0, self.config.target_std_floor
+            residual_mean_z, std_z = 0.0, 1.0
         else:
-            mean, std = self._posterior(_decode_one_hot(feature.values, self.schema))
+            residual_mean_z, std_z = self._posterior(
+                decode_reaction_one_hot(feature.values, self.schema)
+            )
+        mean = self.y_mean + self.y_scale * (prior_mean + residual_mean_z)
+        std = self.y_scale * std_z
         acquisition = make_acquisition("ucb", minimize=(False,), beta=beta)
         return BOPrediction.scalar(
             candidate_id,
             mean=mean,
             std=std,
             acquisition_score=float(acquisition.score(mean, std)),
-            metadata={"surrogate": "reaction_categorical_ard_gp", "fit_status": self.fit_status},
+            metadata={
+                "surrogate": "reaction_categorical_ard_gp",
+                "fit_status": self.fit_status,
+                "mean_source": self.mean_source,
+                "prior_mean_standardized": prior_mean,
+                "residual_mean_standardized": residual_mean_z,
+            },
         )
 
     def _posterior(self, code: tuple[int, ...]) -> tuple[float, float]:
@@ -205,7 +280,7 @@ class _ReactionCategoricalGPSurrogate:
             self.parameters.signal_variance - float(np.sum(projected * projected)),
             1.0e-12,
         )
-        return self.y_mean + mean_z * self.y_scale, math.sqrt(variance_z) * self.y_scale
+        return mean_z, math.sqrt(variance_z)
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -215,24 +290,28 @@ class _ReactionCategoricalGPSurrogate:
             "ard_history_threshold": self.ard_history_threshold,
             "target_mean": self.y_mean,
             "target_scale": self.y_scale,
+            "mean_source": self.mean_source,
+            "mean_artifact_sha256": self.artifact_digest,
+            "prior_mean_clip_count": (
+                self.history_prior_clip_count + self.query_prior_clip_count
+            ),
+            "residual_target_mean": self.residual_target_mean,
+            "residual_target_std": self.residual_target_std,
             "kernel": self.parameters.to_dict(self.schema),
             "noise": self.config.noise,
         }
 
 
-def _decode_one_hot(values: Sequence[float], schema: ReactionDatasetSchema) -> tuple[int, ...]:
-    vector = np.asarray(values, dtype=float)
-    if vector.shape != (schema.one_hot_dimension,) or not np.all(np.isfinite(vector)):
-        raise ValueError("reaction GP feature vector does not match the schema")
-    codes, offset = [], 0
-    for factor in schema.factors:
-        segment = vector[offset : offset + len(factor.options)]
-        active = np.flatnonzero(np.isclose(segment, 1.0))
-        if len(active) != 1 or not np.isclose(segment.sum(), 1.0):
-            raise ValueError("reaction GP requires one active option per factor")
-        codes.append(int(active[0]))
-        offset += len(factor.options)
-    return tuple(codes)
+def _prior_vector(
+    values: Sequence[float] | None,
+    expected_size: int,
+    label: str,
+) -> tuple[np.ndarray, int]:
+    raw = np.zeros(expected_size, dtype=float) if values is None else np.asarray(values, dtype=float)
+    if raw.shape != (expected_size,) or not np.all(np.isfinite(raw)):
+        raise ValueError(f"reaction GP {label} must be a finite aligned vector")
+    clip_count = int(np.count_nonzero(np.abs(raw) > PRIOR_MEAN_CLIP))
+    return np.clip(raw, -PRIOR_MEAN_CLIP, PRIOR_MEAN_CLIP), clip_count
 
 
 def _validate_history_features(history: Sequence[BOObservation], feature_version: str) -> None:
@@ -257,6 +336,7 @@ def _validate_representations(
 
 
 __all__ = [
+    "PRIOR_MEAN_CLIP",
     "ReactionCategoricalGPUCBSelector",
     "ReactionGPUCBConfig",
     "ReactionKernelParameters",

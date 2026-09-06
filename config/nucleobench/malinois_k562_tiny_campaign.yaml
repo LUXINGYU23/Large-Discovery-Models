@@ -1,0 +1,34 @@
+name: nucleobench_malinois_k562_tiny_campaign
+task: nucleobench
+algorithm: ldm_tiny_qualification
+mode: real
+description: One active LDM step after the official Malinois K562 paired start.
+args:
+  execution-profile: qualification
+  termination-kind: rounds
+  initialization-mode: shared_start
+  case-id: malinois_k562
+  search-method: ldm
+  proposal-mode: openai
+  iterations: 2
+  evaluations-per-round: 1
+  proposal-samples: 4
+  proposal-max-workers: 4
+  campaign-index: 0
+  start-index: 0
+  source-dir: ${NUCLEOBENCH_SOURCE_ROOT}
+  prepared-dir: ${NUCLEOBENCH_DATA_ROOT}/malinois_k562
+  expected-start-set-sha256: ${NUCLEOBENCH_START_SET_SHA256}
+  hardware-profile: n1-highmem-16-cpu
+  llm-url: null
+  llm-model-name: null
+  llm-wire-api: responses
+  llm-reasoning: max
+  llm-timeout: 600.0
+  llm-max-tokens: 262144
+  llm-temperature: 0.7
+  api-key-file: ${NUCLEOBENCH_API_KEY_FILE}
+  out-dir: ${NUCLEOBENCH_RUNS_ROOT}/qualification
+env:
+  CUDA_VISIBLE_DEVICES: ""
+  LDM_DATA_COLLECTION_ENABLED: "1"

@@ -15,6 +15,7 @@ from ldm_tts.optimization.acquisition import make_acquisition
 
 MIN_VARIANCE_TOLERANCE = 1.0e-10
 TARGET_STD_FLOOR = 0.1
+PRIOR_MEAN_CLIP = 5.0
 
 
 @dataclass(frozen=True)
@@ -51,9 +52,15 @@ class SynthonTanimotoGPUCBSelector:
         self.feature_version = str(feature_version)
         self.config = config
         self._posterior = _OnlinePosterior(self.feature_dimension)
-        self._signature: tuple[tuple[str, float], ...] = ()
+        self._signature: tuple[tuple[str, float, float], ...] = ()
         self._target_mean = 0.0
         self._target_scale = 1.0
+        self._mean_source = "zero"
+        self._artifact_digest: str | None = None
+        self._history_prior_clip_count = 0
+        self._query_prior_clip_count = 0
+        self._residual_target_mean = 0.0
+        self._residual_target_std = 0.0
 
     def describe(self) -> AcquisitionSpec:
         return AcquisitionSpec(
@@ -71,19 +78,61 @@ class SynthonTanimotoGPUCBSelector:
             },
         )
 
-    def fit(self, history: Sequence[BOObservation]) -> None:
+    def fit(
+        self,
+        history: Sequence[BOObservation],
+        *,
+        history_prior_mean: Sequence[float] | None = None,
+        mean_source: str = "zero",
+        artifact_digest: str | None = None,
+    ) -> None:
         _validate_history(history, self.feature_dimension, self.feature_version)
-        signature = tuple((item.candidate_id, item.scalar_score) for item in history)
+        if not mean_source.strip():
+            raise ValueError("Synthon Tanimoto GP mean_source must not be empty")
+        prior, clip_count = _prior_vector(
+            history_prior_mean,
+            len(history),
+            "history prior mean",
+        )
+        signature = tuple(
+            (item.candidate_id, item.scalar_score, float(prior[index]))
+            for index, item in enumerate(history)
+        )
+        self._mean_source = mean_source
+        self._artifact_digest = artifact_digest
+        self._history_prior_clip_count = clip_count
         if signature == self._signature:
             return
         self._posterior = _OnlinePosterior(self.feature_dimension)
         scores = np.asarray([item.scalar_score for item in history], dtype=float)
         self._target_mean, self._target_scale = _target_transform(scores)
-        for observation in history:
+        targets = (
+            (scores - self._target_mean) / self._target_scale - prior
+            if len(scores)
+            else np.asarray((), dtype=float)
+        )
+        self._residual_target_mean = float(targets.mean()) if len(targets) else 0.0
+        self._residual_target_std = float(targets.std()) if len(targets) else 0.0
+        for observation, target in zip(history, targets, strict=True):
             feature, residual = self._latent_feature(observation.feature_vector)
-            target = (observation.scalar_score - self._target_mean) / self._target_scale
-            self._posterior.update(feature, target, self._observation_variance(residual))
+            self._posterior.update(
+                feature,
+                float(target),
+                self._observation_variance(residual),
+            )
         self._signature = signature
+
+    def posterior_projection(self, history, features):
+        training = [self._latent_feature(item.feature_vector) for item in history]
+        query = [self._latent_feature(row) for row in features]
+        train_features = np.asarray([item[0] for item in training])
+        query_features = np.asarray([item[0] for item in query])
+        noise = np.asarray([self._observation_variance(item[1]) for item in training])
+        weights = (query_features @ self._posterior.covariance @ train_features.T) / noise
+        _, variance = self._posterior.predict(query_features)
+        variance += self.config.signal_std**2 * np.asarray([item[1] for item in query])
+        return {"weights": weights, "std": np.sqrt(np.maximum(variance, 0.0)),
+                "location_scale": np.asarray([self._target_mean, self._target_scale])}
 
     def select(
         self,
@@ -91,11 +140,17 @@ class SynthonTanimotoGPUCBSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        query_prior_mean: Sequence[float] | None = None,
     ) -> BOSelectionResult:
         if count < 1:
             raise ValueError("selection count must be positive")
         _validate_representations(candidates, representations, self.feature_dimension, self.feature_version)
-        predictions = self._predictions(candidates, representations)
+        prior, self._query_prior_clip_count = _prior_vector(
+            query_prior_mean,
+            len(candidates),
+            "query prior mean",
+        )
+        predictions = self._predictions(candidates, representations, prior)
         ranked = sorted(predictions, key=_rank_key, reverse=True)
         return BOSelectionResult(
             selected_candidate_ids=tuple(item.candidate_id for item in ranked[:count]),
@@ -111,6 +166,7 @@ class SynthonTanimotoGPUCBSelector:
         self,
         candidates: Sequence[Candidate],
         representations: Mapping[str, SurrogateVector],
+        prior_mean: np.ndarray,
     ) -> tuple[BOPrediction, ...]:
         if not candidates:
             return ()
@@ -120,7 +176,9 @@ class SynthonTanimotoGPUCBSelector:
         normalized_means, normalized_variances = self._posterior.predict(features)
         total_variances = normalized_variances + self.config.signal_std**2 * residuals
         _validate_variances(total_variances)
-        means = self._target_mean + self._target_scale * normalized_means
+        means = self._target_mean + self._target_scale * (
+            prior_mean + normalized_means
+        )
         stds = self._target_scale * np.sqrt(np.maximum(total_variances, 0.0))
         beta = self.config.beta
         acquisition = make_acquisition("ucb", minimize=(False,), beta=beta)
@@ -134,9 +192,20 @@ class SynthonTanimotoGPUCBSelector:
                     "surrogate": "synthon_nystrom_fitc_tanimoto_gp",
                     "history_size": len(self._signature),
                     "fitc_residual": float(residual),
+                    "mean_source": self._mean_source,
+                    "prior_mean_standardized": float(prior),
+                    "residual_mean_standardized": float(residual_mean),
                 },
             )
-            for candidate, mean, std, residual in zip(candidates, means, stds, residuals, strict=True)
+            for candidate, mean, std, residual, prior, residual_mean in zip(
+                candidates,
+                means,
+                stds,
+                residuals,
+                prior_mean,
+                normalized_means,
+                strict=True,
+            )
         )
 
     def _latent_feature(self, values: Sequence[float]) -> tuple[np.ndarray, float]:
@@ -157,6 +226,13 @@ class SynthonTanimotoGPUCBSelector:
             "target_standardization": "z_score",
             "target_mean": self._target_mean,
             "target_scale": self._target_scale,
+            "mean_source": self._mean_source,
+            "mean_artifact_sha256": self._artifact_digest,
+            "prior_mean_clip_count": (
+                self._history_prior_clip_count + self._query_prior_clip_count
+            ),
+            "residual_target_mean": self._residual_target_mean,
+            "residual_target_std": self._residual_target_std,
         }
 
 
@@ -202,6 +278,22 @@ def _validate_history(history: Sequence[BOObservation], dimension: int, version:
         if len(observation.objectives) != 1 or observation.feature is None:
             raise ValueError("Synthon Tanimoto GP requires one objective and one feature per observation")
         _validate_vector(observation.feature, dimension, version)
+
+
+def _prior_vector(
+    values: Sequence[float] | None,
+    expected_size: int,
+    label: str,
+) -> tuple[np.ndarray, int]:
+    raw = (
+        np.zeros(expected_size, dtype=float)
+        if values is None
+        else np.asarray(values, dtype=float)
+    )
+    if raw.shape != (expected_size,) or not np.all(np.isfinite(raw)):
+        raise ValueError(f"Synthon Tanimoto GP {label} must be a finite aligned vector")
+    clip_count = int(np.count_nonzero(np.abs(raw) > PRIOR_MEAN_CLIP))
+    return np.clip(raw, -PRIOR_MEAN_CLIP, PRIOR_MEAN_CLIP), clip_count
 
 
 def _validate_representations(
@@ -250,4 +342,9 @@ def _nonnegative(name: str, value: float) -> None:
         raise ValueError(f"{name} must be finite and non-negative")
 
 
-__all__ = ["SynthonTanimotoGPUCBSelector", "TanimotoGPUCBConfig"]
+__all__ = [
+    "PRIOR_MEAN_CLIP",
+    "TARGET_STD_FLOOR",
+    "SynthonTanimotoGPUCBSelector",
+    "TanimotoGPUCBConfig",
+]

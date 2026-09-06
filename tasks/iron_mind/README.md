@@ -7,9 +7,12 @@ Each external round follows the Iron Mind comparison protocol: exactly one
 reaction condition is evaluated. The direct backend asks the model for 64
 independent proposal samples. `ldm_harness` instead collects 16 candidates from
 each of four persistent research sessions; both LDM methods estimate empirical
-`q0` and use the same task-local GP and acquisition-tilted policy. The separate
-`harness` method uses one persistent research session to choose the single
-condition evaluated that round, without `q0`, a GP, or an acquisition selector.
+`q0` and use the same task-local GP and acquisition-tilted policy.
+`ldm_harness_compiled` keeps that 4-by-16 proposal path and adds one independent
+persistent policy session that may define the GP prior mean and round-specific
+LDM `alpha` and `eta`. The separate `harness` method uses one persistent
+research session to choose the single condition evaluated that round, without
+`q0`, a GP, or an acquisition selector.
 
 ## Architecture
 
@@ -30,7 +33,8 @@ policy, and the frozen oracle evaluator. `core/ldm_policy.py`,
 `core/proposal_base_measure.py`, `core/proposal_pool.py`, and
 `core/ldm_selector.py` own the tilt math, empirical proposal distribution,
 maintained BO pool, and selector adapter respectively; no algorithm code is
-imported from another task.
+imported from another task. `core/optimization_policy.py` owns the task-local
+feature and validation boundary for compiled policies.
 
 ```text
 ldm_task/          shared-runner adapter
@@ -105,9 +109,8 @@ The evaluated condition is sampled without replacement from
 
 `--acquisition-beta` is the constant exploration coefficient inside UCB. `--alpha` controls the
 model base measure and `--eta` controls the outer acquisition tilt; these are
-different quantities. Released configurations use `beta=1`, `alpha=1`, and
-`eta=1` for the official 20-evaluation protocol; the fixed pilot-evaluation
-profiles use the calibrated values documented below. `--z-clip` defaults to 5.
+different quantities. Released configurations use `beta=1`, `alpha=2`, and
+`eta=0.25`. `--z-clip` defaults to 5.
 The campaign index seeds task-side pool
 maintenance and final sampling; endpoint determinism remains provider-controlled.
 
@@ -201,10 +204,12 @@ session must not maintain a private exclusion set.
 
 The structured tools expose factor definitions and complete legal condition
 combinations from the source-pinned table, but never oracle scores. Python
-performs authoritative validation before a turn commits. Invalid candidates,
-historical repeats, and duplicates within one session are returned to the Agent
-with indexed reasons and must be replaced. Agreement across different sessions
-is retained as repeated occurrences before empirical `q0` is calculated.
+performs authoritative validation before a turn commits. Invalid candidates and
+historical repeats are returned to the Agent with indexed reasons and must be
+replaced. An LDM proposal minibatch is an ordered multiset: deliberate repeated
+occurrences within or across sessions allocate more empirical `q0` mass to that
+candidate. The direct `harness` method still requires distinct candidates because
+it evaluates every submitted item without a `q0` selection stage.
 
 The direct `harness` method uses one persistent comprehensive-research session.
 It submits one legal unseen condition per active round, and that condition is
@@ -254,6 +259,64 @@ namespaced tools. Configure hard per-Agent, per-turn limits with repeated
 `--harness-tool-budget NAME=COUNT` values. Default web and Context7 budgets,
 secret references, and trace semantics are documented in
 [`docs/research-harness.md`](../../docs/research-harness.md).
+
+## Harness-Compiled LDM
+
+`ldm_harness_compiled` preserves the complete Harness proposal path: four
+persistent proposal sessions still produce 64 valid unseen occurrences, and
+the task still computes empirical `q0` and maintains the same 32-candidate BO
+pool. Before final selection, one separate `policy_architect` session receives
+the measured condition history, factor schema, proposal-distribution summaries,
+and fixed GP/acquisition contract. It returns `replace`, `keep`, or `disable`;
+`replace` references a complete `optimization_policy.py` file.
+
+The current policy API exposes exactly two capabilities:
+
+- `prior_mean@1` computes one standardized mean for every measured and query
+  factor one-hot row. The unchanged categorical GP is fit to the residual after
+  subtracting this mean, then adds the mean back to its predictions.
+- `ldm_weights@1` selects a stage label and finite non-negative `alpha` and
+  `eta` for `q0^alpha * exp(eta * robust_z(UCB))`.
+
+History utilities are raw task values; the adapter supplies their current
+location and scale, and the generated mean returns standardized conditional
+expectations. Its features are schema-ordered one-hot factor groups. Policy
+instructions therefore require reference coding, within-group centering, or
+regularization and reject unsupported interpretation of confounded main effects
+or interactions. Draft evaluation compares chronological measured-history
+holdouts with training-prefix GP hyperparameters frozen. The policy also receives
+exact sampling logits and subsequent errors of frozen pre-measurement predictions.
+Historical holdouts are development diagnostics, not an untouched test set.
+The task owns these calculations in `core/policy_diagnostics.py` and the
+digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
+Measured feedback retains the original pool's q0 ranks and relative mass,
+acquisition ranks, first-draw probabilities, and actual alpha/eta. These describe
+the selection context, not validation of a ranking or weight policy. Proposal
+and policy Agents also receive measured-only condition coverage and exact
+single-factor comparisons; different complete conditions are not replicates.
+
+Candidate identity, row order, `q0`, acquisition values, selection
+probabilities, and hidden scores are unavailable to the prior-mean function.
+The categorical kernel, model-mismatch variance, observation noise, UCB rule,
+pool maintenance, Gumbel sampling, evaluation budget, and frozen oracle remain
+task-owned and fixed. A zero prior with the configured default weights is
+equivalent to `ldm_harness`.
+
+The policy Agent can inspect and test drafts with the built-in policy MCP. The
+accepted immutable snapshot is then executed again outside the host interpreter
+in a read-only, network-disabled container. Formal profiles allow at most three
+submission attempts. If a turn still fails, the task re-evaluates the previous
+valid policy epoch for the current inputs; if none remains valid, it uses the
+static zero-prior/default-weight policy and marks the round degraded.
+
+Policy research uses the same user-configured provider, model, Responses wire
+API, thinking level, and turn wall time as the proposal Harness. Its tool limits
+are configured independently with `--policy-tool-budget`. Proposal traces stay
+under `<run_dir>/harness/`; policy sessions, round inputs, validations, accepted
+epochs, and compiled outputs stay under `<run_dir>/policy_harness/`.
+The task-local profile and Skill remain the versioned sources; the sidecar
+digest-verifies and exposes only their per-session snapshot read-only inside the
+guest so Pi can load the full Skill and relative references.
 
 ## Prepare the Official Data
 
@@ -330,21 +393,24 @@ uv run --locked --project tasks/iron_mind python \
 ## Fixed-Budget Pilot Evaluation
 
 `config/pilot_evaluation/iron_mind.yaml` compares direct LDM, Harness-backed
-LDM, plain task-local GP-UCB BO, direct LLM sampling, and direct research
-Harness on two source-pinned datasets. Each case uses three seeds, one shared
-random initialization round, and five optimization rounds. Every campaign
-therefore makes six official evaluations.
+LDM, Harness-Compiled LDM, plain task-local GP-UCB BO, direct LLM sampling, and
+direct research Harness on two source-pinned datasets. Each case uses three
+seeds, one shared random initialization round, and five optimization rounds.
+Every campaign therefore makes six official evaluations.
 
 `config/pilot_evaluation/iron_mind_extended.yaml` is the twelve-round
-confirmation matrix for the same five methods. The six-round standard matrix
+confirmation matrix for the same six methods. The six-round standard matrix
 provides the corresponding lower-cost screen.
 
 Direct LDM retains 64 independent requests with at most 4 concurrent workers.
 Harness LDM uses four concurrent persistent sessions with 16 candidates each.
-Both use empirical `q0`, a 32-candidate maintained pool, `beta=1`, `eta=1`, and
-acquisition z-clipping at 2 as locked by the pilot-evaluation profiles. The
-smaller pool preserves oversampling headroom when independent sessions agree
-on the same candidate. Pure BO
+Harness-Compiled LDM uses the same proposal sessions and adds one independent
+policy session per campaign. All three use empirical `q0`, a 32-candidate
+maintained pool, `beta=1`, and acquisition z-clipping at 2. The two fixed LDM
+methods use `alpha=2` and `eta=0.25`; the compiled method starts from those values
+and may replace them through its validated policy artifact. The smaller pool
+preserves oversampling headroom when independent sessions agree on the same
+candidate. Pure BO
 does not call a model endpoint: it scores every unseen condition in the finite
 reaction table with the same factor-aware GP-UCB. The direct LLM baseline makes
 one independent request per optimization round and evaluates its admitted
@@ -354,11 +420,13 @@ one-evaluation baseline. Direct research Harness also evaluates one candidate
 per optimization round, but obtains it from one persistent Agent session with
 tools and the accumulated private research transcript.
 
-The pilot direct methods request maximum reasoning through the Chat
-Completions `reasoning_effort` field. The Harness uses Pi's Responses API
-thinking-level mapping instead; these provider fields are intentionally
-different. Direct requests retain four workers and apply bounded backoff to
-transient provider failures without changing the logical candidate count.
+The pilot direct methods request maximum reasoning through the Chat Completions
+`reasoning_effort` field. Proposal and policy Harness sessions use Pi's
+Responses API thinking-level mapping instead; these provider fields are
+intentionally different. Direct requests retain four workers and apply bounded
+backoff to transient provider failures without changing the logical candidate
+count. Endpoint, API key, model, and thinking configuration remain
+user-supplied.
 
 ```bash
 uv run --locked --project tasks/iron_mind python \
@@ -376,7 +444,8 @@ The matrix needs `IRON_MIND_WORK_ROOT`, `IRON_MIND_DATA_ROOT`,
 children. Harness children additionally require Docker, KVM, and the built Pi
 image. It writes a
 portable manifest, per-campaign standard artifacts, round-level trajectories,
-and an English `summary.json` below `$IRON_MIND_RUNS_ROOT/pilot_evaluation/`.
+an English `summary.json`, and `compiled_policy_rounds.csv` below
+`$IRON_MIND_RUNS_ROOT/pilot_evaluation/`.
 Use `--resume` only for the same repository revision and unchanged configs.
 For a source archive rather than a Git checkout, set
 `LDM_PILOT_EVALUATION_COMMIT` to the archive release commit so the manifest records

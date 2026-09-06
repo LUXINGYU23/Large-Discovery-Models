@@ -13,8 +13,8 @@ args:
   proposal-max-workers: 64
   evaluations-per-round: 1
   acquisition-beta: 1.0
-  alpha: 1.0
-  eta: 1.0
+  alpha: 2.0
+  eta: 0.25
   z-clip: 5.0
   campaign-index: 0
   data-dir: ${IRON_MIND_DATA_ROOT}

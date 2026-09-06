@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.harness.pi import PiGuestRuntime, load_pi_guest_runtime
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient,
-    HarnessGuestRuntime,
     HarnessProfile,
-    HarnessSubmissionRejection,
+    HarnessSubmissionContract,
+    HarnessSubmissionError,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
     HarnessToolExtension,
@@ -22,7 +24,6 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     canonical_sha256,
     file_sha256,
-    load_harness_guest_runtime,
     profile_set_sha256,
 )
 from tasks.iron_mind.core.candidate import (
@@ -31,9 +32,13 @@ from tasks.iron_mind.core.candidate import (
     PreparedCandidatePayload,
     prepare_candidate_payload,
 )
-from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.iron_mind.core.constants import (
+    FORBIDDEN_QUERY_TERMS,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
+from tasks.iron_mind.core.history import condition_evidence
 from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
-
 
 HARNESS_PROFILE_IDS = (
     "mechanistic_chemistry",
@@ -43,16 +48,6 @@ HARNESS_PROFILE_IDS = (
 )
 DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "iron_mind_persistent_research_harness"
-HARNESS_FORBIDDEN_PATTERNS = (
-    r"iron[\s_-]*mind",
-    r"gomesgroup[/\\]iron-mind-public",
-)
-HARNESS_FORBIDDEN_TERMS = (
-    "iron mind",
-    "iron-mind-public",
-    "gomesgroup/iron-mind-public",
-    "476c555e45e2556e2ee4b24c726e774c2bfb7762",
-)
 HARNESS_TOOL_NAMES = (
     "describe_reaction_space",
     "search_reaction_conditions",
@@ -65,8 +60,13 @@ _LOCAL_IMAGE_ROOT = _LOCAL_RESOURCE_ROOT / "image"
 _CONTAINER_PROFILE_ROOT = Path("/resources/profiles")
 
 
-def harness_candidate_schema(schema) -> dict[str, object]:
-    return {
+def harness_submission_contract(
+    schema,
+    candidates_per_profile: int,
+) -> HarnessSubmissionContract:
+    if candidates_per_profile < 1:
+        raise ValueError("Iron Mind harness candidate count must be positive")
+    candidate_schema = {
         "type": "object",
         "properties": {
             "dataset_id": {
@@ -93,6 +93,23 @@ def harness_candidate_schema(schema) -> dict[str, object]:
         "required": ["dataset_id", "conditions"],
         "additionalProperties": False,
     }
+    return HarnessSubmissionContract(
+        contract_id="iron_mind_candidate_batch",
+        tool_name="submit_candidates",
+        payload_schema={
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": candidate_schema,
+                    "minItems": candidates_per_profile,
+                    "maxItems": candidates_per_profile,
+                },
+            },
+            "required": ["candidates"],
+            "additionalProperties": False,
+        },
+    )
 
 
 def write_harness_space_catalog(domain: IronMindCandidateDomain, output_path: Path) -> None:
@@ -125,24 +142,22 @@ def write_harness_space_catalog(domain: IronMindCandidateDomain, output_path: Pa
     )
 
 
-def harness_profiles(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
+def harness_profiles() -> tuple[HarnessProfile, ...]:
     return tuple(
         HarnessProfile(
             profile_id,
             _CONTAINER_PROFILE_ROOT / profile_id / "AGENTS.md",
-            candidates_per_turn,
             agents_sha256=file_sha256(_LOCAL_PROFILE_ROOT / profile_id / "AGENTS.md"),
         )
         for profile_id in HARNESS_PROFILE_IDS
     )
 
 
-def direct_harness_profile(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
+def direct_harness_profile() -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(
             DIRECT_HARNESS_PROFILE_ID,
             _CONTAINER_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
-            candidates_per_turn,
             agents_sha256=file_sha256(
                 _LOCAL_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md"
             ),
@@ -160,8 +175,8 @@ def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
     )
 
 
-def harness_guest_runtime() -> HarnessGuestRuntime:
-    return load_harness_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
+def harness_guest_runtime() -> PiGuestRuntime:
+    return load_pi_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
 
 
 class IronMindHarnessExpander:
@@ -173,18 +188,22 @@ class IronMindHarnessExpander:
         domain: IronMindCandidateDomain,
         *,
         profiles: Sequence[HarnessProfile],
+        candidates_per_profile: int,
         campaign_id: str,
         first_active_round: int,
         attach_empirical_q0: bool,
-        account: Callable[[dict[str, int]], None] | None = None,
+        account: Callable[[dict[str, int | float]], None] | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("Iron Mind harness requires at least one profile")
         if first_active_round < 0:
             raise ValueError("first_active_round must be non-negative")
+        if candidates_per_profile < 1:
+            raise ValueError("candidates_per_profile must be positive")
         self.client = client
         self.domain = domain
         self.profiles = tuple(profiles)
+        self.candidates_per_profile = candidates_per_profile
         self.campaign_id = campaign_id
         self.profile_set_sha256 = profile_set_sha256(self.profiles)
         self.first_active_round = first_active_round
@@ -192,7 +211,7 @@ class IronMindHarnessExpander:
         self.account = account
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
-        expected = sum(profile.candidates_per_turn for profile in self.profiles)
+        expected = len(self.profiles) * self.candidates_per_profile
         if request.reservoir_size != expected:
             raise ValueError(
                 f"harness reservoir size must equal the configured minibatch total ({expected})"
@@ -201,14 +220,21 @@ class IronMindHarnessExpander:
         turns = self._turns(request, evaluated_candidates)
         if self.account is not None:
             self.account({"proposal_attempts": len(turns), "harness_turns": len(turns)})
+        started = time.perf_counter()
         results = self.client.run_turn(
             turns,
             submission_validator=lambda submission: _validate_submission(
-                submission, self.domain, evaluated
+                submission,
+                self.domain,
+                evaluated,
+                allow_repeated_occurrences=self.attach_empirical_q0,
             ),
         )
         if self.account is not None:
-            self.account(_usage_counts(results))
+            self.account({
+                **_usage_counts(results),
+                "harness_wall_time_seconds": time.perf_counter() - started,
+            })
         sampling_mode = (
             "persistent_parallel_research_sessions"
             if self.attach_empirical_q0
@@ -233,9 +259,7 @@ class IronMindHarnessExpander:
                 "sampling_mode": sampling_mode,
                 "round_idx": request.round_idx,
                 "session_count": len(self.profiles),
-                "candidates_per_session": [
-                    profile.candidates_per_turn for profile in self.profiles
-                ],
+                "candidates_per_session": [self.candidates_per_profile] * len(self.profiles),
                 "proposal_count": len(proposals),
                 "submitted_candidate_count": expected,
                 "candidate_lineage": [
@@ -256,6 +280,9 @@ class IronMindHarnessExpander:
         history_from_seq = history_to_seq - len(history)
         history_digest = canonical_sha256(serialized_history)
         forbidden_query_terms = _forbidden_query_terms(request)
+        evidence = condition_evidence(
+            _serialize_observations(request.observations), self.domain.schema
+        )
         return tuple(
             HarnessTurn(
                 profile_id=profile.profile_id,
@@ -274,10 +301,10 @@ class IronMindHarnessExpander:
                 history_digest=history_digest,
                 message=_turn_message(
                     request,
-                    profile,
-                    candidate_schema=harness_candidate_schema(self.domain.schema),
                     observations=serialized_history,
+                    evidence=evidence,
                     evaluated_candidates=evaluated_candidates,
+                    allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
                     history_from_seq=history_from_seq,
                     history_to_seq=history_to_seq,
@@ -303,13 +330,24 @@ class IronMindHarnessExpander:
             result = by_profile.get(profile.profile_id)
             if result is None:
                 raise ValueError(f"harness profile did not commit: {profile.profile_id}")
-            if len(result.candidates) != profile.candidates_per_turn:
+            if result.submission_status != "accepted":
+                raise RuntimeError(
+                    f"harness profile submission was rejected: {profile.profile_id}"
+                )
+            candidates = result.submission.get("candidates")
+            if not isinstance(candidates, list) or any(
+                not isinstance(candidate, dict) for candidate in candidates
+            ):
+                raise RuntimeError(
+                    f"harness profile {profile.profile_id} committed an invalid candidate payload"
+                )
+            if len(candidates) != self.candidates_per_profile:
                 raise ValueError(
                     f"harness profile {profile.profile_id} must submit exactly "
-                    f"{profile.candidates_per_turn} candidates"
+                    f"{self.candidates_per_profile} candidates"
                 )
             profile_keys: set[str] = set()
-            for index, candidate in enumerate(result.candidates):
+            for index, candidate in enumerate(candidates):
                 try:
                     prepared = _validated_candidate(candidate, self.domain, evaluated)
                 except ValueError as exc:
@@ -317,7 +355,10 @@ class IronMindHarnessExpander:
                         "committed harness candidate failed authoritative validation: "
                         f"{result.profile_id}[{index}]: {exc}"
                     ) from exc
-                if prepared.canonical_key in profile_keys:
+                if (
+                    not self.attach_empirical_q0
+                    and prepared.canonical_key in profile_keys
+                ):
                     raise RuntimeError(
                         "committed harness profile contains a duplicate occurrence: "
                         f"{result.profile_id}[{index}]"
@@ -393,7 +434,7 @@ def _turn_id(
 
 
 def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
-    terms = set(HARNESS_FORBIDDEN_TERMS)
+    terms = set(FORBIDDEN_QUERY_TERMS)
     for observation in request.observations:
         terms.add(observation.candidate_id)
         terms.add(observation.canonical_key)
@@ -402,11 +443,11 @@ def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
 
 def _turn_message(
     request: ExpansionRequest,
-    profile: HarnessProfile,
     *,
-    candidate_schema: dict[str, object],
     observations: Sequence[dict[str, object]],
+    evidence: dict[str, Any],
     evaluated_candidates: Sequence[dict[str, object]],
+    allow_repeated_occurrences: bool,
     initial: bool,
     history_from_seq: int,
     history_to_seq: int,
@@ -422,21 +463,30 @@ def _turn_message(
         "dataset_id": request.observations[0].candidate.payload["dataset_id"] if request.observations else None,
         "objective": f"maximize measured {OBJECTIVE_NAME}; higher is better",
         "new_measured_observations": list(observations),
+        "condition_evidence": evidence,
         "evaluated_candidates": list(evaluated_candidates),
+        "measurement_feedback": (
+            "Your occurrences enter a shared pool; only selected unique candidates are measured. "
+            "Match new measurements to your earlier submissions and revise the corresponding hypotheses. "
+            "A submitted but unmeasured candidate is neither failed nor successful and remains eligible. "
+            "Selection is a sampling event, not evidence of candidate quality: neither being selected "
+            "nor being left unmeasured justifies extra confidence or more slots by itself. "
+            "Allocate repeated slots from measured or scientific evidence, not to win selection. "
+            "Separate expected improvement from the information value of a control. "
+            "If progress stalls, investigate a contrasting hypothesis rather than only repeating "
+            "near-equivalent variants; controls need meaningful proposal mass to have a chance of measurement."
+            if allow_repeated_occurrences else
+            "Your distinct submitted candidates are directly measured; update hypotheses from the returned results."
+        ),
         "novelty_contract": {
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
-            "required_not_evaluated_candidate_count": profile.candidates_per_turn,
             "same_round_cross_session_agreement_is_allowed": True,
-            "same_session_duplicates_are_forbidden": True,
+            "same_session_repeated_occurrences_are_allowed": allow_repeated_occurrences,
+            "repeated_occurrences_contribute_to_empirical_q0": allow_repeated_occurrences,
             "validate_before_submission": True,
         },
         "reaction_space_tools": list(HARNESS_TOOL_NAMES),
-        "submission_contract": {
-            "tool": "submit_candidates",
-            "candidate_count": profile.candidates_per_turn,
-            "candidate_schema": candidate_schema,
-        },
         "time_budget": {
             "hard_wall_time_minutes": 30,
             "end_open_ended_research_by_minute": 20,
@@ -450,11 +500,16 @@ def _turn_message(
             "Campaign measurements are the only measured objective values; do not present predictions as measurements.",
             "The isolated sandbox contains no authoritative task data; use the structured tools for the legal condition space and measurements.",
             "Research autonomously when useful: search public literature, inspect public documents, and run scratch analysis code in the sandbox.",
-            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "End open-ended research by minute 20 and make the first complete validated submission by minute 25; delivering the minibatch takes priority over further research.",
             "Never submit a candidate listed in evaluated_candidates.",
             "A candidate proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
-            "Historical repeats, invalid candidates, and duplicates within your own minibatch will be rejected with exact reasons.",
+            (
+                "Your minibatch is an ordered multiset of proposal occurrences. You may allocate multiple slots to the same legal, historically unseen candidate when your evidence justifies extra empirical q0 mass; use multiplicity deliberately rather than as filler."
+                if allow_repeated_occurrences
+                else "Your directly evaluated minibatch must contain distinct candidates."
+            ),
+            "Historical repeats and invalid candidates will be rejected with exact reasons.",
             "If rejected, replace the reported entries and resubmit the complete minibatch without restarting the research phase.",
         ],
     }
@@ -482,19 +537,41 @@ def _validate_submission(
     submission: HarnessSubmissionRequest,
     domain: IronMindCandidateDomain,
     evaluated: set[str],
+    *,
+    allow_repeated_occurrences: bool,
 ) -> HarnessSubmissionValidation:
-    rejections: list[HarnessSubmissionRejection] = []
+    candidates = submission.submission.get("candidates")
+    if not isinstance(candidates, list):
+        return HarnessSubmissionValidation("retry", (
+            HarnessSubmissionError(
+                "/candidates",
+                "invalid_candidate_batch",
+                "The submission must contain a candidates array.",
+                "Submit the complete candidate batch required by the terminal tool schema.",
+            ),
+        ))
+    errors: list[HarnessSubmissionError] = []
     first_index_by_key: dict[str, int] = {}
-    for index, candidate in enumerate(submission.candidates):
+    for index, candidate in enumerate(candidates):
+        path = f"/candidates/{index}"
+        if not isinstance(candidate, dict):
+            errors.append(HarnessSubmissionError(
+                path,
+                "invalid_candidate",
+                f"Candidate at index {index} must be an object.",
+                "Replace it with one complete legal reaction-condition object.",
+            ))
+            continue
         try:
             prepared = prepare_candidate_payload(candidate, domain.schema, domain.table)
         except CandidatePayloadError as exc:
-            rejections.append(
-                HarnessSubmissionRejection(
-                    index,
+            errors.append(
+                HarnessSubmissionError(
+                    path,
                     "invalid_candidate",
                     f"Candidate at index {index} is not a legal source-pinned reaction condition "
                     f"({exc.reason}): {exc}",
+                    "Use the structured reaction-space tools to replace this entry.",
                 )
             )
             continue
@@ -502,28 +579,34 @@ def _validate_submission(
             prepared.payload, ensure_ascii=False, separators=(",", ":")
         )
         if prepared.canonical_key in evaluated:
-            rejections.append(
-                HarnessSubmissionRejection(
-                    index,
+            errors.append(
+                HarnessSubmissionError(
+                    path,
                     "historical_duplicate",
                     f"Candidate at index {index} {candidate_label} was already evaluated in a "
                     "previous round. Replace it with a different unseen condition.",
+                    "Choose a legal condition absent from evaluated_candidates.",
                 )
             )
             continue
         first_index = first_index_by_key.get(prepared.canonical_key)
-        if first_index is not None:
-            rejections.append(
-                HarnessSubmissionRejection(
-                    index,
+        if not allow_repeated_occurrences and first_index is not None:
+            errors.append(
+                HarnessSubmissionError(
+                    path,
                     "same_session_duplicate",
                     f"Candidate at index {index} {candidate_label} duplicates index {first_index} "
                     "in this submission. Keep the first occurrence and replace this one.",
+                    "Replace only this repeated entry with another unseen legal condition.",
                 )
             )
             continue
-        first_index_by_key[prepared.canonical_key] = index
-    return HarnessSubmissionValidation(tuple(rejections))
+        first_index_by_key.setdefault(prepared.canonical_key, index)
+    return (
+        HarnessSubmissionValidation("retry", tuple(errors))
+        if errors
+        else HarnessSubmissionValidation()
+    )
 
 
 def _evaluated_history(
@@ -546,6 +629,10 @@ def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
             sum(int(count) for count in result.usage["toolCalls"].values())
             for result in results
         ),
+        "harness_validation_submissions": sum(
+            int(result.usage.get("validationSubmissions", 0))
+            for result in results
+        ),
         "harness_artifact_bytes": sum(
             int(result.usage["artifactBytes"]) for result in results
         ),
@@ -562,6 +649,7 @@ def _candidate_lineage(
 
 
 def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
+    candidates = result.submission.get("candidates")
     return {
         "profile_id": result.profile_id,
         "session_id": result.session_id,
@@ -571,20 +659,19 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
         "history_to_seq": result.history_to_seq,
         "history_digest": result.history_digest,
         "submission_id": result.submission_id,
-        "candidate_count": len(result.candidates),
+        "candidate_count": len(candidates) if isinstance(candidates, list) else 0,
         "usage": result.usage,
         "artifacts": result.artifacts,
     }
 
 
 __all__ = [
-    "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",
     "IronMindHarnessExpander",
-    "harness_candidate_schema",
-    "harness_profiles",
     "harness_guest_runtime",
+    "harness_profiles",
+    "harness_submission_contract",
     "harness_tool_extensions",
     "write_harness_space_catalog",
 ]

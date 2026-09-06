@@ -4,6 +4,9 @@ Read [`docs/research-harness.md`](../../../docs/research-harness.md) before
 implementing a persistent proposal backend. That document is authoritative for
 the shared interface, ownership boundary, resources, traces, and qualification.
 Use this reference only as the task-registration checklist.
+For an independent policy-artifact session, use
+[harness-compiled-policy.md](harness-compiled-policy.md) instead of extending
+the candidate submission schema with policy fields.
 
 ## Choose The Backend Deliberately
 
@@ -30,6 +33,8 @@ unchanged after recovery.
 
 The Harness remains inside the task's `ReservoirExpander`. Do not add another
 Campaign, BO loop, optimization history, evaluator path, or central task branch.
+Use `PiHarnessConfig` from `ldm_tts.harness.pi` for Pi-specific provider, tools,
+and guest settings. Keep `HarnessPoolConfig` and the shared client backend-neutral.
 
 ## Implement The Task Boundary
 
@@ -39,24 +44,29 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   `tasks/<task_id>/core/`.
 - Put versioned `AGENTS.md` profiles, optional skill directories, and optional
   structured task tools under `tasks/<task_id>/resources/harness/`.
-- Record SHA-256 identities for profiles, skills, candidate schemas, and tool
-  sources; mount these resources read-only.
-- Provide the sidecar with the task's strict candidate JSON Schema, including
-  required fields, value constraints, and `additionalProperties: false`. The
-  sidecar must expose that schema through `submit_candidates` and require the
-  exact profile minibatch size; task validation remains the authoritative
-  admission boundary.
+- Record SHA-256 identities for profiles, skills, submission contracts, and tool
+  sources. Let the sidecar snapshot selected profile and Skill files into the
+  session workspace and expose that snapshot read-only at the guest-visible
+  `/workspace/.ldm-resources` path.
+- Provide the sidecar with one strict `HarnessSubmissionContract`. Its payload
+  schema owns the terminal tool name, required fields, value constraints,
+  `additionalProperties: false`, and exact profile minibatch size. Task
+  validation remains the authoritative admission boundary.
 - Build deterministic `HarnessTurn` identities from campaign, profile, round,
   and history range/digest.
 - Send newly measured observations for reasoning and a compact authoritative
   evaluated-candidate snapshot when historical repeats are forbidden.
-- State explicitly that only the authoritative evaluated snapshot is excluded.
+- When historical repeats are forbidden, state that only the authoritative evaluated snapshot is excluded.
   Candidates proposed in an earlier turn but not evaluated remain eligible;
   persistent sessions must not invent a private exclusion set.
 - Validate every provisional submission through the same parser and canonical
   identity used by Campaign admission.
-- Return one stable, actionable `HarnessSubmissionRejection` for each rejected
-  index and accept only a complete valid minibatch.
+- Return one stable, actionable `HarnessSubmissionError` with a JSON Pointer,
+  code, message, and repair hint for each invalid entry. Return `retry` until a
+  complete valid minibatch is available; use `reject_turn` only when the
+  contract's validation-attempt limit closes the turn.
+  Keep research, editing, and validation tools usable after rejection; do not
+  force the next model request to call only the terminal tool.
 - Turn instructions must translate the hard wall-time into explicit research,
   validation, and first-submission milestones. "Reserve enough time" is not a
   reliable delivery contract for an autonomous Agent; qualify the slowest role
@@ -85,6 +95,8 @@ Add focused tests for profile/tool digests, turn identity and history ranges,
 strict minibatch cardinality, indexed rejection and correction, committed-turn
 idempotence, budget counters, lineage, and credential redaction. A mock uses a
 protocol-faithful fake sidecar and no external systems.
+Test partial-turn recovery without overwriting attempts and reject resume when
+configuration, resource digests, or runtime identity changes.
 
 Before `tiny_campaign_verified`, run the actual sidecar unit tests and one real
 capability smoke with the configured wire API, isolation, profiles, and tools.

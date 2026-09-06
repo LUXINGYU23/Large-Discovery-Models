@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "task_id": "nucleobench",
+  "stage": "tiny_campaign_verified",
+  "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+  "contract_profile": "",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/nucleobench/task.json",
+        "tasks/nucleobench/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/nucleobench/ldm_task/procedure.py",
+        "tasks/nucleobench/core/dependencies.py",
+        "tasks/nucleobench/core/cases.py",
+        "tasks/nucleobench/resources/cases/catalog.json"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/mock.yaml",
+        "tasks/nucleobench/core/mock.py",
+        "tasks/nucleobench/core/workflow.py",
+        "tasks/nucleobench/tests/test_procedure.py",
+        "tasks/nucleobench/resources/verification_record.json"
+      ]
+    },
+    "contract_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/nucleobench/resources/upstream_contract.json",
+        "tasks/nucleobench/scripts/prepare_official_data.py",
+        "tasks/nucleobench/tests/test_official_adapter.py",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "The official source and runner are pinned. Public starts, editable masks, and model artifacts are digest-bound for the 16 published paired-start cases; RiNALMo remains blocked on its unpublished paired-start set."
+    },
+    "seed_evaluated": {
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/malinois_k562_seed_qualification.yaml",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "The first paired start was evaluated by the unchanged source-pinned Malinois oracle."
+    },
+    "tiny_campaign_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/nucleobench/malinois_k562_tiny_campaign.yaml",
+        "tasks/nucleobench/resources/verification_record.json"
+      ],
+      "description": "Direct LDM, four-session LDM Harness, one-session direct Harness, and completed-campaign resume paths passed real two-round qualification."
+    },
+    "campaign_qualified": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

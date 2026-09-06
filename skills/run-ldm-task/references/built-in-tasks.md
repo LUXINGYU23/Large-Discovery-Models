@@ -8,6 +8,7 @@
 - [Antibody](#antibody)
 - [Iron Mind](#iron-mind)
 - [SynthonBench](#synthonbench)
+- [NucleoBench](#nucleobench)
 
 ## Common Rules
 
@@ -47,6 +48,12 @@ qualified execution of the named profile.
 All model-backed task modes accept OpenAI-compatible URL, model, and key
 settings. Keep authenticated keys in environment variables or documented
 ignored protected files, never tracked YAML or literal command arguments.
+
+For Iron Mind, SynthonBench, and NucleoBench pilot runs, select children from
+`config/pilot_evaluation/<task>.yaml` using `scripts/run_pilot_evaluation.py`
+with `--method`, `--case`, and `--seed`. Method arguments come from the matrix's
+base config and `method_overrides`; do not create standalone method copies.
+See `docs/pilot-evaluation.md` for six-round and twelve-round entry points.
 
 Direct proposal backends use Chat Completions. A task's research Harness may
 use another compatible wire API; the Pi sidecar uses Responses and
@@ -147,26 +154,34 @@ config/pilot_evaluation/iron_mind.yaml
 
 All model-backed methods use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY`.
 Direct sampling uses Chat Completions. Harness methods use the Pi Responses
-sidecar and additionally requires Docker, Linux KVM, a built Harness image, and
+sidecar and additionally require Docker, Linux KVM, a built Harness image, and
 writable external run/cache roots. A protected API-key file may be selected by
 `--harness-api-key-file`.
 
 Iron Mind constructs the shared `LDMEngine` directly around source-pinned
 finite reaction tables. Four persistent Harness profiles each submit 16 exact
-condition combinations. Task-local Python rejects invalid, historically
-evaluated, and within-session duplicate candidates before commit; cross-session
-agreement remains as proposal-frequency mass. Accepted occurrences then use
+condition combinations. Task-local Python rejects invalid and historically
+evaluated candidates before commit; repeated unevaluated candidates retain
+their proposal-frequency mass. Accepted occurrences then use
 the same empirical `q0`, factor-aware categorical GP-UCB, acquisition tilt,
 and frozen evaluator as direct LDM. The direct research Harness instead uses
 one persistent session to choose the evaluated condition without `q0`, GP, or
 acquisition.
 
+Harness-Compiled LDM keeps the four proposal sessions and adds one independent
+`policy_architect` session. Its complete `optimization_policy.py` may supply a
+standardized prior mean for the task-local residual GP and schedule LDM
+`alpha`/`eta`; candidate generation, kernel, variance, UCB, pool, and evaluator
+remain fixed. Inspect `<run_dir>/policy_harness/` for the separate manifest,
+turns, validations, accepted epochs, and degraded/fallback state.
+
 Follow `tasks/iron_mind/QUICKSTART.md`: validate the mock path, prepare the
 official source-pinned data, build the sidecar, run `ldm_harness_smoke.yaml`, and
-only then run the five-method Pilot Evaluation. Inspect `<run_dir>/harness/` for
-session/provider traces and the normal campaign artifacts for optimization
-history and results. Optional MCP servers and per-tool turn budgets use the
-shared Harness configuration in `docs/research-harness.md`.
+only then run the six-method Pilot Evaluation. Inspect `<run_dir>/harness/` for
+proposal traces, `<run_dir>/policy_harness/` for compiled-policy traces, and the
+normal campaign artifacts for optimization history and results. Optional MCP
+servers and separate proposal/policy tool budgets use the shared Harness
+configuration in `docs/research-harness.md`.
 
 ## SynthonBench
 
@@ -177,12 +192,13 @@ tasks/synthonbench/README.md
 tasks/synthonbench/QUICKSTART.md
 config/synthonbench/mock.yaml
 config/synthonbench/ldm_harness_surrogate_smoke.yaml
+config/pilot_evaluation/synthonbench.yaml
 ```
 
 Direct methods use the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
 `LLM_API_KEY` settings. Harness methods use the same provider identity but run
 the Pi sidecar over the OpenAI Responses wire format. They additionally
-requires Docker, Linux KVM, the configured Harness image, writable run and cache
+require Docker, Linux KVM, the configured Harness image, writable run and cache
 directories, and read-only task profiles/tools. An ignored protected key file
 may be selected by the task config instead of placing a key in process
 arguments.
@@ -202,3 +218,53 @@ uses one persistent comprehensive session and evaluates its complete 16-tuple
 minibatch without `q0`, GP, or acquisition. Inspect `<run_dir>/harness/`
 alongside the shared campaign artifacts. Optional MCP servers and per-tool turn
 budgets use `docs/research-harness.md`.
+
+Harness-Compiled LDM retains the four proposal sessions and adds one independent
+policy session. The task-local policy feature encoder uses released reaction,
+slot, capacity, and synthon-descriptor data. Its complete Python artifact may
+set the residual-GP prior mean and LDM `alpha`/`eta`, while the Nyström/FITC
+kernel, uncertainty, acquisition, pool, and official evaluator remain fixed.
+Inspect `<run_dir>/policy_harness/` and the matrix
+`compiled_policy_rounds.csv`; policy tool budgets are separate from proposal
+tool budgets.
+
+## NucleoBench
+
+Files:
+
+```text
+tasks/nucleobench/README.md
+tasks/nucleobench/QUICKSTART.md
+config/nucleobench/mock.yaml
+config/nucleobench/malinois_k562_tiny_campaign.yaml
+config/pilot_evaluation/nucleobench.yaml
+```
+
+Direct and Harness methods use `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
+`LLM_API_KEY`. Direct methods can select Chat Completions or Responses; the
+committed real profiles use Responses. Harness methods require the Pi sidecar,
+Linux KVM, the built task guest, and external cache and run roots. An ignored
+protected key file may be selected with `--api-key-file`.
+
+NucleoBench exposes the shared `LDMEngine` through the source-pinned official
+`SequenceOptimizer` lifecycle. Candidates are mutation patches relative to
+one paired official start. Direct LDM makes four independent minibatch requests;
+Harness LDM advances four persistent sequence-research roles. Invalid and
+historically evaluated patches are repaired before commit, while cross-lineage
+agreement remains empirical `q0` mass. The task maintains a `3B` pool, fits
+its exact normalized-Hamming GP-UCB, applies the LDM acquisition tilt, and
+batch-evaluates selected sequences through the official model wrapper.
+
+Direct research Harness uses one persistent session and evaluates its accepted
+minibatch without `q0`, GP, or acquisition. Harness-Compiled LDM adds one
+independent `policy_architect` session whose task-local Skill may set the
+residual-GP prior mean and LDM `alpha`/`eta`; the kernel, variance, UCB,
+pool, candidate budget, and evaluator remain fixed.
+
+Follow `tasks/nucleobench/QUICKSTART.md` to validate the mock path, prepare
+digest-pinned external starts and model artifacts, build and smoke the task
+guest, run the qualified Malinois K562 tiny campaign, and inspect the
+six-method three-seed Pilot Evaluation. Proposal traces are under
+`<run_dir>/harness/`, compiled-policy traces under
+`<run_dir>/policy_harness/`, and optimization state in the shared campaign
+artifacts.

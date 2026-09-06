@@ -110,7 +110,12 @@ export class ProviderProxy {
 		if (!this.server) return;
 		const server = this.server;
 		this.server = undefined;
-		await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+		this.port = undefined;
+		const closed = new Promise<void>((resolve, reject) => {
+			server.close((error) => (error ? reject(error) : resolve()));
+		});
+		server.closeAllConnections();
+		await closed;
 	}
 
 	private async readRequest(request: IncomingMessage): Promise<Buffer> {

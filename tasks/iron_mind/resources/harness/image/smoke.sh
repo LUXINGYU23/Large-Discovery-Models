@@ -3,8 +3,10 @@ set -eu
 
 mkdir -p /workspace/research
 python - <<'PY'
+import numpy as np
 from pypdf import PdfReader, PdfWriter
 
+assert np.isfinite(np.asarray([1.0, 2.0])).all()
 path = "/workspace/research/smoke.pdf"
 writer = PdfWriter()
 writer.add_blank_page(width=72, height=72)

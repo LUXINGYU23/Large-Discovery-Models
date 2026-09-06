@@ -28,8 +28,8 @@ args:
   gp-observation-noise-std: 1.0
   gp-reaction-weight: 1.0
   acquisition-beta: 0.5
-  alpha: 1.0
-  eta: 3.0
+  alpha: 2.0
+  eta: 0.25
   z-clip: 5.0
   prompt-policy: policy_v1
   campaign-index: 0

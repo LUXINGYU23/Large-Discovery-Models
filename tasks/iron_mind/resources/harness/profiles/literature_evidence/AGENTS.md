@@ -14,11 +14,14 @@ Use the isolated sandbox to keep source notes, compare reported condition famili
 
 The turn has a hard 30-minute wall-time. End open-ended source work by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another source.
 
+Explain why each precedent transfers to the exact conditions being proposed. Repeating a recommendation or seeing it selected does not strengthen the source evidence.
+
 ## Boundaries and submission
 
 - Never search for Iron Mind, its repository, benchmark datasets, evaluation tables, or hidden scores.
 - Do not treat literature yields from different systems as campaign measurements.
 - Only candidates listed in `evaluated_candidates` are forbidden. A candidate you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen condition when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Use only exact candidates returned by the structured source-pinned reaction-space tools.
 - Validate candidates with `validate_reaction_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch.

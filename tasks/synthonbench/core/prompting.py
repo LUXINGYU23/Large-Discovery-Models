@@ -73,21 +73,33 @@ def build_synthon_batch_prompt_messages(
             "candidate_count": len(plans),
             "candidates": [
                 {
-                    "proposal_index": "copy the integer from the corresponding proposal slot",
-                    "reaction_id": "copy the fixed reaction_id from that slot",
-                    "synthon_ids": "one complete ordered integer array valid for that slot",
+                    "proposal_index": "use every output occurrence index exactly once",
+                    "source_proposal_index": "copy the proposal_index of the source slot used to construct this occurrence",
+                    "reaction_id": "copy the fixed reaction_id from the source slot",
+                    "synthon_ids": "one complete ordered integer array valid for the source slot",
                 }
             ],
+            "multiplicity": (
+                "The candidates array is an ordered multiset. A legal candidate may occupy "
+                "multiple output occurrences by reusing its source_proposal_index and exact "
+                "tuple when stronger confidence warrants more empirical q0 mass."
+            ),
         },
     }
     user = (
-        f"Complete all {len(plans)} independent molecular-design proposal slots. "
-        "Choose exactly one tuple per slot using only that slot's supplied options; never mix "
-        "components between slots. The measured history is shared evidence, not an exclusion "
-        "list beyond candidates explicitly present in it.\n\n"
+        f"Allocate all {len(plans)} molecular-design proposal occurrences. "
+        "Construct each occurrence from one supplied source slot and never mix components "
+        "between source slots. You may deliberately repeat an exact legal tuple across output "
+        "occurrences to give it more empirical q0 mass; do so only when your evidence supports "
+        "the allocation, not as filler or to make an unselected candidate win selection. "
+        "Being selected or left unmeasured is not evidence of molecular quality. "
+        "Keep the information value of controls separate from expected improvement. "
+        "The measured history is shared evidence, not an "
+        "exclusion list beyond candidates explicitly present in it.\n\n"
         + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         + "\n\nReturn exactly one JSON object containing only candidates. Include every "
-        "proposal_index exactly once and include no explanation or additional fields."
+        "output proposal_index exactly once, identify each source_proposal_index, and include "
+        "no explanation or additional fields."
     )
     return [
         {"role": "system", "content": _batch_system_prompt(len(plans))},

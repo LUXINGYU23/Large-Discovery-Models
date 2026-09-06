@@ -102,24 +102,28 @@ async function main(): Promise<void> {
 			})));
 		} else if (call === 2) {
 			writeEvents(response, toolEvents(call, "bash", JSON.stringify({
-				command: "if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
+				command: "if printf 'tamper' >> .ldm-resources/skills/0/capability-smoke/SKILL.md 2>/dev/null; then exit 9; fi; if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
 			})));
 		} else if (call === 3) {
-			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
+			writeEvents(response, toolEvents(call, "read", JSON.stringify({
+				path: "/workspace/.ldm-resources/skills/0/capability-smoke/SKILL.md",
+			})));
 		} else if (call === 4) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+			writeEvents(response, toolEvents(call, "read", JSON.stringify({ path: "proof.txt" })));
+		} else if (call === 5) {
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r1", synthon_ids: ["a", "b"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
-		} else if (call === 5) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+		} else if (call === 6) {
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r5", synthon_ids: ["i", "j"] }, { reaction_id: "r2", synthon_ids: ["c", "d"] }],
 			})));
-		} else if (call === 6) {
-			writeEvents(response, textEvents(call, "Corrected submission accepted."));
 		} else if (call === 7) {
-			writeEvents(response, failureEvents(call, "stream_read_error"));
+			writeEvents(response, textEvents(call, "Corrected submission accepted."));
 		} else if (call === 8) {
-			writeEvents(response, toolEvents(call, "submit_candidates", JSON.stringify({
+			writeEvents(response, failureEvents(call, "stream_read_error"));
+		} else if (call === 9) {
+			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r3", synthon_ids: ["e", "f"] }, { reaction_id: "r4", synthon_ids: ["g", "h"] }],
 			})));
 		} else {
@@ -131,15 +135,29 @@ async function main(): Promise<void> {
 	assert(address && typeof address !== "string");
 
 	const agentsPath = join(root, "AGENTS.md");
-	const agents = "You are the capability-smoke researcher. Use the available tools and submit exactly two candidates.\n";
+	const agents = "You are the capability-smoke researcher. Read the capability-smoke Skill, use the available tools, and submit exactly two candidates.\n";
 	await writeFile(agentsPath, agents);
+	const skillDirectory = join(root, "skills", "capability-smoke");
+	const skill = [
+		"---",
+		"name: capability-smoke",
+		"description: Verify that the task-local capability smoke instructions are readable inside the isolated guest.",
+		"---",
+		"",
+		"# Capability Smoke",
+		"",
+		"Report the marker task-local-skill-ok after reading this file.",
+		"",
+	].join("\n");
+	await mkdir(skillDirectory, { recursive: true });
+	await writeFile(join(skillDirectory, "SKILL.md"), skill);
+	const skillDigest = canonicalSha256([{ path: "SKILL.md", sha256: sha256(skill) }]);
 	const profile = {
 		profileId: "target_sar",
 		agentsPath,
 		agentsSha256: sha256(agents),
-		skillDirs: [],
-		skillDirSha256: [],
-		candidatesPerTurn: 2,
+		skillDirs: [skillDirectory],
+		skillDirSha256: [skillDigest],
 	};
 	const candidateSchema = {
 		type: "object",
@@ -149,6 +167,20 @@ async function main(): Promise<void> {
 		},
 		required: ["reaction_id", "synthon_ids"],
 		additionalProperties: false,
+	};
+	const submissionContract = {
+		contractId: "candidate_batch",
+		toolName: "submit_research",
+		payloadSchema: {
+			type: "object",
+			properties: {
+				candidates: { type: "array", items: candidateSchema, minItems: 2, maxItems: 2 },
+			},
+			required: ["candidates"],
+			additionalProperties: false,
+		},
+		artifactRules: [],
+		maxValidationAttempts: null,
 	};
 	const config: InitializeFrame = {
 		type: "initialize",
@@ -163,12 +195,11 @@ async function main(): Promise<void> {
 		taskId: recipe.taskId,
 		caseId: "local-smoke",
 		seed: 1,
-		candidateSchema,
-		candidateSchemaSha256: canonicalSha256(candidateSchema),
+		submissionContract,
+		submissionContractSha256: canonicalSha256(submissionContract),
 		guestRuntime: recipe.guestRuntime,
 		profileSetSha256: canonicalSha256([{
 			agentsSha256: profile.agentsSha256,
-			candidatesPerTurn: profile.candidatesPerTurn,
 			profileId: profile.profileId,
 			skillDirSha256: profile.skillDirSha256,
 		}]),
@@ -194,15 +225,16 @@ async function main(): Promise<void> {
 	const validate = async (request: { turnId: string; attemptIndex: number }) => {
 		if (request.turnId === "capability_turn" && request.attemptIndex === 1) {
 			return {
-				accepted: false,
-				rejected: [{
-					index: 0,
+				decision: "retry" as const,
+				errors: [{
+					path: "/candidates/0",
 					code: "historical_duplicate",
 					message: "Candidate r1 was already evaluated; replace index 0.",
+					hint: "Replace the rejected candidate and resubmit.",
 				}],
 			};
 		}
-		return { accepted: true, rejected: [] };
+		return { decision: "accept" as const, errors: [] };
 	};
 	try {
 		await pool.initialize();
@@ -229,20 +261,27 @@ async function main(): Promise<void> {
 			forbiddenQueryTerms: ["candidate-secret-id"],
 		}], validate);
 		assert(turn);
-		assert.equal(turn.submission.candidates.length, 2);
-		assert.equal(turn.usage.providerCalls, 6);
+		assert.equal((turn.submission.candidates as unknown[]).length, 2);
+		assert.equal(turn.usage.providerCalls, 7);
 		assert.equal(turn.usage.toolCalls.web_search, 1);
 		assert.deepEqual(turn.toolBudget.web_search, { limit: 2, used: 1, remaining: 1 });
 		assert(requestBodies[0]?.includes("capability-smoke researcher"));
+		assert(requestBodies[0]?.includes("<name>capability-smoke</name>"));
+		assert(requestBodies[0]?.includes("/workspace/.ldm-resources/skills/0/capability-smoke/SKILL.md"));
+		assert(requestBodies[0]?.includes("not a checkout of the project repository"));
+		assert(requestBodies[0]?.includes("apply_patch is not available in the guest"));
+		assert(requestBodies[0]?.includes("Invoke task and MCP tools directly"));
+		assert.equal(requestBodies[0]?.includes("task-local-skill-ok"), false);
 		assert(requestBodies[0]?.includes('"effort":"max"'));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });
 		assert.equal(payloads[0]?.tool_choice, "required");
-		const submissionChoice = { type: "function", name: "submit_candidates" };
+		const submissionChoice = { type: "function", name: "submit_research" };
 		assert.equal(payloads[1]?.tool_choice, undefined);
 		assert.equal(payloads[2]?.tool_choice, undefined);
 		assert.equal(payloads[3]?.tool_choice, undefined);
-		assert.deepEqual(payloads[4]?.tool_choice, submissionChoice);
-		assert.equal(payloads[5]?.tool_choice, undefined);
+		assert.equal(payloads[4]?.tool_choice, undefined);
+		assert.deepEqual(payloads[5]?.tool_choice, submissionChoice);
+		assert.equal(payloads[6]?.tool_choice, undefined);
 
 		const recoveryInput = {
 			profileId: "target_sar",
@@ -257,12 +296,14 @@ async function main(): Promise<void> {
 		};
 		const [recovered] = await pool.runTurns([recoveryInput], validate);
 		assert(recovered);
-		assert.equal(recovered.submission.candidates.length, 2);
+		assert.equal((recovered.submission.candidates as unknown[]).length, 2);
 		assert.equal(recovered.usage.providerCalls, 3);
-		assert.deepEqual((JSON.parse(requestBodies[7] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
+		assert.deepEqual((JSON.parse(requestBodies[8] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
 		const [replayed] = await pool.runTurns([recoveryInput], validate);
-		assert.deepEqual(replayed, recovered);
-		assert.equal(call, 9);
+		assert(replayed);
+		assert.equal(replayed.submissionDigest, recovered.submissionDigest);
+		assert.equal(replayed.replayed, true);
+		assert.equal(call, 10);
 		await assert.rejects(
 			pool.runTurns(
 				[{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }],
@@ -275,25 +316,31 @@ async function main(): Promise<void> {
 		const sessionFiles = await readdir(join(root, "harness", "sessions", "target_sar", "pi-session"));
 		assert.equal(sessionFiles.filter((name) => name.endsWith(".jsonl")).length, 1);
 		const session = await readFile(join(root, "harness", "sessions", "target_sar", "pi-session", sessionFiles[0] as string), "utf8");
-		const readResult = session
+		const readResults = session
 			.trim()
 			.split("\n")
 			.map((line) => JSON.parse(line) as { message?: { role?: string; toolName?: string; content?: unknown; isError?: boolean } })
-			.find((entry) => entry.message?.role === "toolResult" && entry.message.toolName === "read")
-			?.message;
-		assert(readResult);
-		assert.equal(readResult.isError, false, JSON.stringify(readResult.content));
-		assert.match(JSON.stringify(readResult.content), /sandbox-network-ok/);
+			.filter((entry) => entry.message?.role === "toolResult" && entry.message.toolName === "read")
+			.map((entry) => entry.message);
+		assert.equal(readResults.length, 2);
+		assert(readResults.every((result) => result?.isError === false), JSON.stringify(readResults));
+		assert.match(JSON.stringify(readResults), /task-local-skill-ok/);
+		assert.match(JSON.stringify(readResults), /sandbox-network-ok/);
 		assert.equal(await readFile(join(root, "harness", "sessions", "target_sar", "workspace", "proof.txt"), "utf8"), "sandbox-network-ok");
-		assert.match(session, /submit_candidates/);
+		assert.equal(
+			await readFile(join(root, "harness", "sessions", "target_sar", "workspace", ".ldm-resources", "skills", "0", "capability-smoke", "SKILL.md"), "utf8"),
+			skill,
+		);
+		assert.match(session, /submit_research/);
 		assert.match(session, /historical_duplicate/);
 		assert.match(session, /already evaluated; replace index 0/);
 		assert.match(session, /previous provider stream ended/);
 		assert.match(session, /sandbox-network-ok/);
+		assert.match(session, /task-local-skill-ok/);
 		assert.match(session, /web_search/);
 		assert.match(session, /Buchwald Hartwig/);
 		const providerIndex = await readFile(join(root, "harness", "sessions", "target_sar", "turns", "capability_turn", "provider_index.jsonl"), "utf8");
-		assert.equal(providerIndex.trim().split("\n").length, 6);
+		assert.equal(providerIndex.trim().split("\n").length, 7);
 		assert.equal((await readdir(join(root, "harness", "sessions", "target_sar", "pi-agent"))).includes("auth.json"), false);
 		const manifest = JSON.parse(await readFile(join(root, "harness", "manifest.json"), "utf8")) as {
 			campaignId?: unknown;

@@ -153,6 +153,118 @@ def test_online_posterior_matches_closed_form_bayesian_linear_update() -> None:
     assert result.metadata["effective_beta"] == 1.0
     assert result.metadata["surrogate"]["target_mean"] == pytest.approx(target_mean)
     assert result.metadata["surrogate"]["target_scale"] == pytest.approx(target_scale)
+    projection = selector.posterior_projection(history, np.asarray([query.values]))
+    np.testing.assert_allclose(
+        target_mean + target_scale * (projection["weights"] @ target),
+        [prediction.scalar_mean],
+    )
+    np.testing.assert_allclose(target_scale * projection["std"], [prediction.scalar_std])
+
+
+def test_zero_prior_path_is_numerically_identical() -> None:
+    encoder = SynthonNystromEncoder(
+        _Space(),
+        ("r1", "r2"),
+        landmark_count=3,
+        seed=4,
+        fingerprint_bits=128,
+    )
+    observed = _candidate("r1", (1, 11))
+    candidate = _candidate("r2", (21,))
+    history = (
+        BOObservation.scalar(
+            observed.candidate_id,
+            1.0,
+            encoder.encode(observed).values,
+            feature_version=encoder.version,
+        ),
+    )
+    config = TanimotoGPUCBConfig()
+    static = SynthonTanimotoGPUCBSelector(
+        objective_name="utility",
+        feature_dimension=encoder.dimension,
+        feature_version=encoder.version,
+        config=config,
+    )
+    residual = SynthonTanimotoGPUCBSelector(
+        objective_name="utility",
+        feature_dimension=encoder.dimension,
+        feature_version=encoder.version,
+        config=config,
+    )
+    representations = {candidate.candidate_id: encoder.encode(candidate)}
+
+    static.fit(history)
+    residual.fit(history, history_prior_mean=np.zeros(1))
+
+    assert static.select((candidate,), representations).to_dict() == residual.select(
+        (candidate,),
+        representations,
+        query_prior_mean=np.zeros(1),
+    ).to_dict()
+
+
+def test_nonzero_prior_is_fitted_as_a_residual_and_added_back() -> None:
+    encoder = SynthonNystromEncoder(
+        _Space(),
+        ("r1", "r2"),
+        landmark_count=3,
+        seed=4,
+        fingerprint_bits=128,
+    )
+    observed = _candidate("r1", (1, 11))
+    candidate = _candidate("r2", (21,))
+    history = (
+        BOObservation.scalar(
+            observed.candidate_id,
+            1.0,
+            encoder.encode(observed).values,
+            feature_version=encoder.version,
+        ),
+    )
+    config = TanimotoGPUCBConfig()
+    static = SynthonTanimotoGPUCBSelector(
+        objective_name="utility",
+        feature_dimension=encoder.dimension,
+        feature_version=encoder.version,
+        config=config,
+    )
+    residual = SynthonTanimotoGPUCBSelector(
+        objective_name="utility",
+        feature_dimension=encoder.dimension,
+        feature_version=encoder.version,
+        config=config,
+    )
+    representations = {candidate.candidate_id: encoder.encode(candidate)}
+
+    static.fit(history)
+    residual.fit(
+        history,
+        history_prior_mean=(0.5,),
+        mean_source="compiled:artifact",
+        artifact_digest="a" * 64,
+    )
+    static_prediction = static.select((candidate,), representations).predictions[0]
+    result = residual.select(
+        (candidate,),
+        representations,
+        query_prior_mean=(0.25,),
+    )
+    prediction = result.predictions[0]
+    summary = result.metadata["surrogate"]
+
+    assert prediction.scalar_std == pytest.approx(static_prediction.scalar_std)
+    assert prediction.scalar_mean == pytest.approx(
+        summary["target_mean"]
+        + summary["target_scale"]
+        * (
+            prediction.metadata["prior_mean_standardized"]
+            + prediction.metadata["residual_mean_standardized"]
+        )
+    )
+    assert summary["residual_target_mean"] == pytest.approx(-0.5)
+    assert summary["mean_source"] == "compiled:artifact"
+    assert summary["mean_artifact_sha256"] == "a" * 64
 
 
 def test_selector_rejects_negative_observation_noise() -> None:

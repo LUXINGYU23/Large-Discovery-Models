@@ -4,24 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
-from dataclasses import dataclass, field
-from pathlib import Path
 from collections.abc import Mapping, Sequence
-from typing import Any
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+from typing import Any, Literal
 
-from ldm_tts.harness.guest_runtime import HarnessGuestRuntime
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
-_SEARCH_FALLBACK_KINDS = frozenset(
-    {"transient", "quota", "network", "invalid-response", "unsupported"}
-)
-DEFAULT_NETWORK_TOOL_BUDGETS = (
-    "web_search=8",
-    "fetch_content=16",
-    "get_search_content=16",
-    "resolve-library-id=4",
-    "query-docs=8",
-)
+
 
 
 def canonical_sha256(value: Any) -> str:
@@ -37,11 +28,108 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def directory_sha256(path: Path) -> str:
+    root = Path(path).resolve()
+    files: list[dict[str, str]] = []
+
+    def visit(directory: Path) -> None:
+        with os.scandir(directory) as entries:
+            for entry in sorted(entries, key=lambda item: os.fsencode(item.name)):
+                entry_path = Path(entry.path)
+                if entry.is_dir(follow_symlinks=False):
+                    visit(entry_path)
+                elif entry.is_file(follow_symlinks=False):
+                    files.append({
+                        "path": entry_path.relative_to(root).as_posix(),
+                        "sha256": file_sha256(entry_path),
+                    })
+
+    visit(root)
+    return canonical_sha256(files)
+
+
+@dataclass(frozen=True)
+class HarnessArtifactRule:
+    path_pointer: str
+    allowed_suffixes: tuple[str, ...]
+    max_bytes: int
+
+    def __post_init__(self) -> None:
+        if not self.path_pointer.startswith("/"):
+            raise ValueError("harness artifact path_pointer must be a non-root JSON Pointer")
+        if not self.allowed_suffixes or any(
+            not suffix.startswith(".") or "/" in suffix or "\\" in suffix
+            for suffix in self.allowed_suffixes
+        ):
+            raise ValueError("harness artifact suffixes must be non-empty file suffixes")
+        if len(set(self.allowed_suffixes)) != len(self.allowed_suffixes):
+            raise ValueError("harness artifact suffixes must be unique")
+        if isinstance(self.max_bytes, bool) or self.max_bytes < 1:
+            raise ValueError("harness artifact max_bytes must be positive")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "pathPointer": self.path_pointer,
+            "allowedSuffixes": list(self.allowed_suffixes),
+            "maxBytes": self.max_bytes,
+        }
+
+
+@dataclass(frozen=True)
+class HarnessSubmissionContract:
+    contract_id: str
+    tool_name: str
+    payload_schema: Mapping[str, Any]
+    artifact_rules: tuple[HarnessArtifactRule, ...] = ()
+    max_validation_attempts: int | None = None
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.contract_id) is None:
+            raise ValueError("harness contract_id must be a lowercase identifier")
+        if re.fullmatch(r"[A-Za-z0-9_-]+", self.tool_name) is None:
+            raise ValueError("harness terminal tool_name must be a function identifier")
+        try:
+            schema = json.loads(json.dumps(dict(self.payload_schema)))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("harness payload_schema must be JSON serializable") from exc
+        if schema.get("type") != "object" or schema.get("additionalProperties") is not False:
+            raise ValueError("harness payload_schema must be a strict JSON object schema")
+        if len({rule.path_pointer for rule in self.artifact_rules}) != len(self.artifact_rules):
+            raise ValueError("harness artifact path pointers must be unique")
+        if self.max_validation_attempts is not None and (
+            isinstance(self.max_validation_attempts, bool)
+            or self.max_validation_attempts < 1
+        ):
+            raise ValueError("harness max_validation_attempts must be positive")
+        object.__setattr__(self, "payload_schema", schema)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "contractId": self.contract_id,
+            "toolName": self.tool_name,
+            "payloadSchema": dict(self.payload_schema),
+            "artifactRules": [rule.to_dict() for rule in self.artifact_rules],
+            "maxValidationAttempts": self.max_validation_attempts,
+        }
+
+    @property
+    def canonical_json(self) -> str:
+        return json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.canonical_json.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class HarnessProfile:
     profile_id: str
     agents_path: Path
-    candidates_per_turn: int
     skill_dirs: tuple[Path, ...] = ()
     agents_sha256: str = ""
     skill_dir_sha256: tuple[str, ...] = ()
@@ -49,8 +137,6 @@ class HarnessProfile:
     def __post_init__(self) -> None:
         if re.fullmatch(r"[a-z][a-z0-9_]*", self.profile_id) is None:
             raise ValueError("harness profile_id must be a lowercase identifier")
-        if self.candidates_per_turn < 1:
-            raise ValueError("harness candidates_per_turn must be positive")
         if _SHA256_PATTERN.fullmatch(self.agents_sha256) is None:
             raise ValueError("harness agents_sha256 must be a lowercase SHA-256 digest")
         if len(self.skill_dirs) != len(self.skill_dir_sha256):
@@ -65,7 +151,6 @@ class HarnessProfile:
             "agentsSha256": self.agents_sha256,
             "skillDirs": [str(path) for path in self.skill_dirs],
             "skillDirSha256": list(self.skill_dir_sha256),
-            "candidatesPerTurn": self.candidates_per_turn,
         }
 
 
@@ -172,7 +257,6 @@ def profile_set_sha256(profiles: tuple[HarnessProfile, ...]) -> str:
     return canonical_sha256([
         {
             "agentsSha256": profile.agents_sha256,
-            "candidatesPerTurn": profile.candidates_per_turn,
             "profileId": profile.profile_id,
             "skillDirSha256": list(profile.skill_dir_sha256),
         }
@@ -197,8 +281,6 @@ class HarnessLimits:
             for name, limit in budgets.items()
         ):
             raise ValueError("harness tool budgets require valid names and non-negative integers")
-        if "submit_candidates" in budgets:
-            raise ValueError("submit_candidates cannot have a tool call budget")
         object.__setattr__(self, "tool_call_budgets", dict(sorted(budgets.items())))
 
     def to_dict(self) -> dict[str, Any]:
@@ -208,12 +290,19 @@ class HarnessLimits:
         }
 
 
-def parse_tool_call_budgets(values: Sequence[str]) -> dict[str, int]:
+def parse_tool_call_budgets(
+    values: Sequence[str],
+    *,
+    excluded_tools: Sequence[str] = (),
+) -> dict[str, int]:
     budgets: dict[str, int] = {}
+    excluded = set(excluded_tools)
     for value in values:
         name, separator, raw_limit = value.partition("=")
         if not separator or re.fullmatch(r"[A-Za-z0-9_-]+", name) is None:
             raise ValueError("harness tool budgets must use NAME=COUNT")
+        if name in excluded:
+            raise ValueError(f"harness terminal tool cannot have a call budget: {name}")
         if name in budgets:
             raise ValueError(f"duplicate harness tool budget: {name}")
         if not raw_limit.isdigit():
@@ -236,155 +325,42 @@ class HarnessNetworkPolicy:
         }
 
 
-@dataclass(frozen=True)
-class HarnessWebSearch:
-    providers: tuple[str, ...] = ("parallel-mcp", "exa", "duckduckgo")
-    fallback_on: tuple[str, ...] = (
-        "transient",
-        "quota",
-        "network",
-        "invalid-response",
-        "unsupported",
-    )
-
-    def __post_init__(self) -> None:
-        if not self.providers:
-            raise ValueError("harness web search requires at least one provider")
-        if len(set(self.providers)) != len(self.providers):
-            raise ValueError("harness web search providers must be unique")
-        if any(
-            re.fullmatch(r"[a-z][a-z0-9-]*", provider) is None
-            or provider in {"auto", "all"}
-            for provider in self.providers
-        ):
-            raise ValueError(
-                "harness web search providers must be resolved lowercase provider names"
-            )
-        if not self.fallback_on:
-            raise ValueError("harness web search fallback_on must not be empty")
-        if len(set(self.fallback_on)) != len(self.fallback_on):
-            raise ValueError("harness web search fallback kinds must be unique")
-        if any(kind not in _SEARCH_FALLBACK_KINDS for kind in self.fallback_on):
-            raise ValueError("unsupported harness web search fallback kind")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "providers": list(self.providers),
-            "fallbackOn": list(self.fallback_on),
-        }
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class HarnessPoolConfig:
     artifact_root: Path
-    base_url: str
-    model: str
     profiles: tuple[HarnessProfile, ...]
     campaign_id: str
     task_id: str
     case_id: str
     seed: int
-    candidate_schema: dict[str, Any]
-    guest_runtime: HarnessGuestRuntime
-    tool_extensions: tuple[HarnessToolExtension, ...] = ()
-    mcp_servers: tuple[HarnessMcpServer, ...] = ()
-    thinking: str = "off"
+    submission_contract: HarnessSubmissionContract
     limits: HarnessLimits = field(default_factory=HarnessLimits)
-    network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
-    web_search: HarnessWebSearch = field(default_factory=HarnessWebSearch)
-    context7_enabled: bool = True
 
     def __post_init__(self) -> None:
-        if not self.base_url.strip() or not self.model.strip():
-            raise ValueError("harness base_url and model are required")
         if not self.campaign_id.strip() or not self.task_id.strip() or not self.case_id.strip():
             raise ValueError("harness campaign, task, and case identities are required")
-        if self.seed < 0:
+        if isinstance(self.seed, bool) or self.seed < 0:
             raise ValueError("harness seed must be non-negative")
-        if (
-            not isinstance(self.candidate_schema, dict)
-            or self.candidate_schema.get("type") != "object"
-            or self.candidate_schema.get("additionalProperties") is not False
-        ):
-            raise ValueError(
-                "harness candidate_schema must be a strict JSON object schema"
-            )
-        try:
-            canonical_sha256(self.candidate_schema)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("harness candidate_schema must be JSON serializable") from exc
-        if not self.profiles:
-            raise ValueError("harness requires at least one profile")
-        if len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
-            raise ValueError("harness profile_id values must be unique")
-        tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
-        if len(set(tool_names)) != len(tool_names):
-            raise ValueError("harness tool names must be unique across extensions")
-        server_ids = [server.server_id for server in self.mcp_servers]
-        if len(set(server_ids)) != len(server_ids):
-            raise ValueError("harness MCP server IDs must be unique")
-        mcp_tool_names = [
-            f"mcp__{server.server_id}__{name}"
-            for server in self.mcp_servers
-            for name in server.tools
-        ]
-        if len(set(mcp_tool_names)) != len(mcp_tool_names):
-            raise ValueError("harness MCP tool names must be unique")
-        if set(tool_names) & set(mcp_tool_names):
-            raise ValueError("harness task and MCP tool names must not conflict")
-        available_tools = {
-            "read", "write", "bash", "web_search", "fetch_content",
-            "get_search_content", "submit_candidates", *tool_names, *mcp_tool_names,
-        }
-        if self.context7_enabled:
-            available_tools.update(("resolve-library-id", "query-docs"))
-        unknown_budgets = set(self.limits.tool_call_budgets) - available_tools
-        if unknown_budgets:
-            raise ValueError(
-                "harness tool budgets reference unavailable tools: "
-                + ", ".join(sorted(unknown_budgets))
-            )
-        if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
-            raise ValueError("unsupported harness thinking level")
+        if not self.profiles or len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
+            raise ValueError("harness requires non-empty, unique profiles")
+        if self.submission_contract.tool_name in self.limits.tool_call_budgets:
+            raise ValueError("harness terminal tool cannot have a call budget")
 
     @property
     def profile_set_sha256(self) -> str:
         return profile_set_sha256(self.profiles)
 
-    @property
-    def candidate_schema_json(self) -> str:
-        return json.dumps(
-            self.candidate_schema,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
-
-    @property
-    def candidate_schema_sha256(self) -> str:
-        return hashlib.sha256(self.candidate_schema_json.encode("utf-8")).hexdigest()
-
     def initialize_payload(self) -> dict[str, Any]:
         return {
             "artifactRoot": str(self.artifact_root),
-            "baseUrl": self.base_url,
-            "wireApi": "responses",
-            "model": self.model,
-            "thinking": self.thinking,
             "taskId": self.task_id,
             "caseId": self.case_id,
             "seed": self.seed,
-            "candidateSchemaJson": self.candidate_schema_json,
-            "candidateSchemaSha256": self.candidate_schema_sha256,
-            "guestRuntime": self.guest_runtime.to_dict(),
+            "submissionContractJson": self.submission_contract.canonical_json,
+            "submissionContractSha256": self.submission_contract.sha256,
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
-            "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
-            "mcpServers": [server.to_dict() for server in self.mcp_servers],
-            "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
-            "webSearch": self.web_search.to_dict(),
-            "context7Enabled": self.context7_enabled,
         }
 
 
@@ -435,6 +411,69 @@ class HarnessTurn:
 
 
 @dataclass(frozen=True)
+class HarnessSubmittedArtifact:
+    path_pointer: str
+    relative_path: str
+    snapshot_path: str
+    sha256: str
+    size_bytes: int
+
+    def __post_init__(self) -> None:
+        if not self.path_pointer.startswith("/"):
+            raise ValueError("harness artifact path_pointer must be a non-root JSON Pointer")
+        for name, value in (
+            ("relative_path", self.relative_path),
+            ("snapshot_path", self.snapshot_path),
+        ):
+            path = PurePosixPath(value)
+            if (
+                not value
+                or "\\" in value
+                or ":" in value
+                or path.is_absolute()
+                or any(part in {"", ".", ".."} for part in path.parts)
+            ):
+                raise ValueError(f"harness artifact {name} must be a safe POSIX relative path")
+        if _SHA256_PATTERN.fullmatch(self.sha256) is None:
+            raise ValueError("harness artifact sha256 must be a lowercase SHA-256 digest")
+        if isinstance(self.size_bytes, bool) or self.size_bytes < 0:
+            raise ValueError("harness artifact size_bytes must be non-negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "pathPointer": self.path_pointer,
+            "relativePath": self.relative_path,
+            "snapshotPath": self.snapshot_path,
+            "sha256": self.sha256,
+            "sizeBytes": self.size_bytes,
+        }
+
+
+@dataclass(frozen=True)
+class HarnessSubmissionError:
+    path: str
+    code: str
+    message: str
+    hint: str = ""
+
+    def __post_init__(self) -> None:
+        if self.path and not self.path.startswith("/"):
+            raise ValueError("harness submission error path must be a JSON Pointer")
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.code) is None:
+            raise ValueError("harness submission error code must be a lowercase identifier")
+        if not self.message.strip():
+            raise ValueError("harness submission error message must not be empty")
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "path": self.path,
+            "code": self.code,
+            "message": self.message,
+            "hint": self.hint,
+        }
+
+
+@dataclass(frozen=True)
 class HarnessTurnResult:
     profile_id: str
     session_id: str
@@ -444,8 +483,13 @@ class HarnessTurnResult:
     history_to_seq: int
     history_digest: str
     input_digest: str
+    replayed: bool
+    submission_status: Literal["accepted", "rejected"]
     submission_id: str
-    candidates: tuple[dict[str, Any], ...]
+    submission_digest: str
+    submission: Mapping[str, Any]
+    submitted_artifacts: tuple[HarnessSubmittedArtifact, ...]
+    validation_errors: tuple[HarnessSubmissionError, ...]
     usage: dict[str, Any]
     tool_budget: dict[str, dict[str, int]]
     artifacts: dict[str, str]
@@ -456,67 +500,73 @@ class HarnessSubmissionRequest:
     profile_id: str
     turn_id: str
     attempt_index: int
-    candidates: tuple[dict[str, Any], ...]
+    submission: Mapping[str, Any]
+    artifacts: tuple[HarnessSubmittedArtifact, ...] = ()
+    submission_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_id or not self.turn_id:
             raise ValueError("harness submission identity must not be empty")
         if self.attempt_index < 1:
             raise ValueError("harness submission attempt_index must be positive")
-        if not self.candidates:
-            raise ValueError("harness submission candidates must not be empty")
+        if not isinstance(self.submission, Mapping):
+            raise ValueError("harness submission payload must be a mapping")
+        if (
+            self.submission_digest is not None
+            and _SHA256_PATTERN.fullmatch(self.submission_digest) is None
+        ):
+            raise ValueError("harness submission_digest must be a lowercase SHA-256 digest")
+        object.__setattr__(self, "submission", dict(self.submission))
 
-
-@dataclass(frozen=True)
-class HarnessSubmissionRejection:
-    index: int
-    code: str
-    message: str
-
-    def __post_init__(self) -> None:
-        if self.index < 0:
-            raise ValueError("harness submission rejection index must be non-negative")
-        if re.fullmatch(r"[a-z][a-z0-9_]*", self.code) is None:
-            raise ValueError("harness submission rejection code must be a lowercase identifier")
-        if not self.message.strip():
-            raise ValueError("harness submission rejection message must not be empty")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"index": self.index, "code": self.code, "message": self.message}
+    @property
+    def digest(self) -> str:
+        if self.submission_digest is not None:
+            return self.submission_digest
+        return canonical_sha256({
+            "artifacts": [artifact.to_dict() for artifact in self.artifacts],
+            "submission": dict(self.submission),
+        })
 
 
 @dataclass(frozen=True)
 class HarnessSubmissionValidation:
-    rejections: tuple[HarnessSubmissionRejection, ...] = ()
+    decision: Literal["accept", "retry", "reject_turn"] = "accept"
+    errors: tuple[HarnessSubmissionError, ...] = ()
 
     def __post_init__(self) -> None:
-        indices = [rejection.index for rejection in self.rejections]
-        if len(set(indices)) != len(indices):
-            raise ValueError("harness submission rejection indices must be unique")
+        if self.decision not in {"accept", "retry", "reject_turn"}:
+            raise ValueError("unsupported harness submission decision")
+        if self.decision == "accept" and self.errors:
+            raise ValueError("accepted harness submissions cannot contain errors")
+        if self.decision != "accept" and not self.errors:
+            raise ValueError("rejected harness submissions require errors")
 
-    @property
-    def accepted(self) -> bool:
-        return not self.rejections
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "decision": self.decision,
+            "errors": [error.to_dict() for error in self.errors],
+        }
 
 
 __all__ = [
-    "DEFAULT_NETWORK_TOOL_BUDGETS",
+    "HarnessArtifactRule",
     "HarnessLimits",
-    "HarnessGuestRuntime",
     "HarnessMcpServer",
     "HarnessMcpValue",
     "HarnessNetworkPolicy",
     "HarnessPoolConfig",
     "HarnessProfile",
-    "HarnessWebSearch",
+    "HarnessSubmissionContract",
+    "HarnessSubmissionError",
+    "HarnessSubmissionRequest",
+    "HarnessSubmissionValidation",
+    "HarnessSubmittedArtifact",
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
-    "HarnessSubmissionRequest",
-    "HarnessSubmissionRejection",
-    "HarnessSubmissionValidation",
     "canonical_sha256",
+    "directory_sha256",
     "file_sha256",
-    "profile_set_sha256",
     "parse_tool_call_budgets",
+    "profile_set_sha256",
 ]

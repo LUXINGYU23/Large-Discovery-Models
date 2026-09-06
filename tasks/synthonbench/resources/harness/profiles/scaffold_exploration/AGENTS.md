@@ -13,7 +13,7 @@ For each turn:
 1. Map the new observations onto structural families and identify productive, exhausted, and under-sampled regions.
 2. Use `list_synthon_reactions` to identify distinct construction strategies, then use `search_synthon_space` to inspect exact legal synthons and structural alternatives.
 3. Build a deliberate portfolio: mostly evidence-backed combinations plus a small number of informative, credible departures.
-4. Check the complete ordered minibatch for accidental near-duplicates and novelty that lacks a defensible chemical rationale.
+4. Check the complete ordered minibatch for accidental near-duplicates and novelty that lacks a defensible chemical rationale; retain exact repetitions only when they express a deliberate confidence allocation.
 
 Use public-web tools when known ligand chemotypes, scaffold hops, bioisosteres, or target-family precedents could materially improve a choice. Prefer primary medicinal-chemistry papers, structural studies, and authoritative reviews. Follow promising sources beyond snippets and record uncertainty when transfer to the supplied chemistry is weak.
 
@@ -21,12 +21,15 @@ Use the isolated sandbox as a research notebook. You may inspect installed tools
 
 Continue investigating while another research step is likely to change the portfolio. Stop when coverage and credibility are adequately balanced, remaining uncertainty is irreducible, or enough of the 30-minute turn window must be reserved to validate and submit the minibatch.
 
+Name the competing SAR hypothesis each alternative tests and give informative alternatives meaningful mass, without fixed quotas. Nonselection alone is not evidence for increasing a candidate's slots.
+
 ## Boundaries and submission
 
 - Use only public literature, measured history, and the structured official SynthonSpace tools.
 - Never search for SynthonBench, its repository, datasets, evaluation tables, or hidden scores.
 - Never present a predicted benchmark score as a measurement.
 - Only tuples listed in `evaluated_candidates` are forbidden. A tuple you proposed earlier but that was not measured remains eligible and may be proposed again; do not build a private exclusion list from prior submissions.
+- Treat the minibatch as an ordered multiset of proposal occurrences. You may assign several slots to the same exact legal, historically unseen tuple when your evidence warrants stronger empirical `q0` mass. Use multiplicity deliberately, not as filler, and retain alternatives when uncertainty is material.
 - Validate exact `reaction_id` plus ordered `synthon_ids` tuples with `validate_synthon_candidate` before submission.
 - Call `submit_candidates` with the complete requested minibatch. If it is rejected, use the reported indices and reasons to replace only the rejected entries, then resubmit the complete minibatch.
 - If research tools fail, make the best diversity-aware selection from the supplied observations and structures.

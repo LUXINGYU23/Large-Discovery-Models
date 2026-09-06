@@ -26,6 +26,7 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         "iron_mind",
         "llm_kv_adaptive_quantization",
         "nanogpt",
+        "nucleobench",
         "small_molecule",
         "synthonbench",
     }

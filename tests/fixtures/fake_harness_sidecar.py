@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -10,6 +11,17 @@ from importlib.metadata import version
 
 profiles: list[str] = []
 print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
+
+
+def submission_record(submission, artifacts) -> tuple[str, str]:
+    body = json.dumps(
+        {"artifacts": artifacts, "submission": submission},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return body, hashlib.sha256(body.encode()).hexdigest()
+
+
 for line in sys.stdin:
     frame = json.loads(line)
     request_id = frame["requestId"]
@@ -25,33 +37,51 @@ for line in sys.stdin:
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
-        assert frame["guestRuntime"] == {
-            "imageRef": "ldm/fixture-research:aaaaaaaaaaaa",
-            "recipeSha256": "a" * 64,
-            "rootfsSize": "4G",
-            "installPolicy": "session_overlay",
-        }
         profiles = [item["profileId"] for item in frame["profiles"]]
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
+        failure = os.environ.get("HARNESS_TEST_TURN_FAILURE")
+        if failure:
+            error = {"message": "provider 502"}
+            if failure != "unknown":
+                error["turnUsage"] = [{
+                    "profileId": item["profileId"],
+                    "turnId": "wrong-turn" if failure == "wrong-turn" else item["turnId"],
+                    "usage": {"providerCalls": 3, "toolCalls": {"bash": 2}, "artifactBytes": 120},
+                } for item in frame["turns"]]
+            print(json.dumps({"type": "error", **common, "error": error}), flush=True)
+            continue
         turns = []
         for item in frame["turns"]:
-            candidates = [{"value": item["profileId"]}]
-            if not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
+            attempt_index = 0
+            submission = {"candidates": [{"value": item["profileId"]}]}
+            artifacts = []
+            decision = {"decision": "accept", "errors": []}
+            while not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
+                attempt_index += 1
+                submission_json, digest = submission_record(submission, artifacts)
                 print(json.dumps({
                     "type": "submission_validation_requested",
                     **common,
-                    "validationId": f"{item['turnId']}-validation-1",
+                    "validationId": f"{item['turnId']}-validation-{attempt_index}",
                     "profileId": item["profileId"],
                     "turnId": item["turnId"],
-                    "attemptIndex": 1,
-                    "candidates": candidates,
+                    "attemptIndex": attempt_index,
+                    "submission": submission,
+                    "artifacts": artifacts,
+                    "submissionJson": submission_json,
+                    "submissionDigest": digest,
                 }), flush=True)
                 validation = json.loads(next(sys.stdin))
                 assert validation["type"] == "submission_validation_result"
-                assert validation["accepted"] is True
+                assert validation["submissionDigest"] == digest
+                decision = validation
+                if decision["decision"] != "retry":
+                    break
+                submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
+            submission_json, digest = submission_record(submission, artifacts)
             if os.environ.get("HARNESS_TEST_CHANGE_AFTER_VALIDATION"):
-                candidates = [{"value": "changed"}]
+                submission = {"candidates": [{"value": "changed"}]}
             turns.append({
                 "profileId": item["profileId"],
                 "sessionId": f"session-{item['profileId']}",
@@ -61,10 +91,16 @@ for line in sys.stdin:
                 "historyToSeq": item["historyToSeq"],
                 "historyDigest": item["historyDigest"],
                 "inputDigest": item["inputDigest"],
-                "submission": {
-                    "submissionId": f"{item['turnId']}-submission",
-                    "candidates": candidates,
-                },
+                "replayed": False,
+                "submissionStatus": (
+                    "rejected" if decision["decision"] == "reject_turn" else "accepted"
+                ),
+                "submissionId": f"{item['turnId']}-submission-{max(attempt_index, 1)}",
+                "submissionJson": submission_json,
+                "submissionDigest": digest,
+                "submission": submission,
+                "submittedArtifacts": artifacts,
+                "validationErrors": decision["errors"],
                 "usage": {"providerCalls": 1, "toolCalls": {}, "artifactBytes": 12},
                 "toolBudget": {},
                 "artifacts": {"turn": f"turns/{item['turnId']}", "session": f"sessions/{item['profileId']}.jsonl"},

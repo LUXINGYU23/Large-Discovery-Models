@@ -74,8 +74,9 @@ one-candidate requests with up to 64 local workers, estimates empirical `q0`,
 maintains a 32-candidate BO pool, and samples one reaction condition from the
 GP-UCB-tilted LDM policy.
 That one external evaluation is the Iron Mind-compatible batch size.
-Malformed or duplicate responses are recorded and can reduce the admitted
-reservoir.
+Malformed responses are recorded and can reduce the admitted reservoir. Equal
+valid responses remain separate proposal occurrences for empirical `q0` and are
+canonicalized only when the BO pool is built.
 
 The default `portfolio_v1` prompt assigns a distinct factor focus to every
 request and records the policy, slot role, focus, and prompt digest in the run
@@ -145,7 +146,13 @@ Use `--set args.harness-mcp-config=/absolute/path/to/mcp.yaml` for allowlisted
 MCP tools. Per-tool turn limits are configured with `harness-tool-budget` in a
 runner YAML; see `docs/research-harness.md` for the schema and defaults.
 
-## 6. Run the Five-Method Pilot Evaluation
+Harness-Compiled LDM reuses the same four proposal sessions and creates one
+independent `policy_architect` session. Its proposal artifacts remain under
+`harness/`; policy traces, immutable `optimization_policy.py` epochs, and round
+results are written under `policy_harness/`. Configure policy-session tool
+limits separately with `policy-tool-budget`.
+
+## 6. Run the Six-Method Pilot Evaluation
 
 After the official data and endpoint are ready, run the fixed six-round matrix:
 
@@ -157,10 +164,17 @@ uv run --locked --project tasks/iron_mind python \
   scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml
 ```
 
-The BO comparator is offline after data preparation. Direct LDM, Harness LDM,
-direct LLM, and direct research Harness use the generic endpoint variables from
-step 2. The two Harness children also use the image and KVM setup from step 5.
-The direct research Harness keeps one session and evaluates its one accepted
-candidate without GP selection. The output root is
-`$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted matrix with
-`--resume` after confirming the repository and configurations are unchanged.
+The matrix runs direct LDM, Harness LDM, Harness-Compiled LDM, BO, direct LLM,
+and direct research Harness. The BO comparator is offline after data
+preparation. All model-backed methods use the generic endpoint variables from
+step 2. The three Harness-backed children also use the image and KVM setup from
+step 5. Harness-Compiled LDM adds one independent policy session that may set
+the residual-GP prior mean and LDM `alpha`/`eta`; direct research Harness keeps
+one session and evaluates its accepted candidate without GP selection. The
+output root is `$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted
+matrix with `--resume` only after confirming the repository and configurations
+are unchanged.
+
+Before starting a full real matrix, confirm the resolved cases, methods, seeds,
+round counts, endpoint, model, wire API, thinking level, direct-request
+concurrency, proposal and policy tool budgets, output root, and resume policy.

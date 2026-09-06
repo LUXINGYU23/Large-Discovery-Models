@@ -12,13 +12,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from ldm_tts.cli.runner import apply_override, build_plan, load_config, preflight_plan, run_plan
+from ldm_tts.cli.runner import (
+    apply_override,
+    build_plan,
+    load_config,
+    plan_for_json,
+    preflight_plan,
+    run_plan,
+)
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.pilot_evaluation.config import PilotEvaluationSpec
 from ldm_tts.pilot_evaluation.reporting import write_evaluation_reports
 
 
 _MANIFEST_NAME = "evaluation_manifest.json"
+_COMPILED_METHOD = "ldm_harness_compiled"
 
 
 @dataclass(frozen=True)
@@ -54,7 +62,8 @@ def run_evaluation(
     manifest = _open_manifest(spec, base, resume=resume, dry_run=dry_run)
     plans = [_child_plan(spec, base, item, resume=resume) for item in selected]
     if dry_run:
-        print(json.dumps({"manifest": manifest, "plans": plans}, indent=2, sort_keys=True))
+        public_plans = [plan_for_json(plan) for plan in plans]
+        print(json.dumps({"manifest": manifest, "plans": public_plans}, indent=2, sort_keys=True))
         return 0
     for item, plan in zip(selected, plans, strict=True):
         _run_child(manifest, spec, item, plan, resume=resume)
@@ -155,12 +164,8 @@ def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, A
 
 def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     entry = manifest["runs"].get(run.key, {})
-    if _child_complete(run.run_dir):
-        _mark_completed(entry, spec, run)
-        manifest["runs"][run.key] = entry
-        _write_manifest(spec, manifest)
-        return
-    if run.run_dir.exists() and not resume:
+    completed = _child_complete(run.run_dir)
+    if run.run_dir.exists() and not completed and not resume:
         raise FileExistsError(f"child run already exists: {run.run_dir}; use --resume")
     entry.update({
         "status": "running",
@@ -171,18 +176,29 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     })
     manifest["runs"][run.key] = entry
     _write_manifest(spec, manifest)
-    preflight_plan(plan)
-    return_code = run_plan(plan)
-    entry["status"] = "completed" if return_code == 0 and _child_complete(run.run_dir) else "failed"
-    entry["return_code"] = return_code
-    entry["updated_at_unix"] = time.time()
-    if entry["status"] == "completed":
+    try:
+        if not completed:
+            preflight_plan(plan)
+            return_code = run_plan(plan)
+            entry["return_code"] = return_code
+            if return_code != 0 or not _child_complete(run.run_dir):
+                raise RuntimeError(f"pilot evaluation child failed: {run.key}")
         _mark_completed(entry, spec, run)
-    _write_manifest(spec, manifest)
-    if entry["status"] != "completed":
+        entry.pop("error", None)
+        entry["updated_at_unix"] = time.time()
+        _write_manifest(spec, manifest)
+    except Exception as error:
+        entry.update({
+            "status": "failed",
+            "updated_at_unix": time.time(),
+            "error": {
+                "type": type(error).__name__,
+                "message": str(error),
+            },
+        })
         manifest["state"] = "failed"
         _write_manifest(spec, manifest)
-        raise RuntimeError(f"pilot evaluation child failed: {run.key}")
+        raise
 
 
 def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> bool:
@@ -198,37 +214,89 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
 
 
 def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _EvaluationRun) -> None:
+    if run.method == _COMPILED_METHOD:
+        entry["harness"] = _compiled_harness_provenance(
+            run.run_dir,
+            spec.output_root,
+        )
+    elif run.method in {"ldm_harness", "harness"}:
+        entry["harness"] = _harness_manifest_provenance(
+            run.run_dir / "harness" / "manifest.json",
+            spec.output_root,
+        )
     entry.update(
         status="completed",
         run_dir=str(run.run_dir.relative_to(spec.output_root)),
     )
-    if run.method in {"ldm_harness", "harness"}:
-        entry["harness"] = _harness_provenance(run.run_dir, spec.output_root)
 
 
-def _harness_provenance(run_dir: Path, output_root: Path) -> dict[str, Any]:
-    path = run_dir / "harness" / "manifest.json"
+def _compiled_harness_provenance(
+    run_dir: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    proposal = _harness_manifest_provenance(
+        run_dir / "harness" / "manifest.json",
+        output_root,
+    )
+    policy = _harness_manifest_provenance(
+        run_dir / "policy_harness" / "manifest.json",
+        output_root,
+    )
+    for field in ("campaign_id", "task_id", "seed"):
+        if proposal[field] is None or proposal[field] != policy[field]:
+            raise ValueError(
+                f"compiled Harness proposal/policy {field} identities differ: {run_dir}"
+            )
+    if len(policy["profiles"]) != 1:
+        raise ValueError(
+            "compiled Harness requires one policy profile: "
+            f"{run_dir}"
+        )
+    return {"topology": "dual_pool", "proposal": proposal, "policy": policy}
+
+
+def _harness_manifest_provenance(
+    path: Path,
+    output_root: Path,
+) -> dict[str, Any]:
     if not path.is_file():
-        raise ValueError(f"completed Harness campaign lacks its manifest: {run_dir}")
+        raise ValueError(f"completed Harness campaign lacks its manifest: {path.parent}")
     manifest = _read_json(path)
     limits = manifest.get("limits")
     if not isinstance(limits, dict):
         raise ValueError(f"Harness manifest lacks limits: {path}")
+    profiles = manifest.get("profiles")
+    if not isinstance(profiles, list) or not profiles:
+        raise ValueError(f"Harness manifest requires proposal or policy profiles: {path}")
+    profile_ids = [profile.get("profileId") if isinstance(profile, dict) else None for profile in profiles]
+    if any(not isinstance(value, str) or not value.strip() for value in profile_ids) or (
+        len(set(profile_ids)) != len(profile_ids)
+    ):
+        raise ValueError(f"Harness manifest profile IDs must be non-empty and unique: {path}")
     return {
         "artifact": str(path.relative_to(output_root)),
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "protocol_version": manifest.get("protocolVersion"),
+        "campaign_id": manifest.get("campaignId"),
+        "task_id": manifest.get("taskId"),
+        "case_id": manifest.get("caseId"),
+        "seed": manifest.get("seed"),
         "backend": manifest.get("backend"),
         "base_url": manifest.get("baseUrl"),
+        "wire_api": manifest.get("wireApi"),
         "model": manifest.get("model"),
         "thinking": manifest.get("thinking"),
-        "profiles": manifest.get("profiles"),
+        "profile_set_sha256": manifest.get("profileSetSha256"),
+        "profiles": profiles,
+        "guest_runtime": manifest.get("guestRuntime"),
+        "submission_contract": manifest.get("submissionContract"),
         "mcp_servers": manifest.get("mcpServers"),
         "tool_call_budgets": limits.get("toolCallBudgets"),
     }
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "ldm_harness", "harness"}:
+    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

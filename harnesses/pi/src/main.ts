@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
 import {
 	ProtocolError,
+	TurnExecutionError,
 	parseFrame,
 	type InputFrame,
 	type SubmissionValidationDecision,
@@ -23,6 +24,7 @@ type CommandFrame = Exclude<InputFrame, SubmissionValidationResultFrame>;
 class SubmissionValidationBroker {
 	private readonly pending = new Map<string, {
 		requestId: string;
+		submissionDigest: string;
 		resolve: (decision: SubmissionValidationDecision) => void;
 		reject: (error: Error) => void;
 	}>();
@@ -35,7 +37,12 @@ class SubmissionValidationBroker {
 		this.nextId += 1;
 		const validationId = `${frame.requestId}-validation-${this.nextId.toString().padStart(6, "0")}`;
 		const result = new Promise<SubmissionValidationDecision>((resolve, reject) => {
-			this.pending.set(validationId, { requestId: frame.requestId, resolve, reject });
+			this.pending.set(validationId, {
+				requestId: frame.requestId,
+				submissionDigest: request.submissionDigest,
+				resolve,
+				reject,
+			});
 		});
 		respondTo(frame, "submission_validation_requested", { validationId, ...request });
 		return result;
@@ -43,11 +50,15 @@ class SubmissionValidationBroker {
 
 	resolve(frame: SubmissionValidationResultFrame): void {
 		const pending = this.pending.get(frame.validationId);
-		if (!pending || pending.requestId !== frame.requestId) {
+		if (
+			!pending
+			|| pending.requestId !== frame.requestId
+			|| pending.submissionDigest !== frame.submissionDigest
+		) {
 			throw new ProtocolError("invalid_state", `unknown submission validation: ${frame.validationId}`);
 		}
 		this.pending.delete(frame.validationId);
-		pending.resolve({ accepted: frame.accepted, rejected: frame.rejected });
+		pending.resolve({ decision: frame.decision, errors: frame.errors });
 	}
 
 	rejectAll(error: Error): void {
@@ -84,12 +95,16 @@ async function close(): Promise<void> {
 	if (closing) return;
 	closing = true;
 	validations.rejectAll(new Error("harness sidecar is closing"));
-	await pool?.close();
+	const activePool = pool;
 	pool = undefined;
-	apiKey = undefined;
-	namedSecrets = undefined;
-	campaignId = undefined;
-	redactor = new Redactor([]);
+	try {
+		await activePool?.close();
+	} finally {
+		apiKey = undefined;
+		namedSecrets = undefined;
+		campaignId = undefined;
+		redactor = new Redactor([]);
+	}
 }
 
 process.on("SIGTERM", () => {
@@ -196,9 +211,14 @@ for await (const line of lines) {
 		try {
 			if (!(await handle(frame))) lines.close();
 		} catch (error) {
+			const failure = {
+				code: errorCode(error),
+				message: redactor.text((error as Error).message),
+				...(error instanceof TurnExecutionError ? { turnUsage: error.turnUsage } : {}),
+			};
 			validations.rejectAll(error as Error);
 			respondTo(frame, "error", {
-				error: { code: errorCode(error), message: redactor.text((error as Error).message) },
+				error: failure,
 			});
 		}
 	})();

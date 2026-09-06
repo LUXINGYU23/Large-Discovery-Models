@@ -4,22 +4,27 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.harness.pi import PiHarnessConfig, policy_mcp_server
 from ldm_tts.contracts import LDMTaskSpec
+from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
 from ldm_tts.harness import (
+    DockerPolicyExecutor,
     HarnessClient,
     HarnessLimits,
     HarnessNetworkPolicy,
-    HarnessPoolConfig,
+    PolicyResearchController,
     load_harness_mcp_config,
     parse_tool_call_budgets,
+    policy_submission_contract,
 )
+from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -27,11 +32,14 @@ from ldm_tts.registration.experiment import (
 )
 from ldm_tts.transport import CallableProposalClient, ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
-
-from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.candidate import IronMindCandidateDomain
+from tasks.iron_mind.core.constants import (
+    FORBIDDEN_QUERY_PATTERNS,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
+from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.dependencies import load_pinned_reaction_table
-from tasks.iron_mind.core.constants import OBJECTIVE_NAME, TASK_ID
 from tasks.iron_mind.core.factory import (
     CampaignComponentOptions,
     build_base_reaction_selector,
@@ -39,12 +47,11 @@ from tasks.iron_mind.core.factory import (
     build_reaction_selector,
 )
 from tasks.iron_mind.core.harness import (
-    HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
     harness_guest_runtime,
-    harness_candidate_schema,
     harness_profiles as parallel_harness_profiles,
+    harness_submission_contract,
     harness_tool_extensions,
     write_harness_space_catalog,
 )
@@ -53,6 +60,10 @@ from tasks.iron_mind.core.mock import (
     load_mock_table,
     mock_proposal_response,
 )
+from tasks.iron_mind.core.optimization_policy import (
+    IronMindOptimizationPolicyAdapter,
+    policy_harness_profile,
+)
 from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
@@ -60,13 +71,20 @@ from tasks.iron_mind.core.provider import (
 )
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
+from tasks.iron_mind.core.search import (
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
+    finite_domain_size,
+)
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
-from tasks.iron_mind.core.search import finite_domain_size
 from tasks.iron_mind.core.task_spec import (
     build_direct_acquisition,
     build_reaction_task_spec,
     disabled_surrogate,
 )
+from tasks.iron_mind.core.workflow_args import parse_args, validate_args
 from tasks.iron_mind.core.workflow_support import (
     campaign_budget,
     jsonable_args,
@@ -75,7 +93,6 @@ from tasks.iron_mind.core.workflow_support import (
     preflight_endpoint,
     provider_settings,
 )
-from tasks.iron_mind.core.workflow_args import parse_args, validate_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = TASK_ROOT / "resources" / "reaction_schemas.json"
@@ -117,7 +134,7 @@ def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskS
         domain_size=finite_domain_size(table),
         harness_profile_count=(
             len(HARNESS_PROFILE_IDS)
-            if args.search_method == "ldm_harness"
+            if args.search_method in PARALLEL_HARNESS_METHODS
             else 1
             if args.search_method == "harness"
             else 0
@@ -145,36 +162,81 @@ def _run_campaign(
 ) -> int:
     provider = (
         provider_settings(args)
-        if args.proposal_mode == "openai" or args.search_method in {"ldm_harness", "harness"}
+        if args.proposal_mode == "openai"
+        or args.search_method in PERSISTENT_HARNESS_METHODS
         else None
     )
     if provider is not None:
         args.llm_url = provider.base_url
         args.llm_model_name = provider.model
     runtime = _open_runtime(args, table, task_spec, contract, profile_name)
-    if args.search_method in {"ldm_harness", "harness"}:
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
         assert provider is not None
         missing = _missing_harness_provider(provider)
         if missing:
             pause_endpoint(runtime, args, payload, missing)
             return 2
-        harness_client = _harness_client(args, runtime, provider, table)
-        try:
-            harness_client.start()
-            components = _components(args, table, runtime, None, harness_client)
+        mcp = load_harness_mcp_config(args.harness_mcp_config)
+        with ExitStack() as stack:
+            harness_client = stack.enter_context(
+                _proposal_harness_client(args, runtime, provider, table, mcp)
+            )
+            policy_controller = None
+            policy_adapter = None
+            if args.search_method == COMPILED_POLICY_METHOD:
+                policy_adapter = IronMindOptimizationPolicyAdapter(
+                    table.schema,
+                    seed=args.campaign_index,
+                    acquisition_beta=args.acquisition_beta,
+                    default_alpha=args.alpha,
+                    default_eta=args.eta,
+                    enabled_capabilities=tuple(args.policy_capability),
+                )
+                policy_client = stack.enter_context(
+                    _policy_harness_client(args, runtime, provider, table, mcp)
+                )
+                policy_controller = PolicyResearchController(
+                    client=policy_client,
+                    adapter=policy_adapter,
+                    executor=DockerPolicyExecutor(
+                        image=args.harness_sidecar_image,
+                        docker_host=args.harness_docker_host or "",
+                        container_user=resolve_container_user(
+                            args.harness_container_user,
+                            args.harness_docker_host,
+                        ),
+                    ),
+                    root=(runtime.run_dir / "policy_harness").resolve(),
+                    account=runtime.consume_many,
+                )
+            components = _components(
+                args,
+                table,
+                runtime,
+                None,
+                harness_client,
+                policy_controller,
+                policy_adapter,
+            )
             return _finish_campaign(args, components, runtime, payload)
-        finally:
-            harness_client.close()
     client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
         assert provider is not None and client is not None
         if not preflight_endpoint(client, runtime, args, payload, provider):
             return 2
-    components = _components(args, table, runtime, client, None)
+    components = _components(args, table, runtime, client, None, None, None)
     return _finish_campaign(args, components, runtime, payload)
 
 
-def _components(args, table, runtime, client, harness_client):
+def _components(
+    args,
+    table,
+    runtime,
+    client,
+    harness_client,
+    policy_controller,
+    policy_adapter,
+):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
         (lambda count: runtime.consume("llm_requests", count))
@@ -203,11 +265,14 @@ def _components(args, table, runtime, client, harness_client):
             prompt_policy=args.prompt_policy,
             harness_client=harness_client,
             harness_profiles=profiles,
+            harness_candidates_per_profile=_harness_candidates_per_profile(args),
             account_harness_usage=(
                 runtime.consume_many
-                if args.search_method in {"ldm_harness", "harness"}
+                if args.search_method in PERSISTENT_HARNESS_METHODS
                 else None
             ),
+            policy_controller=policy_controller,
+            policy_adapter=policy_adapter,
         )
     )
 
@@ -225,63 +290,27 @@ def _missing_harness_provider(provider) -> str:
     return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
 
 
-def _harness_client(
+def _proposal_harness_client(
     args,
     runtime: CampaignRuntime,
     provider: OpenAIProviderSettings,
     table: FrozenReactionTable,
+    mcp,
 ) -> HarnessClient:
-    mcp = load_harness_mcp_config(args.harness_mcp_config)
     artifact_root = (runtime.run_dir / "harness").resolve()
-    cache_root = (
-        args.harness_cache_dir.expanduser().resolve()
-        if args.harness_cache_dir is not None
-        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
-    )
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
-    cache_root.mkdir(parents=True, exist_ok=True)
-    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
     domain = IronMindCandidateDomain(table.schema, table)
     write_harness_space_catalog(domain, artifact_root / "reaction_space.json")
-    command = ["docker"]
-    if args.harness_docker_host:
-        command.extend(("--host", args.harness_docker_host))
-    command.extend(("run", "--rm", "-i"))
-    container_user = args.harness_container_user
-    if not container_user and hasattr(os, "getuid") and hasattr(os, "getgid"):
-        container_user = f"{os.getuid()}:{os.getgid()}"
-    if container_user:
-        command.extend(("--user", container_user))
-    command.extend(
-        (
-            "--device",
-            "/dev/kvm",
-            "--env",
-            "HOME=/runtime-home",
-            "--env",
-            "XDG_CACHE_HOME=/runtime-home/.cache",
-            "--env",
-            "GONDOLIN_IMAGE_STORE=/runtime-home/.cache/gondolin/images",
-            "--env",
-            "GONDOLIN_SESSIONS_DIR=/runtime-home/.cache/gondolin/sessions",
-            "--env",
-            "LDM_HARNESS_CACHE_ROOT=/runtime-home/.cache/gondolin",
-            "--env",
-            "TMPDIR=/runtime-home/.cache/gondolin/runtime-overlays",
-            "--env",
-            "LDM_IRON_MIND_CATALOG=/artifacts/reaction_space.json",
-            "--mount",
-            f"type=bind,src={artifact_root},dst=/artifacts",
-            "--mount",
-            f"type=bind,src={resource_root},dst=/resources,readonly",
-            "--mount",
-            f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
-            args.harness_sidecar_image,
-        )
+    command = _harness_command(
+        args,
+        artifact_root,
+        _harness_cache_root(args),
+        environment={"LDM_IRON_MIND_CATALOG": "/artifacts/reaction_space.json"},
+        mounts=((resource_root, "/resources", True),),
     )
     profiles = _harness_profiles(args)
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
         model=provider.model,
@@ -290,17 +319,23 @@ def _harness_client(
         task_id=TASK_ID,
         case_id=args.dataset_id,
         seed=args.campaign_index,
-        candidate_schema=harness_candidate_schema(table.schema),
+        submission_contract=harness_submission_contract(
+            table.schema,
+            _harness_candidates_per_profile(args),
+        ),
         guest_runtime=harness_guest_runtime(),
         tool_extensions=harness_tool_extensions(),
         mcp_servers=mcp.servers,
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,
-            tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget),
+            tool_call_budgets=parse_tool_call_budgets(
+                args.harness_tool_budget,
+                excluded_tools=("submit_candidates",),
+            ),
         ),
         network_policy=HarnessNetworkPolicy(
-            forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
+            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
         ),
         context7_enabled=args.harness_context7,
     )
@@ -311,6 +346,142 @@ def _harness_client(
         named_secrets=mcp.named_secrets,
         response_timeout_seconds=args.harness_response_timeout,
     )
+
+
+def _policy_harness_client(
+    args,
+    runtime: CampaignRuntime,
+    provider: OpenAIProviderSettings,
+    table: FrozenReactionTable,
+    mcp,
+) -> HarnessClient:
+    artifact_root = (runtime.run_dir / "policy_harness").resolve()
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    write_harness_space_catalog(
+        IronMindCandidateDomain(table.schema, table),
+        artifact_root / "reaction_space.json",
+    )
+    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
+    mounts = (
+        (harness_resources, "/resources", True),
+        ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
+        (
+            (TASK_ROOT / "resources" / "README.md").resolve(),
+            "/public/resources_README.md",
+            True,
+        ),
+        (
+            (TASK_ROOT / "resources" / "reaction_schemas.json").resolve(),
+            "/public/reaction_schemas.json",
+            True,
+        ),
+        (
+            (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
+            "/public/upstream_contract.json",
+            True,
+        ),
+    )
+    config = PiHarnessConfig(
+        artifact_root=Path("/artifacts"),
+        base_url=provider.base_url,
+        model=provider.model,
+        profiles=policy_harness_profile(),
+        campaign_id=runtime.run_id,
+        task_id=TASK_ID,
+        case_id=f"{args.dataset_id}:optimization_policy",
+        seed=args.campaign_index,
+        submission_contract=policy_submission_contract(
+            args.policy_max_submission_attempts
+        ),
+        guest_runtime=harness_guest_runtime(),
+        tool_extensions=harness_tool_extensions(),
+        mcp_servers=(*mcp.servers, policy_mcp_server(
+            diagnostics_path="/resources/policy_diagnostics.py",
+            diagnostics_sha256=file_sha256(harness_resources / "policy_diagnostics.py"),
+        )),
+        thinking=args.harness_thinking,
+        limits=HarnessLimits(
+            wall_time_seconds=args.harness_wall_time_seconds,
+            tool_call_budgets=parse_tool_call_budgets(
+                args.policy_tool_budget,
+                excluded_tools=("submit_optimization_policy",),
+            ),
+        ),
+        network_policy=HarnessNetworkPolicy(
+            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
+        ),
+        context7_enabled=args.harness_context7,
+    )
+    return HarnessClient(
+        _harness_command(
+            args,
+            artifact_root,
+            _harness_cache_root(args),
+            environment={"LDM_IRON_MIND_CATALOG": "/artifacts/reaction_space.json"},
+            mounts=mounts,
+        ),
+        api_key=provider.api_key,
+        config=config,
+        named_secrets=mcp.named_secrets,
+        response_timeout_seconds=args.harness_response_timeout,
+    )
+
+
+def _harness_cache_root(args) -> Path:
+    root = (
+        args.harness_cache_dir.expanduser().resolve()
+        if args.harness_cache_dir is not None
+        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _harness_command(
+    args,
+    artifact_root: Path,
+    cache_root: Path,
+    *,
+    environment: dict[str, str],
+    mounts: tuple[tuple[Path, str, bool], ...],
+) -> list[str]:
+    cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
+    command = ["docker"]
+    if args.harness_docker_host:
+        command.extend(("--host", args.harness_docker_host))
+    command.extend(("run", "--rm", "-i"))
+    container_user = resolve_container_user(
+        args.harness_container_user,
+        args.harness_docker_host,
+    )
+    command.extend(docker_identity_args(container_user, args.harness_docker_host))
+    command.extend(("--device", "/dev/kvm"))
+    runtime_environment = {
+        "HOME": "/runtime-home",
+        "XDG_CACHE_HOME": "/runtime-home/.cache",
+        "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
+        "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
+        "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
+        "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
+        **environment,
+    }
+    for name, value in sorted(runtime_environment.items()):
+        command.extend(("--env", f"{name}={value}"))
+    command.extend((
+        "--mount",
+        f"type=bind,src={artifact_root},dst=/artifacts",
+        "--mount",
+        f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
+    ))
+    for source, destination, readonly in mounts:
+        suffix = ",readonly" if readonly else ""
+        command.extend((
+            "--mount",
+            f"type=bind,src={source},dst={destination}{suffix}",
+        ))
+    command.append(args.harness_sidecar_image)
+    return command
 
 
 def _finish_campaign(
@@ -476,11 +647,12 @@ def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncode
         pool_size=args.bo_pool_size,
         proposal_sample_count=args.proposal_samples,
         feature_version=encoder.version,
+        policy_mode=args.search_method == COMPILED_POLICY_METHOD,
     )
 
 
 def _reservoir_size(args, components) -> int:
-    if args.search_method in {"ldm", "ldm_harness"}:
+    if args.search_method in ACQUISITION_TILTED_METHODS:
         return args.proposal_samples
     if args.search_method in {"llm", "harness"}:
         return args.evaluations_per_round
@@ -496,8 +668,16 @@ def _proposal_samples(args) -> int:
 
 
 def _harness_profiles(args):
-    if args.search_method == "ldm_harness":
-        return parallel_harness_profiles(args.harness_candidates_per_session)
+    if args.search_method in PARALLEL_HARNESS_METHODS:
+        return parallel_harness_profiles()
     if args.search_method == "harness":
-        return direct_harness_profile(args.evaluations_per_round)
+        return direct_harness_profile()
     return ()
+
+
+def _harness_candidates_per_profile(args) -> int:
+    if args.search_method in PARALLEL_HARNESS_METHODS:
+        return args.harness_candidates_per_session
+    if args.search_method == "harness":
+        return args.evaluations_per_round
+    return 0

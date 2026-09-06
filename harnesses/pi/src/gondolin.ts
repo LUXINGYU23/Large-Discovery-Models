@@ -14,6 +14,7 @@ import type { NetworkPolicy } from "./protocol.js";
 import type { ResolvedGuestRuntime } from "./guest-image.js";
 
 const GUEST_WORKSPACE = "/workspace";
+export const GUEST_RESOURCE_ROOT = `${GUEST_WORKSPACE}/.ldm-resources`;
 const INVENTORY_LIMIT_BYTES = 256 * 1024;
 
 function hostMatches(hostname: string, configured: string): boolean {
@@ -110,6 +111,7 @@ export class GondolinController {
 
 	constructor(
 		private readonly hostWorkspace: string,
+		private readonly hostResources: string,
 		private readonly networkPolicy: NetworkPolicy,
 		private readonly guestRuntime: ResolvedGuestRuntime,
 	) {}
@@ -125,7 +127,7 @@ export class GondolinController {
 				if (this.vm) return this.vm;
 			if (!this.starting) {
 				this.starting = (async () => {
-					const { createHttpHooks, RealFSProvider, VM } = await import("@earendil-works/gondolin");
+					const { createHttpHooks, ReadonlyProvider, RealFSProvider, VM } = await import("@earendil-works/gondolin");
 					const { httpHooks, env } = createHttpHooks({
 							...(this.networkPolicy.allowedHosts.length > 0
 								? { allowedHosts: this.networkPolicy.allowedHosts }
@@ -144,7 +146,12 @@ export class GondolinController {
 							rootfs: { mode: "cow", size: this.guestRuntime.rootfsSize },
 							httpHooks,
 							env,
-							vfs: { mounts: { [GUEST_WORKSPACE]: new RealFSProvider(hostWorkspace) } },
+							vfs: {
+								mounts: {
+									[GUEST_WORKSPACE]: new RealFSProvider(hostWorkspace),
+									[GUEST_RESOURCE_ROOT]: new ReadonlyProvider(new RealFSProvider(this.hostResources)),
+								},
+							},
 						});
 						this.vm = created;
 						return created;

@@ -175,7 +175,7 @@ directly when an official evaluator lifecycle cannot be represented by a
 budgets, events, checkpoints, status, and final summaries to those shared
 components rather than assembling parallel task-local lifecycle machinery.
 
-### Optional Research Harness Backend
+### Optional Research Harness Backends
 
 A task may implement reservoir expansion with persistent Agent sessions through
 the public `ldm_tts.harness` package. The Harness remains behind the task's
@@ -194,9 +194,17 @@ task-defined duplicate rule so the Agent can replace rejected entries in the
 same session. Accept a complete minibatch before computing empirical proposal
 mass or running acquisition.
 
+A Harness-Compiled LDM method keeps that proposal path unchanged and adds one
+independent policy `HarnessClient`. The task owns its numeric feature encoder,
+`OptimizationPolicyAdapter`, residual-GP wiring, policy profile, and capability
+contract. The policy Agent submits a complete `optimization_policy.py`; it must
+not select candidates or change the kernel, uncertainty, acquisition, pool,
+evaluator, or budget. Snapshot and execute the artifact through the isolated
+policy runner, never the host interpreter.
+
 Harness-native sessions and redacted provider request/response records belong
-under the ignored run directory. They are raw research traces, not automatic
-`ldm-2.0` training rows. See the
+under the ignored run directory. Keep proposal and policy roots separate. They
+are raw research traces, not automatic `ldm-2.0` training rows. See the
 [Research Harness integration guide](../docs/research-harness.md) and the
 [Pi sidecar contract](../harnesses/pi/README.md).
 

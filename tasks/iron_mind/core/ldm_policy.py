@@ -9,7 +9,8 @@ import numpy as np
 
 MAD_SCALE = 1.4826
 DEFAULT_Z_CLIP = 5.0
-DEFAULT_ETA = 1.0
+DEFAULT_ALPHA = 2.0
+DEFAULT_ETA = 0.25
 NUMERICAL_EPSILON = 1.0e-12
 
 
@@ -17,7 +18,7 @@ NUMERICAL_EPSILON = 1.0e-12
 class AcquisitionTiltConfig:
     """Weights and reproducibility settings for the finite LDM policy."""
 
-    alpha: float = 1.0
+    alpha: float = DEFAULT_ALPHA
     eta: float = DEFAULT_ETA
     z_clip: float = DEFAULT_Z_CLIP
     seed: int = 0
@@ -82,7 +83,7 @@ def tilted_probabilities(
     q0: np.ndarray,
     acquisition: np.ndarray,
     *,
-    alpha: float = 1.0,
+    alpha: float = DEFAULT_ALPHA,
     eta: float = DEFAULT_ETA,
     z_clip: float = DEFAULT_Z_CLIP,
 ) -> np.ndarray:
@@ -153,6 +154,7 @@ def effective_sample_size(probabilities: np.ndarray) -> float:
 
 __all__ = [
     "AcquisitionTiltConfig",
+    "DEFAULT_ALPHA",
     "DEFAULT_ETA",
     "effective_sample_size",
     "gumbel_top_k",

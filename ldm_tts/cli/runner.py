@@ -37,7 +37,14 @@ from ldm_tts.repository import resolve_repository_root
 
 REPO_ROOT = resolve_repository_root(source_file=Path(__file__))
 ENV_VAR_PATTERN = re.compile(r"\$(?P<brace>\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\})|\$(?P<plain>[A-Za-z_][A-Za-z0-9_]*)")
-SENSITIVE_NAME_SUFFIXES = ("api-key", "password", "secret", "access-token", "auth-token")
+SENSITIVE_NAME_SUFFIXES = (
+    "api-key",
+    "api-key-file",
+    "password",
+    "secret",
+    "access-token",
+    "auth-token",
+)
 
 NEGATABLE_BOOLEAN_KEYS = {
     "allow-early-stop",

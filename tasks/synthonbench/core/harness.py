@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.harness.pi import PiGuestRuntime, load_pi_guest_runtime
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient,
-    HarnessGuestRuntime,
     HarnessProfile,
-    HarnessSubmissionRejection,
+    HarnessSubmissionContract,
+    HarnessSubmissionError,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
     HarnessToolExtension,
@@ -23,7 +25,6 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     canonical_sha256,
     file_sha256,
-    load_harness_guest_runtime,
     profile_set_sha256,
 )
 from tasks.synthonbench.core.candidate import (
@@ -32,7 +33,11 @@ from tasks.synthonbench.core.candidate import (
     SynthonCandidateDomain,
     prepare_candidate_payload,
 )
-from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
+from tasks.synthonbench.core.constants import (
+    FORBIDDEN_QUERY_TERMS,
+    OBJECTIVE_NAME,
+    TASK_ID,
+)
 from tasks.synthonbench.core.prompting import serialize_observations
 from tasks.synthonbench.core.proposal_base_measure import attach_empirical_base_measure
 from tasks.synthonbench.core.space_order import ordered_positions, ordered_reactions, ordered_synthon_ids
@@ -45,15 +50,6 @@ HARNESS_PROFILE_IDS = (
 )
 DIRECT_HARNESS_PROFILE_ID = "direct_research"
 HARNESS_SOURCE = "synthonbench_persistent_research_harness"
-HARNESS_FORBIDDEN_PATTERNS = (
-    r"synthon\s*bench",
-    r"mireklzicar[/\\]synthonbench",
-)
-HARNESS_FORBIDDEN_TERMS = (
-    "synthonbench",
-    "mireklzicar/synthonbench",
-    "4e89d72a19ebc5f9e59513bb57771ea8e8db4336",
-)
 HARNESS_CANDIDATE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -121,24 +117,44 @@ def _reaction_metadata(path: Path | None) -> dict[str, dict[str, str]]:
         }
 
 
-def harness_profiles(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
+def harness_submission_contract(candidates_per_profile: int) -> HarnessSubmissionContract:
+    if candidates_per_profile < 1:
+        raise ValueError("SynthonBench harness candidate count must be positive")
+    return HarnessSubmissionContract(
+        contract_id="synthonbench_candidate_batch",
+        tool_name="submit_candidates",
+        payload_schema={
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": HARNESS_CANDIDATE_SCHEMA,
+                    "minItems": candidates_per_profile,
+                    "maxItems": candidates_per_profile,
+                },
+            },
+            "required": ["candidates"],
+            "additionalProperties": False,
+        },
+    )
+
+
+def harness_profiles() -> tuple[HarnessProfile, ...]:
     return tuple(
         HarnessProfile(
             profile_id,
             _CONTAINER_PROFILE_ROOT / profile_id / "AGENTS.md",
-            candidates_per_turn,
             agents_sha256=file_sha256(_LOCAL_PROFILE_ROOT / profile_id / "AGENTS.md"),
         )
         for profile_id in HARNESS_PROFILE_IDS
     )
 
 
-def direct_harness_profile(candidates_per_turn: int) -> tuple[HarnessProfile, ...]:
+def direct_harness_profile() -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(
             DIRECT_HARNESS_PROFILE_ID,
             _CONTAINER_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md",
-            candidates_per_turn,
             agents_sha256=file_sha256(
                 _LOCAL_PROFILE_ROOT / DIRECT_HARNESS_PROFILE_ID / "AGENTS.md"
             ),
@@ -156,8 +172,8 @@ def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
     )
 
 
-def harness_guest_runtime() -> HarnessGuestRuntime:
-    return load_harness_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
+def harness_guest_runtime() -> PiGuestRuntime:
+    return load_pi_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
 
 
 class SynthonHarnessExpander:
@@ -170,19 +186,23 @@ class SynthonHarnessExpander:
         *,
         target: str,
         profiles: Sequence[HarnessProfile],
+        candidates_per_profile: int,
         campaign_id: str,
         first_active_round: int,
         attach_empirical_q0: bool,
-        account: Callable[[dict[str, int]], None] | None = None,
+        account: Callable[[dict[str, int | float]], None] | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("Synthon harness requires at least one profile")
         if first_active_round < 0:
             raise ValueError("first_active_round must be non-negative")
+        if candidates_per_profile < 1:
+            raise ValueError("candidates_per_profile must be positive")
         self.client = client
         self.domain = domain
         self.target = target
         self.profiles = tuple(profiles)
+        self.candidates_per_profile = candidates_per_profile
         self.campaign_id = campaign_id
         self.profile_set_sha256 = profile_set_sha256(self.profiles)
         self.first_active_round = first_active_round
@@ -190,7 +210,7 @@ class SynthonHarnessExpander:
         self.account = account
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
-        expected = sum(profile.candidates_per_turn for profile in self.profiles)
+        expected = len(self.profiles) * self.candidates_per_profile
         if request.reservoir_size != expected:
             raise ValueError(
                 f"harness reservoir size must equal the configured minibatch total ({expected})"
@@ -202,14 +222,21 @@ class SynthonHarnessExpander:
                 "proposal_attempts": len(turns),
                 "harness_turns": len(turns),
             })
+        started = time.perf_counter()
         results = self.client.run_turn(
             turns,
             submission_validator=lambda submission: _validate_submission(
-                submission, self.domain, evaluated
+                submission,
+                self.domain,
+                evaluated,
+                allow_repeated_occurrences=self.attach_empirical_q0,
             ),
         )
         if self.account is not None:
-            self.account(_usage_counts(results))
+            self.account({
+                **_usage_counts(results),
+                "harness_wall_time_seconds": time.perf_counter() - started,
+            })
         sampling_mode = (
             "persistent_parallel_research_sessions"
             if self.attach_empirical_q0
@@ -234,9 +261,7 @@ class SynthonHarnessExpander:
                 "sampling_mode": sampling_mode,
                 "round_idx": request.round_idx,
                 "session_count": len(self.profiles),
-                "candidates_per_session": [
-                    profile.candidates_per_turn for profile in self.profiles
-                ],
+                "candidates_per_session": [self.candidates_per_profile] * len(self.profiles),
                 "proposal_count": len(proposals),
                 "submitted_candidate_count": expected,
                 "candidate_lineage": [
@@ -276,10 +301,10 @@ class SynthonHarnessExpander:
                 history_digest=history_digest,
                 message=_turn_message(
                     request,
-                    profile,
                     target=self.target,
                     observations=serialized_history,
                     evaluated_candidates=evaluated_candidates,
+                    allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
                     history_from_seq=history_from_seq,
                     history_to_seq=history_to_seq,
@@ -304,12 +329,23 @@ class SynthonHarnessExpander:
             result = by_profile.get(profile.profile_id)
             if result is None:
                 raise ValueError(f"harness profile did not commit: {profile.profile_id}")
-            if len(result.candidates) != profile.candidates_per_turn:
+            if result.submission_status != "accepted":
+                raise RuntimeError(
+                    f"harness profile submission was rejected: {profile.profile_id}"
+                )
+            candidates = result.submission.get("candidates")
+            if not isinstance(candidates, list) or any(
+                not isinstance(candidate, dict) for candidate in candidates
+            ):
+                raise RuntimeError(
+                    f"harness profile {profile.profile_id} committed an invalid candidate payload"
+                )
+            if len(candidates) != self.candidates_per_profile:
                 raise ValueError(
-                    f"harness profile {profile.profile_id} must submit exactly {profile.candidates_per_turn} candidates"
+                    f"harness profile {profile.profile_id} must submit exactly {self.candidates_per_profile} candidates"
                 )
             profile_keys: set[str] = set()
-            for index, candidate in enumerate(result.candidates):
+            for index, candidate in enumerate(candidates):
                 try:
                     prepared = _validated_candidate(candidate, self.domain, evaluated)
                 except ValueError as exc:
@@ -317,7 +353,10 @@ class SynthonHarnessExpander:
                         f"committed harness candidate failed authoritative validation: "
                         f"{result.profile_id}[{index}]: {exc}"
                     ) from exc
-                if prepared.product_id in profile_keys:
+                if (
+                    not self.attach_empirical_q0
+                    and prepared.product_id in profile_keys
+                ):
                     raise RuntimeError(
                         f"committed harness profile contains a duplicate occurrence: "
                         f"{result.profile_id}[{index}]"
@@ -379,7 +418,7 @@ def _turn_id(
 
 
 def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
-    terms = set(HARNESS_FORBIDDEN_TERMS)
+    terms = set(FORBIDDEN_QUERY_TERMS)
     for observation in request.observations:
         terms.add(observation.candidate_id)
         terms.add(observation.canonical_key)
@@ -388,11 +427,11 @@ def _forbidden_query_terms(request: ExpansionRequest) -> tuple[str, ...]:
 
 def _turn_message(
     request: ExpansionRequest,
-    profile: HarnessProfile,
     *,
     target: str,
     observations: Sequence[dict[str, object]],
     evaluated_candidates: Sequence[dict[str, object]],
+    allow_repeated_occurrences: bool,
     initial: bool,
     history_from_seq: int,
     history_to_seq: int,
@@ -409,20 +448,28 @@ def _turn_message(
         "objective": f"maximize measured {OBJECTIVE_NAME}; higher is better",
         "new_measured_observations": list(observations),
         "evaluated_candidates": list(evaluated_candidates),
+        "measurement_feedback": (
+            "Your occurrences enter a shared pool; only selected unique candidates are measured. "
+            "Match new measurements to your earlier submissions and revise the corresponding hypotheses. "
+            "A submitted but unmeasured candidate is neither failed nor successful and remains eligible. "
+            "Selection is a sampling event, not evidence of candidate quality: neither being selected "
+            "nor being left unmeasured justifies extra confidence or more slots by itself. "
+            "Allocate repeated slots from measured or scientific evidence, not to win selection. "
+            "Separate expected improvement from the information value of a control. "
+            "If progress stalls, investigate a contrasting hypothesis rather than only repeating "
+            "near-equivalent variants; controls need meaningful proposal mass to have a chance of measurement."
+            if allow_repeated_occurrences else
+            "Your distinct submitted candidates are directly measured; update hypotheses from the returned results."
+        ),
         "novelty_contract": {
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
-            "required_not_evaluated_candidate_count": profile.candidates_per_turn,
             "same_round_cross_session_agreement_is_allowed": True,
-            "same_session_duplicates_are_forbidden": True,
+            "same_session_repeated_occurrences_are_allowed": allow_repeated_occurrences,
+            "repeated_occurrences_contribute_to_empirical_q0": allow_repeated_occurrences,
             "validate_before_submission": True,
         },
         "synthon_space_tools": list(HARNESS_TOOL_NAMES),
-        "submission_contract": {
-            "tool": "submit_candidates",
-            "candidate_count": profile.candidates_per_turn,
-            "candidate_schema": HARNESS_CANDIDATE_SCHEMA,
-        },
         "constraints": [
             "Choose reaction types and search directions autonomously using only the structured official SynthonSpace tools.",
             "Do not search for this benchmark, its repository, datasets, or hidden scores.",
@@ -430,13 +477,18 @@ def _turn_message(
             "Do not estimate or claim benchmark scores as measurements.",
             "The isolated sandbox contains no authoritative task data; use the structured tools for the official space and supplied measurements.",
             "Research autonomously when it can improve the choices: search public literature, inspect public documents, and write or run scratch analysis code in the sandbox.",
-            "Prioritize the distinct research perspective in your AGENTS.md. Cross-session agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
+            "Prioritize the distinct research perspective in your AGENTS.md. Agreement is allowed when your own evidence supports it, but do not collapse into generic ranking by assumption.",
             "Use the reaction summary to narrow the turn to roughly two to six evidence-backed reaction directions; do not enumerate the entire SynthonSpace without a specific reason.",
             "Use tools iteratively when useful, but leave enough of the 30-minute turn window to validate and submit the complete minibatch.",
             "If a tool fails or gives no decisive evidence, continue from the supplied data rather than withholding a candidate.",
             "Never submit an exact reaction_id plus ordered synthon_ids tuple listed in evaluated_candidates.",
             "A tuple proposed in an earlier turn remains eligible if it is absent from evaluated_candidates; do not maintain a private exclusion set of prior submissions.",
-            "Historical repeats, invalid tuples, and duplicates within your own minibatch will be rejected with exact reasons.",
+            (
+                "Your minibatch is an ordered multiset of proposal occurrences. You may allocate multiple slots to the same legal, historically unseen tuple when your evidence justifies extra empirical q0 mass; use multiplicity deliberately rather than as filler."
+                if allow_repeated_occurrences
+                else "Your directly evaluated minibatch must contain distinct tuples."
+            ),
+            "Historical repeats and invalid tuples will be rejected with exact reasons.",
             "If submission is rejected, replace the reported entries and resubmit the complete minibatch; do not repeat the research phase.",
         ],
     }
@@ -464,43 +516,71 @@ def _validate_submission(
     submission: HarnessSubmissionRequest,
     domain: SynthonCandidateDomain,
     evaluated: set[str],
+    *,
+    allow_repeated_occurrences: bool,
 ) -> HarnessSubmissionValidation:
-    rejections: list[HarnessSubmissionRejection] = []
+    candidates = submission.submission.get("candidates")
+    if not isinstance(candidates, list):
+        return HarnessSubmissionValidation("retry", (
+            HarnessSubmissionError(
+                "/candidates",
+                "invalid_candidate_batch",
+                "The submission must contain a candidates array.",
+                "Submit the complete candidate batch required by the terminal tool schema.",
+            ),
+        ))
+    errors: list[HarnessSubmissionError] = []
     first_index_by_key: dict[str, int] = {}
-    for index, candidate in enumerate(submission.candidates):
+    for index, candidate in enumerate(candidates):
+        path = f"/candidates/{index}"
+        if not isinstance(candidate, dict):
+            errors.append(HarnessSubmissionError(
+                path,
+                "invalid_candidate",
+                f"Candidate at index {index} must be an object.",
+                "Replace it with one complete legal SynthonSpace tuple.",
+            ))
+            continue
         try:
             prepared = prepare_candidate_payload(
                 candidate, domain.space, domain.allowed_reactions
             )
         except CandidatePayloadError as exc:
-            rejections.append(HarnessSubmissionRejection(
-                index,
+            errors.append(HarnessSubmissionError(
+                path,
                 "invalid_candidate",
                 f"Candidate at index {index} is not a legal official SynthonSpace tuple: {exc}",
+                "Use the structured SynthonSpace tools to replace this entry.",
             ))
             continue
         candidate_label = json.dumps(
             prepared.payload, ensure_ascii=False, separators=(",", ":")
         )
         if prepared.product_id in evaluated:
-            rejections.append(HarnessSubmissionRejection(
-                index,
+            errors.append(HarnessSubmissionError(
+                path,
                 "historical_duplicate",
                 f"Candidate at index {index} {candidate_label} was already evaluated in a previous round. "
                 "Replace it with a different unseen tuple.",
+                "Choose a legal tuple absent from evaluated_candidates.",
             ))
             continue
         first_index = first_index_by_key.get(prepared.product_id)
-        if first_index is not None:
-            rejections.append(HarnessSubmissionRejection(
-                index,
+        if not allow_repeated_occurrences and first_index is not None:
+            errors.append(HarnessSubmissionError(
+                path,
                 "same_session_duplicate",
                 f"Candidate at index {index} {candidate_label} duplicates index {first_index} in this submission. "
                 "Keep the first occurrence and replace this one with a different unseen tuple.",
+                "Replace only this repeated entry with another unseen legal tuple.",
             ))
             continue
-        first_index_by_key[prepared.product_id] = index
-    return HarnessSubmissionValidation(tuple(rejections))
+        first_index_by_key.setdefault(prepared.product_id, index)
+    return (
+        HarnessSubmissionValidation("retry", tuple(errors))
+        if errors
+        else HarnessSubmissionValidation()
+    )
 
 
 def _evaluated_history(
@@ -525,6 +605,10 @@ def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
             sum(int(count) for count in result.usage["toolCalls"].values())
             for result in results
         ),
+        "harness_validation_submissions": sum(
+            int(result.usage.get("validationSubmissions", 0))
+            for result in results
+        ),
         "harness_artifact_bytes": sum(
             int(result.usage["artifactBytes"]) for result in results
         ),
@@ -544,6 +628,7 @@ def _candidate_lineage(
 
 
 def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
+    candidates = result.submission.get("candidates")
     return {
         "profile_id": result.profile_id,
         "session_id": result.session_id,
@@ -553,7 +638,7 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
         "history_to_seq": result.history_to_seq,
         "history_digest": result.history_digest,
         "submission_id": result.submission_id,
-        "candidate_count": len(result.candidates),
+        "candidate_count": len(candidates) if isinstance(candidates, list) else 0,
         "usage": result.usage,
         "artifacts": result.artifacts,
     }
@@ -562,11 +647,11 @@ def _result_summary(result: HarnessTurnResult) -> dict[str, object]:
 __all__ = [
     "HARNESS_CANDIDATE_SCHEMA",
     "DIRECT_HARNESS_PROFILE_ID",
-    "HARNESS_FORBIDDEN_PATTERNS",
     "HARNESS_PROFILE_IDS",
     "HARNESS_TOOL_NAMES",
     "SynthonHarnessExpander",
     "direct_harness_profile",
+    "harness_submission_contract",
     "harness_profiles",
     "harness_guest_runtime",
     "harness_tool_extensions",
