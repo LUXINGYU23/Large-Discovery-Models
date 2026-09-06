@@ -49,6 +49,12 @@ All model-backed task modes accept OpenAI-compatible URL, model, and key
 settings. Keep authenticated keys in environment variables or documented
 ignored protected files, never tracked YAML or literal command arguments.
 
+For Iron Mind, SynthonBench, and NucleoBench pilot runs, select children from
+`config/pilot_evaluation/<task>.yaml` using `scripts/run_pilot_evaluation.py`
+with `--method`, `--case`, and `--seed`. Method arguments come from the matrix's
+base config and `method_overrides`; do not create standalone method copies.
+See `docs/pilot-evaluation.md` for six-round and twelve-round entry points.
+
 Direct proposal backends use Chat Completions. A task's research Harness may
 use another compatible wire API; the Pi sidecar uses Responses and
 must be checked through its documented capability smoke.
@@ -143,7 +149,6 @@ tasks/iron_mind/README.md
 tasks/iron_mind/QUICKSTART.md
 config/iron_mind/mock.yaml
 config/iron_mind/ldm_harness_smoke.yaml
-config/iron_mind/pilot_evaluation_ldm_harness_compiled.yaml
 config/pilot_evaluation/iron_mind.yaml
 ```
 
@@ -155,9 +160,9 @@ writable external run/cache roots. A protected API-key file may be selected by
 
 Iron Mind constructs the shared `LDMEngine` directly around source-pinned
 finite reaction tables. Four persistent Harness profiles each submit 16 exact
-condition combinations. Task-local Python rejects invalid, historically
-evaluated, and within-session duplicate candidates before commit; cross-session
-agreement remains as proposal-frequency mass. Accepted occurrences then use
+condition combinations. Task-local Python rejects invalid and historically
+evaluated candidates before commit; repeated unevaluated candidates retain
+their proposal-frequency mass. Accepted occurrences then use
 the same empirical `q0`, factor-aware categorical GP-UCB, acquisition tilt,
 and frozen evaluator as direct LDM. The direct research Harness instead uses
 one persistent session to choose the evaluated condition without `q0`, GP, or
@@ -187,7 +192,7 @@ tasks/synthonbench/README.md
 tasks/synthonbench/QUICKSTART.md
 config/synthonbench/mock.yaml
 config/synthonbench/ldm_harness_surrogate_smoke.yaml
-config/synthonbench/pilot_evaluation_ldm_harness_compiled.yaml
+config/pilot_evaluation/synthonbench.yaml
 ```
 
 Direct methods use the common `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
@@ -232,7 +237,6 @@ tasks/nucleobench/README.md
 tasks/nucleobench/QUICKSTART.md
 config/nucleobench/mock.yaml
 config/nucleobench/malinois_k562_tiny_campaign.yaml
-config/nucleobench/malinois_k562_pilot_ldm_harness_compiled.yaml
 config/pilot_evaluation/nucleobench.yaml
 ```
 

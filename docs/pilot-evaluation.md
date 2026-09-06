@@ -53,6 +53,36 @@ uv run --locked python scripts/run_pilot_evaluation.py \
 Use `--case`, `--method`, and `--seed` to select children. Reports are written
 only after every configured child is complete.
 
+For example, run only Harness-Compiled LDM for one seed:
+
+```bash
+uv run --locked python scripts/run_pilot_evaluation.py \
+  config/pilot_evaluation/iron_mind.yaml \
+  --method ldm_harness_compiled --seed 0
+```
+
+## Configuration Layout
+
+Each matrix references one task base configuration. Its `method_overrides`
+selects the experiment profile and method-specific arguments; the runner sets
+the method, proposal backend, case, seed, rounds, and output path. Use this
+matrix for both single-method runs and comparisons, without separate copies
+of each method's configuration. Scientific profiles remain in the task's
+`experiment.json`.
+
+| Matrix | Task base config | Campaign rounds |
+| --- | --- | --- |
+| `iron_mind.yaml` | `iron_mind/pilot_evaluation_base.yaml` | 6 |
+| `iron_mind_extended.yaml` | `iron_mind/pilot_evaluation_extended.yaml` | 12 |
+| `synthonbench.yaml` | `synthonbench/pilot_evaluation_base.yaml` | 6 |
+| `synthonbench_extended.yaml` | `synthonbench/pilot_evaluation_extended.yaml` | 12 |
+| `nucleobench.yaml` | `nucleobench/malinois_k562_pilot_base.yaml` | 12 |
+
+Matrix paths are relative to `config/pilot_evaluation/`; task base paths are
+relative to `config/`. Round one is shared initialization. Mock, qualification,
+Harness smoke, and full official benchmark configs stay under `config/<task>/`
+because they serve distinct validation or benchmark budgets.
+
 ## Outputs And Integrity
 
 The output root contains:
@@ -118,8 +148,8 @@ in-session rejection and refill to deliver their complete accepted minibatch.
 1. Implement the applicable method names in the normal task procedure. All
    methods must emit `trajectory.csv`, `result.json`, and standard runtime
    artifacts.
-2. Add real task profiles under `config/<task>/`. Keep provider settings
-   user-defined and enforce scientific settings through `experiment.json`.
+2. Add a real task base config under `config/<task>/`. Keep provider settings
+   user-defined and enforce scientific profiles through `experiment.json`.
    A compiled method also needs a task-local feature and policy adapter,
    residual-GP path, independent policy profile, isolated artifact runner, and
    explicit policy budgets.

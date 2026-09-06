@@ -11,6 +11,7 @@ import yaml
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 from ldm_tts.pilot_evaluation.execution import _child_plan, _select_runs, run_evaluation
 from ldm_tts.cli.runner import load_config
+from ldm_tts.registration.experiment import load_experiment_contract
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -141,46 +142,48 @@ def test_dry_run_redacts_api_key_file_path(tmp_path: Path, capsys) -> None:
     )
 
 
-def test_harness_methods_build_distinct_child_plans(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
-    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
-    monkeypatch.setenv("IRON_MIND_WORK_ROOT", str(tmp_path / "work"))
-    spec = load_pilot_evaluation_spec(
-        REPO_ROOT / "config" / "pilot_evaluation" / "iron_mind.yaml"
-    )
+@pytest.mark.parametrize(
+    "config_path",
+    sorted((REPO_ROOT / "config" / "pilot_evaluation").glob("*.yaml")),
+    ids=lambda path: path.stem,
+)
+def test_registered_matrices_build_all_method_plans(
+    config_path: Path, monkeypatch, tmp_path: Path,
+) -> None:
+    for task in ("IRON_MIND", "SYNTHONBENCH", "NUCLEOBENCH"):
+        for suffix in ("DATA_ROOT", "RUNS_ROOT", "WORK_ROOT", "SOURCE_ROOT", "API_KEY_FILE"):
+            monkeypatch.setenv(f"{task}_{suffix}", str(tmp_path / task / suffix))
+    monkeypatch.setenv("NUCLEOBENCH_START_SET_SHA256", "a" * 64)
+    spec = load_pilot_evaluation_spec(config_path)
     base = load_config(spec.base_config)
-    runs = {
-        run.method: run
-        for run in _select_runs(
-            spec,
-            cases=("reductive_amination",),
-            methods=("ldm_harness", "ldm_harness_compiled", "harness"),
-            seeds=(0,),
-        )
-    }
-
-    ldm_harness = _child_plan(spec, base, runs["ldm_harness"], resume=False)
-    compiled = _child_plan(
-        spec,
-        base,
-        runs["ldm_harness_compiled"],
-        resume=False,
+    contract = load_experiment_contract(
+        REPO_ROOT / "tasks" / spec.task / "experiment.json"
     )
-    direct_harness = _child_plan(spec, base, runs["harness"], resume=False)
-
-    assert ldm_harness["contract_profile"] == "pilot_evaluation_ldm_harness"
-    assert compiled["contract_profile"] == "pilot_evaluation_ldm_harness_compiled"
-    assert direct_harness["contract_profile"] == "pilot_evaluation_harness"
-    assert _option(ldm_harness["argv"], "--search-method") == "ldm_harness"
-    assert _option(compiled["argv"], "--search-method") == "ldm_harness_compiled"
-    assert _option(direct_harness["argv"], "--search-method") == "harness"
-    assert _option(ldm_harness["argv"], "--proposal-samples") == "64"
-    assert _option(compiled["argv"], "--proposal-samples") == "64"
-    assert _options(compiled["argv"], "--policy-capability") == [
-        "ldm_weights@1",
-        "prior_mean@1",
-    ]
-    assert _option(direct_harness["argv"], "--proposal-samples") == "1"
+    runs = _select_runs(spec, cases=None, methods=None, seeds=None)
+    assert len(runs) == len(spec.cases) * len(spec.methods) * len(spec.seeds)
+    for run in runs:
+        plan = _child_plan(spec, base, run, resume=False)
+        argv = plan["argv"]
+        assert _option(argv, "--search-method") == run.method
+        assert _option(argv, "--iterations") == str(spec.iterations)
+        assert _option(argv, "--campaign-index") == str(run.seed)
+        mode = "openai" if run.method in {"ldm", "llm"} else "none"
+        assert _option(argv, "--proposal-mode") == mode
+        profile = contract.profile(plan["contract_profile"])
+        if run.method == "harness":
+            assert _option(argv, "--proposal-samples") == _option(argv, "--evaluations-per-round")
+            if "harness_turns" in profile.budget:
+                assert profile.budget["harness_turns"] == spec.optimization_rounds
+        if run.method in {"ldm_harness", "ldm_harness_compiled"}:
+            assert _option(argv, "--proposal-samples") == "64"
+            assert _option(argv, "--harness-candidates-per-session") == "16"
+            if "harness_turns" in profile.budget:
+                assert profile.budget["harness_turns"] == 4 * spec.optimization_rounds
+        if run.method == "ldm_harness_compiled":
+            assert _options(argv, "--policy-capability") == ["ldm_weights@1", "prior_mean@1"]
+            assert _option(argv, "--policy-max-submission-attempts") == "3"
+            if "policy_harness_turns" in profile.budget:
+                assert profile.budget["policy_harness_turns"] == spec.optimization_rounds
 
 
 def _option(argv: list[str], name: str) -> str:

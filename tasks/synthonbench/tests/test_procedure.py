@@ -259,10 +259,11 @@ def test_real_profiles_lock_the_scientific_method_arguments() -> None:
             else common | direct
         )
         assert required <= set(profile.locked_args)
-        filename = "pilot_evaluation_base.yaml" if profile.name == "pilot_evaluation" else f"{profile.name}.yaml"
-        config_path = REPO_ROOT / "config" / "synthonbench" / filename
+
+    for config_path in (REPO_ROOT / "config" / "synthonbench").glob("*.yaml"):
         config = _load_yaml(config_path)
-        validate_profile_args(contract, profile.name, config["args"])
+        if "contract_profile" in config:
+            validate_profile_args(contract, config["contract_profile"], config["args"])
 
 
 def test_direct_harness_profiles_lock_one_sixteen_candidate_session() -> None:
