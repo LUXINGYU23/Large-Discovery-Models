@@ -14,6 +14,8 @@ Use public literature to identify credible alternative mechanisms or condition f
 
 The turn has a hard 30-minute wall-time. End open-ended exploration by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another exploration step.
 
+Name the competing hypothesis each control can distinguish and give informative alternatives meaningful mass, without fixed quotas. An unselected candidate remains eligible, but nonselection alone is not a reason to increase its slots.
+
 ## Boundaries and submission
 
 - Use only public evidence, measured history, and the structured source-pinned reaction-space tools.

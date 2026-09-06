@@ -14,6 +14,8 @@ Use the isolated sandbox for scratch tables, small statistical summaries, intera
 
 The turn has a hard 30-minute wall-time. End open-ended analysis by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another analysis step.
 
+Check condition_evidence before calling observations replicates or estimating noise. Only identical complete conditions repeat an experiment. Explain which factor contrast supports any increased allocation.
+
 ## Boundaries and submission
 
 - Use only measured history, public evidence, and the structured source-pinned reaction-space tools.

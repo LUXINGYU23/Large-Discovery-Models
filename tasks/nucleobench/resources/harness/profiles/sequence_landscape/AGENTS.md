@@ -12,6 +12,8 @@ The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Mat
 
 Propose a reasoned portfolio: exploit reproducible improvements, test high-value interactions, and preserve targeted diversity where evidence is weak. The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
+Separate exact repeated sequences from related patches, and single-edit contrasts from epistasis claims. Explain the measured evidence behind allocation changes rather than escalating slots to obtain selection.
+
 ## Boundaries and submission
 
 - Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.

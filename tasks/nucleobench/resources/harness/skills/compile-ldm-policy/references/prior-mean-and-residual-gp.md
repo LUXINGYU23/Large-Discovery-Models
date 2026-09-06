@@ -81,19 +81,23 @@ the same result alone, permuted, or in a larger batch.
 
 ## Evaluating a draft
 
-`evaluate_policy_draft` reports:
+`evaluate_policy_draft` holds out whole measured rounds and fits each zero-mean
+GP on its earlier training prefix. With that GP fixed, it compares
+`A @ z_train` against `h_test + A @ (z_train - h_train)`, where
+`A = K_test,train @ inverse(K_train,train + noise)`. The mean is called with
+training-only features, utilities, and target scaling. No current-query labels
+are available. Until two measured rounds exist, holdout evidence is unavailable.
 
-- standardized history-utility and prior-residual summaries;
-- zero-prior and draft-prior RMSE on the current history;
-- their difference and prior/target Pearson correlation;
-- history/query prior ranges and the number of clipped values.
+The tool reports raw-utility RMSE and per-fold predictions, plus current-pool
+first-draw probabilities for default and draft policies. These probabilities
+are not batch inclusion probabilities. The GP hyperparameters are frozen for
+this diagnostic; the actual online task retains its existing refitting rules.
 
-These metrics are labeled `in_sample_prior_fit_only`. They detect scale errors,
-sign reversals, extreme means, and obvious non-fit. They do not establish
-out-of-sample accuracy and should not reward interpolation. When sample size
-allows, use sandbox calculations for leave-one-round-out or otherwise honest
-held-out comparisons, and prefer the least complex model that remains
-scientifically coherent.
+The Agent has already seen the historical holdout labels, so repeated draft
+selection can overfit these development checks. Use the independently frozen
+pre-measurement predictions in `weight_context.prediction_feedback` to assess
+subsequent real behavior. Do not optimize training fit or historical validation
+alone, and do not infer whole-space calibration from selected-point errors.
 
 ## Further reading
 

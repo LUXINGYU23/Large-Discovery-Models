@@ -76,11 +76,17 @@ the built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
 the authoritative feature contract and repair a draft before submission. These
 tools are advisory. Inspection returns the exact task-supplied `mean_context`
 and `weight_context` in addition to the public research snapshot, so generated
-code does not have to guess target scaling or available keys. Draft evaluation
-executes the file on current authoritative arrays and reports prior ranges,
-clipping, and explicitly in-sample residual diagnostics. Those diagnostics can
-identify scale, sign, and gross-fit errors; they are not an estimate of future
-optimization performance.
+code does not have to guess target scaling or available keys. Inspection also
+exports read-only arrays to `guest_snapshot.directory`. Draft evaluation compares
+chronological measured-history holdouts with training-prefix GP hyperparameters
+frozen, and reports current-pool first-draw distribution changes. These are
+development diagnostics, not an untouched test or a closed-loop counterfactual.
+The weight context also contains exact normalization, candidate predictions,
+measured progress, and errors for predictions frozen before real measurements.
+Measured feedback retains the original pool-relative q0, competition ranks,
+first-draw probability and alpha/eta. Do not compare historical q0 with the
+current pool maximum. A positive residual is underprediction, not validation
+of acquisition ranking; GP holdout error does not evaluate sampling weights.
 
 After immutable snapshotting, task-owned Python executes the accepted artifact
 again in a separate read-only, network-disabled container with bounded CPU,

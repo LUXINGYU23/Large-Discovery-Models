@@ -18,6 +18,15 @@ but reserve time to validate, evaluate, repair, and submit one terminal action.
 
 ## Statistical semantics
 
+Use the returned `guest_snapshot.directory` to load the read-only authoritative
+`arrays.npz` and JSON feature contract for sandbox calculations. Do not
+reconstruct numeric rows by hand. Compare the actual default logit ranges and
+per-candidate probabilities, then audit `prediction_feedback` and
+`optimization_progress` in the weight context. Frozen errors concern measured
+selections only, not the entire domain. Deliberate occurrence repetitions
+express preference and must not be counted as independent supporting evidence.
+The defaults are a comparison baseline, not a requirement to preserve.
+
 The supplied history utility `u` is on the raw task scale. Define
 
 ```text
@@ -32,7 +41,11 @@ uncertainty. Prefer zero or strongly regularized structure until measurements
 support more.
 
 Iron Mind features are schema-ordered one-hot groups, with exactly one active
-level per reaction factor. An intercept plus every level of every group is not
+level per reaction factor. Check `research_snapshot.condition_evidence` before
+claiming replication or a factor effect: only identical complete conditions
+are replicates; a changed reagent loading is a different experiment. Coverage
+counts do not remove confounding between substrate and other factors.
+An intercept plus every level of every group is not
 identifiable. Use a reference level, centered within-group effects, or ridge
 regularization. Do not interpret coefficients from confounded combinations as
 separate causal effects. Add an interaction only when multiple measured
@@ -56,7 +69,7 @@ log q(x) = alpha * log(q0(x) + epsilon)
            + eta * robust_z(UCB(x)) - log Z.
 ```
 
-`alpha / eta` changes the balance between independent proposal consensus and
+`alpha / eta` changes the balance between empirical proposal preference and
 the fixed GP acquisition; scaling both changes concentration. The released
 baseline is `alpha=2.0, eta=0.25`. Treat weight design as co-equal with prior-mean
 design: perform a separate weight audit every round even when the mean stays
@@ -66,11 +79,14 @@ Infer a curriculum state from evidence, not elapsed rounds. Do not branch on
 `round_index`, label fixed round ranges as early/middle/late, or treat history
 size alone as surrogate readiness. Use the exact `weight_context`, proposal
 concentration, acquisition separation, measured progress, contradictions, and
-the surrogate behavior visible in the snapshot. Favor proposal mass when GP
-ranking is prior-like or unvalidated; raise acquisition influence only when
-real measurements support it; flatten whichever signal has collapsed or become
-contradictory. The state may move backward as evidence changes. Entropy and ESS
-describe concentration, not correctness.
+the surrogate behavior visible in the snapshot. Require evidence for both
+proposal quality and GP ranking; an unvalidated GP does not validate proposal
+confidence. Positive prediction residuals do not validate ranking, and mean
+RMSE does not evaluate alpha/eta. Use each measured point's frozen pool-relative
+q0 and ranks, not the current pool maximum. When both signals are uncertain,
+consider reducing concentration in both. Test stalled and contradictory states;
+do not restore sharper defaults merely because the last evaluation failed to
+improve. Entropy, ESS and logit ranges describe influence, not correctness.
 
 ## Evidence and implementation boundary
 
@@ -82,16 +98,20 @@ unmeasured benchmark label.
 
 The task owns the factor representation, categorical kernel, noise and model
 mismatch, GP posterior, UCB, pool, empirical `q0`, robust normalization,
-Gumbel sampling, and evaluator. The policy must not use candidate identity,
+Gumbel sampling, and evaluator. The mean function must not use candidate identity,
 row position, `q0`, acquisition values, selection probabilities, hidden values,
 files, or network access at execution time. It must be deterministic, finite,
 query-order equivariant, batch independent, and valid for empty or tiny
 history.
 
+The separate weight function may and should read `weight_context`, including
+proposal mass, acquisition, and measured prediction feedback.
+
 Write the complete NumPy-only implementation to `optimization_policy.py`.
-Call `validate_policy_draft` and `evaluate_policy_draft`. Treat draft RMSE and
-correlation as in-sample diagnostics for scale, sign, and gross overfitting,
-not proof of predictive value; use honest sandbox holdouts when data permit.
+Call `validate_policy_draft` and `evaluate_policy_draft`. Compare chronological
+fixed-GP holdouts and first-draw distribution changes. Historical holdouts are
+development diagnostics, not untouched tests; the online GP may refit after a
+mean change. Use subsequent frozen-prediction feedback to check real benefit.
 Repair every structured error before submitting. Use `replace` for a justified
 validated artifact, `keep` only after evaluating the active artifact on the new
 snapshot, and `disable` when zero mean with task-default weights is better

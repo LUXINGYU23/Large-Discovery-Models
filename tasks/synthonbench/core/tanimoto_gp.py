@@ -122,6 +122,18 @@ class SynthonTanimotoGPUCBSelector:
             )
         self._signature = signature
 
+    def posterior_projection(self, history, features):
+        training = [self._latent_feature(item.feature_vector) for item in history]
+        query = [self._latent_feature(row) for row in features]
+        train_features = np.asarray([item[0] for item in training])
+        query_features = np.asarray([item[0] for item in query])
+        noise = np.asarray([self._observation_variance(item[1]) for item in training])
+        weights = (query_features @ self._posterior.covariance @ train_features.T) / noise
+        _, variance = self._posterior.predict(query_features)
+        variance += self.config.signal_std**2 * np.asarray([item[1] for item in query])
+        return {"weights": weights, "std": np.sqrt(np.maximum(variance, 0.0)),
+                "location_scale": np.asarray([self._target_mean, self._target_scale])}
+
     def select(
         self,
         candidates: Sequence[Candidate],

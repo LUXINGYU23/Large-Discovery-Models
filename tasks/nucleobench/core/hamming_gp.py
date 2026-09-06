@@ -222,6 +222,19 @@ class HammingGPUCBSelector:
         )
         self._fit_status = "fitted_grid_length_scale"
 
+    def posterior_projection(self, history, features):
+        weights = np.zeros((len(features), len(history)))
+        std = np.ones(len(features))
+        if self._fit_status != "neutral_prior":
+            cross = normalized_hamming_kernel(features, self._codes, self._length_scale)
+            projected = np.linalg.solve(self._cholesky, cross.T)
+            working_weights = np.linalg.solve(self._cholesky.T, projected).T
+            indices = {item.candidate_id: index for index, item in enumerate(history)}
+            weights[:, [indices[key] for key in self._working_ids]] = working_weights
+            std = np.sqrt(np.maximum(1.0 - np.sum(projected**2, axis=0), MIN_VARIANCE))
+        return {"weights": weights, "std": std,
+                "location_scale": np.asarray([self._target_mean, self._target_scale])}
+
     def select(
         self,
         candidates: Sequence[Candidate],

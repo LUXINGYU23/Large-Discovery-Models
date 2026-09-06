@@ -189,10 +189,22 @@ prior_mean(x) = E[z(x) | public task features and supported evidence].
 The unchanged task GP is fitted to `z - prior_mean` and adds the mean back to
 its posterior. The policy mean is not a maximum, rank, probability of
 optimality, or acquisition score. `inspect_policy_contract` exposes the exact
-execution contexts used by the runner. `evaluate_policy_draft` reports current
-history RMSE, residual, correlation, prior range, and clipping as explicitly
-in-sample diagnostics; it does not claim calibration or held-out predictive
-performance. Task-local profile and Skill instructions must state the exact
+execution contexts and exports authoritative numeric inputs read-only into the
+research guest. `evaluate_policy_draft` compares chronological measured-history
+holdouts using GP hyperparameters fitted on each training prefix and frozen.
+Current-pool diagnostics describe first-draw probabilities, not batch inclusion.
+Historical validation is a development check: the Agent has seen those labels.
+The controller separately freezes zero-mean and active predictions before real
+evaluation, then reports paired errors on subsequently measured candidates.
+Each record also freezes that round's pool size, q0 relative to its maximum,
+competition ranks (1 is best; ties share rank), acquisition and first-draw
+probability, and actual alpha/eta. Interpret historical confidence in that
+original pool, not against a later pool's maximum. Selected-point residuals do
+not establish whole-pool ranking; mean holdout error does not validate weights.
+Proposal slots express preference, not independent measurements or evidence
+from being selected. Both proposal and acquisition influence require support.
+The online task retains its existing GP refitting procedure. No current-query
+oracle labels enter research snapshots. Task-local instructions must state the exact
 feature semantics, identifiability limits, and evidence hierarchy.
 
 ## Resources And Artifacts

@@ -145,6 +145,11 @@ def test_gp_working_set_is_capped_and_keeps_the_global_best() -> None:
     assert summary["fit_status"] == "fitted_grid_length_scale"
     assert all(np.isfinite(item.scalar_mean) for item in result.predictions)
     assert all(item.scalar_std > 0.0 for item in result.predictions)
+    projection = selector.posterior_projection(history, np.asarray([encoder.encode(item).values for item in candidates[-2:]]))
+    location, scale = projection["location_scale"]
+    expected = location + scale * (projection["weights"] @ ((np.asarray([item.scalar_score for item in history]) - location) / scale))
+    np.testing.assert_allclose(expected, [item.scalar_mean for item in result.predictions])
+    np.testing.assert_allclose(scale * projection["std"], [item.scalar_std for item in result.predictions])
 
 
 class _FixedSelector:
@@ -341,10 +346,13 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     assert np.isfinite(round_input.query_features).all()
     mean_context = str(round_input.execution_context["mean_context"])
     assert all(term not in mean_context for term in ("q0", "acquisition", "candidate_id"))
-    assert round_input.research_snapshot["new_measured_observations"][0]["utility"] == 2.0
+    assert round_input.research_snapshot["measured_observations"][0]["utility"] == 2.0
 
 
 class _StaticPolicyController:
+    def record_predictions(self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition):
+        assert len(baseline) == len(active) == len(q0)
+
     def resolve(self, round_input):
         return CompiledOptimizationPolicy(
             epoch_id="epoch_001",

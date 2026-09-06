@@ -13,8 +13,9 @@ Use one bounded repair loop:
    material edit.
 7. Submit exactly one terminal action.
 
-Host-side snapshot paths in the round message are lineage references. Do not
-spend tool calls trying to read them from the guest filesystem.
+Use the tool's `guest_snapshot.directory` to read `arrays.npz`,
+`input.json`, and the feature contract with NumPy/JSON. Host-side paths in the
+round message remain lineage references.
 
 Common failures:
 
@@ -34,9 +35,20 @@ Common failures:
   components or selecting candidates.
 
 Do not hide validation failures behind broad exceptions, silent constant
-fallbacks, or clipping. The runner's `draft_diagnostics` are in-sample checks,
-not a score to optimize. A lower draft RMSE can expose a scale or sign fix but
-cannot by itself justify a more flexible mean.
+fallbacks, or clipping. Draft diagnostics use the last available chronological
+holdouts with GP hyperparameters fitted only on each training prefix and then
+frozen. They are development checks on already measured history, not an
+untouched test set or a counterfactual optimization run. The online task can
+refit hyperparameters after applying a mean. Check subsequent frozen-prediction
+feedback before claiming predictive improvement.
+
+Passing these tools proves executability and reports diagnostics, not scientific
+validity. Holdout GP RMSE assesses the mean, not alpha/eta; a lower concentration
+or changed first-draw distribution does not prove higher reward. Audit the
+weight function separately, including what it returns when improvement stops,
+feedback is ambiguous, or both signals lack support. A residual sign is not a
+ranking test. Compare historical proposal confidence using that measurement's
+frozen pool-relative fields, never the current pool's maximum.
 
 Terminal payloads are exact:
 

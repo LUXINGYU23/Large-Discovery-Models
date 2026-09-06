@@ -138,6 +138,11 @@ def test_selector_fits_ard_after_the_schema_scaled_history_threshold() -> None:
     )
 
     assert result.metadata["surrogate"]["fit_status"] == "fitted_ard_marginal_likelihood"
+    projection = selector.posterior_projection(history, np.asarray([encoder.encode(item).values for item in candidates]))
+    location, scale = projection["location_scale"]
+    expected = location + scale * (projection["weights"] @ ((np.asarray([item.scalar_score for item in history]) - location) / scale))
+    np.testing.assert_allclose(expected, [item.scalar_mean for item in result.predictions])
+    np.testing.assert_allclose(scale * projection["std"], [item.scalar_std for item in result.predictions])
 
 
 def test_single_observation_shapes_the_next_round_posterior() -> None:

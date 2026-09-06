@@ -153,6 +153,12 @@ def test_online_posterior_matches_closed_form_bayesian_linear_update() -> None:
     assert result.metadata["effective_beta"] == 1.0
     assert result.metadata["surrogate"]["target_mean"] == pytest.approx(target_mean)
     assert result.metadata["surrogate"]["target_scale"] == pytest.approx(target_scale)
+    projection = selector.posterior_projection(history, np.asarray([query.values]))
+    np.testing.assert_allclose(
+        target_mean + target_scale * (projection["weights"] @ target),
+        [prediction.scalar_mean],
+    )
+    np.testing.assert_allclose(target_scale * projection["std"], [prediction.scalar_std])
 
 
 def test_zero_prior_path_is_numerically_identical() -> None:

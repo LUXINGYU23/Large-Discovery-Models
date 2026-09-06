@@ -16,6 +16,7 @@ from typing import Any, Literal, Protocol
 import numpy as np
 
 from ldm_tts.harness.client import HarnessClient, HarnessError
+from ldm_tts.harness.policy_diagnostics import optimization_progress, prediction_feedback
 from ldm_tts.harness.policy_execution import (
     PolicyExecutionError,
     PolicyExecutionResult,
@@ -132,6 +133,7 @@ class PolicyRoundInput:
     query_features: np.ndarray
     research_snapshot: Mapping[str, Any]
     execution_context: Mapping[str, Any]
+    diagnostic_arrays: Mapping[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if isinstance(self.round_index, bool) or self.round_index < 0:
@@ -160,6 +162,16 @@ class PolicyRoundInput:
         object.__setattr__(self, "query_features", query)
         object.__setattr__(self, "research_snapshot", research)
         object.__setattr__(self, "execution_context", context)
+        diagnostic_arrays = {}
+        for name, value in self.diagnostic_arrays.items():
+            if not name.startswith("diagnostic_") or not name.isidentifier():
+                raise ValueError("invalid policy diagnostic array name")
+            array = np.asarray(value, dtype=float).copy()
+            if array.ndim not in (1, 2) or not np.isfinite(array).all():
+                raise ValueError("policy diagnostic arrays must be finite vectors or matrices")
+            array.setflags(write=False)
+            diagnostic_arrays[name] = array
+        object.__setattr__(self, "diagnostic_arrays", diagnostic_arrays)
 
 
 @dataclass(frozen=True)
@@ -313,6 +325,7 @@ class PolicyResearchController:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def resolve(self, round_input: PolicyRoundInput) -> CompiledOptimizationPolicy:
+        round_input = self._with_feedback(round_input)
         self._validate_round_input(round_input)
         round_directory, input_digest = self._materialize_round(round_input)
         result_path = round_directory / "result.json"
@@ -385,7 +398,7 @@ class PolicyResearchController:
             errors = (
                 exc.errors
                 if isinstance(exc, PolicyExecutionError)
-                else (_submission_error(
+                else (HarnessSubmissionError(
                     "",
                     "policy_round_failed",
                     f"Policy research round failed: {exc}",
@@ -407,6 +420,65 @@ class PolicyResearchController:
         if round_input.history_features.shape[1] != len(self.contract.feature_names):
             raise ValueError("policy round feature width does not match the capability contract")
 
+    def record_predictions(
+        self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition,
+    ) -> None:
+        signals = {
+            "q0": np.asarray(q0, dtype=float),
+            "baseline_acquisition": np.asarray([item.acquisition_score for item in baseline], dtype=float),
+            "active_acquisition": np.asarray([item.acquisition_score for item in active], dtype=float),
+        }
+        ranks = {
+            name: 1 + np.searchsorted(np.sort(-values), -values, side="left")
+            for name, values in signals.items()
+        }
+        normalized = normalize_acquisition(signals["active_acquisition"])
+        logits = alpha * np.log(signals["q0"] + 1e-12) + eta * normalized
+        probabilities = np.exp(logits - logits.max())
+        probabilities /= probabilities.sum()
+        max_q0 = signals["q0"].max()
+        rows = []
+        for index, (first, second, mass) in enumerate(zip(baseline, active, q0, strict=True)):
+            if first.candidate_id != second.candidate_id:
+                raise ValueError("policy feedback predictions must be aligned")
+            rows.append({
+                "candidate_id": first.candidate_id,
+                "q0": float(mass),
+                "q0_relative_to_max": float(mass / max_q0),
+                "pool_size": len(q0),
+                **{name + "_rank": int(values[index]) for name, values in ranks.items()},
+                "baseline_acquisition": first.acquisition_score,
+                "active_acquisition": second.acquisition_score,
+                "normalized_acquisition": float(normalized[index]),
+                "first_draw_probability": float(probabilities[index]),
+                "alpha": float(alpha), "eta": float(eta),
+                "baseline_mean": first.mean[0], "baseline_std": first.std[0],
+                "active_mean": second.mean[0], "active_std": second.std[0],
+            })
+        payload = {"round_index": round_index, "predictions": rows}
+        path = self.root / "rounds" / f"round_{round_index:03d}" / "predictions.json"
+        if path.is_file() and _read_json(path) != payload:
+            raise ValueError("recorded pre-measurement predictions cannot be replaced")
+        _atomic_json(path, payload)
+
+    def _with_feedback(self, round_input: PolicyRoundInput) -> PolicyRoundInput:
+        research = dict(round_input.research_snapshot)
+        ids = research.get("history_candidate_ids", [])
+        rounds = research.get("history_rounds", [])
+        if not ids:
+            return round_input
+        records = [
+            _read_json(path) for path in sorted((self.root / "rounds").glob("round_*/predictions.json"))
+            if int(path.parent.name.rsplit("_", 1)[1]) < round_input.round_index
+        ]
+        context = dict(round_input.execution_context)
+        context["weight_context"] = {
+            **context["weight_context"],
+            "prediction_feedback": prediction_feedback(ids, rounds, round_input.history_utilities, records),
+            "optimization_progress": optimization_progress(rounds, round_input.history_utilities),
+        }
+        return replace(round_input, execution_context=context)
+
     def _materialize_round(
         self,
         round_input: PolicyRoundInput,
@@ -416,6 +488,7 @@ class PolicyResearchController:
             "history_features": _array_sha256(round_input.history_features),
             "history_utilities": _array_sha256(round_input.history_utilities),
             "query_features": _array_sha256(round_input.query_features),
+            **{name: _array_sha256(value) for name, value in round_input.diagnostic_arrays.items()},
         }
         input_data = {
             "round_index": round_input.round_index,
@@ -448,6 +521,7 @@ class PolicyResearchController:
             history_features=round_input.history_features,
             history_utilities=round_input.history_utilities,
             query_features=round_input.query_features,
+            **round_input.diagnostic_arrays,
         )
         _atomic_json(
             manifest_path,
@@ -480,13 +554,11 @@ class PolicyResearchController:
         history_from = self._previous_history_size(round_input.round_index)
         if history_to < history_from:
             raise ValueError("policy history size cannot decrease across rounds")
-        new_observations = round_input.research_snapshot.get(
-            "new_measured_observations",
-            [],
-        )
+        measured = round_input.research_snapshot.get("measured_observations", [])
+        if not isinstance(measured, list) or len(measured) != history_to:
+            raise ValueError("measured_observations must align with the numeric history")
+        new_observations = measured[history_from:history_to]
         forbidden_terms = round_input.research_snapshot.get("forbidden_query_terms", [])
-        if not isinstance(new_observations, list):
-            raise ValueError("new_measured_observations must be an array")
         if not isinstance(forbidden_terms, list) or any(
             not isinstance(value, str) for value in forbidden_terms
         ):
@@ -510,9 +582,9 @@ class PolicyResearchController:
             },
             "active_policy": _active_summary(active),
             "snapshot_access": (
-                "Use inspect_policy_contract for authoritative content and execution "
-                "contexts. Snapshot paths are host-side lineage references, not guest "
-                "workspace paths."
+                "Call inspect_policy_contract to obtain the read-only guest snapshot paths, "
+                "execution contexts, and prediction feedback. Load its arrays.npz with NumPy "
+                "for research; do not reconstruct numerical features by hand."
             ),
             "required_action": "Research, validate, then submit exactly one terminal action.",
             "terminal_actions": {
@@ -562,14 +634,14 @@ class PolicyResearchController:
         action = submission.get("action")
         allowed_keys = {"action", "artifact_path"} if action == "replace" else {"action"}
         if action not in {"replace", "keep", "disable"}:
-            return _retry(_submission_error(
+            return _retry(HarnessSubmissionError(
                 "/action",
                 "invalid_action",
                 "action must be replace, keep, or disable.",
                 "Choose one supported policy action.",
             ))
         if set(submission) != allowed_keys:
-            return _retry(_submission_error(
+            return _retry(HarnessSubmissionError(
                 "",
                 "invalid_submission_shape",
                 f"{action} requires exactly these fields: {sorted(allowed_keys)}.",
@@ -577,14 +649,14 @@ class PolicyResearchController:
             ))
         if action == "replace":
             if submission.get("artifact_path") != POLICY_ARTIFACT_NAME:
-                return _retry(_submission_error(
+                return _retry(HarnessSubmissionError(
                     "/artifact_path",
                     "invalid_artifact_path",
                     f"replace must reference {POLICY_ARTIFACT_NAME}.",
                     f"Write the complete policy to {POLICY_ARTIFACT_NAME} and resubmit.",
                 ))
             if len(request.artifacts) != 1:
-                return _retry(_submission_error(
+                return _retry(HarnessSubmissionError(
                     "/artifact_path",
                     "missing_artifact_snapshot",
                     "replace requires exactly one immutable artifact snapshot.",
@@ -607,7 +679,7 @@ class PolicyResearchController:
             return HarnessSubmissionValidation()
 
         if request.artifacts:
-            return _retry(_submission_error(
+            return _retry(HarnessSubmissionError(
                 "/artifact_path",
                 "unexpected_artifact",
                 f"{action} must not submit an artifact.",
@@ -615,7 +687,7 @@ class PolicyResearchController:
             ))
         if action == "keep":
             if active is None:
-                return _retry(_submission_error(
+                return _retry(HarnessSubmissionError(
                     "/action",
                     "no_active_policy",
                     "keep is unavailable because no custom policy is active.",
@@ -827,7 +899,7 @@ class PolicyResearchController:
         try:
             errors = tuple(self.adapter.validate_task_execution(execution, round_input))
         except Exception as exc:
-            return (_submission_error(
+            return (HarnessSubmissionError(
                 "/artifact_path",
                 "task_validation_exception",
                 f"Task-level policy validation failed: {type(exc).__name__}: {exc}",
@@ -842,7 +914,7 @@ class PolicyResearchController:
             descriptor.path_pointer != "/artifact_path"
             or descriptor.relative_path != POLICY_ARTIFACT_NAME
         ):
-            raise PolicyExecutionError((_submission_error(
+            raise PolicyExecutionError((HarnessSubmissionError(
                 "/artifact_path",
                 "invalid_artifact_descriptor",
                 "The submitted artifact descriptor does not match optimization_policy.py.",
@@ -850,14 +922,14 @@ class PolicyResearchController:
             ),))
         path = (self.root / descriptor.snapshot_path).resolve()
         if not path.is_relative_to(self.root) or not path.is_file():
-            raise PolicyExecutionError((_submission_error(
+            raise PolicyExecutionError((HarnessSubmissionError(
                 "/artifact_path",
                 "artifact_snapshot_unavailable",
                 "The immutable policy artifact snapshot is unavailable.",
                 "Rewrite optimization_policy.py and submit it again.",
             ),))
         if path.stat().st_size != descriptor.size_bytes or file_sha256(path) != descriptor.sha256:
-            raise PolicyExecutionError((_submission_error(
+            raise PolicyExecutionError((HarnessSubmissionError(
                 "/artifact_path",
                 "artifact_digest_mismatch",
                 "The policy artifact no longer matches its submitted digest.",
@@ -903,6 +975,7 @@ class PolicyResearchController:
                 and saved_round < round_index
                 and isinstance(saved_size, int)
                 and saved_size >= 0
+                and value.get("harness_turn") is not None
             ):
                 sizes.append(saved_size)
         return max(sizes, default=0)
@@ -1005,8 +1078,6 @@ def _json_mapping(value: Mapping[str, Any], name: str) -> dict[str, Any]:
         copied = json.loads(json.dumps(dict(value)))
     except (TypeError, ValueError) as exc:
         raise ValueError(f"policy {name} must be JSON serializable") from exc
-    if not isinstance(copied, dict):
-        raise ValueError(f"policy {name} must be a JSON object")
     return copied
 
 
@@ -1142,15 +1213,6 @@ def _annotate_policy(
 
 def _retry(error: HarnessSubmissionError) -> HarnessSubmissionValidation:
     return HarnessSubmissionValidation("retry", (error,))
-
-
-def _submission_error(
-    path: str,
-    code: str,
-    message: str,
-    hint: str,
-) -> HarnessSubmissionError:
-    return HarnessSubmissionError(path=path, code=code, message=message, hint=hint)
 
 
 __all__ = [

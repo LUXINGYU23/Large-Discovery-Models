@@ -12,6 +12,7 @@ import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
+from ldm_tts.harness.policy_diagnostics import prepare_policy_research
 from ldm_tts.optimization import (
     BOObservation,
     BOPrediction,
@@ -153,16 +154,21 @@ class AcquisitionTiltedSelector:
             ordered_baseline = _ordered_predictions(
                 pool.candidates, baseline.predictions
             )
-            policy = self.policy_controller.resolve(
-                self.policy_adapter.build_selection_round(
-                    history=self.history,
-                    candidates=pool.candidates,
-                    representations=representations,
-                    q0=q0,
-                    baseline_predictions=ordered_baseline,
-                    valid_proposal_occurrences=pool.valid_occurrences,
-                )
+            round_input = self.policy_adapter.build_selection_round(
+                history=self.history,
+                candidates=pool.candidates,
+                representations=representations,
+                q0=q0,
+                baseline_predictions=ordered_baseline,
+                valid_proposal_occurrences=pool.valid_occurrences,
             )
+            round_input = prepare_policy_research(
+                round_input, history=self.history, candidates=pool.candidates,
+                representations=representations, baseline=ordered_baseline,
+                q0=q0, selector=self.base_selector, z_clip=self.config.z_clip,
+                normalize_acquisition=lambda values: _robust_z(values, self.config.z_clip),
+            )
+            policy = self.policy_controller.resolve(round_input)
             self.base_selector.fit(
                 self.history,
                 history_prior_mean=policy.history_prior_mean,
@@ -177,6 +183,11 @@ class AcquisitionTiltedSelector:
             )
             compiled_predictions = _ordered_predictions(
                 pool.candidates, base.predictions
+            )
+            self.policy_controller.record_predictions(
+                round_input.round_index, ordered_baseline, compiled_predictions, q0,
+                alpha=policy.alpha, eta=policy.eta,
+                normalize_acquisition=lambda values: _robust_z(values, self.config.z_clip),
             )
             policy = replace(
                 policy,

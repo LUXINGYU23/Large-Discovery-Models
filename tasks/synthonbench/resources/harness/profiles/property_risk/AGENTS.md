@@ -21,6 +21,8 @@ Use the isolated sandbox as a research notebook. You may inspect installed tools
 
 Continue investigating while another research step is likely to change a decision. Stop when the material liabilities are differentiated, remaining uncertainty is irreducible, or enough of the 30-minute turn window must be reserved to validate and submit the minibatch.
 
+Distinguish calculated descriptors, inferred liabilities and measured target utility. Explain the evidence behind stronger allocation; tool validation or selection alone does not confirm a property hypothesis.
+
 ## Boundaries and submission
 
 - Use only public literature, measured history, and the structured official SynthonSpace tools.

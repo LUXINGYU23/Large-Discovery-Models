@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 		},
 	}));
 	await writeFile(join(round, "research_snapshot.json"), JSON.stringify({ task_objective: "fixture" }));
+	await writeFile(join(round, "arrays.npz"), "fixture arrays");
 	await writeFile(join(root, "active_round.json"), JSON.stringify({
 		round_index: 1,
 		round_path: "rounds/round_001",
@@ -35,7 +36,7 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 const command = process.argv[2];
 console.log(JSON.stringify(command === "inspect"
   ? { status: "ok", inspection: { policy_api_version: 1 } }
-  : { status: "ok", stage: "test", alpha: 1, eta: 2, draft_diagnostics: { draft_prior_rmse: 0.25 } }));
+  : { status: "ok", stage: "test", alpha: 1, eta: 2, draft_diagnostics: { draft_gp_rmse: 0.25 } }));
 `);
 	const entrypoint = fileURLToPath(new URL("./policy-mcp.js", import.meta.url));
 	const config: McpServerConfig = {
@@ -76,6 +77,10 @@ console.log(JSON.stringify(command === "inspect"
 			{} as never,
 		);
 		assert.equal((inspect.details as any).structuredContent.round_index, 1);
+		assert.deepEqual((inspect.details as any).structuredContent.guest_snapshot, {
+			directory: "/workspace/.ldm-resources/policy/round_001", arrays: "arrays.npz", read_only: true,
+		});
+		assert.equal(await readFile(join(workspace, ".ldm-resources/policy/round_001/arrays.npz"), "utf8"), "fixture arrays");
 		assert.deepEqual(
 			(inspect.details as any).structuredContent.execution_context,
 			{
@@ -85,7 +90,7 @@ console.log(JSON.stringify(command === "inspect"
 		);
 		assert.equal((validation.details as any).structuredContent.status, "ok");
 		assert.equal(
-			(evaluation.details as any).structuredContent.draft_diagnostics.draft_prior_rmse,
+			(evaluation.details as any).structuredContent.draft_diagnostics.draft_gp_rmse,
 			0.25,
 		);
 		await assert.rejects(

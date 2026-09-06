@@ -139,14 +139,6 @@ class NucleoOptimizationPolicyAdapter:
                 "editable_components": ["prior_mean", "alpha", "eta"],
             },
             "measured_observations": _serialized_history(history, self.features),
-            "new_measured_observations": _serialized_history(
-                [
-                    item
-                    for item in history
-                    if item.metadata.get("round_idx") == round_index - 1
-                ],
-                self.features,
-            ),
             "proposal_pool": {
                 "unique_candidate_count": len(candidates),
                 "valid_proposal_occurrences": valid_proposal_occurrences,

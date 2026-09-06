@@ -1,6 +1,6 @@
 # LDM Curriculum Weights
 
-Harness-Compiled LDM combines independent proposal occurrences with the fixed
+Harness-Compiled LDM combines empirical proposal occurrences with the fixed
 task acquisition on the maintained finite pool.
 
 ## Distribution
@@ -22,8 +22,8 @@ log(q(x_i) / q(x_j))
 
 This odds equation is the most useful way to reason about the controls:
 
-- `alpha` scales evidence from same-round proposal frequency.
-- `eta` scales evidence from the task GP's acquisition.
+- `alpha` scales preference from same-round proposal frequency.
+- `eta` scales the influence of the task GP's acquisition.
 - Their ratio changes which source dominates.
 - Multiplying both by the same positive constant preserves the logit direction
   but changes softmax concentration, like inverse temperature.
@@ -33,6 +33,10 @@ proposal minibatch, are meaningful mass in (q_0); they are not a validation
 defect. A proposing Agent may allocate several occurrence slots to one legal,
 historically unseen candidate when its evidence warrants stronger mass.
 Historical evaluated candidates have already been rejected before this stage.
+Multiplicity is an allocation of belief, not a count of independent experiments.
+Repeated slots from one session can dominate mass without stronger evidence.
+Being selected is not a successful objective measurement; being left unmeasured
+is not evidence for extra confidence. Do not reward vote escalation itself.
 
 Useful limiting cases are:
 
@@ -48,7 +52,47 @@ The stage string is provenance only. It has no computational effect.
 
 The exact `weight_context` is visible through `inspect_policy_contract`.
 It includes history size, pool and occurrence counts, task defaults, a (q_0)
-summary, and a baseline-acquisition summary.
+summary, and a baseline-acquisition summary. `candidate_predictions` adds each
+pool member's q0, raw GP mean/std/UCB, normalized acquisition, and default
+first-draw probability. `normalization` records the exact robust-z clip.
+`prediction_feedback` compares frozen zero-mean/active GP predictions with the
+subsequent measurements; `optimization_progress` records measured improvement.
+These errors are selected-point evidence, not accuracy on the whole space.
+
+Each measured prediction carries its original `pool_size`, competition ranks
+(1 is best, ties share rank), `q0_relative_to_max`, `first_draw_probability`,
+and alpha/eta. These are frozen in the measurement's own round. Do not compare
+an old q0 against the current pool's maximum; use its saved relative mass or
+rank within its original pool. First-draw probability is not the inclusion
+probability for a multi-candidate evaluation batch.
+
+Separate three questions:
+
+- **Prediction:** an error or standardized residual concerns the utility
+  prediction at that measured point. A positive residual means underprediction,
+  not that GP ranking or acquisition has been validated.
+- **Ranking:** compare predictions frozen under the same model and history
+  against multiple subsequent measurements from that round. A round with one
+  measured point provides no within-round ranking test. A nonconstant UCB
+  alone is not evidence of useful ordering.
+- **Decision:** assess observed progress and contradictions under the actual
+  selection distribution. GP holdout RMSE does not depend on alpha/eta and
+  cannot validate a weight change. Selected-point feedback does not reveal
+  the rewards of alternative unmeasured candidates.
+
+Both q0 and acquisition can be wrong, especially on sparsely measured or
+confounded regions. An unvalidated GP does not justify sharpening q0, and weak
+proposal evidence does not justify increasing eta. When neither signal is
+supported, consider reducing concentration rather than arbitrarily trusting
+one. Defaults, entropy, ESS and weighted logit ranges are comparison statistics,
+not preferred answers or evidence of correctness.
+
+Before choosing weights, calculate pairwise log-odds for a high-frequency
+candidate and a contrasting high-acquisition candidate. Check whether the
+proposed weights can materially change the distribution. For example, a 20:1
+q0 ratio contributes about 6 logit units at alpha=2, whereas eta=0.25 with z
+clipped to [-2,2] contributes at most 1. No GP ranking can overcome that gap.
+Use the actual task clip and evidence rather than adopting these example values.
 
 For a pool of size (N):
 
@@ -84,21 +128,26 @@ measured progress and contradictions in the research snapshot.
   flat or unstable, and proposal consensus has a defensible scientific basis.
   Favor `alpha` relative to `eta`.
 - **Balanced:** proposal mass and acquisition provide distinct, credible signals
-  without a clear conflict. Stay near the released baseline unless diagnostics
-  support a material change.
+  without a clear conflict. Choose weights whose actual logit contributions
+  express that balance; the numerical defaults need not be balanced.
 - **Acquisition-led:** measured evidence supports the residual model,
   acquisition separates the pool, and recent evaluations validate its ranking
   better than proposal frequency. Increase `eta` relative to `alpha`.
 - **Recovery:** proposal mass has collapsed onto an unsupported family,
   acquisition conflicts with new measurements, or progress has stalled. Flatten
   the unreliable source, and possibly both, to recover useful support.
+  Do not require a preceding improvement to enter recovery or automatically
+  restore sharper default weights when progress stops. Test the rule on plausible
+  stalled and contradictory contexts, not only the current successful point.
 
-Transitions may be non-monotone. New evidence can move a campaign back to a
-proposal-led or recovery state after the surrogate appeared informative.
+Transitions may be non-monotone. Moving back to proposal-led needs independent
+support for proposal quality, not just an acquisition failure. Expected
+improvement and the information value of a discriminating experiment are
+different reasons for retaining meaningful probability on alternatives.
 
 Keep decisions legible:
 
-- begin from the task defaults;
+- compare against the task defaults without treating them as a preferred answer;
 - change one or both weights only when the current snapshot provides a reason;
 - make the weight audit explicit even when the prior mean is unchanged;
 - record the reason in session analysis and use a stable evidence-state label;

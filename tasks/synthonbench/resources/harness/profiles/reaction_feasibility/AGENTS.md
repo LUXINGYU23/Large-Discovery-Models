@@ -21,6 +21,8 @@ Use the isolated sandbox as a research notebook. You may inspect installed tools
 
 Continue investigating while another research step is likely to change a decision. Stop when the chemistry is adequately differentiated, remaining uncertainty is irreducible, or enough of the 30-minute turn window must be reserved to validate and submit the minibatch.
 
+Keep structural legality, synthetic plausibility and measured target utility separate. A validated tuple or a selected proposal does not independently establish potency.
+
 ## Boundaries and submission
 
 - Use only public literature, measured history, and the structured official SynthonSpace tools.

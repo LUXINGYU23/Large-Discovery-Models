@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
 import {
+	copyFile,
+	mkdir,
 	mkdtemp,
 	readFile,
 	realpath,
@@ -73,7 +75,7 @@ function createPolicyServer(config = environmentConfig()): McpServer {
 	server.registerTool(
 		"evaluate_policy_draft",
 		{
-			description: "Execute a draft policy on the current no-leakage arrays and return descriptive diagnostics.",
+			description: "Evaluate a draft mean on chronological measured-history holdouts with fixed training GP posteriors, and inspect its current sampling distribution. No unseen oracle labels are available.",
 			inputSchema: z.object({ artifact_path: z.string() }),
 		},
 		async ({ artifact_path }) => {
@@ -97,6 +99,12 @@ function createPolicyServer(config = environmentConfig()): McpServer {
 
 async function inspectSnapshot(config: PolicyMcpConfig): Promise<Record<string, unknown>> {
 	const snapshot = await loadSnapshot(config);
+	const resourcePath = join(".ldm-resources", "policy", basename(snapshot.directory));
+	await mkdir(join(config.workspace, resourcePath), { recursive: true });
+	const exported = await containedPath(config.workspace, resourcePath, false);
+	for (const name of ["arrays.npz", "contract.json", "input.json", "research_snapshot.json"]) {
+		await copyFile(join(snapshot.directory, name), join(exported, name));
+	}
 	return {
 		round_index: snapshot.pointer.round_index,
 		input_sha256: snapshot.pointer.input_sha256,
@@ -105,6 +113,11 @@ async function inspectSnapshot(config: PolicyMcpConfig): Promise<Record<string, 
 		execution_context: snapshot.input.execution_context,
 		research_snapshot: snapshot.research,
 		active_policy: snapshot.pointer.active_policy,
+		guest_snapshot: {
+			directory: `/workspace/${resourcePath.split(sep).join("/")}`,
+			arrays: "arrays.npz",
+			read_only: true,
+		},
 	};
 }
 

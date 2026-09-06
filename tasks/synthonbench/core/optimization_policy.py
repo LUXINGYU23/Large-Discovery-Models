@@ -142,7 +142,8 @@ class SynthonOptimizationPolicyAdapter:
             dtype=float,
         )
         round_index = _next_round_index(history)
-        target_location, target_scale = _target_standardization(history_utilities)
+        target_location = float(history_utilities.mean())
+        target_scale = max(float(history_utilities.std()), TARGET_STD_FLOOR)
         q0 = empirical_base_masses(candidates)
         acquisition = np.asarray(
             [_prediction_acquisition(item) for item in baseline_predictions],
@@ -172,14 +173,6 @@ class SynthonOptimizationPolicyAdapter:
                 "editable_components": ["prior_mean", "alpha", "eta"],
             },
             "measured_observations": _serialized_history(history, self.features),
-            "new_measured_observations": _serialized_history(
-                [
-                    item
-                    for item in history
-                    if item.metadata.get("round_idx") == round_index - 1
-                ],
-                self.features,
-            ),
             "proposal_pool": {
                 "unique_candidate_count": len(candidates),
                 "valid_proposal_occurrences": valid_proposal_occurrences,
@@ -265,10 +258,6 @@ def _next_round_index(history: Sequence[BOObservation]) -> int:
     ):
         raise ValueError("Synthon BO history is missing authoritative round_idx metadata")
     return 1 + max(values)
-
-
-def _target_standardization(utilities: np.ndarray) -> tuple[float, float]:
-    return float(utilities.mean()), max(float(utilities.std()), TARGET_STD_FLOOR)
 
 
 def _serialized_history(

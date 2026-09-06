@@ -14,6 +14,8 @@ The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Mat
 
 The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
+Distinguish biological evidence from the sampling outcome. Increase a patch's allocation for supported biology or new measurements, not because it was selected or left unmeasured.
+
 ## Boundaries and submission
 
 - Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.

@@ -21,6 +21,8 @@ Use the isolated sandbox as a research notebook. You may inspect installed tools
 
 Continue investigating while another research step is likely to change a decision. Stop when the evidence is sufficient, remaining uncertainty is irreducible, or enough of the 30-minute turn window must be reserved to validate and submit the minibatch.
 
+Separate measured SAR from assay-selection events. Raise allocation only for target-relevant evidence, not because an earlier proposal was selected or left unmeasured.
+
 ## Boundaries and submission
 
 - Use only public literature, measured history, and the structured official SynthonSpace tools.

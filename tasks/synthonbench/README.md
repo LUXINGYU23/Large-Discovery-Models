@@ -363,7 +363,15 @@ expectations. Mean features contain reaction family, slot count and capacity,
 slot-presence masks, and globally standardized descriptors of released source
 synthons. They are not assembled-product descriptors. Task instructions call
 out correlated reaction/slot groups, missing-slot semantics, and the need for
-shrinkage. Draft fit diagnostics are in-sample checks, not predictive evidence.
+shrinkage. Draft evaluation compares chronological measured-history holdouts
+under the training-prefix GP and reports current-pool distribution changes.
+The policy receives read-only numeric arrays and subsequent errors of frozen
+pre-measurement predictions. Historical holdouts are development diagnostics.
+Feedback preserves the measured point's original pool size, q0 ranks and
+relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
+Selected-point residuals do not validate whole-pool ranking or weight-policy
+reward. Proposal multiplicity expresses preference, not evidence from being
+selected or left unmeasured.
 
 The Count-Morgan proxy, Nyström landmarks, count-Tanimoto kernel, FITC variance,
 noise, UCB rule, maintained pool, Gumbel sampling, official evaluator, and

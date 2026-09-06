@@ -215,7 +215,6 @@ for await (const line of lines) {
 				message: redactor.text((error as Error).message),
 			};
 			validations.rejectAll(error as Error);
-			if (frame.type === "run_turn") await close();
 			respondTo(frame, "error", {
 				error: failure,
 			});

@@ -14,6 +14,8 @@ Use the isolated sandbox to keep source notes, compare reported condition famili
 
 The turn has a hard 30-minute wall-time. End open-ended source work by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another source.
 
+Explain why each precedent transfers to the exact conditions being proposed. Repeating a recommendation or seeing it selected does not strengthen the source evidence.
+
 ## Boundaries and submission
 
 - Never search for Iron Mind, its repository, benchmark datasets, evaluation tables, or hidden scores.

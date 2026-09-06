@@ -80,7 +80,9 @@ def build_mutation_prompt_messages(
         + (
             "Treat a multi-candidate response as an ordered multiset: you may deliberately "
             "repeat the same legal unseen patch at multiple proposal_index values when stronger "
-            "confidence warrants more empirical q0 mass, but never repeat it merely as filler. "
+            "confidence warrants more empirical q0 mass, but never repeat it merely as filler "
+            "or to win selection after being left unmeasured. Selection itself is not evidence "
+            "of biological quality. Separate control information value from expected improvement. "
             if allow_repeated_occurrences and candidate_count > 1
             else "Every directly evaluated candidate must be distinct from the other candidates in this request. "
         )

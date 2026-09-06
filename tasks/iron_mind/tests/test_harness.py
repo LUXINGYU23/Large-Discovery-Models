@@ -155,6 +155,9 @@ def test_harness_turn_sends_history_delta_and_complete_exclusion_snapshot() -> N
     assert all(message["message_type"] == "history_delta" for message in messages)
     assert all(len(message["new_measured_observations"]) == 1 for message in messages)
     assert all(len(message["evaluated_candidates"]) == 2 for message in messages)
+    for message in messages:
+        coverage = message["condition_evidence"]["factor_coverage"]
+        assert all(sum(row["measured_count"] for row in levels) == 2 for levels in coverage.values())
     assert all("required_not_evaluated_candidate_count" not in message["novelty_contract"] for message in messages)
     assert all("submission_contract" not in message for message in messages)
     assert all(

@@ -114,6 +114,16 @@ class ReactionCategoricalGPUCBSelector:
             artifact_digest=artifact_digest,
         )
 
+    def posterior_projection(self, history, features):
+        surrogate = self.surrogate
+        codes = np.asarray([decode_reaction_one_hot(row, self.schema) for row in features])
+        cross = reaction_ard_kernel(codes, surrogate.codes, self.schema, surrogate.parameters)
+        projected = np.linalg.solve(surrogate.cholesky, cross.T)
+        weights = np.linalg.solve(surrogate.cholesky.T, projected).T
+        std = np.sqrt(np.maximum(surrogate.parameters.signal_variance - np.sum(projected**2, axis=0), 1e-12))
+        return {"weights": weights, "std": std,
+                "location_scale": np.asarray([surrogate.y_mean, surrogate.y_scale])}
+
     def select(
         self,
         candidates: Sequence[Candidate],

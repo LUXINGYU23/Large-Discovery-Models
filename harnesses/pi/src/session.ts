@@ -913,9 +913,12 @@ export class PiSessionPool {
 		for (const input of inputs) {
 			if (!expected.delete(input.profileId)) throw new Error(`unknown or duplicate profile: ${input.profileId}`);
 		}
-		return Promise.all(inputs.map(
+		const results = await Promise.allSettled(inputs.map(
 			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate) as Promise<CommittedTurn>,
 		));
+		const failed = results.find((result) => result.status === "rejected");
+		if (failed?.status === "rejected") throw failed.reason;
+		return results.map((result) => (result as PromiseFulfilledResult<CommittedTurn>).value);
 	}
 
 	async close(): Promise<void> {

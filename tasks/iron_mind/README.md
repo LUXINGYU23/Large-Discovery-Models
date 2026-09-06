@@ -283,8 +283,15 @@ location and scale, and the generated mean returns standardized conditional
 expectations. Its features are schema-ordered one-hot factor groups. Policy
 instructions therefore require reference coding, within-group centering, or
 regularization and reject unsupported interpretation of confounded main effects
-or interactions. Draft evaluation reports in-sample scale/sign/fit diagnostics
-only; it does not provide predictive validation.
+or interactions. Draft evaluation compares chronological measured-history
+holdouts with training-prefix GP hyperparameters frozen. The policy also receives
+exact sampling logits and subsequent errors of frozen pre-measurement predictions.
+Historical holdouts are development diagnostics, not an untouched test set.
+Measured feedback retains the original pool's q0 ranks and relative mass,
+acquisition ranks, first-draw probabilities, and actual alpha/eta. These describe
+the selection context, not validation of a ranking or weight policy. Proposal
+and policy Agents also receive measured-only condition coverage and exact
+single-factor comparisons; different complete conditions are not replicates.
 
 Candidate identity, row order, `q0`, acquisition values, selection
 probabilities, and hidden scores are unavailable to the prior-mean function.

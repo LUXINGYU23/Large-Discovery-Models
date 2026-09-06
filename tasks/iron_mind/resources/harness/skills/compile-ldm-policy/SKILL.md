@@ -15,8 +15,9 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
 ## Required workflow
 
 1. Call `inspect_policy_contract`. Its contract, execution contexts, research
-   snapshot, and active-policy pointer are authoritative. The snapshot paths in
-   the turn message are provenance references, not files in your guest workspace.
+   snapshot, and active-policy pointer are authoritative. Load NumPy arrays from
+   the returned `guest_snapshot.directory`; this export is read-only. Do not
+   reconstruct numeric feature rows from SMILES or prose.
 2. Read [prior-mean-and-residual-gp.md](references/prior-mean-and-residual-gp.md)
    before designing `compute_prior_mean` and
    [ldm-curriculum.md](references/ldm-curriculum.md) before choosing `alpha` or
@@ -29,16 +30,21 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
    prior mean changes. Infer an evidence-defined curriculum state from proposal
    concentration, surrogate readiness and acquisition separation, and measured
    progress or contradiction. Never switch stages from round number or history
-   size alone.
+   size alone. Test the credibility of both proposal mass and GP acquisition;
+   uncertainty in one does not validate the other.
 5. Use the sandbox, public tools, and literature to test useful hypotheses.
    Prefer a zero mean or a shrunken additive model until the observations support
    more structure. Do not confuse in-sample fit with predictive evidence.
 6. Write a complete deterministic NumPy-only `optimization_policy.py` in the
    session workspace. Research scripts may use the task guest, but submitted
    code must obey the restricted runtime contract.
-7. Call `validate_policy_draft`, then `evaluate_policy_draft`. Interpret its
-   draft diagnostics as descriptive in-sample checks only. Repair exact errors
-   and rerun both tools when the file changes materially.
+7. Call `validate_policy_draft`, then `evaluate_policy_draft`. Compare the
+   chronological fixed-GP holdouts and current-pool first-draw probabilities;
+   inspect frozen pre-measurement errors in `weight_context.prediction_feedback`.
+   Predictive error checks evaluate the mean, not the utility of alpha/eta.
+   A positive residual, successful validation, or a changed distribution is
+   not evidence that a weight policy improves optimization.
+   Repair exact errors and rerun both tools after a material edit.
 8. Submit `replace` only for a justified, validated file. Use `keep` after
    evaluating the active file on the new snapshot when its assumptions still
    hold. Use `disable` when the zero-mean/default-weight task baseline is better
@@ -59,8 +65,8 @@ log q(x) = alpha * log(q0(x) + epsilon)
            + eta * robust_z(acquisition(x)) - log Z.
 ```
 
-`alpha` controls proposal-frequency evidence; `eta` controls task-GP acquisition
-evidence. Their ratio changes the balance and their common scale changes the
+`alpha` controls proposal-frequency preference; `eta` controls task-GP acquisition
+influence. Neither signal is automatically calibrated. Their ratio changes the balance and their common scale changes the
 concentration. Both must be finite and non-negative. The released baseline is
 `alpha=2.0, eta=0.25`; treat it as the comparison anchor, not a mandatory value
 for every evidence state.
@@ -86,6 +92,11 @@ When evidence supports adaptation, replace this baseline return with a
 deterministic rule over the supplied diagnostics. Stage names describe the
 current evidence state. Do not branch on `round_index` or use a fixed
 early/middle/late round schedule.
+
+Only the mean is barred from reading proposal and acquisition diagnostics;
+`choose_ldm_weights` should use the supplied `weight_context`. Audit actual
+log-odds with its exact `normalization.z_clip`, not raw UCB spread. Deliberate
+repetitions express one agent's preference, not independent measurements.
 
 The mean must be finite, deterministic, query-order equivariant, batch
 independent, and valid for empty and one-point histories. It must not use

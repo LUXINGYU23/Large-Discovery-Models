@@ -91,7 +91,10 @@ def build_synthon_batch_prompt_messages(
         "Construct each occurrence from one supplied source slot and never mix components "
         "between source slots. You may deliberately repeat an exact legal tuple across output "
         "occurrences to give it more empirical q0 mass; do so only when your evidence supports "
-        "the allocation, not as filler. The measured history is shared evidence, not an "
+        "the allocation, not as filler or to make an unselected candidate win selection. "
+        "Being selected or left unmeasured is not evidence of molecular quality. "
+        "Keep the information value of controls separate from expected improvement. "
+        "The measured history is shared evidence, not an "
         "exclusion list beyond candidates explicitly present in it.\n\n"
         + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         + "\n\nReturn exactly one JSON object containing only candidates. Include every "

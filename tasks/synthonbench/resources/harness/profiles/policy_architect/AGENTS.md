@@ -19,6 +19,15 @@ terminal action.
 
 ## Statistical semantics
 
+Use the returned `guest_snapshot.directory` to load the read-only authoritative
+`arrays.npz` and JSON feature contract for sandbox calculations. Do not
+reconstruct numeric rows by hand. Compare the actual default logit ranges and
+per-candidate probabilities, then audit `prediction_feedback` and
+`optimization_progress` in the weight context. Frozen errors concern measured
+selections only, not the entire domain. Deliberate occurrence repetitions
+express preference and must not be counted as independent supporting evidence.
+The defaults are a comparison baseline, not a requirement to preserve.
+
 For raw utility `u`, use the supplied scale exactly:
 
 ```text
@@ -59,7 +68,7 @@ log q(x) = alpha * log(q0(x) + epsilon)
 
 `alpha / eta` changes the proposal-consensus/acquisition balance; their common
 scale changes concentration. Same-round duplicate occurrences, including
-deliberate repetitions within one proposal minibatch, are evidence in `q0`, not
+deliberate repetitions within one proposal minibatch, are preference in `q0`, not
 an error. The released baseline is `alpha=2.0, eta=0.25`. Treat weight design as
 co-equal with prior-mean design and perform a separate weight audit every round.
 
@@ -67,12 +76,14 @@ Infer a curriculum state from evidence, not elapsed rounds. Do not branch on
 `round_index`, label fixed round ranges as early/middle/late, or treat history
 size alone as surrogate readiness. Use exact weight-context summaries together
 with proposal concentration, acquisition separation, measured progress,
-contradictions, and residual-model behavior. Favor proposal mass while GP
-ranking is prior-like or unvalidated; raise acquisition influence only when
-real measurements support it; flatten whichever source has collapsed or become
-contradictory. The state may move backward as evidence changes. Entropy, ESS,
-and acquisition spread are descriptive and cannot by themselves establish
-which source is correct.
+contradictions, and residual-model behavior. Require evidence for both proposal
+quality and GP ranking; an unvalidated GP does not validate proposal confidence.
+Positive prediction residuals do not validate ranking, and mean RMSE does not
+evaluate alpha/eta. Use each measured point's frozen pool-relative q0 and ranks,
+not the current pool maximum. When both signals are uncertain, consider reducing
+concentration in both. Test stalled and contradictory states; do not restore
+sharper defaults merely because the last evaluation failed to improve. Entropy,
+ESS and logit ranges describe influence, not correctness.
 
 ## Evidence and implementation boundary
 
@@ -85,16 +96,20 @@ or unpublished products.
 The task owns tuple legality and identity, fingerprints, Nyström landmarks,
 FITC count-Tanimoto kernel and variance, noise, residual GP posterior, UCB,
 pool, empirical `q0`, robust normalization, Gumbel sampling, and official
-evaluation. At execution time the policy may use only numeric rows, measured
+evaluation. At execution time the mean may use only numeric rows, measured
 utilities, and its exact context. It must not use IDs, SMILES, row position,
 `q0`, acquisition, selection probabilities, files, network access, or hidden
 lookups. It must be deterministic, finite, query-order equivariant, batch
 independent, and valid for empty or tiny history.
 
+The separate weight function may and should read `weight_context`, including
+proposal mass, acquisition, and measured prediction feedback.
+
 Write the complete NumPy-only implementation to `optimization_policy.py`.
-Call `validate_policy_draft` and `evaluate_policy_draft`. Treat draft RMSE and
-correlation as in-sample checks for scale, sign, and gross overfitting, not
-future-performance evidence; use honest sandbox holdouts when data permit.
+Call `validate_policy_draft` and `evaluate_policy_draft`. Compare chronological
+fixed-GP holdouts and first-draw distribution changes. Historical holdouts are
+development diagnostics, not untouched tests; the online GP may refit after a
+mean change. Use subsequent frozen-prediction feedback to check real benefit.
 Repair every structured error before submitting. Use `replace` for a justified
 validated artifact, `keep` only after evaluating the active artifact on the new
 snapshot, and `disable` when zero mean with task-default weights is better

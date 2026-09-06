@@ -4,7 +4,12 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from ldm_tts.optimization import BOPrediction
+from ldm_tts.harness.policy_diagnostics import prediction_feedback
+
+from ldm_tts.harness.client import HarnessError
 from ldm_tts.harness.policy import (
     PolicyCapabilityContract,
     PolicyResearchController,
@@ -85,12 +90,16 @@ class FakeHarnessClient:
         self.root = root
         self.scripted_turns = list(scripted_turns)
         self.calls = 0
+        self.turns = []
         self.validation_errors: list[str] = []
 
     def run_turn(self, turns, *, submission_validator):
         turn = turns[0]
+        self.turns.append(turn)
         attempts = self.scripted_turns[self.calls]
         self.calls += 1
+        if isinstance(attempts, Exception):
+            raise attempts
         final_request = None
         final_validation = None
         for attempt_index, (submission, source) in enumerate(attempts, start=1):
@@ -152,7 +161,7 @@ def _round(round_index: int) -> PolicyRoundInput:
         history_utilities=np.arange(history_size, dtype=float),
         query_features=np.asarray([[1.0, 2.0], [3.0, 4.0]]),
         research_snapshot={
-            "new_measured_observations": [{"round": round_index}],
+            "measured_observations": [{"round": index} for index in range(history_size)],
             "task_objective": "fixture objective",
         },
         execution_context={
@@ -176,6 +185,44 @@ def _controller(tmp_path: Path, scripted_turns):
         root=tmp_path,
     )
     return controller, client, executor
+
+
+def test_prediction_record_freezes_same_round_ranks_probabilities_and_weights(tmp_path: Path) -> None:
+    controller, _, _ = _controller(tmp_path, [])
+    baseline = tuple(
+        BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
+        for key, value in zip(("a", "b", "c"), (1.0, 1.0, 3.0), strict=True)
+    )
+    active = tuple(
+        BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
+        for key, value in zip(("a", "b", "c"), (0.0, 2.0, 2.0), strict=True)
+    )
+    q0 = np.asarray((0.5, 0.25, 0.25))
+    options = {"alpha": 0.8, "eta": 0.3, "normalize_acquisition": lambda values: values}
+    controller.record_predictions(1, baseline, active, q0, **options)
+    path = tmp_path / "rounds/round_001/predictions.json"
+    original = path.read_bytes()
+    record = json.loads(original)
+    rows = record["predictions"]
+    expected = (q0 + 1e-12)**0.8 * np.exp(0.3 * np.asarray((0.0, 2.0, 2.0)))
+    assert [row["first_draw_probability"] for row in rows] == pytest.approx(expected / expected.sum())
+    assert [row["q0_rank"] for row in rows] == [1, 2, 2]
+    assert [row["baseline_acquisition_rank"] for row in rows] == [2, 2, 1]
+    assert [row["active_acquisition_rank"] for row in rows] == [3, 1, 1]
+    assert [row["q0_relative_to_max"] for row in rows] == [1.0, 0.5, 0.5]
+    feedback = prediction_feedback(["b", "c"], [1, 2], [5.0, 9.0], [record])
+    assert len(feedback["measurements"]) == 1
+    measured = feedback["measurements"][0]
+    assert measured["pool_size"] == 3
+    assert (measured["alpha"], measured["eta"]) == (0.8, 0.3)
+    assert measured["q0_relative_to_max"] == 0.5
+    assert measured["measured_utility"] == 5.0
+    controller.record_predictions(1, baseline, active, q0, **options)
+    with pytest.raises(ValueError, match="cannot be replaced"):
+        controller.record_predictions(1, baseline, active, q0, **{**options, "alpha": 1.0})
+    with pytest.raises(ValueError, match="must be aligned"):
+        controller.record_predictions(1, baseline, active[::-1], q0, **options)
+    assert path.read_bytes() == original
 
 
 def test_policy_controller_replace_keep_disable_and_resume(tmp_path: Path) -> None:
@@ -243,6 +290,22 @@ def test_policy_controller_uses_previous_epoch_after_runtime_failure(tmp_path: P
     assert fallback.source == "previous"
     assert fallback.epoch_id == first.epoch_id
     assert fallback.degraded
+
+
+def test_policy_failure_preserves_committed_cursor_and_delivers_missed_history(tmp_path: Path) -> None:
+    controller, client, _executor = _controller(tmp_path, [
+        [_replace()], HarnessError("provider 502"), [({"action": "keep"}, "")],
+    ])
+    first = controller.resolve(_round(1))
+    failed = controller.resolve(_round(2))
+    recovered = controller.resolve(_round(3))
+
+    assert failed.degraded and not recovered.degraded
+    assert recovered.epoch_id == first.epoch_id
+    turn = client.turns[-1]
+    assert (turn.history_from_seq, turn.history_to_seq) == (1, 3)
+    message = json.loads(turn.message)
+    assert message["new_measured_observations"] == [{"round": 1}, {"round": 2}]
 
 
 def test_policy_contract_and_builtin_mcp_are_generic() -> None:

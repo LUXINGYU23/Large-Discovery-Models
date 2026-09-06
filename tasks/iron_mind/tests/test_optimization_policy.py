@@ -14,8 +14,11 @@ from ldm_tts.harness import (
     load_harness_mcp_config,
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
+from ldm_tts.harness.policy_diagnostics import prepare_policy_research
+from tasks.iron_mind.core.ldm_policy import robust_z
 from tasks.iron_mind.core.candidate import IRON_MIND_Q0_METADATA_KEY
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
+from tasks.iron_mind.core.history import condition_evidence
 from tasks.iron_mind.core.optimization_policy import (
     IronMindOptimizationPolicyAdapter,
     policy_harness_profile,
@@ -138,7 +141,7 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
     ]
     assert round_input.round_index == 1
     assert "round_index" not in round_input.execution_context["weight_context"]
-    assert round_input.research_snapshot["new_measured_observations"] == [
+    assert round_input.research_snapshot["measured_observations"] == [
         {
             "round_index": 0,
             "conditions": {"base": "A", "solvent": "X"},
@@ -151,6 +154,9 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
         for forbidden in ("q0", "acquisition", "candidate_id", "canonical_key")
     )
     assert "candidate_id" not in json.dumps(round_input.research_snapshot)
+    assert round_input.research_snapshot["condition_evidence"]["factor_coverage"]["base"] == [
+        {"option": "A", "measured_count": 1}, {"option": "B", "measured_count": 0},
+    ]
     assert round_input.research_snapshot["fixed_optimization"] == {
         "surrogate": "factor-aware categorical ARD residual GP",
         "model_mismatch_variance": 0.04,
@@ -164,7 +170,34 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
     }
 
 
+def test_condition_evidence_separates_factor_changes_replicates_and_confounding() -> None:
+    observations = [
+        {"round_index": index, "conditions": {"base": base, "solvent": solvent}, "reaction_score": score}
+        for index, (base, solvent, score) in enumerate([
+            ("A", "X", 21.0), ("B", "X", 18.0), ("B", "Y", 30.0), ("A", "X", 22.0),
+        ])
+    ]
+    evidence = condition_evidence(observations, _schema())
+    comparisons = {
+        (row["earlier_round_index"], row["later_round_index"]): row
+        for row in evidence["comparisons"]
+    }
+    changed = comparisons[(0, 1)]
+    assert changed["comparison_type"] == "single_factor_change"
+    assert changed["changed_factors"] == {"base": {"from": "A", "to": "B"}}
+    assert changed["utility_difference"] == -3.0
+    assert comparisons[(0, 3)]["comparison_type"] == "same_conditions"
+    assert comparisons[(0, 3)]["changed_factors"] == {}
+    assert (0, 2) not in comparisons
+    assert evidence["factor_coverage"]["solvent"] == [
+        {"option": "X", "measured_count": 3}, {"option": "Y", "measured_count": 1},
+    ]
+
+
 class _StaticPolicyController:
+    def record_predictions(self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition):
+        assert len(baseline) == len(active) == len(q0)
+
     def __init__(self) -> None:
         self.round_input = None
 
@@ -182,6 +215,41 @@ class _StaticPolicyController:
             degraded=False,
             metadata={"action": "replace", "status": "accepted"},
         )
+
+
+def test_policy_holdouts_use_training_prefix_and_restore_online_gp() -> None:
+    schema = _schema()
+    encoder = ReactionOneHotEncoder(schema)
+    candidates = tuple(
+        _candidate(schema, str(i), 1, base=base, solvent=solvent)
+        for i, (base, solvent) in enumerate((("A", "X"), ("A", "Y"), ("B", "X"), ("B", "Y")))
+    )
+    history = tuple(BOObservation.scalar(
+        item.candidate_id, score, encoder.encode(item).values,
+        feature_version=encoder.version, metadata={"round_idx": i},
+    ) for i, (item, score) in enumerate(zip(candidates[:3], (1.0, 5.0, 3.0), strict=True)))
+    query = candidates[3:]
+    representations = {item.candidate_id: encoder.encode(item) for item in query}
+    gp = ReactionCategoricalGPUCBSelector(schema=schema, objective_name="reaction_score", feature_version=encoder.version)
+    gp.fit(history)
+    baseline = gp.select(query, representations)
+    adapter = IronMindOptimizationPolicyAdapter(schema, seed=0, acquisition_beta=1.0, default_alpha=2.0, default_eta=0.25)
+    round_input = adapter.build_selection_round(
+        history=history, candidates=query, representations=representations,
+        q0=np.ones(1), baseline_predictions=baseline.predictions, valid_proposal_occurrences=1,
+    )
+    prepared = prepare_policy_research(
+        round_input, history=history, candidates=query, representations=representations,
+        baseline=baseline.predictions, q0=np.ones(1), selector=gp, z_clip=2.0,
+        normalize_acquisition=lambda values: robust_z(values, clip=2.0),
+    )
+    assert gp.select(query, representations).to_dict() == baseline.to_dict()
+    for fold in prepared.execution_context["validation_folds"]:
+        training = [history[i] for i in fold["train_indices"]]
+        assert max(fold["train_indices"]) < min(fold["test_indices"])
+        gp.fit(training)
+        expected = gp.posterior_projection(training, np.asarray([history[i].feature_vector for i in fold["test_indices"]]))
+        np.testing.assert_allclose(prepared.diagnostic_arrays[fold["prefix"] + "weights"], expected["weights"])
 
 
 def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:

@@ -35,6 +35,10 @@ def _round_input(path: Path) -> None:
                     "target_scale": 1.0,
                 },
                 "weight_context": {"round_index": 2},
+                "validation_folds": [{
+                    "prefix": "diagnostic_fold_0_", "round_index": 1,
+                    "train_indices": [0], "test_indices": [1],
+                }],
             }
         }),
         encoding="utf-8",
@@ -44,6 +48,8 @@ def _round_input(path: Path) -> None:
         history_features=np.asarray([[1.0, 0.0], [0.0, 1.0]]),
         history_utilities=np.asarray([3.0, 1.0]),
         query_features=np.asarray([[1.0, 1.0], [2.0, -1.0]]),
+        diagnostic_fold_0_weights=np.asarray([[0.0]]),
+        diagnostic_fold_0_location_scale=np.asarray([3.0, 1.0]),
     )
 
 
@@ -99,12 +105,11 @@ def choose_ldm_weights(context):
     assert result["stage"] == "focused"
     assert result["alpha"] == 0.8
     diagnostics = result["draft_diagnostics"]
-    assert diagnostics["scope"] == "in_sample_prior_fit_only"
-    assert diagnostics["history_count"] == 2
-    assert np.isclose(diagnostics["zero_prior_rmse"], 1.0)
-    assert np.isclose(diagnostics["draft_prior_rmse"], 0.0)
-    assert np.isclose(diagnostics["draft_minus_zero_rmse"], -1.0)
-    assert np.isclose(diagnostics["prior_target_pearson"], 1.0)
+    assert diagnostics["scope"] == "chronological_measured_history_fixed_gp"
+    assert diagnostics["held_out_count"] == 1
+    # The perfect full-history fit has no predictive gain on the unseen feature.
+    assert np.isclose(diagnostics["baseline_gp_rmse"], 2.0)
+    assert np.isclose(diagnostics["draft_gp_rmse"], 2.0)
     with np.load(output / "arrays.npz", allow_pickle=False) as arrays:
         assert arrays["history_prior_mean"].shape == (2,)
         assert arrays["query_prior_mean"].shape == (2,)

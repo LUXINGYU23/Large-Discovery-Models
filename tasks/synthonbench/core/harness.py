@@ -449,6 +449,19 @@ def _turn_message(
         "objective": f"maximize measured {OBJECTIVE_NAME}; higher is better",
         "new_measured_observations": list(observations),
         "evaluated_candidates": list(evaluated_candidates),
+        "measurement_feedback": (
+            "Your occurrences enter a shared pool; only selected unique candidates are measured. "
+            "Match new measurements to your earlier submissions and revise the corresponding hypotheses. "
+            "A submitted but unmeasured candidate is neither failed nor successful and remains eligible. "
+            "Selection is a sampling event, not evidence of candidate quality: neither being selected "
+            "nor being left unmeasured justifies extra confidence or more slots by itself. "
+            "Allocate repeated slots from measured or scientific evidence, not to win selection. "
+            "Separate expected improvement from the information value of a control. "
+            "If progress stalls, investigate a contrasting hypothesis rather than only repeating "
+            "near-equivalent variants; controls need meaningful proposal mass to have a chance of measurement."
+            if allow_repeated_occurrences else
+            "Your distinct submitted candidates are directly measured; update hypotheses from the returned results."
+        ),
         "novelty_contract": {
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,

@@ -12,6 +12,8 @@ The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Mat
 
 The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
+Identify the motif or grammar hypothesis and which measured contrast supports it. Selection is not biological validation, and confounded multi-edit changes are not isolated motif effects.
+
 ## Boundaries and submission
 
 - Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.

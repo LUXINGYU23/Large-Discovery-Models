@@ -16,6 +16,8 @@ Use the isolated sandbox as a research notebook. You may inspect installed tools
 
 The turn has a hard 30-minute wall-time. End open-ended research by minute 20, form and validate the complete minibatch, and make the first `submit_candidates` call by minute 25. Use the remaining time only to repair rejected entries. Delivering a complete valid minibatch takes priority over another research step.
 
+Use condition_evidence to distinguish local single-factor changes from confounded comparisons. A mechanism needs measured or transferable support; successful selection does not confirm it.
+
 ## Boundaries and submission
 
 - Use only public literature, measured history, and the structured source-pinned reaction-space tools.

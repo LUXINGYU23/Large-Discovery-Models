@@ -120,8 +120,16 @@ position and adjacency statistics, GC/transition and target-base composition,
 and eight editable-region bins. They do not identify an exact sequence, motif,
 or edited position. The task-local policy instructions describe the resulting
 compositional collinearity and require regularized, coarse effects rather than
-trying to reproduce the full Hamming representation. Draft fit diagnostics are
-explicitly in-sample.
+trying to reproduce the full Hamming representation. Draft evaluation compares
+chronological measured-history holdouts with training-prefix GP hyperparameters
+frozen. Read-only numeric inputs, exact sampling logits, and subsequent errors
+of frozen predictions support policy research; historical holdouts are development
+diagnostics rather than an untouched test set.
+Feedback preserves the measured point's original pool size, q0 ranks and
+relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
+Selected-point residuals do not validate whole-pool ranking or weight-policy
+reward. Proposal multiplicity expresses preference, not evidence from being
+selected or left unmeasured.
 
 The policy role and its task-local Skill live under
 `resources/harness/`. Accepted policy epochs and validation records are

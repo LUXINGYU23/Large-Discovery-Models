@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -314,78 +315,99 @@ def _summary(values: np.ndarray) -> dict[str, float | int | None]:
 
 
 def _draft_diagnostics(
+    module: ModuleType,
+    capabilities: Mapping[str, int],
+    arrays: dict[str, np.ndarray],
+    history_features: np.ndarray,
     history_utilities: np.ndarray,
     history_prior: np.ndarray,
-    mean_context: dict[str, Any],
+    query_prior: np.ndarray,
+    execution_context: dict[str, Any],
+    weights: dict[str, Any],
+    mean_clip: float,
 ) -> dict[str, Any]:
-    if not len(history_utilities):
-        return {
-            "scope": "in_sample_prior_fit_only",
-            "history_count": 0,
-            "zero_prior_rmse": None,
-            "draft_prior_rmse": None,
-            "draft_minus_zero_rmse": None,
-            "prior_target_pearson": None,
-            "standardized_history_utility": _summary(history_utilities),
-            "history_prior_residual": _summary(history_utilities),
-        }
-
-    location = _context_number(
-        mean_context,
-        "target_location",
-        float(np.mean(history_utilities)),
-    )
-    fallback_scale = float(np.std(history_utilities))
-    if fallback_scale <= 0.0:
-        fallback_scale = 1.0
-    scale = _context_number(
-        mean_context,
-        "target_scale",
-        fallback_scale,
-        positive=True,
-    )
-    standardized = (history_utilities - location) / scale
-    residual = standardized - history_prior
-    zero_rmse = float(np.sqrt(np.mean(standardized**2)))
-    draft_rmse = float(np.sqrt(np.mean(residual**2)))
-    return {
-        "scope": "in_sample_prior_fit_only",
-        "history_count": len(history_utilities),
-        "target_location": location,
-        "target_scale": scale,
-        "zero_prior_rmse": zero_rmse,
-        "draft_prior_rmse": draft_rmse,
-        "draft_minus_zero_rmse": draft_rmse - zero_rmse,
-        "prior_target_pearson": _pearson(history_prior, standardized),
-        "standardized_history_utility": _summary(standardized),
-        "history_prior_residual": _summary(residual),
+    mean_context = execution_context["mean_context"]
+    folds = []
+    baseline_errors, draft_errors = [], []
+    for fold in execution_context.get("validation_folds", []):
+        prefix = fold["prefix"]
+        train = np.asarray(fold["train_indices"], dtype=int)
+        test = np.asarray(fold["test_indices"], dtype=int)
+        if not len(train) or not len(test) or train.max() >= test.min():
+            raise RunnerError("invalid_input", "policy holdouts must follow the training prefix")
+        location, scale = arrays[prefix + "location_scale"]
+        context = {**mean_context, "round_index": fold["round_index"],
+                   "target_location": float(location), "target_scale": float(scale)}
+        train_prior = np.zeros(len(train))
+        test_prior = np.zeros(len(test))
+        if "prior_mean" in capabilities:
+            function = getattr(module, _CAPABILITY_EXPORTS["prior_mean"])
+            train_prior = np.clip(_prior(function, history_features[train], history_utilities[train],
+                                         history_features[train], context), -mean_clip, mean_clip)
+            test_prior = np.clip(_prior(function, history_features[train], history_utilities[train],
+                                        history_features[test], context), -mean_clip, mean_clip)
+        operator = arrays[prefix + "weights"]
+        standardized = (history_utilities[train] - location) / scale
+        baseline_mean = location + scale * (operator @ standardized)
+        draft_mean = location + scale * (test_prior + operator @ (standardized - train_prior))
+        before = baseline_mean - history_utilities[test]
+        after = draft_mean - history_utilities[test]
+        baseline_errors.extend(before.tolist())
+        draft_errors.extend(after.tolist())
+        folds.append({
+            "round_index": fold["round_index"], "train_count": len(train), "test_count": len(test),
+            "baseline_gp_rmse": float(np.sqrt(np.mean(before**2))),
+            "draft_gp_rmse": float(np.sqrt(np.mean(after**2))),
+            "baseline_prediction": baseline_mean.tolist(), "draft_prediction": draft_mean.tolist(),
+            "measured_utility": history_utilities[test].tolist(),
+        })
+    result = {
+        "scope": "chronological_measured_history_fixed_gp",
+        "status": "available" if folds else "insufficient_history",
+        "hyperparameters": "fitted on each training prefix, frozen during draft comparison",
+        "folds": folds,
+        "held_out_count": len(baseline_errors),
+        "baseline_gp_rmse": float(np.sqrt(np.mean(np.square(baseline_errors)))) if folds else None,
+        "draft_gp_rmse": float(np.sqrt(np.mean(np.square(draft_errors)))) if folds else None,
     }
+    if "diagnostic_current_weights" in arrays:
+        context = execution_context["weight_context"]
+        rows = context["candidate_predictions"]
+        mass = np.asarray([row["q0"] for row in rows])
+        baseline_acquisition = np.asarray([row["baseline_acquisition"] for row in rows])
+        scale = arrays["diagnostic_current_location_scale"][1]
+        delta = scale * (query_prior - arrays["diagnostic_current_weights"] @ history_prior)
+        acquisition = baseline_acquisition + delta
+        normalization = context["normalization"]
+        before = _selection_probability(mass, baseline_acquisition, context["default_alpha"], context["default_eta"], normalization)
+        after = _selection_probability(mass, acquisition, weights["alpha"], weights["eta"], normalization)
+        result["current_pool"] = {
+            "scope": "first_draw_probabilities_under_fixed_baseline_gp; no query labels",
+            "probability_total_variation": float(np.abs(after - before).sum() / 2),
+            "default_effective_sample_size": float(1 / np.sum(before**2)),
+            "draft_effective_sample_size": float(1 / np.sum(after**2)),
+            "top_candidates": [
+                {"candidate_id": rows[i]["candidate_id"], "q0": float(mass[i]),
+                 "default_probability": float(before[i]), "draft_probability": float(after[i]),
+                 "draft_acquisition": float(acquisition[i])}
+                for i in np.argsort(after)[::-1][:5]
+            ],
+        }
+    return result
 
 
-def _context_number(
-    context: dict[str, Any],
-    name: str,
-    default: float,
-    *,
-    positive: bool = False,
-) -> float:
-    try:
-        value = float(context.get(name, default))
-    except (TypeError, ValueError):
-        return default
-    if not np.isfinite(value) or (positive and value <= 0.0):
-        return default
-    return value
-
-
-def _pearson(left: np.ndarray, right: np.ndarray) -> float | None:
-    if (
-        len(left) < 2
-        or float(np.std(left)) <= 1.0e-12
-        or float(np.std(right)) <= 1.0e-12
-    ):
-        return None
-    return float(np.corrcoef(left, right)[0, 1])
+def _selection_probability(mass, acquisition, alpha, eta, normalization):
+    epsilon = normalization["epsilon"]
+    median = float(np.median(acquisition))
+    scale = normalization["mad_scale"] * float(np.median(np.abs(acquisition - median)))
+    if scale <= epsilon:
+        scale = float(np.std(acquisition))
+    z = np.zeros_like(acquisition) if scale <= epsilon else np.clip(
+        (acquisition - median) / (scale + epsilon), -normalization["z_clip"], normalization["z_clip"]
+    )
+    logits = alpha * np.log(mass + epsilon) + eta * z
+    probability = np.exp(logits - logits.max())
+    return probability / probability.sum()
 
 
 def execute_artifact(
@@ -405,6 +427,7 @@ def execute_artifact(
         history_features = _matrix(arrays, "history_features")
         query_features = _matrix(arrays, "query_features", history_features.shape[1])
         history_utilities = _vector(arrays, "history_utilities", len(history_features))
+        diagnostic_arrays = {name: arrays[name] for name in arrays.files if name.startswith("diagnostic_")}
     finally:
         arrays.close()
     if len(query_features) == 0:
@@ -546,9 +569,16 @@ def execute_artifact(
             "query": _summary(query_prior),
         },
         "draft_diagnostics": _draft_diagnostics(
+            module,
+            capabilities,
+            diagnostic_arrays,
+            history_features,
             history_utilities,
             history_prior,
-            mean_context,
+            query_prior,
+            execution_context,
+            weights,
+            mean_clip,
         ),
         "inspection": inspection,
     }

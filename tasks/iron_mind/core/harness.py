@@ -38,6 +38,7 @@ from tasks.iron_mind.core.constants import (
     OBJECTIVE_NAME,
     TASK_ID,
 )
+from tasks.iron_mind.core.history import condition_evidence
 from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
 
 HARNESS_PROFILE_IDS = (
@@ -280,6 +281,9 @@ class IronMindHarnessExpander:
         history_from_seq = history_to_seq - len(history)
         history_digest = canonical_sha256(serialized_history)
         forbidden_query_terms = _forbidden_query_terms(request)
+        evidence = condition_evidence(
+            _serialize_observations(request.observations), self.domain.schema
+        )
         return tuple(
             HarnessTurn(
                 profile_id=profile.profile_id,
@@ -299,6 +303,7 @@ class IronMindHarnessExpander:
                 message=_turn_message(
                     request,
                     observations=serialized_history,
+                    evidence=evidence,
                     evaluated_candidates=evaluated_candidates,
                     allow_repeated_occurrences=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
@@ -441,6 +446,7 @@ def _turn_message(
     request: ExpansionRequest,
     *,
     observations: Sequence[dict[str, object]],
+    evidence: dict[str, Any],
     evaluated_candidates: Sequence[dict[str, object]],
     allow_repeated_occurrences: bool,
     initial: bool,
@@ -458,7 +464,21 @@ def _turn_message(
         "dataset_id": request.observations[0].candidate.payload["dataset_id"] if request.observations else None,
         "objective": f"maximize measured {OBJECTIVE_NAME}; higher is better",
         "new_measured_observations": list(observations),
+        "condition_evidence": evidence,
         "evaluated_candidates": list(evaluated_candidates),
+        "measurement_feedback": (
+            "Your occurrences enter a shared pool; only selected unique candidates are measured. "
+            "Match new measurements to your earlier submissions and revise the corresponding hypotheses. "
+            "A submitted but unmeasured candidate is neither failed nor successful and remains eligible. "
+            "Selection is a sampling event, not evidence of candidate quality: neither being selected "
+            "nor being left unmeasured justifies extra confidence or more slots by itself. "
+            "Allocate repeated slots from measured or scientific evidence, not to win selection. "
+            "Separate expected improvement from the information value of a control. "
+            "If progress stalls, investigate a contrasting hypothesis rather than only repeating "
+            "near-equivalent variants; controls need meaningful proposal mass to have a chance of measurement."
+            if allow_repeated_occurrences else
+            "Your distinct submitted candidates are directly measured; update hypotheses from the returned results."
+        ),
         "novelty_contract": {
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,

@@ -12,6 +12,8 @@ The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Mat
 
 The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
+Name the assumption each counter-hypothesis can distinguish and give useful alternatives meaningful mass, without fixed quotas. Nonselection alone does not increase quality evidence for an unmeasured patch.
+
 ## Boundaries and submission
 
 - Never seek task implementations, evaluator models or weights, evaluation tables, hidden scores, or other benchmark-only assets.

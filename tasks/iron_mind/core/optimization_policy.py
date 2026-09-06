@@ -26,6 +26,7 @@ from tasks.iron_mind.core.constants import (
     OBJECTIVE_NAME,
     TASK_ID,
 )
+from tasks.iron_mind.core.history import condition_evidence
 from tasks.iron_mind.core.reaction_gp import (
     DEFAULT_MODEL_MISMATCH_VARIANCE,
     PRIOR_MEAN_CLIP,
@@ -116,11 +117,13 @@ class IronMindOptimizationPolicyAdapter:
             [item.scalar_score for item in history], dtype=float
         )
         round_index = _next_round_index(history)
-        target_location, target_scale = _target_standardization(history_utilities)
+        target_location = float(history_utilities.mean())
+        target_scale = max(float(history_utilities.std()), TARGET_STD_FLOOR)
         acquisition = np.asarray(
             [_prediction_acquisition(item) for item in baseline_predictions],
             dtype=float,
         )
+        measured = _serialized_history(history, self.schema)
         research_snapshot = {
             "task": TASK_ID,
             "dataset": {
@@ -150,15 +153,8 @@ class IronMindOptimizationPolicyAdapter:
                 ),
                 "editable_components": ["prior_mean", "alpha", "eta"],
             },
-            "measured_observations": _serialized_history(history, self.schema),
-            "new_measured_observations": _serialized_history(
-                [
-                    item
-                    for item in history
-                    if item.metadata.get("round_idx") == round_index - 1
-                ],
-                self.schema,
-            ),
+            "measured_observations": measured,
+            "condition_evidence": condition_evidence(measured, self.schema),
             "proposal_pool": {
                 "unique_candidate_count": len(candidates),
                 "valid_proposal_occurrences": valid_proposal_occurrences,
@@ -270,10 +266,6 @@ def _next_round_index(history: Sequence[BOObservation]) -> int:
             "Iron Mind BO history is missing authoritative round_idx metadata"
         )
     return 1 + max(values)
-
-
-def _target_standardization(utilities: np.ndarray) -> tuple[float, float]:
-    return float(utilities.mean()), max(float(utilities.std()), TARGET_STD_FLOOR)
 
 
 def _serialized_history(
