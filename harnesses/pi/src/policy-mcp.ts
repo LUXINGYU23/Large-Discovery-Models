@@ -28,6 +28,7 @@ interface PolicyMcpConfig {
 	workspace: string;
 	python: string;
 	runner: string;
+	diagnostics?: { path: string; sha256: string };
 }
 
 interface ActiveRound {
@@ -62,33 +63,35 @@ function createPolicyServer(config = environmentConfig()): McpServer {
 			description: "Statically inspect a draft optimization_policy.py against the current contract.",
 			inputSchema: z.object({ artifact_path: z.string() }),
 		},
-		async ({ artifact_path }) => {
+		async ({ artifact_path }, context) => {
 			const snapshot = await loadSnapshot(config);
 			const artifact = await draftArtifact(config.workspace, artifact_path);
 			return response(await runPolicy(config, [
 				"inspect",
 				"--artifact", artifact,
 				"--contract", join(snapshot.directory, "contract.json"),
-			]));
+			], context.mcpReq.signal));
 		},
 	);
 	server.registerTool(
 		"evaluate_policy_draft",
 		{
-			description: "Evaluate a draft mean on chronological measured-history holdouts with fixed training GP posteriors, and inspect its current sampling distribution. No unseen oracle labels are available.",
+			description: "Execute a draft optimization policy and return task-defined diagnostics from the authoritative round snapshot. No unseen oracle labels are available.",
 			inputSchema: z.object({ artifact_path: z.string() }),
 		},
-		async ({ artifact_path }) => {
+		async ({ artifact_path }, context) => {
 			const snapshot = await loadSnapshot(config);
 			const artifact = await draftArtifact(config.workspace, artifact_path);
 			const output = await mkdtemp(join(config.workspace, ".policy-eval-"));
 			try {
 				return response(await runPolicy(config, [
-					"execute",
-					"--artifact", artifact,
-					"--input", snapshot.directory,
-					"--output", output,
-				]));
+					"execute", "--artifact", artifact,
+					"--input", snapshot.directory, "--output", output,
+					...(config.diagnostics ? [
+						"--diagnostics", config.diagnostics.path,
+						"--diagnostics-sha256", config.diagnostics.sha256,
+					] : []),
+				], context.mcpReq.signal));
 			} finally {
 				await rm(output, { recursive: true, force: true });
 			}
@@ -175,11 +178,13 @@ async function containedPath(root: string, value: string, requireFile: boolean):
 async function runPolicy(
 	config: PolicyMcpConfig,
 	args: string[],
+	signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
 	let stdout = "";
 	let stderr = "";
 	try {
 		const result = await executeFile(config.python, [config.runner, ...args], {
+			signal,
 			timeout: 15_000,
 			maxBuffer: 1024 * 1024,
 			env: {
@@ -229,6 +234,14 @@ function response(value: Record<string, unknown>) {
 function environmentConfig(): PolicyMcpConfig {
 	const root = process.env.LDM_POLICY_ROOT;
 	const workspace = process.env.LDM_POLICY_WORKSPACE;
+	const diagnosticsPath = process.env.LDM_POLICY_DIAGNOSTICS;
+	const diagnosticsSha256 = process.env.LDM_POLICY_DIAGNOSTICS_SHA256;
+	if ((diagnosticsPath !== undefined || diagnosticsSha256 !== undefined) && (
+		!diagnosticsPath || !isAbsolute(diagnosticsPath)
+		|| !diagnosticsSha256 || !/^[a-f0-9]{64}$/.test(diagnosticsSha256)
+	)) {
+		throw new Error("Task diagnostics require an absolute path and SHA-256 digest");
+	}
 	if (!root || !workspace || !isAbsolute(root) || !isAbsolute(workspace)) {
 		throw new Error("LDM_POLICY_ROOT and LDM_POLICY_WORKSPACE must be absolute paths");
 	}
@@ -237,6 +250,8 @@ function environmentConfig(): PolicyMcpConfig {
 		workspace,
 		python: process.env.LDM_POLICY_PYTHON ?? "python3",
 		runner: process.env.LDM_POLICY_RUNNER ?? "/app/policy_runner.py",
+		...(diagnosticsPath && diagnosticsSha256
+			? { diagnostics: { path: diagnosticsPath, sha256: diagnosticsSha256 } } : {}),
 	};
 }
 

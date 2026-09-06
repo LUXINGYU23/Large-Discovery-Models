@@ -6,8 +6,8 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness import (
-    DEFAULT_NETWORK_TOOL_BUDGETS,
     POLICY_CAPABILITIES,
     parse_tool_call_budgets,
 )

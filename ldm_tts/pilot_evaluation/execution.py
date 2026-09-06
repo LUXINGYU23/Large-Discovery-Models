@@ -164,12 +164,8 @@ def _child_plan(spec, base, run: _EvaluationRun, *, resume: bool) -> dict[str, A
 
 def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     entry = manifest["runs"].get(run.key, {})
-    if _child_complete(run.run_dir):
-        _mark_completed(entry, spec, run)
-        manifest["runs"][run.key] = entry
-        _write_manifest(spec, manifest)
-        return
-    if run.run_dir.exists() and not resume:
+    completed = _child_complete(run.run_dir)
+    if run.run_dir.exists() and not completed and not resume:
         raise FileExistsError(f"child run already exists: {run.run_dir}; use --resume")
     entry.update({
         "status": "running",
@@ -181,8 +177,16 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
     manifest["runs"][run.key] = entry
     _write_manifest(spec, manifest)
     try:
-        preflight_plan(plan)
-        return_code = run_plan(plan)
+        if not completed:
+            preflight_plan(plan)
+            return_code = run_plan(plan)
+            entry["return_code"] = return_code
+            if return_code != 0 or not _child_complete(run.run_dir):
+                raise RuntimeError(f"pilot evaluation child failed: {run.key}")
+        _mark_completed(entry, spec, run)
+        entry.pop("error", None)
+        entry["updated_at_unix"] = time.time()
+        _write_manifest(spec, manifest)
     except Exception as error:
         entry.update({
             "status": "failed",
@@ -195,16 +199,6 @@ def _run_child(manifest, spec, run, plan, *, resume: bool) -> None:
         manifest["state"] = "failed"
         _write_manifest(spec, manifest)
         raise
-    entry["status"] = "completed" if return_code == 0 and _child_complete(run.run_dir) else "failed"
-    entry["return_code"] = return_code
-    entry["updated_at_unix"] = time.time()
-    if entry["status"] == "completed":
-        _mark_completed(entry, spec, run)
-    _write_manifest(spec, manifest)
-    if entry["status"] != "completed":
-        manifest["state"] = "failed"
-        _write_manifest(spec, manifest)
-        raise RuntimeError(f"pilot evaluation child failed: {run.key}")
 
 
 def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> bool:
@@ -220,10 +214,6 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
 
 
 def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _EvaluationRun) -> None:
-    entry.update(
-        status="completed",
-        run_dir=str(run.run_dir.relative_to(spec.output_root)),
-    )
     if run.method == _COMPILED_METHOD:
         entry["harness"] = _compiled_harness_provenance(
             run.run_dir,
@@ -234,6 +224,10 @@ def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _Eval
             run.run_dir / "harness" / "manifest.json",
             spec.output_root,
         )
+    entry.update(
+        status="completed",
+        run_dir=str(run.run_dir.relative_to(spec.output_root)),
+    )
 
 
 def _compiled_harness_provenance(
@@ -253,16 +247,9 @@ def _compiled_harness_provenance(
             raise ValueError(
                 f"compiled Harness proposal/policy {field} identities differ: {run_dir}"
             )
-    if policy["case_id"] != f"{proposal['case_id']}:optimization_policy":
-        raise ValueError(f"compiled Harness policy case identity is invalid: {run_dir}")
-    for field in ("backend", "base_url", "wire_api", "model", "thinking"):
-        if proposal[field] != policy[field]:
-            raise ValueError(
-                f"compiled Harness proposal/policy {field} settings differ: {run_dir}"
-            )
-    if len(proposal["profiles"] or ()) != 4 or len(policy["profiles"] or ()) != 1:
+    if len(policy["profiles"]) != 1:
         raise ValueError(
-            "compiled Harness requires four proposal profiles and one policy profile: "
+            "compiled Harness requires one policy profile: "
             f"{run_dir}"
         )
     return {"topology": "dual_pool", "proposal": proposal, "policy": policy}
@@ -278,6 +265,14 @@ def _harness_manifest_provenance(
     limits = manifest.get("limits")
     if not isinstance(limits, dict):
         raise ValueError(f"Harness manifest lacks limits: {path}")
+    profiles = manifest.get("profiles")
+    if not isinstance(profiles, list) or not profiles:
+        raise ValueError(f"Harness manifest requires proposal or policy profiles: {path}")
+    profile_ids = [profile.get("profileId") if isinstance(profile, dict) else None for profile in profiles]
+    if any(not isinstance(value, str) or not value.strip() for value in profile_ids) or (
+        len(set(profile_ids)) != len(profile_ids)
+    ):
+        raise ValueError(f"Harness manifest profile IDs must be non-empty and unique: {path}")
     return {
         "artifact": str(path.relative_to(output_root)),
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -292,7 +287,7 @@ def _harness_manifest_provenance(
         "model": manifest.get("model"),
         "thinking": manifest.get("thinking"),
         "profile_set_sha256": manifest.get("profileSetSha256"),
-        "profiles": manifest.get("profiles"),
+        "profiles": profiles,
         "guest_runtime": manifest.get("guestRuntime"),
         "submission_contract": manifest.get("submissionContract"),
         "mcp_servers": manifest.get("mcpServers"),

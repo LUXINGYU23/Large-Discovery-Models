@@ -32,7 +32,9 @@ _SEMVER_PATTERN = re.compile(
 
 
 class HarnessError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None):
+        super().__init__(message)
+        self.turn_usage = {profile: dict(usage) for profile, usage in (turn_usage or {}).items()}
 
 
 class HarnessClient:
@@ -138,12 +140,19 @@ class HarnessClient:
                 terminal_validations[request.profile_id] = (status, request.digest)
             return validation
 
-        payload = self._request(
-            "run_turn",
-            {"turns": [turn.to_dict() for turn in turns]},
-            "turn_committed",
-            submission_validator=validate,
-        )
+        try:
+            payload = self._request(
+                "run_turn",
+                {"turns": [turn.to_dict() for turn in turns]},
+                "turn_committed",
+                submission_validator=validate,
+            )
+        except HarnessError as exc:
+            for profile in expected:
+                exc.turn_usage.setdefault(profile, {})["validationSubmissions"] = (
+                    validation_submissions.get(profile, 0)
+                )
+            raise
         raw_turns = payload.get("turns")
         if not isinstance(raw_turns, list):
             raise HarnessError("harness response is missing committed turns")
@@ -281,7 +290,18 @@ class HarnessClient:
             _assert_response_keys(response, {"type", "requestId", "protocolVersion", "campaignId", "error"})
             error = response.get("error")
             message = error.get("message") if isinstance(error, dict) else "unknown sidecar error"
-            raise HarnessError(str(message))
+            turn_usage = {}
+            expected = {turn["profileId"]: turn["turnId"] for turn in frame.get("turns", [])}
+            raw_usage = error.get("turnUsage", []) if isinstance(error, dict) else []
+            if not isinstance(raw_usage, list):
+                raise HarnessError("harness error turnUsage must be an array")
+            for item in raw_usage:
+                _assert_response_keys(item, {"profileId", "turnId", "usage"})
+                profile = _required_string(item["profileId"], "profileId")
+                if profile in turn_usage or profile not in expected or item["turnId"] != expected[profile]:
+                    raise HarnessError("harness error usage does not match the requested turn")
+                turn_usage[profile] = _parse_usage(item["usage"])
+            raise HarnessError(str(message), turn_usage=turn_usage)
         if response.get("type") != expected_type:
             raise HarnessError(f"expected harness response {expected_type!r}")
         expected_keys = {
@@ -428,9 +448,8 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         raise HarnessError("committed harness turn has invalid submission")
     if not isinstance(usage, dict) or not isinstance(artifacts, dict):
         raise HarnessError("committed harness turn has invalid metadata")
-    _assert_response_keys(usage, {"providerCalls", "toolCalls", "artifactBytes"})
-    tool_calls = _nonnegative_int_mapping(usage["toolCalls"], "toolCalls")
-    tool_budget = _tool_budget(value["toolBudget"], tool_calls)
+    usage = _parse_usage(usage)
+    tool_budget = _tool_budget(value["toolBudget"], usage["toolCalls"])
     _assert_response_keys(artifacts, {"turn", "session"})
     submitted_artifacts = _parse_submitted_artifacts(value["submittedArtifacts"])
     validation_errors = _parse_submission_errors(value["validationErrors"])
@@ -471,14 +490,19 @@ def _parse_turn_result(value: Any) -> HarnessTurnResult:
         submission=dict(submission),
         submitted_artifacts=submitted_artifacts,
         validation_errors=validation_errors,
-        usage={
-            "providerCalls": _required_nonnegative_int(usage["providerCalls"], "providerCalls"),
-            "toolCalls": tool_calls,
-            "artifactBytes": _required_nonnegative_int(usage["artifactBytes"], "artifactBytes"),
-        },
+        usage=usage,
         tool_budget=tool_budget,
         artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
     )
+
+
+def _parse_usage(value: Any) -> dict[str, Any]:
+    _assert_response_keys(value, {"providerCalls", "toolCalls", "artifactBytes"})
+    return {
+        "providerCalls": _required_nonnegative_int(value["providerCalls"], "providerCalls"),
+        "toolCalls": _nonnegative_int_mapping(value["toolCalls"], "toolCalls"),
+        "artifactBytes": _required_nonnegative_int(value["artifactBytes"], "artifactBytes"),
+    }
 
 
 def _verify_submission_json(

@@ -34,6 +34,14 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 	const fakeRunner = join(root, "fake-runner.mjs");
 	await writeFile(fakeRunner, `
 const command = process.argv[2];
+if (command === "execute") {
+  if (process.argv[process.argv.indexOf("--diagnostics") + 1] !== process.env.LDM_POLICY_DIAGNOSTICS
+      || process.argv[process.argv.indexOf("--diagnostics-sha256") + 1] !== "d".repeat(64)) {
+    throw new Error("Task diagnostic registration was not forwarded");
+  }
+} else if (process.argv.includes("--diagnostics")) {
+  throw new Error("Inspection must not execute task diagnostics");
+}
 console.log(JSON.stringify(command === "inspect"
   ? { status: "ok", inspection: { policy_api_version: 1 } }
   : { status: "ok", stage: "test", alpha: 1, eta: 2, draft_diagnostics: { draft_gp_rmse: 0.25 } }));
@@ -49,6 +57,8 @@ console.log(JSON.stringify(command === "inspect"
 			LDM_POLICY_WORKSPACE: { value: workspace },
 			LDM_POLICY_PYTHON: { value: process.execPath },
 			LDM_POLICY_RUNNER: { value: fakeRunner },
+			LDM_POLICY_DIAGNOSTICS: { value: join(root, "task_diagnostics.py") },
+			LDM_POLICY_DIAGNOSTICS_SHA256: { value: "d".repeat(64) },
 		},
 		tools: [
 			"inspect_policy_contract",

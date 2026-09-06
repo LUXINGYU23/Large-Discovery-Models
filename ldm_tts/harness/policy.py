@@ -10,13 +10,13 @@ import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
 import numpy as np
 
+from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness.client import HarnessClient, HarnessError
-from ldm_tts.harness.policy_diagnostics import optimization_progress, prediction_feedback
 from ldm_tts.harness.policy_execution import (
     PolicyExecutionError,
     PolicyExecutionResult,
@@ -24,8 +24,6 @@ from ldm_tts.harness.policy_execution import (
 )
 from ldm_tts.harness.protocol import (
     HarnessArtifactRule,
-    HarnessMcpServer,
-    HarnessMcpValue,
     HarnessSubmissionContract,
     HarnessSubmissionError,
     HarnessSubmissionRequest,
@@ -131,35 +129,56 @@ class PolicyRoundInput:
     history_features: np.ndarray
     history_utilities: np.ndarray
     query_features: np.ndarray
+    history_candidate_ids: tuple[str, ...]
+    history_rounds: tuple[int, ...]
+    measured_observations: tuple[Mapping[str, Any], ...]
     research_snapshot: Mapping[str, Any]
     execution_context: Mapping[str, Any]
     diagnostic_arrays: Mapping[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if isinstance(self.round_index, bool) or self.round_index < 0:
+        if isinstance(self.round_index, bool) or not isinstance(self.round_index, int) or self.round_index < 0:
             raise ValueError("policy round_index must be non-negative")
         history = _readonly_array(self.history_features, dimensions=2, name="history_features")
         utilities = _readonly_array(
             self.history_utilities,
-            dimensions=1,
+            dimensions=(1, 2),
             name="history_utilities",
         )
         query = _readonly_array(self.query_features, dimensions=2, name="query_features")
         if len(history) != len(utilities):
             raise ValueError("policy history features and utilities must have equal length")
+        if utilities.ndim == 2 and utilities.shape[1] == 0:
+            raise ValueError("policy history must contain at least one objective")
         if history.shape[1] != query.shape[1]:
             raise ValueError("policy history and query features must have equal width")
         if len(query) == 0:
             raise ValueError("policy query_features must contain at least one row")
+        ids = tuple(self.history_candidate_ids)
+        rounds = tuple(self.history_rounds)
+        measured = tuple(_json_mapping(row, "measured observation") for row in self.measured_observations)
+        if not (len(ids) == len(rounds) == len(measured) == len(history)):
+            raise ValueError("policy history identifiers, rounds and measurements must align with numeric history")
+        if any(not isinstance(value, str) or not value.strip() for value in ids):
+            raise ValueError("policy history candidate IDs must be non-empty strings")
+        if any(isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < self.round_index for value in rounds):
+            raise ValueError("policy history rounds must be integers preceding the current round")
+        if any(left > right for left, right in zip(rounds, rounds[1:])):
+            raise ValueError("policy history must be chronological")
         research = _json_mapping(self.research_snapshot, "research_snapshot")
+        if {"history_candidate_ids", "history_rounds", "measured_observations"} & research.keys():
+            raise ValueError("policy history belongs in explicit input fields, not research_snapshot")
         context = _json_mapping(self.execution_context, "execution_context")
-        if not isinstance(context.get("mean_context", {}), dict) or not isinstance(
-            context.get("weight_context", {}), dict
+        if not isinstance(context.get("mean_context"), dict) or not isinstance(
+            context.get("weight_context"), dict
         ):
             raise ValueError("policy execution_context requires object mean/weight contexts")
         object.__setattr__(self, "history_features", history)
         object.__setattr__(self, "history_utilities", utilities)
         object.__setattr__(self, "query_features", query)
+        object.__setattr__(self, "history_candidate_ids", ids)
+        object.__setattr__(self, "history_rounds", rounds)
+        object.__setattr__(self, "measured_observations", measured)
         object.__setattr__(self, "research_snapshot", research)
         object.__setattr__(self, "execution_context", context)
         diagnostic_arrays = {}
@@ -202,18 +221,26 @@ class CompiledOptimizationPolicy:
         object.__setattr__(
             self,
             "history_prior_mean",
-            _readonly_array(self.history_prior_mean, dimensions=1, name="history_prior_mean"),
+            _readonly_array(self.history_prior_mean, dimensions=(1, 2), name="history_prior_mean"),
         )
         object.__setattr__(
             self,
             "query_prior_mean",
-            _readonly_array(self.query_prior_mean, dimensions=1, name="query_prior_mean"),
+            _readonly_array(self.query_prior_mean, dimensions=(1, 2), name="query_prior_mean"),
         )
+        if self.history_prior_mean.shape[1:] != self.query_prior_mean.shape[1:]:
+            raise ValueError("compiled policy prior means must have matching objective dimensions")
+        if self.query_prior_mean.ndim == 2 and self.query_prior_mean.shape[1] == 0:
+            raise ValueError("compiled policy prior means must contain at least one objective")
         object.__setattr__(self, "metadata", _json_mapping(self.metadata, "metadata"))
 
 
 class OptimizationPolicyAdapter(Protocol):
     def capability_contract(self) -> PolicyCapabilityContract: ...
+
+    def with_feedback(
+        self, round_input: PolicyRoundInput, records: Sequence[Mapping[str, Any]],
+    ) -> PolicyRoundInput: ...
 
     def validate_task_execution(
         self,
@@ -265,43 +292,6 @@ def policy_submission_contract(
     )
 
 
-def policy_mcp_server(
-    artifact_root: str = "/artifacts",
-    profile_id: str = "policy_architect",
-) -> HarnessMcpServer:
-    root = PurePosixPath(artifact_root)
-    if not root.is_absolute():
-        raise ValueError("built-in policy MCP artifact root must be absolute")
-    workspace = root / "sessions" / profile_id / "workspace"
-    fields = {
-        "server_id": "ldm_policy",
-        "transport": "stdio",
-        "tools": [
-            "inspect_policy_contract",
-            "validate_policy_draft",
-            "evaluate_policy_draft",
-        ],
-        "command": "node",
-        "args": ["/app/dist/policy-mcp.js", "stdio"],
-        "env": {
-            "LDM_POLICY_ROOT": str(root),
-            "LDM_POLICY_WORKSPACE": str(workspace),
-        },
-    }
-    return HarnessMcpServer(
-        server_id=fields["server_id"],
-        transport=fields["transport"],
-        tools=tuple(fields["tools"]),
-        config_sha256=canonical_sha256(fields),
-        command=fields["command"],
-        args=tuple(fields["args"]),
-        env=tuple(
-            (name, HarnessMcpValue(value=value))
-            for name, value in sorted(fields["env"].items())
-        ),
-    )
-
-
 class PolicyResearchController:
     def __init__(
         self,
@@ -326,14 +316,15 @@ class PolicyResearchController:
 
     def resolve(self, round_input: PolicyRoundInput) -> CompiledOptimizationPolicy:
         round_input = self._with_feedback(round_input)
-        self._validate_round_input(round_input)
+        if round_input.history_features.shape[1] != len(self.contract.feature_names):
+            raise ValueError("policy round feature width does not match the capability contract")
         round_directory, input_digest = self._materialize_round(round_input)
         result_path = round_directory / "result.json"
         if result_path.is_file():
             return self._load_result(round_directory, input_digest)
 
         active = self._active_policy()
-        _atomic_json(
+        atomic_json_write(
             self.root / "active_round.json",
             {
                 "round_index": round_input.round_index,
@@ -358,14 +349,15 @@ class PolicyResearchController:
                 validated,
             )
 
+        started = time.perf_counter()
+        result = None
+        failed_usage: dict[str, Any] = {}
         try:
-            started = time.perf_counter()
             results = self.client.run_turn((turn,), submission_validator=validate)
             elapsed = time.perf_counter() - started
             if len(results) != 1:
                 raise HarnessError("policy harness must commit exactly one turn")
             result = results[0]
-            self._account(result, elapsed)
             if result.submission_status != "accepted":
                 policy = _annotate_policy(
                     self._fallback(round_input, round_directory, active),
@@ -375,26 +367,27 @@ class PolicyResearchController:
                     validation_errors=result.validation_errors,
                     turn=result,
                 )
-                self._persist_result(round_directory, input_digest, policy)
-                return policy
-            policy = _annotate_policy(
-                self._apply_submission(
-                    result,
-                    round_input,
-                    round_directory,
-                    input_digest,
-                    active,
-                    validated,
-                ),
-                action=str(result.submission["action"]),
-                status="accepted",
-                submission_digest=result.submission_digest,
-                validation_errors=(),
-                turn=result,
-            )
-            self._persist_result(round_directory, input_digest, policy)
-            return policy
+            else:
+                policy = _annotate_policy(
+                    self._apply_submission(
+                        result,
+                        round_input,
+                        round_directory,
+                        input_digest,
+                        active,
+                        validated,
+                    ),
+                    action=str(result.submission["action"]),
+                    status="accepted",
+                    submission_digest=result.submission_digest,
+                    validation_errors=(),
+                    turn=result,
+                )
         except (HarnessError, PolicyExecutionError, OSError, ValueError) as exc:
+            if result is None:
+                elapsed = time.perf_counter() - started
+            if isinstance(exc, HarnessError):
+                failed_usage = dict(exc.turn_usage.get(turn.profile_id, {}))
             errors = (
                 exc.errors
                 if isinstance(exc, PolicyExecutionError)
@@ -409,75 +402,37 @@ class PolicyResearchController:
                 self._fallback(round_input, round_directory, active),
                 action="fallback",
                 status="runtime_fallback",
-                submission_digest=None,
+                submission_digest=result.submission_digest if result is not None else None,
                 validation_errors=errors,
-                turn=None,
+                turn=result,
+                failed_usage=failed_usage if result is None else None,
             )
-            self._persist_result(round_directory, input_digest, policy)
-            return policy
+        if result is None or not result.replayed:
+            self._account(
+                result.usage if result is not None else failed_usage,
+                elapsed,
+            )
+        self._persist_result(round_directory, input_digest, policy)
+        return policy
 
-    def _validate_round_input(self, round_input: PolicyRoundInput) -> None:
-        if round_input.history_features.shape[1] != len(self.contract.feature_names):
-            raise ValueError("policy round feature width does not match the capability contract")
-
-    def record_predictions(
-        self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition,
-    ) -> None:
-        signals = {
-            "q0": np.asarray(q0, dtype=float),
-            "baseline_acquisition": np.asarray([item.acquisition_score for item in baseline], dtype=float),
-            "active_acquisition": np.asarray([item.acquisition_score for item in active], dtype=float),
+    def record_predictions(self, round_index: int, predictions: Sequence[Mapping[str, Any]]) -> None:
+        if isinstance(round_index, bool) or not isinstance(round_index, int) or round_index < 0:
+            raise ValueError("prediction round_index must be a non-negative integer")
+        payload = {
+            "round_index": round_index,
+            "predictions": [_json_mapping(row, "prediction snapshot") for row in predictions],
         }
-        ranks = {
-            name: 1 + np.searchsorted(np.sort(-values), -values, side="left")
-            for name, values in signals.items()
-        }
-        normalized = normalize_acquisition(signals["active_acquisition"])
-        logits = alpha * np.log(signals["q0"] + 1e-12) + eta * normalized
-        probabilities = np.exp(logits - logits.max())
-        probabilities /= probabilities.sum()
-        max_q0 = signals["q0"].max()
-        rows = []
-        for index, (first, second, mass) in enumerate(zip(baseline, active, q0, strict=True)):
-            if first.candidate_id != second.candidate_id:
-                raise ValueError("policy feedback predictions must be aligned")
-            rows.append({
-                "candidate_id": first.candidate_id,
-                "q0": float(mass),
-                "q0_relative_to_max": float(mass / max_q0),
-                "pool_size": len(q0),
-                **{name + "_rank": int(values[index]) for name, values in ranks.items()},
-                "baseline_acquisition": first.acquisition_score,
-                "active_acquisition": second.acquisition_score,
-                "normalized_acquisition": float(normalized[index]),
-                "first_draw_probability": float(probabilities[index]),
-                "alpha": float(alpha), "eta": float(eta),
-                "baseline_mean": first.mean[0], "baseline_std": first.std[0],
-                "active_mean": second.mean[0], "active_std": second.std[0],
-            })
-        payload = {"round_index": round_index, "predictions": rows}
         path = self.root / "rounds" / f"round_{round_index:03d}" / "predictions.json"
         if path.is_file() and _read_json(path) != payload:
             raise ValueError("recorded pre-measurement predictions cannot be replaced")
-        _atomic_json(path, payload)
+        atomic_json_write(path, payload)
 
     def _with_feedback(self, round_input: PolicyRoundInput) -> PolicyRoundInput:
-        research = dict(round_input.research_snapshot)
-        ids = research.get("history_candidate_ids", [])
-        rounds = research.get("history_rounds", [])
-        if not ids:
-            return round_input
         records = [
             _read_json(path) for path in sorted((self.root / "rounds").glob("round_*/predictions.json"))
             if int(path.parent.name.rsplit("_", 1)[1]) < round_input.round_index
         ]
-        context = dict(round_input.execution_context)
-        context["weight_context"] = {
-            **context["weight_context"],
-            "prediction_feedback": prediction_feedback(ids, rounds, round_input.history_utilities, records),
-            "optimization_progress": optimization_progress(rounds, round_input.history_utilities),
-        }
-        return replace(round_input, execution_context=context)
+        return self.adapter.with_feedback(round_input, records)
 
     def _materialize_round(
         self,
@@ -494,11 +449,17 @@ class PolicyResearchController:
             "round_index": round_input.round_index,
             "execution_context": dict(round_input.execution_context),
         }
+        research = {
+            **round_input.research_snapshot,
+            "history_candidate_ids": list(round_input.history_candidate_ids),
+            "history_rounds": list(round_input.history_rounds),
+            "measured_observations": list(round_input.measured_observations),
+        }
         input_digest = canonical_sha256({
             "contract_sha256": self.contract.sha256,
             "arrays": array_digests,
             "input": input_data,
-            "research_snapshot": dict(round_input.research_snapshot),
+            "research_snapshot": research,
         })
         manifest_path = directory / "manifest.json"
         if manifest_path.is_file():
@@ -507,14 +468,17 @@ class PolicyResearchController:
                 raise ValueError(
                     f"policy round {round_input.round_index} already exists with different input"
                 )
+            for name in ("contract.json", "input.json", "research_snapshot.json", "arrays.npz"):
+                if file_sha256(directory / name) != manifest.get("files", {}).get(name):
+                    raise ValueError(f"persisted policy round input digest mismatch: {name}")
             return directory, input_digest
 
         directory.mkdir(parents=True, exist_ok=True)
-        _atomic_json(directory / "contract.json", self.contract.to_dict())
-        _atomic_json(directory / "input.json", input_data)
-        _atomic_json(
+        atomic_json_write(directory / "contract.json", self.contract.to_dict())
+        atomic_json_write(directory / "input.json", input_data)
+        atomic_json_write(
             directory / "research_snapshot.json",
-            dict(round_input.research_snapshot),
+            research,
         )
         _atomic_npz(
             directory / "arrays.npz",
@@ -523,7 +487,7 @@ class PolicyResearchController:
             query_features=round_input.query_features,
             **round_input.diagnostic_arrays,
         )
-        _atomic_json(
+        atomic_json_write(
             manifest_path,
             {
                 "round_index": round_input.round_index,
@@ -554,10 +518,7 @@ class PolicyResearchController:
         history_from = self._previous_history_size(round_input.round_index)
         if history_to < history_from:
             raise ValueError("policy history size cannot decrease across rounds")
-        measured = round_input.research_snapshot.get("measured_observations", [])
-        if not isinstance(measured, list) or len(measured) != history_to:
-            raise ValueError("measured_observations must align with the numeric history")
-        new_observations = measured[history_from:history_to]
+        new_observations = list(round_input.measured_observations[history_from:history_to])
         forbidden_terms = round_input.research_snapshot.get("forbidden_query_terms", [])
         if not isinstance(forbidden_terms, list) or any(
             not isinstance(value, str) for value in forbidden_terms
@@ -582,9 +543,9 @@ class PolicyResearchController:
             },
             "active_policy": _active_summary(active),
             "snapshot_access": (
-                "Call inspect_policy_contract to obtain the read-only guest snapshot paths, "
-                "execution contexts, and prediction feedback. Load its arrays.npz with NumPy "
-                "for research; do not reconstruct numerical features by hand."
+                "Use the task-provided research snapshot and registered tools to access "
+                "execution contexts, numerical arrays, and prediction feedback. "
+                "Do not reconstruct numerical features by hand."
             ),
             "required_action": "Research, validate, then submit exactly one terminal action.",
             "terminal_actions": {
@@ -599,10 +560,11 @@ class PolicyResearchController:
         if first_turn:
             message["policy_contract"] = self.contract.to_dict()
             message["responsibility"] = (
-                "Design a standardized conditional prior mean and LDM alpha/eta only. "
-                "History utilities are raw task values; normalize them with the supplied "
-                "target location and scale. Do not select candidates, call the oracle, "
-                "or modify fixed task GP components."
+                "Implement only the enabled capabilities in policy_contract. "
+                "Follow the task instructions and execution contexts for objective "
+                "order, direction, units, transformations, and scientific constraints. "
+                "Do not infer a target transformation or scalarization. Do not select "
+                "candidates, call the oracle, or modify components outside the contract."
             )
         turn_id = (
             f"{self.contract.task_id}-{self.profile_id}-"
@@ -742,7 +704,7 @@ class PolicyResearchController:
             cached = validated[result.submission_digest]
         action, execution, descriptor = cached
         if action == "disable":
-            _atomic_json(
+            atomic_json_write(
                 self.root / "active_policy.json",
                 {"epoch_id": None, "artifact_sha256": None, "artifact_path": None},
             )
@@ -794,7 +756,7 @@ class PolicyResearchController:
                 or manifest.get("submission_sha256") != result.submission_digest
             ):
                 raise ValueError(f"policy epoch collision: {epoch_id}")
-            _atomic_json(self.root / "active_policy.json", _active_pointer(manifest))
+            atomic_json_write(self.root / "active_policy.json", _active_pointer(manifest))
             return manifest
 
         directory.mkdir(parents=True, exist_ok=True)
@@ -817,8 +779,8 @@ class PolicyResearchController:
             "eta": execution.eta,
             "prior_clip_count": execution.prior_clip_count,
         }
-        _atomic_json(directory / "validation.json", validation)
-        _atomic_json(directory / "evaluation.json", evaluation)
+        atomic_json_write(directory / "validation.json", validation)
+        atomic_json_write(directory / "evaluation.json", evaluation)
         manifest = {
             "epoch_id": epoch_id,
             "round_index": round_index,
@@ -843,8 +805,8 @@ class PolicyResearchController:
                 )
             },
         }
-        _atomic_json(manifest_path, manifest)
-        _atomic_json(self.root / "active_policy.json", _active_pointer(manifest))
+        atomic_json_write(manifest_path, manifest)
+        atomic_json_write(self.root / "active_policy.json", _active_pointer(manifest))
         return manifest
 
     def _fallback(
@@ -881,8 +843,8 @@ class PolicyResearchController:
         return CompiledOptimizationPolicy(
             epoch_id=None,
             artifact_digest=None,
-            history_prior_mean=np.zeros(len(round_input.history_features)),
-            query_prior_mean=np.zeros(len(round_input.query_features)),
+            history_prior_mean=np.zeros_like(round_input.history_utilities),
+            query_prior_mean=np.zeros((len(round_input.query_features), *round_input.history_utilities.shape[1:])),
             stage="default",
             alpha=float(self.contract.default_alpha),
             eta=float(self.contract.default_eta),
@@ -896,6 +858,17 @@ class PolicyResearchController:
         execution: PolicyExecutionResult,
         round_input: PolicyRoundInput,
     ) -> tuple[HarnessSubmissionError, ...]:
+        for name, values, shape in (
+            ("history_prior_mean", execution.history_prior_mean, round_input.history_utilities.shape),
+            ("query_prior_mean", execution.query_prior_mean,
+             (len(round_input.query_features), *round_input.history_utilities.shape[1:])),
+        ):
+            if values.shape != shape or not np.isfinite(values).all():
+                return (HarnessSubmissionError(
+                    f"/outputs/{name}", "invalid_prior_shape",
+                    f"{name} must have finite values and shape {shape}.",
+                    "Preserve the objective dimensions of history_utilities for each requested row.",
+                ),)
         try:
             errors = tuple(self.adapter.validate_task_execution(execution, round_input))
         except Exception as exc:
@@ -1006,7 +979,7 @@ class PolicyResearchController:
             "query_size": len(policy.query_prior_mean),
             "compiled_arrays_sha256": file_sha256(directory / "compiled.npz"),
         }
-        _atomic_json(directory / "result.json", payload)
+        atomic_json_write(directory / "result.json", payload)
 
     def _load_result(
         self,
@@ -1040,6 +1013,7 @@ class PolicyResearchController:
                         "submission_sha256",
                         "validation_errors",
                         "harness_turn",
+                        "failed_harness_usage",
                         "prior_clip_count",
                     )
                     if key in value
@@ -1048,24 +1022,29 @@ class PolicyResearchController:
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("persisted policy result is invalid") from exc
 
-    def _account(self, result: HarnessTurnResult, wall_time_seconds: float) -> None:
-        if self.account is None or result.replayed:
+    def _account(self, usage: Mapping[str, Any], wall_time_seconds: float) -> None:
+        if self.account is None:
             return
-        self.account({
+        cost = {
             "policy_harness_turns": 1,
-            "policy_provider_requests": int(result.usage["providerCalls"]),
-            "policy_tool_calls": sum(result.usage["toolCalls"].values()),
-            "policy_validation_submissions": int(
-                result.usage.get("validationSubmissions", 0)
-            ),
-            "policy_artifact_bytes": int(result.usage["artifactBytes"]),
             "policy_wall_time_seconds": wall_time_seconds,
-        })
+        }
+        for key, counter in (
+            ("providerCalls", "policy_provider_requests"),
+            ("validationSubmissions", "policy_validation_submissions"),
+            ("artifactBytes", "policy_artifact_bytes"),
+        ):
+            if key in usage:
+                cost[counter] = int(usage[key])
+        if "toolCalls" in usage:
+            cost["policy_tool_calls"] = sum(usage["toolCalls"].values())
+        self.account(cost)
 
 
-def _readonly_array(value: Any, *, dimensions: int, name: str) -> np.ndarray:
+def _readonly_array(value: Any, *, dimensions: int | tuple[int, ...], name: str) -> np.ndarray:
     array = np.asarray(value, dtype=np.float64).copy()
-    if array.ndim != dimensions or not np.isfinite(array).all():
+    allowed = (dimensions,) if isinstance(dimensions, int) else dimensions
+    if array.ndim not in allowed or not np.isfinite(array).all():
         raise ValueError(f"policy {name} must be a finite {dimensions}-dimensional array")
     array.setflags(write=False)
     return array
@@ -1075,7 +1054,7 @@ def _json_mapping(value: Mapping[str, Any], name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"policy {name} must be a mapping")
     try:
-        copied = json.loads(json.dumps(dict(value)))
+        copied = json.loads(json.dumps(dict(value), allow_nan=False))
     except (TypeError, ValueError) as exc:
         raise ValueError(f"policy {name} must be JSON serializable") from exc
     return copied
@@ -1087,26 +1066,6 @@ def _array_sha256(array: np.ndarray) -> str:
     digest.update(json.dumps(array.shape).encode("ascii"))
     digest.update(np.ascontiguousarray(array).tobytes())
     return digest.hexdigest()
-
-
-def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=path.name + ".",
-        suffix=".tmp",
-        dir=path.parent,
-    )
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(payload, stream, indent=2, sort_keys=True)
-            stream.write("\n")
-        os.replace(temporary, path)
-    except BaseException:
-        try:
-            os.unlink(temporary)
-        except OSError:
-            pass
-        raise
 
 
 def _atomic_npz(path: Path, **arrays: np.ndarray) -> None:
@@ -1189,6 +1148,7 @@ def _annotate_policy(
     submission_digest: str | None,
     validation_errors: Sequence[HarnessSubmissionError],
     turn: HarnessTurnResult | None,
+    failed_usage: Mapping[str, Any] | None = None,
 ) -> CompiledOptimizationPolicy:
     metadata: dict[str, Any] = {
         **dict(policy.metadata),
@@ -1208,6 +1168,8 @@ def _annotate_policy(
             "tool_budget": turn.tool_budget,
             "artifacts": turn.artifacts,
         }
+    elif failed_usage is not None:
+        metadata["failed_harness_usage"] = dict(failed_usage)
     return replace(policy, metadata=metadata)
 
 
@@ -1225,6 +1187,5 @@ __all__ = [
     "PolicyCapabilityContract",
     "PolicyResearchController",
     "PolicyRoundInput",
-    "policy_mcp_server",
     "policy_submission_contract",
 ]

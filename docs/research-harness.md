@@ -50,8 +50,7 @@ The public `ldm_tts.harness` package provides:
 
 | Type | Purpose |
 | --- | --- |
-| `HarnessPoolConfig` | Campaign, provider, profiles, submission contract, guest runtime, tools, MCP servers, network policy, and limits. |
-| `HarnessGuestRuntime` | Task-owned digest-addressed Gondolin image, COW rootfs size, and install policy. |
+| `HarnessPoolConfig` | Backend-neutral campaign identity, profiles, submission contract, and limits. |
 | `HarnessProfile` | One persistent Agent identity, `AGENTS.md`, optional skill directories, and content digests. |
 | `HarnessSubmissionContract` | Dynamic terminal tool name, strict payload schema, artifact rules, and optional validation-attempt limit. |
 | `HarnessArtifactRule` | One JSON-Pointer file reference with allowed suffixes and a size limit. |
@@ -63,8 +62,15 @@ The public `ldm_tts.harness` package provides:
 | `HarnessSubmissionValidation` | Task-owned `accept`, `retry`, or `reject_turn` decision with actionable errors. |
 | `HarnessTurnResult` | Committed generic submission, artifact descriptors, session lineage, and measured usage. |
 | `PolicyCapabilityContract` | Versioned task feature schema and enabled compiled-policy capabilities. |
+| `PolicyRoundInput` | Aligned numeric history, explicit history identities and rounds, measured records, and task-owned contexts. |
+| `OptimizationPolicyAdapter` | Task-owned prediction feedback and scientific execution validation. |
 | `PolicyResearchController` | Policy rounds, artifact validation, epoch state, resume, and deterministic fallback. |
 | `PolicyExecutor` | Isolated execution boundary for accepted policy artifacts. |
+
+Pi-specific configuration is imported from `ldm_tts.harness.pi`:
+`PiHarnessConfig` extends the pool configuration with its provider, tools,
+MCP servers, network policy, and `PiGuestRuntime`. Other backends can extend
+`HarnessPoolConfig` without importing Pi or declaring a Gondolin guest.
 
 The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
 session lifecycle, automatic context compaction, isolated file and shell tools,
@@ -142,20 +148,20 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
    block.
 2. Define one profile set and strict submission contract per pool.
 3. Build deterministic turns from campaign, profile, round, and history identity.
-4. Send newly measured observations and the authoritative evaluated-candidate
-   exclusion snapshot.
+4. Send newly measured observations and, when historical repeats are forbidden,
+   the authoritative evaluated-candidate exclusion snapshot.
 5. Validate provisional submissions with the same parser, canonical identity,
    and official-space checks used by candidate admission.
 6. Return stable JSON-Pointer paths, rejection codes, messages, and repair hints
    so the Agent can repair the same submission in-session.
 7. Refill until the complete valid minibatch is accepted.
 8. Preserve meaningful same-round occurrences before estimating `q0` for both
-   Harness-backed LDM methods; require distinct real evaluations for direct
-   `harness`.
+   Harness-backed LDM methods. Define real-evaluation replicate semantics in
+   the task contract.
 9. Record each pool's turns and measured provider/tool usage separately in the
    campaign budget.
 
-Only candidates in the authoritative evaluated set are historical repeats.
+For the reference tasks, only candidates in the authoritative evaluated set are historical repeats.
 Candidates proposed in an earlier turn but never evaluated remain eligible.
 
 For `ldm_harness_compiled`, the task must additionally:
@@ -176,8 +182,48 @@ For `ldm_harness_compiled`, the task must additionally:
    the previous valid epoch when it remains valid; otherwise use static task
    defaults and mark the round degraded.
 
-The policy interface uses two different utility scales deliberately. Measured
-`history_utilities` remain raw task values. The task supplies
+Each policy attempt consumes one `policy_harness_turns`, whether the sidecar
+commits a submission or fails. Persisted round decisions and committed-turn
+replays do not consume another attempt. Runtime failure does not advance the
+session's committed history cursor. Failed responses carry available per-turn
+provider/tool/artifact usage; transport loss may leave that usage unknown.
+The controller records only measured counters and marks missing usage in the
+round report instead of assuming zero. This lifecycle accounting is independent
+of the task's objectives and scientific fallback validation.
+
+The shared policy boundary accepts `history_utilities` with shape `(H,)` or
+`(H, M)`. Prior outputs preserve that objective shape: `(H,)` and `(Q,)`,
+or `(H, M)` and `(Q, M)`. Objective order, direction, units, transforms,
+scalarization, and diagnostic metrics belong to the task. The controller and
+runner do not select an objective or impose a GP or acquisition family.
+
+`PolicyRoundInput` requires aligned `history_candidate_ids`, `history_rounds`,
+and `measured_observations`, alongside numeric history. History is chronological;
+replicate semantics and candidate identity checks belong to the task.
+Supply these fields directly, not inside `research_snapshot`. The
+controller builds the exported history snapshot and sends measurement deltas.
+Its `record_predictions(round_index, predictions)` persists task-defined JSON
+rows unchanged. The adapter's `with_feedback(round_input, records)` constructs
+task-specific feedback from earlier prediction records and measured outcomes.
+
+Draft diagnostics are also task-owned. Pi runs drafts in a sidecar Python
+subprocess; no additional draft sandbox is created. A task may mount a trusted standalone
+module read-only and register it with
+`ldm_tts.harness.pi.policy_mcp_server(diagnostics_path=..., diagnostics_sha256=...)`.
+Its `evaluate_policy_draft(prior, inputs, outputs)` returns a JSON object.
+`inputs` contains `arrays`, `execution_context`, and `contract`;
+`outputs` contains history/query prior means and `weights`. The `prior`
+callback executes the draft with shape and finiteness checks, or is `None`
+when that capability is disabled. The Pi runner verifies the module digest
+before loading it. Without a hook it reports artifact outputs only. The accepted
+artifact is still re-executed independently by `PolicyExecutor`; advisory
+diagnostics do not replace authoritative task validation.
+
+### Reference Task Diagnostics
+
+Iron Mind, SynthonBench, and NucleoBench currently optimize scalar utilities
+with task-local UCB GPs. Their measured `history_utilities` remain raw task
+values. Each task supplies
 `target_location` and positive `target_scale`, and the policy returns a
 conditional mean on the standardized scale:
 
@@ -194,8 +240,9 @@ research guest. `evaluate_policy_draft` compares chronological measured-history
 holdouts using GP hyperparameters fitted on each training prefix and frozen.
 Current-pool diagnostics describe first-draw probabilities, not batch inclusion.
 Historical validation is a development check: the Agent has seen those labels.
-The controller separately freezes zero-mean and active predictions before real
-evaluation, then reports paired errors on subsequently measured candidates.
+Each task constructs zero-mean and active prediction records before real
+evaluation; the controller freezes them, and the task adapter computes paired
+errors on subsequently measured candidates.
 Each record also freezes that round's pool size, q0 relative to its maximum,
 competition ranks (1 is best; ties share rank), acquisition and first-draw
 probability, and actual alpha/eta. Interpret historical confidence in that
@@ -215,6 +262,7 @@ Versioned task inputs belong under:
 tasks/<task_id>/resources/harness/
 |-- profiles/<profile_id>/AGENTS.md
 |-- skills/<skill_id>/SKILL.md      # optional task-runtime skills
+|-- policy_diagnostics.py          # optional trusted draft-evaluation hook
 |-- image/guest-image.json
 |-- image/Dockerfile
 |-- image/lock/
@@ -223,7 +271,10 @@ tasks/<task_id>/resources/harness/
 ```
 
 Record content digests for profile instructions, skills, submission contracts,
-and tool sources. Before a session starts, the sidecar verifies the selected
+and tool sources. Pi pins initialization configuration, resource digests,
+resolved guest identity, and sidecar implementation in the run manifest.
+Resume requires the same identity; changed configuration or runtime needs a
+new artifact root. Before a session starts, the sidecar verifies the selected
 `AGENTS.md` and Skill digests, snapshots only those resources under the session
 workspace, and exposes the snapshot read-only at `/workspace/.ldm-resources` in
 the guest. Pi advertises guest-visible Skill paths so progressive `read` calls
@@ -296,6 +347,10 @@ attempts, immutable policy snapshots, accepted epochs, compiled arrays, the
 active-policy pointer, and each round result. Pilot Evaluation also exports
 `compiled_policy_rounds.csv` with actions, fallback/degraded status, policy
 weights, validation and usage counts, and selection diagnostics.
+Scientific report fields are mapped explicitly by the task's evaluation
+configuration; vectors and structured objective diagnostics are preserved.
+Proposal and policy pools may use independent providers, models, and thinking
+levels. Their shared campaign, task, and seed identities must still match.
 
 ## Qualification
 

@@ -14,8 +14,7 @@ from ldm_tts.harness import (
     load_harness_mcp_config,
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
-from ldm_tts.harness.policy_diagnostics import prepare_policy_research
-from tasks.iron_mind.core.ldm_policy import robust_z
+from tasks.iron_mind.core.policy_diagnostics import prepare_ucb_policy_research
 from tasks.iron_mind.core.candidate import IRON_MIND_Q0_METADATA_KEY
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.history import condition_evidence
@@ -141,7 +140,7 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
     ]
     assert round_input.round_index == 1
     assert "round_index" not in round_input.execution_context["weight_context"]
-    assert round_input.research_snapshot["measured_observations"] == [
+    assert list(round_input.measured_observations) == [
         {
             "round_index": 0,
             "conditions": {"base": "A", "solvent": "X"},
@@ -195,8 +194,8 @@ def test_condition_evidence_separates_factor_changes_replicates_and_confounding(
 
 
 class _StaticPolicyController:
-    def record_predictions(self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition):
-        assert len(baseline) == len(active) == len(q0)
+    def record_predictions(self, round_index, predictions):
+        assert predictions and all("candidate_id" in row for row in predictions)
 
     def __init__(self) -> None:
         self.round_input = None
@@ -238,10 +237,9 @@ def test_policy_holdouts_use_training_prefix_and_restore_online_gp() -> None:
         history=history, candidates=query, representations=representations,
         q0=np.ones(1), baseline_predictions=baseline.predictions, valid_proposal_occurrences=1,
     )
-    prepared = prepare_policy_research(
+    prepared = prepare_ucb_policy_research(
         round_input, history=history, candidates=query, representations=representations,
         baseline=baseline.predictions, q0=np.ones(1), selector=gp, z_clip=2.0,
-        normalize_acquisition=lambda values: robust_z(values, clip=2.0),
     )
     assert gp.select(query, representations).to_dict() == baseline.to_dict()
     for fold in prepared.execution_context["validation_folds"]:

@@ -332,8 +332,8 @@ network policy, tool set, pinned package versions, profile resource digests,
 resolved guest metadata, an environment snapshot, and the profile-to-session mapping.
 
 If a Responses stream ends with the known interrupted-stream error before
-terminal submission, the same session continues submission-only recovery using
-its existing analysis until it commits, encounters a non-recoverable error, or
+terminal submission, the same session continues from its existing analysis with
+research and editing tools available until it commits, encounters a non-recoverable error, or
 reaches the turn wall-time limit. Every provider attempt remains in the raw
 trace; the runner never switches to the direct backend or invents replacement
 candidates.
@@ -367,6 +367,8 @@ shrinkage. Draft evaluation compares chronological measured-history holdouts
 under the training-prefix GP and reports current-pool distribution changes.
 The policy receives read-only numeric arrays and subsequent errors of frozen
 pre-measurement predictions. Historical holdouts are development diagnostics.
+The task owns these calculations in `core/policy_diagnostics.py` and the
+digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
 Feedback preserves the measured point's original pool size, q0 ranks and
 relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
 Selected-point residuals do not validate whole-pool ranking or weight-policy

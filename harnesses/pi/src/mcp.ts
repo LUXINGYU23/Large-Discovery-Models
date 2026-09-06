@@ -54,12 +54,12 @@ export class McpToolBridge {
 			promptSnippet: `${piToolName(connection.config.serverId, tool.name)}: ${tool.description ?? tool.name}`,
 			parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema),
 			executionMode: "sequential" as const,
-			execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+			execute: async (_toolCallId: string, params: Record<string, unknown>, signal?: AbortSignal) => {
 				try {
 					const result = await connection.client.callTool({
 						name: tool.name,
 						arguments: params,
-					});
+					}, signal ? { signal } : {});
 					const safe = this.redactor.value(result) as typeof result;
 					if (safe.isError === true) {
 						throw new Error(`MCP tool returned an error: ${JSON.stringify(safe.content)}`);
@@ -115,27 +115,33 @@ export class McpToolBridge {
 			});
 			transport.stderr.on("end", () => process.stderr.write(stderr.end()));
 		}
-		await client.connect(transport);
-		const available = await client.listTools();
-		const byName = new Map(available.tools.map((tool) => [tool.name, tool]));
-		const missing = config.tools.filter((name) => !byName.has(name));
-		if (missing.length > 0) {
-			await client.close();
-			throw new Error(`MCP server ${config.serverId} is missing allowlisted tools: ${missing.join(", ")}`);
-		}
-		const tools = config.tools.map((name) => byName.get(name) as McpTool);
-		for (const tool of tools) {
-			if (
-				!tool.inputSchema
-				|| typeof tool.inputSchema !== "object"
-				|| Array.isArray(tool.inputSchema)
-				|| tool.inputSchema.type !== "object"
-			) {
-				await client.close();
-				throw new Error(`MCP tool ${config.serverId}/${tool.name} requires an object input schema`);
+		try {
+			await client.connect(transport);
+			const available = await client.listTools();
+			const byName = new Map(available.tools.map((tool) => [tool.name, tool]));
+			const missing = config.tools.filter((name) => !byName.has(name));
+			if (missing.length > 0) {
+				throw new Error(`MCP server ${config.serverId} is missing allowlisted tools: ${missing.join(", ")}`);
 			}
+			const tools = config.tools.map((name) => byName.get(name) as McpTool);
+			for (const tool of tools) {
+				if (
+					!tool.inputSchema
+					|| typeof tool.inputSchema !== "object"
+					|| Array.isArray(tool.inputSchema)
+					|| tool.inputSchema.type !== "object"
+				) {
+					throw new Error(`MCP tool ${config.serverId}/${tool.name} requires an object input schema`);
+				}
+			}
+			return { config, client, transport, tools };
+		} catch (error) {
+			if (transport instanceof StreamableHTTPClientTransport) {
+				await transport.terminateSession().catch(() => undefined);
+			}
+			await client.close();
+			throw error;
 		}
-		return { config, client, transport, tools };
 	}
 
 	private transport(config: McpServerConfig): Transport {

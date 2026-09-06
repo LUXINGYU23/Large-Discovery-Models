@@ -26,6 +26,7 @@ from ldm_tts.contracts import (
     SurrogateSpaceSpec,
 )
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, unique_run_dir
+from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.optimization.records import BOObservation, BOSelectionResult, SurrogateVector
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
@@ -38,6 +39,21 @@ from ldm_tts.campaign import (
 )
 from ldm_tts.optimization.gp import RBFGPSurrogate, RBFGPUCBSelector, select_max_ucb_record
 from ldm_tts.transport import CallableProposalClient, ProposalRequest
+
+
+@pytest.mark.parametrize("error", [OSError("disk failure"), KeyboardInterrupt()])
+def test_atomic_json_write_preserves_previous_state_on_interruption(tmp_path, monkeypatch, error):
+    path = tmp_path / "state.json"
+    atomic_json_write(path, {"epoch": 1})
+
+    def fail_replace(*_args):
+        raise error
+
+    monkeypatch.setattr("ldm_tts.engine.run_store.os.replace", fail_replace)
+    with pytest.raises(type(error)):
+        atomic_json_write(path, {"epoch": 2})
+    assert json.loads(path.read_text()) == {"epoch": 1}
+    assert list(tmp_path.iterdir()) == [path]
 
 
 @dataclass

@@ -72,10 +72,42 @@ Integrity checks require complete rounds, shared initialization, unique real
 evaluations, zero model calls from BO, and method-specific proposal budgets.
 `ldm_harness` must execute one turn per profile and optimization round. Direct
 `harness` must execute one turn per optimization round and submit exactly the
-real-evaluation minibatch. `ldm_harness_compiled` must also execute one policy
+real-evaluation minibatch. `ldm_harness_compiled` must also attempt one policy
 turn per optimization round and retain separate proposal and policy manifests.
+`policy_harness_turns` counts these attempts, including runtime failures that
+produce a recorded degraded decision. Reports distinguish committed turns from
+failed attempts; a missing policy result still fails integrity validation.
+Known failed-call usage is included in budgets. Unknown usage remains empty in
+round reports, with `usage_complete=false` and `policy_usage_incomplete_rounds`
+in the summary; aggregate usage counters then represent measured lower bounds.
 The top-level manifest records their digests and selected non-secret
 provenance.
+Policy reports read `candidates_selected` events from the shared engine's
+`events.jsonl`, not task-specific exports. Initialization candidates come from
+checkpoint round zero. The expected evaluation count is that initial count
+plus the optimization-round count times the configured evaluation batch size;
+initialization need not have the same batch size as subsequent rounds.
+Proposal and policy pools may use different providers, models, and reasoning
+settings. Provenance checks require matching campaign, task, and seed identity,
+not matching model configuration or a fixed case-name suffix.
+
+Scientific policy diagnostics are configured by the task matrix:
+
+```yaml
+policy_fields:
+  objective_diagnostics: compiled_policy.objective_diagnostics
+  residual_means: base_selection.residual_target_mean
+  rank_agreement: compiled_policy.rank_agreement
+policy_mean_fields: [rank_agreement]
+```
+
+Paths are relative to selection metadata. The pipeline preserves mapped values;
+arrays and objects are encoded as JSON in CSV cells. Absent diagnostics produce
+empty cells. Only explicitly named scalar fields receive a
+`policy_mean_<field>` summary. Mappings cannot overwrite lifecycle columns.
+Objective direction, scaling, scalarization, and scientific diagnostics remain
+task-owned. A multiobjective task selects an explicit progress metric (such as
+hypervolume) for the existing scalar trajectory plot.
 
 Direct model methods may yield fewer valid evaluations when their fixed request
 budget produces malformed or repeated candidates. Harness methods instead use

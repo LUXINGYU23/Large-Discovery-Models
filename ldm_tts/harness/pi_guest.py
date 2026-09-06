@@ -19,7 +19,7 @@ _SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
-class HarnessGuestRuntime:
+class PiGuestRuntime:
     """Immutable, task-owned Gondolin guest selected for one campaign."""
 
     image_ref: str
@@ -46,7 +46,7 @@ class HarnessGuestRuntime:
         }
 
 
-def load_harness_guest_runtime(task_id: str, image_directory: Path) -> HarnessGuestRuntime:
+def load_pi_guest_runtime(task_id: str, image_directory: Path) -> PiGuestRuntime:
     """Load a task recipe and derive its deterministic local image identity."""
 
     if _TASK_ID.fullmatch(task_id) is None:
@@ -93,7 +93,7 @@ def load_harness_guest_runtime(task_id: str, image_directory: Path) -> HarnessGu
         recipe_files=recipe_files,
         image_directory=image_directory,
     )
-    return HarnessGuestRuntime(
+    return PiGuestRuntime(
         image_ref=f"ldm/{image_id}:{recipe_sha256[:12]}",
         recipe_sha256=recipe_sha256,
         rootfs_size=rootfs_size,
@@ -169,4 +169,4 @@ def _recipe_source(image_directory: Path, relative_path: str) -> Path:
     return source
 
 
-__all__ = ["HarnessGuestRuntime", "load_harness_guest_runtime"]
+__all__ = ["PiGuestRuntime", "load_pi_guest_runtime"]

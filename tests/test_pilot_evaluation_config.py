@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
+
+import pytest
 
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 
@@ -25,6 +28,12 @@ def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tm
         "harness",
     )
     assert len(spec.cases) == 2
+    assert spec.policy_fields["gp_residual_target_mean"] == "base_selection.residual_target_mean"
+    assert "tilted_ess" in spec.policy_mean_fields
+    with pytest.raises(ValueError, match="policy_mean_fields"):
+        replace(spec, policy_mean_fields=("unknown",))
+    with pytest.raises(ValueError, match="policy_fields"):
+        replace(spec, policy_fields={"diagnostic": "invalid..path"}, policy_mean_fields=())
     assert spec.seeds == (0, 1, 2)
     assert spec.iterations == 6
     assert spec.method_overrides["llm"] == (

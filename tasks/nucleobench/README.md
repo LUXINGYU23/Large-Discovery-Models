@@ -125,6 +125,8 @@ chronological measured-history holdouts with training-prefix GP hyperparameters
 frozen. Read-only numeric inputs, exact sampling logits, and subsequent errors
 of frozen predictions support policy research; historical holdouts are development
 diagnostics rather than an untouched test set.
+The task owns these calculations in `core/policy_diagnostics.py` and the
+digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
 Feedback preserves the measured point's original pool size, q0 ranks and
 relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
 Selected-point residuals do not validate whole-pool ranking or weight-policy

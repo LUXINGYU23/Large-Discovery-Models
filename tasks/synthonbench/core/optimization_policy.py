@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 
 from ldm_tts.contracts import Candidate
+from tasks.synthonbench.core.policy_diagnostics import with_feedback
 from ldm_tts.harness import (
     HarnessProfile,
     HarnessSubmissionError,
@@ -172,7 +173,6 @@ class SynthonOptimizationPolicyAdapter:
                 ),
                 "editable_components": ["prior_mean", "alpha", "eta"],
             },
-            "measured_observations": _serialized_history(history, self.features),
             "proposal_pool": {
                 "unique_candidate_count": len(candidates),
                 "valid_proposal_occurrences": valid_proposal_occurrences,
@@ -216,9 +216,17 @@ class SynthonOptimizationPolicyAdapter:
             history_features=history_features,
             history_utilities=history_utilities,
             query_features=query_features,
+            history_candidate_ids=tuple(item.candidate_id for item in history),
+            history_rounds=tuple(item.metadata["round_idx"] for item in history),
+            measured_observations=tuple(_serialized_history(history, self.features)),
             research_snapshot=research_snapshot,
             execution_context=execution_context,
         )
+
+    def with_feedback(
+        self, round_input: PolicyRoundInput, records: Sequence[Mapping[str, Any]],
+    ) -> PolicyRoundInput:
+        return with_feedback(round_input, records)
 
     def validate_task_execution(
         self,

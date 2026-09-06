@@ -9,12 +9,12 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.harness.pi import PiGuestRuntime, load_pi_guest_runtime
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient,
-    HarnessGuestRuntime,
     HarnessProfile,
     HarnessSubmissionContract,
     HarnessSubmissionError,
@@ -25,7 +25,6 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     canonical_sha256,
     file_sha256,
-    load_harness_guest_runtime,
     profile_set_sha256,
 )
 from tasks.synthonbench.core.candidate import (
@@ -173,8 +172,8 @@ def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
     )
 
 
-def harness_guest_runtime() -> HarnessGuestRuntime:
-    return load_harness_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
+def harness_guest_runtime() -> PiGuestRuntime:
+    return load_pi_guest_runtime(TASK_ID, _LOCAL_IMAGE_ROOT)
 
 
 class SynthonHarnessExpander:

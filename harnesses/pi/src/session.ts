@@ -19,6 +19,7 @@ import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
 import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
 import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
+import { TurnExecutionError } from "./protocol.js";
 import type {
 	HarnessLimits,
 	HarnessProfileConfig,
@@ -134,6 +135,27 @@ async function directorySha256(root: string): Promise<string> {
 	return canonicalSha256(files);
 }
 
+export async function pinInitialization(root: string, identity: unknown): Promise<string> {
+	const digest = canonicalSha256(identity);
+	const manifestPath = join(root, "manifest.json");
+	const previous = await optionalJson<{ initializationSha256?: string }>(manifestPath);
+	if (previous) {
+		if (previous.initializationSha256 !== digest) {
+			throw new Error("Harness initialization identity changed; restore the original configuration and runtime or use a new artifact root");
+		}
+	} else {
+		try {
+			if ((await readdir(join(root, "sessions"))).length) {
+				throw new Error("Harness sessions exist without an initialization manifest");
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		}
+		await atomicJson(manifestPath, { initializationSha256: digest });
+	}
+	return digest;
+}
+
 async function copyDirectory(source: string, target: string): Promise<void> {
 	await mkdir(target, { recursive: true });
 	const entries = await readdir(source, { withFileTypes: true });
@@ -193,11 +215,10 @@ function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[
 	);
 }
 
-class SubmissionController {
+export class SubmissionController {
 	private readonly parameters: TUnsafe<Record<string, unknown>>;
 	private providerRequests = 0;
 	private attemptIndex = 0;
-	private submissionRequired = false;
 	private profileId = "";
 	private turnId = "";
 	private turnRoot = "";
@@ -214,20 +235,25 @@ class SubmissionController {
 		);
 	}
 
-	begin(
+	async begin(
 		profileId: string,
 		turnId: string,
 		turnRoot: string,
 		persist: (submission: TerminalSubmission) => Promise<void>,
 		validate: SubmissionValidator,
-		recovering: boolean,
-	): void {
+	): Promise<void> {
 		this.profileId = profileId;
 		this.turnId = turnId;
 		this.turnRoot = turnRoot;
 		this.providerRequests = 0;
 		this.attemptIndex = 0;
-		this.submissionRequired = recovering;
+		try {
+			for (const name of await readdir(join(turnRoot, "attempts"))) {
+				if (/^\d+$/.test(name)) this.attemptIndex = Math.max(this.attemptIndex, Number(name));
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		}
 		this.value = undefined;
 		this.persist = persist;
 		this.validate = validate;
@@ -235,10 +261,6 @@ class SubmissionController {
 
 	get submission(): TerminalSubmission | undefined {
 		return this.value;
-	}
-
-	requireSubmission(): void {
-		this.submissionRequired = true;
 	}
 
 	createExtension(): ExtensionFactory {
@@ -250,12 +272,6 @@ class SubmissionController {
 				}
 				this.providerRequests += 1;
 				if (this.value) return payload;
-				if (this.submissionRequired) {
-					return {
-						...payload,
-						tool_choice: { type: "function", name: this.config.submissionContract.toolName },
-					};
-				}
 				if (this.providerRequests > 1) return payload;
 				return {
 					...payload,
@@ -276,7 +292,6 @@ class SubmissionController {
 			executionMode: "sequential",
 			execute: async (_toolCallId, params) => {
 				if (this.value) throw new Error(`${toolName} may be called only once per turn`);
-				this.submissionRequired = true;
 				this.attemptIndex += 1;
 				if (!this.validate) throw new Error("submission validator is not initialized");
 				const submission = { ...params };
@@ -340,7 +355,6 @@ class SubmissionController {
 				if (!this.persist) throw new Error("submission turn is not initialized");
 				await this.persist(terminal);
 				this.value = terminal;
-				this.submissionRequired = false;
 				return {
 					content: [{
 						type: "text",
@@ -359,7 +373,7 @@ class SubmissionController {
 
 }
 
-class PersistentProfileSession {
+export class PersistentProfileSession {
 	private readonly profileRoot: string;
 	private readonly workspace: string;
 	private readonly resourceRoot: string;
@@ -598,7 +612,7 @@ class PersistentProfileSession {
 		}
 		await this.policy.begin(input.forbiddenQueryTerms, join(turnRoot, "tool-budget.json"));
 
-		this.submissions.begin(
+		await this.submissions.begin(
 			this.profile.profileId,
 			input.turnId,
 			turnRoot,
@@ -607,7 +621,6 @@ class PersistentProfileSession {
 				toolUsage: this.policy.snapshot(),
 			} satisfies SavedSubmission),
 			validate,
-			priorInput !== undefined,
 		);
 		await this.proxy.beginTurn(
 			this.profile.profileId,
@@ -618,6 +631,7 @@ class PersistentProfileSession {
 		let submission: TerminalSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
 		let policySummary: ToolUsageSnapshot;
+		let failure: Error | undefined;
 		try {
 			await this.promptWithTimeout(
 				`${input.message}\n\n${this.policy.budgetMessage()}`,
@@ -633,10 +647,24 @@ class PersistentProfileSession {
 					`session ${this.profile.profileId} ended without ${this.config.submissionContract.toolName}`,
 				);
 			}
+		} catch (error) {
+			failure = error instanceof Error ? error : new Error(String(error));
 		} finally {
 			providerSummary = await this.proxy.endTurn(this.profile.profileId);
 			policySummary = this.policy.end();
 		}
+		if (failure) {
+			throw new TurnExecutionError(failure.message, [{
+				profileId: input.profileId,
+				turnId: input.turnId,
+				usage: {
+					providerCalls: providerSummary.providerCalls,
+					toolCalls: policySummary.toolCalls,
+					artifactBytes: providerSummary.artifactBytes,
+				},
+			}]);
+		}
+		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);
 	}
 
@@ -692,9 +720,10 @@ class PersistentProfileSession {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const session = this.session;
 		const options = { expandPromptTemplates: false, source: "rpc" as const };
+		let expired = false;
 		const run = async () => {
 			await session.prompt(message, options);
-			while (!this.submissions.submission) {
+			while (!expired && !this.submissions.submission) {
 				const lastMessage = session.messages.at(-1);
 				const errorMessage = lastMessage?.role === "assistant"
 					? lastMessage.errorMessage?.toLowerCase()
@@ -711,25 +740,30 @@ class PersistentProfileSession {
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error" && !interrupted) {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
-				this.submissions.requireSubmission();
 				await session.prompt(
 					interrupted
 						? "The previous provider stream ended before your submission was accepted. "
-							+ `Do not research again. Call ${this.config.submissionContract.toolName} now using your prior analysis.`
-						: `The research phase is complete. Call ${this.config.submissionContract.toolName} now with the complete structured result. `
-							+ "Do not perform more research or add narrative output.",
+							+ `Continue from your existing work, use tools to complete or repair it, and call ${this.config.submissionContract.toolName} when ready.`
+						: `No submission has been accepted. Address any validation errors, use the available tools as needed, and call ${this.config.submissionContract.toolName} with the complete result.`,
 					options,
 				);
 			}
 		};
 		let timer: NodeJS.Timeout | undefined;
 		const timeout = new Promise<never>((_resolve, reject) => {
-			timer = setTimeout(() => reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`)), limits.wallTimeSeconds * 1000);
+			timer = setTimeout(() => {
+				expired = true;
+				reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`));
+			}, limits.wallTimeSeconds * 1000);
 		});
+		const pending = run();
 		try {
-			await Promise.race([run(), timeout]);
+			await Promise.race([pending, timeout]);
 		} catch (error) {
-			if ((error as Error).message.includes("wall-time limit")) await session.abort();
+			if (expired) {
+				await session.abort();
+				await pending.catch(() => undefined);
+			}
 			throw error;
 		} finally {
 			if (timer) clearTimeout(timer);
@@ -797,6 +831,7 @@ class PersistentProfileSession {
 			.sort((left, right) => left.roundIndex - right.roundIndex);
 		let cursor = 0;
 		for (const commit of commits) {
+			await verifySubmissionRecord(commit, this.config.artifactRoot);
 			if (commit.historyFromSeq !== cursor || commit.historyToSeq < cursor) {
 				throw new Error(`invalid committed history chain for profile ${this.profile.profileId}`);
 			}
@@ -821,6 +856,14 @@ export class PiSessionPool {
 	async initialize(): Promise<void> {
 		await mkdir(this.config.artifactRoot, { recursive: true });
 		const guestRuntime = await resolveGuestRuntime(this.config.taskId, this.config.guestRuntime);
+		const packages = await runtimePackages();
+		const { requestId: _requestId, artifactRoot: _artifactRoot, ...configuration } = this.config;
+		const { assetDir: _assetDir, ...guestIdentity } = guestRuntime;
+		const initializationSha256 = await pinInitialization(this.config.artifactRoot, {
+			configuration, guestRuntime: guestIdentity, packages,
+			implementationSha256: await directorySha256(join(APP_ROOT, "dist")),
+			policyRunnerSha256: sha256(await readFile(join(APP_ROOT, "policy_runner.py"))),
+		});
 		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
 			agentsSha256: profile.agentsSha256,
 			profileId: profile.profileId,
@@ -855,6 +898,7 @@ export class PiSessionPool {
 		}
 		await Promise.all([...this.sessions.values()].map((session) => session.initialize()));
 		await atomicJson(join(this.config.artifactRoot, "manifest.json"), {
+			initializationSha256,
 			protocolVersion: this.config.protocolVersion,
 			campaignId: this.config.campaignId,
 			taskId: this.config.taskId,
@@ -900,7 +944,7 @@ export class PiSessionPool {
 			topology: {
 				profileCount: this.config.profiles.length,
 			},
-			packages: await runtimePackages(),
+			packages,
 			profiles: [...this.sessions.values()].map((session) => session.manifestEntry()),
 		});
 	}
@@ -917,7 +961,18 @@ export class PiSessionPool {
 			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate) as Promise<CommittedTurn>,
 		));
 		const failed = results.find((result) => result.status === "rejected");
-		if (failed?.status === "rejected") throw failed.reason;
+		if (failed?.status === "rejected") {
+			throw new TurnExecutionError(String(failed.reason), results.flatMap((result) => {
+				if (result.status === "rejected") {
+					return result.reason instanceof TurnExecutionError ? result.reason.turnUsage : [];
+				}
+				return result.value.replayed ? [] : [{
+					profileId: result.value.profileId,
+					turnId: result.value.turnId,
+					usage: result.value.usage,
+				}];
+			}));
+		}
 		return results.map((result) => (result as PromiseFulfilledResult<CommittedTurn>).value);
 	}
 

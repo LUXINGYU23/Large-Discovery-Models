@@ -112,14 +112,13 @@ def _collect(
         config = _json_object(run_dir / "config.json")
         campaign = _json_object(run_dir / "campaign.json")
         evaluations = int(config["evaluations_per_round"])
-        if len(observations) < evaluations:
-            raise ValueError(
-                f"checkpoint has fewer observations than its initialization batch: {run_dir}"
-            )
         initial_candidate_ids = tuple(
             str(item["candidate"]["candidate_id"])
-            for item in observations[:evaluations]
+            for item in observations if item["round_idx"] == 0
         )
+        if not initial_candidate_ids:
+            raise ValueError(f"checkpoint has no initialization observations: {run_dir}")
+        expected_evaluations = len(initial_candidate_ids) + spec.optimization_rounds * evaluations
         canonical_keys = [
             str(item["candidate"]["canonical_key"])
             for item in observations
@@ -136,8 +135,8 @@ def _collect(
             **_budget_fields(budget),
             "wall_time_seconds": _wall_time(run_dir),
             "evaluations_per_round": evaluations,
-            "expected_evaluations": spec.iterations * evaluations,
-            "evaluation_utilization": len(observations) / (spec.iterations * evaluations),
+            "expected_evaluations": expected_evaluations,
+            "evaluation_utilization": len(observations) / expected_evaluations,
             "completed_rounds": len(round_rows),
             "proposal_samples": int(config["proposal_samples"]),
             "proposal_candidates_per_request": int(
@@ -153,8 +152,9 @@ def _collect(
                 run_dir,
                 case,
                 int(seed_text.removeprefix("seed_")),
+                spec.policy_fields,
             )
-            row.update(_compiled_policy_summary(compiled))
+            row.update(_compiled_policy_summary(compiled, spec.policy_mean_fields))
             policy_rounds.extend(compiled)
         rows.append(row)
         trajectories.extend(round_rows)
@@ -244,7 +244,7 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             if row["method"] == _COMPILED_METHOD:
                 if row.get("budget_policy_harness_turns", 0) != spec.optimization_rounds:
                     errors.append(
-                        f"unexpected compiled policy turn count for {row['case']}/{row['seed']}"
+                        f"unexpected compiled policy attempt count for {row['case']}/{row['seed']}"
                     )
                 if row.get("policy_rounds", 0) != spec.optimization_rounds:
                     errors.append(
@@ -346,13 +346,17 @@ def _compiled_policy_records(
     run_dir: Path,
     case: str,
     seed: int,
+    fields: dict[str, str],
 ) -> list[dict[str, Any]]:
-    selections = _json_object(run_dir / "selection_record.json").get("selections")
-    if not isinstance(selections, list):
-        raise ValueError(f"compiled policy selection record is invalid: {run_dir}")
     records = []
-    for event in selections:
-        if not isinstance(event, dict) or not isinstance(event.get("payload"), dict):
+    with (run_dir / "events.jsonl").open(encoding="utf-8") as handle:
+        events = [json.loads(line) for line in handle if line.strip()]
+    for event in events:
+        if not isinstance(event, dict):
+            raise ValueError(f"campaign event must be an object: {run_dir}")
+        if event.get("event_type") != "candidates_selected":
+            continue
+        if not isinstance(event.get("payload"), dict):
             raise ValueError(f"compiled policy selection event is invalid: {run_dir}")
         payload = event["payload"]
         metadata = payload.get("metadata")
@@ -374,6 +378,7 @@ def _compiled_policy_records(
                 round_index,
                 metadata,
                 policy,
+                fields,
             )
         )
     return sorted(records, key=lambda item: item["round"])
@@ -386,6 +391,7 @@ def _compiled_policy_record(
     round_index: int,
     metadata: dict[str, Any],
     policy: dict[str, Any],
+    fields: dict[str, str],
 ) -> dict[str, Any]:
     round_dir = run_dir / "policy_harness" / "rounds" / f"round_{round_index:03d}"
     persisted = _json_object(round_dir / "result.json")
@@ -406,30 +412,29 @@ def _compiled_policy_record(
                 f"compiled policy selector/result {field} mismatch: {round_dir}"
             )
     turn = policy.get("harness_turn")
-    if turn is not None:
-        _validate_policy_turn(run_dir, persisted, turn)
     if turn is None:
-        usage = {}
+        if policy.get("status") != "runtime_fallback" or policy.get("degraded") is not True:
+            raise ValueError("a policy round without a committed turn must record runtime fallback")
+        usage = policy.get("failed_harness_usage")
+        if not isinstance(usage, dict) or usage != persisted.get("failed_harness_usage"):
+            raise ValueError("compiled policy failed usage does not match the persisted result")
     elif not isinstance(turn, dict) or not isinstance(turn.get("usage"), dict):
         raise ValueError("compiled policy Harness usage is invalid")
     else:
+        _validate_policy_turn(run_dir, persisted, turn)
         usage = turn["usage"]
-    tool_calls = usage.get("toolCalls", {})
-    if not isinstance(tool_calls, dict):
+    tool_calls = usage.get("toolCalls")
+    if tool_calls is not None and not isinstance(tool_calls, dict):
         raise ValueError("compiled policy toolCalls must be an object")
     validation_errors = policy.get("validation_errors", [])
     if not isinstance(validation_errors, list):
         raise ValueError("compiled policy validation_errors must be an array")
-    validation_submissions = int(usage.get("validationSubmissions", 0))
-    validation_failures = validation_submissions - int(
-        policy.get("status") == "accepted"
+    validation_submissions = usage.get("validationSubmissions")
+    validation_failures = (
+        max(int(validation_submissions) - int(policy.get("status") == "accepted"), 0)
+        if validation_submissions is not None else None
     )
-    base = metadata.get("base_selection")
-    if not isinstance(base, dict):
-        base = {}
-    baseline = policy.get("baseline_prediction_diagnostics")
-    compiled = policy.get("compiled_prediction_diagnostics")
-    return {
+    record = {
         "case": case,
         "method": _COMPILED_METHOD,
         "method_label": METHOD_LABELS[_COMPILED_METHOD],
@@ -441,71 +446,29 @@ def _compiled_policy_record(
         "epoch_id": policy.get("epoch_id"),
         "artifact_sha256": policy.get("artifact_sha256"),
         "degraded": bool(policy.get("degraded", False)),
+        "turn_committed": turn is not None,
+        "usage_complete": all(key in usage for key in (
+            "providerCalls", "toolCalls", "artifactBytes", "validationSubmissions",
+        )),
         "stage": str(policy.get("stage", "")),
         "alpha": _optional_finite(policy.get("alpha"), "compiled alpha"),
         "eta": _optional_finite(policy.get("eta"), "compiled eta"),
         "prior_clip_count": int(policy.get("prior_clip_count", 0)),
         "validation_error_count": len(validation_errors),
         "validation_submission_count": validation_submissions,
-        "validation_failure_count": max(validation_failures, 0),
-        "provider_request_count": int(usage.get("providerCalls", 0)),
-        "tool_call_count": sum(int(value) for value in tool_calls.values()),
-        "artifact_bytes": int(usage.get("artifactBytes", 0)),
-        "gp_mean_source": str(base.get("mean_source", "")),
-        "gp_prior_clip_count": int(base.get("prior_mean_clip_count", 0)),
-        "gp_residual_target_mean": _optional_finite(
-            base.get("residual_target_mean"),
-            "residual target mean",
-        ),
-        "gp_residual_target_std": _optional_finite(
-            base.get("residual_target_std"),
-            "residual target std",
-        ),
-        "baseline_prediction_mean": _diagnostic_value(baseline, "mean_mean"),
-        "baseline_prediction_std": _diagnostic_value(baseline, "mean_std"),
-        "compiled_prediction_mean": _diagnostic_value(compiled, "mean_mean"),
-        "compiled_prediction_std": _diagnostic_value(compiled, "mean_std"),
-        "baseline_acquisition_mean": _diagnostic_value(
-            baseline,
-            "acquisition_mean",
-        ),
-        "baseline_acquisition_std": _diagnostic_value(
-            baseline,
-            "acquisition_std",
-        ),
-        "compiled_acquisition_mean": _diagnostic_value(
-            compiled,
-            "acquisition_mean",
-        ),
-        "compiled_acquisition_std": _diagnostic_value(
-            compiled,
-            "acquisition_std",
-        ),
-        "baseline_compiled_top10_overlap": _optional_finite(
-            policy.get("baseline_compiled_top10_overlap"),
-            "baseline/compiled top-10 overlap",
-        ),
-        "q0_entropy": _optional_finite(
-            metadata.get("base_probability_entropy"),
-            "q0 entropy",
-        ),
-        "tilted_entropy": _optional_finite(
-            metadata.get("probability_entropy"),
-            "tilted entropy",
-        ),
-        "tilted_ess": _optional_finite(
-            metadata.get("probability_effective_sample_size"),
-            "tilted effective sample size",
-        ),
-        "tilted_kl_from_q0": _optional_finite(
-            metadata.get("tilted_kl_from_q0"),
-            "tilted KL from q0",
-        ),
-        "q0_tilted_topk_overlap": _optional_finite(
-            metadata.get("q0_tilted_topk_overlap"),
-            "q0/tilted top-k overlap",
-        ),
+        "validation_failure_count": validation_failures,
+        "provider_request_count": usage.get("providerCalls"),
+        "tool_call_count": sum(int(value) for value in tool_calls.values()) if tool_calls is not None else None,
+        "artifact_bytes": usage.get("artifactBytes"),
     }
+    if fields.keys() & record.keys():
+        raise ValueError("policy_fields must not replace built-in policy columns")
+    for name, path in fields.items():
+        value: Any = metadata
+        for part in path.split("."):
+            value = value.get(part) if isinstance(value, dict) else None
+        record[name] = value
+    return record
 
 
 def _validate_policy_turn(
@@ -534,12 +497,17 @@ def _validate_policy_turn(
         )
 
 
-def _compiled_policy_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+def _compiled_policy_summary(
+    records: list[dict[str, Any]], mean_fields: tuple[str, ...],
+) -> dict[str, Any]:
     if not records:
         return {
             "policy_rounds": 0,
             "policy_degraded_rounds": 0,
             "policy_fallback_rounds": 0,
+            "policy_committed_turns": 0,
+            "policy_failed_turns": 0,
+            "policy_usage_incomplete_rounds": 0,
             "policy_validation_failures": 0,
             "policy_prior_clip_count": 0,
         }
@@ -548,8 +516,12 @@ def _compiled_policy_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "policy_rounds": len(records),
         "policy_degraded_rounds": sum(bool(item["degraded"]) for item in records),
         "policy_fallback_rounds": sum(item["action"] == "fallback" for item in records),
+        "policy_committed_turns": sum(item["turn_committed"] for item in records),
+        "policy_failed_turns": sum(not item["turn_committed"] for item in records),
+        "policy_usage_incomplete_rounds": sum(not item["usage_complete"] for item in records),
         "policy_validation_failures": sum(
             int(item["validation_failure_count"]) for item in records
+            if item["validation_failure_count"] is not None
         ),
         "policy_prior_clip_count": sum(int(item["prior_clip_count"]) for item in records),
         "policy_last_action": last["action"],
@@ -558,34 +530,11 @@ def _compiled_policy_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "policy_last_stage": last["stage"],
         "policy_last_alpha": last["alpha"],
         "policy_last_eta": last["eta"],
-        "policy_mean_q0_entropy": _mean_present(records, "q0_entropy"),
-        "policy_mean_tilted_entropy": _mean_present(records, "tilted_entropy"),
-        "policy_mean_tilted_ess": _mean_present(records, "tilted_ess"),
-        "policy_mean_tilted_kl_from_q0": _mean_present(
-            records,
-            "tilted_kl_from_q0",
-        ),
-        "policy_mean_q0_tilted_topk_overlap": _mean_present(
-            records,
-            "q0_tilted_topk_overlap",
-        ),
-        "policy_mean_baseline_compiled_top10_overlap": _mean_present(
-            records,
-            "baseline_compiled_top10_overlap",
-        ),
+        **{f"policy_mean_{name}": _mean_present(records, name) for name in mean_fields},
     }
 
-
-def _diagnostic_value(value: Any, key: str) -> float | None:
-    return (
-        _optional_finite(value.get(key), f"prediction diagnostic {key}")
-        if isinstance(value, dict)
-        else None
-    )
-
-
 def _mean_present(records: list[dict[str, Any]], key: str) -> float | None:
-    values = [float(item[key]) for item in records if item.get(key) is not None]
+    values = [_finite(item[key], key) for item in records if item.get(key) is not None]
     return statistics.fmean(values) if values else None
 
 
@@ -713,8 +662,8 @@ def _json_object(path: Path) -> dict[str, Any]:
 
 
 def _finite(value: Any, label: str) -> float:
-    if isinstance(value, bool):
-        raise ValueError(f"{label} must be numeric")
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"{label} must be a numeric scalar")
     result = float(value)
     if not math.isfinite(result):
         raise ValueError(f"{label} must be finite")
@@ -726,7 +675,13 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(
+            {
+                key: json.dumps(value, allow_nan=False) if isinstance(value, (list, dict)) else value
+                for key, value in row.items()
+            }
+            for row in rows
+        )
 
 
 __all__ = ["write_evaluation_reports"]

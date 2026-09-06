@@ -37,15 +37,20 @@ for line in sys.stdin:
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
-        assert frame["guestRuntime"] == {
-            "imageRef": "ldm/fixture-research:aaaaaaaaaaaa",
-            "recipeSha256": "a" * 64,
-            "rootfsSize": "4G",
-            "installPolicy": "session_overlay",
-        }
         profiles = [item["profileId"] for item in frame["profiles"]]
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
+        failure = os.environ.get("HARNESS_TEST_TURN_FAILURE")
+        if failure:
+            error = {"message": "provider 502"}
+            if failure != "unknown":
+                error["turnUsage"] = [{
+                    "profileId": item["profileId"],
+                    "turnId": "wrong-turn" if failure == "wrong-turn" else item["turnId"],
+                    "usage": {"providerCalls": 3, "toolCalls": {"bash": 2}, "artifactBytes": 120},
+                } for item in frame["turns"]]
+            print(json.dumps({"type": "error", **common, "error": error}), flush=True)
+            continue
         turns = []
         for item in frame["turns"]:
             attempt_index = 0

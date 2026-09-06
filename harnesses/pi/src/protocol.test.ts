@@ -166,18 +166,6 @@ test("parseFrame requires named secret bootstrap values", () => {
 	}
 });
 
-test("parseFrame rejects the obsolete protocol version", () => {
-	assert.throws(
-		() => parseFrame(JSON.stringify({
-			type: "close",
-			requestId: "close-1",
-			protocolVersion: 6,
-			campaignId: "campaign-1",
-		})),
-		(error: unknown) => error instanceof ProtocolError && error.code === "protocol_mismatch",
-	);
-});
-
 test("parseFrame rejects path traversal turn identifiers", () => {
 	assert.throws(
 		() => parseFrame(JSON.stringify({

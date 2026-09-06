@@ -8,7 +8,9 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.harness.pi import PiHarnessConfig, policy_mcp_server
 from ldm_tts.contracts import LDMTaskSpec
+from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
@@ -17,11 +19,9 @@ from ldm_tts.harness import (
     HarnessClient,
     HarnessLimits,
     HarnessNetworkPolicy,
-    HarnessPoolConfig,
     PolicyResearchController,
     load_harness_mcp_config,
     parse_tool_call_budgets,
-    policy_mcp_server,
     policy_submission_contract,
 )
 from ldm_tts.harness.container import docker_identity_args, resolve_container_user
@@ -310,7 +310,7 @@ def _proposal_harness_client(
         mounts=((resource_root, "/resources", True),),
     )
     profiles = _harness_profiles(args)
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
         model=provider.model,
@@ -381,7 +381,7 @@ def _policy_harness_client(
             True,
         ),
     )
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
         model=provider.model,
@@ -395,7 +395,10 @@ def _policy_harness_client(
         ),
         guest_runtime=harness_guest_runtime(),
         tool_extensions=harness_tool_extensions(),
-        mcp_servers=(*mcp.servers, policy_mcp_server()),
+        mcp_servers=(*mcp.servers, policy_mcp_server(
+            diagnostics_path="/resources/policy_diagnostics.py",
+            diagnostics_sha256=file_sha256(harness_resources / "policy_diagnostics.py"),
+        )),
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,

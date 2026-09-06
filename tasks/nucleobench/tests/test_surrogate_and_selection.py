@@ -346,12 +346,12 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     assert np.isfinite(round_input.query_features).all()
     mean_context = str(round_input.execution_context["mean_context"])
     assert all(term not in mean_context for term in ("q0", "acquisition", "candidate_id"))
-    assert round_input.research_snapshot["measured_observations"][0]["utility"] == 2.0
+    assert list(round_input.measured_observations)[0]["utility"] == 2.0
 
 
 class _StaticPolicyController:
-    def record_predictions(self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition):
-        assert len(baseline) == len(active) == len(q0)
+    def record_predictions(self, round_index, predictions):
+        assert predictions and all("candidate_id" in row for row in predictions)
 
     def resolve(self, round_input):
         return CompiledOptimizationPolicy(

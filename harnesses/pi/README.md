@@ -44,14 +44,24 @@ inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
 Committed turns are idempotent and partial turns recover from their saved
 submission, artifact descriptors, and measured usage.
+Initialization pins configuration, profile/tool digests, resolved guest, and
+sidecar implementation. Resume rejects a different identity without rewriting
+the original manifest. Use a new artifact root for a changed configuration.
 
 During `run_turn`, the terminal tool named by `HarnessSubmissionContract` is
 provisional until the Python caller answers a
 `submission_validation_requested` frame. `retry` returns task-provided
-JSON-Pointer errors to the same session; `accept` commits the turn, while
+JSON-Pointer errors to the same session, with research and editing tools still
+available for repair; `accept` commits the turn, while
 `reject_turn` records a terminal failure for caller fallback. The protocol is
 task-neutral: payload meaning and domain validation remain in the task-owned
 Python callback.
+
+Execution errors carry `error.turnUsage` entries for available per-profile,
+per-turn provider calls, tool calls, and captured artifact bytes, including
+work completed before a provider failure or wall-time limit. Failed turns do
+not commit or advance history. If the transport exits before delivering usage,
+the client preserves unknown counters rather than reporting zero.
 
 Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
 escapes, unsupported suffixes, missing files, and oversized files, then stores
@@ -77,7 +87,17 @@ the authoritative feature contract and repair a draft before submission. These
 tools are advisory. Inspection returns the exact task-supplied `mean_context`
 and `weight_context` in addition to the public research snapshot, so generated
 code does not have to guess target scaling or available keys. Inspection also
-exports read-only arrays to `guest_snapshot.directory`. Draft evaluation compares
+exports read-only arrays to `guest_snapshot.directory`. The runner preserves
+single-objective vectors or multiobjective matrices; objective meaning and GP
+diagnostics are task-owned. A trusted read-only diagnostic module is configured
+through `LDM_POLICY_DIAGNOSTICS` and `LDM_POLICY_DIAGNOSTICS_SHA256`.
+Its digest is verified before loading. See the
+[task hook contract](../../docs/research-harness.md#task-responsibilities).
+Without a task hook, evaluation reports artifact outputs only.
+Draft validation and evaluation use the existing sidecar Python subprocess.
+They do not start another container or microVM.
+
+The three reference tasks' draft-evaluation hooks compare
 chronological measured-history holdouts with training-prefix GP hyperparameters
 frozen, and reports current-pool first-draw distribution changes. These are
 development diagnostics, not an untouched test or a closed-loop counterfactual.
@@ -130,8 +150,9 @@ The configured terminal tool cannot be limited. A started tool execution consume
 call even when it fails; policy and budget rejections do not. Reservations are
 persisted before execution, so an interrupted turn resumes with the same used
 counts. If a provider stream ends before a committed batch, the sidecar
-continues submission-only recovery within the same wall-time window and retains
-every raw attempt.
+continues the existing work with tools available for repair within the same
+wall-time window and retains every raw attempt. Partial-turn recovery continues
+attempt numbering rather than replacing earlier artifact snapshots.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
 artifacts, read-only task resources, and the selected guest cache explicitly.

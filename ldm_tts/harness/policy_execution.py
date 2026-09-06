@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -77,10 +78,11 @@ class DockerPolicyExecutor:
         output.mkdir(parents=True, exist_ok=True)
         for name in ("arrays.npz", "result.json"):
             (output / name).unlink(missing_ok=True)
-        command = ["docker"]
+        docker = ["docker"]
         if self.docker_host:
-            command.extend(("--host", self.docker_host))
-        command.extend(("run", "--rm", "--network", "none", "--read-only"))
+            docker.extend(("--host", self.docker_host))
+        container_name = f"ldm-policy-{uuid.uuid4().hex}"
+        command = [*docker, "run", "--name", container_name, "--rm", "--network", "none", "--read-only"]
         if self.container_user:
             command.extend(("--user", self.container_user))
         command.extend((
@@ -89,6 +91,11 @@ class DockerPolicyExecutor:
             "--pids-limit", "64",
             "--memory", "1g",
             "--cpus", "1",
+            "--env", "PYTHONHASHSEED=0",
+            "--env", "OMP_NUM_THREADS=1",
+            "--env", "OPENBLAS_NUM_THREADS=1",
+            "--env", "MKL_NUM_THREADS=1",
+            "--env", "NUMEXPR_NUM_THREADS=1",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
             "--mount", f"type=bind,src={artifact.parent},dst=/policy,readonly",
             "--mount", f"type=bind,src={round_input},dst=/input,readonly",
@@ -100,15 +107,8 @@ class DockerPolicyExecutor:
             "--input", "/input",
             "--output", "/output",
         ))
-        environment = {
-            **os.environ,
-            "PYTHONHASHSEED": "0",
-            "OMP_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "NUMEXPR_NUM_THREADS": "1",
-        }
         os.chmod(output, 0o777)
+        client_started = True
         try:
             try:
                 completed = subprocess.run(
@@ -118,7 +118,6 @@ class DockerPolicyExecutor:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    env=environment,
                     timeout=self.timeout_seconds,
                 )
             except subprocess.TimeoutExpired as exc:
@@ -129,14 +128,25 @@ class DockerPolicyExecutor:
                     "Simplify the policy and remove expensive loops or matrix operations.",
                 ),)) from exc
             except OSError as exc:
+                client_started = False
                 raise PolicyExecutionError((_error(
                     "/artifact_path",
                     "runner_unavailable",
                     f"Policy runner could not start: {exc}",
-                    "Verify Docker and the configured Pi image before retrying.",
+                    "Verify Docker and the configured policy runner image before retrying.",
                 ),)) from exc
         finally:
-            os.chmod(output, 0o755)
+            try:
+                if client_started:
+                    # Killing the Docker client does not stop a daemon-owned container.
+                    cleanup = subprocess.run(
+                        [*docker, "rm", "--force", container_name],
+                        check=False, capture_output=True, text=True, timeout=15,
+                    )
+                    if cleanup.returncode and "No such container" not in cleanup.stderr:
+                        raise RuntimeError(f"could not remove policy container {container_name}: {cleanup.stderr.strip()}")
+            finally:
+                os.chmod(output, 0o755)
         if completed.returncode != 0:
             raise PolicyExecutionError(_parse_errors(completed.stdout, completed.stderr))
         try:
@@ -147,6 +157,7 @@ class DockerPolicyExecutor:
             with np.load(round_input / "arrays.npz", allow_pickle=False) as arrays:
                 history_size = len(arrays["history_features"])
                 query_size = len(arrays["query_features"])
+                objective_shape = arrays["history_utilities"].shape[1:]
         except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
             raise PolicyExecutionError((_error(
                 "/artifact_path",
@@ -155,8 +166,8 @@ class DockerPolicyExecutor:
                 "Run draft validation and repair the artifact before resubmitting.",
             ),)) from exc
         if (
-            history_prior.shape != (history_size,)
-            or query_prior.shape != (query_size,)
+            history_prior.shape != (history_size, *objective_shape)
+            or query_prior.shape != (query_size, *objective_shape)
             or not np.isfinite(history_prior).all()
             or not np.isfinite(query_prior).all()
         ):
@@ -164,7 +175,7 @@ class DockerPolicyExecutor:
                 "/outputs/prior_mean",
                 "invalid_runner_output",
                 "Policy runner returned invalid prior-mean arrays.",
-                "Return one finite scalar for every requested feature row.",
+                "Preserve the history objective dimensions for every requested feature row.",
             ),))
         try:
             if metadata.get("status") != "ok":

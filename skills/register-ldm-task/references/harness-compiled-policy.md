@@ -15,7 +15,7 @@ optimization policy in addition to the existing proposal Harness.
   session history, tool budget, and budget counters. Do not mix policy turns
   into proposal-session state.
 
-## Implement the task-local policy seam
+## Implement the task-local policy adapter
 
 1. Add a deterministic public feature encoder under `tasks/<task_id>/core/`.
    Features may use released task data and measured observations, but must not
@@ -25,11 +25,17 @@ optimization policy in addition to the existing proposal Harness.
    `PolicyCapabilityContract`, materializes authoritative round inputs, and
    validates execution outputs against task semantics. Its exact
    `mean_context` and `weight_context` must be safe to expose through
-   `inspect_policy_contract`; include target location/scale, feature names and
-   groups, task defaults, and only the aggregate diagnostics the generated
-   functions are allowed to consume.
+   `inspect_policy_contract`; include task-defined target transforms, feature
+   names and groups, defaults, and the diagnostics each generated function is
+   allowed to consume. Keep pool identities, `q0`, and acquisition signals in
+   `weight_context`, not in `mean_context`.
+   Populate `PolicyRoundInput.history_candidate_ids`, `history_rounds`, and
+   `measured_observations` explicitly, aligned with numeric history; do not
+   duplicate those fields in `research_snapshot`. Preserve all objective
+   columns: `history_utilities` and prior outputs can be vectors or matrices.
+   Define objective order, direction, and scaling in the task context.
 3. Wire the prior mean into the existing task surrogate as a residual GP:
-   subtract the standardized prior from measured targets, fit the unchanged GP,
+   subtract the prior on the task-declared target scale, fit the unchanged GP,
    and add the prior back to query predictions. Kernel, variance, noise,
    acquisition, and numerical safeguards remain fixed.
 4. Prove zero-prior parity: a zero prior with default `alpha` and `eta` must
@@ -42,12 +48,31 @@ optimization policy in addition to the existing proposal Harness.
    `/workspace/.ldm-resources`, not the sidecar-only source path. Do not put task
    runtime skills in the repository-level developer `skills/` directory.
    Document what every feature means, which groups are collinear or masked,
-   what scientific structures cannot be represented, and that raw utility must
-   be standardized before fitting the prior mean.
+   what scientific structures cannot be represented, and the exact objective
+   order, direction, units, and target transformations. Standardization is the
+   reference tasks' choice, not a shared requirement. Document only enabled
+   capabilities; a weights-only contract does not require prior-mean research.
+   Make artifact declarations and required exports match `enabled_capabilities`
+   exactly. Qualify the documented single-capability examples against the real
+   runner, not just the default dual-capability contract.
 
 The current release supports only `prior_mean@1` and `ldm_weights@1`. Add a new
 versioned capability and task adapter path before exposing another editable
 component; do not broaden the meaning of an existing capability.
+
+Keep GP holdouts, acquisition normalization, prediction errors, and optimization
+progress under the task, not in the shared controller or Pi runner. Implement
+`with_feedback(round_input, records)` on the adapter. Build task-defined rows
+before calling `controller.record_predictions(round_index, predictions)`.
+For draft evaluation, register a read-only task resource implementing
+`evaluate_policy_draft(prior, inputs, outputs)` through
+`ldm_tts.harness.pi.policy_mcp_server(diagnostics_path=..., diagnostics_sha256=...)`; see the
+shared Harness documentation for its inputs. Only the task can determine
+whether UCB, RMSE, a Pareto metric, or another diagnostic is appropriate.
+Declare scientific report paths in the task matrix's `policy_fields` and scalar
+aggregates in `policy_mean_fields`; do not add task metric names or scalarization
+to the shared reporter.
+Proposal profile count belongs to the task, not the shared policy lifecycle.
 
 ## Artifact and fallback contract
 
@@ -57,8 +82,9 @@ Use the generic `HarnessSubmissionContract` with one terminal action:
 - `keep`: revalidate and reuse the active policy epoch;
 - `disable`: use the static zero-prior/default-weight policy.
 
-Snapshot the file before task validation. The Agent may use the built-in policy
-MCP to inspect, validate, and evaluate drafts, but the host must execute the
+Snapshot the file before task validation. Pi's built-in policy MCP uses a
+sidecar Python subprocess to inspect, validate, and evaluate drafts. The
+campaign must execute the
 accepted snapshot again through `PolicyExecutor` with read-only inputs, no
 network, and bounded CPU, memory, processes, and time. Never execute Agent code
 with the host interpreter.
@@ -69,7 +95,8 @@ aggressive clipping. Label fit statistics as in-sample; do not present them as
 prequential accuracy, GP calibration, or evidence that a more flexible mean
 will optimize better.
 
-Return exact JSON-Pointer errors to the same session for repair. Bound formal
+Return exact JSON-Pointer errors to the same session for repair. Keep research,
+file-editing, and validation tools available after rejection. Bound formal
 profiles to a small submission-attempt count. If the turn fails, revalidate the
 previous epoch on current inputs; if it is unavailable or invalid, use static
 defaults and record `degraded=true`.
@@ -84,6 +111,14 @@ defaults and record `degraded=true`.
   `<run_dir>/policy_harness/`. Include policy turns, provider/tool/artifact
   usage, validation failures, epoch/source/action, degraded state, and selected
   weights in reports.
+  Attach compiled policy metadata to the shared engine's `candidates_selected`
+  event in `events.jsonl`; no additional task-specific selection export is
+  required by Pilot Evaluation. Test report collection with the task's actual
+  initialization count, which may differ from its optimization batch size.
+  Count every policy attempt, including runtime failures that use fallback;
+  distinguish committed turns, failed attempts, and incomplete usage. Never
+  substitute zero for unavailable provider or tool counts. Cached decisions
+  must not charge the same attempt again.
 - Test feature determinism and leakage boundaries, strict artifact paths and
   digests, repair, isolated execution, zero-prior parity, residual-GP behavior,
   exact execution-context inspection, scale/sign diagnostics, epoch resume,

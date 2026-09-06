@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+from ldm_tts.harness.protocol import file_sha256
 
 
 RUNNER = Path(__file__).parents[1] / "harnesses" / "pi" / "policy_runner.py"
@@ -64,7 +68,8 @@ def _run(*args: str) -> tuple[subprocess.CompletedProcess[str], dict[str, object
     return completed, json.loads(completed.stdout)
 
 
-def test_policy_runner_executes_valid_numpy_artifact(tmp_path: Path) -> None:
+@pytest.mark.parametrize("task", ["iron_mind", "synthonbench", "nucleobench"])
+def test_policy_runner_executes_valid_numpy_artifact(tmp_path: Path, task) -> None:
     artifact = tmp_path / "optimization_policy.py"
     artifact.write_text(
         """\
@@ -90,6 +95,7 @@ def choose_ldm_weights(context):
     round_input = tmp_path / "round"
     output = tmp_path / "output"
     _round_input(round_input)
+    diagnostics_path = RUNNER.parents[2] / "tasks" / task / "resources/harness/policy_diagnostics.py"
 
     completed, result = _run(
         "execute",
@@ -99,6 +105,8 @@ def choose_ldm_weights(context):
         str(round_input),
         "--output",
         str(output),
+        "--diagnostics", str(diagnostics_path),
+        "--diagnostics-sha256", file_sha256(diagnostics_path),
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
@@ -113,6 +121,37 @@ def choose_ldm_weights(context):
     with np.load(output / "arrays.npz", allow_pickle=False) as arrays:
         assert arrays["history_prior_mean"].shape == (2,)
         assert arrays["query_prior_mean"].shape == (2,)
+
+
+@pytest.mark.parametrize("task", ["iron_mind", "synthonbench", "nucleobench"])
+@pytest.mark.parametrize("capability,example_index", [("prior_mean@1", 0), ("ldm_weights@1", 1)])
+def test_task_skill_single_capability_artifacts_execute(tmp_path, task, capability, example_index):
+    resources = RUNNER.parents[2] / "tasks" / task / "resources/harness"
+    skill = (resources / "skills/compile-ldm-policy/SKILL.md").read_text()
+    artifact = tmp_path / "optimization_policy.py"
+    artifact.write_text(re.findall(r"```python\n(.*?)```", skill, re.DOTALL)[example_index])
+    round_input = tmp_path / "round"
+    _round_input(round_input)
+    contract_path = round_input / "contract.json"
+    contract = json.loads(contract_path.read_text())
+    contract["enabled_capabilities"] = [capability]
+    contract_path.write_text(json.dumps(contract))
+    input_path = round_input / "input.json"
+    inputs = json.loads(input_path.read_text())
+    inputs["execution_context"]["weight_context"].update(default_alpha=1.0, default_eta=1.0)
+    input_path.write_text(json.dumps(inputs))
+    output = tmp_path / "output"
+    hook = resources / "policy_diagnostics.py"
+    completed, result = _run(
+        "execute", "--artifact", str(artifact), "--input", str(round_input), "--output", str(output),
+        "--diagnostics", str(hook), "--diagnostics-sha256", file_sha256(hook),
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert result["alpha"] == result["eta"] == 1.0
+    assert result["draft_diagnostics"]["held_out_count"] == 1
+    with np.load(output / "arrays.npz", allow_pickle=False) as arrays:
+        np.testing.assert_array_equal(arrays["history_prior_mean"], np.zeros(2))
+        np.testing.assert_array_equal(arrays["query_prior_mean"], np.zeros(2))
 
 
 def test_policy_runner_rejects_forbidden_imports(tmp_path: Path) -> None:
@@ -174,3 +213,58 @@ def choose_ldm_weights(context):
 
     assert completed.returncode == 2
     assert result["errors"][0]["code"] == "batch_dependent_output"
+
+
+@pytest.mark.parametrize("scalarize", [False, True])
+def test_runner_preserves_multiple_objectives_and_loads_dataclasses(tmp_path: Path, scalarize) -> None:
+    round_input = tmp_path / "round"
+    output = tmp_path / "output"
+    _round_input(round_input)
+    np.savez_compressed(
+        round_input / "arrays.npz",
+        history_features=np.eye(2),
+        history_utilities=np.asarray([[3.0, -1.0], [1.0, 4.0]]),
+        query_features=np.asarray([[1.0, 1.0], [2.0, -1.0]]),
+    )
+    artifact = tmp_path / "optimization_policy.py"
+    artifact.write_text(
+        """\
+from dataclasses import dataclass
+import numpy as np
+POLICY_API_VERSION = 1
+CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}
+@dataclass
+class Stage:
+    name: str = "multiobjective"
+def compute_prior_mean(history_features, history_utilities, query_features, context):
+    result = np.tile(np.asarray([1.5, -2.0]), (len(query_features), 1))
+    return result[:, 0] if SCALARIZE else result
+def choose_ldm_weights(context):
+    return {"stage": Stage().name, "alpha": 1.0, "eta": 0.25}
+""".replace("SCALARIZE", repr(scalarize)), encoding="utf-8",
+    )
+    completed, result = _run(
+        "execute", "--artifact", str(artifact), "--input", str(round_input), "--output", str(output),
+    )
+    if scalarize:
+        assert completed.returncode == 2
+        assert result["errors"][0]["code"] == "invalid_prior_shape"
+    else:
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert "draft_diagnostics" not in result
+        assert [item["mean"] for item in result["prior_summary"]["query"]["objectives"]] == [1.5, -2.0]
+        with np.load(output / "arrays.npz", allow_pickle=False) as arrays:
+            assert arrays["history_prior_mean"].tolist() == [[1.5, -2.0]] * 2
+            assert arrays["query_prior_mean"].tolist() == [[1.5, -2.0]] * 2
+
+
+def test_runner_rejects_changed_task_diagnostics_before_loading(tmp_path: Path) -> None:
+    diagnostics = tmp_path / "diagnostics.py"
+    diagnostics.write_text("raise AssertionError('must not execute')", encoding="utf-8")
+    completed, result = _run(
+        "execute", "--artifact", str(tmp_path / "unused.py"),
+        "--input", str(tmp_path / "unused"), "--output", str(tmp_path / "output"),
+        "--diagnostics", str(diagnostics), "--diagnostics-sha256", "0" * 64,
+    )
+    assert completed.returncode == 2
+    assert result["errors"][0]["code"] == "diagnostics_digest_mismatch"

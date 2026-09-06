@@ -455,7 +455,7 @@ def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
         os.replace(temporary_name, path)
-    except Exception:
+    except BaseException:
         try:
             os.unlink(temporary_name)
         except OSError:

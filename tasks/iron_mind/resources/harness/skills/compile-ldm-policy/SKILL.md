@@ -1,13 +1,13 @@
 ---
 name: compile-ldm-policy
-description: Design, test, and submit a deterministic Python prior mean and LDM weight policy from an authoritative campaign snapshot without selecting candidates or changing the task GP.
+description: Design, test, and submit the enabled prior-mean and/or LDM-weight capabilities from an authoritative campaign snapshot without selecting candidates or changing the task GP.
 ---
 
 # Compile an LDM Optimization Policy
 
 Produce one complete `optimization_policy.py` for the current campaign round.
-You are a belief compiler: translate task evidence into a small auditable mean
-function and two LDM weights. The task remains responsible for numerical GP
+Translate task evidence into the capabilities enabled by the current contract.
+The task remains responsible for numerical GP
 inference, acquisition, sampling, candidate validation, and evaluation.
 This package is a digest-bound, read-only snapshot inside the session guest.
 Resolve every referenced file relative to the Skill location advertised by Pi.
@@ -18,28 +18,32 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
    snapshot, and active-policy pointer are authoritative. Load NumPy arrays from
    the returned `guest_snapshot.directory`; this export is read-only. Do not
    reconstruct numeric feature rows from SMILES or prose.
-2. Read [prior-mean-and-residual-gp.md](references/prior-mean-and-residual-gp.md)
-   before designing `compute_prior_mean` and
-   [ldm-curriculum.md](references/ldm-curriculum.md) before choosing `alpha` or
-   `eta`.
+2. Read `enabled_capabilities`. Only for `prior_mean@1`, read
+   [prior-mean-and-residual-gp.md](references/prior-mean-and-residual-gp.md).
+   Only for `ldm_weights@1`, read
+   [ldm-curriculum.md](references/ldm-curriculum.md).
+   Do not research, declare, or implement a disabled capability. The task
+   supplies zero mean or default weights for the disabled component.
 3. State a small set of testable hypotheses. Give priority to direct campaign
    measurements, then exact released task facts, then transferable literature,
    and finally clearly labeled mechanistic speculation. Direct contradictory
    measurements override a generic literature prior.
-4. Audit the LDM weights as a first-class decision, independently of whether the
+4. When `ldm_weights@1` is enabled, audit weights independently of whether the
    prior mean changes. Infer an evidence-defined curriculum state from proposal
    concentration, surrogate readiness and acquisition separation, and measured
    progress or contradiction. Never switch stages from round number or history
    size alone. Test the credibility of both proposal mass and GP acquisition;
    uncertainty in one does not validate the other.
 5. Use the sandbox, public tools, and literature to test useful hypotheses.
-   Prefer a zero mean or a shrunken additive model until the observations support
-   more structure. Do not confuse in-sample fit with predictive evidence.
+   For an enabled prior mean, prefer zero or a shrunken additive model until
+   observations support more structure. Do not confuse in-sample fit with
+   predictive evidence.
 6. Write a complete deterministic NumPy-only `optimization_policy.py` in the
    session workspace. Research scripts may use the task guest, but submitted
    code must obey the restricted runtime contract.
-7. Call `validate_policy_draft`, then `evaluate_policy_draft`. Compare the
-   chronological fixed-GP holdouts and current-pool first-draw probabilities;
+7. Call `validate_policy_draft`, then `evaluate_policy_draft`. For an enabled
+   mean, compare chronological fixed-GP holdouts; for enabled weights, compare
+   current-pool first-draw probabilities. In either case,
    inspect frozen pre-measurement errors in `weight_context.prediction_feedback`.
    Predictive error checks evaluate the mean, not the utility of alpha/eta.
    A positive residual, successful validation, or a changed distribution is
@@ -51,6 +55,10 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
    justified. A policy need not change every round.
 
 ## Mathematical contract
+
+Apply the mean guidance only for `prior_mean@1` and the weight-design guidance
+only for `ldm_weights@1`. Read-only diagnostics do not authorize changing a
+disabled component.
 
 `history_utilities` contains raw task utilities. `compute_prior_mean` must use
 `context["target_location"]` and `context["target_scale"]` and return the
@@ -73,12 +81,28 @@ for every evidence state.
 
 ## Artifact interface
 
+`CAPABILITIES` must be a literal dictionary matching `enabled_capabilities`
+exactly, converting each `name@1` to `"name": 1`. Include only its required
+functions. These are complete baseline artifacts for the two single-capability
+contracts; adapt the enabled function when evidence justifies a change.
+
+Prior mean only:
+
 ```python
+import numpy as np
+
 POLICY_API_VERSION = 1
-CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}
+CAPABILITIES = {"prior_mean": 1}
 
 def compute_prior_mean(history_features, history_utilities, query_features, context):
-    ...
+    return np.zeros(len(query_features), dtype=float)
+```
+
+LDM weights only:
+
+```python
+POLICY_API_VERSION = 1
+CAPABILITIES = {"ldm_weights": 1}
 
 def choose_ldm_weights(context):
     return {
@@ -88,7 +112,11 @@ def choose_ldm_weights(context):
     }
 ```
 
-When evidence supports adaptation, replace this baseline return with a
+When both capabilities are enabled, combine these two functions and the NumPy
+import in one file, keep one `POLICY_API_VERSION = 1`, and declare
+`CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}`.
+
+When weight adaptation is enabled and supported, replace its baseline return with a
 deterministic rule over the supplied diagnostics. Stage names describe the
 current evidence state. Do not branch on `round_index` or use a fixed
 early/middle/late round schedule.

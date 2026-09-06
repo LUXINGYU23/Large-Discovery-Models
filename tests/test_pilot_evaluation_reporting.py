@@ -7,14 +7,20 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
+
 from ldm_tts.pilot_evaluation.reporting import (
     METHOD_LABELS,
+    _collect,
     _compiled_policy_records,
     _compiled_policy_summary,
     _expected_model_proposal_attempts,
     _integrity,
     _round_rows,
     _verdict,
+    _write_csv,
 )
 
 
@@ -127,9 +133,16 @@ def test_harness_methods_have_distinct_release_labels_and_budget_semantics() -> 
     assert METHOD_LABELS["harness"] == "Direct Research Harness"
 
 
+@pytest.mark.parametrize("failed_usage", [None, {
+    "providerCalls": 3, "toolCalls": {"bash": 2, "web_search": 1},
+    "validationSubmissions": 2, "artifactBytes": 128,
+}, {}])
 def test_compiled_policy_reporting_uses_structured_selection_and_turn_records(
     tmp_path: Path,
+    monkeypatch,
+    failed_usage,
 ) -> None:
+    monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path))
     run_dir = tmp_path / "run"
     round_dir = run_dir / "policy_harness" / "rounds" / "round_001"
     turn_dir = run_dir / "policy_harness" / "turns" / "turn-1"
@@ -174,6 +187,10 @@ def test_compiled_policy_reporting_uses_structured_selection_and_turn_records(
             },
         },
     }
+    if failed_usage is not None:
+        policy.pop("harness_turn")
+        policy.update(action="fallback", status="runtime_fallback", degraded=True,
+                      failed_harness_usage=failed_usage)
     (round_dir / "manifest.json").write_text(
         json.dumps({"input_sha256": digest}),
         encoding="utf-8",
@@ -181,15 +198,7 @@ def test_compiled_policy_reporting_uses_structured_selection_and_turn_records(
     (round_dir / "result.json").write_text(
         json.dumps(
             {
-                "input_sha256": digest,
-                "epoch_id": "epoch_001",
-                "artifact_sha256": artifact,
-                "submission_sha256": submission,
-                "source": "artifact",
-                "degraded": False,
-                "stage": "explore",
-                "alpha": 0.8,
-                "eta": 2.0,
+                **policy, "input_sha256": digest, "submission_sha256": submission,
             }
         ),
         encoding="utf-8",
@@ -204,49 +213,72 @@ def test_compiled_policy_reporting_uses_structured_selection_and_turn_records(
         ),
         encoding="utf-8",
     )
-    (run_dir / "selection_record.json").write_text(
-        json.dumps(
-            {
-                "selections": [
-                    {
-                        "iteration": 1,
-                        "payload": {
-                            "metadata": {
-                                "compiled_policy": policy,
-                                "base_probability_entropy": 0.5623351446,
-                                "probability_entropy": 0.5623351446,
-                                "probability_effective_sample_size": 1.6,
-                                "tilted_kl_from_q0": 0.5493061443,
-                                "q0_tilted_topk_overlap": 0.0,
-                                "base_selection": {
-                                    "mean_source": "compiled:artifact",
-                                    "prior_mean_clip_count": 1,
-                                    "residual_target_mean": 0.0,
-                                    "residual_target_std": 1.0,
-                                },
-                            },
-                        },
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
+    event = {
+        "event_type": "candidates_selected",
+        "iteration": 1,
+        "payload": {
+            "metadata": {
+                "compiled_policy": policy,
+                "base_probability_entropy": 0.5623351446,
+                "probability_entropy": 0.5623351446,
+                "probability_effective_sample_size": 1.6,
+                "tilted_kl_from_q0": 0.5493061443,
+                "q0_tilted_topk_overlap": 0.0,
+                "base_selection": {
+                    "mean_source": "compiled:artifact",
+                    "prior_mean_clip_count": 1,
+                    "residual_target_mean": 0.0,
+                    "residual_target_std": 1.0,
+                },
+            },
+        },
+    }
+    event_path = run_dir / "events.jsonl"
+    event_path.write_text(json.dumps({"event_type": "run_started"}) + "\n" + json.dumps(event) + "\n")
+
+    spec = load_pilot_evaluation_spec(
+        Path(__file__).parents[1] / "config/pilot_evaluation/iron_mind.yaml"
     )
+    records = _compiled_policy_records(run_dir, "case", 0, spec.policy_fields)
+    summary = _compiled_policy_summary(records, spec.policy_mean_fields)
 
-    records = _compiled_policy_records(run_dir, "case", 0)
-    summary = _compiled_policy_summary(records)
-
-    assert records[0]["provider_request_count"] == 3
-    assert records[0]["tool_call_count"] == 3
-    assert records[0]["validation_submission_count"] == 2
-    assert records[0]["validation_failure_count"] == 1
+    assert records[0]["provider_request_count"] == (None if failed_usage == {} else 3)
+    assert records[0]["tool_call_count"] == (None if failed_usage == {} else 3)
+    assert records[0]["validation_submission_count"] == (None if failed_usage == {} else 2)
+    assert records[0]["validation_failure_count"] == (
+        None if failed_usage == {} else 1 if failed_usage is None else 2
+    )
+    assert records[0]["turn_committed"] == (failed_usage is None)
+    assert records[0]["usage_complete"] == (failed_usage != {})
     assert records[0]["compiled_prediction_std"] == 0.03
     assert records[0]["compiled_acquisition_std"] == 0.04
     assert records[0]["tilted_kl_from_q0"] > 0
     assert records[0]["q0_tilted_topk_overlap"] == 0.0
     assert summary["policy_rounds"] == 1
-    assert summary["policy_validation_failures"] == 1
+    assert summary["policy_validation_failures"] == (0 if failed_usage == {} else 1 if failed_usage is None else 2)
+    assert summary["policy_failed_turns"] == (failed_usage is not None)
+    assert summary["policy_committed_turns"] == (failed_usage is None)
+    assert summary["policy_usage_incomplete_rounds"] == (failed_usage == {})
     assert summary["policy_last_stage"] == "explore"
+
+    event["payload"]["metadata"]["multiobjective"] = {
+        "means": [1.0, -2.0], "per_objective": {"yield": 1.0, "cost": -2.0},
+    }
+    event_path.write_text(json.dumps(event) + "\n")
+    records = _compiled_policy_records(run_dir, "case", 0, {
+        "prior_vector": "multiobjective.means",
+        "objective_metrics": "multiobjective.per_objective",
+    })
+    assert records[0]["prior_vector"] == [1.0, -2.0]
+    assert "compiled_prediction_std" not in records[0]
+    _write_csv(tmp_path / "policy.csv", records)
+    with (tmp_path / "policy.csv").open(newline="") as handle:
+        row = next(csv.DictReader(handle))
+    assert json.loads(row["objective_metrics"]) == {"yield": 1.0, "cost": -2.0}
+    with pytest.raises(ValueError, match="numeric scalar"):
+        _compiled_policy_summary(records, ("prior_vector",))
+    with pytest.raises(ValueError, match="built-in policy columns"):
+        _compiled_policy_records(run_dir, "case", 0, {"round": "multiobjective.means"})
 
 
 def test_model_proposal_budget_counts_minibatch_requests() -> None:
@@ -265,6 +297,42 @@ def test_model_proposal_budget_counts_minibatch_requests() -> None:
 
     assert _expected_model_proposal_attempts(ldm, 11) == 44
     assert _expected_model_proposal_attempts(llm, 11) == 176
+
+
+@pytest.mark.parametrize("initial_count", [1, 2])
+def test_report_counts_initialization_separately_from_optimization_batches(
+    tmp_path: Path, initial_count: int,
+) -> None:
+    observations = [
+        {"round_idx": round_idx, "candidate": {"candidate_id": str(index), "canonical_key": str(index)}}
+        for index, round_idx in enumerate([0] * initial_count + [1, 1])
+    ]
+    for name, value in {
+        "checkpoint": {"state": {"observations": observations}},
+        "result": {},
+        "config": {"evaluations_per_round": 2, "proposal_samples": 64},
+        "campaign": {"contract_sha256": "contract"},
+        "budget": {"counters": {}},
+        "status": {"started_at_unix": 0, "updated_at_unix": 1},
+    }.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(value))
+    with (tmp_path / "trajectory.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("round", "utility"))
+        writer.writeheader()
+        writer.writerows({"round": item["round_idx"], "utility": index}
+                        for index, item in enumerate(observations))
+    spec = SimpleNamespace(
+        output_root=tmp_path, iterations=2, optimization_rounds=1, result_fields={},
+        trajectory=SimpleNamespace(step_column="round", step_kind="round",
+                                   objective_column="utility", direction="maximize"),
+    )
+
+    rows, trajectory, _ = _collect(spec, [("case/bo/seed_0", {"status": "completed", "run_dir": "."})])
+
+    assert rows[0]["initial_candidate_ids"] == tuple(map(str, range(initial_count)))
+    assert rows[0]["expected_evaluations"] == initial_count + 2
+    assert rows[0]["evaluation_utilization"] == 1.0
+    assert [item["round_evaluations"] for item in trajectory] == [initial_count, 2]
 
 
 def test_evaluation_index_trajectory_uses_checkpoint_rounds_with_short_batches(

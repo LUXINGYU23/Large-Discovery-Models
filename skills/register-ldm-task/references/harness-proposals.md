@@ -33,6 +33,8 @@ unchanged after recovery.
 
 The Harness remains inside the task's `ReservoirExpander`. Do not add another
 Campaign, BO loop, optimization history, evaluator path, or central task branch.
+Use `PiHarnessConfig` from `ldm_tts.harness.pi` for Pi-specific provider, tools,
+and guest settings. Keep `HarnessPoolConfig` and the shared client backend-neutral.
 
 ## Implement The Task Boundary
 
@@ -54,7 +56,7 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   and history range/digest.
 - Send newly measured observations for reasoning and a compact authoritative
   evaluated-candidate snapshot when historical repeats are forbidden.
-- State explicitly that only the authoritative evaluated snapshot is excluded.
+- When historical repeats are forbidden, state that only the authoritative evaluated snapshot is excluded.
   Candidates proposed in an earlier turn but not evaluated remain eligible;
   persistent sessions must not invent a private exclusion set.
 - Validate every provisional submission through the same parser and canonical
@@ -63,6 +65,8 @@ Campaign, BO loop, optimization history, evaluator path, or central task branch.
   code, message, and repair hint for each invalid entry. Return `retry` until a
   complete valid minibatch is available; use `reject_turn` only when the
   contract's validation-attempt limit closes the turn.
+  Keep research, editing, and validation tools usable after rejection; do not
+  force the next model request to call only the terminal tool.
 - Turn instructions must translate the hard wall-time into explicit research,
   validation, and first-submission milestones. "Reserve enough time" is not a
   reliable delivery contract for an autonomous Agent; qualify the slowest role
@@ -91,6 +95,8 @@ Add focused tests for profile/tool digests, turn identity and history ranges,
 strict minibatch cardinality, indexed rejection and correction, committed-turn
 idempotence, budget counters, lineage, and credential redaction. A mock uses a
 protocol-faithful fake sidecar and no external systems.
+Test partial-turn recovery without overwriting attempts and reject resume when
+configuration, resource digests, or runtime identity changes.
 
 Before `tiny_campaign_verified`, run the actual sidecar unit tests and one real
 capability smoke with the configured wire API, isolation, profiles, and tools.

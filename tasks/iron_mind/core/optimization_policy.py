@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from ldm_tts.contracts import Candidate
+from tasks.iron_mind.core.policy_diagnostics import with_feedback
 from ldm_tts.harness import (
     HarnessProfile,
     HarnessSubmissionError,
@@ -153,7 +154,6 @@ class IronMindOptimizationPolicyAdapter:
                 ),
                 "editable_components": ["prior_mean", "alpha", "eta"],
             },
-            "measured_observations": measured,
             "condition_evidence": condition_evidence(measured, self.schema),
             "proposal_pool": {
                 "unique_candidate_count": len(candidates),
@@ -198,9 +198,17 @@ class IronMindOptimizationPolicyAdapter:
             history_features=history_features,
             history_utilities=history_utilities,
             query_features=query_features,
+            history_candidate_ids=tuple(item.candidate_id for item in history),
+            history_rounds=tuple(item.metadata["round_idx"] for item in history),
+            measured_observations=tuple(measured),
             research_snapshot=research_snapshot,
             execution_context=execution_context,
         )
+
+    def with_feedback(
+        self, round_input: PolicyRoundInput, records: Sequence[Mapping[str, Any]],
+    ) -> PolicyRoundInput:
+        return with_feedback(round_input, records)
 
     def validate_task_execution(
         self,

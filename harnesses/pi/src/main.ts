@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
 import {
 	ProtocolError,
+	TurnExecutionError,
 	parseFrame,
 	type InputFrame,
 	type SubmissionValidationDecision,
@@ -213,6 +214,7 @@ for await (const line of lines) {
 			const failure = {
 				code: errorCode(error),
 				message: redactor.text((error as Error).message),
+				...(error instanceof TurnExecutionError ? { turnUsage: error.turnUsage } : {}),
 			};
 			validations.rejectAll(error as Error);
 			respondTo(frame, "error", {

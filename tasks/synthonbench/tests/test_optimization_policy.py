@@ -170,10 +170,10 @@ def test_policy_adapter_separates_research_data_from_deployed_mean_inputs() -> N
     assert "round_index" not in round_input.execution_context["weight_context"]
     assert round_input.history_features.shape == (1, policy_features.dimension)
     assert round_input.query_features.shape == (2, policy_features.dimension)
-    assert round_input.research_snapshot["measured_observations"][0][
+    assert list(round_input.measured_observations)[0][
         OBJECTIVE_NAME
     ] == 4.0
-    assert "smiles" in json.dumps(round_input.research_snapshot)
+    assert "smiles" in json.dumps(round_input.measured_observations)
     mean_context = json.dumps(round_input.execution_context["mean_context"])
     assert all(
         term not in mean_context
@@ -182,8 +182,8 @@ def test_policy_adapter_separates_research_data_from_deployed_mean_inputs() -> N
 
 
 class _StaticPolicyController:
-    def record_predictions(self, round_index, baseline, active, q0, *, alpha, eta, normalize_acquisition):
-        assert len(baseline) == len(active) == len(q0)
+    def record_predictions(self, round_index, predictions):
+        assert predictions and all("candidate_id" in row for row in predictions)
 
     def __init__(self) -> None:
         self.round_input = None

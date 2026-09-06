@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import importlib.util
 import json
 import os
 import sys
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -180,11 +180,12 @@ def inspect_artifact(artifact: Path, contract: dict[str, Any]) -> dict[str, Any]
     }
 
 
-def _load_module(artifact: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("ldm_generated_policy", artifact)
+def _load_module(artifact: Path, name: str = "ldm_generated_policy") -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, artifact)
     if spec is None or spec.loader is None:
         raise RunnerError("module_load_failed", "Could not create a module loader")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as exc:
@@ -206,12 +207,13 @@ def _matrix(arrays: Any, name: str, columns: int | None = None) -> np.ndarray:
     return value
 
 
-def _vector(arrays: Any, name: str, length: int) -> np.ndarray:
+def _objectives(arrays: Any, name: str, length: int) -> np.ndarray:
     if name not in arrays:
         raise RunnerError("invalid_input", f"Missing array: {name}")
     value = np.asarray(arrays[name], dtype=np.float64)
-    if value.shape != (length,) or not np.isfinite(value).all():
-        raise RunnerError("invalid_input", f"{name} must be a finite vector with length {length}")
+    if (value.ndim not in (1, 2) or len(value) != length
+            or (value.ndim == 2 and value.shape[1] == 0) or not np.isfinite(value).all()):
+        raise RunnerError("invalid_input", f"{name} must be a finite objective vector or matrix with {length} rows")
     return value
 
 
@@ -236,10 +238,11 @@ def _prior(
             path="/exports/compute_prior_mean",
         ) from exc
     result = np.asarray(value, dtype=np.float64)
-    if result.shape != (len(query_features),):
+    expected_shape = (len(query_features), *history_utilities.shape[1:])
+    if result.shape != expected_shape:
         raise RunnerError(
             "invalid_prior_shape",
-            f"compute_prior_mean returned shape {result.shape}; expected {(len(query_features),)}",
+            f"compute_prior_mean returned shape {result.shape}; expected {expected_shape}",
             path="/exports/compute_prior_mean",
         )
     if not np.isfinite(result).all():
@@ -302,7 +305,11 @@ def _weights(function: Any, context: dict[str, Any]) -> dict[str, Any]:
     return {"stage": stage.strip(), **numbers}
 
 
-def _summary(values: np.ndarray) -> dict[str, float | int | None]:
+def _summary(values: np.ndarray) -> dict[str, Any]:
+    if values.ndim == 2:
+        return {"shape": list(values.shape), "objectives": [
+            _summary(values[:, index]) for index in range(values.shape[1])
+        ]}
     if not len(values):
         return {"count": 0, "min": None, "max": None, "mean": None, "std": None}
     return {
@@ -314,107 +321,21 @@ def _summary(values: np.ndarray) -> dict[str, float | int | None]:
     }
 
 
-def _draft_diagnostics(
-    module: ModuleType,
-    capabilities: Mapping[str, int],
-    arrays: dict[str, np.ndarray],
-    history_features: np.ndarray,
-    history_utilities: np.ndarray,
-    history_prior: np.ndarray,
-    query_prior: np.ndarray,
-    execution_context: dict[str, Any],
-    weights: dict[str, Any],
-    mean_clip: float,
-) -> dict[str, Any]:
-    mean_context = execution_context["mean_context"]
-    folds = []
-    baseline_errors, draft_errors = [], []
-    for fold in execution_context.get("validation_folds", []):
-        prefix = fold["prefix"]
-        train = np.asarray(fold["train_indices"], dtype=int)
-        test = np.asarray(fold["test_indices"], dtype=int)
-        if not len(train) or not len(test) or train.max() >= test.min():
-            raise RunnerError("invalid_input", "policy holdouts must follow the training prefix")
-        location, scale = arrays[prefix + "location_scale"]
-        context = {**mean_context, "round_index": fold["round_index"],
-                   "target_location": float(location), "target_scale": float(scale)}
-        train_prior = np.zeros(len(train))
-        test_prior = np.zeros(len(test))
-        if "prior_mean" in capabilities:
-            function = getattr(module, _CAPABILITY_EXPORTS["prior_mean"])
-            train_prior = np.clip(_prior(function, history_features[train], history_utilities[train],
-                                         history_features[train], context), -mean_clip, mean_clip)
-            test_prior = np.clip(_prior(function, history_features[train], history_utilities[train],
-                                        history_features[test], context), -mean_clip, mean_clip)
-        operator = arrays[prefix + "weights"]
-        standardized = (history_utilities[train] - location) / scale
-        baseline_mean = location + scale * (operator @ standardized)
-        draft_mean = location + scale * (test_prior + operator @ (standardized - train_prior))
-        before = baseline_mean - history_utilities[test]
-        after = draft_mean - history_utilities[test]
-        baseline_errors.extend(before.tolist())
-        draft_errors.extend(after.tolist())
-        folds.append({
-            "round_index": fold["round_index"], "train_count": len(train), "test_count": len(test),
-            "baseline_gp_rmse": float(np.sqrt(np.mean(before**2))),
-            "draft_gp_rmse": float(np.sqrt(np.mean(after**2))),
-            "baseline_prediction": baseline_mean.tolist(), "draft_prediction": draft_mean.tolist(),
-            "measured_utility": history_utilities[test].tolist(),
-        })
-    result = {
-        "scope": "chronological_measured_history_fixed_gp",
-        "status": "available" if folds else "insufficient_history",
-        "hyperparameters": "fitted on each training prefix, frozen during draft comparison",
-        "folds": folds,
-        "held_out_count": len(baseline_errors),
-        "baseline_gp_rmse": float(np.sqrt(np.mean(np.square(baseline_errors)))) if folds else None,
-        "draft_gp_rmse": float(np.sqrt(np.mean(np.square(draft_errors)))) if folds else None,
-    }
-    if "diagnostic_current_weights" in arrays:
-        context = execution_context["weight_context"]
-        rows = context["candidate_predictions"]
-        mass = np.asarray([row["q0"] for row in rows])
-        baseline_acquisition = np.asarray([row["baseline_acquisition"] for row in rows])
-        scale = arrays["diagnostic_current_location_scale"][1]
-        delta = scale * (query_prior - arrays["diagnostic_current_weights"] @ history_prior)
-        acquisition = baseline_acquisition + delta
-        normalization = context["normalization"]
-        before = _selection_probability(mass, baseline_acquisition, context["default_alpha"], context["default_eta"], normalization)
-        after = _selection_probability(mass, acquisition, weights["alpha"], weights["eta"], normalization)
-        result["current_pool"] = {
-            "scope": "first_draw_probabilities_under_fixed_baseline_gp; no query labels",
-            "probability_total_variation": float(np.abs(after - before).sum() / 2),
-            "default_effective_sample_size": float(1 / np.sum(before**2)),
-            "draft_effective_sample_size": float(1 / np.sum(after**2)),
-            "top_candidates": [
-                {"candidate_id": rows[i]["candidate_id"], "q0": float(mass[i]),
-                 "default_probability": float(before[i]), "draft_probability": float(after[i]),
-                 "draft_acquisition": float(acquisition[i])}
-                for i in np.argsort(after)[::-1][:5]
-            ],
-        }
-    return result
-
-
-def _selection_probability(mass, acquisition, alpha, eta, normalization):
-    epsilon = normalization["epsilon"]
-    median = float(np.median(acquisition))
-    scale = normalization["mad_scale"] * float(np.median(np.abs(acquisition - median)))
-    if scale <= epsilon:
-        scale = float(np.std(acquisition))
-    z = np.zeros_like(acquisition) if scale <= epsilon else np.clip(
-        (acquisition - median) / (scale + epsilon), -normalization["z_clip"], normalization["z_clip"]
-    )
-    logits = alpha * np.log(mass + epsilon) + eta * z
-    probability = np.exp(logits - logits.max())
-    return probability / probability.sum()
-
-
 def execute_artifact(
     artifact: Path,
     input_directory: Path,
     output_directory: Path,
+    *,
+    diagnostics_path: Path | None = None,
+    diagnostics_sha256: str | None = None,
 ) -> dict[str, Any]:
+    diagnostics = None
+    if (diagnostics_path is None) != (diagnostics_sha256 is None):
+        raise RunnerError("invalid_contract", "Task diagnostics require a path and SHA-256 digest")
+    if diagnostics_path is not None:
+        if hashlib.sha256(diagnostics_path.read_bytes()).hexdigest() != diagnostics_sha256:
+            raise RunnerError("diagnostics_digest_mismatch", "Task diagnostic module digest mismatch")
+        diagnostics = _load_module(diagnostics_path, "ldm_task_diagnostics")
     contract = _load_json(input_directory / "contract.json")
     inspection = inspect_artifact(artifact, contract)
     capabilities = inspection["capabilities"]
@@ -426,8 +347,8 @@ def execute_artifact(
     try:
         history_features = _matrix(arrays, "history_features")
         query_features = _matrix(arrays, "query_features", history_features.shape[1])
-        history_utilities = _vector(arrays, "history_utilities", len(history_features))
-        diagnostic_arrays = {name: arrays[name] for name in arrays.files if name.startswith("diagnostic_")}
+        history_utilities = _objectives(arrays, "history_utilities", len(history_features))
+        input_arrays = {name: arrays[name] for name in arrays.files}
     finally:
         arrays.close()
     if len(query_features) == 0:
@@ -435,15 +356,17 @@ def execute_artifact(
     execution_context = input_data.get("execution_context")
     if not isinstance(execution_context, dict):
         raise RunnerError("invalid_input", "execution_context must be an object")
-    mean_context = execution_context.get("mean_context", {})
-    weight_context = execution_context.get("weight_context", {})
+    mean_context = execution_context.get("mean_context")
+    weight_context = execution_context.get("weight_context")
     if not isinstance(mean_context, dict) or not isinstance(weight_context, dict):
         raise RunnerError("invalid_input", "mean_context and weight_context must be objects")
 
     np.random.seed(0)
     module = _load_module(artifact)
+    prior_function = None
     if "prior_mean" in capabilities:
         function = getattr(module, _CAPABILITY_EXPORTS["prior_mean"], None)
+        prior_function = function
         if not callable(function):
             raise RunnerError(
                 "missing_export",
@@ -517,8 +440,8 @@ def execute_artifact(
                 mean_context,
             )
     else:
-        history_prior = np.zeros(len(history_features), dtype=np.float64)
-        query_prior = np.zeros(len(query_features), dtype=np.float64)
+        history_prior = np.zeros_like(history_utilities)
+        query_prior = np.zeros((len(query_features), *history_utilities.shape[1:]))
 
     if "ldm_weights" in capabilities:
         function = getattr(module, _CAPABILITY_EXPORTS["ldm_weights"], None)
@@ -568,22 +491,22 @@ def execute_artifact(
             "history": _summary(history_prior),
             "query": _summary(query_prior),
         },
-        "draft_diagnostics": _draft_diagnostics(
-            module,
-            capabilities,
-            diagnostic_arrays,
-            history_features,
-            history_utilities,
-            history_prior,
-            query_prior,
-            execution_context,
-            weights,
-            mean_clip,
-        ),
         "inspection": inspection,
     }
+    if diagnostics is not None:
+        prior = None
+        if prior_function is not None:
+            def prior(history, utilities, query, context):
+                return _prior(prior_function, history, utilities, query, context)
+        result["draft_diagnostics"] = diagnostics.evaluate_policy_draft(
+            prior,
+            {"arrays": input_arrays, "execution_context": execution_context, "contract": contract},
+            {"history_prior_mean": history_prior, "query_prior_mean": query_prior, "weights": weights},
+        )
+        if not isinstance(result["draft_diagnostics"], dict):
+            raise RunnerError("invalid_diagnostics", "Task diagnostics must return a JSON object")
     (output_directory / "result.json").write_text(
-        json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n",
+        json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
         encoding="utf-8",
     )
     return result
@@ -599,6 +522,8 @@ def _parser() -> argparse.ArgumentParser:
     execute_parser.add_argument("--artifact", type=Path, required=True)
     execute_parser.add_argument("--input", type=Path, required=True)
     execute_parser.add_argument("--output", type=Path, required=True)
+    execute_parser.add_argument("--diagnostics", type=Path)
+    execute_parser.add_argument("--diagnostics-sha256")
     return parser
 
 
@@ -615,7 +540,10 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             }
         else:
-            result = execute_artifact(args.artifact, args.input, args.output)
+            result = execute_artifact(
+                args.artifact, args.input, args.output,
+                diagnostics_path=args.diagnostics, diagnostics_sha256=args.diagnostics_sha256,
+            )
     except RunnerError as exc:
         result = {"status": "error", "errors": [exc.to_dict()]}
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))

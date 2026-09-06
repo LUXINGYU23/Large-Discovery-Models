@@ -11,19 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
-from ldm_tts.harness.guest_runtime import HarnessGuestRuntime
-
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
-_SEARCH_FALLBACK_KINDS = frozenset(
-    {"transient", "quota", "network", "invalid-response", "unsupported"}
-)
-DEFAULT_NETWORK_TOOL_BUDGETS = (
-    "web_search=8",
-    "fetch_content=16",
-    "get_search_content=16",
-    "resolve-library-id=4",
-    "query-docs=8",
-)
+
 
 
 def canonical_sha256(value: Any) -> str:
@@ -336,111 +325,26 @@ class HarnessNetworkPolicy:
         }
 
 
-@dataclass(frozen=True)
-class HarnessWebSearch:
-    providers: tuple[str, ...] = ("parallel-mcp", "exa", "duckduckgo")
-    fallback_on: tuple[str, ...] = (
-        "transient",
-        "quota",
-        "network",
-        "invalid-response",
-        "unsupported",
-    )
-
-    def __post_init__(self) -> None:
-        if not self.providers:
-            raise ValueError("harness web search requires at least one provider")
-        if len(set(self.providers)) != len(self.providers):
-            raise ValueError("harness web search providers must be unique")
-        if any(
-            re.fullmatch(r"[a-z][a-z0-9-]*", provider) is None
-            or provider in {"auto", "all"}
-            for provider in self.providers
-        ):
-            raise ValueError(
-                "harness web search providers must be resolved lowercase provider names"
-            )
-        if not self.fallback_on:
-            raise ValueError("harness web search fallback_on must not be empty")
-        if len(set(self.fallback_on)) != len(self.fallback_on):
-            raise ValueError("harness web search fallback kinds must be unique")
-        if any(kind not in _SEARCH_FALLBACK_KINDS for kind in self.fallback_on):
-            raise ValueError("unsupported harness web search fallback kind")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "providers": list(self.providers),
-            "fallbackOn": list(self.fallback_on),
-        }
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class HarnessPoolConfig:
     artifact_root: Path
-    base_url: str
-    model: str
     profiles: tuple[HarnessProfile, ...]
     campaign_id: str
     task_id: str
     case_id: str
     seed: int
     submission_contract: HarnessSubmissionContract
-    guest_runtime: HarnessGuestRuntime
-    tool_extensions: tuple[HarnessToolExtension, ...] = ()
-    mcp_servers: tuple[HarnessMcpServer, ...] = ()
-    thinking: str = "off"
     limits: HarnessLimits = field(default_factory=HarnessLimits)
-    network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
-    web_search: HarnessWebSearch = field(default_factory=HarnessWebSearch)
-    context7_enabled: bool = True
 
     def __post_init__(self) -> None:
-        if not self.base_url.strip() or not self.model.strip():
-            raise ValueError("harness base_url and model are required")
         if not self.campaign_id.strip() or not self.task_id.strip() or not self.case_id.strip():
             raise ValueError("harness campaign, task, and case identities are required")
-        if self.seed < 0:
+        if isinstance(self.seed, bool) or self.seed < 0:
             raise ValueError("harness seed must be non-negative")
-        if not self.profiles:
-            raise ValueError("harness requires at least one profile")
-        if len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
-            raise ValueError("harness profile_id values must be unique")
-        tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
-        if len(set(tool_names)) != len(tool_names):
-            raise ValueError("harness tool names must be unique across extensions")
-        server_ids = [server.server_id for server in self.mcp_servers]
-        if len(set(server_ids)) != len(server_ids):
-            raise ValueError("harness MCP server IDs must be unique")
-        mcp_tool_names = [
-            f"mcp__{server.server_id}__{name}"
-            for server in self.mcp_servers
-            for name in server.tools
-        ]
-        if len(set(mcp_tool_names)) != len(mcp_tool_names):
-            raise ValueError("harness MCP tool names must be unique")
-        if set(tool_names) & set(mcp_tool_names):
-            raise ValueError("harness task and MCP tool names must not conflict")
-        ordinary_tools = {
-            "read", "write", "bash", "web_search", "fetch_content",
-            "get_search_content", *tool_names, *mcp_tool_names,
-        }
-        if self.context7_enabled:
-            ordinary_tools.update(("resolve-library-id", "query-docs"))
-        if self.submission_contract.tool_name in ordinary_tools:
-            raise ValueError("harness terminal tool conflicts with another available tool")
+        if not self.profiles or len({profile.profile_id for profile in self.profiles}) != len(self.profiles):
+            raise ValueError("harness requires non-empty, unique profiles")
         if self.submission_contract.tool_name in self.limits.tool_call_budgets:
-            raise ValueError(
-                "harness terminal tool cannot have a call budget: "
-                + self.submission_contract.tool_name
-            )
-        unknown_budgets = set(self.limits.tool_call_budgets) - ordinary_tools
-        if unknown_budgets:
-            raise ValueError(
-                "harness tool budgets reference unavailable tools: "
-                + ", ".join(sorted(unknown_budgets))
-            )
-        if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
-            raise ValueError("unsupported harness thinking level")
+            raise ValueError("harness terminal tool cannot have a call budget")
 
     @property
     def profile_set_sha256(self) -> str:
@@ -449,24 +353,14 @@ class HarnessPoolConfig:
     def initialize_payload(self) -> dict[str, Any]:
         return {
             "artifactRoot": str(self.artifact_root),
-            "baseUrl": self.base_url,
-            "wireApi": "responses",
-            "model": self.model,
-            "thinking": self.thinking,
             "taskId": self.task_id,
             "caseId": self.case_id,
             "seed": self.seed,
             "submissionContractJson": self.submission_contract.canonical_json,
             "submissionContractSha256": self.submission_contract.sha256,
-            "guestRuntime": self.guest_runtime.to_dict(),
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
-            "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
-            "mcpServers": [server.to_dict() for server in self.mcp_servers],
-            "networkPolicy": self.network_policy.to_dict(),
             "limits": self.limits.to_dict(),
-            "webSearch": self.web_search.to_dict(),
-            "context7Enabled": self.context7_enabled,
         }
 
 
@@ -655,8 +549,6 @@ class HarnessSubmissionValidation:
 
 
 __all__ = [
-    "DEFAULT_NETWORK_TOOL_BUDGETS",
-    "HarnessGuestRuntime",
     "HarnessArtifactRule",
     "HarnessLimits",
     "HarnessMcpServer",
@@ -672,7 +564,6 @@ __all__ = [
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
-    "HarnessWebSearch",
     "canonical_sha256",
     "directory_sha256",
     "file_sha256",

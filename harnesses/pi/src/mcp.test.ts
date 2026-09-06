@@ -37,13 +37,16 @@ test("stdio MCP tools are allowlisted, callable, and secret-safe", async () => {
 	);
 	try {
 		await bridge.initialize();
-		const tools = bridge.toolDefinitions();
+        const tools = bridge.toolDefinitions();
 		assert.deepEqual(tools.map((tool) => tool.name), [
 			"mcp__local__echo",
 			"mcp__local__image",
 			"mcp__local__fail",
 		]);
 		const result = await call(tools[0] as ToolDefinition, "hello");
+		await assert.rejects(
+			(tools[0] as ToolDefinition).execute("cancelled", { value: "unused" }, AbortSignal.abort(), undefined, {} as never),
+		);
 		assert.match(JSON.stringify(result), /hello:\[REDACTED\]:\d+/);
 		assert.doesNotMatch(JSON.stringify(result), new RegExp(secret));
 		assert.deepEqual(result.details, {

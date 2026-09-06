@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from ldm_tts.harness.pi import PiGuestRuntime, PiHarnessConfig
 from ldm_tts.harness import (
     HarnessClient,
-    HarnessError,
-    HarnessGuestRuntime,
     HarnessPoolConfig,
+    HarnessError,
     HarnessProfile,
     HarnessSubmissionContract,
     HarnessSubmissionError,
@@ -25,12 +25,24 @@ from ldm_tts.harness import (
 )
 
 
-TEST_GUEST_RUNTIME = HarnessGuestRuntime(
+TEST_GUEST_RUNTIME = PiGuestRuntime(
     image_ref="ldm/fixture-research:aaaaaaaaaaaa",
     recipe_sha256="a" * 64,
     rootfs_size="4G",
     install_policy="session_overlay",
 )
+
+
+def test_generic_pool_configuration_does_not_require_pi_provider_or_guest(tmp_path):
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    payload = config.initialize_payload()
+    assert payload["taskId"] == "fixture"
+    assert not {"model", "baseUrl", "wireApi", "guestRuntime", "mcpServers"} & payload.keys()
 
 
 def _candidate_contract(
@@ -64,7 +76,7 @@ def _candidate_contract(
 
 def test_submission_contract_digest_covers_transmitted_json(tmp_path: Path) -> None:
     contract = _candidate_contract()
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=tmp_path,
         base_url="https://provider.example/v1",
         model="test-model",
@@ -176,8 +188,6 @@ def test_persistent_harness_client_runs_one_profile_batch(
     fixture = Path(__file__).parent / "fixtures" / "fake_harness_sidecar.py"
     config = HarnessPoolConfig(
         artifact_root=tmp_path,
-        base_url="https://provider.example/v1",
-        model="test-model",
         profiles=(HarnessProfile(
             "chemist",
             Path("/resources/AGENTS.md"),
@@ -188,7 +198,6 @@ def test_persistent_harness_client_runs_one_profile_batch(
         case_id="case-1",
         seed=1,
         submission_contract=_candidate_contract(),
-        guest_runtime=TEST_GUEST_RUNTIME,
     )
     monkeypatch.setenv("HARNESS_TEST_SECRET", "test-secret")
     monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-secret")
@@ -225,6 +234,36 @@ def test_persistent_harness_client_runs_one_profile_batch(
     assert result[0].tool_budget == {}
 
 
+@pytest.mark.parametrize("failure", ["measured", "unknown", "wrong-turn"])
+def test_failed_turn_preserves_known_usage_and_checks_identity(tmp_path, monkeypatch, failure):
+    monkeypatch.setenv("HARNESS_TEST_TURN_FAILURE", failure)
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn(
+        profile_id="research", turn_id="turn-1", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    )
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        with pytest.raises(HarnessError) as caught:
+            client.run_turn((turn,), submission_validator=lambda _: HarnessSubmissionValidation())
+    usage = caught.value.turn_usage["research"]
+    assert usage["validationSubmissions"] == 0
+    if failure == "measured":
+        assert usage == {"providerCalls": 3, "toolCalls": {"bash": 2}, "artifactBytes": 120, "validationSubmissions": 0}
+    else:
+        assert "providerCalls" not in usage
+    assert str(caught.value) == (
+        "harness error usage does not match the requested turn" if failure == "wrong-turn" else "provider 502"
+    )
+
+
 @pytest.mark.parametrize(
     "environment_variable",
     ("HARNESS_TEST_SKIP_VALIDATION", "HARNESS_TEST_CHANGE_AFTER_VALIDATION"),
@@ -235,7 +274,7 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
     environment_variable: str,
 ) -> None:
     fixture = Path(__file__).parent / "fixtures" / "fake_harness_sidecar.py"
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=tmp_path,
         base_url="https://provider.example/v1",
         model="test-model",
@@ -280,7 +319,7 @@ def test_persistent_harness_client_rejects_unvalidated_submission(
 
 def test_submission_retry_preserves_the_turn_until_acceptance(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "fake_harness_sidecar.py"
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=tmp_path,
         base_url="https://provider.example/v1",
         model="test-model",
@@ -332,7 +371,7 @@ def test_maximum_validation_attempts_rejects_the_turn(tmp_path: Path) -> None:
         "The artifact is invalid.",
         "Repair the file.",
     )
-    config = HarnessPoolConfig(
+    config = PiHarnessConfig(
         artifact_root=tmp_path,
         base_url="https://provider.example/v1",
         model="test-model",

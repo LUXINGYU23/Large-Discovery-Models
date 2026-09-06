@@ -1,7 +1,6 @@
 """Persistent research harness client contracts."""
 
 from ldm_tts.harness.client import HarnessClient, HarnessError
-from ldm_tts.harness.guest_runtime import HarnessGuestRuntime, load_harness_guest_runtime
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
 from ldm_tts.harness.policy import (
     POLICY_CAPABILITIES,
@@ -10,7 +9,6 @@ from ldm_tts.harness.policy import (
     PolicyCapabilityContract,
     PolicyResearchController,
     PolicyRoundInput,
-    policy_mcp_server,
     policy_submission_contract,
 )
 from ldm_tts.harness.policy_execution import (
@@ -20,7 +18,6 @@ from ldm_tts.harness.policy_execution import (
     PolicyExecutor,
 )
 from ldm_tts.harness.protocol import (
-    DEFAULT_NETWORK_TOOL_BUDGETS,
     HarnessArtifactRule,
     HarnessLimits,
     HarnessMcpServer,
@@ -36,7 +33,6 @@ from ldm_tts.harness.protocol import (
     HarnessToolExtension,
     HarnessTurn,
     HarnessTurnResult,
-    HarnessWebSearch,
     canonical_sha256,
     directory_sha256,
     file_sha256,
@@ -45,14 +41,12 @@ from ldm_tts.harness.protocol import (
 )
 
 __all__ = [
-    "DEFAULT_NETWORK_TOOL_BUDGETS",
     "POLICY_CAPABILITIES",
     "CompiledOptimizationPolicy",
     "DockerPolicyExecutor",
     "HarnessArtifactRule",
     "HarnessClient",
     "HarnessError",
-    "HarnessGuestRuntime",
     "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",
@@ -67,7 +61,6 @@ __all__ = [
     "HarnessToolExtension",
     "HarnessTurn",
     "HarnessTurnResult",
-    "HarnessWebSearch",
     "OptimizationPolicyAdapter",
     "PolicyCapabilityContract",
     "PolicyExecutionError",
@@ -79,10 +72,8 @@ __all__ = [
     "canonical_sha256",
     "directory_sha256",
     "file_sha256",
-    "load_harness_guest_runtime",
     "load_harness_mcp_config",
     "parse_tool_call_budgets",
-    "policy_mcp_server",
     "policy_submission_contract",
     "profile_set_sha256",
 ]

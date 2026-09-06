@@ -185,6 +185,16 @@ export type InputFrame =
 	| SubmissionValidationResultFrame
 	| CloseFrame;
 
+export class TurnExecutionError extends Error {
+	constructor(message: string, readonly turnUsage: Array<{
+		profileId: string;
+		turnId: string;
+		usage: { providerCalls: number; toolCalls: Record<string, number>; artifactBytes: number };
+	}>) {
+		super(message);
+	}
+}
+
 export class ProtocolError extends Error {
 	readonly code: string;
 

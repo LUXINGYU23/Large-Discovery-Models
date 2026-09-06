@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from ldm_tts.optimization import BOPrediction
-from ldm_tts.harness.policy_diagnostics import prediction_feedback
-
+from ldm_tts.harness.pi import policy_mcp_server
 from ldm_tts.harness.client import HarnessError
 from ldm_tts.harness.policy import (
     PolicyCapabilityContract,
     PolicyResearchController,
     PolicyRoundInput,
-    policy_mcp_server,
     policy_submission_contract,
 )
 from ldm_tts.harness.policy_execution import (
@@ -42,6 +41,10 @@ class FakeAdapter:
             default_alpha=1.0,
             default_eta=2.0,
         )
+
+    def with_feedback(self, round_input, records):
+        self.feedback_records = records
+        return round_input
 
     def validate_task_execution(self, execution, _round_input):
         if execution.stage == "invalid":
@@ -74,10 +77,11 @@ class FakeExecutor:
         with np.load(Path(input_directory) / "arrays.npz", allow_pickle=False) as arrays:
             history_size = len(arrays["history_features"])
             query_size = len(arrays["query_features"])
+            objective_shape = arrays["history_utilities"].shape[1:]
         stage = "invalid" if "INVALID" in source else f"round_{round_index}"
         return PolicyExecutionResult(
-            history_prior_mean=np.full(history_size, float(round_index)),
-            query_prior_mean=np.full(query_size, float(round_index)),
+            history_prior_mean=np.full((history_size, *objective_shape), float(round_index)),
+            query_prior_mean=np.full((query_size, *objective_shape), float(round_index)),
             stage=stage,
             alpha=0.5 + round_index,
             eta=1.0 + round_index,
@@ -160,8 +164,10 @@ def _round(round_index: int) -> PolicyRoundInput:
         history_features=np.arange(history_size * 2, dtype=float).reshape(history_size, 2),
         history_utilities=np.arange(history_size, dtype=float),
         query_features=np.asarray([[1.0, 2.0], [3.0, 4.0]]),
+        history_candidate_ids=tuple(f"candidate-{index}" for index in range(history_size)),
+        history_rounds=tuple(range(history_size)),
+        measured_observations=tuple({"round": index} for index in range(history_size)),
         research_snapshot={
-            "measured_observations": [{"round": index} for index in range(history_size)],
             "task_objective": "fixture objective",
         },
         execution_context={
@@ -187,55 +193,65 @@ def _controller(tmp_path: Path, scripted_turns):
     return controller, client, executor
 
 
-def test_prediction_record_freezes_same_round_ranks_probabilities_and_weights(tmp_path: Path) -> None:
-    controller, _, _ = _controller(tmp_path, [])
-    baseline = tuple(
-        BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
-        for key, value in zip(("a", "b", "c"), (1.0, 1.0, 3.0), strict=True)
-    )
-    active = tuple(
-        BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
-        for key, value in zip(("a", "b", "c"), (0.0, 2.0, 2.0), strict=True)
-    )
-    q0 = np.asarray((0.5, 0.25, 0.25))
-    options = {"alpha": 0.8, "eta": 0.3, "normalize_acquisition": lambda values: values}
-    controller.record_predictions(1, baseline, active, q0, **options)
+def test_prediction_records_are_immutable_and_task_feedback_is_delegated(tmp_path: Path) -> None:
+    controller, _, _ = _controller(tmp_path, [[({"action": "disable"}, "")]])
+    rows = [{"candidate_id": "a", "objectives": [1.0, -2.0], "task_metric": "pareto"}]
+    controller.record_predictions(1, rows)
     path = tmp_path / "rounds/round_001/predictions.json"
     original = path.read_bytes()
-    record = json.loads(original)
-    rows = record["predictions"]
-    expected = (q0 + 1e-12)**0.8 * np.exp(0.3 * np.asarray((0.0, 2.0, 2.0)))
-    assert [row["first_draw_probability"] for row in rows] == pytest.approx(expected / expected.sum())
-    assert [row["q0_rank"] for row in rows] == [1, 2, 2]
-    assert [row["baseline_acquisition_rank"] for row in rows] == [2, 2, 1]
-    assert [row["active_acquisition_rank"] for row in rows] == [3, 1, 1]
-    assert [row["q0_relative_to_max"] for row in rows] == [1.0, 0.5, 0.5]
-    feedback = prediction_feedback(["b", "c"], [1, 2], [5.0, 9.0], [record])
-    assert len(feedback["measurements"]) == 1
-    measured = feedback["measurements"][0]
-    assert measured["pool_size"] == 3
-    assert (measured["alpha"], measured["eta"]) == (0.8, 0.3)
-    assert measured["q0_relative_to_max"] == 0.5
-    assert measured["measured_utility"] == 5.0
-    controller.record_predictions(1, baseline, active, q0, **options)
+    controller.record_predictions(1, rows)
     with pytest.raises(ValueError, match="cannot be replaced"):
-        controller.record_predictions(1, baseline, active, q0, **{**options, "alpha": 1.0})
-    with pytest.raises(ValueError, match="must be aligned"):
-        controller.record_predictions(1, baseline, active[::-1], q0, **options)
+        controller.record_predictions(1, [{"candidate_id": "b"}])
+    with pytest.raises(ValueError, match="JSON serializable"):
+        controller.record_predictions(2, [{"value": float("nan")}])
     assert path.read_bytes() == original
+    controller.resolve(_round(2))
+    assert controller.adapter.feedback_records == [json.loads(original)]
 
 
-def test_policy_controller_replace_keep_disable_and_resume(tmp_path: Path) -> None:
+def test_weights_only_multiobjective_policy_uses_task_contract_without_target_assumptions(tmp_path):
+    controller, client, _ = _controller(tmp_path, [[({"action": "disable"}, "")]])
+    controller.contract = replace(
+        controller.contract, enabled_capabilities=("ldm_weights@1",),
+    )
+    policy_input = replace(
+        _round(1),
+        history_utilities=np.asarray([[1.0, -4.0]]),
+        execution_context={
+            "mean_context": {},
+            "weight_context": {"objectives": ["yield", "cost"], "progress_metric": "hypervolume"},
+        },
+    )
+    result = controller.resolve(policy_input)
+    assert result.query_prior_mean.shape == (2, 2)
+    message = json.loads(client.turns[0].message)
+    assert message["policy_contract"]["enabled_capabilities"] == ["ldm_weights@1"]
+    assert "standardized" not in message["responsibility"]
+    assert "only the enabled capabilities" in message["responsibility"]
+    assert "inspect_policy_contract" not in message["snapshot_access"]
+
+
+@pytest.mark.parametrize("objectives", [None, 2])
+def test_policy_controller_replace_keep_disable_and_resume(tmp_path: Path, objectives) -> None:
     controller, client, executor = _controller(tmp_path, [
         [_replace()],
         [({"action": "keep"}, "")],
         [({"action": "disable"}, "")],
     ])
 
-    replaced = controller.resolve(_round(1))
-    kept = controller.resolve(_round(2))
-    disabled = controller.resolve(_round(3))
-    replayed = controller.resolve(_round(3))
+    def round_input(index):
+        value = _round(index)
+        return value if objectives is None else replace(
+            value, history_utilities=np.tile(value.history_utilities[:, None], (1, objectives)),
+        )
+
+    replaced = controller.resolve(round_input(1))
+    kept = controller.resolve(round_input(2))
+    disabled = controller.resolve(round_input(3))
+    replayed = controller.resolve(round_input(3))
+    expected = (2,) if objectives is None else (2, objectives)
+    assert replaced.query_prior_mean.shape == kept.query_prior_mean.shape == expected
+    assert disabled.query_prior_mean.shape == replayed.query_prior_mean.shape == expected
 
     assert replaced.source == "artifact" and replaced.epoch_id == "epoch_001"
     assert replaced.metadata["action"] == "replace"
@@ -292,10 +308,19 @@ def test_policy_controller_uses_previous_epoch_after_runtime_failure(tmp_path: P
     assert fallback.degraded
 
 
-def test_policy_failure_preserves_committed_cursor_and_delivers_missed_history(tmp_path: Path) -> None:
+@pytest.mark.parametrize("usage", [
+    {"providerCalls": 3, "toolCalls": {"bash": 2}, "artifactBytes": 120, "validationSubmissions": 1},
+    {},
+])
+def test_policy_failure_preserves_cursor_accounting_and_complete_rounds(tmp_path: Path, usage) -> None:
+    from ldm_tts.pilot_evaluation.reporting import _integrity
+
     controller, client, _executor = _controller(tmp_path, [
-        [_replace()], HarnessError("provider 502"), [({"action": "keep"}, "")],
+        [_replace()], HarnessError("provider 502", turn_usage={"policy_architect": usage}),
+        [({"action": "keep"}, "")],
     ])
+    charges = []
+    controller.account = charges.append
     first = controller.resolve(_round(1))
     failed = controller.resolve(_round(2))
     recovered = controller.resolve(_round(3))
@@ -306,6 +331,28 @@ def test_policy_failure_preserves_committed_cursor_and_delivers_missed_history(t
     assert (turn.history_from_seq, turn.history_to_seq) == (1, 3)
     message = json.loads(turn.message)
     assert message["new_measured_observations"] == [{"round": 1}, {"round": 2}]
+    assert sum(cost["policy_harness_turns"] for cost in charges) == 3
+    assert failed.metadata["failed_harness_usage"] == usage
+    assert "harness_turn" not in failed.metadata
+    if usage:
+        assert charges[1]["policy_provider_requests"] == 3
+        assert charges[1]["policy_tool_calls"] == 2
+        assert charges[1]["policy_validation_submissions"] == 1
+    else:
+        assert "policy_provider_requests" not in charges[1]
+        assert "policy_tool_calls" not in charges[1]
+    assert controller.resolve(_round(2)).metadata["failed_harness_usage"] == usage
+    assert len(charges) == 3 and client.calls == 3
+    row = dict(
+        case="fixture", seed=0, method="ldm_harness_compiled", initial_candidate_ids=["initial"],
+        completed_rounds=4, budget_outer_iterations=4, candidate_ids_unique=True,
+        proposal_samples=64, harness_candidates_per_session=16, budget_proposal_attempts=12,
+        budget_harness_turns=12, budget_policy_harness_turns=len(charges), policy_rounds=3,
+    )
+    spec = SimpleNamespace(methods=["ldm_harness_compiled"], iterations=4, optimization_rounds=3)
+    assert _integrity(spec, [row], [{}] * 4) == {"valid": True, "errors": []}
+    row["policy_rounds"] = 2
+    assert not _integrity(spec, [row], [{}] * 4)["valid"]
 
 
 def test_policy_contract_and_builtin_mcp_are_generic() -> None:
@@ -328,3 +375,46 @@ def test_policy_contract_and_builtin_mcp_are_generic() -> None:
         "validate_policy_draft",
         "evaluate_policy_draft",
     )
+
+
+@pytest.mark.parametrize("changes", [
+    {"history_candidate_ids": ()},
+    {"history_rounds": (1,)},
+    {"history_rounds": (True,)},
+    {"measured_observations": ()},
+    {"research_snapshot": {"measured_observations": []}},
+    {"execution_context": {"weight_context": {}}},
+    {"history_utilities": np.empty((1, 0))},
+])
+def test_policy_round_rejects_incomplete_or_ambiguous_history(changes) -> None:
+    with pytest.raises(ValueError):
+        replace(_round(1), **changes)
+
+
+def test_policy_round_preserves_replicates_without_task_identity_assumptions() -> None:
+    value = replace(_round(2), history_candidate_ids=("same", "same"))
+    assert value.history_candidate_ids == ("same", "same")
+    assert replace(value, history_rounds=(0, 0)).history_rounds == (0, 0)
+
+
+def test_policy_mcp_pins_task_owned_diagnostics() -> None:
+    server = policy_mcp_server(
+        diagnostics_path="/resources/diagnostics.py", diagnostics_sha256="a" * 64,
+    )
+    env = {key: value.value for key, value in server.env}
+    assert env["LDM_POLICY_DIAGNOSTICS"] == "/resources/diagnostics.py"
+    assert env["LDM_POLICY_DIAGNOSTICS_SHA256"] == "a" * 64
+    assert server.config_sha256 != policy_mcp_server().config_sha256
+    with pytest.raises(ValueError, match="path and SHA-256"):
+        policy_mcp_server(diagnostics_path="/resources/diagnostics.py")
+
+
+@pytest.mark.parametrize("name", ["arrays.npz", "research_snapshot.json"])
+def test_policy_resume_rejects_changed_authoritative_inputs(tmp_path: Path, name) -> None:
+    controller, client, _ = _controller(tmp_path, [[_replace()]])
+    controller.resolve(_round(1))
+    path = tmp_path / "rounds/round_001" / name
+    path.write_bytes(path.read_bytes() + b" ")
+    with pytest.raises(ValueError, match="input digest mismatch"):
+        controller.resolve(_round(1))
+    assert client.calls == 1

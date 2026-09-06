@@ -1,4 +1,30 @@
 schema_version: 1
+policy_fields:
+  gp_mean_source: base_selection.mean_source
+  gp_prior_clip_count: base_selection.prior_mean_clip_count
+  gp_residual_target_mean: base_selection.residual_target_mean
+  gp_residual_target_std: base_selection.residual_target_std
+  baseline_prediction_mean: compiled_policy.baseline_prediction_diagnostics.mean_mean
+  baseline_prediction_std: compiled_policy.baseline_prediction_diagnostics.mean_std
+  compiled_prediction_mean: compiled_policy.compiled_prediction_diagnostics.mean_mean
+  compiled_prediction_std: compiled_policy.compiled_prediction_diagnostics.mean_std
+  baseline_acquisition_mean: compiled_policy.baseline_prediction_diagnostics.acquisition_mean
+  baseline_acquisition_std: compiled_policy.baseline_prediction_diagnostics.acquisition_std
+  compiled_acquisition_mean: compiled_policy.compiled_prediction_diagnostics.acquisition_mean
+  compiled_acquisition_std: compiled_policy.compiled_prediction_diagnostics.acquisition_std
+  baseline_compiled_top10_overlap: compiled_policy.baseline_compiled_top10_overlap
+  q0_entropy: base_probability_entropy
+  tilted_entropy: probability_entropy
+  tilted_ess: probability_effective_sample_size
+  tilted_kl_from_q0: tilted_kl_from_q0
+  q0_tilted_topk_overlap: q0_tilted_topk_overlap
+policy_mean_fields:
+  - q0_entropy
+  - tilted_entropy
+  - tilted_ess
+  - tilted_kl_from_q0
+  - q0_tilted_topk_overlap
+  - baseline_compiled_top10_overlap
 name: iron_mind_pilot_evaluation_extended
 task: iron_mind
 base_config: ../iron_mind/pilot_evaluation_extended.yaml

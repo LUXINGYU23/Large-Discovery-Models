@@ -12,7 +12,7 @@ import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
-from ldm_tts.harness.policy_diagnostics import prepare_policy_research
+from tasks.nucleobench.core.policy_diagnostics import prepare_ucb_policy_research, prediction_records
 from ldm_tts.optimization import (
     BOObservation,
     BOPrediction,
@@ -162,11 +162,10 @@ class AcquisitionTiltedSelector:
                 baseline_predictions=ordered_baseline,
                 valid_proposal_occurrences=pool.valid_occurrences,
             )
-            round_input = prepare_policy_research(
+            round_input = prepare_ucb_policy_research(
                 round_input, history=self.history, candidates=pool.candidates,
                 representations=representations, baseline=ordered_baseline,
                 q0=q0, selector=self.base_selector, z_clip=self.config.z_clip,
-                normalize_acquisition=lambda values: _robust_z(values, self.config.z_clip),
             )
             policy = self.policy_controller.resolve(round_input)
             self.base_selector.fit(
@@ -185,9 +184,11 @@ class AcquisitionTiltedSelector:
                 pool.candidates, base.predictions
             )
             self.policy_controller.record_predictions(
-                round_input.round_index, ordered_baseline, compiled_predictions, q0,
-                alpha=policy.alpha, eta=policy.eta,
-                normalize_acquisition=lambda values: _robust_z(values, self.config.z_clip),
+                round_input.round_index,
+                prediction_records(
+                    ordered_baseline, compiled_predictions, q0,
+                    alpha=policy.alpha, eta=policy.eta, z_clip=self.config.z_clip,
+                ),
             )
             policy = replace(
                 policy,
