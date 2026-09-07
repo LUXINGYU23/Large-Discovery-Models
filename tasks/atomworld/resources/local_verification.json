@@ -1,0 +1,214 @@
+{
+  "campaigns": {
+    "mock": {
+      "budget": {
+        "counters": {
+          "benchmark_jobs": 2,
+          "endpoint_preflights": 0,
+          "expensive_evaluation_attempts": 2,
+          "external_evaluations": 2,
+          "geometry_tool_calls": 0,
+          "llm_requests": 0,
+          "mock_model_requests": 2,
+          "outer_iterations": 2,
+          "proposal_attempts": 2,
+          "selected_candidates": 2,
+          "successful_evaluations": 2,
+          "valid_search_candidates": 2
+        },
+        "limits": {
+          "benchmark_jobs": 2,
+          "endpoint_preflights": 0,
+          "expensive_evaluation_attempts": 2,
+          "external_evaluations": 2,
+          "geometry_tool_calls": 0,
+          "llm_requests": 0,
+          "mock_model_requests": 2,
+          "outer_iterations": 3,
+          "proposal_attempts": 2,
+          "selected_candidates": 2,
+          "successful_evaluations": 2,
+          "valid_search_candidates": 2
+        },
+        "metadata": {
+          "run_id": "mock_3",
+          "task": "atomworld"
+        },
+        "remaining": {
+          "benchmark_jobs": 0,
+          "endpoint_preflights": 0,
+          "expensive_evaluation_attempts": 0,
+          "external_evaluations": 0,
+          "geometry_tool_calls": 0,
+          "llm_requests": 0,
+          "mock_model_requests": 0,
+          "outer_iterations": 1,
+          "proposal_attempts": 0,
+          "selected_candidates": 0,
+          "successful_evaluations": 0,
+          "valid_search_candidates": 0
+        }
+      },
+      "classification": "Synthetic mock transport/evaluator; not an LLM benchmark score",
+      "metrics": {
+        "attempts_per_sample": 2,
+        "extended_final_accuracy": 1.0,
+        "official_paper_score_claimed": false,
+        "one_shot_accuracy": 0.0,
+        "oracle_any_attempt_accuracy_diagnostic": 1.0,
+        "proposal_format": "cif",
+        "sample_count": 1
+      },
+      "raw_artifact_sha256": {
+        "attempts/000000.json": "54c69b71574ef83e913ff7a02fa9bee16c02cb836f2c7af3c99e587598b3be6e",
+        "attempts/000001.json": "4fdfd044044917545d24cff8ca5599daa11d94c0958d7c1fe469d41c4fa58bbc",
+        "budget.json": "f0d617c727b6b05f6690fc912576b56332e0d44ff094fd3e4e9c939918b9bf62",
+        "campaign.json": "d1028a54d4e62703760e4af14767635a6adc3cabc82776ec3ac6d0ad179fa01b",
+        "checkpoint.json": "0489e3f2c9c4122489ad9ed09eb1438f42e872806ccf5f402f133c4a08bd1f0d",
+        "config.json": "43d1d72b5c1adaa900a0873b0052dcbd920f3b6b65d6e6cd887ec5350779043a",
+        "dataset_manifest.json": "c069277a1d51719af118ceaa734a61bed4ffcffb3a2acd8b4820a449a723d7f3",
+        "evaluations/aw-11303c59f55020f351c9edb0.json": "aaac0542b75a2f7fb716c15e3e73b54bd65da2bdcdaa659b9d9d975f97b459bd",
+        "evaluations/aw-1f500705ae71bee88cecb6d3.json": "dc64a905e827b2fcb839190d40960949e37c4775909adf73d2e3cc797db7ff77",
+        "events.jsonl": "cc3ac61c7027c98c7d912d9ced19030d03bf407793afe07a859ec0193ddef8dc",
+        "experiment_contract.json": "a2db337894b874baf3e10fbfdeeeaada72cd9c4d29cebbbb7aa9025cc6d23f99",
+        "ldm_data/dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+        "ldm_data/ldm_ir.jsonl": "48ea350244681ce2b464c53c96c6802c6512da3ab33f2b5dae8c3315806a5422",
+        "ldm_data/ldm_sft.jsonl": "99d8065d590e2d9c49fe506543ff42e85551933c080957ee158c3b4475c522d3",
+        "ldm_task_spec.json": "70fb5e1b5942875b1aa68cf08c2c35b76df746242a29635f21adf5aeee7c784c",
+        "result.json": "88d14676fa53258e2377820743e454df7bb5e9362faaae5ca7412b1042a7676b",
+        "schedule.json": "6687526eca1b905a4ff637bd26b1db027b6928de8764e9695bbf06a159e48035",
+        "status.json": "b10cb9da6af0c4d48ac3a63553037201c79849e2770c062016cfb214f6269420",
+        "summary.json": "2bf181536c6ae2bacc0cf2204e8cc9a2c3df81246e1ee18ae17cbe1455f1bf82",
+        "trajectory.csv": "acbc3316232891abac932501ccd6cd5ce52755578406316d23533c256158a073"
+      }
+    },
+    "official_tool_fixture": {
+      "budget": {
+        "counters": {
+          "benchmark_jobs": 2,
+          "endpoint_preflights": 0,
+          "expensive_evaluation_attempts": 2,
+          "external_evaluations": 2,
+          "geometry_tool_calls": 2,
+          "llm_requests": 2,
+          "mock_model_requests": 0,
+          "outer_iterations": 2,
+          "proposal_attempts": 2,
+          "selected_candidates": 2,
+          "successful_evaluations": 2,
+          "valid_search_candidates": 2
+        },
+        "limits": {
+          "benchmark_jobs": 2,
+          "endpoint_preflights": 2,
+          "expensive_evaluation_attempts": 2,
+          "external_evaluations": 2,
+          "geometry_tool_calls": 2,
+          "llm_requests": 3,
+          "mock_model_requests": 0,
+          "outer_iterations": 3,
+          "proposal_attempts": 2,
+          "selected_candidates": 2,
+          "successful_evaluations": 2,
+          "valid_search_candidates": 2
+        },
+        "metadata": {
+          "run_id": "official_tool_fixture",
+          "task": "atomworld"
+        },
+        "remaining": {
+          "benchmark_jobs": 0,
+          "endpoint_preflights": 2,
+          "expensive_evaluation_attempts": 0,
+          "external_evaluations": 0,
+          "geometry_tool_calls": 0,
+          "llm_requests": 1,
+          "mock_model_requests": 0,
+          "outer_iterations": 1,
+          "proposal_attempts": 0,
+          "selected_candidates": 0,
+          "successful_evaluations": 0,
+          "valid_search_candidates": 0
+        }
+      },
+      "classification": "Deterministic operation-plan client plus actual bounded geometry tool and pinned upstream evaluator on synthetic fixture; not an LLM benchmark score",
+      "metrics": {
+        "attempts_per_sample": 2,
+        "extended_final_accuracy": 1.0,
+        "official_paper_score_claimed": false,
+        "one_shot_accuracy": 0.0,
+        "oracle_any_attempt_accuracy_diagnostic": 1.0,
+        "proposal_format": "operations",
+        "sample_count": 1
+      },
+      "raw_artifact_sha256": {
+        "attempts/000000.json": "8a894b39813d1fdeac5a50e39ee0ee546c3822b51b000842c44d6995fe3ebae4",
+        "attempts/000001.json": "2bbc4925104276b872a838ee2c4af1e2b4aaec063e48e4c2451543edd6739cbb",
+        "budget.json": "8e1d68dca98881a7c1ba353ea34adfee795df4dfd30dd9c37b77b8bf0ec7b11e",
+        "campaign.json": "cbdd563e2c01871fe59905ee76a95f9a8f4c4b9ea359350da744ba60d3407f3a",
+        "checkpoint.json": "ac67bf6b8cf92fc227bf709469eab1d0f6f78ed40ef5c40ecf452201e2da6151",
+        "config.json": "34af82089275c7362cd8a35f9b1d7cb83d1f6d020214be82a6cb3d03cf354790",
+        "dataset_manifest.json": "87f1bf006c9212c342ff126ee46610868cdca983788980356b38bc02ce48b526",
+        "evaluations/aw-9d7be7f24fd0c456bc1a8429.json": "7549e32c98e1b8a271c1902bec3edff687c4d4b90c7b5a82c09d832aa44a454d",
+        "evaluations/aw-bbc960408ab59479339c5442.json": "fd472de74ce0a9b29e516801e9d0f3bb75bd98479e91961e356659f442fe1820",
+        "events.jsonl": "dc9b7c5a98aba608c93d278f59aa83be492f1662c57e75abbdb8a06bd766ac3d",
+        "experiment_contract.json": "a2db337894b874baf3e10fbfdeeeaada72cd9c4d29cebbbb7aa9025cc6d23f99",
+        "ldm_task_spec.json": "c35fec24583a1afc52a866fd309868a1f17462b2ff3b7b4c58275850e8cb4d65",
+        "result.json": "663dd7fd661d69429a1daab59ea54aef6d9dbb1ce01c36381a9665e90533aed3",
+        "schedule.json": "60b8a18b072dd730aff0942540caf1851ff68fe53078c5be21682af1270c0090",
+        "status.json": "396ecccd4bb2a600735cba7e260bddd7f1090fcc1859fd8cf94852ef6baf195f",
+        "summary.json": "422ae2181dcfc5eb7217175e46ea9724124f4f7e60fcc6e45719553171d40de3",
+        "trajectory.csv": "c2b3e35689626e7c61ff5d5a59bdace5e43a1fc5981d61e90c5510765a6241f1"
+      }
+    }
+  },
+  "checks": {
+    "mock_dependencies": "passed without network/GPU/source data",
+    "real_operations_config": "dry-run selected extended_operations profile; lightweight dependencies passed; no endpoint was invoked",
+    "registration": "scripts/validate_tasks.py --task atomworld: valid",
+    "resume": "completed-run no repeated model calls; service failure writes paused_endpoint and fixed-budget recovery test passed",
+    "shared_runner_dry_run": "resolved tasks.atomworld.ldm_task.procedure",
+    "task_tests": "11 passed, zero skipped; both shared root Python3.11 and uv --locked task environment"
+  },
+  "date": "2026-09-06",
+  "experiment_contract_sha256": "8373306624316677f2a27a00b59e551475b9b546e568a3094a5d380e6da217ea",
+  "formal_qualification": "draft; scaffolded tracked-evidence gate",
+  "model_benchmark_score_available": false,
+  "prepared_released_subset": {
+    "actions": [
+      "change_atom_action",
+      "remove_atom_action",
+      "add_atom_action",
+      "move_atom_action",
+      "move_towards_atom_action",
+      "insert_between_atoms_action",
+      "swap_atoms_action",
+      "delete_below_atom_action",
+      "rotate_around_atom_action",
+      "super_cell_action"
+    ],
+    "available_counts": {
+      "add_atom_action": 1000,
+      "change_atom_action": 1000,
+      "delete_below_atom_action": 999,
+      "insert_between_atoms_action": 1000,
+      "move_atom_action": 1000,
+      "move_towards_atom_action": 1000,
+      "remove_atom_action": 1000,
+      "rotate_around_atom_action": 1000,
+      "super_cell_action": 1000,
+      "swap_atoms_action": 998
+    },
+    "dataset_kind": "local_released_subset",
+    "paper_split_verified": false,
+    "per_action": 1,
+    "private_sha256": "cb6c24b87fff618a45f36bab9ccd5136f02a658013c5b7806ff260641cb6d31f",
+    "public_sha256": "67c69e30977f5b053f27baa2781da8661d4b8ef8b3d11e9b2e5657ba01b45249",
+    "sample_count": 10,
+    "seed": 0
+  },
+  "schema_version": 1,
+  "source_inventory_sha256": "ac57d9248fdd9b5461388eb57f12dc33f58d666fd5060dc9a03a269b2908dd85",
+  "test_source_sha256": "8132e05bff7891678283edda2b8b7b7bdf40993f57e007ecda7867185a067f6c",
+  "tracked_evidence_blocker": "Workspace is a source archive with no .git, so git ls-files clean-checkout gates cannot be asserted."
+}

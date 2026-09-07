@@ -1,0 +1,1271 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-05T19:24:04.111865+00:00",
+  "result": "Both tasks integrated and locally verified; no real LDM model scores obtained.",
+  "qualification": "draft",
+  "git_metadata_present": false,
+  "tests": {
+    "command": "LDM_PILOT_EVALUATION_COMMIT=local-source-archive-test-only PYTHONPATH=../atomworld-agentic-reproduction/src .venv/bin/python -m pytest -q -rs tests tasks/atomworld/tests tasks/reasyn/tests ../atomworld-agentic-reproduction/tests",
+    "passed": 359,
+    "skipped": 2,
+    "skip_reasons": [
+      "Existing shared Torch-specific acquisition test: torch absent",
+      "Tool JSON-schema optional test: jsonschema absent (independently checked by tool author in system environment)"
+    ],
+    "archive_marker_note": "A test-only label supported by the existing archive runner; not an upstream Git commit.",
+    "log_sha256": "4194f74ca24e45a16c5d32d450cc0fdd7a700cc7d85df67312513accc30f0b77",
+    "isolated_reasyn": {
+      "passed": 9,
+      "skipped_optional_rdkit": 3,
+      "log_sha256": "8b9ec191f9c63a01469c4641b91a3f0262aad0062e86090b8a5e2cb67b37ab8a"
+    },
+    "isolated_atomworld": {
+      "passed": 11,
+      "skipped": 0,
+      "evidence": "tasks/atomworld/resources/local_verification.json"
+    }
+  },
+  "configuration_checks": {
+    "registered_tasks": [
+      "atomworld",
+      "reasyn"
+    ],
+    "checked_in_config_plans": 18,
+    "generated_reconstruction_plans": 27,
+    "generated_tdc_plans": 39,
+    "real_jobs_launched": 0,
+    "source_changes_to_shared_runtime": false
+  },
+  "mock_campaigns": [
+    {
+      "task": "atomworld",
+      "benchmark": "crystal_manipulation",
+      "mode": "mock",
+      "scientific_model_score": null,
+      "counters": {
+        "benchmark_jobs": 2,
+        "endpoint_preflights": 0,
+        "expensive_evaluation_attempts": 2,
+        "external_evaluations": 2,
+        "geometry_tool_calls": 0,
+        "llm_requests": 0,
+        "mock_model_requests": 2,
+        "outer_iterations": 2,
+        "proposal_attempts": 2,
+        "selected_candidates": 2,
+        "successful_evaluations": 2,
+        "valid_search_candidates": 2
+      },
+      "artifact_sha256": {
+        "campaign.json": "312bfcb37263d1eecf3b4aa1950ddea403976dd07e467e5dcc1485089a860694",
+        "status.json": "6598487ab429e4b898d7327885372f6a620c747d0d89cf971d1cfe526e264460",
+        "budget.json": "12293f0dd48558d9936d340e341af418dd4fb6a1bc0e428b8c58dfbab5d9435a",
+        "events.jsonl": "ae02ea18b4d82977028c0be141c0b82b93757286eba22fde962dbc9f33090538",
+        "checkpoint.json": "f5064b5b421f06a33b4110cca080f0f0af18477f012611b6dcaf988abfb3b9b7",
+        "summary.json": "2bf181536c6ae2bacc0cf2204e8cc9a2c3df81246e1ee18ae17cbe1455f1bf82",
+        "result.json": "88d14676fa53258e2377820743e454df7bb5e9362faaae5ca7412b1042a7676b",
+        "trajectory.csv": "acbc3316232891abac932501ccd6cd5ce52755578406316d23533c256158a073"
+      }
+    },
+    {
+      "task": "reasyn",
+      "benchmark": "reconstruction",
+      "mode": "mock",
+      "scientific_model_score": null,
+      "counters": {
+        "benchmark_jobs": 4,
+        "endpoint_preflight_requests": 0,
+        "expensive_evaluation_attempts": 4,
+        "external_evaluations": 4,
+        "llm_requests": 0,
+        "oracle_calls": 0,
+        "outer_iterations": 2,
+        "projection_cycle_allowance": 4,
+        "projection_targets": 4,
+        "proposal_attempts": 0,
+        "selected_candidates": 4,
+        "successful_evaluations": 4,
+        "valid_search_candidates": 8
+      },
+      "artifact_sha256": {
+        "campaign.json": "ffe7b12656057326833a5f265da894d2eb7b53c5c46b16f1844db9b9c15961f3",
+        "status.json": "e5efb9071b0aa81307146de42c6bc3f2f5faf2aa864ce9dd25dc28038db847a0",
+        "budget.json": "6e20b85e6e64e2361ffe624638fc28ee4cf8b82f8cb120501fdc82cdc558c78a",
+        "events.jsonl": "bad5e73b7cc43e3c44f9e44e607956a26b265a466a15cad328ae6ae3b9d306bf",
+        "checkpoint.json": "a8647f4a497f5e206106020e307629a37be1716dfb1747f3a695ffbb9938a427",
+        "summary.json": "bad7a3e8a44a025ae304a1bf88754ab69ce2308c22564f38a0d86a2f7d35a78c",
+        "result.json": "688daa30d7d4859ef898e865cf25fa0f7efb33ff14e7ccedba58d9b85fe00950",
+        "trajectory.csv": "4564f6ff096ed9815491382fe1e98d04861eef810092f083971243fa527564d5"
+      }
+    },
+    {
+      "task": "reasyn",
+      "benchmark": "tdc",
+      "mode": "mock",
+      "scientific_model_score": null,
+      "counters": {
+        "benchmark_jobs": 4,
+        "endpoint_preflight_requests": 0,
+        "expensive_evaluation_attempts": 4,
+        "external_evaluations": 4,
+        "llm_requests": 0,
+        "oracle_calls": 4,
+        "outer_iterations": 2,
+        "projection_cycle_allowance": 8,
+        "projection_targets": 8,
+        "proposal_attempts": 0,
+        "selected_candidates": 4,
+        "successful_evaluations": 4,
+        "valid_search_candidates": 8
+      },
+      "artifact_sha256": {
+        "campaign.json": "802ff124a402e2336cf7b0bc0b1e76a6a5fcb16abeedd150bb7d60e2304766dc",
+        "status.json": "5dec366f6e01421cc9667a061cfdf4ba7642394c9a32ac972193834f935a7b5e",
+        "budget.json": "cb7ab62a74c5cabab7f47e0c4b9f81fd0a9ca4d62678d5c51ffea204bcf87c97",
+        "events.jsonl": "1509451de1039b041693717d52ff2a55d7a132f3a5a00dd38d67831ebb3959ab",
+        "checkpoint.json": "6c3a684d447e624630ac09740d6921aeefac9828cfc9fd35cfcaf096b62b0a23",
+        "summary.json": "3f6c10784d267121822384b0e9edfe9c6f512a8e81cbd2eeaccf6b5565db9cc5",
+        "result.json": "16f84a01bd640dcd2ee4ff892c7bd8d6d6e48598d721a8aae8526deff93c5740",
+        "trajectory.csv": "9aa2b4c33f02914b71854661066f650ed2cd141fab119eb46b28438f8bfa8df4"
+      }
+    }
+  ],
+  "official_atomworld_evaluator_sanity": {
+    "purpose": "Official upstream evaluator and released-data sanity only; target_identity is a positive control, not model output or an LDM score. Unchanged input is a diagnostic control.",
+    "evaluator_sha256": "191569b763cc2d9a8f61484ee9835a6fd150a9609b4cc0936d875b78b5538bc9",
+    "n_samples": 20,
+    "counts": {
+      "target_identity": 20,
+      "malformed": 0,
+      "unchanged_input": 2
+    },
+    "samples": [
+      {
+        "action": "add_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "d1fa7be9b7b2bed53d169ec4500e17dc95b3e19ac9069b086b1032c0a8774e86",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.244493399894727e-16,
+            "max_dist": 8.980968888084425e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "add_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "9a35384c0f59f000d0363a10d31e8b1e8ba590cd3276e0c1e208755246e74869",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.3742985399631563e-16,
+            "max_dist": 4.379259392649721e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "change_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "364877c7b30aa4c99eab185c270bb2a33472dae3bedb6db6e8977208c84460e9",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.739589142510427e-16,
+            "max_dist": 9.035798055930901e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "change_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "acca92f89a2d80048879a13af5d4ca88ddba4cb1622020956be9d8c7bbcae912",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.307181809484856e-16,
+            "max_dist": 3.9754135883476557e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "remove_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "470c875d268317c8f4d9a0efef52284d91f31033fbdea8c6650610469ba202f8",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.682263668359342e-16,
+            "max_dist": 1.1985328266895115e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "remove_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "286022d9909c3ba851f5e385d16d35555196d8fc7543a8861d93805763eb58fe",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.2303900339816173e-16,
+            "max_dist": 4.2284922996488706e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "swap_atoms_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "6904d5c5307826f53f29c249993767491b9f48827e811089e7ad93c58d6a1102",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.716638763823374e-16,
+            "max_dist": 1.2039481511974223e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "swap_atoms_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "ac9c07075f14f86019bac59cdddf1787d6940bc51f39f57077c6c237aeb30166",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.2901240123947774e-16,
+            "max_dist": 4.3712366822451985e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "move_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "e2d6022926c62f53bc9cb1d9b541db50c103f9b0967b7bc3f07e75d96001d66a",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.770937048653074e-16,
+            "max_dist": 1.2115850417125485e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "move_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "576ce7b6ac2d05dd0c64a0646a2180949f4db63bce71ca3470adb0697cc0e5c5",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.4033580789693705e-16,
+            "max_dist": 5.12344369825015e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "move_towards_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "cc1f86165732ada382fe61472e2868250bcd9c1869b601b8500df6da94efad8c",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.765539799753723e-16,
+            "max_dist": 1.2112091448761068e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 0.0553499609212764,
+            "max_dist": 0.49155020211455724
+          }
+        }
+      },
+      {
+        "action": "move_towards_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "2719c59910aec81e7c545e4924789f2c36273fbea678f18884f41e966442dc6c",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.5341639754200324e-16,
+            "max_dist": 5.123977603936396e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 0.20051420377737297,
+            "max_dist": 0.6650303790664095
+          }
+        }
+      },
+      {
+        "action": "insert_between_atoms_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "4e292de70d31bbde641e27507d9dc50590b4270b3cf60921c7062bdf6813f324",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.1981581675892213e-16,
+            "max_dist": 1.109746222124938e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "insert_between_atoms_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "e826e60103168cf4eed41633ba82e62f1abc2d30194c5305d4380bd4f63d83c1",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.374298539963156e-16,
+            "max_dist": 4.379259392649721e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "delete_below_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "643a52c57ad5bf938ba45aa1fafa8f6dbdd2ff1f8c5bc247f506d1e50e262f8b",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 3.3796686412321145e-16,
+            "max_dist": 7.170137259128638e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "delete_below_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "5f817a6c71d9b992a59b11d286e8969dbbf50a53ff38909c3369832c546eab5c",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 2.381772844979914e-16,
+            "max_dist": 4.745223905870206e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "rotate_around_atom_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "f93ba8f2a3d3648f04ba71a3892c4f90c3c08be6140bee105d36e168422bf0d7",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.845691644373074e-16,
+            "max_dist": 1.209410621793411e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "rotate_around_atom_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "2c5b76662bf9a63bf0f2992c7b8d1c5a08773b14a6b902e6596b7d3c91fb0321",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 1.8621205653932622e-16,
+            "max_dist": 3.073472233372659e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "StructureMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "super_cell_action",
+        "row_index": 0,
+        "input_id": "mp-1013842.cif",
+        "target_sha256": "82e325a09b4fb33bb454a4c67d6f97b63fc559aedec3857d2bd8ec5febac8d0a",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 4.2965916502853514e-16,
+            "max_dist": 1.5327925248174887e-15
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      },
+      {
+        "action": "super_cell_action",
+        "row_index": 1,
+        "input_id": "mp-1015026.cif",
+        "target_sha256": "d4e5f6f218dfe06ccb214e7dad411c1292a1cc9ff4fa4dd187dcfbd23c175987",
+        "checks": {
+          "target_identity": {
+            "correct": true,
+            "wrong_type": null,
+            "rmsd": 1.8517199750045522e-16,
+            "max_dist": 4.848617187994049e-16
+          },
+          "malformed": {
+            "correct": false,
+            "wrong_type": "OutputFormatError",
+            "rmsd": null,
+            "max_dist": null
+          },
+          "unchanged_input": {
+            "correct": false,
+            "wrong_type": "AtomCountMismatch",
+            "rmsd": null,
+            "max_dist": null
+          }
+        }
+      }
+    ]
+  },
+  "atomworld_geometry_tool_sanity": {
+    "purpose": "Execution-component diagnostic with manually transcribed operation plans from public prompts; no model or LDM run, not a benchmark model score.",
+    "n_samples": 10,
+    "correct": 10,
+    "samples": [
+      {
+        "action": "change_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Change the atom at index 77 into Pu in the cif file. The indices of atoms are started from 0.",
+        "operations": [
+          {
+            "op": "change",
+            "index": 77,
+            "symbol": "Pu"
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.739589142510427e-16,
+        "output_sha256": "364877c7b30aa4c99eab185c270bb2a33472dae3bedb6db6e8977208c84460e9"
+      },
+      {
+        "action": "remove_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Remove the atom at index 77 from the cif file. The indices of atoms are started from 0.",
+        "operations": [
+          {
+            "op": "remove",
+            "index": 77
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.682263668359342e-16,
+        "output_sha256": "470c875d268317c8f4d9a0efef52284d91f31033fbdea8c6650610469ba202f8"
+      },
+      {
+        "action": "add_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Add one Ba atom at the Cartesian coordinate [6.54649193 4.73792382 3.90220796] to the cif file.",
+        "operations": [
+          {
+            "op": "add",
+            "symbol": "Ba",
+            "position": [
+              6.54649193,
+              4.73792382,
+              3.90220796
+            ]
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.244493399894727e-16,
+        "output_sha256": "3fa9058c2ace5581c52f955b017cbc5849493b461cf13a4fe0ca645171d18bda"
+      },
+      {
+        "action": "move_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Move the atom at index 69 by [ 1.15526691 -1.06878244 -0.22478065] angstrom in the cif file.",
+        "operations": [
+          {
+            "op": "move",
+            "index": 69,
+            "d_pos": [
+              1.15526691,
+              -1.06878244,
+              -0.22478065
+            ]
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.770937048653074e-16,
+        "output_sha256": "63be027ee9ec56a2eda55faf257cbc4f13d700429e4b91f16bb55db4871d58f7"
+      },
+      {
+        "action": "move_towards_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Move the atom at index 62 towards the atom at index 7 by 1.126425942080598 angstrom in the cif file.",
+        "operations": [
+          {
+            "op": "move_towards",
+            "index1": 62,
+            "index2": 7,
+            "distance": 1.126425942080598
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.765539799753723e-16,
+        "output_sha256": "cc1f86165732ada382fe61472e2868250bcd9c1869b601b8500df6da94efad8c"
+      },
+      {
+        "action": "insert_between_atoms_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Insert Fe between atoms at indices 47 and 22 that are 1.88 Å from 47 in the cif file.",
+        "operations": [
+          {
+            "op": "insert_between",
+            "index1": 47,
+            "index2": 22,
+            "symbol": "Fe",
+            "distance": 1.88
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 0.00017510600728916129,
+        "output_sha256": "23e313f0c119885dc54954939f6a187700be5b7ec8731e520571ced9afd85a82"
+      },
+      {
+        "action": "swap_atoms_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Swap the spatial positions of atoms at indices 52 and 6 in the cif file. The indices of atoms are started from 0.",
+        "operations": [
+          {
+            "op": "swap",
+            "index1": 52,
+            "index2": 6
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.716638763823374e-16,
+        "output_sha256": "6904d5c5307826f53f29c249993767491b9f48827e811089e7ad93c58d6a1102"
+      },
+      {
+        "action": "delete_below_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Delete all atoms whose z coordinate is lower than the atom at index 39 in the cif file. Excluding itself and atoms with the same z coordinate.",
+        "operations": [
+          {
+            "op": "delete_below",
+            "index": 39
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 3.3796686412321145e-16,
+        "output_sha256": "643a52c57ad5bf938ba45aa1fafa8f6dbdd2ff1f8c5bc247f506d1e50e262f8b"
+      },
+      {
+        "action": "rotate_around_atom_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Rotate all surrounding atoms within 2.5475185147048096 angstrom of the center atom at index 2 by 94.38347563086853 degree around the axis [0. 0. 1.] in the cif file. The rotation should following the right-hand rule.",
+        "operations": [
+          {
+            "op": "rotate_around",
+            "index": 2,
+            "radius": 2.5475185147048096,
+            "angle": 94.38347563086853,
+            "axis": [
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.845691644373074e-16,
+        "output_sha256": "f93ba8f2a3d3648f04ba71a3892c4f90c3c08be6140bee105d36e168422bf0d7"
+      },
+      {
+        "action": "super_cell_action",
+        "source_row": 0,
+        "input_id": "mp-1013842.cif",
+        "prompt": "Create a supercell with the size 1X2X1.",
+        "operations": [
+          {
+            "op": "super_cell",
+            "size": [
+              1,
+              2,
+              1
+            ]
+          }
+        ],
+        "correct": true,
+        "wrong_type": null,
+        "normalized_rmsd": 4.2965916502853514e-16,
+        "output_sha256": "82e325a09b4fb33bb454a4c67d6f97b63fc559aedec3857d2bd8ec5febac8d0a"
+      }
+    ]
+  },
+  "ssh": {
+    "recorded_at": "2026-09-05T19:00:30.941855+00:00",
+    "host": "111.2.199.31",
+    "port": 5320,
+    "user": "zsgpu",
+    "attempts": [
+      {
+        "options": [
+          "BatchMode=yes",
+          "ConnectTimeout=15"
+        ],
+        "exit_code": 255,
+        "stderr": "Host key verification failed."
+      },
+      {
+        "options": [
+          "BatchMode=yes",
+          "StrictHostKeyChecking=accept-new",
+          "ConnectTimeout=15"
+        ],
+        "exit_code": 255,
+        "stderr": "Warning: Permanently added '[111.2.199.31]:5320' (ED25519) to the list of known hosts.\nzsgpu@111.2.199.31: Permission denied (publickey)."
+      }
+    ],
+    "diagnostics": {
+      "ssh_agent": "The agent has no identities.",
+      "default_rsa_key_present": true
+    },
+    "outcome": "Network and SSH server reachable; authentication rejected. No remote command executed and no remote files modified.",
+    "required_to_resume": "Configure a private key authorized for zsgpu on the supplied host, then rerun documented preflight."
+  },
+  "reasyn_assets": {
+    "task": "reasyn",
+    "downloaded": false,
+    "assets": [
+      {
+        "path": "data/test_zinc250k.txt",
+        "present": true,
+        "bytes": 59420,
+        "sha256": "59e0f5b4cb40d1c784a4505a1451338a1c4621e68ce1febd4e826a393f47be01",
+        "rows_excluding_SMILES_header": 1000
+      },
+      {
+        "path": "data/building_blocks/building_blocks_zinc250k.txt",
+        "present": true,
+        "bytes": 1116866,
+        "sha256": "96da92294b151cc7cd90d1baf055f913aa4d77d047fe80997fca06d759aad775",
+        "rows_excluding_SMILES_header": 37386
+      },
+      {
+        "path": "data/enamine_smiles_1k.txt",
+        "present": false
+      },
+      {
+        "path": "data/chembl_filtered_1k.txt",
+        "present": false
+      },
+      {
+        "path": "data/trained_model/nv-reasyn-ar-166m-v2.ckpt",
+        "present": false
+      },
+      {
+        "path": "data/trained_model/nv-reasyn-eb-174m-v2.ckpt",
+        "present": false
+      },
+      {
+        "path": "data/processed/comp_2048/fpindex.pkl",
+        "present": false
+      },
+      {
+        "path": "data/processed/comp_2048/matrix.pkl",
+        "present": false
+      },
+      {
+        "path": "data/processed/zinc250k_2048/fpindex.pkl",
+        "present": false
+      },
+      {
+        "path": "data/rxn_templates/comprehensive.txt",
+        "present": false
+      }
+    ],
+    "setup_instructions": "Follow upstream README Data Preparation/Training checkpoint download. Preserve supplied building-block list unchanged."
+  },
+  "environment": {
+    "python": "3.11.15",
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "packages": {
+      "numpy": "1.26.4",
+      "pytest": "8.4.2",
+      "rdkit": "2025.3.2",
+      "ase": "3.29.0",
+      "h5py": "3.16.0",
+      "pymatgen": "2026.5.4",
+      "pandas": "2.3.3"
+    }
+  },
+  "task_and_config_files": [
+    {
+      "path": "tasks/atomworld/QUICKSTART.md",
+      "sha256": "e00f54b39460c4c3539bf591f7da795650307f603a629d0aa7e6fdb205967495"
+    },
+    {
+      "path": "tasks/atomworld/README.md",
+      "sha256": "ecdba29c5b0262f5663a9de12a9a89540ab8dcba7f6ecb0ee328eba87d9433d3"
+    },
+    {
+      "path": "tasks/atomworld/__init__.py",
+      "sha256": "b0b3bd149b467c02e31048367aa0ed8e471dd1565a9e42b1182081d54de7e219"
+    },
+    {
+      "path": "tasks/atomworld/core/__init__.py",
+      "sha256": "6d0f37c6dc85c6b307a2c1c14e26725e0b64d70f6b0afc51107a7dfba043c754"
+    },
+    {
+      "path": "tasks/atomworld/core/data.py",
+      "sha256": "53f51d812f46f490cdbd71cbbcfef5683fab70847b89dcf7cfccdc0799c7ec8d"
+    },
+    {
+      "path": "tasks/atomworld/core/evaluator.py",
+      "sha256": "50df0a7d21296d3c7d98606721bf14cb73ff8815226843d46f59305636b8589e"
+    },
+    {
+      "path": "tasks/atomworld/core/proposals.py",
+      "sha256": "a5e06d3a7610cbdfb3c6ce3ad6c1e5b0bd28ed9b723bfaf3d1f676ea3e10d8be"
+    },
+    {
+      "path": "tasks/atomworld/core/task_spec.py",
+      "sha256": "f7ad5dbdf115ff29e637993db14fd1d99c99f0464720fead0f7cf4fe378872a6"
+    },
+    {
+      "path": "tasks/atomworld/core/workflow.py",
+      "sha256": "e3f929ae8bc5015aff21456b1e1ee2ec76716d53d80c58ccdbc9b5d13177e0dc"
+    },
+    {
+      "path": "tasks/atomworld/experiment.json",
+      "sha256": "8007e9a44e0a7f11a200d7bc38a0711a8eae73db407b0ac58ae4e1b03cbaa80f"
+    },
+    {
+      "path": "tasks/atomworld/ldm_task/__init__.py",
+      "sha256": "5af1a76a751c94f0a558c5156a50558319404ea352101eaa0b86f0b7b754f966"
+    },
+    {
+      "path": "tasks/atomworld/ldm_task/dependencies.py",
+      "sha256": "716e5f58470c85eaa54441cd0ba9bc5e1b77e0d2470d0c963a9bb773faf11834"
+    },
+    {
+      "path": "tasks/atomworld/ldm_task/procedure.py",
+      "sha256": "372d8038dac650fe37c8d8289d3d14843f3676087817c1d98115fe2b417bb2a5"
+    },
+    {
+      "path": "tasks/atomworld/pyproject.toml",
+      "sha256": "80f84db9d97b5eae01f1f6773677515da6f892273e71159bbb82f353f3e3d3eb"
+    },
+    {
+      "path": "tasks/atomworld/resources/README.md",
+      "sha256": "f8ea1f63d909b493e114f53381c020781753fa396da2f67f9f739f190eed12ef"
+    },
+    {
+      "path": "tasks/atomworld/resources/local_verification.json",
+      "sha256": "f15c472b5bcbb29f8bab3b7a59c3c46d08f5e6e3bbf99640c4c7b7b64132fad6"
+    },
+    {
+      "path": "tasks/atomworld/resources/mock_fixture.json",
+      "sha256": "6dc8b64cc340edf6ac181bd78d3d0e86ff970143e8f2b4bad66730e9b2a20f72"
+    },
+    {
+      "path": "tasks/atomworld/resources/qualification_evidence.json",
+      "sha256": "de097b537f6c7696a43d4b9e3f2703dafe05567fb28f8fc4c83358ced0f850c4"
+    },
+    {
+      "path": "tasks/atomworld/resources/source_manifest.json",
+      "sha256": "95a829e1f79c36618a8c326e0422ab77789813bb4a8f13379bec1304889998b7"
+    },
+    {
+      "path": "tasks/atomworld/scripts/__init__.py",
+      "sha256": "0be4d7f74f31c643278ecb1d7df4a60dacbf78f3585cbf49acda4429ac5b756d"
+    },
+    {
+      "path": "tasks/atomworld/scripts/prepare_official_data.py",
+      "sha256": "945bfbf4e11e8a546cfe966476305b35366f3dac554bb0c3e368ef124e104f46"
+    },
+    {
+      "path": "tasks/atomworld/task.json",
+      "sha256": "16e64c96d5f164dbca62d364cbf24885a39ff59b7ca78f778e0224dd4f2dc9e1"
+    },
+    {
+      "path": "tasks/atomworld/tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tasks/atomworld/tests/test_procedure.py",
+      "sha256": "0e5f08346d0864411d2af176ed87882b807f8624baa5deb4a36dcb3dca1c35fc"
+    },
+    {
+      "path": "tasks/atomworld/uv.lock",
+      "sha256": "bc385f012d6e37d59404cfc90d850a9ddf4eaa76af95be576ae8186454563302"
+    },
+    {
+      "path": "tasks/reasyn/QUICKSTART.md",
+      "sha256": "cf162556ebb679c1a891f8fc0d0191122c8dfc8c31e864c7843acfcde8f0348b"
+    },
+    {
+      "path": "tasks/reasyn/README.md",
+      "sha256": "3c6759805693579edf9ff6e02a227430c475fa63d8afd5bd1e501a78cd41766d"
+    },
+    {
+      "path": "tasks/reasyn/__init__.py",
+      "sha256": "9fc2a07d708be5d090fa271addc0d32ce5dab35924b3fc9194cf021dcd6ad06d"
+    },
+    {
+      "path": "tasks/reasyn/core/__init__.py",
+      "sha256": "6d0f37c6dc85c6b307a2c1c14e26725e0b64d70f6b0afc51107a7dfba043c754"
+    },
+    {
+      "path": "tasks/reasyn/core/candidate.py",
+      "sha256": "ddd27d7657d7e37bf94848c116eeb2dd3446d26c76bae679676539959b13f2d4"
+    },
+    {
+      "path": "tasks/reasyn/core/chemistry.py",
+      "sha256": "569a085063d9b8530f0c35e9004dae1575c5055cc62b2f665e0caebb931db2a3"
+    },
+    {
+      "path": "tasks/reasyn/core/evaluator.py",
+      "sha256": "b3db07add3e9beae23512d0fff683757cabc48e6a3d211731c33d099c46dcddd"
+    },
+    {
+      "path": "tasks/reasyn/core/metrics.py",
+      "sha256": "cc8bfbde391a500a64f6f623b1fb97ad43cdd4d5dd519a8a68ddeccef31fea1c"
+    },
+    {
+      "path": "tasks/reasyn/core/projection_worker.py",
+      "sha256": "21ebdd6636d43ca77f7b33fd542642cc8a1e43e5cd8c7ed1abf930b69381ce29"
+    },
+    {
+      "path": "tasks/reasyn/core/projector.py",
+      "sha256": "43fd3a9abc46fd3915a6e8c43e89036e7ee37d355814c852d1bf464461a641a8"
+    },
+    {
+      "path": "tasks/reasyn/core/proposals.py",
+      "sha256": "41aea35d9a82fb9748bb3138f9f13b890ea600316803f1b9ea2162633547b6e2"
+    },
+    {
+      "path": "tasks/reasyn/core/selection.py",
+      "sha256": "358ffcb75f92c9a059e5319c82c5ba9a11e5401f5aa31a897934567f92c2a3f4"
+    },
+    {
+      "path": "tasks/reasyn/core/surrogate.py",
+      "sha256": "47bae5c67f25edd75fd98c6deca8ed3a00616571d2371bef5cc4565347d6c71d"
+    },
+    {
+      "path": "tasks/reasyn/core/workflow.py",
+      "sha256": "53bfaf47957592b03657e93d35b9d2b59875c6b985c0a727a7635cc14b07d489"
+    },
+    {
+      "path": "tasks/reasyn/experiment.json",
+      "sha256": "02405264e2a9c629640b95537eb69bad4f6902e470177c33c048e556708485e6"
+    },
+    {
+      "path": "tasks/reasyn/ldm_task/__init__.py",
+      "sha256": "5af1a76a751c94f0a558c5156a50558319404ea352101eaa0b86f0b7b754f966"
+    },
+    {
+      "path": "tasks/reasyn/ldm_task/dependencies.py",
+      "sha256": "bff93c0e040c2771a2e18e1796e3382945c281f679332fc901c84268c118d43f"
+    },
+    {
+      "path": "tasks/reasyn/ldm_task/procedure.py",
+      "sha256": "a2709967ac4ccc9453c6ac0c71a4ad2e5290e300db19470215b822bfadd029cf"
+    },
+    {
+      "path": "tasks/reasyn/pyproject.toml",
+      "sha256": "40c8e5f170bb2a41a6e718a2edd16a5f870665af0579a7007572b107b854c6f7"
+    },
+    {
+      "path": "tasks/reasyn/resources/README.md",
+      "sha256": "b64a5226a2e86aee7b7436bfc710ca941c71a762227007b3abe61a819c0e1f4e"
+    },
+    {
+      "path": "tasks/reasyn/resources/local_asset_inventory.json",
+      "sha256": "e890537d874bf8aed0a716b61ee62d4d23dd90f5d9503937e6179a4db7897250"
+    },
+    {
+      "path": "tasks/reasyn/resources/qualification_evidence.json",
+      "sha256": "1b18dcf5395eb1d20bf2668bd0075adb7be8fc34b4e506140ab9de88ec0f1c3d"
+    },
+    {
+      "path": "tasks/reasyn/resources/source_provenance.json",
+      "sha256": "579aea5ce46ec612cc9eb65df27fcccedba9b7143b0eda91248b750e4e7bcf6f"
+    },
+    {
+      "path": "tasks/reasyn/resources/verification_record.json",
+      "sha256": "48e04503d129d09fabf233f638cdb47446414b31b9b292a8fbb3243c211ac37d"
+    },
+    {
+      "path": "tasks/reasyn/scripts/aggregate_tdc_results.py",
+      "sha256": "fb41f38d83d158165317f413fe4850672d37c24bffafabd8750e4add702d87ee"
+    },
+    {
+      "path": "tasks/reasyn/scripts/evaluate_reconstruction.py",
+      "sha256": "c7f11b4a0a32e36bd0a47917b1250956f6dfdb354bfca599dc9ac43631c83ee2"
+    },
+    {
+      "path": "tasks/reasyn/scripts/prepare_official_data.py",
+      "sha256": "60839151cf5fd73b982800d02243246dc9a4f1e356119b7d6901f8106a098741"
+    },
+    {
+      "path": "tasks/reasyn/scripts/write_suite_configs.py",
+      "sha256": "c24086f1b1cbeec94d68449086e23adf0fd8d28d13070cab02adceeee08c27a5"
+    },
+    {
+      "path": "tasks/reasyn/task.json",
+      "sha256": "c1eadd89d723277679301ab71ca1ce376242a8622a6214ebdbc3415a67d8f559"
+    },
+    {
+      "path": "tasks/reasyn/tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tasks/reasyn/tests/test_procedure.py",
+      "sha256": "bd10fb49ae386d5bcabf846f6723a52f9546953ff07c8e007d08f18d9d8b9760"
+    },
+    {
+      "path": "tasks/reasyn/tests/test_projection_worker.py",
+      "sha256": "2975088242f96b45a7bbcdd0e8a427d823161f9932e93d50de67666be511d404"
+    },
+    {
+      "path": "tasks/reasyn/uv.lock",
+      "sha256": "2a162d94e4f1e0534531b57d2c6a451d85e6ef6f293da048a01282d195d1950c"
+    },
+    {
+      "path": "config/atomworld/extended_operations.yaml",
+      "sha256": "1659b4a6093409a1d8bca87b1da5a9c3cf98e53cd34e0705c271649598e52b40"
+    },
+    {
+      "path": "config/atomworld/extended_reasoning.yaml",
+      "sha256": "d24b1931ff1571bbb541aec8b2912e78ef00a6fd6aa63ab434fb1780d4ead46a"
+    },
+    {
+      "path": "config/atomworld/mock.yaml",
+      "sha256": "645733dc22b73d894b372985c53d3ff27c71b41232d78b8479449f507d139abe"
+    },
+    {
+      "path": "config/atomworld/one_shot.yaml",
+      "sha256": "d273394bd66e818cd8974ed42c8a9c45424670633bbf48a81b596dbdea67da8b"
+    },
+    {
+      "path": "config/reasyn/mock.yaml",
+      "sha256": "e0f996b9da82b5b30b2a8272b9160cb59c5e14ad4302b37e7671296af2e7f33a"
+    },
+    {
+      "path": "config/reasyn/mock_tdc.yaml",
+      "sha256": "48150570e0eed681cb0b968be164d2140d880b438013b971f9ecbff5611883e2"
+    },
+    {
+      "path": "config/reasyn/reconstruction_chembl_ldm.yaml",
+      "sha256": "b8672bf83b92e82a97f6025258d398cda98b8aead02efbb1f826ac81d3b7c81b"
+    },
+    {
+      "path": "config/reasyn/reconstruction_chembl_matched_baseline.yaml",
+      "sha256": "f36d6fc00ddd1cf076c35a305c826d9943b56f77b0c03693b3f6a499231a866d"
+    },
+    {
+      "path": "config/reasyn/reconstruction_chembl_original.yaml",
+      "sha256": "25ddf2f536c0c878eb67ce0ed7086938f16896493ca9ec150dc1a6fabaa26377"
+    },
+    {
+      "path": "config/reasyn/reconstruction_enamine_ldm.yaml",
+      "sha256": "224c8a72ea79f3ec489ce4c4d6f3a94bdf8611fd6e580edd0f63ee94c84fd774"
+    },
+    {
+      "path": "config/reasyn/reconstruction_enamine_matched_baseline.yaml",
+      "sha256": "268eea0de5da0d52ff5dc8c6f5a06a87f0d1e5e039dace8a8d49b1ec4ffa2074"
+    },
+    {
+      "path": "config/reasyn/reconstruction_enamine_original.yaml",
+      "sha256": "db7c9fb44d49c58ade673da94bef83792ac5a93f85d2fc21d79a10bd3bfd02cf"
+    },
+    {
+      "path": "config/reasyn/reconstruction_tiny.yaml",
+      "sha256": "41e885f9cfed25a8e836963708a5849010639e1ad27574644bca299159979832"
+    },
+    {
+      "path": "config/reasyn/reconstruction_zinc250k_ldm.yaml",
+      "sha256": "2f0d91582e4f9ebc9ff53a36d6db9bf0c866893cf2cf4bf64867a52fb241a7d9"
+    },
+    {
+      "path": "config/reasyn/reconstruction_zinc250k_matched_baseline.yaml",
+      "sha256": "5c8fdeab4e6f9411241f58b723663b32e95a1a356d2d6e93bd9f4f6f6a290669"
+    },
+    {
+      "path": "config/reasyn/reconstruction_zinc250k_original.yaml",
+      "sha256": "ba4a848e216a3cf5a695d1b2bb98d5fbcded265103f06640c231e7ba6324a853"
+    },
+    {
+      "path": "config/reasyn/tdc_10000.yaml",
+      "sha256": "377bfdd540e9a7277b842b46a1cf9e880b99db0b6110aedc6f99b5f96f880216"
+    },
+    {
+      "path": "config/reasyn/tdc_tiny.yaml",
+      "sha256": "1eb07a03c47f9f187b36f370cf066a54c206f1fbe9013e6b6f50a085830c2442"
+    },
+    {
+      "path": "tests/test_task_registration.py",
+      "sha256": "b8d3095bccd4526f4d71d2cdf816437e3f0c9ca20a9236b9e5a134a26e5e3a80"
+    },
+    {
+      "path": "config/suites/science_benchmarks_mock.yaml",
+      "sha256": "fe9a4f512df6ef955305a370595f6c7127bc84927aa85c8daa9c7c0854d17ce8"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "reasyn_mock_tdc",
+  "task": "reasyn",
+  "algorithm": "ldm_gp_ucb",
+  "mode": "mock",
+  "args": {
+    "mock": true,
+    "benchmark": "tdc",
+    "iterations": 2,
+    "reservoir-size": 4,
+    "evaluations-per-round": 2
+  },
+  "env": {
+    "LDM_DATA_COLLECTION_ENABLED": "1"
+  }
+}

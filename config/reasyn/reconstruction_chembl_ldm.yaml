@@ -1,0 +1,21 @@
+{
+  "name": "reasyn_reconstruction_chembl_ldm",
+  "task": "reasyn",
+  "algorithm": "ldm_tanimoto_gp_ucb",
+  "mode": "real",
+  "contract_profile": "reconstruction_chembl_ldm",
+  "args": {
+    "benchmark": "reconstruction",
+    "dataset": "chembl",
+    "target-limit": 1000,
+    "search-width": 8,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 100,
+    "max-results": 100,
+    "evaluations-per-round": 1,
+    "iterations": 4,
+    "num-cycles": 6,
+    "reservoir-size": 8,
+    "proposal-mode": "openai"
+  }
+}

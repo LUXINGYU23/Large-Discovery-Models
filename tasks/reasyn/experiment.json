@@ -1,0 +1,377 @@
+{
+  "schema_version": 1,
+  "task_id": "reasyn",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/NVIDIA-BioNeMo/ReaSyn/tree/reasyn_v2",
+    "source_commit": "archive-sha256:2c129c3e88788a6b04a26b3314bee86fe192f6576793ca7b22e4f94a191a4661",
+    "task_path": "scripts/eval_recon.py; scripts/optimize_tdc.py"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "reconstruction_rate",
+        "direction": "maximize"
+      },
+      {
+        "name": "mean_similarity",
+        "direction": "maximize"
+      },
+      {
+        "name": "product_diversity",
+        "direction": "maximize"
+      },
+      {
+        "name": "building_block_diversity",
+        "direction": "maximize"
+      },
+      {
+        "name": "auc_top10",
+        "direction": "maximize"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "similarity",
+        "direction": "maximize"
+      },
+      {
+        "name": "oracle_score",
+        "direction": "maximize"
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "success_rate",
+        "direction": "maximize"
+      },
+      {
+        "name": "top10",
+        "direction": "maximize"
+      },
+      {
+        "name": "auc_top10_observed",
+        "direction": "maximize"
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "zinc250k",
+      "enamine",
+      "chembl",
+      "released_tdc_13"
+    ],
+    "settings": {
+      "reconstruction_exact": "canonical nonisomeric SMILES",
+      "similarity": "Morgan radius 2, 4096 bits",
+      "diversity": "TDC Evaluator(diversity), >=0.8 analogs, missing targets zero",
+      "released_tdc_oracles": [
+        "amlodipine_mpo",
+        "celecoxib_rediscovery",
+        "drd2",
+        "fexofenadine_mpo",
+        "gsk3b",
+        "jnk3",
+        "median1",
+        "median2",
+        "osimertinib_mpo",
+        "perindopril_mpo",
+        "ranolazine_mpo",
+        "sitagliptin_mpo",
+        "zaleplon_mpo"
+      ],
+      "auc_frequency": 100,
+      "auc_initial_value": 0,
+      "tdc_seeds": [
+        0,
+        1,
+        2
+      ],
+      "source_discrepancy": "Paper prose says 15 TDC tasks; released script and table both list 13.",
+      "proposal_backends": {
+        "openai": "Chat Completions with preflight",
+        "baseline": "offline original reconstruction target",
+        "mock": "synthetic fixture only"
+      },
+      "changes": "LDM target proposals and shared GP selection replace Graph GA; frozen projector, synthesis replay, original metric formulas retained. No automatic TDC convergence padding.",
+      "reconstruction_cycles": {
+        "enamine": 12,
+        "chembl": 24,
+        "zinc250k": 16
+      },
+      "comparison_axis": "TDC: unique oracle calls; reconstruction: selected frozen projection queries plus disclosed cycles, width, exhaustiveness and EB samples."
+    },
+    "per_candidate_limits": {
+      "tdc_unique_oracle_calls": 1,
+      "reconstruction_projection_queries": 1,
+      "sampler_max_evolve_steps": 8,
+      "editflow_steps": 100
+    }
+  },
+  "budget": {
+    "tdc_official_unique_calls": 10000,
+    "tdc_auc_frequency": 100,
+    "reconstruction_official_targets_per_dataset": 1000
+  },
+  "profiles": {
+    "reconstruction_tiny": {
+      "description": "One-target LDM projection-query pilot; not a full paper score.",
+      "budget": {
+        "expensive_evaluations": 2,
+        "projection_targets": 2
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "proposal-mode": "openai",
+        "iterations": 2,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "target-limit": 1,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-cycles": 1,
+        "num-editflow-samples": 4
+      }
+    },
+    "tdc_tiny": {
+      "description": "Two-round, four-call TDC integration pilot; no full-budget AUC score.",
+      "budget": {
+        "expensive_evaluations": 4,
+        "oracle_calls": 4
+      },
+      "locked_args": {
+        "benchmark": "tdc",
+        "proposal-mode": "openai",
+        "iterations": 2,
+        "reservoir-size": 4,
+        "evaluations-per-round": 2,
+        "max-oracle-calls": 10000,
+        "num-cycles": 1,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 4
+      }
+    },
+    "tdc_10000": {
+      "description": "Released TDC evaluation at 10000 unique canonical oracle calls; LDM replaces Graph GA target proposals.",
+      "budget": {
+        "expensive_evaluations": 10000,
+        "oracle_calls": 10000
+      },
+      "locked_args": {
+        "benchmark": "tdc",
+        "proposal-mode": "openai",
+        "iterations": 1000,
+        "reservoir-size": 32,
+        "evaluations-per-round": 16,
+        "max-oracle-calls": 10000,
+        "num-cycles": 1,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 4
+      }
+    },
+    "reconstruction_zinc250k_original": {
+      "description": "zinc250k: published original single evolving projection; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 1000,
+        "projection_targets": 1000,
+        "projection_cycle_allowance": 16000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "zinc250k",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 1,
+        "num-cycles": 16,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_zinc250k_matched_baseline": {
+      "description": "zinc250k: four matched fixed-original-query restarts; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 16000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "zinc250k",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 4,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_zinc250k_ldm": {
+      "description": "zinc250k: four projection restarts with LDM query steering; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 16000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "zinc250k",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 4,
+        "reservoir-size": 8,
+        "proposal-mode": "openai"
+      }
+    },
+    "reconstruction_enamine_original": {
+      "description": "enamine: published original single evolving projection; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 1000,
+        "projection_targets": 1000,
+        "projection_cycle_allowance": 12000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "enamine",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 1,
+        "num-cycles": 12,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_enamine_matched_baseline": {
+      "description": "enamine: four matched fixed-original-query restarts; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 12000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "enamine",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 3,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_enamine_ldm": {
+      "description": "enamine: four projection restarts with LDM query steering; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 12000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "enamine",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 3,
+        "reservoir-size": 8,
+        "proposal-mode": "openai"
+      }
+    },
+    "reconstruction_chembl_original": {
+      "description": "chembl: published original single evolving projection; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 1000,
+        "projection_targets": 1000,
+        "projection_cycle_allowance": 24000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "chembl",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 1,
+        "num-cycles": 24,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_chembl_matched_baseline": {
+      "description": "chembl: four matched fixed-original-query restarts; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 24000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "chembl",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 6,
+        "reservoir-size": 1,
+        "proposal-mode": "baseline"
+      }
+    },
+    "reconstruction_chembl_ldm": {
+      "description": "chembl: four projection restarts with LDM query steering; draft qualification.",
+      "budget": {
+        "expensive_evaluations": 4000,
+        "projection_targets": 4000,
+        "projection_cycle_allowance": 24000
+      },
+      "locked_args": {
+        "benchmark": "reconstruction",
+        "dataset": "chembl",
+        "target-limit": 1000,
+        "search-width": 8,
+        "exhaustiveness": 4,
+        "num-editflow-samples": 100,
+        "max-results": 100,
+        "evaluations-per-round": 1,
+        "iterations": 4,
+        "num-cycles": 6,
+        "reservoir-size": 8,
+        "proposal-mode": "openai"
+      }
+    }
+  }
+}

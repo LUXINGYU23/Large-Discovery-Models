@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "task_id": "atomworld",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/theAfish/AtomWorldBench",
+    "source_commit": "sha256:ac57d9248fdd9b5461388eb57f12dc33f58d666fd5060dc9a03a269b2908dd85",
+    "task_path": "src/atomworld/evaluate.py"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "one_shot_accuracy",
+        "direction": "maximize"
+      },
+      {
+        "name": "extended_final_accuracy",
+        "direction": "maximize"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "correct",
+        "direction": "maximize",
+        "description": "Logged official per-answer objective only; no target-based optimization or answer selection"
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "oracle_any_attempt_accuracy_diagnostic",
+        "direction": "maximize"
+      },
+      {
+        "name": "normalized_rmsd",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "synthetic_mock",
+      "local_released_subset"
+    ],
+    "settings": {
+      "official_api": "atomworld.evaluate(target_cif,generated_output,action_name=...)",
+      "primitive_cell": false,
+      "stol": 0.5,
+      "distance_units": "normalized_dimensionless",
+      "feedback": "public syntax only",
+      "selection": "last scheduled answer",
+      "paper_actions": [
+        "change_atom_action",
+        "remove_atom_action",
+        "add_atom_action",
+        "move_atom_action",
+        "move_towards_atom_action",
+        "insert_between_atoms_action",
+        "swap_atoms_action",
+        "delete_below_atom_action",
+        "rotate_around_atom_action",
+        "super_cell_action"
+      ],
+      "paper_split_verified": false,
+      "source_commit_note": "Archive contains no Git metadata; SHA-256 inventory pins local files.",
+      "proposal_modes": {
+        "mock": "deterministic; no endpoint preflight",
+        "real": "OpenAI-compatible Chat Completions; preflight required"
+      },
+      "collection_modes": {
+        "cif": "Accepted parseable CIF output \u2192 canonical ldm-2.0 IR",
+        "operations": "Raw plans/tool records only; no CIF model-output collection"
+      }
+    },
+    "per_candidate_limits": {
+      "answers_per_round": 1,
+      "max_output_chars": 1000000,
+      "baseline_attempts": 1,
+      "extended_attempts": 4,
+      "official_inference_token_budget": "unspecified; our configs label their token cap"
+    }
+  },
+  "budget": {
+    "baseline_attempts_per_sample": 1,
+    "extended_attempts_per_sample": 4,
+    "extra_service_retry_allowance": 1
+  },
+  "profiles": {
+    "one_shot": {
+      "description": "One answer per released question; 8192 output-token cap, no target feedback",
+      "budget": {
+        "attempts_per_sample": 1
+      },
+      "locked_args": {
+        "attempts-per-sample": 1,
+        "llm-max-tokens": 8192,
+        "llm-temperature": 0.0,
+        "proposal-format": "cif"
+      }
+    },
+    "extended_reasoning": {
+      "description": "Four chronological target-blind self-review turns; final turn scored separately",
+      "budget": {
+        "attempts_per_sample": 4
+      },
+      "locked_args": {
+        "attempts-per-sample": 4,
+        "llm-max-tokens": 8192,
+        "llm-temperature": 0.0,
+        "proposal-format": "cif"
+      }
+    },
+    "extended_operations": {
+      "description": "Four target-blind JSON operation plans executed with bounded geometry tools; distinct tool-assisted extension",
+      "budget": {
+        "attempts_per_sample": 4
+      },
+      "locked_args": {
+        "attempts-per-sample": 4,
+        "llm-max-tokens": 8192,
+        "llm-temperature": 0.0,
+        "proposal-format": "operations"
+      }
+    }
+  }
+}

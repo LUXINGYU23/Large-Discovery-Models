@@ -1,0 +1,10 @@
+name: atomworld_mock
+task: atomworld
+algorithm: target_blind_refinement
+mode: mock
+args:
+  mock: true
+  attempts-per-sample: 2
+  out-dir: runs/mock
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

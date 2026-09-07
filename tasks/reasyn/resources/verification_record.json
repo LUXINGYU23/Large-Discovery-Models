@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "task_id": "reasyn",
+  "verified_on": "2026-09-06",
+  "registration": "valid",
+  "qualification": "draft",
+  "formal_evidence_stage": "scaffolded",
+  "formal_gate_limitation": "Supplied workspace has no .git; clean-checkout tracked-file requirement cannot be certified. Real checkpoints/chemistry indices/endpoint are absent.",
+  "experiment_contract_sha256": "69ce422097f7d3527de70448713388ac49c523fc1c1d8628cab8f2b92a0402ac",
+  "source_provenance": "tasks/reasyn/resources/source_provenance.json",
+  "asset_inventory": "tasks/reasyn/resources/local_asset_inventory.json",
+  "tests": {
+    "root_python": "3.11.15",
+    "root_tests": "12 passed (included in final 359-passed joint suite)",
+    "isolated_locked_task_environment": "9 passed, 3 skipped (optional real RDKit tests excluded without chemistry extra)",
+    "coverage": [
+      "shared campaign mock and resume in both benchmarks",
+      "short target files rejected before silently reducing a requested benchmark denominator",
+      "canonical collection IR and no provenance/credential leakage",
+      "released source AUC parity at boundary lengths and full10000",
+      "real RDKit stereo-exact reconstruction full denominator",
+      "canonical TDC duplicate cache and >=hard cap",
+      "Tanimoto GP transfers to chemically related heldout candidates",
+      "every endpoint preflight counted across resume",
+      "malformed LDM response rejected and recorded without oracle/projection cost",
+      "cached projection boundary revalidated",
+      "frozen worker main executed with fake modules, exact sampler args, two checkpoints and replay-verified valid/invalid routes"
+    ]
+  },
+  "checks": {
+    "manifest_validation": "passed",
+    "mock_dependency_no_optional": "passed",
+    "mock_shared_runner_dry_run": "passed",
+    "mock_shared_runner_execution": "both tracks passed",
+    "isolated_uv_locked_mock_runner": "both tracks passed",
+    "named_real_profile_dry_run": "passed",
+    "real_neural_projector": "not run: missing AR/EB checkpoints and chemistry indices",
+    "real_TDC_oracle_score": "not run",
+    "external_LLM_requests": 0
+  },
+  "mock_campaigns": [
+    {
+      "benchmark": "reconstruction",
+      "mode": "mock",
+      "scientific_score": null,
+      "synthetic_fixture_metrics": {
+        "building_block_diversity": 0.0,
+        "mean_similarity": 1.0,
+        "per_target": [
+          {
+            "output_count": 4,
+            "reconstructed": true,
+            "similarity": 1.0,
+            "target": "CCO"
+          }
+        ],
+        "product_diversity": 0.0,
+        "reconstruction_rate": 1.0,
+        "success_rate": 1.0,
+        "target_count": 1
+      },
+      "budget": {
+        "counters": {
+          "benchmark_jobs": 4,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 4,
+          "external_evaluations": 4,
+          "llm_requests": 0,
+          "oracle_calls": 0,
+          "outer_iterations": 2,
+          "projection_cycle_allowance": 4,
+          "projection_targets": 4,
+          "proposal_attempts": 0,
+          "selected_candidates": 4,
+          "successful_evaluations": 4,
+          "valid_search_candidates": 8
+        },
+        "limits": {
+          "benchmark_jobs": 4,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 4,
+          "external_evaluations": 4,
+          "llm_requests": 0,
+          "oracle_calls": 0,
+          "outer_iterations": 2,
+          "projection_cycle_allowance": 4,
+          "projection_targets": 4,
+          "proposal_attempts": 0,
+          "selected_candidates": 4,
+          "successful_evaluations": 4,
+          "valid_search_candidates": 8
+        },
+        "metadata": {
+          "run_id": "reasyn_7",
+          "task": "reasyn"
+        },
+        "remaining": {
+          "benchmark_jobs": 0,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 0,
+          "external_evaluations": 0,
+          "llm_requests": 0,
+          "oracle_calls": 0,
+          "outer_iterations": 0,
+          "projection_cycle_allowance": 0,
+          "projection_targets": 0,
+          "proposal_attempts": 0,
+          "selected_candidates": 0,
+          "successful_evaluations": 0,
+          "valid_search_candidates": 0
+        }
+      },
+      "raw_artifact_sha256": {
+        "campaign.json": "875594222fb224b90115f1a06bc3c537f4260cd3f0a5b0d7b441c16a70507758",
+        "events.jsonl": "0ab4c4ad6eaeb3196b22088985c45e09372f80cc181f2b396b676bb15a9532ed",
+        "checkpoint.json": "ff3a5c2f9c74ebc46fb2d31c6fdbb3424dea9127dd75edfd7db6b069d5277807",
+        "summary.json": "bad7a3e8a44a025ae304a1bf88754ab69ce2308c22564f38a0d86a2f7d35a78c",
+        "budget.json": "8863e6e819c21d27f4ee5522b3449ab145b9e7f5cb174d396511fde374c0a378",
+        "status.json": "e58392fb075122b5a64222136b491d995f66d514c8a67ea84991899093cb963a",
+        "result.json": "cc15d84972c2e65b501ac396c2056d38fc806491ac87dd3ab467a93d92e69a95",
+        "trajectory.csv": "4564f6ff096ed9815491382fe1e98d04861eef810092f083971243fa527564d5",
+        "experiment_contract.json": "179892c8c1f9d2dda3164252a49baef59d23153825e8f2bafec62ed25dbc9658"
+      }
+    },
+    {
+      "benchmark": "tdc",
+      "mode": "mock",
+      "scientific_score": null,
+      "synthetic_fixture_metrics": {
+        "auc_top10": null,
+        "auc_top10_observed": 8.130565632165076e-05,
+        "top10": 0.4065282816082538
+      },
+      "budget": {
+        "counters": {
+          "benchmark_jobs": 4,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 4,
+          "external_evaluations": 4,
+          "llm_requests": 0,
+          "oracle_calls": 4,
+          "outer_iterations": 2,
+          "projection_cycle_allowance": 8,
+          "projection_targets": 8,
+          "proposal_attempts": 0,
+          "selected_candidates": 4,
+          "successful_evaluations": 4,
+          "valid_search_candidates": 8
+        },
+        "limits": {
+          "benchmark_jobs": 4,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 4,
+          "external_evaluations": 4,
+          "llm_requests": 0,
+          "oracle_calls": 10000,
+          "outer_iterations": 2,
+          "projection_cycle_allowance": 8,
+          "projection_targets": 8,
+          "proposal_attempts": 0,
+          "selected_candidates": 4,
+          "successful_evaluations": 4,
+          "valid_search_candidates": 8
+        },
+        "metadata": {
+          "run_id": "reasyn_8",
+          "task": "reasyn"
+        },
+        "remaining": {
+          "benchmark_jobs": 0,
+          "endpoint_preflight_requests": 0,
+          "expensive_evaluation_attempts": 0,
+          "external_evaluations": 0,
+          "llm_requests": 0,
+          "oracle_calls": 9996,
+          "outer_iterations": 0,
+          "projection_cycle_allowance": 0,
+          "projection_targets": 0,
+          "proposal_attempts": 0,
+          "selected_candidates": 0,
+          "successful_evaluations": 0,
+          "valid_search_candidates": 0
+        }
+      },
+      "raw_artifact_sha256": {
+        "campaign.json": "dcbf5625db0ebc0cb574108e9cb9082778f4616fea82acd44abc84682fcfbb66",
+        "events.jsonl": "b006661fb36c7e5b3c0d6c925351493f56fff4831480f0f8350e52df84e6129d",
+        "checkpoint.json": "0ee7410a0fedaef5f5c061f908a37ed63ece6574a04c2366996764d3d9d7f034",
+        "summary.json": "3f6c10784d267121822384b0e9edfe9c6f512a8e81cbd2eeaccf6b5565db9cc5",
+        "budget.json": "5af0f025c93d26761c02f391d436c22504ca97c818a7b7fa46ed7fbc63925139",
+        "status.json": "aab0984dc0c13e012c0ba7ab18b41859bb57b139d6b4d4d768ae133dac8631a9",
+        "result.json": "efce3e171492ac111cbf5b325989a041f2bfe78618062014f761a71b6b814ef4",
+        "trajectory.csv": "9aa2b4c33f02914b71854661066f650ed2cd141fab119eb46b28438f8bfa8df4",
+        "experiment_contract.json": "179892c8c1f9d2dda3164252a49baef59d23153825e8f2bafec62ed25dbc9658"
+      }
+    }
+  ]
+}

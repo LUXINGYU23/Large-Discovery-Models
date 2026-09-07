@@ -1,0 +1,21 @@
+{
+  "name": "reasyn_reconstruction_chembl_matched_baseline",
+  "task": "reasyn",
+  "algorithm": "projection_baseline",
+  "mode": "real",
+  "contract_profile": "reconstruction_chembl_matched_baseline",
+  "args": {
+    "benchmark": "reconstruction",
+    "dataset": "chembl",
+    "target-limit": 1000,
+    "search-width": 8,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 100,
+    "max-results": 100,
+    "evaluations-per-round": 1,
+    "iterations": 4,
+    "num-cycles": 6,
+    "reservoir-size": 1,
+    "proposal-mode": "baseline"
+  }
+}

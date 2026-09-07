@@ -1,0 +1,16 @@
+[project]
+name = "ldm-tts-reasyn"
+version = "0.1.0"
+description = "LDM-guided ReaSyn reconstruction and released TDC oracle evaluation"
+requires-python = ">=3.10,<3.12"
+dependencies = ["numpy>=1.26,<2", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+chemistry = ["rdkit>=2023.9", "pytdc==0.4.1", "pandas>=2,<3", "networkx>=3,<4", "setuptools<81"]
+projection = ["torch==2.7.0", "omegaconf>=2.3", "einops", "pandas>=2,<3", "joblib", "tqdm", "scikit-learn==1.2.2", "editdistance", "torchtyping", "rdkit>=2023.9"]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[tool.uv]
+package = false

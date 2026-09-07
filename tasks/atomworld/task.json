@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "atomworld",
+  "description": "Target-blind long-horizon crystal manipulation with the official AtomWorld evaluator.",
+  "dependency_checker": "tasks.atomworld.ldm_task.dependencies:check_dependencies"
+}

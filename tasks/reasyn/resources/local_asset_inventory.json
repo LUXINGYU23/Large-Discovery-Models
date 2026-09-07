@@ -1,0 +1,54 @@
+{
+  "task": "reasyn",
+  "upstream_root": "../ReaSyn-reasyn_v2",
+  "downloaded": false,
+  "assets": [
+    {
+      "path": "data/test_zinc250k.txt",
+      "present": true,
+      "bytes": 59420,
+      "sha256": "59e0f5b4cb40d1c784a4505a1451338a1c4621e68ce1febd4e826a393f47be01",
+      "rows_excluding_SMILES_header": 1000
+    },
+    {
+      "path": "data/building_blocks/building_blocks_zinc250k.txt",
+      "present": true,
+      "bytes": 1116866,
+      "sha256": "96da92294b151cc7cd90d1baf055f913aa4d77d047fe80997fca06d759aad775",
+      "rows_excluding_SMILES_header": 37386
+    },
+    {
+      "path": "data/enamine_smiles_1k.txt",
+      "present": false
+    },
+    {
+      "path": "data/chembl_filtered_1k.txt",
+      "present": false
+    },
+    {
+      "path": "data/trained_model/nv-reasyn-ar-166m-v2.ckpt",
+      "present": false
+    },
+    {
+      "path": "data/trained_model/nv-reasyn-eb-174m-v2.ckpt",
+      "present": false
+    },
+    {
+      "path": "data/processed/comp_2048/fpindex.pkl",
+      "present": false
+    },
+    {
+      "path": "data/processed/comp_2048/matrix.pkl",
+      "present": false
+    },
+    {
+      "path": "data/processed/zinc250k_2048/fpindex.pkl",
+      "present": false
+    },
+    {
+      "path": "data/rxn_templates/comprehensive.txt",
+      "present": false
+    }
+  ],
+  "setup_instructions": "Follow upstream README Data Preparation/Training checkpoint download. Preserve supplied building-block list unchanged."
+}

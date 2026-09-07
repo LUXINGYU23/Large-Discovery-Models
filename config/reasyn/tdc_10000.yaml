@@ -1,0 +1,18 @@
+{
+  "name": "reasyn_tdc_10000",
+  "task": "reasyn",
+  "algorithm": "ldm_gp_ucb",
+  "mode": "real",
+  "contract_profile": "tdc_10000",
+  "args": {
+    "benchmark": "tdc",
+    "proposal-mode": "openai",
+    "iterations": 1000,
+    "reservoir-size": 32,
+    "evaluations-per-round": 16,
+    "max-oracle-calls": 10000,
+    "num-cycles": 1,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 4
+  }
+}

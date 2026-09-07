@@ -1,0 +1,21 @@
+{
+  "source_url": "https://github.com/theAfish/AtomWorldBench",
+  "source_commit": null,
+  "identity_policy": "SHA-256 source inventory; local source archive has no .git",
+  "files_sha256": {
+    "README.md": "6897a8b1dc2db9ae9446d9f8aea018ce0ab6a6bcd8fd1296dd0c220674ffdfee",
+    "pyproject.toml": "1d62516788f77ddb2b6c230e82d0f75acac1cc1b54c273a4332dcef32e5cc9ee",
+    "src/atom_world/__init__.py": "d1c9c72312715cde781235724e83349bb86b78619d034bd21b60a438ca8596e9",
+    "src/atom_world/actions.py": "206db8d7e9409f3f33d58ca3b29c4ac5faa3e8cda6ed0ff46768a23bb9b0e694",
+    "src/atom_world/cell_actions.py": "c39cb8327eca320f999e961cd4eb42baf96ec8448b868bafbf5ce5a1d8ba5320",
+    "src/atom_world/data_generator.py": "29bf1526c1dea6ee038abb3fc6f6b5fc969cf82e0f32455bf20fedde84cf1064",
+    "src/atomworld/__init__.py": "7d30a808408c33fb3b0e70c0c6fc60920ac3ca7d0b35226f4fa9919f66daf9d1",
+    "src/atomworld/evaluate.py": "191569b763cc2d9a8f61484ee9835a6fd150a9609b4cc0936d875b78b5538bc9",
+    "src/benchmark/evaluation/atomworld_evaluator.py": "12bd97632f840f01f23aa12c12cecfc1e488071e0cb678ab6da01ddba6c3cfa9",
+    "src/benchmark/evaluation/metrics.py": "622289a8c410cbb7fed5344505b0242ffa4f057535309d74d24cea5699391abf",
+    "src/prompts/cif_action_prompt.py": "f0dc16836048e54eb69bb6b18540fea01f081e68a428d2fc330d5c5ee061bf9b",
+    "src/utils/dataloader.py": "30ed0a649415aa2010f22b469524a5805ad6cf4c784e2ac89dac7aeeab8bc1f3"
+  },
+  "paper_sha256": "e807edb48b05db4f596e5a41cb9b1e42c94a74a54c072f46d64834483eb634d8",
+  "inventory_sha256": "ac57d9248fdd9b5461388eb57f12dc33f58d666fd5060dc9a03a269b2908dd85"
+}
