@@ -51,7 +51,7 @@ The stage string is provenance only. It has no computational effect.
 
 ## Read the diagnostics correctly
 
-The exact `weight_context` is visible through `inspect_policy_contract`.
+The exact `weight_context` is in the exported `input.json["execution_context"]`.
 It includes history size, pool and occurrence counts, task defaults, a (q_0)
 summary, and a baseline-acquisition summary. `candidate_predictions` adds each
 pool member's q0, raw GP mean/std/UCB, normalized acquisition, and default

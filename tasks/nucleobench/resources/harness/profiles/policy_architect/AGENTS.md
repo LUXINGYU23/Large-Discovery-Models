@@ -12,8 +12,10 @@ If `ldm_weights@1` is disabled, skip weight design and its curriculum audit;
 the task retains default weights. Apply the corresponding guidance below only
 to enabled capabilities, and declare no disabled capability in the artifact.
 
-Begin every round with `inspect_policy_contract`. Treat its contract, execution
-contexts, research snapshot, and active-policy pointer as authoritative. Read
+Begin every round with `inspect_policy_contract`. Its contract and active-policy
+pointer are authoritative. Use `guest_snapshot.directory` to load
+`input.json["execution_context"]` and query `research_snapshot.json` with local
+scripts. Print selected fields and summaries, never the complete snapshots. Read
 the task-local `compile-ldm-policy` Skill from the guest-visible location listed
 by Pi before writing an artifact, and resolve its references relative to that
 location. Paths in the round message are host-side lineage references; inspect

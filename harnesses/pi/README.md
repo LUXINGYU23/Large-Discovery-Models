@@ -97,10 +97,12 @@ relative references without mounting the repository. The pool also includes
 the built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
 `validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
 the authoritative feature contract and repair a draft before submission. These
-tools are advisory. Inspection returns the exact task-supplied `mean_context`
-and `weight_context` in addition to the public research snapshot, so generated
-code does not have to guess target scaling or available keys. Inspection also
-exports read-only arrays to `guest_snapshot.directory`. The runner preserves
+tools are advisory. Inspection returns the contract and file paths under
+`guest_snapshot.directory`. Its read-only `input.json` contains the exact
+task-supplied `execution_context`, including `mean_context` and `weight_context`;
+`research_snapshot.json` contains the full research history and `arrays.npz`
+contains numeric inputs. Agents query those files with local scripts instead
+of receiving the entire history in a tool response. The runner preserves
 single-objective vectors or multiobjective matrices; objective meaning and GP
 diagnostics are task-owned. A trusted read-only diagnostic module is configured
 through `LDM_POLICY_DIAGNOSTICS` and `LDM_POLICY_DIAGNOSTICS_SHA256`.

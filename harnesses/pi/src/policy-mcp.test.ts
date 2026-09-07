@@ -16,13 +16,15 @@ test("built-in policy MCP reads the active snapshot and runs draft tools", async
 	await mkdir(round, { recursive: true });
 	await writeFile(join(workspace, "optimization_policy.py"), "POLICY_API_VERSION = 1\n");
 	await writeFile(join(round, "contract.json"), JSON.stringify({ feature_names: ["a", "b"] }));
-	await writeFile(join(round, "input.json"), JSON.stringify({
+	const input = {
 		execution_context: {
 			mean_context: { target_location: 2, target_scale: 0.5 },
 			weight_context: { history_size: 4 },
 		},
-	}));
-	await writeFile(join(round, "research_snapshot.json"), JSON.stringify({ task_objective: "fixture" }));
+	};
+	const research = { task_objective: "fixture", history: Array(10_000).fill({ utility: 2, notes: "measured evidence" }) };
+	await writeFile(join(round, "input.json"), JSON.stringify(input));
+	await writeFile(join(round, "research_snapshot.json"), JSON.stringify(research));
 	await writeFile(join(round, "arrays.npz"), "fixture arrays");
 	await writeFile(join(root, "active_round.json"), JSON.stringify({
 		round_index: 1,
@@ -88,15 +90,16 @@ console.log(JSON.stringify(command === "inspect"
 		);
 		assert.equal((inspect.details as any).structuredContent.round_index, 1);
 		assert.deepEqual((inspect.details as any).structuredContent.guest_snapshot, {
-			directory: "/workspace/.ldm-resources/policy/round_001", arrays: "arrays.npz", read_only: true,
+			directory: "/workspace/.ldm-resources/policy/round_001", arrays: "arrays.npz",
+			contract: "contract.json", input: "input.json", research: "research_snapshot.json", read_only: true,
 		});
 		assert.equal(await readFile(join(workspace, ".ldm-resources/policy/round_001/arrays.npz"), "utf8"), "fixture arrays");
+		assert.ok(JSON.stringify(inspect.content).length < 2000);
 		assert.deepEqual(
-			(inspect.details as any).structuredContent.execution_context,
-			{
-				mean_context: { target_location: 2, target_scale: 0.5 },
-				weight_context: { history_size: 4 },
-			},
+			JSON.parse(await readFile(join(workspace, ".ldm-resources/policy/round_001/input.json"), "utf8")), input,
+		);
+		assert.deepEqual(
+			JSON.parse(await readFile(join(workspace, ".ldm-resources/policy/round_001/research_snapshot.json"), "utf8")), research,
 		);
 		assert.equal((validation.details as any).structuredContent.status, "ok");
 		assert.equal(

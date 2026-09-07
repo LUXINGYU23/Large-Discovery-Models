@@ -43,8 +43,6 @@ interface RoundSnapshot {
 	pointer: ActiveRound;
 	directory: string;
 	contract: Record<string, unknown>;
-	input: Record<string, unknown>;
-	research: Record<string, unknown>;
 }
 
 function createPolicyServer(config = environmentConfig()): McpServer {
@@ -52,7 +50,7 @@ function createPolicyServer(config = environmentConfig()): McpServer {
 	server.registerTool(
 		"inspect_policy_contract",
 		{
-			description: "Inspect the authoritative optimization-policy contract and current research snapshot.",
+			description: "Inspect the authoritative optimization-policy contract and export current snapshot files to the guest. Read execution_context from input.json and query research_snapshot.json with local scripts; do not print whole history files.",
 			inputSchema: z.object({}),
 		},
 		async () => response(await inspectSnapshot(config)),
@@ -113,12 +111,13 @@ async function inspectSnapshot(config: PolicyMcpConfig): Promise<Record<string, 
 		input_sha256: snapshot.pointer.input_sha256,
 		contract_sha256: snapshot.pointer.contract_sha256,
 		contract: snapshot.contract,
-		execution_context: snapshot.input.execution_context,
-		research_snapshot: snapshot.research,
 		active_policy: snapshot.pointer.active_policy,
 		guest_snapshot: {
 			directory: `/workspace/${resourcePath.split(sep).join("/")}`,
 			arrays: "arrays.npz",
+			contract: "contract.json",
+			input: "input.json",
+			research: "research_snapshot.json",
 			read_only: true,
 		},
 	};
@@ -140,8 +139,6 @@ async function loadSnapshot(config: PolicyMcpConfig): Promise<RoundSnapshot> {
 		pointer,
 		directory,
 		contract: await jsonFile(join(directory, "contract.json")),
-		input: await jsonFile(join(directory, "input.json")),
-		research: await jsonFile(join(directory, "research_snapshot.json")),
 	};
 }
 

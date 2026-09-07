@@ -238,9 +238,11 @@ prior_mean(x) = E[z(x) | public task features and supported evidence].
 
 The unchanged task GP is fitted to `z - prior_mean` and adds the mean back to
 its posterior. The policy mean is not a maximum, rank, probability of
-optimality, or acquisition score. `inspect_policy_contract` exposes the exact
-execution contexts and exports authoritative numeric inputs read-only into the
-research guest. `evaluate_policy_draft` compares chronological measured-history
+optimality, or acquisition score. `inspect_policy_contract` returns the contract
+and exports authoritative snapshot files read-only into the research guest.
+The exact execution contexts remain in `input.json`; full history remains in
+`research_snapshot.json`. Query these files locally rather than printing them
+in full. `evaluate_policy_draft` compares chronological measured-history
 holdouts using GP hyperparameters fitted on each training prefix and frozen.
 Current-pool diagnostics describe first-draw probabilities, not batch inclusion.
 Historical validation is a development check: the Agent has seen those labels.

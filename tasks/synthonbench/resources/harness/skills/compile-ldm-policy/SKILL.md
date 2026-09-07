@@ -14,10 +14,11 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
 
 ## Required workflow
 
-1. Call `inspect_policy_contract`. Its contract, execution contexts, research
-   snapshot, and active-policy pointer are authoritative. Load NumPy arrays from
-   the returned `guest_snapshot.directory`; this export is read-only. Do not
-   reconstruct numeric feature rows from SMILES or prose.
+1. Call `inspect_policy_contract`. Its contract and active-policy pointer are
+   authoritative. In the read-only `guest_snapshot.directory`, load
+   `input.json["execution_context"]`, `research_snapshot.json`, and `arrays.npz`
+   with JSON/NumPy. Query selected evidence and print compact summaries, not
+   entire files. Do not reconstruct numeric feature rows from SMILES or prose.
 2. Read `enabled_capabilities`. Only for `prior_mean@1`, read
    [prior-mean-and-residual-gp.md](references/prior-mean-and-residual-gp.md).
    Only for `ldm_weights@1`, read
