@@ -264,6 +264,61 @@ def test_failed_turn_preserves_known_usage_and_checks_identity(tmp_path, monkeyp
     )
 
 
+@pytest.mark.parametrize("failure", ["turn", "exit", "timeout"])
+def test_partial_session_failure_recovers_without_regenerating_committed_turns(tmp_path, monkeypatch, failure):
+    monkeypatch.setenv("HARNESS_TEST_PARTIAL_FAILURE" if failure == "turn" else "HARNESS_TEST_PROCESS_FAILURE", failure)
+    monkeypatch.setenv("HARNESS_TEST_SECRET", "fixture")
+    monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-fixture")
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=tuple(HarnessProfile(p, Path("/resources/AGENTS.md"), agents_sha256="a" * 64) for p in ("a", "b")),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turns = tuple(HarnessTurn(
+        profile_id=p, turn_id=f"turn-{p}", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    ) for p in ("a", "b"))
+    validated = []
+
+    def validate(request):
+        validated.append(request.profile_id)
+        return HarnessSubmissionValidation()
+
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", named_secrets={"mcp": "mcp-fixture"}, config=config, response_timeout_seconds=2,
+    ) as client:
+        results = client.run_turn(turns, submission_validator=validate, recovery_timeout_seconds=10)
+    assert validated == ["a", "b"]
+    assert [r.replayed for r in results] == [True, False]
+    assert [r.turn_id for r in results] == ["turn-a", "turn-b"]
+    assert [r.usage["validationSubmissions"] for r in results] == [1, 1]
+
+
+@pytest.mark.parametrize("retryable,window", [(False, 10), (True, 0), (True, 0.01)])
+def test_session_recovery_stops_for_fatal_errors_or_exhausted_time(tmp_path, monkeypatch, retryable, window):
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("a", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    client = HarnessClient(("unused",), api_key="fixture", config=config)
+    calls = []
+
+    def fail(*args, **kwargs):
+        calls.append(1)
+        raise HarnessError("failure", retryable=retryable)
+
+    monkeypatch.setattr(client, "_request", fail)
+    turn = HarnessTurn(profile_id="a", turn_id="a-1", round_index=1,
+                       history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research")
+    with pytest.raises(HarnessError, match="failure"):
+        client.run_turn((turn,), submission_validator=lambda _: HarnessSubmissionValidation(), recovery_timeout_seconds=window)
+    assert calls == [1]
+
+
 @pytest.mark.parametrize(
     "environment_variable",
     ("HARNESS_TEST_SKIP_VALIDATION", "HARNESS_TEST_CHANGE_AFTER_VALIDATION"),

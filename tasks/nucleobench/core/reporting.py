@@ -16,6 +16,7 @@ from ldm_tts.engine.reporting import (
 )
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write
 from tasks.nucleobench.core.digests import file_digest
+from tasks.nucleobench.core.benchmark_clock import clock_segments, elapsed_at
 
 _EXECUTION_PROFILES = frozenset(
     {"qualification", "pilot_evaluation", "official_benchmark"}
@@ -59,7 +60,17 @@ def write_campaign_reports(
 
     normalized = _validate_execution(execution)
     observations = load_successful_observations(runtime.run_dir / "checkpoint.json")
-    rows = _trajectory_rows(runtime, observations, normalized["search_method"])
+    benchmark_started_at = None
+    segments = []
+    if normalized["termination_kind"] == "wall_time":
+        segments = clock_segments(runtime.events(), normalized["max_seconds"])
+        if not segments:
+            raise ValueError("Wall-time reporting requires a matching benchmark clock")
+        benchmark_started_at = segments[0]["started_at_unix"]
+        normalized["benchmark_comparable"] = len(segments) == 1
+    rows = _trajectory_rows(
+        runtime, observations, normalized["search_method"], segments
+    )
     completed_rounds = len({int(row["round"]) for row in rows})
     if (
         normalized["termination_kind"] == "rounds"
@@ -76,6 +87,7 @@ def write_campaign_reports(
             "evaluation",
             "round",
             "elapsed_seconds",
+            "benchmark_elapsed_seconds",
             "oracle_evaluation_index",
             "candidate_id",
             "energy",
@@ -102,7 +114,7 @@ def write_campaign_reports(
         "best_found_utility": None if best is None else best["utility"],
         "best_found_energy": (None if best is None else best["metrics"].get("energy")),
         "trajectory_primary_axis": (
-            "elapsed_seconds"
+            "benchmark_elapsed_seconds"
             if normalized["termination_kind"] == "wall_time"
             else "round"
         ),
@@ -114,6 +126,26 @@ def write_campaign_reports(
             "proposal_trace": "proposal_trace.jsonl",
         },
     }
+    if benchmark_started_at is not None:
+        in_budget = [
+            row for row in rows
+            if row["benchmark_elapsed_seconds"] <= normalized["max_seconds"]
+        ]
+        best_in_budget = max(in_budget, key=lambda row: row["utility"], default=None)
+        result["wall_time_result"] = {
+            "clock_mode": "cumulative_runtime" if len(segments) > 1 else "continuous_wall_time",
+            "segments": segments,
+            "clock_started_at_unix": benchmark_started_at,
+            "max_seconds": normalized["max_seconds"],
+            "evaluation_count": len(in_budget),
+            "best_candidate_id": None if best_in_budget is None else best_in_budget["candidate_id"],
+            "best_utility": None if best_in_budget is None else best_in_budget["utility"],
+            "best_energy": None if best_in_budget is None else best_in_budget["energy"],
+            "evaluations_after_deadline": len(rows) - len(in_budget),
+            "last_evaluation_seconds": max(
+                (row["benchmark_elapsed_seconds"] for row in rows), default=0.0
+            ),
+        }
     atomic_json_write(runtime.run_dir / "result.json", result)
     return result
 
@@ -148,9 +180,9 @@ def _validate_execution(execution: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(comparable, bool):
         raise TypeError("benchmark_comparable must be boolean")
     if profile == "official_benchmark":
-        if termination != "wall_time" or not comparable:
+        if termination != "wall_time":
             raise ValueError(
-                "official benchmark results require wall-time comparability"
+                "official benchmark results require wall-time termination"
             )
         _positive_int(result["max_seconds"], "max_seconds")
     elif termination != "rounds" or comparable or result["max_seconds"] is not None:
@@ -194,6 +226,7 @@ def _trajectory_rows(
     runtime: CampaignRuntime,
     observations: Sequence[Mapping[str, Any]],
     search_method: str,
+    benchmark_segments: Sequence[Mapping[str, float]] = (),
 ) -> list[dict[str, Any]]:
     events = runtime.events()
     event_by_candidate = {
@@ -230,15 +263,20 @@ def _trajectory_rows(
         best_energy = energy if best_energy is None else min(best_energy, energy)
         best_utility = utility if best_utility is None else max(best_utility, utility)
         oracle_index = index
+        evaluated_at = timestamp
         for call in model_calls:
             if float(call["timestamp_unix"]) > timestamp:
                 break
             oracle_index = int(call["payload"]["cumulative_sequence_count"])
+            evaluated_at = float(call["timestamp_unix"])
         rows.append(
             {
                 "evaluation": index,
                 "round": int(observation["round_idx"]),
                 "elapsed_seconds": max(0.0, timestamp - started_at),
+                "benchmark_elapsed_seconds": (
+                    elapsed_at(evaluated_at, benchmark_segments) if benchmark_segments else None
+                ),
                 "oracle_evaluation_index": oracle_index,
                 "candidate_id": candidate_id,
                 "energy": energy,

@@ -190,7 +190,7 @@ export class TurnExecutionError extends Error {
 		profileId: string;
 		turnId: string;
 		usage: { providerCalls: number; toolCalls: Record<string, number>; artifactBytes: number };
-	}>) {
+	}>, readonly retryable = false) {
 		super(message);
 	}
 }

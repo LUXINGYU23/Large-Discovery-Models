@@ -202,6 +202,10 @@ and `measured_observations`, alongside numeric history. History is chronological
 replicate semantics and candidate identity checks belong to the task.
 Supply these fields directly, not inside `research_snapshot`. The
 controller builds the exported history snapshot and sends measurement deltas.
+Tasks should send compact measurement indexes and expose complete records through
+filtered, paginated tools. Candidate identity, scientific summaries and retrieval
+fields remain task-local. Do not serialize full scientific payloads into every
+turn when stable IDs and targeted detail retrieval suffice.
 Its `record_predictions(round_index, predictions)` persists task-defined JSON
 rows unchanged. The adapter's `with_feedback(round_input, records)` constructs
 task-specific feedback from earlier prediction records and measured outcomes.
@@ -340,6 +344,20 @@ Harness artifacts are written below `<run_dir>/harness/`:
 The native Pi session is the only full conversation record. Python does not
 duplicate model or MCP transcripts. These files are raw research traces, not
 canonical `ldm-2.0` accepted-action records.
+
+Tasks can enable partial-turn recovery with
+`HarnessClient.run_turn(..., recovery_timeout_seconds=remaining_seconds)`.
+The sidecar distinguishes recoverable session timeouts and transient provider
+failures from configuration, authentication, validation-contract, and protocol
+failures. During the recovery window, the client retries with capped backoff and
+resends the same turn identities:
+committed profiles replay without another model call; unfinished profiles continue
+their existing session and workspace without appending the full history again.
+Tool quotas and validation attempt indices persist, and provider usage is cumulative
+per turn, not summed twice across retries. There is no partial-batch acceptance.
+No new recovery attempt starts after the supplied window; an attempt already in
+progress retains its configured session time limit. The task owns the campaign
+clock and decides whether recovery is allowed. A zero window disables recovery.
 
 `ldm_harness_compiled` writes the independent policy session below
 `<run_dir>/policy_harness/`. It stores round inputs and digests, validation

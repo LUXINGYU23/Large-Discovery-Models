@@ -208,6 +208,7 @@ def _run_campaign(
                     ),
                     root=(runtime.run_dir / "policy_harness").resolve(),
                     account=runtime.consume_many,
+                    recovery_budget=lambda: float(args.harness_wall_time_seconds),
                 )
             components = _components(
                 args,

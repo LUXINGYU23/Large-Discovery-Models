@@ -302,6 +302,7 @@ class PolicyResearchController:
         root: Path,
         profile_id: str = "policy_architect",
         account: Callable[[Mapping[str, int | float]], None] | None = None,
+        recovery_budget: Callable[[], float] | None = None,
     ) -> None:
         if not profile_id:
             raise ValueError("policy profile_id must not be empty")
@@ -311,6 +312,7 @@ class PolicyResearchController:
         self.root = Path(root).resolve()
         self.profile_id = profile_id
         self.account = account
+        self.recovery_budget = recovery_budget
         self.contract = adapter.capability_contract()
         self.root.mkdir(parents=True, exist_ok=True)
 
@@ -353,7 +355,10 @@ class PolicyResearchController:
         result = None
         failed_usage: dict[str, Any] = {}
         try:
-            results = self.client.run_turn((turn,), submission_validator=validate)
+            results = self.client.run_turn(
+                (turn,), submission_validator=validate,
+                recovery_timeout_seconds=(0 if self.recovery_budget is None else self.recovery_budget()),
+            )
             elapsed = time.perf_counter() - started
             if len(results) != 1:
                 raise HarnessError("policy harness must commit exactly one turn")
@@ -577,7 +582,7 @@ class PolicyResearchController:
             history_from_seq=history_from,
             history_to_seq=history_to,
             history_digest=canonical_sha256(new_observations),
-            message=json.dumps(message, indent=2, sort_keys=True),
+            message=json.dumps(message, separators=(",", ":"), sort_keys=True),
             forbidden_query_terms=tuple(forbidden_terms),
         )
 

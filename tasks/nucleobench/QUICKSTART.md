@@ -112,8 +112,15 @@ docker build -t ldm-pi-harness:latest harnesses/pi
 The task guest is derived from the committed recipe under
 `resources/harness/image/`. The cache stores base images, task build records,
 Gondolin sessions, and copy-on-write overlays. Its smoke test verifies the
-preinstalled sequence-analysis, statistics, plotting, FASTA, interval, and
-alignment/RNA-folding tools before a campaign starts.
+preinstalled sequence-analysis, statistics (including statsmodels and pyDOE3),
+plotting, FASTA, interval, and alignment/RNA-folding tools before a campaign starts.
+
+Candidate sessions load four task-local scientific Skills on demand from
+`resources/harness/skills/`. No global skill installation or extra service
+credentials are needed. Rebuild the guest after changing its package lock;
+use a new campaign after changing profile or Skill content, whose digests are
+part of the recorded session configuration. See the [research Harness section](README.md#persistent-research-harness)
+for the Skill selection and its source attribution.
 
 Optional MCP tools are loaded with `args.harness-mcp-config`. Proposal-session
 network budgets use `args.harness-tool-budget`; the independent compiled
@@ -171,6 +178,24 @@ Results are written below `$NUCLEOBENCH_RUNS_ROOT/pilot_evaluation/`.
 Use `--resume` only with the same repository revision, prepared inputs, model,
 and resolved configuration.
 
+Candidate Harness sessions write `candidates.json` inside their own workspace
+and submit its path. Each candidate has `mutations`, `change_summary`, and
+`rationale`; the latter two are short English pre-evaluation notes. The task
+validates an immutable snapshot before committing
+the batch; rejected entries can be repaired in the same session. No additional
+package or sidecar image is needed for this file-based handoff.
+
+New measurements carry a compact index to proposal and policy Agents.
+`get_measured_history` provides filtered, sortable, paginated results; use
+`response_format="detailed"` for selected IDs to read exact patches and original notes.
+the portable view is `harness/measured_history/observations.json`.
+`get_sequence_window` accepts a measured `candidate_id` to retrieve exact parent
+bases and their checksum for analysis. Notes do not
+affect candidate identity, occurrence counts, or GP features. To verify the
+feedback path, use a separately named tiny run with `args.iterations=3`: one
+paired-start evaluation followed by two active rounds, so the second proposal
+turn consumes the first batch's measured results and annotations.
+
 ## 7. Official Wall-Time Run
 
 The official profile uses the source-pinned runner's wall-time termination:
@@ -187,3 +212,40 @@ uv run --locked --project tasks/nucleobench --extra official \
 
 Pilot Evaluation results are development diagnostics and must not be reported
 as official wall-time benchmark results.
+
+For eight independent comprehensive researchers with compiled policy, use the
+same base config with overrides:
+
+```bash
+uv run --locked --project tasks/nucleobench --extra official \
+  python scripts/run_ldm_tts.py \
+  config/nucleobench/malinois_k562_official_base.yaml --dry-run \
+  --set args.search-method=ldm_harness_compiled \
+  --set args.proposal-mode=none \
+  --set 'args.harness-profile=["comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research"]' \
+  --set args.harness-unique-candidates=true \
+  --set args.harness-candidates-per-session=32 \
+  --set args.proposal-samples=256 \
+  --set args.bo-pool-size=176 \
+  --set args.evaluations-per-round=128 \
+  --set args.campaign-index=42 \
+  --set args.start-index=0
+```
+
+Use the same overrides for dependency checks and execution. Confirm the complete
+resolved run before removing `--dry-run`, including the actual hardware label,
+provider, image, tool budgets, and output directory. This is one official start
+with one optimization seed, not the paper's aggregate over 100 starts.
+The batch is an upper limit on unique evaluations, while the 256 proposal
+occurrences remain fixed. Use `result.json.wall_time_result` for the strict 8h
+score; the official runner may complete its last round after the deadline.
+For an interrupted campaign, set `args.resume-from=<campaign-directory>`.
+Only the original budget's remaining runtime is used. Repair downtime is excluded,
+so resumed results are labelled cumulative-runtime runs, not uninterrupted
+official comparisons. Keep the original failure artifacts and record runtime changes.
+
+Each session submits 32 distinct, historically unmeasured sequences. Agreement
+between independent sessions is preserved as empirical `q0` mass; the BO pool,
+compiled policy, and selection rule remain unchanged. The earlier specialist
+roles remain selectable through the same `--harness-profile` option. Omit
+`--harness-unique-candidates` to permit within-session multiplicity.

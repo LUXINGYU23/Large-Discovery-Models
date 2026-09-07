@@ -319,6 +319,8 @@ def _make_candidate(
     harness_lineage = proposal_metadata.get("harness_lineage")
     if isinstance(harness_lineage, Mapping):
         metadata["harness_lineage"] = dict(harness_lineage)
+    if "research_annotations" in proposal_metadata:
+        metadata["research_annotations"] = [dict(item) for item in proposal_metadata["research_annotations"]]
     return Candidate(
         candidate_id=f"nucleobench:{prepared.canonical_key}",
         payload=prepared.payload,

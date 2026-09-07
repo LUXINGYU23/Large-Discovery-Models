@@ -15,6 +15,7 @@ from ldm_tts.optimization import (
     SurrogateVector,
 )
 from tasks.nucleobench.core import factory
+from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
 from tasks.nucleobench.core.candidate import MutationContext, NucleoBenchCandidateDomain
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.constants import NUCLEOBENCH_Q0_METADATA_KEY
@@ -319,12 +320,16 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
         )
         for index, candidate in enumerate(candidates)
     )
+    clock = BenchmarkClock(28_800)
+    clock.start()
     adapter = NucleoOptimizationPolicyAdapter(
         features,
         seed=7,
         gp_config=HammingGPUCBConfig(),
         default_alpha=1.0,
         default_eta=1.0,
+        evaluations_per_round=128,
+        benchmark_clock=clock,
     )
 
     round_input = adapter.build_selection_round(
@@ -347,6 +352,12 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     mean_context = str(round_input.execution_context["mean_context"])
     assert all(term not in mean_context for term in ("q0", "acquisition", "candidate_id"))
     assert list(round_input.measured_observations)[0]["utility"] == 2.0
+    pool = round_input.research_snapshot["proposal_pool"]
+    assert pool["requested_evaluation_batch"] == 128
+    assert pool["effective_evaluation_batch"] == 2
+    assert pool["evaluated_pool_fraction"] == 1.0
+    assert round_input.execution_context["weight_context"]["effective_evaluation_batch"] == 2
+    assert 0 < round_input.research_snapshot["benchmark_time"]["remaining_seconds"] <= 28_800
 
 
 class _StaticPolicyController:

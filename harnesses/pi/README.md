@@ -63,6 +63,19 @@ work completed before a provider failure or wall-time limit. Failed turns do
 not commit or advance history. If the transport exits before delivering usage,
 the client preserves unknown counters rather than reporting zero.
 
+Recoverable execution failures use `error.code=recoverable_turn_error`. A caller
+may retry within its task-owned recovery window. The same batch and turn IDs
+replay committed profiles and continue only unfinished sessions; quota usage and
+validation attempts are retained. Continuation messages do not duplicate the
+history delta. Authentication, protocol, and integrity errors remain fatal.
+On transport exit or response timeout, Python recreates the sidecar with the
+same persistent artifact root and replays the turn batch. Credentials remain
+private in-memory until close so the replacement process can be bootstrapped;
+they are never added to subprocess arguments or inherited environment.
+Timeout cancellation aborts Pi compaction as well as ordinary inference.
+See [partial-turn recovery](../../docs/research-harness.md) for the Python API
+and time-budget semantics.
+
 Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
 escapes, unsupported suffixes, missing files, and oversized files, then stores
 an immutable per-attempt snapshot before task validation. Wire records contain

@@ -249,9 +249,20 @@ protected key file may be selected with `--api-key-file`.
 NucleoBench exposes the shared `LDMEngine` through the source-pinned official
 `SequenceOptimizer` lifecycle. Candidates are mutation patches relative to
 one paired official start. Direct LDM makes four independent minibatch requests;
-Harness LDM advances four persistent sequence-research roles. Invalid and
+Harness LDM advances the selected persistent sequence-research roles (four by
+default). `--harness-profile`, `--harness-candidates-per-session`, and
+`--bo-pool-size` configure its topology independently of the evaluation batch.
+Repeated profile roles create independent sessions with a shared instruction
+template. `--harness-unique-candidates` enforces canonical uniqueness within
+each session; cross-session occurrences still contribute to empirical `q0`.
+Candidate roles expose the task-local `biopython`, `experimental-design`,
+`scientific-critical-thinking`, and `statsmodels` Skills on demand. The guest
+preinstalls their sequence-analysis, DOE, and statistical-modeling dependencies;
+skill sources and licenses are recorded under the task's Harness resources.
+Invalid and
 historically evaluated patches are repaired before commit, while cross-lineage
-agreement remains empirical `q0` mass. The task maintains a `3B` pool, fits
+agreement remains empirical `q0` mass. The task maintains a bounded pool (`3B`
+by default), fits
 its exact normalized-Hamming GP-UCB, applies the LDM acquisition tilt, and
 batch-evaluates selected sequences through the official model wrapper.
 
@@ -260,6 +271,21 @@ minibatch without `q0`, GP, or acquisition. Harness-Compiled LDM adds one
 independent `policy_architect` session whose task-local Skill may set the
 residual-GP prior mean and LDM `alpha`/`eta`; the kernel, variance, UCB,
 pool, candidate budget, and evaluator remain fixed.
+
+The official wall-time profile runs one published start per campaign;
+`start-index` and optimization `campaign-index` are independent. Wall-time
+resume deducts previously used runtime and excludes repair downtime; it must be
+reported as cumulative runtime, not an uninterrupted official run. Never reset
+the eight-hour budget. The runner checks time
+between rounds: report `result.json.wall_time_result` and
+`trajectory.csv.benchmark_elapsed_seconds` for the strict time window, separately
+from late measurements in the complete official output. Confirm actual hardware
+when comparing against published results.
+
+NucleoBench sends compact measurement indexes. Use `get_measured_history`
+filters and ranking before requesting detailed patches and research notes for
+selected IDs. Exact historical exclusion is checked by task tools and submission,
+not by relying on an exhaustive list in model context. Keep full records on disk.
 
 Follow `tasks/nucleobench/QUICKSTART.md` to validate the mock path, prepare
 digest-pinned external starts and model artifacts, build and smoke the task

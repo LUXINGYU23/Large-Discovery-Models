@@ -97,7 +97,8 @@ class FakeHarnessClient:
         self.turns = []
         self.validation_errors: list[str] = []
 
-    def run_turn(self, turns, *, submission_validator):
+    def run_turn(self, turns, *, submission_validator, recovery_timeout_seconds=0):
+        self.recovery_timeout_seconds = recovery_timeout_seconds
         turn = turns[0]
         self.turns.append(turn)
         attempts = self.scripted_turns[self.calls]
@@ -191,6 +192,14 @@ def _controller(tmp_path: Path, scripted_turns):
         root=tmp_path,
     )
     return controller, client, executor
+
+
+def test_policy_uses_the_current_task_recovery_budget(tmp_path):
+    controller, client, _ = _controller(tmp_path, [[({"action": "disable"}, "")]])
+    controller.recovery_budget = lambda: 87.0
+    result = controller.resolve(_round(1))
+    assert result.metadata["status"] == "accepted"
+    assert client.recovery_timeout_seconds == 87.0
 
 
 def test_prediction_records_are_immutable_and_task_feedback_is_delegated(tmp_path: Path) -> None:
