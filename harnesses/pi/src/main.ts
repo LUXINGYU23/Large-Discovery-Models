@@ -88,6 +88,7 @@ function respondTo(
 }
 
 function errorCode(error: unknown): string {
+	if (error instanceof TurnExecutionError && error.retryable) return "recoverable_turn_error";
 	return error instanceof ProtocolError ? error.code : "sidecar_error";
 }
 

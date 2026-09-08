@@ -1,7 +1,8 @@
 # Repository Agent Skills
 
-Repository-local agent workflows live in one folder so additional skills can be
-added without mixing them into task implementations.
+These Skills guide repository development and execution. Research Agents load
+their task-owned Skills from `tasks/<task_id>/resources/harness/skills/`, not
+from this directory.
 
 | Skill | Purpose |
 | --- | --- |

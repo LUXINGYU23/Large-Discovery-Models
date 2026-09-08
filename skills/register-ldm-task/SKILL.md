@@ -1,6 +1,6 @@
 ---
 name: register-ldm-task
-description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, direct or research-Harness proposal backend, Harness-Compiled LDM policy seam, metric roles, qualification evidence, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, durable budget/status reporting, or staged real-run qualification.
+description: Add, repair, and qualify a manifest-registered LDM task in this repository, including its scientific contract, direct or persistent Harness proposals, and optional compiled policy. Use for task implementation and registration; use run-ldm-task to execute an existing task.
 ---
 
 # Register And Qualify An LDM Task
@@ -73,6 +73,10 @@ and real evaluator checks support `qualified`.
    model requests. For a persistent research backend, implement the task's
    `ReservoirExpander` around `HarnessClient` on either engine path; do not
    create a second optimization loop.
+   Keep compact measured-history lookup, annotated file admission, duplicate
+   semantics, and research Skill selection task-local. Use the Harness
+   registration reference for fixed minibatches, recovery, and guest smoke
+   checks; do not copy another task's scientific features or runtime libraries.
    A compiled-policy method must keep proposal generation unchanged and attach
    one task-local `PolicyResearchController` to the existing selector path; do
    not let the policy Agent select candidates or replace the Campaign.

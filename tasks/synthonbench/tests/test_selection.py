@@ -41,6 +41,7 @@ class FixedSelector:
         _representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         self.last_candidates = tuple(item.candidate_id for item in candidates)
         predictions = tuple(

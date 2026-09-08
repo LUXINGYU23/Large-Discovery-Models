@@ -14,6 +14,7 @@ import pytest
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine
 from ldm_tts.engine.run_store import CampaignRuntime, atomic_json_write
+from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
 from tasks.nucleobench.core.candidate import MutationContext, NucleoBenchCandidateDomain
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.designer import (
@@ -38,6 +39,7 @@ from tasks.nucleobench.core.source import require_clean_revision
 from tasks.nucleobench.core.workflow import (
     _finish_completed_resume,
     build_official_runner_args,
+    parse_args,
     run_official_driver,
 )
 from tasks.nucleobench.scripts import prepare_official_data as prepare_module
@@ -589,10 +591,13 @@ def test_completed_resume_preserves_existing_result_artifacts(tmp_path: Path) ->
     assert json.loads((run_dir / "result.json").read_text()) == result
 
 
+@pytest.mark.parametrize("wall_time", [False, True])
 def test_official_driver_preserves_raw_outputs_and_finishes_once(
     tmp_path: Path,
+    wall_time: bool,
 ) -> None:
     designer, model, runtime = _build_designer(tmp_path)
+    clock = BenchmarkClock(60) if wall_time else None
     output_dir = runtime.run_dir / "official"
     all_args = build_official_runner_args(
         SimpleNamespace,
@@ -602,13 +607,17 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(
         positions_to_mutate=list(MOCK_CONTEXT.editable_positions),
         output_path=output_dir,
         proposals_per_round=2,
-        max_seconds=60,
+        max_seconds=60 if wall_time else None,
+        max_number_of_rounds=None if wall_time else 3,
         model_init_args={"target_feature": 0},
         optimizer_init_args={"reservoir_size": 4},
     )
 
     def fake_run_loop(*, model, opt, all_args, ignore_errors):
         assert ignore_errors is False
+        if clock is not None:
+            assert 0 < clock.snapshot()["remaining_seconds"] <= 60
+            assert runtime.events()[-1]["event_type"] == "benchmark_clock_started"
         output = Path(all_args.main_args.output_path)
         output.mkdir(parents=True)
         (output / "START.txt").write_text("START", encoding="utf-8")
@@ -629,12 +638,12 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(
         all_args=all_args,
         runtime=runtime,
         execution={
-            "execution_profile": "qualification",
-            "termination_kind": "rounds",
+            "execution_profile": "official_benchmark" if wall_time else "qualification",
+            "termination_kind": "wall_time" if wall_time else "rounds",
             "total_rounds": 3,
             "active_optimization_rounds": 2,
             "initialization_evaluations": 1,
-            "benchmark_comparable": False,
+            "benchmark_comparable": wall_time,
             "case_id": "mock_dna",
             "start_index": 0,
             "start_set_digest": MOCK_CONTEXT.start_set_digest,
@@ -642,10 +651,11 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(
             "hardware_profile": "test-cpu",
             "search_method": "bo",
             "method_preset_sha256": "1" * 64,
-            "max_seconds": None,
+            "max_seconds": 60 if wall_time else None,
         },
         oracle_manifest={"schema_version": 1, "oracle": "fixture"},
         expected_active_steps=2,
+        benchmark_clock=clock,
     )
 
     raw_output = next(
@@ -658,11 +668,45 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(
     assert json.loads(runtime.status.path.read_text())["status"] == "completed"
     assert designer.active_steps == 2
     assert model.call_count == 6
+    if wall_time:
+        assert result["wall_time_result"]["evaluation_count"] == result["evaluation_count"]
+        assert result["wall_time_result"]["evaluations_after_deadline"] == 0
+    else:
+        assert "wall_time_result" not in result
     assert MOCK_START_SEQUENCE not in runtime.event_path.read_text()
     assert (
         sum(event["event_type"] == "campaign_finished" for event in runtime.events())
         == 1
     )
+
+
+def test_wall_time_resume_preserves_spent_budget_and_excludes_downtime(tmp_path: Path, monkeypatch) -> None:
+    parse_args([
+        "--execution-profile", "official_benchmark", "--termination-kind", "wall_time",
+        "--initialization-mode", "official_start", "--max-seconds", "28800",
+        "--resume-from", str(tmp_path),
+    ])
+    events = [
+        {"event_type": "benchmark_clock_started", "payload": {"started_at_unix": 100, "max_seconds": 28800}},
+        {"event_type": "campaign_failed", "timestamp_unix": 20100},
+    ]
+    clock = BenchmarkClock.resume(28800, events)
+    assert clock.remaining_before_start == 8800
+    monkeypatch.setattr("tasks.nucleobench.core.benchmark_clock.time.time", lambda: 90000)
+    monkeypatch.setattr("tasks.nucleobench.core.benchmark_clock.time.monotonic", lambda: 1000)
+    started = clock.start()
+    monkeypatch.setattr("tasks.nucleobench.core.benchmark_clock.time.monotonic", lambda: 1060)
+    assert clock.snapshot()["elapsed_seconds"] == 20060
+    assert clock.snapshot()["remaining_seconds"] == 8740
+    events.extend([
+        {"event_type": "benchmark_clock_resumed", "payload": started},
+        {"event_type": "campaign_failed", "timestamp_unix": 90060},
+    ])
+    assert BenchmarkClock.resume(28800, events).remaining_before_start == 8740
+    with pytest.raises(ValueError, match="identity"):
+        BenchmarkClock.resume(30000, events)
+    with pytest.raises(ValueError, match="without its benchmark clock"):
+        BenchmarkClock.resume(28800, [])
 
 
 def test_official_runner_args_require_exactly_one_termination_mode(

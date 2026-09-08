@@ -4,11 +4,15 @@ The generated policy supplies a deterministic mean function. The task owns the
 representation, kernel family, hyperparameter procedure, noise model, posterior,
 uncertainty, and acquisition function.
 
+Choosing zero mean retains that complete GP and its uncertainty-driven
+acquisition. Evidence against a generated mean does not justify switching off
+the separate LDM acquisition weight.
+
 ## Probability semantics
 
 For raw measured utilities (u_i), the task supplies a location (ell_t) and
-positive scale (s_t) in the exact `mean_context` returned by
-`inspect_policy_contract`:
+positive scale (s_t) in `input.json["execution_context"]["mean_context"]`,
+exported by `inspect_policy_contract`:
 
 ```text
 z_i = (u_i - location_t) / scale_t

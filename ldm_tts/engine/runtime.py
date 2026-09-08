@@ -249,7 +249,9 @@ class LDMEngine:
                 if remaining_attempts == 0:
                     stop_reason = "evaluation_attempt_budget"
                     break
-                self.runtime.consume("outer_iterations")
+                self.runtime.consume_many(
+                    {"outer_iterations": 1}, usage_key=f"engine:round:{round_idx}"
+                )
                 self.runtime.status.update(
                     "running",
                     phase="reservoir_expansion",
@@ -337,6 +339,7 @@ class LDMEngine:
                     active.observations,
                     reservoir.candidates,
                     selection_count,
+                    round_idx=round_idx,
                     use_reservoir_order=expansion.selection_mode == "reservoir_order",
                 )
                 selected = self._resolve_selection(reservoir.candidates, selection)
@@ -450,6 +453,7 @@ class LDMEngine:
         candidates: Sequence[Candidate],
         count: int,
         *,
+        round_idx: int,
         use_reservoir_order: bool = False,
     ) -> BOSelectionResult:
         if use_reservoir_order or self.selector is None:
@@ -487,7 +491,9 @@ class LDMEngine:
             if self.surrogate_encoder is not None
             else {}
         )
-        return self.selector.select(candidates, representations, count=count)
+        return self.selector.select(
+            candidates, representations, count=count, round_idx=round_idx
+        )
 
     def _resolve_selection(
         self,

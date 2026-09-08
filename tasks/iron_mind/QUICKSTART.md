@@ -31,8 +31,9 @@ export LLM_API_KEY=your-api-key
 
 The task accepts any compatible provider. The committed configuration files
 leave these values unset, so users can select a provider through their own
-environment. For a local endpoint without authentication, omit
-`LLM_API_KEY`.
+environment. Direct sampling can omit `LLM_API_KEY` for an unauthenticated
+local endpoint. Harness requires a non-empty key; use `EMPTY` only for an
+endpoint that does not validate credentials.
 
 ## 3. Prepare the Source-Pinned Data
 
@@ -129,7 +130,8 @@ npm --prefix harnesses/pi run smoke:task-guest -- \
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
+  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 
 uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
@@ -145,6 +147,16 @@ session and redacted provider traces below the campaign's `harness/` directory.
 Use `--set args.harness-mcp-config=/absolute/path/to/mcp.yaml` for allowlisted
 MCP tools. Per-tool turn limits are configured with `harness-tool-budget` in a
 runner YAML; see `docs/research-harness.md` for the schema and defaults.
+
+Harness defaults use four independent sessions from one comprehensive
+researcher template, each submitting 16 distinct conditions in an annotated
+`candidates.json`. Cross-session agreement still contributes to `q0`.
+Candidate sessions expose experimental-design, scientific-critical-thinking,
+and statsmodels Skills on demand; the guest smoke checks their numerical
+dependencies. Each new history message is a compact index. Agents use
+`get_measured_history` for exact conditions and research notes, while Python
+enforces historical exclusion. See [README.md](README.md#persistent-research-harness)
+for file fields, tools, recovery, and provenance.
 
 Harness-Compiled LDM reuses the same four proposal sessions and creates one
 independent `policy_architect` session. Its proposal artifacts remain under

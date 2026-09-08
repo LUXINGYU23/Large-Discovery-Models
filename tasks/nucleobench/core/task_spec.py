@@ -14,6 +14,7 @@ from ldm_tts.contracts import (
     SurrogateSpaceSpec,
 )
 from tasks.nucleobench.core.cases import NucleoBenchCase
+from tasks.nucleobench.core.harness import HARNESS_SKILL_IDS, harness_submission_contract
 from tasks.nucleobench.core.constants import (
     COMPILED_POLICY_METHOD,
     DIRECT_SEARCH_METHODS,
@@ -29,6 +30,10 @@ def build_task_spec(
     search_method: str = "ldm",
     evaluations_per_round: int = 1,
     proposal_max_workers: int = 4,
+    harness_profile_count: int = 4,
+    harness_candidates_per_session: int | None = None,
+    harness_unique_candidates: bool = False,
+    bo_pool_size: int | None = None,
     acquisition: AcquisitionSpec | None = None,
     surrogate: SurrogateSpaceSpec | None = None,
 ) -> LDMTaskSpec:
@@ -38,6 +43,10 @@ def build_task_spec(
         raise ValueError(f"unknown NucleoBench search method: {search_method!r}")
     if evaluations_per_round < 1 or proposal_max_workers < 1:
         raise ValueError("evaluation and worker counts must be positive")
+    if harness_candidates_per_session is None:
+        harness_candidates_per_session = evaluations_per_round
+    if harness_profile_count < 1 or harness_candidates_per_session < 1:
+        raise ValueError("Harness profile and candidate counts must be positive")
     direct = search_method in DIRECT_SEARCH_METHODS
     if surrogate is None:
         surrogate = (
@@ -86,6 +95,11 @@ def build_task_spec(
                     if search_method == "bo"
                     else "Empirical q0 tilted by task-local Hamming GP-UCB."
                 ),
+                parameters=(
+                    {} if search_method == "bo" else {
+                        "pool_size": 3 * evaluations_per_round if bo_pool_size is None else bo_pool_size,
+                    }
+                ),
             )
         )
     if search_method == "ldm":
@@ -102,14 +116,16 @@ def build_task_spec(
         session_turn_count: int | None = None
         candidates_per_model_request: int | None = evaluations_per_round
     elif search_method in PARALLEL_HARNESS_METHODS:
-        response_name = "harness_mutation_patch_batch_json"
-        response_spaces = (_harness_batch_response_space(evaluations_per_round),)
-        reservoir_size = 4 * evaluations_per_round
+        response_name = "harness_candidate_file"
+        response_spaces = (_harness_batch_response_space(harness_candidates_per_session),)
+        reservoir_size = harness_profile_count * harness_candidates_per_session
         proposal_name = "persistent_parallel_research_sessions"
         proposal_parameters = {
-            "profile_count": 4,
-            "candidates_per_session": evaluations_per_round,
-            "skills_loaded": False,
+            "profile_count": harness_profile_count,
+            "candidates_per_session": harness_candidates_per_session,
+            "unique_candidates_per_session": harness_unique_candidates,
+            "skills_loaded": True,
+            "skill_ids": list(HARNESS_SKILL_IDS),
         }
         if search_method == COMPILED_POLICY_METHOD:
             proposal_parameters.update(
@@ -118,7 +134,7 @@ def build_task_spec(
                 editable_optimization_components=["prior_mean", "alpha", "eta"],
             )
         model_request_count = None
-        session_turn_count = 4
+        session_turn_count = harness_profile_count
         candidates_per_model_request = None
     elif search_method == "bo":
         response_name = "mutation_patch_json"
@@ -147,14 +163,15 @@ def build_task_spec(
         session_turn_count = None
         candidates_per_model_request = 1
     else:
-        response_name = "harness_mutation_patch_batch_json"
+        response_name = "harness_candidate_file"
         response_spaces = (_harness_batch_response_space(evaluations_per_round),)
         reservoir_size = evaluations_per_round
         proposal_name = "persistent_direct_research_session"
         proposal_parameters = {
             "profile_count": 1,
             "candidates_per_session": evaluations_per_round,
-            "skills_loaded": False,
+            "skills_loaded": True,
+            "skill_ids": list(HARNESS_SKILL_IDS),
         }
         model_request_count = None
         session_turn_count = 1
@@ -286,27 +303,10 @@ def _indexed_batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
 
 def _harness_batch_response_space(candidate_count: int) -> ResponseSpaceSpec:
     return ResponseSpaceSpec(
-        name="harness_mutation_patch_batch_json",
+        name="harness_candidate_file",
         output_kind="json_object",
-        description="One complete Harness submission containing the requested mutation patches.",
-        schema={
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["candidates"],
-            "properties": {
-                "candidates": {
-                    "type": "array",
-                    "minItems": candidate_count,
-                    "maxItems": candidate_count,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["mutations"],
-                        "properties": {"mutations": _mutation_schema()},
-                    },
-                }
-            },
-        },
+        description="Workspace file reference; the immutable JSON snapshot contains mutation patches with pre-evaluation change_summary and rationale notes.",
+        schema=harness_submission_contract(candidate_count).payload_schema,
     )
 
 

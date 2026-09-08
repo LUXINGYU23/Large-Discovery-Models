@@ -97,7 +97,8 @@ class FakeHarnessClient:
         self.turns = []
         self.validation_errors: list[str] = []
 
-    def run_turn(self, turns, *, submission_validator):
+    def run_turn(self, turns, *, submission_validator, recovery_timeout_seconds=0):
+        self.recovery_timeout_seconds = recovery_timeout_seconds
         turn = turns[0]
         self.turns.append(turn)
         attempts = self.scripted_turns[self.calls]
@@ -191,6 +192,31 @@ def _controller(tmp_path: Path, scripted_turns):
         root=tmp_path,
     )
     return controller, client, executor
+
+
+def test_policy_uses_the_current_task_recovery_budget(tmp_path):
+    controller, client, _ = _controller(tmp_path, [[({"action": "disable"}, "")]])
+    controller.recovery_budget = lambda: 87.0
+    result = controller.resolve(_round(1))
+    assert result.metadata["status"] == "accepted"
+    assert client.recovery_timeout_seconds == 87.0
+
+
+def test_policy_advances_with_unchanged_training_history_and_resumes(tmp_path):
+    controller, client, _ = _controller(tmp_path, [[_replace()], [_replace()]])
+    first = _round(1)
+    second = replace(
+        first, round_index=3, query_features=first.query_features + 1,
+        execution_context={"mean_context": {"round_index": 3}, "weight_context": {}},
+    )
+    assert controller.resolve(first).epoch_id == "epoch_001"
+    result = controller.resolve(second)
+    assert result.epoch_id == "epoch_003"
+    assert client.turns[-1].history_from_seq == client.turns[-1].history_to_seq == 1
+    assert json.loads(client.turns[-1].message)["new_measured_observations"] == []
+    resumed, resumed_client, _ = _controller(tmp_path, [])
+    assert resumed.resolve(second).epoch_id == result.epoch_id
+    assert resumed_client.calls == 0
 
 
 def test_prediction_records_are_immutable_and_task_feedback_is_delegated(tmp_path: Path) -> None:

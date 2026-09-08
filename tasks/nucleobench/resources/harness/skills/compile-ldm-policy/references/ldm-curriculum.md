@@ -43,14 +43,15 @@ Useful limiting cases are:
 - `alpha=1, eta=0`: sample from empirical (q_0).
 - `alpha=0, eta>0`: ignore occurrence frequency and use acquisition tilt.
 - `alpha>0, eta=0`: ignore acquisition.
-- `alpha=0, eta=0`: uniform over the maintained pool.
+- `alpha=0, eta=0`: uniform over the maintained pool; both final-selection
+  signals are disabled. Earlier q0-weighted pool admission still applies.
 - task defaults `alpha=2.0, eta=0.25`: reproduce the fixed LDM baseline.
 
 The stage string is provenance only. It has no computational effect.
 
 ## Read the diagnostics correctly
 
-The exact `weight_context` is visible through `inspect_policy_contract`.
+The exact `weight_context` is in the exported `input.json["execution_context"]`.
 It includes history size, pool and occurrence counts, task defaults, a (q_0)
 summary, and a baseline-acquisition summary. `candidate_predictions` adds each
 pool member's q0, raw GP mean/std/UCB, normalized acquisition, and default
@@ -65,6 +66,15 @@ and alpha/eta. These are frozen in the measurement's own round. Do not compare
 an old q0 against the current pool's maximum; use its saved relative mass or
 rank within its original pool. First-draw probability is not the inclusion
 probability for a multi-candidate evaluation batch.
+
+Read `requested_evaluation_batch` and `effective_evaluation_batch` from the
+weight context, and compare the effective batch with the current pool size.
+A large batch can include most candidates even when the first-draw distribution
+is concentrated. If the whole pool is evaluated, no weight choice changes the
+evaluated set. Do not claim selection benefit from entropy or first-draw odds
+alone. With `benchmark_time`, judge the value of further research and information
+gathering against the remaining opportunity to evaluate candidates. Time pressure
+does not itself establish surrogate reliability or proposal quality.
 
 Separate three questions:
 
@@ -81,11 +91,17 @@ Separate three questions:
   the rewards of alternative unmeasured candidates.
 
 Both q0 and acquisition can be wrong, especially on sparsely measured or
-confounded regions. An unvalidated GP does not justify sharpening q0, and weak
-proposal evidence does not justify increasing eta. When neither signal is
-supported, consider reducing concentration rather than arbitrarily trusting
-one. Defaults, entropy, ESS and weighted logit ranges are comparison statistics,
-not preferred answers or evidence of correctness.
+confounded regions. Distinguish missing calibration from measured contradictions.
+The configured baseline is a working decision rule under uncertainty, not a new
+claim that must be proved from scratch each round. With little evidence, retain
+it or the last justified nondegenerate policy. A zero mean still leaves a GP
+posterior and UCB exploration; sparse data do not imply that eta should be zero.
+
+Use entropy, ESS and weighted logit ranges to check actual influence, not as
+optimization objectives. In particular, maximum ESS through alpha=eta=0 abandons
+both final-selection signals. Tiny positive weights are not a meaningful repair.
+Changing or suppressing a signal should answer a concrete observed failure or
+testable opportunity, rather than express a generic preference for neutrality.
 
 Before choosing weights, calculate pairwise log-odds for a high-frequency
 candidate and a contrasting high-acquisition candidate. Check whether the
@@ -124,6 +140,9 @@ numbers. Do not branch on `round_index`, and do not infer readiness from history
 size alone. Use the current proposal and acquisition summaries together with
 measured progress and contradictions in the research snapshot.
 
+- **Baseline:** calibration is unavailable or inconclusive and no concrete
+  failure justifies changing the configured weights. Retain the working LDM
+  balance while collecting measurements; no custom artifact is necessary.
 - **Proposal-led:** the surrogate is still prior-like, acquisition is nearly
   flat or unstable, and proposal consensus has a defensible scientific basis.
   Favor `alpha` relative to `eta`.
@@ -133,12 +152,12 @@ measured progress and contradictions in the research snapshot.
 - **Acquisition-led:** measured evidence supports the residual model,
   acquisition separates the pool, and recent evaluations validate its ranking
   better than proposal frequency. Increase `eta` relative to `alpha`.
-- **Recovery:** proposal mass has collapsed onto an unsupported family,
-  acquisition conflicts with new measurements, or progress has stalled. Flatten
-  the unreliable source, and possibly both, to recover useful support.
-  Do not require a preceding improvement to enter recovery or automatically
-  restore sharper default weights when progress stops. Test the rule on plausible
-  stalled and contradictory contexts, not only the current successful point.
+- **Recovery:** comparative measurements contradict the dominant proposal
+  family or acquisition ordering. Reduce the implicated source and compare the
+  resulting odds with the baseline and active policy. A stall motivates
+  diagnosis; by itself it does not establish that both sources are harmful.
+  Test the rule on plausible stalled and contradictory contexts, not only the
+  current successful point.
 
 Transitions may be non-monotone. Moving back to proposal-led needs independent
 support for proposal quality, not just an acquisition failure. Expected
@@ -147,7 +166,7 @@ different reasons for retaining meaningful probability on alternatives.
 
 Keep decisions legible:
 
-- compare against the task defaults without treating them as a preferred answer;
+- start from the task defaults; retain them when no change is justified;
 - change one or both weights only when the current snapshot provides a reason;
 - make the weight audit explicit even when the prior mean is unchanged;
 - record the reason in session analysis and use a stable evidence-state label;

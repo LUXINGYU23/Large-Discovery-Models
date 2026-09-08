@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 const contextPath = process.env.LDM_NUCLEOBENCH_CONTEXT;
 if (!contextPath) throw new Error("LDM_NUCLEOBENCH_CONTEXT is required");
+const historyPath = process.env.LDM_NUCLEOBENCH_HISTORY;
+if (!historyPath) throw new Error("LDM_NUCLEOBENCH_HISTORY is required");
 
 const context = JSON.parse(readFileSync(contextPath, "utf8"));
 if (context.schema_version !== 1 || !context.case || !context.paired_start) {
@@ -46,6 +48,12 @@ function mutableRegions() {
 	return regions;
 }
 
+function sequenceFromPatch(mutations) {
+	const sequence = [...startSequence];
+	for (const mutation of mutations) sequence[mutation.position] = mutation.base;
+	return sequence.join("");
+}
+
 function validatePatch(mutations) {
 	if (!Array.isArray(mutations) || mutations.length === 0) {
 		throw new Error("mutations must be a non-empty array");
@@ -64,18 +72,69 @@ function validatePatch(mutations) {
 		seen.add(position);
 		return { position, base };
 	}).sort((left, right) => left.position - right.position);
-	const sequence = [...startSequence];
-	for (const mutation of normalized) sequence[mutation.position] = mutation.base;
 	return {
 		valid: true,
 		mutations: normalized,
 		hamming_distance: normalized.length,
-		sequence_sha256: createHash("sha256").update(sequence.join(""), "ascii").digest("hex"),
+		sequence_sha256: createHash("sha256").update(sequenceFromPatch(normalized), "ascii").digest("hex"),
 	};
 }
 
 export default function sequenceContextTools(pi) {
-	pi.registerTool({
+    pi.registerTool({
+        name: "get_measured_history",
+        label: "Read measured sequence history",
+        description: "Query measured history by ID or round. Default concise results contain IDs, utility and mutation count; request detailed for exact patches and original design notes. Sort by utility or recency, and follow next_offset for more. Unmeasured proposals are not exposed.",
+        promptSnippet: "get_measured_history: revisit measured results and the hypotheses that motivated them",
+        parameters: {
+            type: "object",
+            properties: {
+                candidate_ids: { type: "array", items: { type: "string", minLength: 1 } },
+                round_index: { type: "integer", minimum: 0 },
+                sort_by: { type: "string", enum: ["recent", "utility_desc", "utility_asc"] },
+                response_format: { type: "string", enum: ["concise", "detailed"] },
+                offset: { type: "integer", minimum: 0 },
+                limit: { type: "integer", minimum: 1, maximum: 128 },
+            },
+            additionalProperties: false,
+        },
+        async execute(_id, params) {
+            const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
+            const ids = new Set(params.candidate_ids ?? []);
+            const matched = observations.filter((row) =>
+                (ids.size === 0 || ids.has(row.candidate_id))
+                && (params.round_index === undefined || row.round_index === params.round_index),
+            );
+            const offset = params.offset ?? 0;
+            const sortBy = params.sort_by ?? "recent";
+            matched.sort(sortBy === "recent"
+                ? (a, b) => b.round_index - a.round_index
+                : sortBy === "utility_desc" ? (a, b) => b.utility - a.utility : (a, b) => a.utility - b.utility);
+            const limit = params.limit ?? 16;
+            const page = [];
+            let bytes = 0;
+            for (const row of matched.slice(offset, offset + limit)) {
+                const value = params.response_format === "detailed" ? row : {
+                    candidate_id: row.candidate_id, round_index: row.round_index,
+                    utility: row.utility, hamming_distance: row.mutations.length,
+                };
+                const size = Buffer.byteLength(JSON.stringify(value), "utf8");
+                if (page.length && bytes + size > 32000) break;
+                page.push(value);
+                bytes += size;
+            }
+            return jsonResult({
+                total: matched.length,
+                offset,
+                next_offset: offset + page.length < matched.length ? offset + page.length : null,
+                observations: page,
+                unmeasured_or_unknown_ids: [...ids].filter((id) =>
+                    !observations.some((row) => row.candidate_id === id),
+                ),
+            });
+        },
+    });
+    pi.registerTool({
 		name: "get_task_context",
 		label: "Get sequence-design task context",
 		description: "Return paired-start metadata and the public biological target.",
@@ -96,12 +155,13 @@ export default function sequenceContextTools(pi) {
 
 	pi.registerTool({
 		name: "get_sequence_window",
-		label: "Get paired-start sequence window",
-		description: "Read one zero-based half-open window of the paired start and its editable positions.",
-		promptSnippet: "get_sequence_window: inspect exact start bases around positions under consideration",
+		label: "Get authoritative sequence window",
+		description: "Read a zero-based half-open sequence window. Omit candidate_id for the paired start; otherwise use an exact ID from get_measured_history. Returns bases, their SHA-256, and editable positions. Unmeasured candidates are not exposed.",
+		promptSnippet: "get_sequence_window: retrieve exact start or measured-parent bases and verify their checksum before editing",
 		parameters: {
 			type: "object",
 			properties: {
+				candidate_id: { type: "string", minLength: 1, description: "Exact measured candidate ID from get_measured_history; omit for the paired start." },
 				start: { type: "integer", minimum: 0 },
 				end_exclusive: { type: "integer", minimum: 1 },
 			},
@@ -109,13 +169,25 @@ export default function sequenceContextTools(pi) {
 			additionalProperties: false,
 		},
 		async execute(_id, params) {
-			if (params.start >= params.end_exclusive || params.end_exclusive > startSequence.length) {
+			if (!Number.isInteger(params.start) || !Number.isInteger(params.end_exclusive)
+				|| params.start < 0 || params.start >= params.end_exclusive
+				|| params.end_exclusive > startSequence.length) {
 				throw new Error("sequence window must be a non-empty range inside the paired start");
 			}
+			let sequence = startSequence;
+			if (params.candidate_id !== undefined) {
+				const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
+				const measured = observations.find((row) => row.candidate_id === params.candidate_id);
+				if (!measured) throw new Error("candidate_id is unmeasured or unknown: " + params.candidate_id
+					+ ". Use an ID from get_measured_history, or omit candidate_id for the paired start.");
+				sequence = sequenceFromPatch(measured.mutations);
+			}
+			const bases = sequence.slice(params.start, params.end_exclusive);
 			return jsonResult({
 				start: params.start,
 				end_exclusive: params.end_exclusive,
-				start_bases: startSequence.slice(params.start, params.end_exclusive),
+				bases,
+				bases_sha256: createHash("sha256").update(bases, "ascii").digest("hex"),
 				editable_positions: editablePositions.filter(
 					(position) => params.start <= position && position < params.end_exclusive,
 				),
@@ -160,7 +232,17 @@ export default function sequenceContextTools(pi) {
 			additionalProperties: false,
 		},
 		async execute(_id, params) {
-			return jsonResult(validatePatch(params.mutations));
+			const validated = validatePatch(params.mutations);
+			const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
+			// Both patches are canonical and relative to the same paired start.
+			const previous = observations.find((row) =>
+				row.mutations.length === validated.mutations.length && row.mutations.every((mutation, index) =>
+					mutation.position === validated.mutations[index].position
+					&& mutation.base === validated.mutations[index].base));
+			return jsonResult({
+				...validated, already_evaluated: previous !== undefined,
+				evaluated_candidate_id: previous?.candidate_id ?? null,
+			});
 		},
 	});
 }

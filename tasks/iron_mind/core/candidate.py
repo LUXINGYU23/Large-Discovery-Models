@@ -218,6 +218,10 @@ def _candidate_metadata(
         if not isinstance(q0, Mapping):
             raise TypeError("Iron Mind empirical q0 metadata must be a mapping")
         metadata[IRON_MIND_Q0_METADATA_KEY] = dict(q0)
+    if "research_annotations" in proposal_metadata:
+        metadata["research_annotations"] = list(proposal_metadata["research_annotations"])
+    if "harness_lineage" in proposal_metadata:
+        metadata["harness_lineage"] = dict(proposal_metadata["harness_lineage"])
     return metadata
 
 

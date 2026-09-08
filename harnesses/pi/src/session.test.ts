@@ -78,7 +78,7 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	let release!: () => void;
 	const pending = new Promise<void>((resolve) => { release = resolve; });
 	sessions.set("a", { runTurn: async () => {
-		if (first) { first = false; throw new TurnExecutionError("provider 502", [{ profileId: "a", turnId: "a-1", usage }]); }
+		if (first) { first = false; throw new TurnExecutionError("provider 502", [{ profileId: "a", turnId: "a-1", usage }], true); }
 		return { sessionId: "a" };
 	} });
 	const committed = { sessionId: "b", profileId: "b", turnId: "b-1", usage };
@@ -90,6 +90,7 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	const assertion = assert.rejects(failed, (error: unknown) => {
 		assert.ok(error instanceof TurnExecutionError);
 		assert.match(error.message, /provider 502/);
+		assert.equal(error.retryable, true);
 		assert.deepEqual(error.turnUsage, [
 			{ profileId: "a", turnId: "a-1", usage }, { profileId: "b", turnId: "b-1", usage },
 		]);
@@ -102,26 +103,37 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	assert.deepEqual(await pool.runTurns(inputs, validate), [{ sessionId: "a" }, committed]);
 });
 
-test("a provider failure retains usage without committing or advancing history", async () => {
+test("partial-turn continuation keeps history and classifies execution failures", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-failed-turn-"));
 	try {
+		const messages: string[] = [];
 		const profile = Object.assign(Object.create(PersistentProfileSession.prototype), {
 			profileRoot: join(root, "sessions/research"),
-			profile: { profileId: "research" }, config: { artifactRoot: root, limits: {} },
+			profile: { profileId: "research" }, config: { artifactRoot: root, limits: {}, submissionContract: { toolName: "submit_candidates" } },
 			session: { sessionManager: { getSessionId: () => "session-1" } }, historyCursor: 0,
 			policy: { begin: async () => {}, budgetMessage: () => "", end: () => ({ toolCalls: { bash: 2 } }) },
 			submissions: { begin: async () => {} },
 			proxy: { beginTurn: async () => {}, endTurn: async () => ({ providerCalls: 3, artifactBytes: 120 }) },
-			promptWithTimeout: async () => { throw new Error("provider 502"); },
+			promptWithTimeout: async (message: string) => {
+				messages.push(message);
+				throw new Error(messages.length === 1 ? "session wall-time limit reached: 1800s" : "provider response failed: 401 unauthorized");
+			},
 		});
 		await assert.rejects(profile.runTurn({
-			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1,
+			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
 		}, async () => ({})), (error: unknown) => {
 			assert.ok(error instanceof TurnExecutionError);
+			assert.equal(error.retryable, true);
 			assert.deepEqual(error.turnUsage, [{ profileId: "research", turnId: "turn-1",
 				usage: { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120 } }]);
 			return true;
 		});
+		await assert.rejects(profile.runTurn({
+			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
+		}, async () => ({})), (error: unknown) => error instanceof TurnExecutionError && !error.retryable);
+		assert.match(messages[0]!, /ORIGINAL_HISTORY/);
+		assert.doesNotMatch(messages[1]!, /ORIGINAL_HISTORY/);
+		assert.match(messages[1]!, /Continue the interrupted turn.*Tool budgets have not reset/);
 		assert.equal(profile.historyCursor, 0);
 		await assert.rejects(readFile(join(root, "turns/turn-1/turn_committed.json")), { code: "ENOENT" });
 	} finally {
@@ -129,16 +141,27 @@ test("a provider failure retains usage without committing or advancing history",
 	}
 });
 
+test("a fatal failure is not masked by another session's recoverable failure", async () => {
+	const pool = new PiSessionPool({ baseUrl: "https://example.test", campaignId: "test" } as never, "test");
+	const sessions = (pool as unknown as { sessions: Map<string, { runTurn: () => Promise<unknown> }> }).sessions;
+	sessions.set("a", { runTurn: async () => { throw new TurnExecutionError("timeout", [], true); } });
+	sessions.set("b", { runTurn: async () => { throw new Error("digest mismatch"); } });
+	await assert.rejects(pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never, async () => ({} as never)),
+		(error: unknown) => error instanceof TurnExecutionError && !error.retryable && error.message.includes("digest mismatch"));
+});
+
 test("wall-time cancellation drains the current prompt without starting another request", async () => {
 	let release!: () => void;
 	const pending = new Promise<void>((resolve) => { release = resolve; });
 	let requests = 0;
 	let aborted = false;
+	let compactionAborted = false;
 	const context = {
 		session: {
 			messages: [],
 			prompt: async () => { requests += 1; await pending; },
-			abort: async () => { aborted = true; release(); },
+			abortCompaction: () => { compactionAborted = true; release(); },
+			abort: async () => { aborted = true; await pending; },
 		},
 		submissions: { submission: undefined },
 	};
@@ -151,5 +174,6 @@ test("wall-time cancellation drains the current prompt without starting another 
 	);
 	await setImmediate();
 	assert.equal(aborted, true);
+	assert.equal(compactionAborted, true);
 	assert.equal(requests, 1);
 });

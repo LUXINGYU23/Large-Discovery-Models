@@ -50,6 +50,8 @@ from ldm_tts.registration.experiment import (
 from ldm_tts.transport import ProposalClient
 from ldm_tts.transport.openai import WIRE_APIS
 from ldm_tts.transport.openai_http import EndpointRequestError
+from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
+from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE, write_measured_history
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.cases import NucleoBenchCase, get_case
 from tasks.nucleobench.core.constants import (
@@ -74,9 +76,11 @@ from tasks.nucleobench.core.factory import (
 )
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.harness import (
+    AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
     HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
+    HARNESS_SKILL_IDS,
     direct_harness_profile,
     harness_guest_runtime,
     harness_profiles,
@@ -162,6 +166,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--reservoir-size", type=int, default=4)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--proposal-samples", type=int)
+    parser.add_argument("--bo-pool-size", type=int)
     parser.add_argument("--proposal-candidates-per-request", type=int)
     parser.add_argument(
         "--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS
@@ -193,6 +198,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--api-key-file", type=Path)
     parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument("--harness-candidates-per-session", type=int)
+    parser.add_argument("--harness-unique-candidates", action="store_true")
+    parser.add_argument(
+        "--harness-profile", action="append", choices=AVAILABLE_HARNESS_PROFILE_IDS
+    )
     parser.add_argument(
         "--harness-thinking", choices=HARNESS_THINKING_LEVELS, default="max"
     )
@@ -233,7 +242,17 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
         args.proposal_mode = (
             "openai" if args.search_method in {"ldm", "llm"} else "none"
         )
-    if args.proposal_samples is None:
+    if args.harness_profile is None:
+        args.harness_profile = list(HARNESS_PROFILE_IDS)
+    if args.harness_candidates_per_session is None:
+        args.harness_candidates_per_session = args.evaluations_per_round
+    if args.bo_pool_size is None:
+        args.bo_pool_size = 3 * args.evaluations_per_round
+    if args.proposal_samples is None and args.search_method in PARALLEL_HARNESS_METHODS:
+        args.proposal_samples = (
+            len(args.harness_profile) * args.harness_candidates_per_session
+        )
+    elif args.proposal_samples is None:
         args.proposal_samples = args.evaluations_per_round * (
             1 if args.search_method in {"llm", "harness"} else 4
         )
@@ -241,8 +260,6 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
         args.proposal_candidates_per_request = (
             args.evaluations_per_round if args.search_method == "ldm" else 1
         )
-    if args.harness_candidates_per_session is None:
-        args.harness_candidates_per_session = args.evaluations_per_round
     args.proposal_request_limit = (
         direct_request_limit(args.search_method, args.evaluations_per_round)
         if args.search_method in {"ldm", "llm"}
@@ -270,6 +287,7 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         "reservoir_size",
         "evaluations_per_round",
         "proposal_samples",
+        "bo_pool_size",
         "proposal_candidates_per_request",
         "proposal_max_workers",
         "gp_min_history_for_fit",
@@ -343,10 +361,21 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     expected_samples = args.evaluations_per_round * (
         1 if args.search_method in {"llm", "harness"} else 4
     )
+    if args.search_method in PARALLEL_HARNESS_METHODS:
+        expected_samples = len(args.harness_profile) * args.harness_candidates_per_session
+    if args.search_method not in PARALLEL_HARNESS_METHODS and (
+        tuple(args.harness_profile) != HARNESS_PROFILE_IDS or args.harness_unique_candidates
+    ):
+        parser.error("Custom Harness sampling settings require a parallel Harness method")
     if args.proposal_samples != expected_samples:
         parser.error(
             f"--proposal-samples must equal {expected_samples} for {args.search_method}"
         )
+    if args.search_method == "ldm" or args.search_method in PARALLEL_HARNESS_METHODS:
+        if not args.evaluations_per_round <= args.bo_pool_size < args.proposal_samples:
+            parser.error("LDM requires evaluation batch <= BO pool < proposal samples")
+    elif args.bo_pool_size != 3 * args.evaluations_per_round:
+        parser.error("--bo-pool-size requires an LDM method")
     expected_request_size = (
         args.evaluations_per_round if args.search_method == "ldm" else 1
     )
@@ -367,10 +396,10 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         parser.error(
             f"--search-method={args.search_method} requires --proposal-mode=none"
         )
-    if args.search_method in PERSISTENT_HARNESS_METHODS and (
+    if args.search_method == "harness" and (
         args.harness_candidates_per_session != args.evaluations_per_round
     ):
-        parser.error("Harness candidates per session must equal evaluations per round")
+        parser.error("Direct Harness candidates per session must equal evaluations per round")
     if args.harness_tool_budget is None:
         args.harness_tool_budget = [
             value
@@ -433,6 +462,10 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
             search_method=args.search_method,
             evaluations_per_round=args.evaluations_per_round,
             proposal_max_workers=args.proposal_max_workers,
+            harness_profile_count=len(args.harness_profile),
+            harness_candidates_per_session=args.harness_candidates_per_session,
+            harness_unique_candidates=args.harness_unique_candidates,
+            bo_pool_size=args.bo_pool_size,
         )
     )
 
@@ -530,7 +563,7 @@ def _execution_summary(args: argparse.Namespace) -> dict[str, Any]:
             None if total_rounds is None else max(0, total_rounds - 1)
         ),
         "initialization_evaluations": 1,
-        "benchmark_comparable": args.execution_profile == "official_benchmark",
+        "benchmark_comparable": args.execution_profile == "official_benchmark" and args.resume_from is None,
         "hardware_profile": args.hardware_profile,
     }
 
@@ -653,6 +686,8 @@ def _run_real(
         args.search_method,
         prepared.context,
         evaluations_per_round=args.evaluations_per_round,
+        proposal_samples=args.proposal_samples,
+        bo_pool_size=args.bo_pool_size,
         seed=args.campaign_index,
         gp_config=_gp_config(args),
         alpha=args.alpha,
@@ -664,11 +699,22 @@ def _run_real(
         search_method=args.search_method,
         evaluations_per_round=args.evaluations_per_round,
         proposal_max_workers=args.proposal_max_workers,
+        harness_profile_count=len(args.harness_profile),
+        harness_candidates_per_session=args.harness_candidates_per_session,
+        harness_unique_candidates=args.harness_unique_candidates,
+        bo_pool_size=args.bo_pool_size,
         acquisition=None if selector is None else selector.describe(),
         surrogate=None if encoder is None else encoder.describe(),
     )
     payload["ldm_task_spec"] = task_spec.to_dict()
     runtime = _open_runtime(args, task_spec, contract, profile_name)
+    benchmark_clock = (
+        BenchmarkClock(args.max_seconds) if args.termination_kind == "wall_time" else None
+    )
+    if benchmark_clock is not None and args.resume_from is not None:
+        benchmark_clock = BenchmarkClock.resume(args.max_seconds, runtime.events())
+        if benchmark_clock.remaining_before_start <= 0:
+            raise ValueError("The original wall-time budget is exhausted")
     client: ProposalClient | None = None
     harness_client: HarnessClient | None = None
     stack = ExitStack()
@@ -702,9 +748,15 @@ def _run_real(
                     default_alpha=args.alpha,
                     default_eta=args.eta,
                     enabled_capabilities=tuple(args.policy_capability),
+                    evaluations_per_round=args.evaluations_per_round,
+                    benchmark_clock=benchmark_clock,
+                    measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
                 )
                 policy_client = stack.enter_context(
-                    _policy_harness_client(args, runtime, provider, prepared, mcp)
+                    _harness_client(
+                        args, runtime, provider, prepared, policy_harness_profile(), mcp,
+                        policy=True,
+                    )
                 )
                 policy_controller = PolicyResearchController(
                     client=policy_client,
@@ -719,11 +771,17 @@ def _run_real(
                     ),
                     root=(runtime.run_dir / "policy_harness").resolve(),
                     account=runtime.consume_many,
+                    recovery_budget=lambda: (
+                        float(benchmark_clock.snapshot()["remaining_seconds"])
+                        if benchmark_clock is not None else float(args.harness_wall_time_seconds)
+                    ),
                 )
                 encoder, selector = build_surrogate_components(
                     args.search_method,
                     prepared.context,
                     evaluations_per_round=args.evaluations_per_round,
+                    proposal_samples=args.proposal_samples,
+                    bo_pool_size=args.bo_pool_size,
                     seed=args.campaign_index,
                     gp_config=_gp_config(args),
                     alpha=args.alpha,
@@ -754,6 +812,7 @@ def _run_real(
             profiles,
             client,
             harness_client,
+            benchmark_clock,
         )
         designer = NucleoBenchDesigner(
             engine=engine,
@@ -781,7 +840,8 @@ def _run_real(
                 termination_args = {"max_number_of_rounds": remaining_steps}
         else:
             assert args.max_seconds is not None
-            termination_args = {"max_seconds": args.max_seconds}
+            assert benchmark_clock is not None
+            termination_args = {"max_seconds": math.ceil(benchmark_clock.remaining_before_start)}
 
         if termination_args is not None:
             all_args = build_official_runner_args(
@@ -807,7 +867,10 @@ def _run_real(
                 ),
                 oracle_manifest=oracle_manifest,
                 expected_active_steps=expected_active_steps,
+                benchmark_clock=benchmark_clock,
             )
+        if harness_client is not None:
+            write_measured_history(runtime.run_dir / "harness", designer.state.observations, prepared.context)
     except Exception as exc:
         status = json.loads(runtime.status.path.read_text(encoding="utf-8"))
         if status.get("status") != "failed":
@@ -832,6 +895,7 @@ def _real_engine(
     profiles: Sequence[HarnessProfile],
     client: ProposalClient | None,
     harness_client: HarnessClient | None,
+    benchmark_clock: BenchmarkClock | None = None,
 ) -> LDMEngine:
     expander = build_proposal_expander(
         args.search_method,
@@ -840,7 +904,11 @@ def _real_engine(
         evaluations_per_round=args.evaluations_per_round,
         client=client,
         harness_client=harness_client,
+        harness_artifact_root=runtime.run_dir / "harness",
         harness_session_profiles=profiles,
+        harness_candidates_per_session=args.harness_candidates_per_session,
+        harness_unique_candidates=args.harness_unique_candidates,
+        benchmark_clock=benchmark_clock,
         campaign_id=runtime.run_id,
         first_active_round=1,
         max_workers=args.proposal_max_workers,
@@ -935,7 +1003,7 @@ def _campaign_budget(
         request_limit = active_rounds * args.proposal_request_limit
         limits.update(proposal_attempts=request_limit, llm_requests=request_limit)
     elif args.search_method in PARALLEL_HARNESS_METHODS:
-        turns = active_rounds * len(HARNESS_PROFILE_IDS)
+        turns = active_rounds * len(args.harness_profile)
         limits.update(proposal_attempts=turns, harness_turns=turns)
         if args.search_method == COMPILED_POLICY_METHOD:
             limits["policy_harness_turns"] = active_rounds
@@ -994,7 +1062,7 @@ def _proposal_client(
 
 def _harness_profiles(args: argparse.Namespace):
     if args.search_method in PARALLEL_HARNESS_METHODS:
-        return harness_profiles()
+        return harness_profiles(args.harness_profile)
     if args.search_method == "harness":
         return direct_harness_profile()
     return ()
@@ -1007,23 +1075,51 @@ def _harness_client(
     prepared: PreparedCase,
     profiles: Sequence[HarnessProfile],
     mcp,
+    *,
+    policy: bool = False,
 ) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "harness").resolve()
+    artifact_root = (runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
     write_harness_sequence_context(
         prepared.context,
         artifact_root / "sequence_context.json",
     )
+    mounts = [(resource_root, "/resources", True)]
+    mcp_servers = mcp.servers
+    if policy:
+        submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
+        history_path = "/measured_history/observations.json"
+        mounts.append((
+            (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.resolve(),
+            "/measured_history", True,
+        ))
+        for source, destination in (
+            ("README.md", "task_README.md"),
+            ("resources/README.md", "resources_README.md"),
+            ("resources/cases/catalog.json", "case_catalog.json"),
+            ("resources/upstream_contract.json", "upstream_contract.json"),
+            ("resources/verification_record.json", "verification_record.json"),
+        ):
+            mounts.append(((TASK_ROOT / source).resolve(), f"/public/{destination}", True))
+        mcp_servers = (*mcp_servers, policy_mcp_server(
+            diagnostics_path="/resources/policy_diagnostics.py",
+            diagnostics_sha256=file_sha256(resource_root / "policy_diagnostics.py"),
+        ))
+    else:
+        submission_contract = harness_submission_contract(args.harness_candidates_per_session)
+        history_path = "/artifacts/measured_history/observations.json"
+        (artifact_root / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
     return HarnessClient(
         _harness_command(
             args,
             artifact_root,
             _harness_cache_root(args),
             environment={
-                "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json"
+                "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
+                "LDM_NUCLEOBENCH_HISTORY": history_path,
             },
-            mounts=((resource_root, "/resources", True),),
+            mounts=mounts,
         ),
         api_key=provider.api_key,
         config=PiHarnessConfig(
@@ -1033,105 +1129,18 @@ def _harness_client(
             profiles=profiles,
             campaign_id=runtime.run_id,
             task_id=TASK_ID,
-            case_id=args.case_id,
+            case_id=f"{args.case_id}:optimization_policy" if policy else args.case_id,
             seed=args.campaign_index,
-            submission_contract=harness_submission_contract(
-                args.harness_candidates_per_session
-            ),
+            submission_contract=submission_contract,
             guest_runtime=harness_guest_runtime(),
             tool_extensions=harness_tool_extensions(),
-            mcp_servers=mcp.servers,
+            mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(
-                    args.harness_tool_budget,
-                    excluded_tools=("submit_candidates",),
-                ),
-            ),
-            network_policy=HarnessNetworkPolicy(
-                forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
-            ),
-            context7_enabled=args.harness_context7,
-        ),
-        named_secrets=mcp.named_secrets,
-        response_timeout_seconds=args.harness_response_timeout,
-    )
-
-
-def _policy_harness_client(
-    args: argparse.Namespace,
-    runtime: CampaignRuntime,
-    provider: ProviderSettings,
-    prepared: PreparedCase,
-    mcp,
-) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "policy_harness").resolve()
-    artifact_root.mkdir(parents=True, exist_ok=True)
-    write_harness_sequence_context(
-        prepared.context,
-        artifact_root / "sequence_context.json",
-    )
-    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
-    mounts = (
-        (harness_resources, "/resources", True),
-        ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
-        (
-            (TASK_ROOT / "resources" / "README.md").resolve(),
-            "/public/resources_README.md",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "cases" / "catalog.json").resolve(),
-            "/public/case_catalog.json",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
-            "/public/upstream_contract.json",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "verification_record.json").resolve(),
-            "/public/verification_record.json",
-            True,
-        ),
-    )
-    return HarnessClient(
-        _harness_command(
-            args,
-            artifact_root,
-            _harness_cache_root(args),
-            environment={
-                "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json"
-            },
-            mounts=mounts,
-        ),
-        api_key=provider.api_key,
-        config=PiHarnessConfig(
-            artifact_root=Path("/artifacts"),
-            base_url=provider.base_url,
-            model=provider.model,
-            profiles=policy_harness_profile(),
-            campaign_id=runtime.run_id,
-            task_id=TASK_ID,
-            case_id=f"{args.case_id}:optimization_policy",
-            seed=args.campaign_index,
-            submission_contract=policy_submission_contract(
-                args.policy_max_submission_attempts
-            ),
-            guest_runtime=harness_guest_runtime(),
-            tool_extensions=harness_tool_extensions(),
-            mcp_servers=(*mcp.servers, policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(harness_resources / "policy_diagnostics.py"),
-            )),
-            thinking=args.harness_thinking,
-            limits=HarnessLimits(
-                wall_time_seconds=args.harness_wall_time_seconds,
-                tool_call_budgets=parse_tool_call_budgets(
-                    args.policy_tool_budget,
-                    excluded_tools=("submit_optimization_policy",),
+                    args.policy_tool_budget if policy else args.harness_tool_budget,
+                    excluded_tools=(submission_contract.tool_name,),
                 ),
             ),
             network_policy=HarnessNetworkPolicy(
@@ -1246,7 +1255,7 @@ def _execution_record(
         "total_rounds": active_steps + 1,
         "active_optimization_rounds": active_steps,
         "initialization_evaluations": 1,
-        "benchmark_comparable": args.execution_profile == "official_benchmark",
+        "benchmark_comparable": args.execution_profile == "official_benchmark" and args.resume_from is None,
         "case_id": args.case_id,
         "start_index": args.start_index,
         "start_set_digest": prepared.context.start_set_digest,
@@ -1355,16 +1364,20 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
     if args.search_method not in PERSISTENT_HARNESS_METHODS:
         return None
     profiles = (
-        HARNESS_PROFILE_IDS
+        args.harness_profile
         if args.search_method in PARALLEL_HARNESS_METHODS
         else (DIRECT_HARNESS_PROFILE_ID,)
     )
     description = {
         "research_mode": "open_research",
         "image": args.harness_sidecar_image,
-        "profile_ids": list(profiles),
+        "profile_ids": [profile.profile_id for profile in _harness_profiles(args)],
+        "profile_roles": list(profiles),
         "session_count": len(profiles),
         "candidates_per_session": args.harness_candidates_per_session,
+        "unique_candidates_per_session": (
+            args.search_method == "harness" or args.harness_unique_candidates
+        ),
         "thinking": args.harness_thinking,
         "wall_time_seconds": args.harness_wall_time_seconds,
         "response_timeout_seconds": args.harness_response_timeout,
@@ -1374,7 +1387,8 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         ),
         "context7_enabled": args.harness_context7,
         "mcp_configured": args.harness_mcp_config is not None,
-        "skills_loaded": False,
+        "skills_loaded": True,
+        "skill_ids": list(HARNESS_SKILL_IDS),
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         description["policy_session"] = {
@@ -1487,8 +1501,15 @@ def run_official_driver(
     execution: Mapping[str, Any] | Callable[[int], Mapping[str, Any]],
     oracle_manifest: Mapping[str, Any],
     expected_active_steps: int | None = None,
+    benchmark_clock: BenchmarkClock | None = None,
 ) -> dict[str, Any]:
     try:
+        if benchmark_clock is not None:
+            # Start just before the unchanged runner, conservatively including entry overhead.
+            runtime.record(
+                "benchmark_clock_resumed" if benchmark_clock.elapsed_before_start else "benchmark_clock_started",
+                benchmark_clock.start(),
+            )
         run_loop(model=model, opt=designer, all_args=all_args, ignore_errors=False)
         if (
             expected_active_steps is not None

@@ -14,6 +14,7 @@ ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/research.py   measured-history projection and candidate-file admission
 core/              tuple validation, prompts, Tanimoto GP, compiled-policy adapter, oracle adapter
 scripts/           source-pinned official data preparation
 resources/         immutable upstream and qualification contracts
@@ -211,12 +212,16 @@ This section documents the SynthonBench adapter. The shared interface and task
 registration rules are in the
 [Research Harness integration guide](../../docs/research-harness.md).
 
-The `ldm_harness` method changes only the proposal policy used by LDM. At
-campaign startup it creates four persistent Pi sessions with task-owned roles for target
-SAR, reaction feasibility, scaffold exploration, and property risk. Every
-session autonomously selects reaction types and searches a structured,
-read-only snapshot of the official SynthonSpace before submitting one
-16-candidate minibatch of exact `reaction_id + synthon_ids` tuples. The
+The `ldm_harness` method changes only candidate generation. It creates four
+independent persistent Pi sessions from one task-owned
+`comprehensive_research/AGENTS.md`. Each combines target SAR, reaction
+feasibility, scaffold coverage, and property analysis in its own workspace and
+transcript. It autonomously selects reaction types and searches the read-only
+official SynthonSpace; no adapter-generated slot menu constrains its research.
+Instructions balance supported refinement, credible alternatives, and
+informative controls without fixed quotas or hardcoded curriculum rounds.
+Each session writes one 16-candidate file of exact
+`reaction_id + ordered synthon_ids` tuples. The
 combined 64 raw occurrences enter the
 same task validation, empirical `q0`, maintained BO pool, Tanimoto GP-UCB, and
 LDM acquisition tilt used by the direct backend.
@@ -231,33 +236,48 @@ same history, official-space validation, rejection, and refill logic, but does
 not estimate `q0`, maintain a BO pool, fit the Tanimoto GP, or run acquisition.
 
 The Python runner remains the owner of measured optimization history. The first
-active turn bootstraps each session with all existing observations; later turns
-append only the newly measured suffix. Every turn carries an explicit history
-range and digest. A session rejects a gap, overlap, or changed replay before it
+active turn sends compact indexes of existing measurements; later turns send
+only the newly measured suffix. Each index contains candidate ID, round, and
+`synthon_utility`. Every turn carries an explicit history range and digest. A session rejects a gap, overlap, or changed replay before it
 can call the model, while the native Pi conversation retains each profile's
 private research context.
 
 The task-local Pi extension exposes `list_synthon_reactions`,
-`search_synthon_space`, and `validate_synthon_candidate`. The Python adapter
+`search_synthon_space`, `validate_synthon_candidate`, and
+`get_measured_history`. The history tool paginates measured records, filters
+by ID or round, and sorts by recency or utility. Detailed records include exact
+tuples, component SMILES, and original research annotations. The validator
+returns `already_evaluated`, including failed evaluations. Full history stays
+in `harness/measured_history/observations.json`, projected from engine
+observations and shared read-only with the policy session. The Python adapter
 creates the tool catalog from the loaded official `SynthonSpace`; the raw data
 file is not exposed to the agent shell. Every submitted tuple is validated
 again against the official Python object before entering LDM.
 
-Each session must submit 16 legal candidates absent from the authoritative
-evaluated snapshot. Evaluated repeats and invalid tuples are rejected before
-commit with their indices and exact reasons; the same Pi session replaces them
-until its quota is full. A candidate proposed in an earlier turn but not evaluated
-remains eligible. An LDM minibatch is an ordered multiset, so a session may assign
-multiple slots to one strong candidate. Equal candidates proposed within or
-across sessions remain separate raw occurrences, so deliberate emphasis and
-independent agent agreement increase that candidate's empirical `q0` before reservoir
-deduplication. There is no profile-balanced correction or per-session `q0`.
+Each session writes `candidates.json` with only a `candidates` array and submits
+`{"artifact_path":"candidates.json"}`. Each entry contains exactly
+`reaction_id`, `synthon_ids`, `change_summary`, and `rationale`; the two
+English research notes describe the chemical change and its hypothesis.
+The task validates the immutable snapshot, official tuple, historical
+exclusion, annotations, and exact count before commit. Each minibatch must
+contain 16 distinct tuples. Invalid entries and repeats receive indexed reasons
+and repair hints; the Agent repairs and resubmits the complete file in-session.
 
-The `ldm_harness` profile set loads four committed `AGENTS.md` files and the
-direct `harness` method loads one comprehensive profile under
-`resources/harness/profiles/`; candidate-generation profiles do not load
-skills. The compiled-policy method additionally loads its task-local policy
-Skill from `resources/harness/skills/`. Pi provides web retrieval, Context7,
+A prior proposal that remains unmeasured is still eligible. Equal new tuples
+from different sessions remain separate raw occurrences for empirical `q0`,
+and all contributing research notes survive canonical deduplication into the
+measured record. There is no profile-balanced correction or per-session `q0`.
+
+Both proposal methods load the comprehensive template and task-local
+`rdkit`, `experimental-design`, `scientific-critical-thinking`, and
+`statsmodels` Skills on demand. Pinned K-Dense sources and licenses are in
+[the attribution record](resources/harness/skills/ATTRIBUTION.md).
+The guest preinstalls RDKit, NumPy, SciPy, pandas, pyDOE3, statsmodels,
+scikit-learn, Matplotlib, and seaborn. These support structure checks, matched
+contrasts, and small quantitative analyses, not access to the hidden oracle.
+Source-synthon descriptors are not assembled-product properties. Research
+steps are chosen for the current uncertainty, not mechanically repeated every
+round. The compiled-policy session separately loads only `compile-ldm-policy`. Pi provides web retrieval, Context7,
 and a separate Gondolin microVM for each session. The guest has root
 shell, file, package-installation, and unrestricted HTTP(S) access; the host
 repository and official task data are not mounted. Benchmark names, repository
@@ -331,18 +351,23 @@ API, 262,144-token context window, Pi automatic-compaction settings, wall-time l
 network policy, tool set, pinned package versions, profile resource digests,
 resolved guest metadata, an environment snapshot, and the profile-to-session mapping.
 
-If a Responses stream ends with the known interrupted-stream error before
-terminal submission, the same session continues from its existing analysis with
-research and editing tools available until it commits, encounters a non-recoverable error, or
-reaches the turn wall-time limit. Every provider attempt remains in the raw
-trace; the runner never switches to the direct backend or invents replacement
-candidates.
+Recoverable timeouts and provider interruptions resume the failed session's
+existing workspace within a recovery window of twice the configured session
+wall time, measured from the first attempt (60 minutes by default). Proposal
+and policy calls have separate windows. No retry starts after its window closes;
+an in-flight attempt keeps its session time limit. Accepted peers are
+replayed without new sampling. Research and editing tools remain available;
+every attempt stays in the raw trace. Instructions derive research and
+first-submission milestones from the configured wall time. No direct-backend
+substitution or invented replacement candidates are used.
+Failed proposal calls retain their measured usage in `budget.json`; cumulative
+per-turn accounting prevents replay from charging the same calls twice.
 
 ## Harness-Compiled Policy
 
 Each active `ldm_harness_compiled` round first collects the same 64 valid unseen
 proposal occurrences as `ldm_harness`. The policy session then receives the
-measured tuple history, released reaction and synthon descriptions, proposal
+compact measurement indexes, released reaction and synthon descriptions, proposal
 and `q0` summaries, baseline acquisition summaries, and a versioned numeric
 feature contract. It submits `replace`, `keep`, or `disable`; `replace`
 references a complete `optimization_policy.py` rather than embedding source in
@@ -380,6 +405,12 @@ noise, UCB rule, maintained pool, Gumbel sampling, official evaluator, and
 evaluation budget remain fixed. The task fits that GP to residual targets after
 subtracting the compiled prior and adds the prior back to predictions. A zero
 prior with the configured default weights is equivalent to `ldm_harness`.
+The policy can query detailed measured tuples and original research notes.
+It starts from `alpha=2` and `eta=0.25` and assesses weight changes alongside
+mean changes. Sparse evidence or high selected-point residuals alone do not
+justify removing both LDM signals. The weight context includes the requested
+and effective evaluation batch; ESS is a diagnostic, not an optimization
+objective or a substitute for without-replacement inclusion analysis.
 
 The policy Agent can research and use the built-in policy MCP to inspect,
 validate, and evaluate drafts. The accepted immutable snapshot is executed

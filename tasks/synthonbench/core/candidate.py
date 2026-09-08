@@ -127,6 +127,8 @@ def _candidate_from_prepared(prepared: PreparedSynthonCandidate, proposal: RawPr
     lineage = proposal.metadata.get("harness_lineage")
     if isinstance(lineage, Mapping):
         metadata["harness_lineage"] = dict(lineage)
+    if "research_annotations" in proposal.metadata:
+        metadata["research_annotations"] = list(proposal.metadata["research_annotations"])
     return Candidate(
         candidate_id=f"synthonbench:{prepared.product_id}",
         payload=prepared.payload,

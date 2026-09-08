@@ -40,9 +40,9 @@ shared Campaign / LDMEngine
 ```
 
 The Campaign owns measured optimization history. Each Pi session owns its
-private research transcript. A task sends an initial history snapshot and then
-monotonic deltas, together with the compact exclusion set needed to reject
-previously evaluated candidates.
+private research transcript. A task sends initial measurement indexes and then
+monotonic deltas. Its tools and validator check the authoritative evaluated set;
+full candidate details can be retrieved on demand.
 
 ## Shared Interface
 
@@ -128,7 +128,7 @@ args:
     - fetch_content=16
 ```
 
-The default network budgets are eight `web_search` calls, sixteen
+The reference tasks default to eight `web_search` calls, sixteen
 `fetch_content`, sixteen `get_search_content`, four `resolve-library-id`, and eight
 `query-docs` calls per turn. Context7 budgets are omitted when Context7 is
 disabled. A tool absent from the mapping is unlimited; zero disables it.
@@ -148,8 +148,10 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
    block.
 2. Define one profile set and strict submission contract per pool.
 3. Build deterministic turns from campaign, profile, round, and history identity.
-4. Send newly measured observations and, when historical repeats are forbidden,
-   the authoritative evaluated-candidate exclusion snapshot.
+4. Send compact newly measured observations and provide task-owned access to
+   detailed records. When repeats are forbidden, expose exact membership in
+   the authoritative evaluated set through the task's tools and validator;
+   the entire exclusion set need not occupy model context.
 5. Validate provisional submissions with the same parser, canonical identity,
    and official-space checks used by candidate admission.
 6. Return stable JSON-Pointer paths, rejection codes, messages, and repair hints
@@ -163,6 +165,14 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 
 For the reference tasks, only candidates in the authoritative evaluated set are historical repeats.
 Candidates proposed in an earlier turn but never evaluated remain eligible.
+
+Task-local history tools may filter by ID or round, sort, and paginate detailed
+records with original research notes. Build this read-only projection from
+engine observations, not private session transcripts. Annotation schemas,
+candidate identity, and within-session duplicate rules remain task-owned.
+Independent profiles may share an instruction template without sharing private
+workspaces. Load selected Skills on demand and keep their dependencies in the
+task guest recipe; the shared Harness must not import scientific packages.
 
 For `ldm_harness_compiled`, the task must additionally:
 
@@ -197,11 +207,19 @@ or `(H, M)` and `(Q, M)`. Objective order, direction, units, transforms,
 scalarization, and diagnostic metrics belong to the task. The controller and
 runner do not select an objective or impose a GP or acquisition family.
 
+The engine passes the actual campaign `round_idx` to `AcquisitionSelector.select`.
+Pass that value as `PolicyRoundInput.round_index`; successful GP training rows
+cannot determine the current round when evaluations fail or rounds are empty.
+
 `PolicyRoundInput` requires aligned `history_candidate_ids`, `history_rounds`,
 and `measured_observations`, alongside numeric history. History is chronological;
 replicate semantics and candidate identity checks belong to the task.
 Supply these fields directly, not inside `research_snapshot`. The
 controller builds the exported history snapshot and sends measurement deltas.
+Tasks should send compact measurement indexes and expose complete records through
+filtered, paginated tools. Candidate identity, scientific summaries and retrieval
+fields remain task-local. Do not serialize full scientific payloads into every
+turn when stable IDs and targeted detail retrieval suffice.
 Its `record_predictions(round_index, predictions)` persists task-defined JSON
 rows unchanged. The adapter's `with_feedback(round_input, records)` constructs
 task-specific feedback from earlier prediction records and measured outcomes.
@@ -234,9 +252,13 @@ prior_mean(x) = E[z(x) | public task features and supported evidence].
 
 The unchanged task GP is fitted to `z - prior_mean` and adds the mean back to
 its posterior. The policy mean is not a maximum, rank, probability of
-optimality, or acquisition score. `inspect_policy_contract` exposes the exact
-execution contexts and exports authoritative numeric inputs read-only into the
-research guest. `evaluate_policy_draft` compares chronological measured-history
+optimality, or acquisition score. `inspect_policy_contract` returns the contract
+and exports authoritative snapshot files read-only into the research guest.
+The exact execution contexts remain in `input.json`; `research_snapshot.json`
+contains the task's research context and measured-record index. Query exact
+designs and original notes through the task's history tool; use `arrays.npz`
+for numeric analysis rather than printing it in full.
+`evaluate_policy_draft` compares chronological measured-history
 holdouts using GP hyperparameters fitted on each training prefix and frozen.
 Current-pool diagnostics describe first-draw probabilities, not batch inclusion.
 Historical validation is a development check: the Agent has seen those labels.
@@ -279,9 +301,10 @@ new artifact root. Before a session starts, the sidecar verifies the selected
 workspace, and exposes the snapshot read-only at `/workspace/.ldm-resources` in
 the guest. Pi advertises guest-visible Skill paths so progressive `read` calls
 and relative references stay inside the sandbox. The task tree remains the
-versioned source of truth. The contract carries the strict payload JSON Schema
-and exact minibatch count; Python remains the authoritative scientific
-validator. Artifact rules snapshot referenced files before task validation and
+versioned source of truth. The contract carries the strict terminal-payload
+JSON Schema. For file submissions, Python validates the snapshot contents,
+including the exact minibatch count and scientific constraints.
+Artifact rules snapshot referenced files before task validation and
 expose only relative path, size, and digest metadata on the wire.
 
 ## Task Guest Runtime
@@ -340,6 +363,31 @@ Harness artifacts are written below `<run_dir>/harness/`:
 The native Pi session is the only full conversation record. Python does not
 duplicate model or MCP transcripts. These files are raw research traces, not
 canonical `ldm-2.0` accepted-action records.
+
+Tasks can enable partial-turn recovery with
+`HarnessClient.run_turn(..., recovery_timeout_seconds=remaining_seconds)`.
+The sidecar distinguishes recoverable session timeouts and transient provider
+failures from configuration, authentication, validation-contract, and protocol
+failures. During the recovery window, the client retries with capped backoff and
+resends the same turn identities:
+committed profiles replay without another model call; unfinished profiles continue
+their existing session and workspace without appending the full history again.
+Tool quotas and validation attempt indices persist, and provider usage is cumulative
+per turn, not summed twice across retries. There is no partial-batch acceptance.
+The recovery window starts before the first attempt. Iron Mind and SynthonBench
+use twice the configured session wall time for each proposal or policy call,
+leaving recovery time after a full-length timeout. A benchmark with its own
+campaign clock supplies its remaining allowance instead.
+No new recovery attempt starts after the supplied window; an attempt already in
+progress retains its configured session time limit. The task owns the campaign
+clock and decides whether recovery is allowed. A zero window disables recovery.
+
+Account for measured `HarnessError.turn_usage` on failure as well as committed
+results. `CampaignRuntime.consume_many(totals, usage_key=stable_operation_id)`
+records cumulative counters atomically in the existing budget ledger and charges
+only increases on replay or resume. Use a per-turn identity for cumulative
+provider/tool/artifact usage; elapsed invocation wall time remains an increment.
+Missing usage is unknown, not a measured zero.
 
 `ldm_harness_compiled` writes the independent policy session below
 `<run_dir>/policy_harness/`. It stores round inputs and digests, validation

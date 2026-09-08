@@ -41,6 +41,7 @@ ldm_task/          shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/research.py   measured-history projection and candidate-file admission
 resources/         versioned fixtures, Harness profiles/tools, and upstream provenance
 scripts/           data preparation and result aggregation
 tests/             task-local tests
@@ -194,22 +195,58 @@ proposal. Providers that do not support this extension can use
 
 ## Persistent Research Harness
 
-The `ldm_harness` method keeps four task-local Pi sessions alive for a campaign:
-mechanistic chemistry, empirical interactions, literature evidence, and design
-space exploration. Each active round sends the new measurements plus a compact
-snapshot of all evaluated conditions. Every session must commit 16 legal
-candidates absent from that authoritative evaluated snapshot. A candidate
-proposed in an earlier turn but not evaluated remains eligible; a persistent
-session must not maintain a private exclusion set.
+The `ldm_harness` method keeps four independent Pi sessions alive for a campaign.
+Each uses the same task-local `comprehensive_research/AGENTS.md` and maintains
+its own transcript and workspace. The researcher combines chemical mechanisms,
+measured interactions, literature, and design-space coverage. Instructions call
+for evidence-driven refinement, credible alternatives, and informative controls;
+there are no fixed exploration quotas or round-based curriculum switches.
 
-The structured tools expose factor definitions and complete legal condition
-combinations from the source-pinned table, but never oracle scores. Python
-performs authoritative validation before a turn commits. Invalid candidates and
-historical repeats are returned to the Agent with indexed reasons and must be
-replaced. An LDM proposal minibatch is an ordered multiset: deliberate repeated
-occurrences within or across sessions allocate more empirical `q0` mass to that
-candidate. The direct `harness` method still requires distinct candidates because
-it evaluates every submitted item without a `q0` selection stage.
+Each session writes `candidates.json` with exactly 16 distinct legal conditions
+and submits `{"artifact_path":"candidates.json"}`. Each candidate contains only
+`dataset_id`, `conditions`, `change_summary`, and `rationale`; the two notes
+are short English descriptions of the proposed change and its hypothesis.
+Python validates the immutable snapshot, official table membership, historical
+exclusion, annotations, and within-session uniqueness. Rejections identify the
+entry, reason, and repair action. The Agent repairs and resubmits the complete
+file in the same session.
+
+Historical repeats are forbidden, including failed evaluations. Previously
+proposed but unmeasured candidates remain eligible. Equal new conditions from
+different sessions remain separate occurrences for empirical `q0`; all their
+research annotations survive canonical reservoir deduplication and are attached
+to the measured observation. No per-session balancing is applied.
+
+The structured tools expose only legal table conditions and measured outcomes:
+`describe_reaction_space`, `search_reaction_conditions`,
+`validate_reaction_candidate`, and `get_measured_history`.
+Turn messages carry compact new-measurement indexes: candidate ID, round, and
+reaction score. The paginated history tool filters by ID or round, sorts by
+recency or utility, and returns exact conditions and original research notes on
+request. Validation also returns `already_evaluated`. The authoritative history
+is projected from engine observations to
+`harness/measured_history/observations.json`; it is shared read-only with the
+policy session, not maintained as a second optimization history.
+
+Candidate sessions load `experimental-design`, `scientific-critical-thinking`,
+and `statsmodels` on demand. These task-local adaptations of K-Dense Skills
+include pinned provenance and licenses in
+[the attribution record](resources/harness/skills/ATTRIBUTION.md).
+The guest preinstalls NumPy, SciPy, pandas, pyDOE3, statsmodels, scikit-learn,
+Matplotlib, and seaborn for numerical checks. Neither fitting a model nor
+searching the web is mandatory on every turn. The policy session separately
+loads only `compile-ldm-policy`.
+
+The default turn budget is 30 minutes. Instructions derive research and
+first-submission milestones from the configured wall time. Recoverable failed
+sessions continue in their existing workspace within a recovery window of twice
+the session wall time, measured from the first attempt (60 minutes by default);
+accepted peers are replayed without new sampling. Pi's automatic compaction
+uses the existing 256K context window.
+Proposal and policy calls have separate recovery windows. No new retry starts
+after its window closes; an in-flight attempt keeps its session time limit.
+Failed proposal calls retain their measured usage in `budget.json`; cumulative
+per-turn accounting prevents replay from charging the same calls twice.
 
 The direct `harness` method uses one persistent comprehensive-research session.
 It submits one legal unseen condition per active round, and that condition is
@@ -232,7 +269,8 @@ npm --prefix harnesses/pi run smoke:task-guest -- \
 docker build -t ldm-pi-harness:latest harnesses/pi
 
 uv run --locked --project tasks/iron_mind python \
-  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional
+  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
 
 uv run --locked --project tasks/iron_mind python \
   scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
@@ -266,8 +304,9 @@ secret references, and trace semantics are documented in
 persistent proposal sessions still produce 64 valid unseen occurrences, and
 the task still computes empirical `q0` and maintains the same 32-candidate BO
 pool. Before final selection, one separate `policy_architect` session receives
-the measured condition history, factor schema, proposal-distribution summaries,
-and fixed GP/acquisition contract. It returns `replace`, `keep`, or `disable`;
+compact measured indexes, factor schema, proposal-distribution summaries,
+and the fixed GP/acquisition contract. It can query exact conditions and original
+research notes through the same read-only history tool. It returns `replace`, `keep`, or `disable`;
 `replace` references a complete `optimization_policy.py` file.
 
 The current policy API exposes exactly two capabilities:
@@ -292,15 +331,21 @@ digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
 Measured feedback retains the original pool's q0 ranks and relative mass,
 acquisition ranks, first-draw probabilities, and actual alpha/eta. These describe
 the selection context, not validation of a ranking or weight policy. Proposal
-and policy Agents also receive measured-only condition coverage and exact
-single-factor comparisons; different complete conditions are not replicates.
+and policy Agents can derive measured-only condition coverage and matched
+single-factor comparisons from queried history; different complete conditions
+are not replicates. The policy's numeric diagnostics also summarize measured
+factor evidence.
 
 Candidate identity, row order, `q0`, acquisition values, selection
 probabilities, and hidden scores are unavailable to the prior-mean function.
 The categorical kernel, model-mismatch variance, observation noise, UCB rule,
 pool maintenance, Gumbel sampling, evaluation budget, and frozen oracle remain
 task-owned and fixed. A zero prior with the configured default weights is
-equivalent to `ldm_harness`.
+equivalent to `ldm_harness`. Policy instructions start from `alpha=2` and
+`eta=0.25`, assess both weights as well as the mean, and require evidence before
+removing either signal. ESS is a distribution diagnostic, not a target to
+maximize. The weight context includes the requested and effective evaluation
+batch, so large-batch selection is not mistaken for first-draw sampling.
 
 The policy Agent can inspect and test drafts with the built-in policy MCP. The
 accepted immutable snapshot is then executed again outside the host interpreter

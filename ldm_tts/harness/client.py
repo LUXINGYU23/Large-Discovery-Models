@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
 import os
 import queue
 import re
@@ -32,9 +34,10 @@ _SEMVER_PATTERN = re.compile(
 
 
 class HarnessError(RuntimeError):
-    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None):
+    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None, retryable: bool = False):
         super().__init__(message)
         self.turn_usage = {profile: dict(usage) for profile, usage in (turn_usage or {}).items()}
+        self.retryable = retryable
 
 
 class HarnessClient:
@@ -61,7 +64,7 @@ class HarnessClient:
         self.config = config
         self.response_timeout_seconds = float(response_timeout_seconds)
         self._process: subprocess.Popen[str] | None = None
-        self._responses: queue.Queue[str] = queue.Queue()
+        self._responses: queue.Queue[str | None] = queue.Queue()
         self._stderr: deque[str] = deque(maxlen=40)
         self._request_index = 0
         self._protocol_version: str | None = None
@@ -69,6 +72,13 @@ class HarnessClient:
     def start(self) -> None:
         if self._process is not None:
             raise HarnessError("harness client is already started")
+        self._start_process()
+
+    def _start_process(self) -> None:
+        if not self._api_key:
+            raise HarnessError("harness client is closed")
+        self._responses = queue.Queue()
+        self._stderr = deque(maxlen=40)
         secret_values = {self._api_key, *self._named_secrets.values()}
         process = subprocess.Popen(
             self.command,
@@ -86,8 +96,8 @@ class HarnessClient:
         )
         self._process = process
         assert process.stdout is not None and process.stderr is not None
-        threading.Thread(target=self._read_stdout, args=(process.stdout,), daemon=True).start()
-        threading.Thread(target=self._read_stderr, args=(process.stderr,), daemon=True).start()
+        threading.Thread(target=self._read_stdout, args=(process.stdout, self._responses), daemon=True).start()
+        threading.Thread(target=self._read_stderr, args=(process.stderr, self._stderr), daemon=True).start()
         try:
             self._protocol_version = self._wait_for_ready()
             self._request(
@@ -95,15 +105,12 @@ class HarnessClient:
                 {"apiKey": self._api_key, "namedSecrets": self._named_secrets},
                 "secret_bootstrapped",
             )
-            self._api_key = ""
-            self._named_secrets.clear()
-            request_id = self._next_request_id()
-            self._exchange(
-                self._frame(request_id, "initialize", self.config.initialize_payload()),
+            self._request(
+                "initialize", self.config.initialize_payload(),
                 "initialized",
             )
         except BaseException:
-            self.close()
+            self._stop_process()
             raise
 
     def run_turn(
@@ -111,7 +118,11 @@ class HarnessClient:
         turns: Sequence[HarnessTurn],
         *,
         submission_validator: SubmissionValidator,
+        recovery_timeout_seconds: float = 0,
     ) -> tuple[HarnessTurnResult, ...]:
+        if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
+            raise ValueError("harness recovery timeout must be finite and non-negative")
+        recovery_deadline = time.monotonic() + recovery_timeout_seconds
         if not turns:
             raise ValueError("harness turn batch must not be empty")
         expected = {turn.profile_id: turn for turn in turns}
@@ -140,19 +151,41 @@ class HarnessClient:
                 terminal_validations[request.profile_id] = (status, request.digest)
             return validation
 
-        try:
-            payload = self._request(
-                "run_turn",
-                {"turns": [turn.to_dict() for turn in turns]},
-                "turn_committed",
-                submission_validator=validate,
-            )
-        except HarnessError as exc:
-            for profile in expected:
-                exc.turn_usage.setdefault(profile, {})["validationSubmissions"] = (
-                    validation_submissions.get(profile, 0)
+        known_usage: dict[str, dict[str, Any]] = {}
+        retry_delay = 1.0
+        restart_required = False
+        while True:
+            try:
+                if restart_required:
+                    self._stop_process()
+                    self._start_process()
+                    restart_required = False
+                payload = self._request(
+                    "run_turn",
+                    {"turns": [turn.to_dict() for turn in turns]},
+                    "turn_committed",
+                    submission_validator=validate,
                 )
-            raise
+                break
+            except HarnessError as exc:
+                # Sidecar usage is cumulative per turn, including partial recovery.
+                known_usage.update(exc.turn_usage)
+                for profile in expected:
+                    known_usage.setdefault(profile, {})["validationSubmissions"] = (
+                        validation_submissions.get(profile, 0)
+                    )
+                exc.turn_usage = {profile: dict(usage) for profile, usage in known_usage.items()}
+                remaining = recovery_deadline - time.monotonic()
+                if not exc.retryable or remaining <= 0:
+                    raise
+                restart_required = self._process is None or self._process.poll() is not None
+                logging.getLogger(__name__).warning(
+                    "Continuing unfinished Harness sessions; committed turns are replayed: %s", exc,
+                )
+                time.sleep(min(retry_delay, remaining))
+                retry_delay = min(30.0, retry_delay * 2)
+                if time.monotonic() >= recovery_deadline:
+                    raise
         raw_turns = payload.get("turns")
         if not isinstance(raw_turns, list):
             raise HarnessError("harness response is missing committed turns")
@@ -190,13 +223,8 @@ class HarnessClient:
 
     def close(self) -> None:
         process = self._process
-        if process is None:
-            self._api_key = ""
-            self._named_secrets.clear()
-            self._protocol_version = None
-            return
         try:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 if self._protocol_version is None:
                     _terminate(process)
                 else:
@@ -210,10 +238,20 @@ class HarnessClient:
                         process.kill()
                         process.wait(timeout=10)
         finally:
-            self._process = None
+            self._stop_process()
             self._api_key = ""
             self._named_secrets.clear()
-            self._protocol_version = None
+
+    def _stop_process(self) -> None:
+        if self._process is not None:
+            _terminate(self._process)
+            if self._process.stdin is not None:
+                try:
+                    self._process.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+        self._process = None
+        self._protocol_version = None
 
     def __enter__(self) -> "HarnessClient":
         self.start()
@@ -231,22 +269,7 @@ class HarnessClient:
         timeout_seconds: float | None = None,
         submission_validator: SubmissionValidator | None = None,
     ) -> dict[str, Any]:
-        request_id = self._next_request_id()
-        return self._exchange(
-            self._frame(request_id, frame_type, fields),
-            expected_type,
-            timeout_seconds=timeout_seconds,
-            submission_validator=submission_validator,
-        )
-
-    def _exchange(
-        self,
-        frame: dict[str, Any],
-        expected_type: str,
-        *,
-        timeout_seconds: float | None = None,
-        submission_validator: SubmissionValidator | None = None,
-    ) -> dict[str, Any]:
+        frame = self._frame(self._next_request_id(), frame_type, fields)
         process = self._process
         if process is None or process.stdin is None:
             raise HarnessError("harness client is not started")
@@ -265,6 +288,9 @@ class HarnessClient:
             except queue.Empty as exc:
                 _terminate(process)
                 raise self._process_error("harness sidecar response timed out") from exc
+            if line is None:
+                _terminate(process)
+                raise self._process_error("harness sidecar output closed")
             try:
                 response = json.loads(line)
             except json.JSONDecodeError as exc:
@@ -301,7 +327,10 @@ class HarnessClient:
                 if profile in turn_usage or profile not in expected or item["turnId"] != expected[profile]:
                     raise HarnessError("harness error usage does not match the requested turn")
                 turn_usage[profile] = _parse_usage(item["usage"])
-            raise HarnessError(str(message), turn_usage=turn_usage)
+            raise HarnessError(
+                str(message), turn_usage=turn_usage,
+                retryable=isinstance(error, dict) and error.get("code") == "recoverable_turn_error",
+            )
         if response.get("type") != expected_type:
             raise HarnessError(f"expected harness response {expected_type!r}")
         expected_keys = {
@@ -381,6 +410,8 @@ class HarnessClient:
             line = self._responses.get(timeout=timeout)
         except queue.Empty as exc:
             raise self._process_error("harness sidecar did not declare a release version") from exc
+        if line is None:
+            raise self._process_error("harness sidecar exited before declaring a release version")
         try:
             response = json.loads(line)
         except json.JSONDecodeError as exc:
@@ -409,16 +440,23 @@ class HarnessClient:
 
     def _process_error(self, message: str) -> HarnessError:
         detail = "".join(self._stderr).strip()
-        return HarnessError(f"{message}: {detail}" if detail else message)
+        return HarnessError(f"{message}: {detail}" if detail else message, retryable=True)
 
-    def _read_stdout(self, stream) -> None:
-        for line in stream:
-            if line.strip():
-                self._responses.put(line)
+    @staticmethod
+    def _read_stdout(stream, responses: queue.Queue[str | None]) -> None:
+        try:
+            with stream:
+                for line in stream:
+                    if line.strip():
+                        responses.put(line)
+        finally:
+            responses.put(None)
 
-    def _read_stderr(self, stream) -> None:
-        for line in stream:
-            self._stderr.append(line)
+    @staticmethod
+    def _read_stderr(stream, stderr: deque[str]) -> None:
+        with stream:
+            for line in stream:
+                stderr.append(line)
 
 
 def _terminate(process: subprocess.Popen[str]) -> None:

@@ -31,7 +31,7 @@ from tasks.iron_mind.core.schema import (
 )
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.workflow import (
-    _policy_harness_client,
+    _harness_client,
     describe_ldm_task,
     parse_args,
 )
@@ -87,7 +87,8 @@ def _candidate(
     )
 
 
-def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
+@pytest.mark.parametrize("round_index", [1, 3])
+def test_policy_features_match_schema_and_exclude_mean_leakage(round_index) -> None:
     schema = _schema()
     encoder = ReactionOneHotEncoder(schema)
     observed = _candidate(schema, "observed", 1, base="A", solvent="X")
@@ -117,6 +118,7 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
     )
 
     round_input = adapter.build_selection_round(
+        round_index=round_index,
         history=history,
         candidates=query,
         representations={item.candidate_id: encoder.encode(item) for item in query},
@@ -138,12 +140,12 @@ def test_policy_features_match_schema_and_exclude_mean_leakage() -> None:
         [1.0, 0.0, 0.0, 1.0],
         [0.0, 1.0, 1.0, 0.0],
     ]
-    assert round_input.round_index == 1
+    assert round_input.round_index == round_index
     assert "round_index" not in round_input.execution_context["weight_context"]
     assert list(round_input.measured_observations) == [
         {
+            "candidate_id": "observed",
             "round_index": 0,
-            "conditions": {"base": "A", "solvent": "X"},
             "reaction_score": 4.0,
         }
     ]
@@ -234,6 +236,7 @@ def test_policy_holdouts_use_training_prefix_and_restore_online_gp() -> None:
     baseline = gp.select(query, representations)
     adapter = IronMindOptimizationPolicyAdapter(schema, seed=0, acquisition_beta=1.0, default_alpha=2.0, default_eta=0.25)
     round_input = adapter.build_selection_round(
+        round_index=3,
         history=history, candidates=query, representations=representations,
         q0=np.ones(1), baseline_predictions=baseline.predictions, valid_proposal_occurrences=1,
     )
@@ -250,7 +253,8 @@ def test_policy_holdouts_use_training_prefix_and_restore_online_gp() -> None:
         np.testing.assert_allclose(prepared.diagnostic_arrays[fold["prefix"] + "weights"], expected["weights"])
 
 
-def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
+@pytest.mark.parametrize("round_index", [1, 3])
+def test_compiled_policy_changes_gp_mean_and_ldm_weights(round_index) -> None:
     schema = _schema()
     encoder = ReactionOneHotEncoder(schema)
     observed = _candidate(schema, "observed", 1, base="A", solvent="X")
@@ -294,6 +298,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     result = selector.select(
         candidates,
         {item.candidate_id: encoder.encode(item) for item in candidates},
+        round_idx=round_index,
     )
 
     prediction = {item.candidate_id: item for item in result.predictions}
@@ -307,7 +312,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     assert result.metadata["alpha_base_measure"] == 0.0
     assert result.metadata["eta_acquisition_tilt"] == 0.0
     assert result.metadata["compiled_policy"]["action"] == "replace"
-    assert controller.round_input.round_index == 1
+    assert controller.round_input.round_index == round_index
 
 
 def test_compiled_method_declares_policy_pool_and_separate_budget() -> None:
@@ -335,7 +340,7 @@ def test_compiled_method_declares_policy_pool_and_separate_budget() -> None:
     assert task_spec.acquisition.parameters["optimization_policy"] == (
         "persistent_harness_compiled"
     )
-    assert task_spec.proposal_search.parameters["skills_loaded"] is False
+    assert task_spec.proposal_search.parameters["skills_loaded"] is True
     assert task_spec.proposal_search.parameters["policy_skills_loaded"] is True
     assert task_spec.proposal_search.parameters["optimization_policy"] == (
         "persistent_harness_compiled"
@@ -377,7 +382,7 @@ def test_policy_sidecar_mounts_only_public_task_resources(tmp_path) -> None:
         ]
     )
     table = workflow._load_mock_table(workflow._schema_for("buchwald_hartwig"))
-    client = _policy_harness_client(
+    client = _harness_client(
         args,
         SimpleNamespace(run_dir=tmp_path / "run", run_id="campaign-test"),
         SimpleNamespace(
@@ -387,10 +392,13 @@ def test_policy_sidecar_mounts_only_public_task_resources(tmp_path) -> None:
         ),
         table,
         load_harness_mcp_config(None),
+        policy=True,
     )
 
     command = " ".join(client.command)
     assert "mock_oracle.csv" not in command
+    assert "dst=/measured_history,readonly" in command
+    assert "get_measured_history" in client.config.tool_extensions[0].tool_names
     assert "dst=/resources,readonly" in command
     assert "dst=/skills" not in command
     assert "/public/reaction_schemas.json" in command

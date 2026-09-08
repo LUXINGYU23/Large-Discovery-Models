@@ -43,6 +43,7 @@ class FixedAcquisitionSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         del representations
         self.last_candidate_ids = tuple(candidate.candidate_id for candidate in candidates)

@@ -63,6 +63,19 @@ work completed before a provider failure or wall-time limit. Failed turns do
 not commit or advance history. If the transport exits before delivering usage,
 the client preserves unknown counters rather than reporting zero.
 
+Recoverable execution failures use `error.code=recoverable_turn_error`. A caller
+may retry within its task-owned recovery window. The same batch and turn IDs
+replay committed profiles and continue only unfinished sessions; quota usage and
+validation attempts are retained. Continuation messages do not duplicate the
+history delta. Authentication, protocol, and integrity errors remain fatal.
+On transport exit or response timeout, Python recreates the sidecar with the
+same persistent artifact root and replays the turn batch. Credentials remain
+private in-memory until close so the replacement process can be bootstrapped;
+they are never added to subprocess arguments or inherited environment.
+Timeout cancellation aborts Pi compaction as well as ordinary inference.
+See [partial-turn recovery](../../docs/research-harness.md) for the Python API
+and time-budget semantics.
+
 Contracts may declare file fields. The sidecar rejects unsafe paths, symlink
 escapes, unsupported suffixes, missing files, and oversized files, then stores
 an immutable per-attempt snapshot before task validation. Wire records contain
@@ -84,10 +97,13 @@ relative references without mounting the repository. The pool also includes
 the built-in `ldm_policy` MCP server. Its `inspect_policy_contract`,
 `validate_policy_draft`, and `evaluate_policy_draft` tools let the Agent inspect
 the authoritative feature contract and repair a draft before submission. These
-tools are advisory. Inspection returns the exact task-supplied `mean_context`
-and `weight_context` in addition to the public research snapshot, so generated
-code does not have to guess target scaling or available keys. Inspection also
-exports read-only arrays to `guest_snapshot.directory`. The runner preserves
+tools are advisory. Inspection returns the contract and file paths under
+`guest_snapshot.directory`. Its read-only `input.json` contains the exact
+task-supplied `execution_context`, including `mean_context` and `weight_context`;
+`research_snapshot.json` contains task research context and measured-record
+indexes, while `arrays.npz` contains numeric inputs. Exact designs and original
+notes are available through task-owned history tools. Agents query the relevant
+files or records rather than loading all history into a tool response. The runner preserves
 single-objective vectors or multiobjective matrices; objective meaning and GP
 diagnostics are task-owned. A trusted read-only diagnostic module is configured
 through `LDM_POLICY_DIAGNOSTICS` and `LDM_POLICY_DIAGNOSTICS_SHA256`.
@@ -99,7 +115,7 @@ They do not start another container or microVM.
 
 The three reference tasks' draft-evaluation hooks compare
 chronological measured-history holdouts with training-prefix GP hyperparameters
-frozen, and reports current-pool first-draw distribution changes. These are
+frozen, and report current-pool first-draw distribution changes. These are
 development diagnostics, not an untouched test or a closed-loop counterfactual.
 The weight context also contains exact normalization, candidate predictions,
 measured progress, and errors for predictions frozen before real measurements.

@@ -22,7 +22,7 @@ from tasks.nucleobench.core.reporting import write_campaign_reports
 
 
 def test_campaign_reporting_separates_pilot_and_official_semantics(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch,
 ) -> None:
     task_spec = build_mock_task_spec()
     runtime = CampaignRuntime.open(
@@ -95,6 +95,19 @@ def test_campaign_reporting_separates_pilot_and_official_semantics(
     }
     assert (runtime.run_dir / "proposal_trace.jsonl").is_file()
 
+    events = runtime.events()
+    started_at = next(
+        event["timestamp_unix"] for event in events
+        if event["event_type"] == "baseline_evaluated"
+    )
+    events.append({
+        "event_type": "benchmark_clock_started",
+        "payload": {"started_at_unix": started_at, "max_seconds": 28_800},
+    })
+    for event in events:
+        if event["event_type"] == "candidate_evaluated":
+            event["timestamp_unix"] = started_at + 28_801
+    monkeypatch.setattr(runtime, "events", lambda: events)
     official = write_campaign_reports(
         runtime,
         execution={
@@ -118,5 +131,28 @@ def test_campaign_reporting_separates_pilot_and_official_semantics(
     )
 
     assert official["benchmark_comparable"] is True
-    assert official["trajectory_primary_axis"] == "elapsed_seconds"
+    assert official["trajectory_primary_axis"] == "benchmark_elapsed_seconds"
     assert official["max_seconds"] == 28_800
+    assert official["wall_time_result"]["evaluation_count"] == 1
+    assert official["wall_time_result"]["evaluations_after_deadline"] == 1
+    assert official["wall_time_result"]["last_evaluation_seconds"] == 28_801
+    assert official["wall_time_result"]["best_utility"] < official["best_found_utility"]
+    events.append({
+        "event_type": "benchmark_clock_resumed",
+        "payload": {"started_at_unix": started_at + 28000, "max_seconds": 28800,
+                    "elapsed_before_start": 20000},
+    })
+    resumed = write_campaign_reports(
+        runtime,
+        execution={key: official[key] for key in (
+            "execution_profile", "termination_kind", "total_rounds", "active_optimization_rounds",
+            "initialization_evaluations", "benchmark_comparable", "case_id", "start_index",
+            "start_set_digest", "optimization_seed", "hardware_profile", "search_method",
+            "method_preset_sha256", "max_seconds",
+        )},
+        oracle_manifest={"schema_version": 1, "oracle": "fixture"}, official_outputs=[],
+    )
+    assert resumed["benchmark_comparable"] is False
+    assert resumed["wall_time_result"]["clock_mode"] == "cumulative_runtime"
+    assert resumed["wall_time_result"]["last_evaluation_seconds"] == 20801
+    assert resumed["wall_time_result"]["evaluation_count"] == 2

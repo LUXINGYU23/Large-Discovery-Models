@@ -83,7 +83,8 @@ class CampaignComponentOptions:
     harness_client: HarnessClient | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
     harness_candidates_per_profile: int = 0
-    account_harness_usage: Callable[[dict[str, int]], None] | None = None
+    harness_wall_time_seconds: int = 1800
+    account_harness_usage: Callable[..., object] | None = None
     policy_controller: PolicyResearchController | None = None
     policy_adapter: SynthonOptimizationPolicyAdapter | None = None
 
@@ -274,6 +275,8 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
             attach_empirical_q0=options.search_method in PARALLEL_HARNESS_METHODS,
             account=options.account_harness_usage,
+            artifact_root=options.runtime.run_dir / "harness",
+            wall_time_seconds=options.harness_wall_time_seconds,
         )
     else:
         catalog = SynthonProposalCatalog(

@@ -634,7 +634,9 @@ export class PersistentProfileSession {
 		let failure: Error | undefined;
 		try {
 			await this.promptWithTimeout(
-				`${input.message}\n\n${this.policy.budgetMessage()}`,
+				`${priorInput
+					? `Continue the interrupted turn from your existing research and files. The history and submission contract are unchanged. Your previous submission was not accepted; repair any reported errors and call ${this.config.submissionContract.toolName} with the complete result. Tool budgets have not reset.`
+					: input.message}\n\n${this.policy.budgetMessage()}`,
 				this.config.limits,
 			);
 			submission = this.submissions.submission;
@@ -662,7 +664,7 @@ export class PersistentProfileSession {
 					toolCalls: policySummary.toolCalls,
 					artifactBytes: providerSummary.artifactBytes,
 				},
-			}]);
+			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|\b(?:408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
 		}
 		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);
@@ -692,6 +694,7 @@ export class PersistentProfileSession {
 	async close(): Promise<void> {
 		try {
 			if (this.session) {
+				this.session.abortCompaction();
 				await this.session.abort();
 				this.session.dispose();
 				this.session = undefined;
@@ -761,6 +764,7 @@ export class PersistentProfileSession {
 			await Promise.race([pending, timeout]);
 		} catch (error) {
 			if (expired) {
+				session.abortCompaction();
 				await session.abort();
 				await pending.catch(() => undefined);
 			}
@@ -960,7 +964,9 @@ export class PiSessionPool {
 		const results = await Promise.allSettled(inputs.map(
 			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate) as Promise<CommittedTurn>,
 		));
-		const failed = results.find((result) => result.status === "rejected");
+		const failed = results.find((result) => result.status === "rejected"
+			&& !(result.reason instanceof TurnExecutionError && result.reason.retryable))
+			?? results.find((result) => result.status === "rejected");
 		if (failed?.status === "rejected") {
 			throw new TurnExecutionError(String(failed.reason), results.flatMap((result) => {
 				if (result.status === "rejected") {
@@ -971,7 +977,8 @@ export class PiSessionPool {
 					turnId: result.value.turnId,
 					usage: result.value.usage,
 				}];
-			}));
+			}), results.every((result) => result.status === "fulfilled"
+				|| (result.reason instanceof TurnExecutionError && result.reason.retryable)));
 		}
 		return results.map((result) => (result as PromiseFulfilledResult<CommittedTurn>).value);
 	}

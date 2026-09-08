@@ -35,8 +35,9 @@ class RecordingSelector:
         representations: dict[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
-        self.select_arguments = (candidates, representations, count)
+        self.select_arguments = (candidates, representations, count, round_idx)
         return self.select_result
 
 
@@ -66,11 +67,11 @@ def test_warm_start_delegates_describe_and_select_without_rewriting_result() -> 
         "candidate-2": SurrogateVector((2.0,), "test-v1", source_id="candidate-2")
     }
 
-    result = selector.select((candidate,), representations, count=1)
+    result = selector.select((candidate,), representations, count=1, round_idx=7)
 
     assert selector.describe() is delegate.spec
     assert result is delegate.select_result
-    assert delegate.select_arguments == ((candidate,), representations, 1)
+    assert delegate.select_arguments == ((candidate,), representations, 1, 7)
 
 
 def test_warm_start_rejects_duplicate_candidate_id_across_priors_and_history() -> None:

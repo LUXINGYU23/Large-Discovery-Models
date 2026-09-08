@@ -6,10 +6,14 @@ import hashlib
 import json
 import os
 import sys
+import time
+from pathlib import Path
 from importlib.metadata import version
 
 
 profiles: list[str] = []
+committed = {}
+turn_requests = 0
 print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
 
 
@@ -38,8 +42,12 @@ for line in sys.stdin:
         )
     elif frame["type"] == "initialize":
         profiles = [item["profileId"] for item in frame["profiles"]]
+        store = Path(frame["artifactRoot"]) / "fake_committed.json"
+        if store.exists():
+            committed = json.loads(store.read_text())
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
+        turn_requests += 1
         failure = os.environ.get("HARNESS_TEST_TURN_FAILURE")
         if failure:
             error = {"message": "provider 502"}
@@ -53,6 +61,19 @@ for line in sys.stdin:
             continue
         turns = []
         for item in frame["turns"]:
+            if os.environ.get("HARNESS_TEST_PROCESS_FAILURE") and item["turnId"] in committed:
+                previous = committed[item["turnId"]]
+                assert previous["inputDigest"] == item["inputDigest"]
+                turns.append({**previous, "replayed": True})
+                continue
+            if os.environ.get("HARNESS_TEST_PARTIAL_FAILURE"):
+                if turn_requests == 1 and item["profileId"] == profiles[-1]:
+                    continue
+                if item["turnId"] in committed:
+                    previous = committed[item["turnId"]]
+                    assert previous["inputDigest"] == item["inputDigest"]
+                    turns.append({**previous, "replayed": True})
+                    continue
             attempt_index = 0
             submission = {"candidates": [{"value": item["profileId"]}]}
             artifacts = []
@@ -105,6 +126,20 @@ for line in sys.stdin:
                 "toolBudget": {},
                 "artifacts": {"turn": f"turns/{item['turnId']}", "session": f"sessions/{item['profileId']}.jsonl"},
             })
+            committed[item["turnId"]] = turns[-1]
+            if os.environ.get("HARNESS_TEST_PROCESS_FAILURE"):
+                store.write_text(json.dumps(committed))
+                if len(committed) == 1:
+                    if os.environ["HARNESS_TEST_PROCESS_FAILURE"] == "timeout":
+                        time.sleep(30)
+                    sys.exit(1)
+        if os.environ.get("HARNESS_TEST_PARTIAL_FAILURE") and turn_requests == 1:
+            response = {"type": "error", **common, "error": {
+                "code": "recoverable_turn_error", "message": "session wall-time limit reached: 1800s",
+                "turnUsage": [{"profileId": t["profileId"], "turnId": t["turnId"], "usage": t["usage"]} for t in turns],
+            }}
+            print(json.dumps(response), flush=True)
+            continue
         response = {"type": "turn_committed", **common, "turns": turns}
     elif frame["type"] == "close":
         response = {"type": "closed", **common}

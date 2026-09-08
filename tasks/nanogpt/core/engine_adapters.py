@@ -481,6 +481,7 @@ class NanogptPrecomputedSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         del representations
         warmup = [

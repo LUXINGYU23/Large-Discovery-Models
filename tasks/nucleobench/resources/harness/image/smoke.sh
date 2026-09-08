@@ -10,9 +10,11 @@ import logomaker
 import matplotlib
 import numpy as np
 import pandas as pd
+import statsmodels.formula.api as smf
 from Bio import motifs
 from Bio.Seq import Seq
 from pyfaidx import Fasta
+from pyDOE3 import ff2n
 from pypdf import PdfReader, PdfWriter
 from scipy.spatial.distance import hamming
 from sklearn.linear_model import Ridge
@@ -39,6 +41,23 @@ assert np.isfinite(model.predict(pd.DataFrame({"mutation_count": [4]}))).all()
 
 motif = motifs.create([Seq("ACGT"), Seq("ACGT"), Seq("AGGT")])
 assert motif.counts["A"][0] == 3
+pssm = motif.counts.normalize(pseudocounts=0.5).log_odds()
+for probe in ("ACGT", "ACGTACGT"):
+    for matrix in (pssm, pssm.reverse_complement()):
+        scores = np.atleast_1d(matrix.calculate(Seq(probe)))
+        assert scores.shape == (len(probe) - pssm.length + 1,)
+        assert np.isfinite(scores).all() and scores[0] > 0.0
+
+design = pd.DataFrame(ff2n(3), columns=["module_a", "module_b", "background"])
+design["utility"] = (
+    1 + 2 * design["module_a"] - design["module_b"]
+    + 0.5 * design["module_a"] * design["module_b"]
+    + 0.1 * design["background"]
+)
+fit = smf.ols("utility ~ module_a * module_b", data=design).fit()
+assert np.isclose(fit.params["module_a:module_b"], 0.5)
+assert np.isfinite(fit.get_influence().cooks_distance[0]).all()
+assert np.isfinite(fit.get_robustcov_results(cov_type="HC3").bse).all()
 matrix = logomaker.alignment_to_matrix(["ACGT", "ACGT", "AGGT"])
 figure, axis = plt.subplots(figsize=(4, 2))
 logomaker.Logo(matrix, ax=axis)

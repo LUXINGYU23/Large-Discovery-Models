@@ -34,6 +34,14 @@ optimization policy in addition to the existing proposal Harness.
    duplicate those fields in `research_snapshot`. Preserve all objective
    columns: `history_utilities` and prior outputs can be vectors or matrices.
    Define objective order, direction, and scaling in the task context.
+   Set `PolicyRoundInput.round_index` from the selector's engine-supplied
+   `round_idx`, never from the last successful GP observation. Test a round
+   following failed measurements so policy epochs cannot collide.
+   Keep measured message rows compact and provide task-owned detailed history
+   lookup, including original research notes, when full designs are large.
+   Expose requested and effective evaluation batch sizes in `weight_context`
+   when interpreting without-replacement selection. Those signals must not
+   leak into the deployable mean features.
 3. Wire the prior mean into the existing task surrogate as a residual GP:
    subtract the prior on the task-declared target scale, fit the unchanged GP,
    and add the prior back to query predictions. Kernel, variance, noise,
@@ -52,6 +60,11 @@ optimization policy in addition to the existing proposal Harness.
    order, direction, units, and target transformations. Standardization is the
    reference tasks' choice, not a shared requirement. Document only enabled
    capabilities; a weights-only contract does not require prior-mean research.
+   Give the Agent an explicit task baseline and require evidence for changing
+   either weight signal or the mean. Use the current measured stage, not fixed
+   round switches. Distribution diagnostics such as ESS are not optimization
+   objectives; residual errors on selected points do not establish a better
+   sampling policy. Numerical validity alone does not demonstrate improvement.
    Make artifact declarations and required exports match `enabled_capabilities`
    exactly. Qualify the documented single-capability examples against the real
    runner, not just the default dual-capability contract.

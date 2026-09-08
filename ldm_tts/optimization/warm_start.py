@@ -38,8 +38,11 @@ class WarmStartAcquisitionSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
-        return self.delegate.select(candidates, representations, count=count)
+        return self.delegate.select(
+            candidates, representations, count=count, round_idx=round_idx
+        )
 
 
 def _require_unique_candidate_ids(observations: Sequence[BOObservation]) -> None:

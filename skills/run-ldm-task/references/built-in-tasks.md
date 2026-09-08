@@ -14,7 +14,7 @@
 
 Treat each task README, especially its **Minimal First Real Run** section, as
 the source of truth for commands and artifacts. This reference identifies the
-right configs and migration state; it intentionally does not duplicate volatile
+right configs and runtime ownership; it intentionally does not duplicate volatile
 real-run recipes.
 
 Use identical `--set` overrides for dependency checks, runner dry-runs, and
@@ -55,9 +55,10 @@ with `--method`, `--case`, and `--seed`. Method arguments come from the matrix's
 base config and `method_overrides`; do not create standalone method copies.
 See `docs/pilot-evaluation.md` for six-round and twelve-round entry points.
 
-Direct proposal backends use Chat Completions. A task's research Harness may
-use another compatible wire API; the Pi sidecar uses Responses and
-must be checked through its documented capability smoke.
+Resolve the direct proposal wire API from the task config: Iron Mind and
+SynthonBench use Chat Completions; NucleoBench also supports Responses.
+The Pi sidecar uses Responses and must be checked through its documented
+capability smoke.
 
 ## nanoGPT
 
@@ -159,14 +160,24 @@ writable external run/cache roots. A protected API-key file may be selected by
 `--harness-api-key-file`.
 
 Iron Mind constructs the shared `LDMEngine` directly around source-pinned
-finite reaction tables. Four persistent Harness profiles each submit 16 exact
-condition combinations. Task-local Python rejects invalid and historically
-evaluated candidates before commit; repeated unevaluated candidates retain
-their proposal-frequency mass. Accepted occurrences then use
+finite reaction tables. Four independent persistent sessions share one
+comprehensive researcher template and each submit 16 distinct conditions in an
+annotated `candidates.json`. Task-local Python rejects invalid and historically
+evaluated candidates before commit; agreement across sessions retains its
+proposal-frequency mass and all contributing research notes. Accepted occurrences then use
 the same empirical `q0`, factor-aware categorical GP-UCB, acquisition tilt,
 and frozen evaluator as direct LDM. The direct research Harness instead uses
 one persistent session to choose the evaluated condition without `q0`, GP, or
 acquisition.
+
+Candidate sessions expose experimental-design, scientific-critical-thinking,
+and statsmodels Skills on demand. Their task guest includes the corresponding
+numerical and plotting packages. Compact measurement indexes link to
+`get_measured_history` for exact conditions and original notes; task validation
+checks the full evaluated set. Proposal and policy recovery reuse existing
+sessions within a bounded window without resampling accepted peers.
+The default single-session limit is 30 minutes; each proposal or policy call
+has a recovery window of twice that limit, starting before its first attempt.
 
 Harness-Compiled LDM keeps the four proposal sessions and adds one independent
 `policy_architect` session. Its complete `optimization_policy.py` may supply a
@@ -209,15 +220,27 @@ smoke documented in `harnesses/pi/README.md`; a direct Chat Completions probe is
 not sufficient.
 
 SynthonBench constructs the shared `LDMEngine` directly for its specialized
-official-oracle lifecycle. Four persistent task profiles submit provisional
-minibatches through one `HarnessClient`. The task validates exact reaction and
-ordered-synthon tuples before each turn commits, then routes accepted
+official-oracle lifecycle. Four independent persistent sessions share the
+comprehensive researcher template and submit annotated `candidates.json`
+files through one `HarnessClient`. Each minibatch contains 16 distinct tuples;
+cross-session agreement retains empirical mass and all original notes.
+The task validates exact reaction and ordered-synthon tuples before each turn commits, then routes accepted
 occurrences through the same empirical `q0`, task-local GP-UCB, acquisition,
 and official evaluator used by the ordinary LDM path. Direct research Harness
 uses one persistent comprehensive session and evaluates its complete 16-tuple
 minibatch without `q0`, GP, or acquisition. Inspect `<run_dir>/harness/`
 alongside the shared campaign artifacts. Optional MCP servers and per-tool turn
 budgets use `docs/research-harness.md`.
+
+Candidate sessions load task-local RDKit, experimental-design,
+scientific-critical-thinking, and statsmodels Skills on demand. The guest
+preinstalls their chemistry and numerical tools. `get_measured_history` returns
+paginated measured tuples, component SMILES, and original notes; turn messages
+stay compact. Recoverable failed sessions resume within a bounded window,
+while accepted peers are replayed. The default single-session limit is 30
+minutes; each proposal or policy call uses a recovery window of twice that
+limit, starting before its first attempt. Public synthons and measured outcomes are
+the only scientific inputs; the history projection is not an oracle.
 
 Harness-Compiled LDM retains the four proposal sessions and adds one independent
 policy session. The task-local policy feature encoder uses released reaction,
@@ -249,9 +272,20 @@ protected key file may be selected with `--api-key-file`.
 NucleoBench exposes the shared `LDMEngine` through the source-pinned official
 `SequenceOptimizer` lifecycle. Candidates are mutation patches relative to
 one paired official start. Direct LDM makes four independent minibatch requests;
-Harness LDM advances four persistent sequence-research roles. Invalid and
+Harness LDM advances the selected persistent sequence-research roles (four by
+default). `--harness-profile`, `--harness-candidates-per-session`, and
+`--bo-pool-size` configure its topology independently of the evaluation batch.
+Repeated profile roles create independent sessions with a shared instruction
+template. `--harness-unique-candidates` enforces canonical uniqueness within
+each session; cross-session occurrences still contribute to empirical `q0`.
+Candidate roles expose the task-local `biopython`, `experimental-design`,
+`scientific-critical-thinking`, and `statsmodels` Skills on demand. The guest
+preinstalls their sequence-analysis, DOE, and statistical-modeling dependencies;
+skill sources and licenses are recorded under the task's Harness resources.
+Invalid and
 historically evaluated patches are repaired before commit, while cross-lineage
-agreement remains empirical `q0` mass. The task maintains a `3B` pool, fits
+agreement remains empirical `q0` mass. The task maintains a bounded pool (`3B`
+by default), fits
 its exact normalized-Hamming GP-UCB, applies the LDM acquisition tilt, and
 batch-evaluates selected sequences through the official model wrapper.
 
@@ -260,6 +294,21 @@ minibatch without `q0`, GP, or acquisition. Harness-Compiled LDM adds one
 independent `policy_architect` session whose task-local Skill may set the
 residual-GP prior mean and LDM `alpha`/`eta`; the kernel, variance, UCB,
 pool, candidate budget, and evaluator remain fixed.
+
+The official wall-time profile runs one published start per campaign;
+`start-index` and optimization `campaign-index` are independent. Wall-time
+resume deducts previously used runtime and excludes repair downtime; it must be
+reported as cumulative runtime, not an uninterrupted official run. Never reset
+the eight-hour budget. The runner checks time
+between rounds: report `result.json.wall_time_result` and
+`trajectory.csv.benchmark_elapsed_seconds` for the strict time window, separately
+from late measurements in the complete official output. Confirm actual hardware
+when comparing against published results.
+
+NucleoBench sends compact measurement indexes. Use `get_measured_history`
+filters and ranking before requesting detailed patches and research notes for
+selected IDs. Exact historical exclusion is checked by task tools and submission,
+not by relying on an exhaustive list in model context. Keep full records on disk.
 
 Follow `tasks/nucleobench/QUICKSTART.md` to validate the mock path, prepare
 digest-pinned external starts and model artifacts, build and smoke the task

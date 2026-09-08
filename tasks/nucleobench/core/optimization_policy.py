@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -24,6 +25,8 @@ from ldm_tts.optimization import BOObservation, BOPrediction, SurrogateVector
 from tasks.nucleobench.core.constants import TASK_ID
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig, PRIOR_MEAN_CLIP
 from tasks.nucleobench.core.policy_features import NucleoPolicyFeatureEncoder
+from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
+from tasks.nucleobench.core.research import summarize_measured_observations
 
 _POLICY_PROFILE_ID = "policy_architect"
 _HARNESS_RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
@@ -57,12 +60,18 @@ class NucleoOptimizationPolicyAdapter:
         default_alpha: float,
         default_eta: float,
         enabled_capabilities: Sequence[str] = ("prior_mean@1", "ldm_weights@1"),
+        evaluations_per_round: int | None = None,
+        benchmark_clock: BenchmarkClock | None = None,
+        measured_history_path: Path | None = None,
     ) -> None:
         if seed < 0:
             raise ValueError("Nucleo policy seed must be non-negative")
         self.features = feature_encoder
         self.seed = seed
         self.gp_config = gp_config
+        self.evaluations_per_round = evaluations_per_round
+        self.benchmark_clock = benchmark_clock
+        self.measured_history_path = measured_history_path
         self._contract = PolicyCapabilityContract(
             task_id=TASK_ID,
             api_version=1,
@@ -80,6 +89,7 @@ class NucleoOptimizationPolicyAdapter:
     def build_selection_round(
         self,
         *,
+        round_index: int,
         history: Sequence[BOObservation],
         candidates: Sequence[Candidate],
         representations: Mapping[str, SurrogateVector],
@@ -105,7 +115,6 @@ class NucleoOptimizationPolicyAdapter:
         history_utilities = np.asarray(
             [item.scalar_score for item in history], dtype=float
         )
-        round_index = _next_round_index(history)
         target_location = float(history_utilities.mean())
         target_scale = max(
             float(history_utilities.std()), self.gp_config.target_std_floor
@@ -173,6 +182,29 @@ class NucleoOptimizationPolicyAdapter:
                 "default_eta": self._contract.default_eta,
             },
         }
+        if self.evaluations_per_round is not None:
+            batch_size = min(self.evaluations_per_round, len(candidates))
+            research_snapshot["proposal_pool"].update(
+                requested_evaluation_batch=self.evaluations_per_round,
+                effective_evaluation_batch=batch_size,
+                evaluated_pool_fraction=batch_size / len(candidates) if candidates else 0.0,
+            )
+            execution_context["weight_context"].update(
+                requested_evaluation_batch=self.evaluations_per_round,
+                effective_evaluation_batch=batch_size,
+            )
+        if self.benchmark_clock is not None:
+            benchmark_time = self.benchmark_clock.snapshot()
+            research_snapshot["benchmark_time"] = benchmark_time
+            execution_context["weight_context"]["benchmark_time"] = benchmark_time
+        measured = _serialized_history(history, self.features)
+        if self.measured_history_path is not None:
+            records = json.loads(self.measured_history_path.read_text(encoding="utf-8"))["observations"]
+            by_id = {item["candidate_id"]: item for item in records}
+            for observation, row in zip(history, measured, strict=True):
+                source = by_id[observation.candidate_id]
+                if source["mutations"] != row["mutations"] or source["utility"] != row["utility"]:
+                    raise ValueError("Research history does not match the authoritative policy measurements")
         return PolicyRoundInput(
             round_index=round_index,
             history_features=history_features,
@@ -180,7 +212,7 @@ class NucleoOptimizationPolicyAdapter:
             query_features=query_features,
             history_candidate_ids=tuple(item.candidate_id for item in history),
             history_rounds=tuple(item.metadata["round_idx"] for item in history),
-            measured_observations=tuple(_serialized_history(history, self.features)),
+            measured_observations=summarize_measured_observations(measured),
             research_snapshot=research_snapshot,
             execution_context=execution_context,
         )
@@ -212,19 +244,13 @@ class NucleoOptimizationPolicyAdapter:
         return tuple(errors)
 
 
-def _next_round_index(history: Sequence[BOObservation]) -> int:
-    rounds = [item.metadata.get("round_idx") for item in history]
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in rounds):
-        raise ValueError("Nucleo BO history is missing authoritative round_idx metadata")
-    return 1 + max(rounds)
-
-
 def _serialized_history(
     history: Sequence[BOObservation],
     features: NucleoPolicyFeatureEncoder,
 ) -> list[dict[str, Any]]:
     return [
         {
+            "candidate_id": item.candidate_id,
             "round_index": item.metadata["round_idx"],
             **features.describe_vector(item.feature_vector),
             "utility": item.scalar_score,
