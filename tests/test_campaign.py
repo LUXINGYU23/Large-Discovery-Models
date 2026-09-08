@@ -321,8 +321,9 @@ def test_initialization_order_selector_delegates_after_target() -> None:
         def fit(self, history) -> None:
             self.fits += 1
 
-        def select(self, candidates, representations, *, count=1) -> BOSelectionResult:
+        def select(self, candidates, representations, *, count=1, round_idx=0) -> BOSelectionResult:
             self.selects += 1
+            self.round_idx = round_idx
             return BOSelectionResult(
                 selected_candidate_ids=(candidates[-1].candidate_id,),
                 metadata={"mode": "delegated"},
@@ -341,11 +342,12 @@ def test_initialization_order_selector_delegates_after_target() -> None:
     assert delegate.selects == 0
 
     selector.fit([BOObservation.scalar("first", 1.0, (0.0,))])
-    delegated = selector.select(candidates, {}, count=1)
+    delegated = selector.select(candidates, {}, count=1, round_idx=4)
     assert delegated.selected_candidate_ids == ("second",)
     assert delegated.metadata["mode"] == "delegated"
     assert delegate.fits == 1
     assert delegate.selects == 1
+    assert delegate.round_idx == 4
 
 
 def test_runtime_hook_receives_open_runtime_before_state_factory(tmp_path: Path) -> None:

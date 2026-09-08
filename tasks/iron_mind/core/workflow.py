@@ -46,6 +46,7 @@ from tasks.iron_mind.core.factory import (
     build_campaign_components,
     build_reaction_selector,
 )
+from tasks.iron_mind.core.research import MEASURED_HISTORY_FILE, write_measured_history
 from tasks.iron_mind.core.harness import (
     HARNESS_PROFILE_IDS,
     direct_harness_profile,
@@ -135,9 +136,7 @@ def _task_spec(args: argparse.Namespace, table: FrozenReactionTable) -> LDMTaskS
         harness_profile_count=(
             len(HARNESS_PROFILE_IDS)
             if args.search_method in PARALLEL_HARNESS_METHODS
-            else 1
-            if args.search_method == "harness"
-            else 0
+            else 1 if args.search_method == "harness" else 0
         ),
     )
 
@@ -179,7 +178,7 @@ def _run_campaign(
         mcp = load_harness_mcp_config(args.harness_mcp_config)
         with ExitStack() as stack:
             harness_client = stack.enter_context(
-                _proposal_harness_client(args, runtime, provider, table, mcp)
+                _harness_client(args, runtime, provider, table, mcp)
             )
             policy_controller = None
             policy_adapter = None
@@ -193,7 +192,7 @@ def _run_campaign(
                     enabled_capabilities=tuple(args.policy_capability),
                 )
                 policy_client = stack.enter_context(
-                    _policy_harness_client(args, runtime, provider, table, mcp)
+                    _harness_client(args, runtime, provider, table, mcp, policy=True)
                 )
                 policy_controller = PolicyResearchController(
                     client=policy_client,
@@ -208,7 +207,7 @@ def _run_campaign(
                     ),
                     root=(runtime.run_dir / "policy_harness").resolve(),
                     account=runtime.consume_many,
-                    recovery_budget=lambda: float(args.harness_wall_time_seconds),
+                    recovery_budget=lambda: 2.0 * args.harness_wall_time_seconds,
                 )
             components = _components(
                 args,
@@ -267,6 +266,7 @@ def _components(
             harness_client=harness_client,
             harness_profiles=profiles,
             harness_candidates_per_profile=_harness_candidates_per_profile(args),
+            harness_wall_time_seconds=args.harness_wall_time_seconds,
             account_harness_usage=(
                 runtime.consume_many
                 if args.search_method in PERSISTENT_HARNESS_METHODS
@@ -291,26 +291,66 @@ def _missing_harness_provider(provider) -> str:
     return "Set " + ", ".join(missing) + " for the harness backend." if missing else ""
 
 
-def _proposal_harness_client(
-    args,
-    runtime: CampaignRuntime,
-    provider: OpenAIProviderSettings,
-    table: FrozenReactionTable,
-    mcp,
+def _harness_client(
+    args, runtime: CampaignRuntime, provider, table, mcp, *, policy: bool = False
 ) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "harness").resolve()
-    resource_root = (TASK_ROOT / "resources" / "harness").resolve()
+    artifact_root = (
+        runtime.run_dir / ("policy_harness" if policy else "harness")
+    ).resolve()
+    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
-    domain = IronMindCandidateDomain(table.schema, table)
-    write_harness_space_catalog(domain, artifact_root / "reaction_space.json")
-    command = _harness_command(
-        args,
-        artifact_root,
-        _harness_cache_root(args),
-        environment={"LDM_IRON_MIND_CATALOG": "/artifacts/reaction_space.json"},
-        mounts=((resource_root, "/resources", True),),
+    write_harness_space_catalog(
+        IronMindCandidateDomain(table.schema, table),
+        artifact_root / "reaction_space.json",
     )
-    profiles = _harness_profiles(args)
+    mounts = [(harness_resources, "/resources", True)]
+    history_root = (
+        runtime.run_dir / "harness" / MEASURED_HISTORY_FILE
+    ).parent.resolve()
+    if policy:
+        mounts.append((history_root, "/measured_history", True))
+        mounts.extend(
+            (
+                ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
+                (
+                    (TASK_ROOT / "resources" / "README.md").resolve(),
+                    "/public/resources_README.md",
+                    True,
+                ),
+                (
+                    (TASK_ROOT / "resources" / "reaction_schemas.json").resolve(),
+                    "/public/reaction_schemas.json",
+                    True,
+                ),
+                (
+                    (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
+                    "/public/upstream_contract.json",
+                    True,
+                ),
+            )
+        )
+        profiles = policy_harness_profile()
+        submission_contract = policy_submission_contract(
+            args.policy_max_submission_attempts
+        )
+        mcp_servers = (
+            *mcp.servers,
+            policy_mcp_server(
+                diagnostics_path="/resources/policy_diagnostics.py",
+                diagnostics_sha256=file_sha256(
+                    harness_resources / "policy_diagnostics.py"
+                ),
+            ),
+        )
+        history_path = "/measured_history/observations.json"
+    else:
+        write_measured_history(artifact_root, ())
+        profiles = _harness_profiles(args)
+        submission_contract = harness_submission_contract(
+            _harness_candidates_per_profile(args)
+        )
+        mcp_servers = mcp.servers
+        history_path = "/artifacts/measured_history/observations.json"
     config = PiHarnessConfig(
         artifact_root=Path("/artifacts"),
         base_url=provider.base_url,
@@ -318,98 +358,22 @@ def _proposal_harness_client(
         profiles=profiles,
         campaign_id=runtime.run_id,
         task_id=TASK_ID,
-        case_id=args.dataset_id,
+        case_id=args.dataset_id + (":optimization_policy" if policy else ""),
         seed=args.campaign_index,
-        submission_contract=harness_submission_contract(
-            table.schema,
-            _harness_candidates_per_profile(args),
-        ),
+        submission_contract=submission_contract,
         guest_runtime=harness_guest_runtime(),
         tool_extensions=harness_tool_extensions(),
-        mcp_servers=mcp.servers,
+        mcp_servers=mcp_servers,
         thinking=args.harness_thinking,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_wall_time_seconds,
             tool_call_budgets=parse_tool_call_budgets(
-                args.harness_tool_budget,
-                excluded_tools=("submit_candidates",),
+                args.policy_tool_budget if policy else args.harness_tool_budget,
+                excluded_tools=(submission_contract.tool_name,),
             ),
         ),
         network_policy=HarnessNetworkPolicy(
-            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
-        ),
-        context7_enabled=args.harness_context7,
-    )
-    return HarnessClient(
-        command,
-        api_key=provider.api_key,
-        config=config,
-        named_secrets=mcp.named_secrets,
-        response_timeout_seconds=args.harness_response_timeout,
-    )
-
-
-def _policy_harness_client(
-    args,
-    runtime: CampaignRuntime,
-    provider: OpenAIProviderSettings,
-    table: FrozenReactionTable,
-    mcp,
-) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "policy_harness").resolve()
-    artifact_root.mkdir(parents=True, exist_ok=True)
-    write_harness_space_catalog(
-        IronMindCandidateDomain(table.schema, table),
-        artifact_root / "reaction_space.json",
-    )
-    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
-    mounts = (
-        (harness_resources, "/resources", True),
-        ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
-        (
-            (TASK_ROOT / "resources" / "README.md").resolve(),
-            "/public/resources_README.md",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "reaction_schemas.json").resolve(),
-            "/public/reaction_schemas.json",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
-            "/public/upstream_contract.json",
-            True,
-        ),
-    )
-    config = PiHarnessConfig(
-        artifact_root=Path("/artifacts"),
-        base_url=provider.base_url,
-        model=provider.model,
-        profiles=policy_harness_profile(),
-        campaign_id=runtime.run_id,
-        task_id=TASK_ID,
-        case_id=f"{args.dataset_id}:optimization_policy",
-        seed=args.campaign_index,
-        submission_contract=policy_submission_contract(
-            args.policy_max_submission_attempts
-        ),
-        guest_runtime=harness_guest_runtime(),
-        tool_extensions=harness_tool_extensions(),
-        mcp_servers=(*mcp.servers, policy_mcp_server(
-            diagnostics_path="/resources/policy_diagnostics.py",
-            diagnostics_sha256=file_sha256(harness_resources / "policy_diagnostics.py"),
-        )),
-        thinking=args.harness_thinking,
-        limits=HarnessLimits(
-            wall_time_seconds=args.harness_wall_time_seconds,
-            tool_call_budgets=parse_tool_call_budgets(
-                args.policy_tool_budget,
-                excluded_tools=("submit_optimization_policy",),
-            ),
-        ),
-        network_policy=HarnessNetworkPolicy(
-            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS,
+            forbidden_query_patterns=FORBIDDEN_QUERY_PATTERNS
         ),
         context7_enabled=args.harness_context7,
     )
@@ -417,9 +381,11 @@ def _policy_harness_client(
         _harness_command(
             args,
             artifact_root,
-            _harness_cache_root(args),
-            environment={"LDM_IRON_MIND_CATALOG": "/artifacts/reaction_space.json"},
-            mounts=mounts,
+            environment={
+                "LDM_IRON_MIND_CATALOG": "/artifacts/reaction_space.json",
+                "LDM_IRON_MIND_HISTORY": history_path,
+            },
+            mounts=tuple(mounts),
         ),
         api_key=provider.api_key,
         config=config,
@@ -428,24 +394,18 @@ def _policy_harness_client(
     )
 
 
-def _harness_cache_root(args) -> Path:
-    root = (
-        args.harness_cache_dir.expanduser().resolve()
-        if args.harness_cache_dir is not None
-        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
-    )
-    root.mkdir(parents=True, exist_ok=True)
-    return root
-
-
 def _harness_command(
     args,
     artifact_root: Path,
-    cache_root: Path,
     *,
     environment: dict[str, str],
     mounts: tuple[tuple[Path, str, bool], ...],
 ) -> list[str]:
+    cache_root = (
+        args.harness_cache_dir.expanduser().resolve()
+        if args.harness_cache_dir is not None
+        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
+    )
     cache_root.mkdir(parents=True, exist_ok=True)
     (cache_root / "runtime-overlays").mkdir(exist_ok=True)
     command = ["docker"]
@@ -469,18 +429,22 @@ def _harness_command(
     }
     for name, value in sorted(runtime_environment.items()):
         command.extend(("--env", f"{name}={value}"))
-    command.extend((
-        "--mount",
-        f"type=bind,src={artifact_root},dst=/artifacts",
-        "--mount",
-        f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
-    ))
+    command.extend(
+        (
+            "--mount",
+            f"type=bind,src={artifact_root},dst=/artifacts",
+            "--mount",
+            f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
+        )
+    )
     for source, destination, readonly in mounts:
         suffix = ",readonly" if readonly else ""
-        command.extend((
-            "--mount",
-            f"type=bind,src={source},dst={destination}{suffix}",
-        ))
+        command.extend(
+            (
+                "--mount",
+                f"type=bind,src={source},dst={destination}{suffix}",
+            )
+        )
     command.append(args.harness_sidecar_image)
     return command
 
@@ -511,8 +475,12 @@ def _finish_campaign(
             phase="reservoir_expansion",
         )
         return 2
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
+        write_measured_history(runtime.run_dir / "harness", result.state.observations)
     write_campaign_reports(runtime, objective_name=OBJECTIVE_NAME)
-    payload.update(engine_summary=result.summary, run_dir=str(runtime.run_dir.resolve()))
+    payload.update(
+        engine_summary=result.summary, run_dir=str(runtime.run_dir.resolve())
+    )
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if result.summary["successful_evaluation_count"] else 1
 
@@ -540,11 +508,17 @@ def _run_payload(
     }
 
 
-def _open_runtime(args, table, task_spec, contract, profile_name: str) -> CampaignRuntime:
+def _open_runtime(
+    args, table, task_spec, contract, profile_name: str
+) -> CampaignRuntime:
     default_name = (
         "mock" if args.mock else f"{args.dataset_id}-campaign-{args.campaign_index:02d}"
     )
-    run_dir = args.resume_from.resolve() if args.resume_from else unique_run_dir(args.out_dir / (args.run_name or default_name))
+    run_dir = (
+        args.resume_from.resolve()
+        if args.resume_from
+        else unique_run_dir(args.out_dir / (args.run_name or default_name))
+    )
     profile = contract.profile(profile_name) if profile_name else None
     runtime = CampaignRuntime.open(
         run_dir,
@@ -597,7 +571,9 @@ def _load_table(args: argparse.Namespace) -> FrozenReactionTable:
             slot_seed=args.campaign_index,
         )
     assert args.data_dir is not None
-    return load_pinned_reaction_table(dataset_id=args.dataset_id, data_root=args.data_dir)
+    return load_pinned_reaction_table(
+        dataset_id=args.dataset_id, data_root=args.data_dir
+    )
 
 
 def _proposal_client(
@@ -628,7 +604,9 @@ def _proposal_client(
     )
 
 
-def _selector(args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncoder | None):
+def _selector(
+    args, schema: ReactionDatasetSchema, encoder: ReactionOneHotEncoder | None
+):
     if args.search_method in {"llm", "harness"}:
         return None
     assert encoder is not None

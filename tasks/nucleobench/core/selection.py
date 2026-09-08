@@ -135,6 +135,7 @@ class AcquisitionTiltedSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         if count < 1:
             raise ValueError("selection count must be positive")
@@ -149,12 +150,16 @@ class AcquisitionTiltedSelector:
             assert self.policy_adapter is not None
             self.base_selector.fit(self.history)
             baseline = self.base_selector.select(
-                pool.candidates, representations, count=len(pool.candidates)
+                pool.candidates,
+                representations,
+                count=len(pool.candidates),
+                round_idx=round_idx,
             )
             ordered_baseline = _ordered_predictions(
                 pool.candidates, baseline.predictions
             )
             round_input = self.policy_adapter.build_selection_round(
+                round_index=round_idx,
                 history=self.history,
                 candidates=pool.candidates,
                 representations=representations,
@@ -178,6 +183,7 @@ class AcquisitionTiltedSelector:
                 pool.candidates,
                 representations,
                 count=len(pool.candidates),
+                round_idx=round_idx,
                 query_prior_mean=policy.query_prior_mean,
             )
             compiled_predictions = _ordered_predictions(
@@ -215,6 +221,7 @@ class AcquisitionTiltedSelector:
                 pool.candidates,
                 representations,
                 count=len(pool.candidates),
+                round_idx=round_idx,
             )
             alpha, eta = self.config.alpha, self.config.eta
         predictions = _ordered_predictions(pool.candidates, base.predictions)

@@ -213,6 +213,7 @@ class RBFGPUCBSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         if count < 1:
             raise ValueError("selection count must be positive")

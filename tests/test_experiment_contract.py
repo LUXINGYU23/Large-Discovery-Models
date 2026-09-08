@@ -201,6 +201,24 @@ def test_budget_ledger_persists_and_prevents_overflow(tmp_path: Path) -> None:
     assert restored.remaining("expensive_evaluation_attempts") == 0
 
 
+def test_cumulative_usage_survives_resume_and_overflow_atomically(tmp_path: Path) -> None:
+    path = tmp_path / "budget.json"
+    ledger = BudgetLedger(limits={"calls": 5}, path=path)
+    ledger.consume_many({"calls": 2, "tools": 1}, usage_key="turn:a")
+    ledger = BudgetLedger.load(path)
+    ledger.consume_many({"calls": 2}, usage_key="turn:a")
+    ledger.consume_many({"calls": 1}, usage_key="turn:a")
+    ledger.consume_many({"calls": 3, "tools": 2}, usage_key="turn:a")
+    ledger.consume_many({"calls": 2}, usage_key="turn:b")
+    assert ledger.counters == {"calls": 5, "tools": 2}
+    before = path.read_bytes()
+    with pytest.raises(BudgetExceededError):
+        ledger.consume_many({"tools": 4, "calls": 4}, usage_key="turn:a")
+    assert path.read_bytes() == before
+    assert ledger.counters == {"calls": 5, "tools": 2}
+    assert ledger.metadata["cumulative_usage"]["turn:a"] == {"calls": 3, "tools": 2}
+
+
 def test_budget_snapshot_includes_zero_counters_and_normalizes_integral_floats() -> None:
     ledger = BudgetLedger(
         limits={"whole": 60.0, "fractional": 2.5, "unused": 1},

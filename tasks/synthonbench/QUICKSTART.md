@@ -90,6 +90,15 @@ distinct legal tuples, and evaluates all 16 without `q0`, GP, or acquisition.
 Both methods accept `--harness-mcp-config`; per-tool turn limits are configured
 with `harness-tool-budget` in runner YAML. See `docs/research-harness.md`.
 
+The default four independent sessions share one comprehensive researcher
+template and load RDKit, experimental-design, scientific-critical-thinking,
+and statsmodels Skills on demand. Each writes an annotated
+`candidates.json` with 16 distinct tuples; agreement across sessions still
+contributes to `q0`. Agents receive compact measured indexes and query exact
+tuples, component SMILES, and original notes with `get_measured_history`.
+Python rejects historical repeats before accepting a complete file.
+See [README.md](README.md#persistent-research-harness) for the complete contract.
+
 Harness-Compiled LDM reuses the four proposal sessions and adds one independent
 `policy_architect` session. It writes proposal traces below `harness/` and
 policy traces, immutable `optimization_policy.py` epochs, and round results

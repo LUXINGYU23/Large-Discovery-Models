@@ -35,7 +35,6 @@ class SynthonPolicyFeatureEncoder:
     """Encode official tuples without assembling products or reading oracle data."""
 
     def __init__(self, space: Any, allowed_reactions: Sequence[str]) -> None:
-        self.space = space
         self.reactions = ordered_reactions(allowed_reactions)
         if not self.reactions:
             raise ValueError("Synthon policy features require allowed reactions")
@@ -85,7 +84,7 @@ class SynthonPolicyFeatureEncoder:
         return self.encode_tuple(reaction_id, synthon_ids)
 
     def encode_candidate_id(self, candidate_id: str) -> np.ndarray:
-        reaction_id, synthon_ids = candidate_tuple_from_id(candidate_id)
+        reaction_id, synthon_ids = _candidate_tuple_from_id(candidate_id)
         return self.encode_tuple(reaction_id, synthon_ids)
 
     def encode_tuple(
@@ -122,34 +121,6 @@ class SynthonPolicyFeatureEncoder:
             raise ValueError("Synthon policy features must be finite")
         return values
 
-    def describe_tuple(
-        self,
-        reaction_id: str,
-        synthon_ids: Sequence[int],
-    ) -> dict[str, Any]:
-        positions = self._positions.get(reaction_id)
-        normalized_ids = _integer_ids(synthon_ids)
-        if positions is None or len(positions) != len(normalized_ids):
-            raise ValueError("Cannot describe an invalid Synthon policy tuple")
-        synthons = []
-        for position, synthon_id in zip(positions, normalized_ids, strict=True):
-            key = (reaction_id, position, synthon_id)
-            if key not in self._descriptors:
-                raise ValueError("Cannot describe an invalid public synthon")
-            smiles = self.space.synthon_smiles(*key)
-            synthons.append(
-                {
-                    "position": position,
-                    "synthon_id": synthon_id,
-                    "smiles": smiles,
-                }
-            )
-        return {
-            "reaction_id": reaction_id,
-            "synthon_ids": list(normalized_ids),
-            "synthons": synthons,
-        }
-
     def descriptor_statistics(self) -> dict[str, Any]:
         return {
             "version": self.version,
@@ -160,7 +131,7 @@ class SynthonPolicyFeatureEncoder:
         }
 
 
-def candidate_tuple_from_id(candidate_id: str) -> tuple[str, tuple[int, ...]]:
+def _candidate_tuple_from_id(candidate_id: str) -> tuple[str, tuple[int, ...]]:
     prefix = "synthonbench:"
     if not candidate_id.startswith(prefix):
         raise ValueError("Synthon policy history has an invalid candidate ID")
@@ -292,5 +263,4 @@ def _integer_ids(values: Sequence[int]) -> tuple[int, ...]:
 __all__ = [
     "DESCRIPTOR_NAMES",
     "SynthonPolicyFeatureEncoder",
-    "candidate_tuple_from_id",
 ]

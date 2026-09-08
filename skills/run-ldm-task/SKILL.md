@@ -101,8 +101,8 @@ README before a tiny or full real run. When `requires_endpoint_preflight` is
 true, identify the configured backend, base URL, API key source, model ID, and
 wire API. Keep the base URL at the API root, normally ending in `/v1`.
 
-For a direct proposal backend, probe model discovery and the actual Chat
-Completions route. For a research Harness, run its documented sidecar capability
+For a direct proposal backend, probe its configured wire API, not a different
+route exposed by the same provider. For a research Harness, run its documented sidecar capability
 smoke with the configured wire API, profiles, container isolation, and task
 tools; the current Pi implementation uses OpenAI Responses. Do not certify a
 Harness with only a `/chat/completions` request. Skip endpoint-only probes when
@@ -133,6 +133,11 @@ For real mode, reread and follow the task README's **Minimal First Real Run**
 exactly. Do not copy an older recipe from this skill over a newer task README:
 
 1. Run the backend-specific direct-provider or Harness preflight when required.
+   For Harness, verify the selected profile and on-demand Skill digests and
+   run the task guest's dependency smoke after a recipe change. Check exact
+   submission admission, including snapshots for file contracts, and
+   measured-history queries through the task's actual tools, not only a
+   provider response.
 2. Run the light dependency check.
 3. Run the task-level zero-iteration or dry contract smoke.
 4. Run the documented tiny real budget.
@@ -162,12 +167,27 @@ tasks also re-export their historical trajectory files (see
 [references/built-in-tasks.md](references/built-in-tasks.md)). For a
 Harness-backed run, also inspect the run-local Harness manifest, committed turn
 records, session lineage, redacted provider index, and Harness/provider/tool
-budget counters. For Harness-Compiled LDM, inspect both `harness/` and
+budget counters. Inspect research notes on accepted candidate artifacts and
+measured checkpoints, within-session uniqueness rules, cross-session agreement
+before `q0`, and bounded failed-session recovery. Reconcile measured usage
+from failed attempts as well as committed turns; cumulative per-turn reports
+must not be summed again on replay. Missing provider usage is unknown, not zero.
+Verify that policy results use the engine's current round even when the last
+round has no successful measurement. Query compact history before
+opening selected detailed records; do not paste complete raw traces into model
+context. For Harness-Compiled LDM, inspect both `harness/` and
 `policy_harness/`, each compiled round result, accepted epoch and artifact
 digest, action/source/stage, validation failures, degraded/fallback status, and
 separate policy budget counters. For a task-owned runtime, inspect the task-specific artifacts named by its README and
 do not claim shared-engine resume or budget semantics unless the executed path
 actually provides them.
+
+For recovery, distinguish the single-session timeout from the task's recovery
+window, which includes the first attempt. Resume unchanged turn identities so
+accepted peers replay and unfinished sessions continue. Check the task's
+remaining campaign allowance; never reset a benchmark clock or remove budget
+receipts to make a resumed run fit. Changed profiles, Skills, or guest/runtime
+identities require a new artifact root, not a forced resume.
 
 For a remote backend, pull the complete run directory as an archive when
 available rather than reconstructing selected files. A remote backend used for

@@ -165,6 +165,11 @@ when the task uses surrogate-guided selection. Keep the procedure adapter
 limited to CLI parsing, `LDMTaskSpec` construction, dependency preparation, and
 campaign dispatch.
 
+The engine supplies `round_idx` to `AcquisitionSelector.select` independently of
+the successful observations passed to `fit`. Forward it through selector
+decorators and use it for round-scoped policies and artifacts; do not infer the
+current campaign round from the last successful measurement.
+
 The campaign algorithm creates authoritative `Candidate`, `EvaluationResult`, and
 `Observation` records. Do not introduce task-local equivalents unless the task
 payload needs a private intermediate record behind an engine adapter.
@@ -193,6 +198,13 @@ actionable reasons for invalid candidates, historical repeats, and any
 task-defined duplicate rule so the Agent can replace rejected entries in the
 same session. Accept a complete minibatch before computing empirical proposal
 mass or running acquisition.
+
+Large or annotated minibatches may be submitted as immutable workspace file
+snapshots. Keep task-defined research notes in candidate metadata and preserve
+all contributing notes through canonical admission and measured checkpoints.
+Prefer compact measurement indexes plus task-local paginated detail and
+membership tools. Runtime Skills are task resources loaded on demand, with
+pinned attribution and dependencies exercised by the task guest smoke.
 
 A Harness-Compiled LDM method keeps that proposal path unchanged and adds one
 independent policy `HarnessClient`. The task owns its numeric feature encoder,

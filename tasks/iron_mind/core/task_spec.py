@@ -172,7 +172,12 @@ def _proposal_search(
             "profile_count": harness_profile_count,
             "candidates_per_session": samples // harness_profile_count,
             "persistent_sessions": True,
-            "skills_loaded": False,
+            "skills_loaded": True,
+            "profile_template": "comprehensive_research",
+            "submission": "annotated_candidate_file",
+            "history_access": "compact_delta_and_paginated_lookup",
+            "same_session_unique_candidates": True,
+            "cross_session_agreement": True,
             "candidate_source": "structured_source_pinned_reaction_space_tools",
         }
         if method == COMPILED_POLICY_METHOD:

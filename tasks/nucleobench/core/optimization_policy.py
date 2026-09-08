@@ -89,6 +89,7 @@ class NucleoOptimizationPolicyAdapter:
     def build_selection_round(
         self,
         *,
+        round_index: int,
         history: Sequence[BOObservation],
         candidates: Sequence[Candidate],
         representations: Mapping[str, SurrogateVector],
@@ -114,7 +115,6 @@ class NucleoOptimizationPolicyAdapter:
         history_utilities = np.asarray(
             [item.scalar_score for item in history], dtype=float
         )
-        round_index = _next_round_index(history)
         target_location = float(history_utilities.mean())
         target_scale = max(
             float(history_utilities.std()), self.gp_config.target_std_floor
@@ -242,13 +242,6 @@ class NucleoOptimizationPolicyAdapter:
                     )
                 )
         return tuple(errors)
-
-
-def _next_round_index(history: Sequence[BOObservation]) -> int:
-    rounds = [item.metadata.get("round_idx") for item in history]
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in rounds):
-        raise ValueError("Nucleo BO history is missing authoritative round_idx metadata")
-    return 1 + max(rounds)
 
 
 def _serialized_history(

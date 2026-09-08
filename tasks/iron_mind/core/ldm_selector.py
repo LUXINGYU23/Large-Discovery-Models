@@ -9,7 +9,10 @@ import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
-from tasks.iron_mind.core.policy_diagnostics import prepare_ucb_policy_research, prediction_records
+from tasks.iron_mind.core.policy_diagnostics import (
+    prepare_ucb_policy_research,
+    prediction_records,
+)
 from ldm_tts.optimization.records import (
     AcquisitionSelector,
     BOObservation,
@@ -77,11 +80,15 @@ class AcquisitionTiltedSelector:
             proposal_sample_count=proposal_sample_count,
         )
         if (policy_controller is None) != (policy_adapter is None):
-            raise ValueError("compiled policy controller and adapter must be configured together")
+            raise ValueError(
+                "compiled policy controller and adapter must be configured together"
+            )
         if policy_controller is not None and not isinstance(
             base_selector, ReactionCategoricalGPUCBSelector
         ):
-            raise TypeError("compiled Iron Mind policies require the categorical GP selector")
+            raise TypeError(
+                "compiled Iron Mind policies require the categorical GP selector"
+            )
         self.policy_controller = policy_controller
         self.policy_adapter = policy_adapter
         self.policy_mode = policy_mode or policy_controller is not None
@@ -128,10 +135,13 @@ class AcquisitionTiltedSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         if count < 1:
             raise ValueError("selection count must be positive")
-        proposal_reservoir = tuple(sorted(candidates, key=lambda item: item.candidate_id))
+        proposal_reservoir = tuple(
+            sorted(candidates, key=lambda item: item.candidate_id)
+        )
         if not proposal_reservoir:
             return BOSelectionResult(())
         pool = maintain_empirical_pool(
@@ -141,7 +151,9 @@ class AcquisitionTiltedSelector:
         )
         policy: CompiledOptimizationPolicy | None = None
         if self.policy_controller is not None and self.history:
-            base_result, policy = self._compiled_base_result(pool, representations)
+            base_result, policy = self._compiled_base_result(
+                pool, representations, count=count, round_idx=round_idx
+            )
             alpha, eta = policy.alpha, policy.eta
         else:
             if self.policy_controller is not None:
@@ -150,6 +162,7 @@ class AcquisitionTiltedSelector:
                 pool.candidates,
                 representations,
                 count=len(pool.candidates),
+                round_idx=round_idx,
             )
             alpha, eta = self.config.alpha, self.config.eta
         state = self._score_pool(pool, base_result, alpha=alpha, eta=eta)
@@ -183,7 +196,9 @@ class AcquisitionTiltedSelector:
                 **dict(policy.metadata),
             }
         return BOSelectionResult(
-            selected_candidate_ids=tuple(pool.candidates[index].candidate_id for index in indices),
+            selected_candidate_ids=tuple(
+                pool.candidates[index].candidate_id for index in indices
+            ),
             predictions=_annotate_predictions(state),
             fallback_reason=state.base_result.fallback_reason,
             metadata=metadata,
@@ -193,6 +208,9 @@ class AcquisitionTiltedSelector:
         self,
         pool: EmpiricalPool,
         representations: Mapping[str, SurrogateVector],
+        *,
+        count: int,
+        round_idx: int,
     ) -> tuple[BOSelectionResult, CompiledOptimizationPolicy]:
         assert isinstance(self.base_selector, ReactionCategoricalGPUCBSelector)
         assert self.policy_controller is not None and self.policy_adapter is not None
@@ -201,10 +219,12 @@ class AcquisitionTiltedSelector:
             pool.candidates,
             representations,
             count=len(pool.candidates),
+            round_idx=round_idx,
         )
         ordered_baseline = _ordered_predictions(pool.candidates, baseline.predictions)
         q0 = empirical_base_masses(pool.candidates)
         round_input = self.policy_adapter.build_selection_round(
+            round_index=round_idx,
             history=self.history,
             candidates=pool.candidates,
             representations=representations,
@@ -213,10 +233,25 @@ class AcquisitionTiltedSelector:
             valid_proposal_occurrences=pool.valid_proposal_occurrences,
         )
         round_input = prepare_ucb_policy_research(
-            round_input, history=self.history, candidates=pool.candidates,
-            representations=representations, baseline=ordered_baseline,
-            q0=q0, selector=self.base_selector,
+            round_input,
+            history=self.history,
+            candidates=pool.candidates,
+            representations=representations,
+            baseline=ordered_baseline,
+            q0=q0,
+            selector=self.base_selector,
             z_clip=self.config.z_clip,
+        )
+        round_input = replace(
+            round_input,
+            execution_context={
+                **round_input.execution_context,
+                "weight_context": {
+                    **round_input.execution_context["weight_context"],
+                    "requested_evaluation_batch": count,
+                    "effective_evaluation_batch": min(count, len(pool.candidates)),
+                },
+            },
         )
         policy = self.policy_controller.resolve(round_input)
         self.base_selector.fit(
@@ -229,14 +264,19 @@ class AcquisitionTiltedSelector:
             pool.candidates,
             representations,
             count=len(pool.candidates),
+            round_idx=round_idx,
             query_prior_mean=policy.query_prior_mean,
         )
         compiled_predictions = _ordered_predictions(pool.candidates, result.predictions)
         self.policy_controller.record_predictions(
             round_input.round_index,
             prediction_records(
-                ordered_baseline, compiled_predictions, q0,
-                alpha=policy.alpha, eta=policy.eta, z_clip=self.config.z_clip,
+                ordered_baseline,
+                compiled_predictions,
+                q0,
+                alpha=policy.alpha,
+                eta=policy.eta,
+                z_clip=self.config.z_clip,
             ),
         )
         policy = replace(
@@ -289,9 +329,13 @@ def _ordered_predictions(candidates, predictions) -> tuple[BOPrediction, ...]:
     by_id = {item.candidate_id: item for item in predictions}
     if len(by_id) != len(predictions):
         raise ValueError("base selector returned duplicate candidate predictions")
-    missing = [item.candidate_id for item in candidates if item.candidate_id not in by_id]
+    missing = [
+        item.candidate_id for item in candidates if item.candidate_id not in by_id
+    ]
     if missing:
-        raise ValueError("base selector omitted candidate predictions: " + ", ".join(missing))
+        raise ValueError(
+            "base selector omitted candidate predictions: " + ", ".join(missing)
+        )
     return tuple(by_id[item.candidate_id] for item in candidates)
 
 

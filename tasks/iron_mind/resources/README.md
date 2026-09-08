@@ -7,8 +7,10 @@ to validate the Iron Mind task:
   data hashes, and schema metadata.
 - `reaction_schemas.json` and `mock_oracle.csv`: self-contained mock
   fixtures.
-- `harness/`: digest-pinned proposal and policy profiles, the policy Agent's
-  task-local skill, and the structured source-pinned reaction-space tool.
+- `harness/`: digest-pinned comprehensive researcher and policy profiles,
+  task-local on-demand Skills, the reaction-space and measured-history tools,
+  and a dependency-pinned research guest. Skill origins and licenses are in
+  [harness/skills/ATTRIBUTION.md](harness/skills/ATTRIBUTION.md).
 - `qualification_evidence.json` and `verification_record.json`: release
   validation summaries.
 

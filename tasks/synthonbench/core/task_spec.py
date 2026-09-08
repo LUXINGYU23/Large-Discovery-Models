@@ -238,7 +238,12 @@ def _proposal_search(
             "profile_count": harness_profile_count,
             "candidates_per_session": breadth // harness_profile_count,
             "persistent_sessions": True,
-            "skills_loaded": False,
+            "skills_loaded": True,
+            "profile_template": "comprehensive_research",
+            "submission": "annotated_candidate_file",
+            "history_access": "compact_delta_and_paginated_lookup",
+            "same_session_unique_candidates": True,
+            "cross_session_agreement": True,
             "agent_selects_reaction": True,
             "candidate_source": "structured_official_synthon_space_tools",
         }

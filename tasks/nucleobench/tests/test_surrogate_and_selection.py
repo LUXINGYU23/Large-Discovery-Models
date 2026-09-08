@@ -169,6 +169,7 @@ class _FixedSelector:
         _representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         predictions = tuple(
             BOPrediction.scalar(
@@ -333,6 +334,7 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     )
 
     round_input = adapter.build_selection_round(
+        round_index=1,
         history=history,
         candidates=candidates,
         representations={
@@ -438,6 +440,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     result = selector.select(
         candidates,
         {candidate.candidate_id: encoder.encode(candidate) for candidate in candidates},
+        round_idx=1,
     )
 
     assert {

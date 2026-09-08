@@ -519,7 +519,7 @@ def test_ldm_engine_enforces_task_contract_and_runs_encoded_selection(tmp_path: 
         )
 
 
-def test_ldm_engine_projects_authoritative_round_index_into_bo_history(tmp_path: Path) -> None:
+def test_ldm_engine_preserves_current_round_after_failed_measurements(tmp_path: Path) -> None:
     class CapturingSelector:
         def __init__(self) -> None:
             self.history = ()
@@ -530,8 +530,9 @@ def test_ldm_engine_projects_authoritative_round_index_into_bo_history(tmp_path:
         def fit(self, history):
             self.history = tuple(history)
 
-        def select(self, candidates, representations, *, count=1):
+        def select(self, candidates, representations, *, count=1, round_idx=0):
             del representations
+            self.round_idx = round_idx
             return BOSelectionResult((candidates[0].candidate_id,))
 
     selector = CapturingSelector()
@@ -553,9 +554,19 @@ def test_ldm_engine_projects_authoritative_round_index_into_bo_history(tmp_path:
         round_idx=4,
     )
 
-    engine._select((previous,), (Candidate("integer-2", 2, "2"),), 1)
-
+    failed = Observation(
+        Candidate("integer-0", 0, "0"),
+        EvaluationResult("integer-0", "failed", error="oracle unavailable"),
+        round_idx=5,
+    )
+    result = engine.run(
+        LDMEngineConfig(iterations=7, reservoir_size=1),
+        state=LDMEngineState(observations=[previous, failed], next_round=6),
+    )
+    assert selector.round_idx == 6
+    assert len(selector.history) == 1
     assert selector.history[0].metadata == {"round_idx": 4}
+    assert result.state.next_round == 7
 
 
 def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path: Path) -> None:
@@ -581,6 +592,36 @@ def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path:
     assert result.state.observations[0].candidate.payload == 1
     event = next(item for item in runtime.events() if item["event_type"] == "candidates_selected")
     assert event["payload"]["metadata"]["selection_source"] == "expander"
+
+
+def test_failed_expansion_resume_does_not_spend_the_round_budget_twice(tmp_path: Path) -> None:
+    run_dir = tmp_path / "retry-round"
+    attempts = 0
+
+    def expand(request):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("proposal interrupted")
+        return ExpansionResult(proposals=(RawProposal(request.round_idx, "mock"),))
+
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(expand),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": 1.0}),
+        runtime=CampaignRuntime.open(
+            run_dir, task="integer_search", budget_limits={"outer_iterations": 1},
+        ),
+    )
+    config = LDMEngineConfig(iterations=1, reservoir_size=1)
+    with pytest.raises(RuntimeError, match="proposal interrupted"):
+        engine.run(config)
+    engine.runtime = CampaignRuntime.open(run_dir, task="integer_search", resume=True)
+    result = engine.run(config)
+    assert result.state.next_round == 1
+    assert len(result.state.observations) == 1
+    assert engine.runtime.budget.counters["outer_iterations"] == 1
 
 
 def test_ldm_engine_resumes_from_shared_checkpoint(tmp_path: Path) -> None:

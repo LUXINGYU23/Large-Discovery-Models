@@ -10,7 +10,6 @@ from typing import Any
 import numpy as np
 
 from ldm_tts.contracts import Candidate
-from tasks.synthonbench.core.policy_diagnostics import with_feedback
 from ldm_tts.harness import (
     HarnessProfile,
     HarnessSubmissionError,
@@ -22,10 +21,8 @@ from ldm_tts.harness import (
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
 from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
-from tasks.synthonbench.core.policy_features import (
-    SynthonPolicyFeatureEncoder,
-    candidate_tuple_from_id,
-)
+from tasks.synthonbench.core.policy_diagnostics import with_feedback
+from tasks.synthonbench.core.policy_features import SynthonPolicyFeatureEncoder
 from tasks.synthonbench.core.proposal_pool import empirical_base_masses
 from tasks.synthonbench.core.tanimoto_gp import PRIOR_MEAN_CLIP, TARGET_STD_FLOOR
 
@@ -40,16 +37,12 @@ _LOCAL_PROFILE_PATH = (
 _LOCAL_SKILL_ROOT = _HARNESS_RESOURCE_ROOT / "skills" / "compile-ldm-policy"
 
 
-def policy_harness_profile(
-    *,
-    profile_root: Path = Path("/resources/profiles"),
-    skill_root: Path = Path("/resources/skills/compile-ldm-policy"),
-) -> tuple[HarnessProfile, ...]:
+def policy_harness_profile() -> tuple[HarnessProfile, ...]:
     return (
         HarnessProfile(
             _POLICY_PROFILE_ID,
-            profile_root / _POLICY_PROFILE_ID / "AGENTS.md",
-            skill_dirs=(skill_root,),
+            Path("/resources/profiles/policy_architect/AGENTS.md"),
+            skill_dirs=(Path("/resources/skills/compile-ldm-policy"),),
             agents_sha256=file_sha256(_LOCAL_PROFILE_PATH),
             skill_dir_sha256=(directory_sha256(_LOCAL_SKILL_ROOT),),
         ),
@@ -123,6 +116,7 @@ class SynthonOptimizationPolicyAdapter:
     def build_selection_round(
         self,
         *,
+        round_index: int,
         history: Sequence[BOObservation],
         candidates: Sequence[Candidate],
         baseline_predictions: Sequence[BOPrediction],
@@ -142,7 +136,6 @@ class SynthonOptimizationPolicyAdapter:
             [item.scalar_score for item in history],
             dtype=float,
         )
-        round_index = _next_round_index(history)
         target_location = float(history_utilities.mean())
         target_scale = max(float(history_utilities.std()), TARGET_STD_FLOOR)
         q0 = empirical_base_masses(candidates)
@@ -218,7 +211,14 @@ class SynthonOptimizationPolicyAdapter:
             query_features=query_features,
             history_candidate_ids=tuple(item.candidate_id for item in history),
             history_rounds=tuple(item.metadata["round_idx"] for item in history),
-            measured_observations=tuple(_serialized_history(history, self.features)),
+            measured_observations=tuple(
+                {
+                    "candidate_id": item.candidate_id,
+                    "round_index": item.metadata["round_idx"],
+                    OBJECTIVE_NAME: item.scalar_score,
+                }
+                for item in history
+            ),
             research_snapshot=research_snapshot,
             execution_context=execution_context,
         )
@@ -256,33 +256,6 @@ class SynthonOptimizationPolicyAdapter:
                     )
                 )
         return tuple(errors)
-
-
-def _next_round_index(history: Sequence[BOObservation]) -> int:
-    values = [item.metadata.get("round_idx") for item in history]
-    if any(
-        isinstance(value, bool) or not isinstance(value, int) or value < 0
-        for value in values
-    ):
-        raise ValueError("Synthon BO history is missing authoritative round_idx metadata")
-    return 1 + max(values)
-
-
-def _serialized_history(
-    history: Sequence[BOObservation],
-    features: SynthonPolicyFeatureEncoder,
-) -> list[dict[str, Any]]:
-    records = []
-    for item in history:
-        reaction_id, synthon_ids = candidate_tuple_from_id(item.candidate_id)
-        records.append(
-            {
-                "round_index": item.metadata["round_idx"],
-                **features.describe_tuple(reaction_id, synthon_ids),
-                OBJECTIVE_NAME: item.scalar_score,
-            }
-        )
-    return records
 
 
 def _reaction_summary(

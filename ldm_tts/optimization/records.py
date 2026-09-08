@@ -181,6 +181,7 @@ class AcquisitionSelector(Protocol):
 
     Acquisition math belongs to :mod:`ldm_tts.optimization.acquisition`. Candidate encoding
     is performed once by the engine and supplied explicitly to the selector.
+    The engine supplies round_idx independently of successful training observations.
     """
 
     def describe(self) -> AcquisitionSpec:
@@ -195,5 +196,6 @@ class AcquisitionSelector(Protocol):
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         ...

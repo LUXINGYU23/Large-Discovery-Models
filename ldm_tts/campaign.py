@@ -102,6 +102,7 @@ class InitializationOrderSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         if self.history_size < self.successful_target:
             return BOSelectionResult(
@@ -110,7 +111,9 @@ class InitializationOrderSelector:
                 ),
                 metadata={"mode": "initialization_order"},
             )
-        return self.selector.select(candidates, representations, count=count)
+        return self.selector.select(
+            candidates, representations, count=count, round_idx=round_idx
+        )
 
 
 @dataclass(frozen=True)

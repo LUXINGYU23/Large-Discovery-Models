@@ -130,6 +130,7 @@ class ReactionCategoricalGPUCBSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
         query_prior_mean: Sequence[float] | None = None,
     ) -> BOSelectionResult:
         if count < 1:

@@ -25,7 +25,7 @@ from tasks.synthonbench.core.tanimoto_gp import (
 )
 from tasks.synthonbench.core.workflow import (
     _load_benchmark,
-    _policy_harness_client,
+    _harness_client,
     describe_ldm_task,
     parse_args,
 )
@@ -120,7 +120,8 @@ def test_policy_features_are_deterministic_finite_and_space_versioned() -> None:
     assert first.descriptor_statistics()["space_sha256"] == first.space_digest
 
 
-def test_policy_adapter_separates_research_data_from_deployed_mean_inputs() -> None:
+@pytest.mark.parametrize("round_index", [1, 3])
+def test_policy_adapter_separates_research_data_from_deployed_mean_inputs(round_index) -> None:
     space = _Space()
     policy_features = SynthonPolicyFeatureEncoder(space, ("r1", "r2"))
     surrogate = SynthonNystromEncoder(
@@ -160,20 +161,24 @@ def test_policy_adapter_separates_research_data_from_deployed_mean_inputs() -> N
     )
 
     round_input = _adapter(policy_features).build_selection_round(
+        round_index=round_index,
         history=history,
         candidates=candidates,
         baseline_predictions=predictions,
         valid_proposal_occurrences=4,
     )
 
-    assert round_input.round_index == 1
+    assert round_input.round_index == round_index
     assert "round_index" not in round_input.execution_context["weight_context"]
     assert round_input.history_features.shape == (1, policy_features.dimension)
     assert round_input.query_features.shape == (2, policy_features.dimension)
-    assert list(round_input.measured_observations)[0][
-        OBJECTIVE_NAME
-    ] == 4.0
-    assert "smiles" in json.dumps(round_input.measured_observations)
+    assert round_input.measured_observations == (
+        {
+            "candidate_id": observed.candidate_id,
+            "round_index": 0,
+            OBJECTIVE_NAME: 4.0,
+        },
+    )
     mean_context = json.dumps(round_input.execution_context["mean_context"])
     assert all(
         term not in mean_context
@@ -204,7 +209,8 @@ class _StaticPolicyController:
         )
 
 
-def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
+@pytest.mark.parametrize("round_index", [1, 3])
+def test_compiled_policy_changes_gp_mean_and_ldm_weights(round_index) -> None:
     space = _Space()
     surrogate = SynthonNystromEncoder(
         space,
@@ -249,6 +255,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     result = selector.select(
         candidates,
         {candidate.candidate_id: surrogate.encode(candidate) for candidate in candidates},
+        round_idx=round_index,
     )
 
     priors = {
@@ -263,7 +270,9 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     assert result.metadata["alpha_base_measure"] == 0.0
     assert result.metadata["eta_acquisition_tilt"] == 0.0
     assert result.metadata["compiled_policy"]["action"] == "replace"
-    assert controller.round_input.round_index == 1
+    assert controller.round_input.round_index == round_index
+    assert controller.round_input.execution_context["weight_context"]["requested_evaluation_batch"] == 1
+    assert controller.round_input.execution_context["weight_context"]["effective_evaluation_batch"] == 1
 
 
 def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
@@ -285,7 +294,7 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
         ]
     )
     benchmark = _load_benchmark(args)
-    client = _policy_harness_client(
+    client = _harness_client(
         args,
         SimpleNamespace(run_dir=tmp_path / "run", run_id="campaign-test"),
         SimpleNamespace(
@@ -295,6 +304,7 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
         ),
         benchmark,
         load_harness_mcp_config(None),
+        policy=True,
     )
     spec = describe_ldm_task(args, benchmark)
     budget = campaign_budget(args, None)
@@ -311,6 +321,8 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
     assert profile.profile_id == "policy_architect"
     assert profile.skill_dirs[0].as_posix() == "/resources/skills/compile-ldm-policy"
     assert len(profile.skill_dir_sha256[0]) == 64
+    assert "dst=/measured_history,readonly" in command
+    assert "get_measured_history" in client.config.tool_extensions[0].tool_names
     assert "dst=/resources,readonly" in command
     assert "dst=/skills" not in command
     assert "/public/verification_record.json" in command

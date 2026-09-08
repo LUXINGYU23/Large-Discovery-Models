@@ -10,6 +10,8 @@ source-pinned Official Example, Surrogate Oracle, and Glide
 Ligand-Efficiency verification boundary. Campaign outputs remain outside the
 repository.
 
-`harness/` contains the proposal and policy profiles, the policy Agent's
-task-local skill, and the digest-pinned official SynthonSpace tool extension.
+`harness/` contains the comprehensive researcher and policy profiles,
+task-local on-demand Skills, the official SynthonSpace and measured-history
+tools, and a dependency-pinned chemistry research guest. Skill sources and
+licenses are in [harness/skills/ATTRIBUTION.md](harness/skills/ATTRIBUTION.md).
 External MCP tools are user-configured at runtime.

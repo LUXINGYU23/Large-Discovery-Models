@@ -705,6 +705,7 @@ def test_research_notes_survive_selection_history_and_policy_projection(tmp_path
     ) for item in observations)
     query = NucleoBenchCandidateDomain(MOCK_CONTEXT).admit(RawProposal(payloads[2], "test"))
     kwargs = dict(
+        round_index=2,
         history=history, candidates=(query,), representations={query.candidate_id: encoder.encode(query)},
         q0=np.asarray([1.0]), baseline_predictions=(BOPrediction.scalar(
             query.candidate_id, mean=0.0, std=1.0, acquisition_score=1.0,

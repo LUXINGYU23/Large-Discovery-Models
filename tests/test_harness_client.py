@@ -266,6 +266,11 @@ def test_failed_turn_preserves_known_usage_and_checks_identity(tmp_path, monkeyp
 
 @pytest.mark.parametrize("failure", ["turn", "exit", "timeout"])
 def test_partial_session_failure_recovers_without_regenerating_committed_turns(tmp_path, monkeypatch, failure):
+    from ldm_tts.harness import client as client_module
+
+    monotonic = client_module.time.monotonic
+    elapsed = 0.0
+    monkeypatch.setattr(client_module.time, "monotonic", lambda: monotonic() + elapsed)
     monkeypatch.setenv("HARNESS_TEST_PARTIAL_FAILURE" if failure == "turn" else "HARNESS_TEST_PROCESS_FAILURE", failure)
     monkeypatch.setenv("HARNESS_TEST_SECRET", "fixture")
     monkeypatch.setenv("HARNESS_MCP_SECRET", "mcp-fixture")
@@ -289,7 +294,21 @@ def test_partial_session_failure_recovers_without_regenerating_committed_turns(t
         (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
         api_key="fixture", named_secrets={"mcp": "mcp-fixture"}, config=config, response_timeout_seconds=2,
     ) as client:
-        results = client.run_turn(turns, submission_validator=validate, recovery_timeout_seconds=10)
+        request = client._request
+
+        def delayed_failure(*args, **kwargs):
+            nonlocal elapsed
+            try:
+                return request(*args, **kwargs)
+            except HarnessError:
+                elapsed += config.limits.wall_time_seconds
+                raise
+
+        monkeypatch.setattr(client, "_request", delayed_failure)
+        results = client.run_turn(
+            turns, submission_validator=validate,
+            recovery_timeout_seconds=2 * config.limits.wall_time_seconds,
+        )
     assert validated == ["a", "b"]
     assert [r.replayed for r in results] == [True, False]
     assert [r.turn_id for r in results] == ["turn-a", "turn-b"]

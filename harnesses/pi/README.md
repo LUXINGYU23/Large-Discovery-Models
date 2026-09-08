@@ -100,9 +100,10 @@ the authoritative feature contract and repair a draft before submission. These
 tools are advisory. Inspection returns the contract and file paths under
 `guest_snapshot.directory`. Its read-only `input.json` contains the exact
 task-supplied `execution_context`, including `mean_context` and `weight_context`;
-`research_snapshot.json` contains the full research history and `arrays.npz`
-contains numeric inputs. Agents query those files with local scripts instead
-of receiving the entire history in a tool response. The runner preserves
+`research_snapshot.json` contains task research context and measured-record
+indexes, while `arrays.npz` contains numeric inputs. Exact designs and original
+notes are available through task-owned history tools. Agents query the relevant
+files or records rather than loading all history into a tool response. The runner preserves
 single-objective vectors or multiobjective matrices; objective meaning and GP
 diagnostics are task-owned. A trusted read-only diagnostic module is configured
 through `LDM_POLICY_DIAGNOSTICS` and `LDM_POLICY_DIAGNOSTICS_SHA256`.
@@ -114,7 +115,7 @@ They do not start another container or microVM.
 
 The three reference tasks' draft-evaluation hooks compare
 chronological measured-history holdouts with training-prefix GP hyperparameters
-frozen, and reports current-pool first-draw distribution changes. These are
+frozen, and report current-pool first-draw distribution changes. These are
 development diagnostics, not an untouched test or a closed-loop counterfactual.
 The weight context also contains exact normalization, candidate predictions,
 measured progress, and errors for predictions frozen before real measurements.
