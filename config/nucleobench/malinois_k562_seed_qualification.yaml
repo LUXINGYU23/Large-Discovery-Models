@@ -1,0 +1,25 @@
+name: nucleobench_malinois_k562_seed_qualification
+task: nucleobench
+algorithm: official_start_oracle_qualification
+mode: real
+description: Evaluate one paired Malinois K562 start through the pinned official oracle.
+args:
+  execution-profile: qualification
+  termination-kind: rounds
+  initialization-mode: shared_start
+  case-id: malinois_k562
+  search-method: bo
+  proposal-mode: none
+  iterations: 1
+  evaluations-per-round: 1
+  proposal-samples: 4
+  campaign-index: 0
+  start-index: 0
+  source-dir: ${NUCLEOBENCH_SOURCE_ROOT}
+  prepared-dir: ${NUCLEOBENCH_DATA_ROOT}/malinois_k562
+  expected-start-set-sha256: ${NUCLEOBENCH_START_SET_SHA256}
+  hardware-profile: n1-highmem-16-cpu
+  out-dir: ${NUCLEOBENCH_RUNS_ROOT}/qualification
+env:
+  CUDA_VISIBLE_DEVICES: ""
+  LDM_DATA_COLLECTION_ENABLED: "1"

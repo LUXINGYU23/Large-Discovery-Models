@@ -1,0 +1,192 @@
+# Iron Mind: First Run Guide
+
+This guide starts from a clean checkout and verifies the task in the same
+order used for a reproducible release: local mock campaign, official data
+preparation, endpoint configuration, and one real smoke run.
+
+Run every command from the repository root.
+
+## 1. Install and Verify the Mock Campaign
+
+```bash
+uv sync --locked --project tasks/iron_mind
+uv run --locked --project tasks/iron_mind \
+  python -m pytest tasks/iron_mind/tests
+uv run --locked --project tasks/iron_mind \
+  python scripts/run_ldm_tts.py config/iron_mind/mock.yaml
+```
+
+The mock path needs no external data, GPU, or model endpoint.
+
+## 2. Configure a Model Endpoint
+
+Direct runs require an OpenAI-compatible Chat Completions endpoint. Harness
+runs use the same provider identity over the Responses API:
+
+```bash
+export LLM_BASE_URL=https://your-model-host.example/v1
+export LLM_MODEL_NAME=your-served-model
+export LLM_API_KEY=your-api-key
+```
+
+The task accepts any compatible provider. The committed configuration files
+leave these values unset, so users can select a provider through their own
+environment. Direct sampling can omit `LLM_API_KEY` for an unauthenticated
+local endpoint. Harness requires a non-empty key; use `EMPTY` only for an
+endpoint that does not validate credentials.
+
+## 3. Prepare the Source-Pinned Data
+
+```bash
+export IRON_MIND_WORK_ROOT=/absolute/path/to/iron-mind-work
+export IRON_MIND_DATA_ROOT="$IRON_MIND_WORK_ROOT/data/official-complete"
+export IRON_MIND_RUNS_ROOT="$IRON_MIND_WORK_ROOT/runs"
+mkdir -p "$IRON_MIND_WORK_ROOT/sources" "$IRON_MIND_RUNS_ROOT"
+
+git clone https://github.com/gomesgroup/iron-mind-public \
+  "$IRON_MIND_WORK_ROOT/sources/iron-mind-public"
+git -C "$IRON_MIND_WORK_ROOT/sources/iron-mind-public" checkout \
+  476c555e45e2556e2ee4b24c726e774c2bfb7762
+git clone https://github.com/gomesgroup/olympus \
+  "$IRON_MIND_WORK_ROOT/sources/olympus"
+git -C "$IRON_MIND_WORK_ROOT/sources/olympus" checkout \
+  7b4bb35c04eb31dc57a8e46cc79a9cab71dee06d
+
+uv run --locked --project tasks/iron_mind python \
+  tasks/iron_mind/scripts/prepare_official_data.py \
+  --iron-mind-checkout "$IRON_MIND_WORK_ROOT/sources/iron-mind-public" \
+  --olympus-checkout "$IRON_MIND_WORK_ROOT/sources/olympus" \
+  --output "$IRON_MIND_DATA_ROOT"
+```
+
+## 4. Run One Real Round
+
+```bash
+uv run --locked --project tasks/iron_mind python \
+  scripts/check_task_dependencies.py config/iron_mind/real_smoke.yaml --no-optional
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_ldm_tts.py config/iron_mind/real_smoke.yaml
+```
+
+A successful run writes a timestamped directory below
+`$IRON_MIND_RUNS_ROOT/smoke/`. The released profile sends 64 independent
+one-candidate requests with up to 64 local workers, estimates empirical `q0`,
+maintains a 32-candidate BO pool, and samples one reaction condition from the
+GP-UCB-tilted LDM policy.
+That one external evaluation is the Iron Mind-compatible batch size.
+Malformed responses are recorded and can reduce the admitted reservoir. Equal
+valid responses remain separate proposal occurrences for empirical `q0` and are
+canonicalized only when the BO pool is built.
+
+The default `portfolio_v1` prompt assigns a distinct factor focus to every
+request and records the policy, slot role, focus, and prompt digest in the run
+events. To run the frozen earlier unallocated prompt as an ablation, use:
+
+```bash
+uv run --locked python scripts/run_ldm_tts.py config/iron_mind/prompt_baseline_smoke.yaml
+```
+
+For a full baseline campaign, override both the contract profile and policy on
+an `ldm_20_<dataset>.yaml` configuration:
+
+```bash
+--set contract_profile=ldm_prompt_baseline_20 --set args.prompt-policy=baseline_v1
+```
+
+If a provider supports OpenAI-compatible JSON mode, add
+`--set args.llm-json-mode=true`; this is an optional formatting aid, not a
+provider requirement. Provider-specific request fields can be supplied without
+editing a tracked config, for example:
+
+```bash
+--set 'args.llm-extra-body-json={"thinking":{"type":"disabled"}}'
+```
+
+Thinking is disabled by default for proposal-only generation. Use this override
+only to replace the default request object for a different OpenAI-compatible
+provider.
+
+After the smoke run, use `ldm_20_<dataset>.yaml` for a 20-evaluation
+campaign or a suite configuration for the full benchmark. Set both
+`--set args.proposal-samples=<M>` and `--set args.bo-pool-size=<K>` to change
+the internal search, with `M > K`, without changing the number of evaluated
+reactions.
+
+## 5. Verify the Harness Backend
+
+Harness runs require Docker and Linux KVM. Build and smoke the task guest, then
+build the pinned Pi sidecar and run the two-round capability gate:
+
+```bash
+export HARNESS_CACHE_DIR=/path/to/harness-cache
+
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi run build:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+npm --prefix harnesses/pi run smoke:task-guest -- \
+  --task iron_mind --cache-dir "$HARNESS_CACHE_DIR"
+
+docker build -t ldm-pi-harness:latest harnesses/pi
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/check_task_dependencies.py config/iron_mind/ldm_harness_smoke.yaml --no-optional \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_ldm_tts.py config/iron_mind/ldm_harness_smoke.yaml \
+  --set args.harness-cache-dir="$HARNESS_CACHE_DIR"
+```
+
+Guest building requires `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest smoke
+additionally requires the host-architecture QEMU system emulator and Linux KVM.
+
+To read the API key from a protected file, add
+`--set args.harness-api-key-file=/absolute/path/to/key`. The sidecar stores raw
+session and redacted provider traces below the campaign's `harness/` directory.
+Use `--set args.harness-mcp-config=/absolute/path/to/mcp.yaml` for allowlisted
+MCP tools. Per-tool turn limits are configured with `harness-tool-budget` in a
+runner YAML; see `docs/research-harness.md` for the schema and defaults.
+
+Harness defaults use four independent sessions from one comprehensive
+researcher template, each submitting 16 distinct conditions in an annotated
+`candidates.json`. Cross-session agreement still contributes to `q0`.
+Candidate sessions expose experimental-design, scientific-critical-thinking,
+and statsmodels Skills on demand; the guest smoke checks their numerical
+dependencies. Each new history message is a compact index. Agents use
+`get_measured_history` for exact conditions and research notes, while Python
+enforces historical exclusion. See [README.md](README.md#persistent-research-harness)
+for file fields, tools, recovery, and provenance.
+
+Harness-Compiled LDM reuses the same four proposal sessions and creates one
+independent `policy_architect` session. Its proposal artifacts remain under
+`harness/`; policy traces, immutable `optimization_policy.py` epochs, and round
+results are written under `policy_harness/`. Configure policy-session tool
+limits separately with `policy-tool-budget`.
+
+## 6. Run the Six-Method Pilot Evaluation
+
+After the official data and endpoint are ready, run the fixed six-round matrix:
+
+```bash
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml --dry-run
+
+uv run --locked --project tasks/iron_mind python \
+  scripts/run_pilot_evaluation.py config/pilot_evaluation/iron_mind.yaml
+```
+
+The matrix runs direct LDM, Harness LDM, Harness-Compiled LDM, BO, direct LLM,
+and direct research Harness. The BO comparator is offline after data
+preparation. All model-backed methods use the generic endpoint variables from
+step 2. The three Harness-backed children also use the image and KVM setup from
+step 5. Harness-Compiled LDM adds one independent policy session that may set
+the residual-GP prior mean and LDM `alpha`/`eta`; direct research Harness keeps
+one session and evaluates its accepted candidate without GP selection. The
+output root is `$IRON_MIND_RUNS_ROOT/pilot_evaluation/`; rerun an interrupted
+matrix with `--resume` only after confirming the repository and configurations
+are unchanged.
+
+Before starting a full real matrix, confirm the resolved cases, methods, seeds,
+round counts, endpoint, model, wire API, thinking level, direct-request
+concurrency, proposal and policy tool budgets, output root, and resume policy.

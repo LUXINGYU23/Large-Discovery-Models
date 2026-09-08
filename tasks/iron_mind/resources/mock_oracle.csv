@@ -1,0 +1,5 @@
+dataset_id,base,ligand,aryl_halide,additive,reaction_score
+buchwald_hartwig,BTMG,AdBrettPhos,1-bromo-4-(trifluoromethyl)benzene,3-methylisoxazole,45.92980056
+buchwald_hartwig,BTMG,AdBrettPhos,1-bromo-4-(trifluoromethyl)benzene,3-phenylisoxazole,48.06786456
+buchwald_hartwig,BTMG,AdBrettPhos,1-bromo-4-(trifluoromethyl)benzene,4-phenylisoxazole,19.84794125
+buchwald_hartwig,BTMG,AdBrettPhos,1-bromo-4-(trifluoromethyl)benzene,5-methyl-3-(1H-pyrrol-1-yl)isoxazole,35.28597628

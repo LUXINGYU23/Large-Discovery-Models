@@ -1,0 +1,188 @@
+"""Deterministic mock assets for the Iron Mind shared-engine path."""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+from collections.abc import Mapping
+from itertools import product
+from pathlib import Path
+from types import MappingProxyType
+
+from ldm_tts.engine.expansion import ExpansionRequest
+from ldm_tts.transport import ProposalResponse
+
+from tasks.iron_mind.core.data import FrozenReactionTable, ReactionRow
+from tasks.iron_mind.core.prompting import build_slot_plan
+from tasks.iron_mind.core.schema import ReactionDatasetSchema
+
+
+MOCK_SEED_ROW_COUNT = 4
+
+
+def load_mock_table(
+    schema: ReactionDatasetSchema,
+    oracle_path: Path,
+    *,
+    candidate_count: int = MOCK_SEED_ROW_COUNT,
+    round_count: int = 1,
+    slot_seed: int = 0,
+) -> FrozenReactionTable:
+    """Build a deterministic finite mock table sized for one reservoir."""
+
+    _validate_candidate_count(candidate_count)
+    if round_count < 1 or slot_seed < 0:
+        raise ValueError("Mock round count must be positive and slot seed non-negative.")
+    seed_rows = _load_seed_rows(schema, oracle_path)
+    rows = _expand_mock_rows(
+        schema,
+        seed_rows,
+        candidate_count,
+        round_count=round_count,
+        slot_seed=slot_seed,
+    )
+    indexed = {
+        tuple(row.conditions[name] for name in schema.factor_names): (row,)
+        for row in rows
+    }
+    return FrozenReactionTable(schema, rows, MappingProxyType(indexed))
+
+
+def _load_seed_rows(
+    schema: ReactionDatasetSchema, oracle_path: Path
+) -> tuple[ReactionRow, ...]:
+    with oracle_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = tuple(
+            _mock_row(schema, index, row)
+            for index, row in enumerate(csv.DictReader(handle), 1)
+        )
+    if len(rows) != MOCK_SEED_ROW_COUNT:
+        raise ValueError("Mock oracle must contain exactly four rows.")
+    return rows
+
+
+def _expand_mock_rows(
+    schema: ReactionDatasetSchema,
+    seed_rows: tuple[ReactionRow, ...],
+    candidate_count: int,
+    *,
+    round_count: int,
+    slot_seed: int,
+) -> tuple[ReactionRow, ...]:
+    by_conditions = {
+        tuple(row.conditions[name] for name in schema.factor_names): row for row in seed_rows
+    }
+    rows = []
+    known = set()
+    batch_size = max(1, candidate_count // round_count)
+    for round_idx in range(round_count):
+        request = ExpansionRequest(round_idx=round_idx, reservoir_size=batch_size)
+        for index in range(batch_size):
+            values = _portfolio_values(schema, request, index, slot_seed)
+            if values in known:
+                continue
+            row = by_conditions.get(values) or _synthetic_mock_row(schema, len(rows) + 1, values)
+            rows.append(row)
+            known.add(values)
+    for values in product(*(factor.options for factor in schema.factors)):
+        if len(rows) == candidate_count:
+            break
+        if values in known:
+            continue
+        rows.append(_synthetic_mock_row(schema, len(rows) + 1, values))
+        known.add(values)
+    if len(rows) != candidate_count:
+        raise ValueError("Mock reservoir size exceeds the finite reaction domain.")
+    return tuple(rows)
+
+
+def _portfolio_values(
+    schema: ReactionDatasetSchema,
+    request: ExpansionRequest,
+    proposal_index: int,
+    slot_seed: int,
+) -> tuple[object, ...]:
+    plan = build_slot_plan(
+        request,
+        schema,
+        proposal_index=proposal_index,
+        slot_seed=slot_seed,
+    )
+    focus = plan.focus_payload()
+    return tuple(focus.get(factor.name, factor.options[0]) for factor in schema.factors)
+
+
+def mock_proposal_response(
+    table: FrozenReactionTable,
+    *,
+    proposal_index: int,
+    slot_focus: Mapping[str, object] | None = None,
+) -> ProposalResponse:
+    """Return one deterministic response for one independent proposal request."""
+
+    if proposal_index < 0 or proposal_index >= len(table.rows):
+        raise ValueError("Mock proposal index is outside the mock table.")
+    matches = tuple(row for row in table.rows if _matches_focus(row, slot_focus))
+    if not matches:
+        raise ValueError("Mock table contains no row for the assigned slot focus.")
+    row = matches[proposal_index % len(matches)]
+    text = json.dumps(
+        {"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)},
+        separators=(",", ":"),
+    )
+    return ProposalResponse(
+        text=text,
+        metadata={"provider": "mock", "proposal_index": proposal_index, "row_id": row.row_id},
+    )
+
+
+def _matches_focus(row: ReactionRow, focus: Mapping[str, object] | None) -> bool:
+    if focus is None:
+        return True
+    return all(row.conditions.get(name) == value for name, value in focus.items())
+
+
+def _mock_row(
+    schema: ReactionDatasetSchema, row_id: int, raw: dict[str, str]
+) -> ReactionRow:
+    expected = {"dataset_id", *schema.factor_names, "reaction_score"}
+    if set(raw) != expected or raw["dataset_id"] != schema.dataset_id:
+        raise ValueError("Mock oracle row does not match the tracked Buchwald schema.")
+    conditions = {name: raw[name] for name in schema.factor_names}
+    score = float(raw["reaction_score"])
+    digest = hashlib.sha256(json.dumps(raw, sort_keys=True).encode("utf-8")).hexdigest()
+    return ReactionRow(
+        row_id,
+        MappingProxyType(conditions),
+        MappingProxyType({"yield": score}),
+        digest,
+    )
+
+
+def _synthetic_mock_row(
+    schema: ReactionDatasetSchema, row_id: int, values: tuple[object, ...]
+) -> ReactionRow:
+    conditions = dict(zip(schema.factor_names, values, strict=True))
+    payload = {"dataset_id": schema.dataset_id, "conditions": conditions}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(encoded).hexdigest()
+    score = 100.0 * int(digest[:8], 16) / 0xFFFFFFFF
+    return ReactionRow(
+        row_id=row_id,
+        conditions=MappingProxyType(conditions),
+        measurements=MappingProxyType({"yield": score}),
+        raw_row_sha256=digest,
+    )
+
+
+def _validate_candidate_count(candidate_count: int) -> None:
+    if (
+        isinstance(candidate_count, bool)
+        or not isinstance(candidate_count, int)
+        or candidate_count < 1
+    ):
+        raise ValueError("Mock candidate count must be a positive integer.")
+
+
+__all__ = ["MOCK_SEED_ROW_COUNT", "load_mock_table", "mock_proposal_response"]

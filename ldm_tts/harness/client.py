@@ -1,0 +1,680 @@
+"""Long-lived JSONL subprocess client for research harness sidecars."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import math
+import os
+import queue
+import re
+import subprocess
+import threading
+import time
+from collections import deque
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+from ldm_tts.harness.protocol import (
+    HarnessPoolConfig,
+    HarnessSubmissionError,
+    HarnessSubmissionRequest,
+    HarnessSubmissionValidation,
+    HarnessSubmittedArtifact,
+    HarnessTurn,
+    HarnessTurnResult,
+)
+
+SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
+_SEMVER_PATTERN = re.compile(
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+)
+
+
+class HarnessError(RuntimeError):
+    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None, retryable: bool = False):
+        super().__init__(message)
+        self.turn_usage = {profile: dict(usage) for profile, usage in (turn_usage or {}).items()}
+        self.retryable = retryable
+
+
+class HarnessClient:
+    def __init__(
+        self,
+        command: Sequence[str],
+        *,
+        api_key: str,
+        config: HarnessPoolConfig,
+        named_secrets: Mapping[str, str] | None = None,
+        response_timeout_seconds: float = 2100,
+    ) -> None:
+        if not command:
+            raise ValueError("harness command must not be empty")
+        if not api_key:
+            raise ValueError("harness API key must not be empty")
+        if response_timeout_seconds <= 0:
+            raise ValueError("harness response timeout must be positive")
+        self.command = tuple(str(part) for part in command)
+        self._api_key = api_key
+        self._named_secrets = dict(named_secrets or {})
+        if any(not name or not value for name, value in self._named_secrets.items()):
+            raise ValueError("harness named secrets require non-empty names and values")
+        self.config = config
+        self.response_timeout_seconds = float(response_timeout_seconds)
+        self._process: subprocess.Popen[str] | None = None
+        self._responses: queue.Queue[str | None] = queue.Queue()
+        self._stderr: deque[str] = deque(maxlen=40)
+        self._request_index = 0
+        self._protocol_version: str | None = None
+
+    def start(self) -> None:
+        if self._process is not None:
+            raise HarnessError("harness client is already started")
+        self._start_process()
+
+    def _start_process(self) -> None:
+        if not self._api_key:
+            raise HarnessError("harness client is closed")
+        self._responses = queue.Queue()
+        self._stderr = deque(maxlen=40)
+        secret_values = {self._api_key, *self._named_secrets.values()}
+        process = subprocess.Popen(
+            self.command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            bufsize=1,
+            env={
+                name: value
+                for name, value in os.environ.items()
+                if value not in secret_values
+            },
+        )
+        self._process = process
+        assert process.stdout is not None and process.stderr is not None
+        threading.Thread(target=self._read_stdout, args=(process.stdout, self._responses), daemon=True).start()
+        threading.Thread(target=self._read_stderr, args=(process.stderr, self._stderr), daemon=True).start()
+        try:
+            self._protocol_version = self._wait_for_ready()
+            self._request(
+                "bootstrap_secret",
+                {"apiKey": self._api_key, "namedSecrets": self._named_secrets},
+                "secret_bootstrapped",
+            )
+            self._request(
+                "initialize", self.config.initialize_payload(),
+                "initialized",
+            )
+        except BaseException:
+            self._stop_process()
+            raise
+
+    def run_turn(
+        self,
+        turns: Sequence[HarnessTurn],
+        *,
+        submission_validator: SubmissionValidator,
+        recovery_timeout_seconds: float = 0,
+    ) -> tuple[HarnessTurnResult, ...]:
+        if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
+            raise ValueError("harness recovery timeout must be finite and non-negative")
+        recovery_deadline = time.monotonic() + recovery_timeout_seconds
+        if not turns:
+            raise ValueError("harness turn batch must not be empty")
+        expected = {turn.profile_id: turn for turn in turns}
+        if len(expected) != len(turns):
+            raise ValueError("harness turn profile IDs must be unique")
+        terminal_validations: dict[str, tuple[str, str]] = {}
+        validation_submissions: dict[str, int] = {}
+
+        def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
+            turn = expected.get(request.profile_id)
+            if turn is None or request.turn_id != turn.turn_id:
+                raise HarnessError(
+                    "harness submission validation request does not match the turn batch"
+                )
+            validation_submissions[request.profile_id] = request.attempt_index
+            validation = submission_validator(request)
+            maximum = self.config.submission_contract.max_validation_attempts
+            if (
+                validation.decision == "retry"
+                and maximum is not None
+                and request.attempt_index >= maximum
+            ):
+                validation = HarnessSubmissionValidation("reject_turn", validation.errors)
+            if validation.decision != "retry":
+                status = "accepted" if validation.decision == "accept" else "rejected"
+                terminal_validations[request.profile_id] = (status, request.digest)
+            return validation
+
+        known_usage: dict[str, dict[str, Any]] = {}
+        retry_delay = 1.0
+        restart_required = False
+        while True:
+            try:
+                if restart_required:
+                    self._stop_process()
+                    self._start_process()
+                    restart_required = False
+                payload = self._request(
+                    "run_turn",
+                    {"turns": [turn.to_dict() for turn in turns]},
+                    "turn_committed",
+                    submission_validator=validate,
+                )
+                break
+            except HarnessError as exc:
+                # Sidecar usage is cumulative per turn, including partial recovery.
+                known_usage.update(exc.turn_usage)
+                for profile in expected:
+                    known_usage.setdefault(profile, {})["validationSubmissions"] = (
+                        validation_submissions.get(profile, 0)
+                    )
+                exc.turn_usage = {profile: dict(usage) for profile, usage in known_usage.items()}
+                remaining = recovery_deadline - time.monotonic()
+                if not exc.retryable or remaining <= 0:
+                    raise
+                restart_required = self._process is None or self._process.poll() is not None
+                logging.getLogger(__name__).warning(
+                    "Continuing unfinished Harness sessions; committed turns are replayed: %s", exc,
+                )
+                time.sleep(min(retry_delay, remaining))
+                retry_delay = min(30.0, retry_delay * 2)
+                if time.monotonic() >= recovery_deadline:
+                    raise
+        raw_turns = payload.get("turns")
+        if not isinstance(raw_turns, list):
+            raise HarnessError("harness response is missing committed turns")
+        results = tuple(_parse_turn_result(item) for item in raw_turns)
+        if (
+            {result.profile_id for result in results} != set(expected)
+            or len(results) != len(turns)
+        ):
+            raise HarnessError("harness response does not match the requested profiles")
+        for result in results:
+            turn = expected[result.profile_id]
+            result.usage["validationSubmissions"] = validation_submissions.get(
+                result.profile_id,
+                0,
+            )
+            if (
+                result.turn_id != turn.turn_id
+                or result.round_index != turn.round_index
+                or result.history_from_seq != turn.history_from_seq
+                or result.history_to_seq != turn.history_to_seq
+                or result.history_digest != turn.history_digest
+                or result.input_digest != turn.input_digest
+            ):
+                raise HarnessError("harness response does not match the requested turn")
+            validation = terminal_validations.get(result.profile_id)
+            if not result.replayed and validation != (
+                result.submission_status,
+                result.submission_digest,
+            ):
+                raise HarnessError(
+                    "harness committed a submission without matching task validation: "
+                    + result.profile_id
+                )
+        return results
+
+    def close(self) -> None:
+        process = self._process
+        try:
+            if process is not None and process.poll() is None:
+                if self._protocol_version is None:
+                    _terminate(process)
+                else:
+                    try:
+                        self._request("close", {}, "closed", timeout_seconds=30)
+                    except HarnessError:
+                        _terminate(process)
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=10)
+        finally:
+            self._stop_process()
+            self._api_key = ""
+            self._named_secrets.clear()
+
+    def _stop_process(self) -> None:
+        if self._process is not None:
+            _terminate(self._process)
+            if self._process.stdin is not None:
+                try:
+                    self._process.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+        self._process = None
+        self._protocol_version = None
+
+    def __enter__(self) -> "HarnessClient":
+        self.start()
+        return self
+
+    def __exit__(self, _type, _value, _traceback) -> None:
+        self.close()
+
+    def _request(
+        self,
+        frame_type: str,
+        fields: dict[str, Any],
+        expected_type: str,
+        *,
+        timeout_seconds: float | None = None,
+        submission_validator: SubmissionValidator | None = None,
+    ) -> dict[str, Any]:
+        frame = self._frame(self._next_request_id(), frame_type, fields)
+        process = self._process
+        if process is None or process.stdin is None:
+            raise HarnessError("harness client is not started")
+        if process.poll() is not None:
+            raise self._process_error("harness sidecar exited")
+        self._send_frame(frame)
+        timeout = self.response_timeout_seconds if timeout_seconds is None else timeout_seconds
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _terminate(process)
+                raise self._process_error("harness sidecar response timed out")
+            try:
+                line = self._responses.get(timeout=remaining)
+            except queue.Empty as exc:
+                _terminate(process)
+                raise self._process_error("harness sidecar response timed out") from exc
+            if line is None:
+                _terminate(process)
+                raise self._process_error("harness sidecar output closed")
+            try:
+                response = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise HarnessError("harness sidecar returned invalid JSON") from exc
+            if not isinstance(response, dict) or response.get("requestId") != frame["requestId"]:
+                raise HarnessError("harness sidecar response requestId mismatch")
+            if (
+                response.get("protocolVersion") != self._protocol_version
+                or response.get("campaignId") != self.config.campaign_id
+            ):
+                raise HarnessError("harness sidecar response protocol identity mismatch")
+            if response.get("type") != "submission_validation_requested":
+                break
+            if submission_validator is None:
+                _terminate(process)
+                raise HarnessError("harness requested submission validation outside run_turn")
+            try:
+                self._answer_submission_validation(response, submission_validator)
+            except BaseException:
+                _terminate(process)
+                raise
+        if response.get("type") == "error":
+            _assert_response_keys(response, {"type", "requestId", "protocolVersion", "campaignId", "error"})
+            error = response.get("error")
+            message = error.get("message") if isinstance(error, dict) else "unknown sidecar error"
+            turn_usage = {}
+            expected = {turn["profileId"]: turn["turnId"] for turn in frame.get("turns", [])}
+            raw_usage = error.get("turnUsage", []) if isinstance(error, dict) else []
+            if not isinstance(raw_usage, list):
+                raise HarnessError("harness error turnUsage must be an array")
+            for item in raw_usage:
+                _assert_response_keys(item, {"profileId", "turnId", "usage"})
+                profile = _required_string(item["profileId"], "profileId")
+                if profile in turn_usage or profile not in expected or item["turnId"] != expected[profile]:
+                    raise HarnessError("harness error usage does not match the requested turn")
+                turn_usage[profile] = _parse_usage(item["usage"])
+            raise HarnessError(
+                str(message), turn_usage=turn_usage,
+                retryable=isinstance(error, dict) and error.get("code") == "recoverable_turn_error",
+            )
+        if response.get("type") != expected_type:
+            raise HarnessError(f"expected harness response {expected_type!r}")
+        expected_keys = {
+            "secret_bootstrapped": {"type", "requestId", "protocolVersion", "campaignId"},
+            "initialized": {
+                "type", "requestId", "protocolVersion", "campaignId", "profiles", "manifest",
+            },
+            "turn_committed": {
+                "type", "requestId", "protocolVersion", "campaignId", "turns",
+            },
+            "closed": {"type", "requestId", "protocolVersion", "campaignId"},
+        }
+        _assert_response_keys(response, expected_keys[expected_type])
+        return response
+
+    def _answer_submission_validation(
+        self,
+        response: dict[str, Any],
+        validator: SubmissionValidator,
+    ) -> None:
+        _assert_response_keys(response, {
+            "type", "requestId", "protocolVersion", "campaignId", "validationId",
+            "profileId", "turnId", "attemptIndex", "submission", "artifacts",
+            "submissionJson", "submissionDigest",
+        })
+        submission = response["submission"]
+        if not isinstance(submission, dict):
+            raise HarnessError("harness submission validation request has invalid payload")
+        artifacts = _parse_submitted_artifacts(response["artifacts"])
+        submission_digest = _required_digest(response["submissionDigest"], "submissionDigest")
+        _verify_submission_json(
+            response["submissionJson"],
+            submission_digest,
+            submission,
+            response["artifacts"],
+        )
+        request = HarnessSubmissionRequest(
+            profile_id=_required_string(response["profileId"], "profileId"),
+            turn_id=_required_string(response["turnId"], "turnId"),
+            attempt_index=_required_positive_int(response["attemptIndex"], "attemptIndex"),
+            submission=dict(submission),
+            artifacts=artifacts,
+            submission_digest=submission_digest,
+        )
+        validation = validator(request)
+        if not isinstance(validation, HarnessSubmissionValidation):
+            raise HarnessError("submission validator returned an invalid result")
+        self._send_frame({
+            **self._frame(response["requestId"], "submission_validation_result"),
+            "validationId": _required_string(response["validationId"], "validationId"),
+            "submissionDigest": submission_digest,
+            **validation.to_dict(),
+        })
+
+    def _frame(
+        self,
+        request_id: str,
+        frame_type: str,
+        fields: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if self._protocol_version is None:
+            raise HarnessError("harness sidecar did not declare a release version")
+        return {
+            "type": frame_type,
+            "requestId": request_id,
+            "protocolVersion": self._protocol_version,
+            "campaignId": self.config.campaign_id,
+            **dict(fields or {}),
+        }
+
+    def _wait_for_ready(self) -> str:
+        process = self._process
+        if process is None:
+            raise HarnessError("harness client is not started")
+        timeout = min(self.response_timeout_seconds, 30)
+        try:
+            line = self._responses.get(timeout=timeout)
+        except queue.Empty as exc:
+            raise self._process_error("harness sidecar did not declare a release version") from exc
+        if line is None:
+            raise self._process_error("harness sidecar exited before declaring a release version")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise HarnessError("harness sidecar returned invalid JSON") from exc
+        _assert_response_keys(response, {"type", "protocolVersion"})
+        if response.get("type") != "ready":
+            raise HarnessError("harness sidecar did not declare a release version")
+        version = response.get("protocolVersion")
+        if not isinstance(version, str) or _SEMVER_PATTERN.fullmatch(version) is None:
+            raise HarnessError("harness sidecar declared an invalid release version")
+        return version
+
+    def _send_frame(self, frame: dict[str, Any]) -> None:
+        process = self._process
+        if process is None or process.stdin is None or process.poll() is not None:
+            raise self._process_error("harness sidecar is not running")
+        try:
+            process.stdin.write(json.dumps(frame, separators=(",", ":")) + "\n")
+            process.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            raise self._process_error("harness sidecar input failed") from exc
+
+    def _next_request_id(self) -> str:
+        self._request_index += 1
+        return f"python-{self._request_index:06d}"
+
+    def _process_error(self, message: str) -> HarnessError:
+        detail = "".join(self._stderr).strip()
+        return HarnessError(f"{message}: {detail}" if detail else message, retryable=True)
+
+    @staticmethod
+    def _read_stdout(stream, responses: queue.Queue[str | None]) -> None:
+        try:
+            with stream:
+                for line in stream:
+                    if line.strip():
+                        responses.put(line)
+        finally:
+            responses.put(None)
+
+    @staticmethod
+    def _read_stderr(stream, stderr: deque[str]) -> None:
+        with stream:
+            for line in stream:
+                stderr.append(line)
+
+
+def _terminate(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+def _parse_turn_result(value: Any) -> HarnessTurnResult:
+    if not isinstance(value, dict):
+        raise HarnessError("committed harness turn must be an object")
+    _assert_response_keys(value, {
+        "profileId", "sessionId", "turnId", "roundIndex", "historyFromSeq",
+        "historyToSeq", "historyDigest", "inputDigest", "replayed",
+        "submissionStatus", "submissionId", "submissionJson", "submissionDigest", "submission",
+        "submittedArtifacts", "validationErrors", "usage", "toolBudget", "artifacts",
+    })
+    submission = value.get("submission")
+    usage = value.get("usage")
+    artifacts = value.get("artifacts")
+    if not isinstance(submission, dict):
+        raise HarnessError("committed harness turn has invalid submission")
+    if not isinstance(usage, dict) or not isinstance(artifacts, dict):
+        raise HarnessError("committed harness turn has invalid metadata")
+    usage = _parse_usage(usage)
+    tool_budget = _tool_budget(value["toolBudget"], usage["toolCalls"])
+    _assert_response_keys(artifacts, {"turn", "session"})
+    submitted_artifacts = _parse_submitted_artifacts(value["submittedArtifacts"])
+    validation_errors = _parse_submission_errors(value["validationErrors"])
+    submission_status = value["submissionStatus"]
+    if submission_status not in {"accepted", "rejected"}:
+        raise HarnessError("committed harness turn has invalid submissionStatus")
+    if submission_status == "accepted" and validation_errors:
+        raise HarnessError("accepted harness turn cannot contain validation errors")
+    if submission_status == "rejected" and not validation_errors:
+        raise HarnessError("rejected harness turn must contain validation errors")
+    submission_digest = _required_digest(value["submissionDigest"], "submissionDigest")
+    _verify_submission_json(
+        value["submissionJson"],
+        submission_digest,
+        submission,
+        value["submittedArtifacts"],
+    )
+    replayed = value["replayed"]
+    if not isinstance(replayed, bool):
+        raise HarnessError("committed harness turn has invalid replayed")
+    history_from_seq = _required_nonnegative_int(value["historyFromSeq"], "historyFromSeq")
+    history_to_seq = _required_nonnegative_int(value["historyToSeq"], "historyToSeq")
+    if history_to_seq < history_from_seq:
+        raise HarnessError("committed harness turn has invalid history range")
+    return HarnessTurnResult(
+        profile_id=_required_string(value["profileId"], "profileId"),
+        session_id=_required_string(value["sessionId"], "sessionId"),
+        turn_id=_required_string(value["turnId"], "turnId"),
+        round_index=_required_nonnegative_int(value["roundIndex"], "roundIndex"),
+        history_from_seq=history_from_seq,
+        history_to_seq=history_to_seq,
+        history_digest=_required_digest(value["historyDigest"], "historyDigest"),
+        input_digest=_required_digest(value["inputDigest"], "inputDigest"),
+        replayed=replayed,
+        submission_status=submission_status,
+        submission_id=_required_string(value["submissionId"], "submissionId"),
+        submission_digest=submission_digest,
+        submission=dict(submission),
+        submitted_artifacts=submitted_artifacts,
+        validation_errors=validation_errors,
+        usage=usage,
+        tool_budget=tool_budget,
+        artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
+    )
+
+
+def _parse_usage(value: Any) -> dict[str, Any]:
+    _assert_response_keys(value, {"providerCalls", "toolCalls", "artifactBytes"})
+    return {
+        "providerCalls": _required_nonnegative_int(value["providerCalls"], "providerCalls"),
+        "toolCalls": _nonnegative_int_mapping(value["toolCalls"], "toolCalls"),
+        "artifactBytes": _required_nonnegative_int(value["artifactBytes"], "artifactBytes"),
+    }
+
+
+def _verify_submission_json(
+    value: Any,
+    digest: str,
+    submission: Any,
+    artifacts: Any,
+) -> None:
+    if not isinstance(value, str):
+        raise HarnessError("harness submissionJson must be a string")
+    if hashlib.sha256(value.encode("utf-8")).hexdigest() != digest:
+        raise HarnessError("harness submissionJson digest mismatch")
+    try:
+        envelope = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise HarnessError("harness submissionJson is invalid JSON") from error
+    if (
+        not isinstance(envelope, dict)
+        or set(envelope) != {"artifacts", "submission"}
+        or envelope["submission"] != submission
+        or envelope["artifacts"] != artifacts
+    ):
+        raise HarnessError("harness submissionJson does not match the submitted payload")
+
+
+def _parse_submitted_artifacts(value: Any) -> tuple[HarnessSubmittedArtifact, ...]:
+    if not isinstance(value, list):
+        raise HarnessError("harness submittedArtifacts must be an array")
+    artifacts: list[HarnessSubmittedArtifact] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise HarnessError("harness submitted artifact must be an object")
+        _assert_response_keys(raw, {
+            "pathPointer", "relativePath", "snapshotPath", "sha256", "sizeBytes",
+        })
+        try:
+            artifact = HarnessSubmittedArtifact(
+                path_pointer=_required_string(raw["pathPointer"], "pathPointer"),
+                relative_path=_required_string(raw["relativePath"], "relativePath"),
+                snapshot_path=_required_string(raw["snapshotPath"], "snapshotPath"),
+                sha256=_required_digest(raw["sha256"], "sha256"),
+                size_bytes=_required_nonnegative_int(raw["sizeBytes"], "sizeBytes"),
+            )
+        except ValueError as exc:
+            raise HarnessError(str(exc)) from exc
+        artifacts.append(artifact)
+    if len({artifact.path_pointer for artifact in artifacts}) != len(artifacts):
+        raise HarnessError("harness submitted artifact pointers must be unique")
+    return tuple(artifacts)
+
+
+def _parse_submission_errors(value: Any) -> tuple[HarnessSubmissionError, ...]:
+    if not isinstance(value, list):
+        raise HarnessError("harness validationErrors must be an array")
+    errors: list[HarnessSubmissionError] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise HarnessError("harness validation error must be an object")
+        _assert_response_keys(raw, {"path", "code", "message", "hint"})
+        path = raw["path"]
+        hint = raw["hint"]
+        if not isinstance(path, str) or not isinstance(hint, str):
+            raise HarnessError("harness validation error path and hint must be strings")
+        try:
+            errors.append(HarnessSubmissionError(
+                path=path,
+                code=_required_string(raw["code"], "code"),
+                message=_required_string(raw["message"], "message"),
+                hint=hint,
+            ))
+        except ValueError as exc:
+            raise HarnessError(str(exc)) from exc
+    return tuple(errors)
+
+
+def _required_string(value: Any, name: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return value
+
+
+def _required_nonnegative_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return value
+
+
+def _required_positive_int(value: Any, name: str) -> int:
+    result = _required_nonnegative_int(value, name)
+    if result < 1:
+        raise HarnessError(f"harness frame has invalid {name}")
+    return result
+
+
+def _required_digest(value: Any, name: str) -> str:
+    result = _required_string(value, name)
+    if len(result) != 64 or any(character not in "0123456789abcdef" for character in result):
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return result
+
+
+def _nonnegative_int_mapping(value: Any, name: str) -> dict[str, int]:
+    if not isinstance(value, dict) or any(
+        not isinstance(key, str)
+        or not key
+        or isinstance(item, bool)
+        or not isinstance(item, int)
+        or item < 0
+        for key, item in value.items()
+    ):
+        raise HarnessError(f"committed harness turn has invalid {name}")
+    return dict(value)
+
+
+def _tool_budget(value: Any, tool_calls: dict[str, int]) -> dict[str, dict[str, int]]:
+    if not isinstance(value, dict):
+        raise HarnessError("committed harness turn has invalid toolBudget")
+    result: dict[str, dict[str, int]] = {}
+    for name, raw in value.items():
+        if not isinstance(name, str) or not name or not isinstance(raw, dict):
+            raise HarnessError("committed harness turn has invalid toolBudget")
+        _assert_response_keys(raw, {"limit", "used", "remaining"})
+        limit = _required_nonnegative_int(raw["limit"], f"toolBudget.{name}.limit")
+        used = _required_nonnegative_int(raw["used"], f"toolBudget.{name}.used")
+        remaining = _required_nonnegative_int(raw["remaining"], f"toolBudget.{name}.remaining")
+        if used + remaining != limit or tool_calls.get(name, 0) != used:
+            raise HarnessError("committed harness turn has inconsistent toolBudget")
+        result[name] = {"limit": limit, "used": used, "remaining": remaining}
+    return result
+
+
+def _assert_response_keys(response: dict[str, Any], expected: set[str]) -> None:
+    if set(response) != expected:
+        raise HarnessError("harness sidecar returned unexpected response fields")
+
+
+__all__ = ["HarnessClient", "HarnessError"]

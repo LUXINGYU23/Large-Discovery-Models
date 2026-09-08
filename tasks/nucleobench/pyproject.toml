@@ -1,0 +1,22 @@
+[project]
+name = "ldm-tts-nucleobench"
+version = "0.1.0"
+description = "Source-pinned LDM task adapter for NucleoBench."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24,<3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+official = [
+    "nucleobench==2.0.10; sys_platform == 'linux'",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.uv]
+package = false

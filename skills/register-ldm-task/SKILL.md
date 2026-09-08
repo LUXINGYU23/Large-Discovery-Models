@@ -1,6 +1,6 @@
 ---
 name: register-ldm-task
-description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, proposal-provider capabilities, metric roles, qualification evidence, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, durable budget/status reporting, or staged real-run qualification.
+description: Add, repair, and qualify a manifest-registered LDM task in this repository, including its scientific contract, direct or persistent Harness proposals, and optional compiled policy. Use for task implementation and registration; use run-ldm-task to execute an existing task.
 ---
 
 # Register And Qualify An LDM Task
@@ -12,6 +12,12 @@ Read [references/task-contract.md](references/task-contract.md) before editing.
 Read [references/qualification.md](references/qualification.md) before adding a
 real config or launching an external evaluator. Treat `tasks/README.md` as the
 authoritative human-facing repository contract when present.
+Read [references/harness-proposals.md](references/harness-proposals.md) only
+when a task will use persistent research sessions, task-provided tools,
+`AGENTS.md` profiles, or the shared `ldm_tts.harness` client.
+Read [references/harness-compiled-policy.md](references/harness-compiled-policy.md)
+when a separate Harness session will compile a task-local GP prior mean or LDM
+weight schedule.
 
 ## Establish The Contract
 
@@ -22,8 +28,9 @@ Before scaffolding, discover or ask for:
   generator, edits a candidate, or updates the expansion schema;
 - the surrogate representation, dimension policy, encoder, and version;
 - the benchmark source URL, immutable commit, and task path;
-- the proposal provider kind, whether it requires endpoint preflight, and whether
-  accepted actions support fine-tuning collection;
+- the proposal execution mode (direct request, persistent research Harness, or
+  both), whether an independent compiled-policy Harness is active, provider
+  kind, required wire API, endpoint preflight, and collection boundary;
 - reported, optimized, and diagnostic metrics with directions;
 - one expensive evaluation and its official per-candidate limits;
 - search, LLM-attempt, expensive-evaluation, and baseline budgets;
@@ -54,11 +61,25 @@ and real evaluator checks support `qualified`.
    scientific provenance, proposal-provider capabilities, metric roles,
    evaluator settings, limits, and named runner-enforced campaign profiles in
    `experiment.json`.
-6. Implement the campaign through `ldm_tts.engine.LDMEngine`. Supply task-owned
-   `ReservoirExpander`, `CandidateDomainAdapter`, and `CandidateEvaluator`
-   adapters. Add `SurrogateEncoder` and `AcquisitionSelector` only for
-   surrogate-guided methods. Use `CampaignRuntime` for budgets, events,
-   checkpoints, status, and summaries; use `ProposalClient` for model transport.
+6. Implement the campaign through `ldm_tts.campaign.run_campaign` by default.
+   Supply a `CampaignRecipe` with task-owned `ReservoirExpander`,
+   `CandidateDomainAdapter`, and `CandidateEvaluator` adapters. Add
+   `SurrogateEncoder` and `AcquisitionSelector` only for surrogate-guided
+   methods, and declare absolute budgets with `CampaignBudget`. When an official
+   evaluator lifecycle cannot be represented by that recipe, a documented
+   workflow under `core/` may construct the shared `LDMEngine` and one
+   `CampaignRuntime` directly while preserving the same budget, event,
+   checkpoint, status, and summary contracts. Use `ProposalClient` for direct
+   model requests. For a persistent research backend, implement the task's
+   `ReservoirExpander` around `HarnessClient` on either engine path; do not
+   create a second optimization loop.
+   Keep compact measured-history lookup, annotated file admission, duplicate
+   semantics, and research Skill selection task-local. Use the Harness
+   registration reference for fixed minibatches, recovery, and guest smoke
+   checks; do not copy another task's scientific features or runtime libraries.
+   A compiled-policy method must keep proposal generation unchanged and attach
+   one task-local `PolicyResearchController` to the existing selector path; do
+   not let the policy Agent select candidates or replace the Campaign.
    Reuse `ldm_tts.optimization.search`, `ldm_tts.optimization.gp`, and
    `ldm_tts.optimization.acquisition`
    behind those adapters before adding task-local infrastructure.
@@ -66,6 +87,8 @@ and real evaluator checks support `qualified`.
    validation. Append canonical `ldm-2.0` IR through
    `DataCollectionSink.from_env`; keep provenance/outcomes out of model-visible
    state and never collect rejected attempts or incompatible fallback actions.
+   Treat native Harness sessions and redacted provider traces as separate raw
+   research records until an explicit conversion contract maps them to IR.
 8. Add a lightweight `dependencies.py` hook only for meaningful external
    prerequisites. Never import optional heavy dependencies at module import.
 
@@ -79,9 +102,10 @@ Finish each stage before starting the next:
    evaluator assembly checks.
 4. `seed_evaluated`: one official-budget seed evaluation with source commit,
    metrics, and artifacts recorded.
-5. `tiny_campaign_verified`: provider-specific preflight when required, one
+5. `tiny_campaign_verified`: backend-specific preflight when required, one
    generated reservoir, one acquisition-selected candidate, and one real
-   evaluation.
+   evaluation. Harness-backed tasks must exercise the real sidecar, persistent
+   session, provisional submission validation, and committed turn path.
 6. `campaign_qualified`: named contract profile, durable resume, budget/status
    files, comparison budget, and monitored durable launch.
 
@@ -143,21 +167,34 @@ evaluator rather than a standalone benchmark agent.
   select enforced production settings with top-level `contract_profile`.
 - Define `main(argv)`, `parse_args`, and a runtime-faithful `describe_ldm_task`.
 - Do not call a task engine-native merely because it emits `LDMTaskSpec`; the
-  executed campaign must construct `LDMEngine` and delegate lifecycle ownership
-  to it.
-- Make the deterministic mock execute at least one complete `LDMEngine` round
-  and assert that `events.jsonl`, `checkpoint.json`, and `summary.json` exist.
+  executed campaign must run through `run_campaign`, or a documented specialized
+  path using shared `LDMEngine` plus `CampaignRuntime`, and delegate lifecycle
+  ownership to shared infrastructure.
+- Make the deterministic mock execute at least one complete shared-campaign
+  round and assert that `events.jsonl`, `checkpoint.json`, and `summary.json`
+  exist.
 - Count LLM calls, valid search states, selected candidates, expensive attempts,
   successful evaluations, benchmark jobs, and outer iterations separately.
+  Count Harness turns plus measured web, Context7, and artifact usage when that
+  backend is active. Count proposal and compiled-policy Harness usage
+  separately when both are active.
 - Serialize every declared budget counter, including zeros, and preserve true
   fractional values while writing integral values as JSON integers.
 - Use expensive evaluations, not wall time or generated states, as the default
   fair-comparison x-axis unless the benchmark specifies otherwise.
 - Snapshot the active experiment contract into every qualified run.
 - Preflight before iteration 1 only when the declared proposal provider requires
-  it. Pause resumably when a required service circuit opens; deterministic,
+  it. Match the probe to the selected backend and wire API; a Harness using the
+  Responses API must not be certified only with a Chat Completions probe. Pause
+  resumably when a required service circuit opens; deterministic,
   dataset-backed, or simulator providers must not be blocked by endpoint-only
   gates.
+- Keep task-owned candidate identity and submission validation outside the
+  generic Harness. Return indexed, actionable rejection codes and messages so a
+  provisional submission can be corrected before the turn commits.
+- Keep compiled-policy features, scientific validation, residual-GP wiring, and
+  capability selection task-local. Execute accepted artifacts through an
+  isolated runner, never through host `import`, `exec`, or `eval`.
 - Store artifact references relative to the run directory. Prefer a portable
   `result.json` and `trajectory.csv` for completed campaigns.
 - Represent detached work with a backend-neutral durable execution handle, not
@@ -177,5 +214,6 @@ repository-local PID files or partial artifact copies.
 
 Run validation first. Preserve the stable task ID and config paths. Add
 `experiment.json` without changing schema-version-1 `task.json`, migrate generic
-GP/budget/endpoint behavior to shared modules where practical, and retain
-compatibility exports when callers already import task-local names.
+GP, budget, transport, and Harness lifecycle behavior to shared modules where
+practical. Remove superseded paths and exports instead of adding compatibility
+layers.

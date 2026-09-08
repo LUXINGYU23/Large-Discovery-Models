@@ -1,4 +1,4 @@
 interface:
   display_name: "Collect LDM Data"
-  short_description: "Collect, augment, and validate LDM training data"
-  default_prompt: "Use $collect-ldm-data to collect an LDM task run into validated ldm-2.0 and reasoning-augmented SFT data."
+  short_description: "Collect accepted LDM actions and preserve Harness traces"
+  default_prompt: "Use $collect-ldm-data to collect accepted actions into validated ldm-2.0 data while keeping raw research-Harness traces separate."

@@ -23,6 +23,18 @@ The LDM-guided process that adds candidates to a reservoir, either directly or
 through edits, generators, or policies.
 _Avoid_: Feature expansion, candidate generation
 
+**Proposal Backend**:
+The execution mechanism used by a reservoir expander to obtain raw proposals,
+such as direct model requests, a persistent research Harness, a deterministic
+generator, or a dataset search.
+_Avoid_: Optimizer, evaluator
+
+**Research Harness**:
+A persistent, tool-using Agent backend behind reservoir expansion. It owns
+research sessions and raw traces while the Campaign remains authoritative for
+optimization history, candidate admission, acquisition, and evaluation.
+_Avoid_: Agent optimizer, second campaign
+
 **Expansion Schema**:
 The structured parameters and actions currently available for reservoir
 expansion. The schema may be fixed or may evolve during discovery.

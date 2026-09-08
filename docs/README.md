@@ -10,6 +10,11 @@ technical and operational contracts.
   for candidates, reservoirs, evaluation, acquisition, and campaigns.
 - [Testing and coverage](testing.md): isolated environments, test lanes, and
   coverage thresholds.
+- [Fixed-budget pilot evaluation](pilot-evaluation.md): reusable LDM, BO,
+  direct-LLM, and Harness comparison matrices and task onboarding.
+- [Research Harness integration](research-harness.md): persistent Agent
+  proposal and compiled-policy sessions, task validation, resources, traces,
+  and qualification.
 - [Data collection](data-collection.md): the shared `ldm-2.0` collection,
   augmentation, rendering, and validation workflow.
 - [Agent execution](agent-execution.md): machine-oriented rules for safely
@@ -23,6 +28,9 @@ technical and operational contracts.
 - [Adaptive KV-cache quantization](../tasks/llm_kv_adaptive_quantization/README.md)
 - [AI4Bio mutation-effect prediction](../tasks/ai4bio_mutation_effect_prediction/README.md)
 - [Discrete causal discovery](../tasks/causal_discovery_discrete/README.md)
+- [Iron Mind](../tasks/iron_mind/README.md)
+- [SynthonBench](../tasks/synthonbench/README.md)
+- [NucleoBench](../tasks/nucleobench/README.md)
 - [Task registration](../tasks/README.md)
 
 ## Runbooks And Agent Skills

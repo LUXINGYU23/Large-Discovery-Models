@@ -18,6 +18,8 @@ from ldm_tts.transport.openai import (
     preflight_openai_chat,
     request_openai_chat,
     request_openai_chat_response,
+    request_openai_responses_response,
+    responses_url,
 )
 
 
@@ -104,6 +106,14 @@ def test_chat_completions_url_rejects_empty() -> None:
         chat_completions_url("")
     with pytest.raises(EndpointRequestError):
         chat_completions_url("   ")
+
+
+def test_responses_url_normalizes_supported_openai_endpoints() -> None:
+    assert responses_url("https://api.example.com") == "https://api.example.com/v1/responses"
+    assert responses_url("https://api.example.com/v1") == "https://api.example.com/v1/responses"
+    assert responses_url("https://api.example.com/v1/chat/completions") == (
+        "https://api.example.com/v1/responses"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -241,6 +251,52 @@ def test_request_openai_chat_response_rejects_reserved_extra_body() -> None:
         request_openai_chat_response(**_chat_kwargs(extra_body={"model": "other"}))
 
 
+def test_responses_request_converts_tools_and_extracts_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[urllib.request.Request] = []
+
+    def respond(request: urllib.request.Request, **_kwargs: object) -> _FakeResponse:
+        calls.append(request)
+        return _FakeResponse(
+            {
+                "status": "completed",
+                "model": "m",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "done"}],
+                    }
+                ],
+            }
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", respond)
+    result = request_openai_responses_response(
+        **_chat_kwargs(
+            tools=(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "emit",
+                        "description": "Emit a candidate.",
+                        "parameters": {"type": "object"},
+                    },
+                },
+            ),
+            tool_choice={"type": "function", "function": {"name": "emit"}},
+        )
+    )
+
+    body = json.loads(calls[0].data or b"{}")
+    assert calls[0].full_url == "https://api.example.com/v1/responses"
+    assert body["input"] == [{"role": "user", "content": "hi"}]
+    assert body["max_output_tokens"] == 32
+    assert body["tools"][0]["name"] == "emit"
+    assert body["tool_choice"] == {"type": "function", "name": "emit"}
+    assert result["output"][0]["content"][0]["text"] == "done"
+
+
 # --------------------------------------------------------------------------- #
 # request_openai_chat
 # --------------------------------------------------------------------------- #
@@ -346,6 +402,42 @@ def test_propose_captures_text_tool_calls_and_usage(monkeypatch: pytest.MonkeyPa
     assert response.usage["total_tokens"] == 15
     assert response.metadata["finish_reason"] == "tool_calls"
     assert response.metadata["model"] == "served-model"
+
+
+def test_proposal_client_normalizes_responses_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: _FakeResponse(
+            {
+                "status": "completed",
+                "model": "served-model",
+                "output": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call-1",
+                        "name": "emit",
+                        "arguments": "{}",
+                    }
+                ],
+                "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+            }
+        ),
+    )
+    client = OpenAICompatibleProposalClient(
+        url="https://api.example.com/v1",
+        model="m",
+        wire_api="responses",
+    )
+
+    response = client.propose(_proposal())
+
+    assert response.tool_calls[0]["id"] == "call-1"
+    assert response.tool_calls[0]["function"] == {"name": "emit", "arguments": "{}"}
+    assert response.usage["total_tokens"] == 15
+    assert response.metadata["finish_reason"] == "completed"
+    assert response.metadata["wire_api"] == "responses"
 
 
 def test_propose_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:

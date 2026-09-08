@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task_id": "iron_mind",
+  "stage": "tiny_campaign_verified",
+  "benchmark_commit": "476c555e45e2556e2ee4b24c726e774c2bfb7762",
+  "contract_profile": "ldm_official_smoke",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/task.json",
+        "tasks/iron_mind/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/ldm_task/procedure.py",
+        "tasks/iron_mind/task.json"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/iron_mind/mock.yaml",
+        "tasks/iron_mind/tests/test_workflow.py"
+      ]
+    },
+    "contract_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/upstream_contract.json",
+        "tasks/iron_mind/tests/test_schema_and_data.py"
+      ]
+    },
+    "seed_evaluated": {
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/verification_record.json"
+      ],
+      "description": "A source-pinned evaluator probe outside campaign budget succeeded."
+    },
+    "tiny_campaign_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/iron_mind/resources/verification_record.json"
+      ],
+      "description": "One real LDM-selected endpoint campaign completed one frozen-table evaluation."
+    },
+    "campaign_qualified": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

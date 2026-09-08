@@ -47,26 +47,23 @@ class BudgetLedger:
         )
 
     def consume(self, name: str, amount: int | float = 1) -> int | float:
-        amount = _validated_number(amount, f"amount for {name}")
-        current = self.counters.get(name, 0)
-        updated = current + amount
-        limit = self.limits.get(name)
-        if limit is not None and updated > limit:
-            raise BudgetExceededError(
-                f"Budget {name!r} would be exceeded: {current} + {amount} > {limit}"
-            )
-        self.counters[name] = updated
-        self.write()
-        return updated
+        return self.consume_many({name: amount})[name]
 
     def consume_many(
-        self, amounts: Mapping[str, int | float]
+        self, amounts: Mapping[str, int | float], *, usage_key: str | None = None
     ) -> dict[str, int | float]:
-        """Validate and persist a group of counter updates atomically."""
+        """Persist increments, or cumulative usage for an idempotent operation key."""
 
+        if usage_key is not None and not usage_key.strip():
+            raise ValueError("usage_key must not be empty")
+        previous = self.metadata.get("cumulative_usage", {}).get(usage_key, {})
+        totals = dict(previous)
         updates: dict[str, int | float] = {}
         for name, raw_amount in amounts.items():
             amount = _validated_number(raw_amount, f"amount for {name}")
+            if usage_key is not None:
+                totals[name] = max(previous.get(name, 0), amount)
+                amount = totals[name] - previous.get(name, 0)
             current = self.counters.get(name, 0)
             updated = current + amount
             limit = self.limits.get(name)
@@ -77,6 +74,8 @@ class BudgetLedger:
                 )
             updates[name] = updated
         self.counters.update(updates)
+        if usage_key is not None:
+            self.metadata.setdefault("cumulative_usage", {})[usage_key] = totals
         self.write()
         return updates
 
@@ -326,14 +325,12 @@ class CampaignRuntime:
         return self.run_dir / "events.jsonl"
 
     def consume(self, name: str, amount: int | float = 1) -> int | float:
-        value = self.budget.consume(name, amount)
-        self.status.update("running", phase="budget_updated", budget=self.budget)
-        return value
+        return self.consume_many({name: amount})[name]
 
     def consume_many(
-        self, amounts: Mapping[str, int | float]
+        self, amounts: Mapping[str, int | float], *, usage_key: str | None = None
     ) -> dict[str, int | float]:
-        values = self.budget.consume_many(amounts)
+        values = self.budget.consume_many(amounts, usage_key=usage_key)
         self.status.update("running", phase="budget_updated", budget=self.budget)
         return values
 
@@ -455,7 +452,7 @@ def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
         os.replace(temporary_name, path)
-    except Exception:
+    except BaseException:
         try:
             os.unlink(temporary_name)
         except OSError:

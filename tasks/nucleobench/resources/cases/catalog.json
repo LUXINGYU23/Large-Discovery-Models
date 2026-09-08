@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "benchmark_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+  "case_count": 17,
+  "official_start_count": 100,
+  "cases": [
+    {
+      "case_id": "malinois_k562",
+      "model_family": "malinois",
+      "model_name": "malinois",
+      "target": "K562",
+      "model_selector": {"target_feature": 0},
+      "sequence_length": 200,
+      "editable_position_count": 200,
+      "max_seconds": 28800,
+      "state": "qualified"
+    },
+    {
+      "case_id": "malinois_hepg2",
+      "model_family": "malinois",
+      "model_name": "malinois",
+      "target": "HepG2",
+      "model_selector": {"target_feature": 1},
+      "sequence_length": 200,
+      "editable_position_count": 200,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "malinois_sknsh",
+      "model_family": "malinois",
+      "model_name": "malinois",
+      "target": "SKNSH",
+      "model_selector": {"target_feature": 2},
+      "sequence_length": 200,
+      "editable_position_count": 200,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_atac",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "ATAC",
+      "model_selector": {"protein": "ATAC"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_ctcf",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "CTCF",
+      "model_selector": {"protein": "CTCF"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_e2f3",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "E2F3",
+      "model_selector": {"protein": "E2F3"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_elf4",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "ELF4",
+      "model_selector": {"protein": "ELF4"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_gata2",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "GATA2",
+      "model_selector": {"protein": "GATA2"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_junb",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "JUNB",
+      "model_selector": {"protein": "JUNB"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_max",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "MAX",
+      "model_selector": {"protein": "MAX"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_mecom",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "MECOM",
+      "model_selector": {"protein": "MECOM"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_myc",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "MYC",
+      "model_selector": {"protein": "MYC"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_otx1",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "OTX1",
+      "model_selector": {"protein": "OTX1"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_rad21",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "RAD21",
+      "model_selector": {"protein": "RAD21"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "bpnet_sox6",
+      "model_family": "bpnet",
+      "model_name": "bpnet",
+      "target": "SOX6",
+      "model_selector": {"protein": "SOX6"},
+      "sequence_length": 3000,
+      "editable_position_count": 3000,
+      "max_seconds": 28800,
+      "state": "prepared"
+    },
+    {
+      "case_id": "rinalmo_mrl",
+      "model_family": "rinalmo",
+      "model_name": "rinalmo_mrl",
+      "target": "mean_ribosome_load",
+      "model_selector": {},
+      "sequence_length": 100,
+      "editable_position_count": 100,
+      "max_seconds": 28800,
+      "state": "planned"
+    },
+    {
+      "case_id": "enformer_muscle_not_liver",
+      "model_family": "enformer",
+      "model_name": "enformer",
+      "target": "muscle_not_liver",
+      "model_selector": {"aggregation_type": "muscle_not_liver"},
+      "sequence_length": 196608,
+      "editable_position_count": 256,
+      "max_seconds": 43200,
+      "state": "prepared"
+    }
+  ]
+}

@@ -23,9 +23,12 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         "ai4bio_mutation_effect_prediction",
         "antibody",
         "causal_discovery_discrete",
+        "iron_mind",
         "llm_kv_adaptive_quantization",
         "nanogpt",
+        "nucleobench",
         "small_molecule",
+        "synthonbench",
     }
     for task_id, definition in TASK_DEFINITIONS.items():
         assert definition.relative_root == Path("tasks") / task_id
@@ -121,8 +124,8 @@ def test_scaffolded_task_is_discoverable_and_valid(tmp_path: Path) -> None:
     mock_engine = (
         tmp_path / "tasks" / "protein_design" / "core" / "mock_engine.py"
     ).read_text(encoding="utf-8")
-    assert "LDMEngine" in mock_engine
-    assert "CampaignRuntime" in mock_engine
+    assert "run_campaign" in mock_engine
+    assert "CampaignRecipe" in mock_engine
     assert "DraftCandidateDomain" in mock_engine
 
 
