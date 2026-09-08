@@ -17,6 +17,7 @@ SUPPORTED_METHODS = (
     "bo",
     "llm",
     "harness",
+    "blind_harness_compiled",
 )
 BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
@@ -58,8 +59,11 @@ class PilotEvaluationSpec:
     result_fields: dict[str, str]
     policy_fields: dict[str, str] = field(default_factory=dict)
     policy_mean_fields: tuple[str, ...] = ()
+    selection_protocol: str = "best_so_far"
 
     def __post_init__(self) -> None:
+        if self.selection_protocol not in ("best_so_far", "final_submission"):
+            raise ValueError("selection_protocol must be best_so_far or final_submission")
         if any(
             not isinstance(name, str) or not name
             or not isinstance(path, str) or not all(path.split("."))
@@ -92,6 +96,7 @@ class PilotEvaluationSpec:
             "result_fields": dict(self.result_fields),
             "policy_fields": dict(self.policy_fields),
             "policy_mean_fields": list(self.policy_mean_fields),
+            "selection_protocol": self.selection_protocol,
         }
 
 
@@ -101,7 +106,8 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     resolved = Path(path).resolve()
     raw = load_config(resolved)
     _require_exact_keys(raw)
-    methods = _methods(raw.get("methods"))
+    protocol = raw.get("selection_protocol", "best_so_far")
+    methods = _methods(raw.get("methods"), require_baselines=protocol != "final_submission")
     policy_fields = raw.get("policy_fields", {})
     policy_mean_fields = raw.get("policy_mean_fields", [])
     if not isinstance(policy_fields, dict) or not isinstance(policy_mean_fields, list):
@@ -125,6 +131,7 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
         result_fields=_result_fields(raw.get("result_fields")),
         policy_fields=policy_fields,
         policy_mean_fields=tuple(policy_mean_fields),
+        selection_protocol=protocol,
     )
 
 
@@ -133,12 +140,12 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         "schema_version", "name", "task", "base_config", "cases", "methods", "method_overrides", "seeds",
         "optimization_rounds", "initialization_mode", "output_root", "trajectory", "result_fields",
     }
-    optional = {"policy_fields", "policy_mean_fields"}
+    optional = {"policy_fields", "policy_mean_fields", "selection_protocol"}
     if not expected <= set(raw) or set(raw) - expected - optional or raw.get("schema_version") != 1:
         raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 
-def _methods(value: Any) -> tuple[str, ...]:
+def _methods(value: Any, *, require_baselines: bool = True) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
         raise ValueError("pilot evaluation methods must be a non-empty list")
     methods = tuple(value)
@@ -146,7 +153,7 @@ def _methods(value: Any) -> tuple[str, ...]:
         raise ValueError(f"pilot evaluation methods must come from {list(SUPPORTED_METHODS)}")
     if len(set(methods)) != len(methods):
         raise ValueError("pilot evaluation methods must be unique")
-    if not BASELINE_METHODS <= set(methods):
+    if require_baselines and not BASELINE_METHODS <= set(methods):
         raise ValueError("pilot evaluation methods must include ldm, bo, and llm")
     return methods
 

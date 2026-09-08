@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import warnings
-import sys
 from pathlib import Path
 
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
@@ -211,6 +210,7 @@ class BlindRefinementExpander:
         run_dir: Path,
         mock=False,
         tools_root: Path | None = None,
+        operations: bool = False,
     ):
         self.samples = [dict(row) for row in samples]
         self.client = client
@@ -219,26 +219,10 @@ class BlindRefinementExpander:
         self.mock = mock
         self.runtime = None
         self.operation_tools = None
-        if tools_root is not None:
-            package_root = (
-                tools_root / "src" if (tools_root / "src").is_dir() else tools_root
-            )
-            if not (package_root / "atomworld_tools" / "__init__.py").is_file():
-                raise FileNotFoundError(
-                    f"Missing bounded AtomWorld tools in {tools_root}"
-                )
-            sys.path.insert(0, str(package_root.resolve()))
-            import atomworld_tools
+        if tools_root is not None or operations:
+            from tasks.atomworld.core import geometry
 
-            if (
-                not Path(atomworld_tools.__file__)
-                .resolve()
-                .is_relative_to(package_root.resolve())
-            ):
-                raise ValueError(
-                    "An AtomWorld tools module from a different source root is already loaded"
-                )
-            self.operation_tools = atomworld_tools
+            self.operation_tools = geometry
 
     def expand(self, request):
         sample_index, attempt = divmod(request.round_idx, self.attempts_per_sample)

@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import sys
+import math
+from copy import copy
 from pathlib import Path
 from ldm_tts.campaign import (
     CampaignBudget,
@@ -23,11 +25,12 @@ from ldm_tts.contracts import (
     ReservoirExpansionSpec,
     ReservoirSpec,
     ResponseSpaceSpec,
+    SurrogateSpaceSpec,
 )
 from ldm_tts.data import DataCollectionSink
-from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir
+from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir, BudgetExceededError
 from ldm_tts.engine.reporting import load_successful_observations
-from .selection import TanimotoGPSelector
+from .selection import TanimotoGPSelector, AcquisitionTiltedSelector
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -41,9 +44,12 @@ from .candidate import ReaSynDomain
 from .chemistry import canonicalize
 from .evaluator import ReconstructionEvaluator, TDCOracleEvaluator
 from .metrics import ORACLES, WIDTH_ONE, reconstruction_metrics, top_auc, top_mean
-from .projector import Projector
-from .proposals import ReaSynExpander
+from .projector import Projector, ProjectionInterruptedError
+from .proposals import ReaSynExpander, ProposalExhausted
 from .surrogate import MoleculeEncoder
+from ldm_tts.harness import HarnessError, PolicyResearchController, DockerPolicyExecutor
+from .harness import HarnessTargetSource, create_client
+from .optimization_policy import ReaSynPolicyAdapter
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = TASK_ROOT.parents[1]
@@ -59,15 +65,24 @@ def parse_args(argv=None):
     )
     p.add_argument(
         "--proposal-mode",
-        choices=("auto", "mock", "openai", "baseline"),
+        choices=("auto", "mock", "callable", "none", "openai", "baseline", "harness"),
         default="auto",
     )
     p.add_argument("--iterations", type=int, default=2)
-    p.add_argument("--reservoir-size", type=int, default=4)
+    p.add_argument("--reservoir-size", "--proposal-samples", dest="reservoir_size", type=int, default=4)
+    p.add_argument("--search-method", choices=("auto", "baseline", "ldm", "bo", "llm", "harness", "ldm_harness", "ldm_harness_compiled"), default="auto")
+    p.add_argument("--proposal-batch-size", type=int, default=2)
+    p.add_argument("--bo-pool-size", type=int)
+    p.add_argument("--bo-targets-file", type=Path, default=os.environ.get("REASYN_BO_TARGETS"))
+    p.add_argument("--max-replenishment-batches", type=int, default=4)
+    p.add_argument("--recovery-attempts", type=int, default=3)
+    p.add_argument("--projection-retry-targets", type=int)
+    p.add_argument("--initialization-mode", choices=("none", "shared_start"), default="none")
+    p.add_argument("--run-name", default="")
     p.add_argument("--evaluations-per-round", type=int, default=1)
     p.add_argument("--max-oracle-calls", type=int, default=10000)
     p.add_argument("--oracle", choices=ORACLES, default="jnk3")
-    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--seed", "--campaign-index", dest="seed", type=int, default=0)
     p.add_argument(
         "--upstream-root",
         type=Path,
@@ -93,12 +108,27 @@ def parse_args(argv=None):
     p.add_argument("--num-editflow-samples", type=int, default=4)
     p.add_argument("--max-results", type=int, default=100)
     p.add_argument("--projection-time-limit", type=int, default=1000)
-    p.add_argument("--projection-timeout", type=int, default=3600)
+    p.add_argument("--projection-timeout", type=int, default=3600,
+        help="Single-target process allowance including loading; each additional serial target adds projection-time-limit seconds.")
     p.add_argument(
         "--evaluator-python", default=os.environ.get("REASYN_PYTHON", sys.executable)
     )
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--acquisition-beta", type=float, default=1.0)
+    p.add_argument("--acquisition-alpha", type=float, default=1.0)
+    p.add_argument("--acquisition-eta", type=float, default=1.0)
+    p.add_argument("--acquisition-z-clip", type=float, default=5.0)
+    p.add_argument("--harness-sessions", type=int, default=4)
+    p.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
+    p.add_argument("--harness-docker-host", default="")
+    p.add_argument("--harness-container-user", default="auto")
+    p.add_argument("--harness-cache-dir", type=Path)
+    p.add_argument("--harness-thinking", choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"), default="high")
+    p.add_argument("--harness-wall-time-seconds", type=int, default=1800)
+    p.add_argument("--harness-response-timeout", type=int, default=2100)
+    p.add_argument("--harness-mcp-config", type=Path)
+    p.add_argument("--harness-tool-budget", action="append", default=[])
+    p.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
     p.add_argument("--gp-history-limit", type=int, default=256)
     p.add_argument(
         "--llm-url",
@@ -116,6 +146,25 @@ def parse_args(argv=None):
     p.add_argument("--resume-from", type=Path)
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(argv)
+    if args.search_method == "auto":
+        args.search_method = "baseline" if args.proposal_mode == "baseline" else "ldm"
+    if args.proposal_mode == "callable":
+        args.proposal_mode = "mock"
+    if args.proposal_mode == "none":
+        args.proposal_mode = "auto"
+    harness_method = args.search_method in ("harness", "ldm_harness", "ldm_harness_compiled")
+    if harness_method:
+        if args.proposal_mode not in ("auto", "harness"):
+            p.error("Harness methods require proposal-mode auto or harness; mock controls the evaluator only")
+        args.proposal_mode = "harness"
+    elif args.proposal_mode == "harness":
+        p.error("proposal-mode harness requires a Harness search-method")
+    if args.bo_pool_size is None:
+        args.bo_pool_size = args.reservoir_size
+    if args.projection_retry_targets is None:
+        args.projection_retry_targets = args.reservoir_size * args.recovery_attempts
+    if args.run_name and (Path(args.run_name).name != args.run_name or args.run_name in (".", "..")):
+        p.error("run-name must be a single directory name")
     args.upstream_root = args.upstream_root.expanduser().resolve()
     if args.proposal_mode == "auto":
         args.proposal_mode = "mock" if args.mock else "openai"
@@ -176,14 +225,21 @@ def parse_args(argv=None):
         )
     ):
         p.error("search, dataset and timing limits must be positive")
-    if args.seed < 0 or args.acquisition_beta < 0:
-        p.error("seed and acquisition beta must be nonnegative")
+    if args.seed < 0 or any(not math.isfinite(v) or v < 0 for v in (args.acquisition_beta, args.acquisition_alpha, args.acquisition_eta)):
+        p.error("seed and acquisition parameters must be finite and nonnegative")
+    if (args.proposal_batch_size < 1 or args.bo_pool_size < args.evaluations_per_round
+            or args.max_replenishment_batches < 0 or args.recovery_attempts < 0
+            or args.projection_retry_targets < 0 or args.harness_sessions < 1
+            or args.harness_wall_time_seconds < 1 or args.harness_response_timeout < 1
+            or not math.isfinite(args.acquisition_z_clip) or args.acquisition_z_clip <= 0):
+        p.error("Invalid sampling, recovery, or Harness limits")
     return args
 
 
 def describe_ldm_task(args):
     recon = args.benchmark == "reconstruction"
     objective = "similarity" if recon else "oracle_score"
+    direct = args.search_method in ("llm", "harness", "baseline")
     return LDMTaskSpec(
         task="reasyn",
         candidate_domain=CandidateDomainSpec(
@@ -230,13 +286,15 @@ def describe_ldm_task(args):
             ),
         ),
         acquisition=AcquisitionSpec(
-            name="tanimoto_gp_ucb",
+            name="direct_proposal_order" if direct else "empirical_q0_tanimoto_gp_ucb" if args.search_method.startswith("ldm") else "tanimoto_gp_ucb",
             objective_names=(objective,),
             score_direction="maximize",
-            selection_rule="Highest shared UCB of Tanimoto GP with bounded recent training history",
+            selection_rule="Task-local empirical q0 with alpha*log(q0+epsilon)+eta*robust_z(UCB) sampling" if args.search_method.startswith("ldm") else "GP-UCB" if args.search_method == "bo" else "Direct proposal order",
             parameters={
                 "beta": args.acquisition_beta,
                 "history_limit": args.gp_history_limit,
+                "alpha": args.acquisition_alpha, "eta": args.acquisition_eta,
+                "bo_pool_size": args.bo_pool_size,
             },
         ),
         reservoir=ReservoirSpec(
@@ -258,9 +316,13 @@ def describe_ldm_task(args):
             else "Canonical isomeric product SMILES SHA256",
             max_size=args.reservoir_size,
         ),
-        surrogate=MoleculeEncoder(mock=args.mock).describe(),
+        surrogate=SurrogateSpaceSpec(
+            kind="none",
+            representation="Direct proposal order without a surrogate",
+            dimension_policy="none",
+        ) if direct else MoleculeEncoder(mock=args.mock).describe(),
         proposal_search=ProposalSearchSpec(
-            name="multi_round_feedback_best_of_n",
+            name="independent_minibatch_empirical_q0" if args.search_method.startswith("ldm") else args.search_method,
             breadth=args.reservoir_size,
             evaluation_policy="gp_ucb_selected_frozen_projection"
             if recon
@@ -270,6 +332,7 @@ def describe_ldm_task(args):
             "benchmark": args.benchmark,
             "mock": args.mock,
             "proposal_mode": args.proposal_mode,
+            "search_method": args.search_method,
             "official_suite_oracles": list(ORACLES),
         },
     )
@@ -283,7 +346,7 @@ def _jsonable(args):
             return [convert(x) for x in v]
         return v
 
-    return {k: convert(v) for k, v in vars(args).items()}
+    return {k: convert(v) for k, v in vars(args).items() if k != "provider_api_key"}
 
 
 def _targets(args):
@@ -382,12 +445,26 @@ def main(argv=None):
         )
         return 0
     _check_assets(args)
+    if args.search_method == "bo" or args.initialization_mode == "shared_start":
+        from .chemistry import MOCK_SMILES
+        if args.mock:
+            args.bo_targets = list(MOCK_SMILES)
+        elif args.bo_targets_file:
+            args.bo_targets = [canonicalize(line.strip()) for line in args.bo_targets_file.expanduser().read_text().splitlines() if line.strip()]
+        elif args.benchmark == "reconstruction" and args.proposal_mode == "baseline":
+            args.bo_targets = []
+        else:
+            raise ValueError("Real BO/shared_start requires a score-blind --bo-targets-file pool")
+        if args.bo_targets_file and not args.bo_targets:
+            raise ValueError("BO target pool is empty")
     targets = _targets(args)
     root = (
         args.resume_from.resolve()
         if args.resume_from
-        else unique_run_dir(args.out_dir.resolve())
+        else ((args.out_dir / args.run_name).resolve() if args.run_name else unique_run_dir(args.out_dir.resolve()))
     )
+    if args.run_name and not args.resume_from and root.exists():
+        raise FileExistsError("Named run directory already exists; use --resume-from")
     root.mkdir(parents=True, exist_ok=True)
     identity = {
         "benchmark": args.benchmark,
@@ -450,8 +527,12 @@ def main(argv=None):
 
 def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     run_dir.mkdir(parents=True, exist_ok=True)
+    previous_status = json.loads((run_dir / "status.json").read_text()).get("status", "") if resume and (run_dir / "status.json").exists() else ""
     # Preserve scientific config across resume; only iterations may extend.
     configuration = _jsonable(args)
+    configuration.update(proposal_samples=args.reservoir_size,
+        proposal_candidates_per_request=args.proposal_batch_size,
+        proposal_counting="bounded_minibatches")
     identity_keys = (
         "benchmark",
         "mock",
@@ -477,9 +558,13 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         "device",
         "evaluator_python",
         "gp_history_limit",
-        "acquisition_beta",
+        "acquisition_beta", "acquisition_alpha", "acquisition_eta", "acquisition_z_clip",
+        "search_method", "proposal_batch_size", "bo_pool_size", "max_replenishment_batches",
+        "recovery_attempts", "projection_retry_targets", "initialization_mode",
+        "harness_sessions", "harness_thinking", "harness_tool_budget",
     )
     scientific = {k: configuration[k] for k in identity_keys}
+    scientific["bo_targets"] = getattr(args, "bo_targets", [])
     scientific["original_target"] = target
     scientific["source_archive_digest"] = contract.benchmark["source_commit"]
     scientific["asset_digests"] = args.asset_digests
@@ -491,7 +576,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     projector = Projector(args, run_dir)
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     client = None
-    if args.proposal_mode == "openai":
+    if args.proposal_mode == "openai" and args.search_method != "bo":
         if not args.llm_url or not args.llm_model:
             raise ValueError(
                 "Set LLM_BASE_URL and LLM_MODEL_NAME for real LDM proposals"
@@ -522,10 +607,23 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     cap = args.iterations * args.evaluations_per_round
     if not target:
         cap = min(cap, args.max_oracle_calls)
-    projection_cap = cap if target else args.iterations * args.reservoir_size
+    checkpoint_path = run_dir / "checkpoint.json"
+    resuming_complete = (
+        resume
+        and checkpoint_path.exists()
+        and len(load_successful_observations(checkpoint_path)) >= cap
+    )
+    batches_per_round = math.ceil(args.reservoir_size / args.proposal_batch_size) + args.max_replenishment_batches
+    request_cap = (args.iterations + args.recovery_attempts) * batches_per_round
+    proposal_cap = args.reservoir_size + args.max_replenishment_batches * args.proposal_batch_size
+    projection_cap = (cap if target else args.iterations * proposal_cap) + args.projection_retry_targets
+    uses_harness = args.proposal_mode == "harness"
     extra = {
-        "llm_requests": args.iterations if client else 0,
-        "proposal_attempts": args.iterations if client else 0,
+        "llm_requests": request_cap if client else 0,
+        "proposal_request_attempts": request_cap if (client or uses_harness) else 0,
+        "proposal_attempts": request_cap if (client or uses_harness) else 0,
+        "recovery_attempts": args.recovery_attempts,
+        "harness_turns": request_cap * args.harness_sessions if uses_harness else 0,
         "oracle_calls": args.max_oracle_calls if not target else 0,
         "projection_targets": projection_cap,
         "projection_cycle_allowance": projection_cap * args.num_cycles,
@@ -533,7 +631,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             json.loads((run_dir / "budget.json").read_text())
             .get("counters", {})
             .get("endpoint_preflight_requests", 0)
-            + 1
+            + (0 if resuming_complete else 1)
             if resume and (run_dir / "budget.json").exists()
             else 1
         )
@@ -548,17 +646,65 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         max_evaluation_attempts=cap,
         extra_limits=extra,
     )
+    if args.search_method.startswith("ldm"):
+        selector = AcquisitionTiltedSelector(selector, alpha=args.acquisition_alpha,
+            eta=args.acquisition_eta, z_clip=args.acquisition_z_clip, seed=args.seed,
+            pool_size=args.bo_pool_size)
+    elif args.search_method in ("llm", "harness", "baseline"):
+        selector, encoder = None, None
     holder = {}
+    harness_clients = []
+    search_expander = expander
+    if args.initialization_mode == "shared_start":
+        initial_args = copy(args)
+        initial_args.search_method = "bo"
+        initial_args.proposal_mode = "mock" if args.mock else "baseline"
+        initializer = ReaSynExpander(initial_args, projector, sink, target=target)
+        class PairedStartExpander:
+            def expand(self, request):
+                if request.round_idx == 0:
+                    from dataclasses import replace
+                    return replace(initializer.expand(request), selection_mode="reservoir_order")
+                return search_expander.expand(request)
+        expander = PairedStartExpander()
 
     def runtime_hook(runtime):
         holder["runtime"] = runtime
+        if resuming_complete:
+            return  # Completed campaigns can be reopened without live services.
         projector.before_project = lambda count: runtime.consume_many(
             {
                 "projection_targets": count,
                 "projection_cycle_allowance": count * args.num_cycles,
             }
         )
-        expander.before_request = lambda: runtime.consume("llm_requests")
+        if resume and (previous_status.startswith("paused") or previous_status == "failed"):
+            runtime.consume("recovery_attempts")
+        def before_request():
+            amounts = {"proposal_request_attempts": 1}
+            if client:
+                amounts["llm_requests"] = 1
+            runtime.consume_many(amounts)
+        search_expander.before_request = before_request
+        if uses_harness:
+            provider_args = copy(args)
+            provider_args.provider_api_key = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+            harness_client = create_client(provider_args, run_dir / "harness", runtime.run_id, target)
+            harness_clients.append(harness_client)
+            harness_client.start()
+            search_expander.client = HarnessTargetSource(harness_client, run_dir / "harness", args,
+                target=target, account=runtime.consume_many)
+            if args.search_method == "ldm_harness_compiled":
+                policy_client = create_client(provider_args, run_dir / "policy_harness", runtime.run_id, target, policy=True)
+                harness_clients.append(policy_client)
+                policy_client.start()
+                adapter = ReaSynPolicyAdapter(encoder, alpha=args.acquisition_alpha, eta=args.acquisition_eta, seed=args.seed,
+                    history_limit=args.gp_history_limit, beta=args.acquisition_beta, z_clip=args.acquisition_z_clip)
+                selector.policy_adapter = adapter
+                selector.policy_controller = PolicyResearchController(client=policy_client, adapter=adapter,
+                    executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
+                        resolve_policy_user(args)), root=run_dir / "policy_harness", account=runtime.consume_many)
+
         if not target:
             evaluator.before_oracle = lambda: runtime.consume("oracle_calls")
         if client:
@@ -595,22 +741,52 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
                 selector=selector,
             ),
         )
-    except EndpointRequestError:
+    except (EndpointRequestError, HarnessError, ProjectionInterruptedError) as exc:
         runtime = holder.get("runtime")
+        status = "paused_projection_interrupted" if isinstance(exc, ProjectionInterruptedError) else "paused_endpoint_unavailable"
         if runtime:
-            runtime.pause(
-                "paused_endpoint_unavailable",
-                phase="proposal_preflight_or_expansion",
-                message="Configured proposal endpoint unavailable; resolve service and resume this directory.",
-            )
-        return {"status": "paused_endpoint_unavailable"}, 2
-    return result.projected, 0 if result.engine.summary[
-        "successful_evaluation_count"
-    ] else 1
+            runtime.pause(status, phase="proposal_or_projection",
+                message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.")
+            report = _report(args, runtime, target)
+            report["status"] = status
+            atomic_json_write(run_dir / "result.json", report)
+        else:
+            report = {"status": status}
+        return report, 2
+    except ProposalExhausted as exc:
+        runtime = holder.get("runtime")
+        runtime.record("proposal_replenishment_exhausted", exc.metadata)
+        if exc.attempts:
+            runtime.consume("proposal_attempts", len(exc.attempts))
+        runtime.pause("paused_proposal_exhausted", phase="proposal_replenishment", message=str(exc))
+        report = _report(args, runtime, target)
+        report.update(status="paused_proposal_exhausted", proposal_diagnostics=exc.metadata)
+        atomic_json_write(run_dir / "result.json", report)
+        return report, 1
+    except BudgetExceededError as exc:
+        runtime = holder.get("runtime")
+        runtime.pause("paused_resource_budget", phase="resource_budget", message=str(exc))
+        report = _report(args, runtime, target)
+        report["status"] = "paused_resource_budget"
+        atomic_json_write(run_dir / "result.json", report)
+        return report, 1
+    finally:
+        for harness_client in reversed(harness_clients):
+            harness_client.close()
+    complete = result.engine.summary["successful_evaluation_count"] == cap
+    if not complete:
+        result.runtime.status.update("stopped", phase="incomplete_scientific_budget", budget=result.runtime.budget)
+    return result.projected, 0 if complete else 1
+
+
+def resolve_policy_user(args):
+    from ldm_tts.harness.container import resolve_container_user
+    return resolve_container_user(args.harness_container_user, args.harness_docker_host)
 
 
 def _report(args, runtime, target):
-    observations = load_successful_observations(runtime.run_dir / "checkpoint.json")
+    checkpoint = runtime.run_dir / "checkpoint.json"
+    observations = load_successful_observations(checkpoint) if checkpoint.exists() else []
     events = runtime.events()
     atomic_json_write(
         runtime.run_dir / "search_manifest.json",

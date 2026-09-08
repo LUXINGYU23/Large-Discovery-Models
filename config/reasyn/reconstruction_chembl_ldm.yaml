@@ -16,6 +16,14 @@
     "iterations": 4,
     "num-cycles": 6,
     "reservoir-size": 8,
-    "proposal-mode": "openai"
+    "proposal-mode": "openai",
+    "search-method": "ldm",
+    "proposal-batch-size": 2,
+    "bo-pool-size": 8,
+    "acquisition-alpha": 1.0,
+    "acquisition-eta": 1.0,
+    "acquisition-z-clip": 5.0,
+    "max-replenishment-batches": 4,
+    "recovery-attempts": 3
   }
 }

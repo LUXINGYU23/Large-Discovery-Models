@@ -1,0 +1,1 @@
+{"schemaVersion":1,"imageId":"reasyn-research","rootfsSize":"4G","installPolicy":"session_overlay","recipeFiles":["Dockerfile","smoke.sh","lock/requirements.lock"],"smokeScript":"smoke.sh"}

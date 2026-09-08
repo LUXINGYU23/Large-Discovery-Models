@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import importlib.util
+import shutil
 from pathlib import Path
 from ldm_tts.registration.dependencies import fail, ok, skip, plan_check_context
 from tasks.atomworld.core.data import DEFAULT_UPSTREAM
@@ -58,17 +59,12 @@ def check_dependencies(plan, *, include_optional=True):
                 task, "ase", "ASE required by bounded geometry tools"
             )
         )
-        root = Path(
-            args.get("tools-root")
-            or DEFAULT_UPSTREAM.parent / "atomworld-agentic-reproduction"
-        )
-        if not root.is_absolute():
-            root = cwd / root
+    if args.get("search-method", "llm") in {"harness", "blind_harness_compiled"}:
         checks.append(
-            (ok if (root / "src/atomworld_tools/__init__.py").is_file() else fail)(
+            (ok if shutil.which("docker") else fail)(
                 task,
-                "geometry tools",
-                "Sibling atomworld-agentic-reproduction/src/atomworld_tools required",
+                "Harness Docker client",
+                "Shared Pi sidecar requires Docker and a Linux KVM host; build its task guest image first",
             )
         )
     for name, keys in (

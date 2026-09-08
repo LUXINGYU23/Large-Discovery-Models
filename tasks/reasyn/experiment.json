@@ -97,9 +97,11 @@
       "proposal_backends": {
         "openai": "Chat Completions with preflight",
         "baseline": "offline original reconstruction target",
-        "mock": "synthetic fixture only"
+        "mock": "synthetic fixture only",
+        "harness": "Shared persistent Pi Harness sessions with task validation/repair, frozen projection, measured-history tools and native/provider traces",
+        "bo": "Score-blind configured molecular target pool; no model requests"
       },
-      "changes": "LDM target proposals and shared GP selection replace Graph GA; frozen projector, synthesis replay, original metric formulas retained. No automatic TDC convergence padding.",
+      "changes": "Direct or independent persistent research proposes projection targets. Empirical occurrence q0 and robust-z Tanimoto GP-UCB define LDM sampling, with separate BO-pool, replenishment and recovery budgets. Optional independent compiled policy supplies validated prior means/weights. Frozen projection, synthesis replay, unique-product oracle counting and original metrics are retained.",
       "reconstruction_cycles": {
         "enamine": 12,
         "chembl": 24,

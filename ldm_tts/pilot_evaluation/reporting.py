@@ -50,7 +50,9 @@ _REPORT_BUDGET_COUNTERS = (
 
 def write_evaluation_reports(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> None:
     """Validate completed child artifacts and export task-neutral evaluation outputs."""
-
+    if spec.selection_protocol == "final_submission":
+        from ldm_tts.pilot_evaluation.submission_reporting import write_submission_reports
+        return write_submission_reports(spec, manifest)
     runs = _run_records(spec, manifest)
     rows, trajectories, policy_rounds = _collect(spec, runs)
     integrity = _integrity(spec, rows, trajectories)
@@ -146,6 +148,10 @@ def _collect(
             "contract_sha256": str(campaign["contract_sha256"]),
             "initial_candidate_ids": initial_candidate_ids,
             "candidate_ids_unique": len(canonical_keys) == len(set(canonical_keys)),
+            "proposal_counting": config.get("proposal_counting", "fixed"),
+            "max_replenishment_batches": int(config.get("max_replenishment_batches", 0)),
+            "harness_sessions": int(config.get("harness_sessions", 1)),
+            "mock_proposals": bool(config.get("mock")) and config.get("proposal_mode") == "mock",
         }
         if method == _COMPILED_METHOD:
             compiled = _compiled_policy_records(
@@ -222,6 +228,9 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
             errors.append(f"duplicate canonical candidate in {row['case']}/{row['method']}/{row['seed']}")
         if row["method"] == "bo" and (row["budget_llm_requests"] != 0 or row["budget_proposal_attempts"] != 0):
             errors.append(f"BO used model proposals: {row['case']}/{row['seed']}")
+        if row.get("proposal_counting") == "bounded_minibatches":
+            _bounded_proposal_integrity(row, spec.optimization_rounds, errors)
+            continue
         if row["method"] in {"ldm", "llm"}:
             actual = row["budget_proposal_attempts"]
             expected = _expected_model_proposal_attempts(
@@ -266,6 +275,31 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
     if len(trajectories) != len(rows) * spec.iterations:
         errors.append("round trajectory count is incomplete")
     return {"valid": not errors, "errors": errors}
+
+
+def _bounded_proposal_integrity(row, rounds, errors):
+    """Validate independently budgeted replenishment without assuming one turn per round."""
+    batch = row["proposal_candidates_per_request"]
+    samples = row["proposal_samples"]
+    refill = row["max_replenishment_batches"]
+    if batch < 1 or samples < row["evaluations_per_round"] or refill < 0:
+        errors.append("invalid bounded proposal sampling configuration")
+        return
+    minimum = rounds * math.ceil(samples / batch)
+    maximum = minimum + rounds * refill
+    actual = row["budget_proposal_attempts"]
+    if row["method"] == "bo" or row.get("mock_proposals"):
+        if actual != 0:
+            errors.append("local proposal source unexpectedly recorded model attempts")
+    elif not minimum <= actual <= maximum:
+        errors.append("bounded proposal attempt count is outside the declared sampling allowance")
+    if "harness" in row["method"]:
+        turns = row["budget_harness_turns"]
+        if not actual <= turns <= actual * min(batch, row["harness_sessions"]):
+            errors.append("bounded Harness session count does not match proposal minibatches")
+    if row["method"] == _COMPILED_METHOD:
+        if row.get("policy_rounds") != rounds or row.get("budget_policy_harness_turns") != rounds:
+            errors.append("compiled policy did not complete every optimization round")
 
 
 def _expected_model_proposal_attempts(row: dict[str, Any], rounds: int) -> int:

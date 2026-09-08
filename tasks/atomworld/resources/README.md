@@ -1,8 +1,10 @@
 # Versioned resources
 
-- `source_manifest.json`: SHA-256 identity of the local source archive and paper; no invented Git revision.
-- `mock_fixture.json`: synthetic crystal, private target and deterministic transport responses used only in mock tests.
-- `qualification_evidence.json`: formal gate state; remains scaffolded because this archive has no tracked Git evidence and no qualified real endpoint campaign.
-- `local_verification.json`: actual local check results, counters and artifact hashes, without treating mock scores as model performance.
+- `source_manifest.json`: hash identity of the official source archive; no fabricated Git revision.
+- `mock_fixture.json`: synthetic public question, private mock label and deterministic responses, used only by host-side tests.
+- `harness/`: task roles, selected skills, structured public tools and the guest image recipe, including the delivered geometry package. This is the only task resource tree mounted into agents.
+- `qualification_evidence.json`: formal qualification remains draft/scaffolded until live research and evaluation traces are verified.
+- `local_verification.json`: historical pre-review evidence; its date and artifact hashes describe that historical snapshot.
+- `review_verification.json`: validation of the review repairs and remaining real-runtime requirements.
 
-Released datasets and run outputs belong under ignored `runs/`; do not copy targets into model-visible state.
+Released datasets and run outputs belong outside versioned resource trees. Private labels and judge artifacts must never enter agent mounts or prompts.

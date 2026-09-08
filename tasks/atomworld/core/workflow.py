@@ -1,6 +1,7 @@
 """One shared LDM campaign over a fixed schedule of benchmark questions and revisions."""
 
 from __future__ import annotations
+
 import argparse
 import csv
 import json
@@ -15,6 +16,7 @@ from ldm_tts.campaign import (
 )
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine.run_store import unique_run_dir
+from ldm_tts.harness import HarnessError
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -47,9 +49,71 @@ def parse_args(argv=None):
         default=Path(os.environ.get("ATOMWORLD_UPSTREAM_ROOT", DEFAULT_UPSTREAM)),
     )
     parser.add_argument("--out-dir", type=Path, default=Path("runs/atomworld"))
+    parser.add_argument("--run-name", default=None)
+    parser.add_argument("--resume-from", type=Path, default=None)
+    parser.add_argument(
+        "--proposal-mode",
+        choices=("mock", "real", "live", "none", "callable", "openai"),
+        default=None,
+    )
     parser.add_argument("--attempts-per-sample", type=int, default=1)
     parser.add_argument(
+        "--search-method",
+        choices=("llm", "harness", "blind_harness_compiled"),
+        default="llm",
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=None,
+        help="Pilot alias for scheduled attempts per sample",
+    )
+    parser.add_argument("--campaign-index", type=int, default=0)
+    parser.add_argument(
+        "--initialization-mode",
+        choices=("shared_start", "independent"),
+        default="shared_start",
+    )
+    parser.add_argument("--service-retry-allowance", type=int, default=3)
+    parser.add_argument(
+        "--harness-profile", nargs="+", default=["geometry_research", "structure_audit"]
+    )
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
+    parser.add_argument(
+        "--harness-cache-dir", type=Path, default=Path.home() / ".cache/ldm-gondolin"
+    )
+    parser.add_argument("--harness-docker-host", default="")
+    parser.add_argument("--harness-container-user", default=None)
+    parser.add_argument(
+        "--harness-thinking",
+        choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"),
+        default="high",
+    )
+    parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
+    parser.add_argument("--harness-response-timeout", type=float, default=2100)
+    parser.add_argument("--harness-recovery-seconds", type=float, default=0)
+    parser.add_argument("--harness-max-submission-attempts", type=int, default=3)
+    parser.add_argument(
+        "--harness-tool-budget",
+        nargs="+",
+        default=[
+            "web_search=8",
+            "fetch_content=16",
+            "get_search_content=16",
+            "resolve-library-id=4",
+            "query-docs=8",
+            "bash=64",
+        ],
+    )
+    parser.add_argument("--harness-mcp-config", type=Path, default=None)
+    parser.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
+    parser.add_argument(
         "--limit", type=int, default=0, help="0 evaluates every prepared sample"
+    )
+    parser.add_argument(
+        "--sample-id",
+        default=None,
+        help="Select one exact public sample ID for a pilot case",
     )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -59,7 +123,8 @@ def parse_args(argv=None):
     parser.add_argument(
         "--tools-root",
         type=Path,
-        default=DEFAULT_UPSTREAM.parent / "atomworld-agentic-reproduction",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--llm-url",
@@ -84,8 +149,56 @@ def parse_args(argv=None):
         help="Provider reasoning controls; never put credentials here",
     )
     args = parser.parse_args(argv)
+    if args.proposal_mode in {"mock", "callable"}:
+        args.mock = True
+    if args.resume_from is not None:
+        args.out_dir, args.resume = args.resume_from, True
+    elif args.run_name is not None:
+        if Path(args.run_name).name != args.run_name or args.run_name in {".", ".."}:
+            parser.error("run-name must be a single safe path component")
+        args.out_dir = args.out_dir / args.run_name
+    if args.iterations is not None:
+        args.attempts_per_sample = args.iterations
     if args.attempts_per_sample < 1 or args.limit < 0:
         parser.error("attempts-per-sample must be positive and limit nonnegative")
+    if args.campaign_index < 0 or args.service_retry_allowance < 0:
+        parser.error("campaign-index and service-retry-allowance must be nonnegative")
+    if args.tools_root is not None:
+        parser.error(
+            "--tools-root is obsolete: bounded geometry tools now ship inside this task"
+        )
+    if args.search_method != "llm":
+        from ldm_tts.harness import parse_tool_call_budgets
+        from tasks.atomworld.core.harness import harness_profiles
+
+        try:
+            harness_profiles(args.harness_profile)
+            if "policy_architect" in args.harness_profile:
+                raise ValueError(
+                    "policy_architect is reserved for the independent policy session"
+                )
+            parse_tool_call_budgets(
+                args.harness_tool_budget,
+                excluded_tools=("submit_answer", "submit_optimization_policy"),
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        if (
+            min(
+                args.harness_wall_time_seconds,
+                args.harness_response_timeout,
+                args.harness_max_submission_attempts,
+            )
+            <= 0
+            or args.harness_recovery_seconds < 0
+        ):
+            parser.error(
+                "Harness deadlines and submission count must be positive; recovery nonnegative"
+            )
+        if args.proposal_format != "cif":
+            parser.error(
+                "Harness submits CIF answers; execute geometry operations inside its guest"
+            )
     if not args.mock and args.data_dir is None:
         parser.error(
             "--data-dir is required for real runs; prepare the released data first"
@@ -139,6 +252,7 @@ def project_result(
     mock: bool,
     dataset_manifest: dict,
     proposal_format="cif",
+    search_method="llm",
 ) -> dict:
     # Never select engine.best: it is a hidden-answer oracle. Fixed last-submission reporting.
     by_key = {
@@ -187,6 +301,8 @@ def project_result(
         "task": "atomworld",
         "mode": "mock" if mock else "real",
         "proposal_format": proposal_format,
+        "search_method": search_method,
+        "selection_protocol": "final_submission",
         "dataset_kind": dataset_manifest["dataset_kind"],
         "paper_split_verified": dataset_manifest.get("paper_split_verified", False),
         "sample_count": count,
@@ -215,6 +331,7 @@ def project_result(
             fieldnames=[
                 "sample_id",
                 "action_name",
+                "round",
                 "attempt",
                 "correct",
                 "submitted",
@@ -222,12 +339,13 @@ def project_result(
             ],
         )
         writer.writeheader()
-        for row in rows:
+        for sample_index, row in enumerate(rows):
             for item in row["attempts"]:
                 writer.writerow(
                     {
                         "sample_id": row["sample_id"],
                         "action_name": row["action_name"],
+                        "round": sample_index * attempts + item["attempt"] - 1,
                         **{
                             key: item[key]
                             for key in (
@@ -237,17 +355,22 @@ def project_result(
                                 "candidate_id",
                             )
                         },
+                        "correct": int(item["correct"]),
                     }
                 )
     return payload
 
 
-def run(args, *, client=None):
+def run(args, *, client=None, harness_client_factory=None, policy_executor=None):
     if args.mock:
         samples, targets, manifest, outputs = _load_mock()
     else:
         samples, targets, manifest = load_prepared(args.data_dir)
         outputs = None
+    if args.sample_id is not None:
+        samples = [
+            sample for sample in samples if sample["sample_id"] == args.sample_id
+        ]
     if args.limit:
         samples = samples[: args.limit]
     if not samples:
@@ -258,7 +381,8 @@ def run(args, *, client=None):
         else unique_run_dir(args.out_dir).resolve()
     )
     run_dir.mkdir(parents=True, exist_ok=True)
-    if client is None:
+    harness_mode = args.search_method != "llm"
+    if client is None and not harness_mode:
         if args.mock:
             client = CallableProposalClient(
                 lambda request: outputs[request.metadata["sample_id"]][
@@ -294,20 +418,36 @@ def run(args, *, client=None):
             )
     official = None if args.mock else load_official_evaluator(args.upstream_root)
     evaluator = AtomWorldEvaluator(targets, run_dir, official=official, mock=args.mock)
-    expander = BlindRefinementExpander(
-        samples,
-        client,
-        attempts_per_sample=args.attempts_per_sample,
-        run_dir=run_dir,
-        mock=args.mock,
-        tools_root=args.tools_root if args.proposal_format == "operations" else None,
-    )
+    if harness_mode:
+        from tasks.atomworld.core.harness import AtomWorldHarnessExpander, make_client
+
+        expander = AtomWorldHarnessExpander(
+            samples,
+            args,
+            run_dir,
+            client_factory=harness_client_factory or make_client,
+            policy_executor=policy_executor,
+        )
+    else:
+        expander = BlindRefinementExpander(
+            samples,
+            client,
+            attempts_per_sample=args.attempts_per_sample,
+            run_dir=run_dir,
+            mock=args.mock,
+            operations=args.proposal_format == "operations",
+        )
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     domain = AtomWorldDomain(samples, sink=sink, mock=args.mock)
     rounds = len(samples) * args.attempts_per_sample
     contract, profile = load_active_experiment_contract()
     contract = contract or load_experiment_contract(TASK_ROOT / "experiment.json")
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
+    config.update(
+        evaluations_per_round=1,
+        proposal_samples=len(args.harness_profile) if harness_mode else 1,
+        harness_candidates_per_session=1 if harness_mode else 0,
+    )
     # These immutable values prevent resuming against a different task schedule or endpoint policy.
     immutable = {
         "samples": samples,
@@ -316,8 +456,10 @@ def run(args, *, client=None):
         "mock": args.mock,
         "proposal_format": args.proposal_format,
         "tool_source_sha256": {
-            str(p.relative_to(args.tools_root)): sha256_file(p)
-            for p in sorted(args.tools_root.rglob("*.py"))
+            str(p.relative_to(TASK_ROOT)): sha256_file(p)
+            for p in sorted(
+                (TASK_ROOT / "resources/harness/image/atomworld_tools").glob("*.py")
+            )
         }
         if args.proposal_format == "operations"
         else {},
@@ -325,7 +467,26 @@ def run(args, *, client=None):
         "llm_max_tokens": args.llm_max_tokens,
         "llm_temperature": args.llm_temperature,
         "llm_extra_body_json": args.llm_extra_body_json,
+        "search_method": args.search_method,
+        "campaign_index": args.campaign_index,
+        "service_retry_allowance": args.service_retry_allowance,
     }
+    if harness_mode:
+        from ldm_tts.harness import canonical_sha256
+
+        resource_root = TASK_ROOT / "resources/harness"
+        immutable["harness_resources_sha256"] = canonical_sha256(
+            {
+                str(path.relative_to(resource_root)): sha256_file(path)
+                for path in sorted(resource_root.rglob("*"))
+                if path.is_file() and "__pycache__" not in path.parts
+            }
+        )
+        immutable["harness_settings"] = {
+            key: value
+            for key, value in config.items()
+            if key.startswith(("harness_", "policy_"))
+        }
     immutable_path = run_dir / "schedule.json"
     if args.resume and immutable_path.exists():
         if json.loads(immutable_path.read_text()) != immutable:
@@ -342,7 +503,12 @@ def run(args, *, client=None):
         expander.runtime = runtime
         checkpoint = runtime.load_checkpoint() if args.resume else None
         completed = bool(checkpoint and checkpoint.get("next_round", 0) >= rounds)
-        if not args.mock and not completed and hasattr(client, "preflight"):
+        if (
+            not args.mock
+            and not harness_mode
+            and not completed
+            and hasattr(client, "preflight")
+        ):
             runtime.consume("endpoint_preflights")
             try:
                 report = client.preflight()
@@ -368,13 +534,30 @@ def run(args, *, client=None):
                     max_empty_reservoir_rounds=rounds + 1,
                     extra_limits={
                         "proposal_attempts": rounds,
-                        "llm_requests": 0 if args.mock else rounds + 1,
+                        **(
+                            {}
+                            if harness_mode
+                            else {
+                                "llm_requests": 0
+                                if args.mock
+                                else rounds + args.service_retry_allowance
+                            }
+                        ),
                         "mock_model_requests": rounds if args.mock else 0,
-                        "endpoint_preflights": 0 if args.mock else 2,
+                        "endpoint_preflights": 0
+                        if args.mock or harness_mode
+                        else args.service_retry_allowance + 1,
                         "geometry_tool_calls": rounds
                         if args.proposal_format == "operations"
                         else 0,
-                        "outer_iterations": rounds + 1,
+                        "outer_iterations": rounds + args.service_retry_allowance,
+                        "harness_turns": (rounds + args.service_retry_allowance)
+                        * len(args.harness_profile)
+                        if harness_mode
+                        else 0,
+                        "policy_harness_turns": rounds
+                        if args.search_method == "blind_harness_compiled"
+                        else 0,
                     },
                 ),
                 config=config,
@@ -391,6 +574,7 @@ def run(args, *, client=None):
                     mock=args.mock,
                     dataset_manifest=manifest,
                     proposal_format=args.proposal_format,
+                    search_method=args.search_method,
                 ),
             ),
             CampaignRecipe(describe_ldm_task(args), expander, domain, evaluator),
@@ -403,6 +587,17 @@ def run(args, *, client=None):
                 message="Endpoint unavailable; resume the same run after recovery",
             )
         raise
+    except HarnessError:
+        if runtime_ref:
+            runtime_ref[0].pause(
+                "paused_harness",
+                phase="proposal",
+                message="Harness unavailable; resume the same run to continue persistent sessions",
+            )
+        raise
+    finally:
+        if harness_mode:
+            expander.close()
     return campaign
 
 

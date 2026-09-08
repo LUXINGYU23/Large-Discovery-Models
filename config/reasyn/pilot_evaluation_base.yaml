@@ -1,0 +1,39 @@
+name: reasyn_pilot_evaluation
+task: reasyn
+algorithm: ldm_bo_llm_harness_pilot_evaluation
+mode: real
+description: One shared initialization round plus five matched optimization rounds; draft qualification.
+args:
+  benchmark: tdc
+  oracle: jnk3
+  search-method: ldm
+  proposal-mode: auto
+  initialization-mode: shared_start
+  iterations: 6
+  proposal-samples: 8
+  proposal-batch-size: 4
+  bo-pool-size: 8
+  bo-targets-file: ${REASYN_BO_TARGETS}
+  evaluations-per-round: 2
+  max-oracle-calls: 10000
+  num-cycles: 1
+  exhaustiveness: 4
+  num-editflow-samples: 4
+  acquisition-beta: 1.0
+  acquisition-alpha: 1.0
+  acquisition-eta: 1.0
+  acquisition-z-clip: 5.0
+  max-replenishment-batches: 4
+  recovery-attempts: 3
+  harness-sessions: 4
+  harness-sidecar-image: ldm-pi-harness:latest
+  harness-thinking: high
+  harness-wall-time-seconds: 1800
+  harness-response-timeout: 2100
+  harness-tool-budget:
+    - describe_reasyn_task=8
+    - get_measured_history=16
+    - check_measured_product=32
+  campaign-index: 0
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"

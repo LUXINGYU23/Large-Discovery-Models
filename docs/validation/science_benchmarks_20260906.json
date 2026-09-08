@@ -857,37 +857,6 @@
       }
     ]
   },
-  "ssh": {
-    "recorded_at": "2026-09-05T19:00:30.941855+00:00",
-    "host": "111.2.199.31",
-    "port": 5320,
-    "user": "zsgpu",
-    "attempts": [
-      {
-        "options": [
-          "BatchMode=yes",
-          "ConnectTimeout=15"
-        ],
-        "exit_code": 255,
-        "stderr": "Host key verification failed."
-      },
-      {
-        "options": [
-          "BatchMode=yes",
-          "StrictHostKeyChecking=accept-new",
-          "ConnectTimeout=15"
-        ],
-        "exit_code": 255,
-        "stderr": "Warning: Permanently added '[111.2.199.31]:5320' (ED25519) to the list of known hosts.\nzsgpu@111.2.199.31: Permission denied (publickey)."
-      }
-    ],
-    "diagnostics": {
-      "ssh_agent": "The agent has no identities.",
-      "default_rsa_key_present": true
-    },
-    "outcome": "Network and SSH server reachable; authentication rejected. No remote command executed and no remote files modified.",
-    "required_to_resume": "Configure a private key authorized for zsgpu on the supplied host, then rerun documented preflight."
-  },
   "reasyn_assets": {
     "task": "reasyn",
     "downloaded": false,
@@ -1267,5 +1236,6 @@
       "path": "config/suites/science_benchmarks_mock.yaml",
       "sha256": "fe9a4f512df6ef955305a370595f6c7127bc84927aa85c8daa9c7c0854d17ce8"
     }
-  ]
+  ],
+  "historical_snapshot_notice": "Historical evidence from 2026-09-06; does not certify the current checkout or live Harness integration."
 }

@@ -232,7 +232,7 @@ def test_tanimoto_gp_transfers_to_related_heldout_molecules():
     assert predictions["CCCO"] > predictions["Cc1ccccc1"] + 0.1
 
 
-def test_endpoint_preflight_counted_on_every_resume(tmp_path, monkeypatch):
+def test_completed_resume_preserves_preflight_count_and_keeps_credentials_private(tmp_path, monkeypatch):
     calls = []
 
     class Client:
@@ -267,15 +267,15 @@ def test_endpoint_preflight_counted_on_every_resume(tmp_path, monkeypatch):
     assert workflow.main(argv) == 0
     assert workflow.main(argv + ["--resume-from", str(tmp_path / "run")]) == 0
     counters = json.loads((tmp_path / "run/budget.json").read_text())["counters"]
-    assert counters["endpoint_preflight_requests"] == 2
+    assert counters["endpoint_preflight_requests"] == 1
     assert counters["llm_requests"] == 1
-    assert calls == ["preflight", "proposal", "preflight"]
+    assert calls == ["preflight", "proposal"]
     for file in (tmp_path / "run").rglob("*"):
         if file.is_file():
             assert "must-not-appear-in-artifacts" not in file.read_text()
 
 
-def test_malformed_model_action_records_rejection_and_finishes(tmp_path, monkeypatch):
+def test_malformed_model_action_exhausts_bounded_repair_without_measurement(tmp_path, monkeypatch):
     class Client:
         def __init__(self, **kwargs):
             pass
@@ -306,7 +306,7 @@ def test_malformed_model_action_records_rejection_and_finishes(tmp_path, monkeyp
     ]
     assert workflow.main(argv) == 1
     counters = json.loads((tmp_path / "run/budget.json").read_text())["counters"]
-    assert counters["llm_requests"] == 1 and counters["proposal_attempts"] == 1
+    assert counters["llm_requests"] == 5 and counters["proposal_attempts"] == 5
     assert (
         counters["expensive_evaluation_attempts"] == 0
         and counters["projection_targets"] == 0

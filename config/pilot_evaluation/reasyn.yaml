@@ -1,0 +1,34 @@
+schema_version: 1
+name: reasyn_pilot_evaluation
+task: reasyn
+base_config: ../reasyn/pilot_evaluation_base.yaml
+cases:
+  - id: tdc_jnk3
+    overrides:
+      - args.oracle="jnk3"
+methods: [ldm, bo, llm, harness, ldm_harness, ldm_harness_compiled]
+method_overrides:
+  ldm: []
+  bo: []
+  llm:
+    - args.proposal-samples=2
+    - args.proposal-batch-size=1
+    - args.bo-pool-size=2
+  harness:
+    - args.harness-sessions=1
+    - args.proposal-samples=2
+    - args.proposal-batch-size=2
+    - args.bo-pool-size=2
+  ldm_harness: []
+  ldm_harness_compiled:
+    - args.policy-runner-image="ldm-pi-harness:latest"
+seeds: [0, 1, 2]
+optimization_rounds: 5
+initialization_mode: shared_start
+output_root: ${REASYN_RUNS_ROOT}/pilot_evaluation
+trajectory:
+  step_column: evaluation
+  step_kind: evaluation_index
+  objective_column: score
+  direction: maximize
+result_fields: {}

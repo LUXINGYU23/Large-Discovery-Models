@@ -8,7 +8,15 @@
     "benchmark": "reconstruction",
     "iterations": 2,
     "reservoir-size": 4,
-    "evaluations-per-round": 2
+    "evaluations-per-round": 2,
+    "search-method": "ldm",
+    "proposal-batch-size": 2,
+    "bo-pool-size": 4,
+    "acquisition-alpha": 1.0,
+    "acquisition-eta": 1.0,
+    "acquisition-z-clip": 5.0,
+    "max-replenishment-batches": 4,
+    "recovery-attempts": 3
   },
   "env": {
     "LDM_DATA_COLLECTION_ENABLED": "1"

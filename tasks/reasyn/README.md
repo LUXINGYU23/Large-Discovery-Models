@@ -1,7 +1,7 @@
 # ReaSyn Science Benchmark for LDM
 
 This task implements **the first/main reconstruction evaluation** and the
-released TDC goal-directed optimization evaluation from the locally supplied
+released TDC goal-directed optimization evaluation from the source-pinned
 ReaSyn v2 code and paper. Both execute through `ldm_tts.campaign.run_campaign`,
 including shared candidate admission, budgets, acquisition, checkpoints and
 resume. No model training is needed. Registration is valid; scientific
@@ -12,16 +12,25 @@ have not been verified. Synthetic mock values are not ReaSyn scores.
 
 | Track | Candidate and reservoir expansion | Expensive evaluation | Reported metric |
 | --- | --- | --- | --- |
-| Reconstruction (default) | LDM proposes molecular SMILES to use as projection queries, sees original target and measured history; Tanimoto GP/UCB selects queries. Restart seeds are assigned by the task. | One frozen ReaSyn projection of the selected query; preserve every returned, replay-verified pathway. | Exact reconstruction, best target similarity, product and building-block diversity, averaged over **all requested targets**. |
-| TDC | LDM replaces Graph GA offspring generation with SMILES targets; frozen ReaSyn projects each target, retaining first/highest-similarity product as in the released script; Tanimoto GP/UCB selects products. | One previously unseen canonical product passed to the released TDC oracle. | Top-10 score and released coarse-trapezoid AUC top-10 versus unique oracle calls. |
+| Reconstruction (default) | LDM proposes molecular SMILES to use as projection queries, sees original target and measured history; Empirical-q0 weighted Tanimoto GP/UCB sampling selects independent query/seed trials. Restart seeds are assigned by the task. | One frozen ReaSyn projection of the selected query; preserve every returned, replay-verified pathway. | Exact reconstruction, best target similarity, product and building-block diversity, averaged over **all requested targets**. |
+| TDC | LDM replaces Graph GA offspring generation with SMILES targets; frozen ReaSyn projects each target, retaining first/highest-similarity product as in the released script; Empirical-q0 weighted Tanimoto GP/UCB sampling selects products. | One previously unseen canonical product passed to the released TDC oracle. | Top-10 score and released coarse-trapezoid AUC top-10 versus unique oracle calls. |
 
 The molecular encoder is Morgan radius 2 / 2048 bits; an exact Tanimoto GP fits
-at most the last 256 observations. Acquisition uses the shared LDM posterior
-UCB implementation. It does not standardize sparse bits into an inappropriate
+at most the last 256 observations. Acquisition uses the shared posterior UCB implementation. Independent
+`--proposal-batch-size` requests collect `--proposal-samples` valid occurrences
+(`--reservoir-size` is its alias) before canonical deduplication. A separately
+configured `--bo-pool-size` maintains the selection pool by q0-weighted sampling.
+LDM then samples without replacement using
+`alpha * log(q0 + epsilon) + eta * robust_z(UCB)`, controlled by
+`--acquisition-alpha`, `--acquisition-eta`, and `--acquisition-z-clip`. It does not standardize sparse bits into an inappropriate
 Euclidean RBF space. Mock features are explicitly synthetic hash features.
 
 Reconstruction queries may repeat with different task-assigned sampling seeds:
-these are different stochastic projection trials. Products in the TDC track
+these are different stochastic projection trials. Their q0 identities include
+both canonical query and sampling seed. In TDC, one independent projection
+occurrence contributes its first verified product, and products converging from
+different queries accumulate frequency under the same canonical product
+identity. Within-round occurrences remain legal. Products in the TDC track
 are deduplicated by canonical **isomeric** SMILES before the oracle. The public
 reconstruction target is legitimately visible to the proposal model. Passing
 the target verbatim gives credit only when the frozen stock/reaction replay
@@ -82,8 +91,11 @@ full production throughput has not been qualified.
 
 ## Setup
 
-The source checkout defaults to sibling `ReaSyn-reasyn_v2`, or set `REASYN_ROOT`.
-Use the upstream `env.yml` for its dedicated GPU environment. LDM's lightweight
+Obtain the official [ReaSyn v2 source](https://github.com/NVIDIA-BioNeMo/ReaSyn/tree/reasyn_v2)
+matching `resources/source_provenance.json`, and set `REASYN_ROOT` to its absolute
+checkout or extracted-source path. A conventional `../ReaSyn-reasyn_v2` path is
+the fallback; a sibling checkout is not required. Use upstream `env.yml` for
+the dedicated GPU environment. LDM's lightweight
 runner can use its own environment; set `REASYN_PYTHON` to the upstream Python.
 Install the task's `chemistry` extra in the runner environment for real
 canonicalization, similarity, TDC oracle and diversity. `projection` lists
@@ -106,10 +118,15 @@ Required assets (not bundled or downloaded by the adapter):
 5. For LDM proposals: `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `LLM_API_KEY` in the
    environment. `LDM_LLM_*` / `OPENAI_*` aliases are accepted where applicable.
    The direct backend uses Chat Completions and checks that wire API before
-   proposals. No live sidecar/harness backend is claimed in this adapter.
+   proposals. Persistent Harness methods use the same configured provider
+   through the shared sidecar and require Docker/KVM and the task guest image
+   environment described below.
 
 ```bash
-# Run from LDM repository root with Python >=3.10.
+# Run from the repository root with Python 3.10 or 3.11.
+uv sync --project tasks/reasyn --group dev
+# Add --extra chemistry to the sync command for real chemistry/oracle runs.
+# Use tasks/reasyn/.venv/bin/python as python below.
 python scripts/validate_tasks.py --task reasyn
 python scripts/check_task_dependencies.py config/reasyn/mock.yaml --no-optional
 python scripts/run_ldm_tts.py config/reasyn/mock.yaml --dry-run
@@ -118,7 +135,7 @@ python scripts/run_ldm_tts.py config/reasyn/mock_tdc.yaml
 python -m pytest tasks/reasyn/tests -q
 
 # Inventory local real prerequisites; never downloads or modifies upstream.
-python tasks/reasyn/scripts/prepare_official_data.py --upstream-root ../ReaSyn-reasyn_v2
+python tasks/reasyn/scripts/prepare_official_data.py --upstream-root "$REASYN_ROOT"
 python scripts/check_task_dependencies.py config/reasyn/reconstruction_tiny.yaml
 python scripts/run_ldm_tts.py config/reasyn/reconstruction_tiny.yaml --dry-run
 # Execute after assets/environment are available:
@@ -147,6 +164,65 @@ claim. For a targeted debug run, call the task module with `--target-smiles`,
 or missing oracle runs. `scripts/aggregate_tdc_results.py` enforces the full
 13-by-3 inventory and 10k real-call condition.
 
+## Persistent research and pilot comparison
+
+`--search-method` selects `ldm`, `bo`, `llm`, `harness`, `ldm_harness`, or
+`ldm_harness_compiled`. Direct LDM and LLM use independently sampled provider
+requests. Pure BO draws from a supplied score-blind SMILES pool
+(`--bo-targets-file` or `REASYN_BO_TARGETS`) and selects by Tanimoto GP/UCB;
+it makes no proposal-provider requests. Real BO never substitutes the mock
+molecular fixture for an external candidate space.
+
+Harness methods create parallel independent persistent research sessions.
+`harness` uses accepted candidates in submission order; its shipped configs
+request exactly the evaluation batch from one persistent session.
+`ldm_harness` samples the empirical proposal distribution tilted by GP/UCB. `ldm_harness_compiled` additionally runs a separate persistent
+policy researcher through the shared policy controller and isolated runner.
+The task packages role instructions, molecular research and policy skills,
+research tools, and a pinned guest-image recipe in `resources/harness`.
+Sessions receive incremental completed history and can query full measured
+history or product membership on demand. They use the guest sandbox to research
+molecules, submit an exact-count candidate file, and repair task validation
+errors in the same session. Provider messages and native sessions are captured
+by the shared Harness alongside candidate artifact digests and lineage.
+
+```bash
+# Build on a Linux host with Docker and /dev/kvm available.
+docker build -t ldm-pi-harness:latest harnesses/pi
+python scripts/check_task_dependencies.py config/reasyn/tdc_ldm_harness_tiny.yaml
+python scripts/run_ldm_tts.py config/reasyn/tdc_ldm_harness_tiny.yaml --dry-run
+python scripts/run_ldm_tts.py config/reasyn/tdc_ldm_harness_tiny.yaml
+python scripts/run_ldm_tts.py config/reasyn/tdc_ldm_harness_compiled_tiny.yaml
+```
+
+Corresponding `reconstruction_{harness,ldm_harness,ldm_harness_compiled}_tiny.yaml`
+and `tdc_harness_tiny.yaml` configs are provided. Configure a remote Docker host
+with `--harness-docker-host` only when source/artifact/cache bind mounts resolve
+on that host. `--harness-mcp-config` uses the shared MCP configuration;
+repeat `--harness-tool-budget NAME=LIMIT` to bound declared tools. The default
+session deadline is 1800 seconds, with a 2100-second response timeout. These
+are research budgets, separately accounted from projection and oracle work.
+Direct `llm`/`harness` configurations use the first accepted reservoir entries;
+if an explicit configuration requests more candidates than evaluations, the
+remaining entries are not automatically evaluated.
+
+The pilot matrix uses one identical `shared_start` initialization round per
+seed, then five optimization rounds across all six methods, with seeds 0, 1,
+and 2. It currently compares the released `jnk3` case and two evaluations per
+round. Set `REASYN_RUNS_ROOT` to a new output root and `REASYN_BO_TARGETS` to an
+absolute, score-blind, one-SMILES-per-line pool file before generating plans:
+
+```bash
+python scripts/run_pilot_evaluation.py config/pilot_evaluation/reasyn.yaml --dry-run
+python scripts/run_pilot_evaluation.py config/pilot_evaluation/reasyn.yaml
+# Continue an interrupted matrix with the same configuration and provenance:
+python scripts/run_pilot_evaluation.py config/pilot_evaluation/reasyn.yaml --resume
+```
+
+The shared pilot runner requires a clean committed checkout for real execution.
+Tiny/pilot runs validate integration and measure a declared partial trajectory;
+they do not establish full-budget TDC AUC or scientific qualification.
+
 ## Resume and artifacts
 
 `python -m tasks.reasyn.ldm_task.procedure ... --resume-from <run-directory>`
@@ -155,8 +231,14 @@ archive identity must match. Iterations can extend. Model name/token cap,
 projector settings, file paths and actual checkpoint/index/upstream-source
 SHA-256 digests are locked across resume. Source files are checked against the
 supplied archive provenance before a real run. All real asset digests are
-computed once at campaign startup and included in cached projection requests. Repeated successful
-projection requests reuse their durable request/result pair. Completed TDC
+computed once at campaign startup and included in cached projection requests. Completed independent proposal responses are cached before projection. Each
+projection target writes an atomic checkpoint, including empty searches; a
+retry reuses completed occurrences with their original seeds and reruns only
+pending targets. A changed request is rejected even if an earlier worker wrote
+no result. `--projection-timeout` is the single-target batch allowance; each
+additional pending serial target adds `--projection-time-limit` seconds. With
+defaults, a 32-target batch has 34,600 seconds instead of 3,600. Worker timeout
+or failure preserves progress and pauses the campaign for explicit resume. Completed TDC
 scores come from an ordered cache; an interrupted, charged oracle request is
 explicitly marked and refused on retry instead of silently evaluated again.
 
@@ -166,6 +248,15 @@ and an experiment contract snapshot are written per campaign. Multiple
 reconstruction targets have individual subdirectories and an aggregate
 `benchmark_result.json`. Resume may retry interrupted proposal rounds; all
 attempted endpoint preflights and proposal calls remain separately counted.
+`--recovery-attempts` is a fixed additional attempt allowance (default 3);
+retries do not increase the requested scientific round/evaluation count.
+`--projection-retry-targets` separately limits reattempted projection work.
+TDC canonical historical products are rejected in the task before reservoir
+admission and trigger feedback plus bounded refill.
+`--max-replenishment-batches` bounds these extra minibatches. If valid-occurrence
+or unique-product quotas cannot be reached, the run stops with the recorded
+`proposal_replenishment_budget_exhausted` reason and does not report a complete
+fixed-budget run.
 
 Fine-tuning collection is opt-in with `LDM_DATA_COLLECTION_ENABLED=1`. The
 accepted action boundary is parsed, chemically validated projection-target
@@ -182,6 +273,8 @@ stock/reaction replay, invalid routes and output capture; metric tests compare
 AUC directly with the released source function and exercise real RDKit
 stereochemistry and Tanimoto acquisition. They do not establish neural-model
 correctness or a measured benchmark score. See `resources/verification_record.json`
-and the repository `docs/science-benchmarks.md` for actual local/SSH diagnostics.
-Local archives have no Git metadata; file SHA-256 identities are recorded and
-formal clean-checkout qualification gates remain pending.
+and the repository `docs/science-benchmarks.md` for the qualification state.
+Source and asset file SHA-256 identities are recorded. A real provider/session,
+agent research, candidate submission, frozen-model projection, and oracle
+measurement must be validated together before upgrading qualification.
+Mocked session/model tests are infrastructure evidence only.

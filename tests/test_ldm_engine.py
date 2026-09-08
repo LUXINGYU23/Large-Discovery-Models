@@ -786,3 +786,53 @@ def test_campaign_algorithm_replaces_failures_until_success_target(tmp_path: Pat
     ]
     assert campaign.runtime.budget.counters["external_evaluations"] == 3
     assert campaign.runtime.budget.counters["successful_evaluations"] == 2
+
+
+@pytest.mark.parametrize("batched", [False, True])
+def test_preparation_failure_is_resumable_before_any_evaluation_charge(tmp_path, batched):
+    from ldm_tts.contracts import CandidateEvaluationPreparer
+    from ldm_tts.transport import ProposalResponse
+
+    class PreparingEvaluator:
+        fail = True
+
+        def prepare_evaluations(self, candidates):
+            assert [c.candidate_id for c in candidates] == ["integer-1", "integer-2"]
+            if self.fail:
+                self.fail = False
+                raise RuntimeError("preparation service interrupted")
+
+        def evaluate(self, candidate):
+            return EvaluationResult(candidate.candidate_id, "succeeded", {"score": float(candidate.payload)})
+
+    class PreparingBatchEvaluator(PreparingEvaluator):
+        def evaluate_batch(self, candidates):
+            return tuple(self.evaluate(candidate) for candidate in candidates)
+
+    evaluator = PreparingBatchEvaluator() if batched else PreparingEvaluator()
+    assert isinstance(evaluator, CandidateEvaluationPreparer)
+    run_dir = tmp_path / "prepare"
+    runtime = CampaignRuntime.open(run_dir, task="integer_search", budget_limits={
+        "outer_iterations": 1, "proposal_attempts": 1,
+        "valid_search_candidates": 2, "expensive_evaluation_attempts": 2,
+    })
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(lambda request: ExpansionResult(
+            proposals=(RawProposal(1, "mock"), RawProposal(2, "mock")),
+            attempts=(ProposalResponse(text="cached independent response"),),
+        )),
+        candidate_domain=IntegerDomain(), evaluator=evaluator, runtime=runtime,
+    )
+    config = LDMEngineConfig(iterations=1, reservoir_size=2, evaluations_per_round=2)
+    with pytest.raises(RuntimeError, match="preparation service interrupted"):
+        engine.run(config)
+    assert runtime.budget.counters.get("expensive_evaluation_attempts", 0) == 0
+    assert runtime.budget.counters.get("selected_candidates", 0) == 0
+    engine.runtime = CampaignRuntime.open(run_dir, task="integer_search", resume=True)
+    result = engine.run(config)
+    assert len(result.state.observations) == 2
+    assert engine.runtime.budget.counters["outer_iterations"] == 1
+    assert engine.runtime.budget.counters["proposal_attempts"] == 1
+    assert engine.runtime.budget.counters["valid_search_candidates"] == 2
+    assert engine.runtime.budget.counters["expensive_evaluation_attempts"] == 2

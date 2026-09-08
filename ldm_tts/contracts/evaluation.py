@@ -118,6 +118,19 @@ class CandidateEvaluator(Protocol):
 
 
 @runtime_checkable
+class CandidateEvaluationPreparer(Protocol):
+    """Optional resumable preparation before scientific evaluation is charged.
+
+    Implementations persist reusable work under candidate identity and keep
+    authoritative oracle evaluation in ``evaluate``. Preparation exceptions
+    propagate to the campaign owner instead of becoming failed observations.
+    """
+
+    def prepare_evaluations(self, candidates: Sequence[Candidate]) -> None:
+        """Prepare the selected candidates, reusing any durable completed work."""
+
+
+@runtime_checkable
 class BatchCandidateEvaluator(CandidateEvaluator, Protocol):
     """Evaluator that scores a selected minibatch in one authoritative call."""
 
@@ -320,6 +333,7 @@ def best_item(
 
 __all__ = [
     "BatchCandidateEvaluator",
+    "CandidateEvaluationPreparer",
     "CandidateEvaluator",
     "CallableCandidateEvaluator",
     "EVALUATION_STATUSES",

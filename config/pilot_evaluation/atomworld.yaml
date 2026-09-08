@@ -1,0 +1,26 @@
+schema_version: 1
+name: atomworld_public_question_refinement
+task: atomworld
+selection_protocol: final_submission
+base_config: ../atomworld/harness.yaml
+cases:
+  - id: first_public_sample
+    overrides:
+      - args.limit=1
+methods: [llm, harness, blind_harness_compiled]
+method_overrides:
+  llm: []
+  harness: []
+  blind_harness_compiled: []
+seeds: [0, 1, 2]
+optimization_rounds: 3
+initialization_mode: shared_start
+output_root: runs/atomworld/pilot_evaluation
+trajectory:
+  step_column: round
+  step_kind: round
+  objective_column: correct
+  direction: maximize
+result_fields:
+  one_shot_accuracy: one_shot_accuracy
+  extended_final_accuracy: extended_final_accuracy

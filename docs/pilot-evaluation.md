@@ -164,3 +164,25 @@ Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
 - `config/pilot_evaluation/iron_mind.yaml`
 - `config/pilot_evaluation/synthonbench.yaml`
 - `config/pilot_evaluation/nucleobench.yaml`
+
+## Final-submission and replenished-sampling protocols
+
+The default `selection_protocol: best_so_far` retains the fixed optimization
+matrix and its LDM/BO/direct baselines. Tasks whose last answer is authoritative
+can set `selection_protocol: final_submission`. This protocol requires one
+scheduled submission per round and one sample per pilot case, permits repeated
+candidate identities, checks scores against recorded evaluations, and reports
+the final submission without selecting an earlier answer from hidden scores.
+Missing or rejected submissions receive zero under this protocol.
+It permits the `llm`, `harness`, and `blind_harness_compiled` comparison without
+inventing an inapplicable LDM or BO baseline. The existing
+`optimization_rounds + 1` field convention counts scheduled submissions in this
+protocol; the first submission is a baseline observation, not oracle-guided
+initialization.
+
+Adapters with projection-driven rejection can declare
+`proposal_counting: bounded_minibatches` in their persisted campaign config.
+Reporting validates the configured minibatch and replenishment bounds, including
+the separate count of persistent research sessions. These adapters must still
+complete the same scientific round/evaluation budget and paired initialization.
+Synthetic protocol tests do not satisfy real Harness qualification.

@@ -1,0 +1,13 @@
+name: atomworld_blind_harness_compiled
+task: atomworld
+algorithm: blind_harness_compiled
+mode: real
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  search-method: blind_harness_compiled
+  attempts-per-sample: 4
+  harness-profile: [geometry_research, structure_audit]
+  harness-cache-dir: ${ATOMWORLD_HARNESS_CACHE}
+  harness-thinking: high
+  harness-max-submission-attempts: 3
+  out-dir: runs/blind_harness_compiled

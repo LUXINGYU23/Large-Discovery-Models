@@ -16,6 +16,7 @@ from ldm_tts.contracts import (
 def describe_ldm_task(args=None):
     attempts = getattr(args, "attempts_per_sample", 1)
     tool_mode = getattr(args, "proposal_format", "cif") == "operations"
+    method = getattr(args, "search_method", "llm")
     response_space = "operation_plan" if tool_mode else "cif_answer"
     return LDMTaskSpec(
         task="atomworld",
@@ -40,7 +41,7 @@ def describe_ldm_task(args=None):
             ResponseSpaceSpec(
                 response_space,
                 "json" if tool_mode else "text",
-                parser="json.loads + atomworld_tools.execute_operations"
+                parser="json.loads + tasks.atomworld.core.geometry.execute_operations"
                 if tool_mode
                 else "tasks.atomworld.core.proposals.extract_cif",
                 description="Bounded geometry operation list produces a scored CIF"
@@ -76,7 +77,7 @@ def describe_ldm_task(args=None):
             "none", "No surrogate: target-blind chronological refinement", "none"
         ),
         proposal_search=ProposalSearchSpec(
-            "blind_refinement",
+            "persistent_blind_research" if method != "llm" else "blind_refinement",
             breadth=1,
             depth=attempts,
             beam_width=1,
@@ -85,5 +86,9 @@ def describe_ldm_task(args=None):
         metadata={
             "feedback_policy": "no targets, judge scores, judge errors, oracle parent or cross-question answers",
             "comparison": "one-shot and extended compute reported separately",
+            "search_method": method,
+            "compiled_policy": "public plausibility prior with empty label history; no hidden-score GP"
+            if method == "blind_harness_compiled"
+            else "disabled",
         },
     )

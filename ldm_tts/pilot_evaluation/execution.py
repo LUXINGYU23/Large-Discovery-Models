@@ -214,7 +214,23 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
 
 
 def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _EvaluationRun) -> None:
-    if run.method == _COMPILED_METHOD:
+    if getattr(spec, "selection_protocol", "best_so_far") == "final_submission" and "harness" in run.method:
+        pools = {}
+        kinds = ("harness", "policy_harness") if "compiled" in run.method else ("harness",)
+        for kind in kinds:
+            root = run.run_dir / kind
+            paths = [root / "manifest.json"] if (root / "manifest.json").is_file() else sorted(root.glob("*/manifest.json"))
+            if not paths:
+                raise ValueError(f"completed submission campaign lacks native {kind} manifests")
+            pools[kind] = [_harness_manifest_provenance(path, spec.output_root) for path in paths]
+        if len(kinds) == 2:
+            if len(pools["harness"]) != len(pools["policy_harness"]):
+                raise ValueError("submission proposal/policy pool counts differ")
+            for proposal, policy in zip(pools["harness"], pools["policy_harness"], strict=True):
+                if any(proposal[field] is None or proposal[field] != policy[field] for field in ("campaign_id", "task_id", "seed")):
+                    raise ValueError("submission proposal/policy identities differ")
+        entry["harness"] = pools
+    elif run.method in {_COMPILED_METHOD, "blind_harness_compiled"}:
         entry["harness"] = _compiled_harness_provenance(
             run.run_dir,
             spec.output_root,
@@ -296,7 +312,7 @@ def _harness_manifest_provenance(
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness"}:
+    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness", "blind_harness_compiled"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

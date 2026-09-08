@@ -1,11 +1,21 @@
 """Bounded official projector process and deterministic infrastructure fixture."""
 
 from __future__ import annotations
-import hashlib
 import json
 import subprocess
 from pathlib import Path
 from ldm_tts.engine.run_store import atomic_json_write
+from .projection_worker import load_progress, write_progress
+
+
+class ProjectionInterruptedError(RuntimeError):
+    """A resumable projection failure; completed targets remain checkpointed."""
+
+    def __init__(self, message, *, completed_targets, target_count, artifact):
+        super().__init__(message)
+        self.completed_targets = completed_targets
+        self.target_count = target_count
+        self.artifact = artifact
 
 
 class Projector:
@@ -39,26 +49,36 @@ class Projector:
                 "time_limit": self.args.projection_time_limit,
             },
         }
-        digest = hashlib.sha256(
-            json.dumps(request, sort_keys=True).encode()
-        ).hexdigest()
         request_path = folder / "request.json"
-        if output.exists() and request_path.exists():
+        if request_path.exists():
             prior = json.loads(request_path.read_text())
             if prior != request:
                 raise ValueError("projection resume request mismatch")
-            rows = json.loads(output.read_text())["rows"]
-            self._validate(rows, targets)
-            return rows, str(output.relative_to(self.run_dir))
+        elif output.exists():
+            raise ValueError("projection result has no matching request")
+        progress = load_progress(output, request)
+        artifact = str(output.relative_to(self.run_dir))
+        if progress is not None:
+            self._validate(progress["rows"], targets)
+            if progress["complete"]:
+                return progress["rows"], artifact
+        completed_indices = (
+            set(progress["completed_target_indices"]) if progress is not None else set()
+        )
+        pending_count = len(targets) - len(completed_indices)
         if self.before_project:
-            self.before_project(len(targets))
+            self.before_project(pending_count)
         atomic_json_write(request_path, request)
-        if self.args.mock:
-            rows = []
-            for target in targets:
+        if self.args.mock or not targets:
+            rows = list(progress["rows"]) if progress is not None else []
+            for index, target in enumerate(targets):
+                if index in completed_indices:
+                    continue
                 rows.append(
                     {
                         "target": target,
+                        "target_index": index,
+                        "sampling_seed": sampling_seed + index,
                         "smiles": target,
                         "synthesis": target,
                         "num_steps": 0,
@@ -66,15 +86,14 @@ class Projector:
                         "mock_fixture": True,
                     }
                 )
-            atomic_json_write(
-                output,
-                {
-                    "rows": rows,
-                    "target_count": len(targets),
-                    "mock": True,
-                    "request_sha256": digest,
-                },
-            )
+                completed_indices.add(index)
+                write_progress(
+                    output, request, rows, completed_indices, mock=self.args.mock
+                )
+            if not targets:
+                write_progress(
+                    output, request, rows, completed_indices, mock=self.args.mock
+                )
         else:
             command = [
                 self.args.evaluator_python,
@@ -84,25 +103,67 @@ class Projector:
                 "--output",
                 str(output.resolve()),
             ]
-            with (folder / "worker.log").open("w") as log:
-                completed = subprocess.run(
-                    command,
-                    cwd=self.args.upstream_root,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    timeout=self.args.projection_timeout,
-                    check=False,
-                )
+            # projection_timeout retains the single-target startup/teardown
+            # allowance. Each additional serial target receives its full budget.
+            timeout = max(
+                self.args.projection_timeout, self.args.projection_time_limit
+            ) + (pending_count - 1) * self.args.projection_time_limit
+            try:
+                with (folder / "worker.log").open("a") as log:
+                    completed = subprocess.run(
+                        command,
+                        cwd=self.args.upstream_root,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        timeout=timeout,
+                        check=False,
+                    )
+            except subprocess.TimeoutExpired as exc:
+                raise self._interrupted(
+                    f"ReaSyn projector timed out after {timeout} seconds",
+                    output,
+                    request,
+                    artifact,
+                ) from exc
             if completed.returncode:
-                raise RuntimeError(
-                    f"ReaSyn projector exited {completed.returncode}; see {folder / 'worker.log'}"
+                raise self._interrupted(
+                    f"ReaSyn projector exited {completed.returncode}",
+                    output,
+                    request,
+                    artifact,
                 )
             if not output.exists():
-                raise RuntimeError("ReaSyn projector omitted result.json")
-        data = json.loads(output.read_text())
+                raise self._interrupted(
+                    "ReaSyn projector omitted result.json", output, request, artifact
+                )
+        data = load_progress(output, request)
+        if not data["complete"]:
+            raise self._interrupted(
+                "ReaSyn projector stopped before completing all targets",
+                output,
+                request,
+                artifact,
+            )
         rows = data["rows"]
         self._validate(rows, targets)
-        return rows, str(output.relative_to(self.run_dir))
+        return rows, artifact
+
+    def _interrupted(self, message, output, request, artifact):
+        progress = load_progress(output, request)
+        if progress is not None:
+            self._validate(progress["rows"], request["targets"])
+        completed = (
+            len(progress["completed_target_indices"])
+            if progress is not None
+            else 0
+        )
+        return ProjectionInterruptedError(
+            f"{message}; {completed}/{len(request['targets'])} targets checkpointed; "
+            f"resume to continue; see {output.parent / 'worker.log'}",
+            completed_targets=completed,
+            target_count=len(request["targets"]),
+            artifact=artifact,
+        )
 
     def _validate(self, rows, targets):
         from .chemistry import canonicalize

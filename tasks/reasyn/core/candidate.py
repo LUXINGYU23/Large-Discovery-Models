@@ -45,7 +45,10 @@ class ReaSynDomain:
                     "smiles"
                 ]  # TDC preserves stereo exactly as upstream Oracle.
             key = hashlib.sha256(identity.encode()).hexdigest()
-            return Candidate("reasyn-" + key[:16], p, key, proposal.source)
+            return Candidate(
+                "reasyn-" + key[:16], p, key, proposal.source,
+                metadata=dict(proposal.metadata),
+            )
         except (ValueError, TypeError, KeyError) as exc:
             return CandidateRejection(
                 "invalid_reasyn_candidate", str(exc), proposal.source

@@ -2,21 +2,31 @@
 
 from __future__ import annotations
 import importlib.util
+import shutil
 from pathlib import Path
-from ldm_tts.registration.dependencies import ok, fail, warn, plan_check_context
+from ldm_tts.registration.dependencies import (
+    configured_value, ok, fail, warn, plan_check_context,
+)
+
+
+HARNESS_METHODS = {"harness", "ldm_harness", "ldm_harness_compiled"}
 
 
 def check_dependencies(plan, *, include_optional=True):
     task, args, env, cwd, mode = plan_check_context(plan)
     mock = bool(args.get("mock")) or mode == "mock"
     if mock:
-        return [
+        checks = [
             ok(
                 task,
                 "mock",
                 "Deterministic fixture uses no checkpoint, GPU, oracle or endpoint.",
             )
         ]
+        if args.get("search-method") in HARNESS_METHODS or args.get("proposal-mode") == "harness":
+            checks[0] = ok(task, "mock", "Projection and oracle values are synthetic; Harness still uses its configured provider.")
+            checks.extend(_provider_checks(task, args, env, cwd))
+        return checks
     root = (
         Path(
             args.get("upstream-root")
@@ -78,28 +88,7 @@ def check_dependencies(plan, *, include_optional=True):
                 "Exactly AR then EB checkpoint paths are required.",
             )
         )
-    proposal = args.get("proposal-mode", "openai")
-    if proposal not in ("baseline", "mock"):
-        url = (
-            args.get("llm-url")
-            or env.get("LLM_BASE_URL")
-            or env.get("LDM_LLM_URL")
-            or env.get("OPENAI_BASE_URL")
-        )
-        model = (
-            args.get("llm-model")
-            or env.get("LLM_MODEL_NAME")
-            or env.get("LDM_LLM_MODEL")
-        )
-        checks.append(
-            (ok if url and model else fail)(
-                task,
-                "proposal_endpoint",
-                "Endpoint and model configured; runtime Chat Completions preflight still required."
-                if url and model
-                else "Set LLM_BASE_URL and LLM_MODEL_NAME; credentials only via LLM_API_KEY.",
-            )
-        )
+    checks.extend(_provider_checks(task, args, env, cwd))
     for module in ("rdkit", "tdc"):
         present = importlib.util.find_spec(module) is not None
         checks.append(
@@ -129,4 +118,101 @@ def check_dependencies(plan, *, include_optional=True):
                 "Real model/evaluator qualification remains draft until official assets and a real seed run are verified.",
             )
         )
+    return checks
+
+
+def _provider_checks(task, args, env, cwd):
+    checks = []
+    method = args.get("search-method", "auto")
+    proposal = args.get("proposal-mode", "auto")
+    harness = method in HARNESS_METHODS or proposal == "harness"
+    needs_pool = (method == "bo" and proposal != "baseline") or (
+        args.get("initialization-mode") == "shared_start"
+        and args.get("benchmark", "reconstruction") == "tdc"
+    )
+    if needs_pool:
+        raw_pool = configured_value(str(args.get("bo-targets-file") or env.get("REASYN_BO_TARGETS") or ""))
+        pool = Path(raw_pool).expanduser() if raw_pool else None
+        if pool is not None and not pool.is_absolute():
+            pool = cwd / pool
+        checks.append(
+            (ok if pool is not None and pool.is_file() else fail)(
+                task,
+                "bo_target_pool",
+                "Score-blind molecular target pool is available."
+                if pool is not None and pool.is_file()
+                else "Real BO and shared TDC initialization require --bo-targets-file or REASYN_BO_TARGETS with a score-blind SMILES pool.",
+                str(pool) if pool is not None else "",
+            )
+        )
+    if method == "bo" or proposal == "baseline":
+        checks.append(ok(task, "proposal_provider", "Local query generation does not use a model endpoint."))
+    elif harness or proposal not in ("baseline", "mock"):
+        url = configured_value(
+            str(
+            args.get("llm-url")
+            or env.get("LLM_BASE_URL")
+            or env.get("LDM_LLM_URL")
+            or env.get("OPENAI_BASE_URL")
+            or ""
+            )
+        )
+        model = configured_value(str(
+            args.get("llm-model")
+            or env.get("LLM_MODEL_NAME")
+            or env.get("LDM_LLM_MODEL")
+            or ""
+        ))
+        checks.append(
+            (ok if url and model else fail)(
+                task,
+                "proposal_endpoint",
+                "Endpoint and model configured; runtime provider preflight still required."
+                if url and model
+                else "Set LLM_BASE_URL and LLM_MODEL_NAME; credentials only via LLM_API_KEY.",
+            )
+        )
+    if harness:
+        checks.append(
+            (ok if shutil.which("docker") else fail)(
+                task,
+                "harness_container_runtime",
+                "Docker CLI is available; runtime still verifies the daemon and sidecar image."
+                if shutil.which("docker")
+                else "Install Docker and build the shared ldm-pi-harness sidecar image.",
+            )
+        )
+        resource_root = Path(__file__).resolve().parents[1] / "resources/harness"
+        resources = [
+            "profiles/molecular_research/AGENTS.md",
+            "skills/molecular-design/SKILL.md",
+            "tools/molecular_research.mjs",
+            "image/guest-image.json",
+            "image/Dockerfile",
+            "image/lock/requirements.lock",
+        ]
+        if method == "ldm_harness_compiled":
+            resources += [
+                "profiles/policy_architect/AGENTS.md",
+                "skills/compile-ldm-policy/SKILL.md",
+            ]
+        missing = [str(resource_root / path) for path in resources if not (resource_root / path).is_file()]
+        checks.append(
+            (fail if missing else ok)(
+                task,
+                "harness_resources",
+                "Missing packaged task research resources." if missing else "Task roles, skills, research tools and guest image recipe are packaged.",
+                ", ".join(missing),
+            )
+        )
+        if args.get("harness-mcp-config"):
+            config = Path(str(args["harness-mcp-config"])).expanduser()
+            config = config if config.is_absolute() else cwd / config
+            checks.append(
+                (ok if config.is_file() else fail)(
+                    task, "harness_mcp_config",
+                    "Configured MCP file is available." if config.is_file() else "Configured MCP file is missing.",
+                    str(config),
+                )
+            )
     return checks

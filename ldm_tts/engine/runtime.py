@@ -11,6 +11,7 @@ from ldm_tts.contracts import (
     BatchCandidateEvaluator,
     Candidate,
     CandidateDomainAdapter,
+    CandidateEvaluationPreparer,
     CandidateEvaluator,
     EvaluationResult,
     LDMTaskSpec,
@@ -282,7 +283,10 @@ class LDMEngine:
                     iteration=round_idx,
                 )
                 if expansion.attempts:
-                    self.runtime.consume("proposal_attempts", len(expansion.attempts))
+                    self.runtime.consume_many(
+                        {"proposal_attempts": len(expansion.attempts)},
+                        usage_key=f"engine:proposals:{round_idx}",
+                    )
 
                 reservoir_limit = config.reservoir_size
                 if self.task_spec.reservoir.max_size is not None:
@@ -303,8 +307,9 @@ class LDMEngine:
                     iteration=round_idx,
                 )
                 if reservoir.candidates:
-                    self.runtime.consume(
-                        "valid_search_candidates", len(reservoir.candidates)
+                    self.runtime.consume_many(
+                        {"valid_search_candidates": len(reservoir.candidates)},
+                        usage_key=f"engine:reservoir:{round_idx}",
                     )
 
                 if not reservoir.candidates:
@@ -354,6 +359,15 @@ class LDMEngine:
                     rounds_run += 1
                     self._checkpoint(active)
                     break
+
+                if isinstance(self.evaluator, CandidateEvaluationPreparer):
+                    self.runtime.status.update(
+                        "running",
+                        phase="evaluation_preparation",
+                        iteration=round_idx,
+                        budget=self.runtime.budget,
+                    )
+                    self.evaluator.prepare_evaluations(selected)
 
                 budget_exhausted = False
                 round_observations = 0

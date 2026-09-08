@@ -12,6 +12,7 @@ from ldm_tts.contracts.candidate import (
 from ldm_tts.contracts.evaluation import (
     BatchCandidateEvaluator,
     CallableCandidateEvaluator,
+    CandidateEvaluationPreparer,
     CandidateEvaluator,
     EvaluationResult,
     EvaluationStatus,
@@ -38,6 +39,7 @@ __all__ = [
     "CandidateAdmission",
     "CandidateDomainAdapter",
     "CandidateDomainSpec",
+    "CandidateEvaluationPreparer",
     "CandidateEvaluator",
     "CandidateRejection",
     "EvaluationResult",

@@ -244,9 +244,8 @@ def test_operations_real_tool_and_official_judge(tmp_path):
     pytest.importorskip("pymatgen")
     from tasks.atomworld.core.data import DEFAULT_UPSTREAM
 
-    tools_root = DEFAULT_UPSTREAM.parent / "atomworld-agentic-reproduction"
-    if not tools_root.exists() or not DEFAULT_UPSTREAM.exists():
-        pytest.skip("Optional sibling tools and upstream archives absent")
+    if not DEFAULT_UPSTREAM.exists():
+        pytest.skip("Optional official upstream archive absent")
     fixture_data = fixture()
     public = fixture_data["public"][0]
     source = tmp_path / "source"

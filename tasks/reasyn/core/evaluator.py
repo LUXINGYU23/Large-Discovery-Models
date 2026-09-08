@@ -16,6 +16,19 @@ class ReconstructionEvaluator:
         self.projector = projector
         self.target = target
 
+    def prepare_evaluations(self, candidates):
+        """Checkpoint selected projections before charging scientific trials.
+
+        A worker interruption leaves completed targets reusable and propagates
+        through the engine preparation seam so the same round can be resumed.
+        """
+        for candidate in candidates:
+            self.projector.project(
+                [candidate.payload["target_smiles"]],
+                sampling_seed=candidate.payload["sampling_seed"],
+                identity=candidate.candidate_id,
+            )
+
     def evaluate(self, candidate):
         p = candidate.payload
         rows, artifact = self.projector.project(

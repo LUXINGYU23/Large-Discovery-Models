@@ -69,12 +69,16 @@
       "source_commit_note": "Archive contains no Git metadata; SHA-256 inventory pins local files.",
       "proposal_modes": {
         "mock": "deterministic; no endpoint preflight",
-        "real": "OpenAI-compatible Chat Completions; preflight required"
+        "real": "OpenAI-compatible Chat Completions; preflight required",
+        "harness": "Persistent sample-isolated Pi Harness sessions; Responses provider; task-local submission repair",
+        "blind_harness_compiled": "Independent compiled public-audit prior; no objective history or fitted GP"
       },
       "collection_modes": {
         "cif": "Accepted parseable CIF output \u2192 canonical ldm-2.0 IR",
         "operations": "Raw plans/tool records only; no CIF model-output collection"
-      }
+      },
+      "harness_feedback": "Public current question and public draft/syntax history only; no judge artifacts, targets, objective observations or cross-question answers",
+      "harness_selection": "Predeclared profile rotation; compiled extension uses untrained public structural prior within the current revision; last revision remains final"
     },
     "per_candidate_limits": {
       "answers_per_round": 1,
@@ -87,7 +91,7 @@
   "budget": {
     "baseline_attempts_per_sample": 1,
     "extended_attempts_per_sample": 4,
-    "extra_service_retry_allowance": 1
+    "extra_service_retry_allowance": 3
   },
   "profiles": {
     "one_shot": {
