@@ -6,7 +6,6 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -387,7 +386,9 @@ class NucleoBenchHarnessExpander:
                         f"{result.profile_id}[{index}]"
                     )
                 profile_keys.add(prepared.canonical_key)
-                annotations_by_key.setdefault(prepared.canonical_key, []).append({
+                # Shared by equal occurrences so canonical deduplication retains every hypothesis.
+                annotations = annotations_by_key.setdefault(prepared.canonical_key, [])
+                annotations.append({
                     "profile_id": result.profile_id,
                     "round_index": request.round_idx,
                     "submission_id": result.submission_id,
@@ -402,6 +403,7 @@ class NucleoBenchHarnessExpander:
                             "collectable": False,
                             "round_idx": request.round_idx,
                             "sampling_mode": sampling_mode,
+                            "research_annotations": annotations,
                             "harness_lineage": {
                                 "campaign_id": self.campaign_id,
                                 "round_index": request.round_idx,
@@ -414,16 +416,7 @@ class NucleoBenchHarnessExpander:
                         },
                     )
                 )
-        # Every occurrence carries all sources, so reservoir deduplication cannot lose a hypothesis.
-        return tuple(
-            replace(proposal, metadata={
-                **proposal.metadata,
-                "research_annotations": annotations_by_key[
-                    prepare_candidate_payload(proposal.payload, self.domain.context).canonical_key
-                ],
-            })
-            for proposal in proposals
-        )
+        return tuple(proposals)
 
 
 def _history_delta(

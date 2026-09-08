@@ -753,7 +753,10 @@ def _run_real(
                     measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
                 )
                 policy_client = stack.enter_context(
-                    _policy_harness_client(args, runtime, provider, prepared, mcp)
+                    _harness_client(
+                        args, runtime, provider, prepared, policy_harness_profile(), mcp,
+                        policy=True,
+                    )
                 )
                 policy_controller = PolicyResearchController(
                     client=policy_client,
@@ -1072,15 +1075,41 @@ def _harness_client(
     prepared: PreparedCase,
     profiles: Sequence[HarnessProfile],
     mcp,
+    *,
+    policy: bool = False,
 ) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "harness").resolve()
+    artifact_root = (runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
-    (artifact_root / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
     write_harness_sequence_context(
         prepared.context,
         artifact_root / "sequence_context.json",
     )
+    mounts = [(resource_root, "/resources", True)]
+    mcp_servers = mcp.servers
+    if policy:
+        submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
+        history_path = "/measured_history/observations.json"
+        mounts.append((
+            (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.resolve(),
+            "/measured_history", True,
+        ))
+        for source, destination in (
+            ("README.md", "task_README.md"),
+            ("resources/README.md", "resources_README.md"),
+            ("resources/cases/catalog.json", "case_catalog.json"),
+            ("resources/upstream_contract.json", "upstream_contract.json"),
+            ("resources/verification_record.json", "verification_record.json"),
+        ):
+            mounts.append(((TASK_ROOT / source).resolve(), f"/public/{destination}", True))
+        mcp_servers = (*mcp_servers, policy_mcp_server(
+            diagnostics_path="/resources/policy_diagnostics.py",
+            diagnostics_sha256=file_sha256(resource_root / "policy_diagnostics.py"),
+        ))
+    else:
+        submission_contract = harness_submission_contract(args.harness_candidates_per_session)
+        history_path = "/artifacts/measured_history/observations.json"
+        (artifact_root / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
     return HarnessClient(
         _harness_command(
             args,
@@ -1088,9 +1117,9 @@ def _harness_client(
             _harness_cache_root(args),
             environment={
                 "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
-                "LDM_NUCLEOBENCH_HISTORY": "/artifacts/measured_history/observations.json",
+                "LDM_NUCLEOBENCH_HISTORY": history_path,
             },
-            mounts=((resource_root, "/resources", True),),
+            mounts=mounts,
         ),
         api_key=provider.api_key,
         config=PiHarnessConfig(
@@ -1100,107 +1129,18 @@ def _harness_client(
             profiles=profiles,
             campaign_id=runtime.run_id,
             task_id=TASK_ID,
-            case_id=args.case_id,
+            case_id=f"{args.case_id}:optimization_policy" if policy else args.case_id,
             seed=args.campaign_index,
-            submission_contract=harness_submission_contract(
-                args.harness_candidates_per_session
-            ),
+            submission_contract=submission_contract,
             guest_runtime=harness_guest_runtime(),
             tool_extensions=harness_tool_extensions(),
-            mcp_servers=mcp.servers,
+            mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(
-                    args.harness_tool_budget,
-                    excluded_tools=("submit_candidates",),
-                ),
-            ),
-            network_policy=HarnessNetworkPolicy(
-                forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
-            ),
-            context7_enabled=args.harness_context7,
-        ),
-        named_secrets=mcp.named_secrets,
-        response_timeout_seconds=args.harness_response_timeout,
-    )
-
-
-def _policy_harness_client(
-    args: argparse.Namespace,
-    runtime: CampaignRuntime,
-    provider: ProviderSettings,
-    prepared: PreparedCase,
-    mcp,
-) -> HarnessClient:
-    artifact_root = (runtime.run_dir / "policy_harness").resolve()
-    artifact_root.mkdir(parents=True, exist_ok=True)
-    write_harness_sequence_context(
-        prepared.context,
-        artifact_root / "sequence_context.json",
-    )
-    harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
-    mounts = (
-        (harness_resources, "/resources", True),
-        ((runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.resolve(), "/measured_history", True),
-        ((TASK_ROOT / "README.md").resolve(), "/public/task_README.md", True),
-        (
-            (TASK_ROOT / "resources" / "README.md").resolve(),
-            "/public/resources_README.md",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "cases" / "catalog.json").resolve(),
-            "/public/case_catalog.json",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "upstream_contract.json").resolve(),
-            "/public/upstream_contract.json",
-            True,
-        ),
-        (
-            (TASK_ROOT / "resources" / "verification_record.json").resolve(),
-            "/public/verification_record.json",
-            True,
-        ),
-    )
-    return HarnessClient(
-        _harness_command(
-            args,
-            artifact_root,
-            _harness_cache_root(args),
-            environment={
-                "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
-                "LDM_NUCLEOBENCH_HISTORY": "/measured_history/observations.json",
-            },
-            mounts=mounts,
-        ),
-        api_key=provider.api_key,
-        config=PiHarnessConfig(
-            artifact_root=Path("/artifacts"),
-            base_url=provider.base_url,
-            model=provider.model,
-            profiles=policy_harness_profile(),
-            campaign_id=runtime.run_id,
-            task_id=TASK_ID,
-            case_id=f"{args.case_id}:optimization_policy",
-            seed=args.campaign_index,
-            submission_contract=policy_submission_contract(
-                args.policy_max_submission_attempts
-            ),
-            guest_runtime=harness_guest_runtime(),
-            tool_extensions=harness_tool_extensions(),
-            mcp_servers=(*mcp.servers, policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(harness_resources / "policy_diagnostics.py"),
-            )),
-            thinking=args.harness_thinking,
-            limits=HarnessLimits(
-                wall_time_seconds=args.harness_wall_time_seconds,
-                tool_call_budgets=parse_tool_call_budgets(
-                    args.policy_tool_budget,
-                    excluded_tools=("submit_optimization_policy",),
+                    args.policy_tool_budget if policy else args.harness_tool_budget,
+                    excluded_tools=(submission_contract.tool_name,),
                 ),
             ),
             network_policy=HarnessNetworkPolicy(

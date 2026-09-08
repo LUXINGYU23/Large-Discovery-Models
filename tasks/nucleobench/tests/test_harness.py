@@ -21,6 +21,7 @@ from ldm_tts.harness import (
     HarnessTurnResult,
     directory_sha256,
 )
+from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig
 from tasks.nucleobench.core.candidate import MutationContext, NucleoBenchCandidateDomain, make_start_candidate
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
@@ -43,9 +44,9 @@ from tasks.nucleobench.core.harness import (
 )
 from tasks.nucleobench.core.mock import MOCK_CONTEXT
 from tasks.nucleobench.core.optimization_policy import policy_harness_profile
-from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE, serialize_measured_observations
+from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE
 from tasks.nucleobench.core.task_spec import build_task_spec
-from tasks.nucleobench.core.workflow import describe_ldm_task, main, parse_args
+from tasks.nucleobench.core.workflow import ProviderSettings, _harness_client, describe_ldm_task, main, parse_args
 
 
 class FakeHarnessClient:
@@ -488,24 +489,42 @@ def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
     assert compiled_spec.proposal_search.parameters["policy_profile_count"] == 1
     assert compiled_spec.proposal_search.parameters["policy_skills_loaded"] is True
 
-    expander = build_proposal_expander(
-        "ldm_harness",
-        MOCK_CONTEXT,
-        seed=0,
-        evaluations_per_round=1,
-        harness_client=FakeHarnessClient(
-            tmp_path,
-            {
-                profile.profile_id: [[_payloads()[index]]]
-                for index, profile in enumerate(profiles)
-            }
-        ),
-        harness_session_profiles=profiles,
-        harness_artifact_root=tmp_path,
-        campaign_id="test-campaign",
-        first_active_round=1,
+
+@pytest.mark.parametrize("policy", [False, True])
+def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy):
+    args = parse_args([
+        "--search-method", "ldm_harness_compiled",
+        "--harness-cache-dir", str(tmp_path / "cache"),
+        "--harness-tool-budget", "web_search=3",
+        "--policy-tool-budget", "web_search=2",
+        "--no-harness-context7",
+    ])
+    profiles = policy_harness_profile() if policy else harness_profiles()
+    provider = ProviderSettings("https://provider.example/v1", "research-model", "test-secret")
+    client = _harness_client(
+        args, SimpleNamespace(run_dir=tmp_path, run_id="test-campaign"),
+        provider, SimpleNamespace(context=MOCK_CONTEXT), profiles,
+        ResolvedHarnessMcpConfig(), policy=policy,
     )
-    assert isinstance(expander, NucleoBenchHarnessExpander)
+    config = client.config
+    assert (config.base_url, config.model, config.thinking) == (provider.base_url, provider.model, "max")
+    assert config.profiles == profiles
+    assert config.submission_contract.tool_name == ("submit_optimization_policy" if policy else "submit_candidates")
+    assert config.limits.tool_call_budgets == {"web_search": 2 if policy else 3}
+    assert config.limits.wall_time_seconds == args.harness_wall_time_seconds
+    assert config.context7_enabled is False
+    assert [server.server_id for server in config.mcp_servers] == (["ldm_policy"] if policy else [])
+    assert config.tool_extensions[0].tool_names == HARNESS_TOOL_NAMES
+    command = "\n".join(client.command)
+    root = tmp_path / ("policy_harness" if policy else "harness")
+    history = "/measured_history/observations.json" if policy else "/artifacts/measured_history/observations.json"
+    assert f"src={root},dst=/artifacts" in command
+    assert f"LDM_NUCLEOBENCH_HISTORY={history}" in command
+    assert ("dst=/measured_history,readonly" in command) is policy
+    assert ("dst=/public/task_README.md,readonly" in command) is policy
+    assert "test-secret" not in command
+    context = json.loads((root / "sequence_context.json").read_text())
+    assert context["paired_start"]["start_sequence"] == MOCK_CONTEXT.start_sequence
 
 
 def test_harness_dry_run_exposes_current_settings_without_secret(
@@ -763,7 +782,9 @@ assert.deepEqual((await read({candidate_ids: ['measured'], response_format: 'det
 assert.equal((await read({candidate_ids: ['measured']})).observations[0].hamming_distance, 2);
 assert.equal((await read({candidate_ids: ['measured']})).observations[0].mutations, undefined);
 assert.equal((await tools.get('validate_mutations').execute('test', {mutations: rows[1].mutations})).details.already_evaluated, true);
+assert.equal((await tools.get('validate_mutations').execute('test', {mutations: [...rows[1].mutations].reverse()})).details.evaluated_candidate_id, 'measured');
 assert.equal((await tools.get('validate_mutations').execute('test', {mutations: [{position: 0, base: 'G'}]})).details.already_evaluated, false);
+assert.equal((await tools.get('validate_mutations').execute('test', {mutations: rows[1].mutations.slice(0, 1)})).details.already_evaluated, false);
 const unseen = await read({candidate_ids: ['private-unmeasured']});
 assert.deepEqual(unseen.observations, []);
 assert.deepEqual(unseen.unmeasured_or_unknown_ids, ['private-unmeasured']);

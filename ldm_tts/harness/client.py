@@ -105,9 +105,8 @@ class HarnessClient:
                 {"apiKey": self._api_key, "namedSecrets": self._named_secrets},
                 "secret_bootstrapped",
             )
-            request_id = self._next_request_id()
-            self._exchange(
-                self._frame(request_id, "initialize", self.config.initialize_payload()),
+            self._request(
+                "initialize", self.config.initialize_payload(),
                 "initialized",
             )
         except BaseException:
@@ -224,13 +223,8 @@ class HarnessClient:
 
     def close(self) -> None:
         process = self._process
-        if process is None:
-            self._api_key = ""
-            self._named_secrets.clear()
-            self._protocol_version = None
-            return
         try:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 if self._protocol_version is None:
                     _terminate(process)
                 else:
@@ -275,22 +269,7 @@ class HarnessClient:
         timeout_seconds: float | None = None,
         submission_validator: SubmissionValidator | None = None,
     ) -> dict[str, Any]:
-        request_id = self._next_request_id()
-        return self._exchange(
-            self._frame(request_id, frame_type, fields),
-            expected_type,
-            timeout_seconds=timeout_seconds,
-            submission_validator=submission_validator,
-        )
-
-    def _exchange(
-        self,
-        frame: dict[str, Any],
-        expected_type: str,
-        *,
-        timeout_seconds: float | None = None,
-        submission_validator: SubmissionValidator | None = None,
-    ) -> dict[str, Any]:
+        frame = self._frame(self._next_request_id(), frame_type, fields)
         process = self._process
         if process is None or process.stdin is None:
             raise HarnessError("harness client is not started")

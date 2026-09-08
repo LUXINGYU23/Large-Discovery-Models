@@ -234,8 +234,11 @@ export default function sequenceContextTools(pi) {
 		async execute(_id, params) {
 			const validated = validatePatch(params.mutations);
 			const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
+			// Both patches are canonical and relative to the same paired start.
 			const previous = observations.find((row) =>
-				createHash("sha256").update(sequenceFromPatch(row.mutations), "ascii").digest("hex") === validated.sequence_sha256);
+				row.mutations.length === validated.mutations.length && row.mutations.every((mutation, index) =>
+					mutation.position === validated.mutations[index].position
+					&& mutation.base === validated.mutations[index].base));
 			return jsonResult({
 				...validated, already_evaluated: previous !== undefined,
 				evaluated_candidate_id: previous?.candidate_id ?? null,

@@ -161,11 +161,6 @@ It uses three seeds, one shared initialization evaluation, eleven active rounds,
 16 real evaluations per active round, and 64 proposal occurrences for each LDM
 method.
 
-Before launching the complete matrix, confirm the resolved case, start index,
-three seeds, 12 total rounds, evaluation count, endpoint, model, wire API,
-reasoning level, direct-request concurrency, Harness image, proposal and policy
-tool budgets, external roots, and resume policy.
-
 Then run:
 
 ```bash
@@ -178,21 +173,12 @@ Results are written below `$NUCLEOBENCH_RUNS_ROOT/pilot_evaluation/`.
 Use `--resume` only with the same repository revision, prepared inputs, model,
 and resolved configuration.
 
-Candidate Harness sessions write `candidates.json` inside their own workspace
-and submit its path. Each candidate has `mutations`, `change_summary`, and
-`rationale`; the latter two are short English pre-evaluation notes. The task
-validates an immutable snapshot before committing
-the batch; rejected entries can be repaired in the same session. No additional
-package or sidecar image is needed for this file-based handoff.
+Candidate sessions submit annotated mutation patches through `candidates.json`.
+Agents receive compact measurement updates and can query detailed history.
+See [the Harness contract](README.md#persistent-research-harness) for submission,
+validation, and history tools.
 
-New measurements carry a compact index to proposal and policy Agents.
-`get_measured_history` provides filtered, sortable, paginated results; use
-`response_format="detailed"` for selected IDs to read exact patches and original notes.
-the portable view is `harness/measured_history/observations.json`.
-`get_sequence_window` accepts a measured `candidate_id` to retrieve exact parent
-bases and their checksum for analysis. Notes do not
-affect candidate identity, occurrence counts, or GP features. To verify the
-feedback path, use a separately named tiny run with `args.iterations=3`: one
+To verify the feedback path, use a separately named tiny run with `args.iterations=3`: one
 paired-start evaluation followed by two active rounds, so the second proposal
 turn consumes the first batch's measured results and annotations.
 
