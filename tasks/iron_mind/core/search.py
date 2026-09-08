@@ -7,16 +7,27 @@ from collections.abc import Sequence
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
-
 from tasks.iron_mind.core.candidate import (
     IRON_MIND_Q0_METADATA_KEY,
     canonical_candidate_key,
 )
 from tasks.iron_mind.core.data import FrozenReactionTable
 
-
 INITIALIZATION_MODES = ("none", "shared_random")
-SEARCH_METHODS = ("ldm", "bo", "llm")
+COMPILED_POLICY_METHOD = "ldm_harness_compiled"
+ACQUISITION_TILTED_METHODS = frozenset(
+    ("ldm", "ldm_harness", COMPILED_POLICY_METHOD)
+)
+PARALLEL_HARNESS_METHODS = frozenset(("ldm_harness", COMPILED_POLICY_METHOD))
+PERSISTENT_HARNESS_METHODS = frozenset((*PARALLEL_HARNESS_METHODS, "harness"))
+SEARCH_METHODS = (
+    "ldm",
+    "ldm_harness",
+    COMPILED_POLICY_METHOD,
+    "bo",
+    "llm",
+    "harness",
+)
 
 
 class IronMindInitializationExpander:
@@ -91,9 +102,13 @@ def _unique_payloads(table: FrozenReactionTable) -> Sequence[dict[str, object]]:
 
 
 __all__ = [
-    "FullReactionDomainExpander",
+    "ACQUISITION_TILTED_METHODS",
+    "COMPILED_POLICY_METHOD",
     "INITIALIZATION_MODES",
-    "IronMindInitializationExpander",
+    "PARALLEL_HARNESS_METHODS",
+    "PERSISTENT_HARNESS_METHODS",
     "SEARCH_METHODS",
+    "FullReactionDomainExpander",
+    "IronMindInitializationExpander",
     "finite_domain_size",
 ]

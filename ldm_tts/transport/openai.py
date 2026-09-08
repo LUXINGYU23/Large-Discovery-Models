@@ -11,13 +11,19 @@ from ldm_tts.transport import ProposalRequest, ProposalResponse
 from ldm_tts.transport.openai_http import (
     EndpointRequestError,
     chat_completions_url,
+    extract_openai_responses_content,
     models_url,
     preflight_openai_chat,
     preflight_openai_endpoint,
+    preflight_openai_responses,
     request_openai_chat,
     request_openai_chat_response,
     request_openai_models,
+    request_openai_responses_response,
+    responses_url,
 )
+
+WIRE_APIS = ("chat_completions", "responses")
 
 
 class EndpointCircuitOpen(EndpointRequestError):
@@ -131,6 +137,7 @@ class OpenAICompatibleProposalClient:
         require_models_preflight: bool = False,
         breaker: EndpointCircuitBreaker | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        wire_api: str = "chat_completions",
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("proposal timeout_seconds must be positive")
@@ -140,6 +147,8 @@ class OpenAICompatibleProposalClient:
             raise ValueError("proposal max_retries must be non-negative")
         if retry_backoff_seconds < 0:
             raise ValueError("proposal retry_backoff_seconds must be non-negative")
+        if wire_api not in WIRE_APIS:
+            raise ValueError(f"proposal wire_api must be one of {WIRE_APIS}")
         self.url = url
         self.model = model
         self.api_key = api_key
@@ -152,9 +161,19 @@ class OpenAICompatibleProposalClient:
         self.require_models_preflight = bool(require_models_preflight)
         self.breaker = breaker or EndpointCircuitBreaker()
         self.sleep = sleep
+        self.wire_api = wire_api
 
     def preflight(self) -> dict[str, Any]:
         timeout_seconds = min(self.timeout_seconds, 30.0)
+        if self.wire_api == "responses":
+            return preflight_openai_responses(
+                url=self.url,
+                model=self.model,
+                api_key=self.api_key,
+                timeout_seconds=timeout_seconds,
+                extra_body=self.extra_body,
+                require_model_visibility=self.require_models_preflight,
+            )
         if self.require_models_preflight:
             return preflight_openai_endpoint(
                 url=self.url,
@@ -181,9 +200,14 @@ class OpenAICompatibleProposalClient:
         last_error: EndpointRequestError | None = None
         for attempt in range(1, self.max_retries + 2):
             try:
+                operation = (
+                    request_openai_responses_response
+                    if self.wire_api == "responses"
+                    else request_openai_chat_response
+                )
                 raw = call_with_circuit_breaker(
                     self.breaker,
-                    request_openai_chat_response,
+                    operation,
                     url=self.url,
                     model=self.model,
                     api_key=self.api_key,
@@ -195,20 +219,28 @@ class OpenAICompatibleProposalClient:
                     tool_choice=request.tool_choice,
                     extra_body=self.extra_body,
                 )
-                message = raw["choices"][0]["message"]
-                return ProposalResponse(
-                    text=str(message.get("content") or ""),
-                    tool_calls=tuple(
+                if self.wire_api == "responses":
+                    text, tool_calls = extract_openai_responses_content(raw)
+                    finish_reason = raw.get("status")
+                else:
+                    message = raw["choices"][0]["message"]
+                    text = str(message.get("content") or "")
+                    tool_calls = tuple(
                         dict(item)
                         for item in message.get("tool_calls", [])
                         if isinstance(item, dict)
-                    ),
+                    )
+                    finish_reason = raw["choices"][0].get("finish_reason")
+                return ProposalResponse(
+                    text=text,
+                    tool_calls=tool_calls,
                     usage=_numeric_usage(raw.get("usage")),
                     latency_seconds=time.monotonic() - started,
                     metadata={
                         "model": raw.get("model", self.model),
-                        "finish_reason": raw["choices"][0].get("finish_reason"),
+                        "finish_reason": finish_reason,
                         "attempts": attempt,
+                        "wire_api": self.wire_api,
                         **dict(request.metadata),
                     },
                 )
@@ -233,16 +265,21 @@ def _numeric_usage(value: Any) -> dict[str, int | float]:
 
 
 __all__ = [
+    "WIRE_APIS",
     "EndpointCircuitBreaker",
     "EndpointCircuitOpen",
     "EndpointRequestError",
     "OpenAICompatibleProposalClient",
     "call_with_circuit_breaker",
     "chat_completions_url",
+    "extract_openai_responses_content",
     "models_url",
     "preflight_openai_chat",
     "preflight_openai_endpoint",
+    "preflight_openai_responses",
     "request_openai_chat",
     "request_openai_chat_response",
     "request_openai_models",
+    "request_openai_responses_response",
+    "responses_url",
 ]

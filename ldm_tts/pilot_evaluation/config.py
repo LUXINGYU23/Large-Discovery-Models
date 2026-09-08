@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ldm_tts.cli.runner import load_config
 
 
-SUPPORTED_METHODS = ("ldm", "harness", "bo", "llm")
+SUPPORTED_METHODS = (
+    "ldm",
+    "ldm_harness",
+    "ldm_harness_compiled",
+    "bo",
+    "llm",
+    "harness",
+)
 BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
 
@@ -49,6 +56,21 @@ class PilotEvaluationSpec:
     output_root: Path
     trajectory: TrajectorySpec
     result_fields: dict[str, str]
+    policy_fields: dict[str, str] = field(default_factory=dict)
+    policy_mean_fields: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if any(
+            not isinstance(name, str) or not name
+            or not isinstance(path, str) or not all(path.split("."))
+            for name, path in self.policy_fields.items()
+        ):
+            raise ValueError("policy_fields must map non-empty names to dotted paths")
+        if (
+            any(name not in self.policy_fields for name in self.policy_mean_fields)
+            or len(set(self.policy_mean_fields)) != len(self.policy_mean_fields)
+        ):
+            raise ValueError("policy_mean_fields must be unique names from policy_fields")
 
     @property
     def iterations(self) -> int:
@@ -68,6 +90,8 @@ class PilotEvaluationSpec:
             "output_root": str(self.output_root),
             "trajectory": self.trajectory.__dict__,
             "result_fields": dict(self.result_fields),
+            "policy_fields": dict(self.policy_fields),
+            "policy_mean_fields": list(self.policy_mean_fields),
         }
 
 
@@ -78,6 +102,12 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     raw = load_config(resolved)
     _require_exact_keys(raw)
     methods = _methods(raw.get("methods"))
+    policy_fields = raw.get("policy_fields", {})
+    policy_mean_fields = raw.get("policy_mean_fields", [])
+    if not isinstance(policy_fields, dict) or not isinstance(policy_mean_fields, list):
+        raise ValueError("policy_fields must be an object and policy_mean_fields an array")
+    if any(not isinstance(name, str) for name in policy_mean_fields):
+        raise ValueError("policy_mean_fields must contain field names")
     return PilotEvaluationSpec(
         task=_required_string(raw.get("task"), "task"),
         name=_required_string(raw.get("name"), "name"),
@@ -93,6 +123,8 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
         output_root=_output_root(raw.get("output_root")),
         trajectory=_trajectory(raw.get("trajectory")),
         result_fields=_result_fields(raw.get("result_fields")),
+        policy_fields=policy_fields,
+        policy_mean_fields=tuple(policy_mean_fields),
     )
 
 
@@ -101,7 +133,8 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         "schema_version", "name", "task", "base_config", "cases", "methods", "method_overrides", "seeds",
         "optimization_rounds", "initialization_mode", "output_root", "trajectory", "result_fields",
     }
-    if set(raw) != expected or raw.get("schema_version") != 1:
+    optional = {"policy_fields", "policy_mean_fields"}
+    if not expected <= set(raw) or set(raw) - expected - optional or raw.get("schema_version") != 1:
         raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 

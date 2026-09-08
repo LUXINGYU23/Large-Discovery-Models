@@ -181,6 +181,8 @@ def _raw_proposals(parsed, request: ExpansionRequest,
                 "sampling_mode": requests[item.request_index].metadata["sampling_mode"],
                 "prompt_sha256": requests[item.request_index].metadata["prompt_sha256"],
                 **item.slot_plan.metadata(),
+                "proposal_index": item.proposal_index,
+                "source_proposal_index": item.source_proposal_index,
             },
         )
         for item in parsed

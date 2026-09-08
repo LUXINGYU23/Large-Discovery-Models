@@ -16,6 +16,7 @@ def mock_proposal_response(request: ProposalRequest) -> ProposalResponse:
         candidates = [
             {
                 "proposal_index": int(plan["proposal_index"]),
+                "source_proposal_index": int(plan["proposal_index"]),
                 **_candidate_from_metadata(plan),
             }
             for plan in plans

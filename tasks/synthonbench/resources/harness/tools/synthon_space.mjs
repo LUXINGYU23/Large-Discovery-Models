@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 const catalogPath = process.env.LDM_SYNTHON_SPACE_CATALOG;
 if (!catalogPath) throw new Error("LDM_SYNTHON_SPACE_CATALOG is required");
 
+const historyPath = process.env.LDM_SYNTHONBENCH_HISTORY;
+if (!historyPath) throw new Error("LDM_SYNTHONBENCH_HISTORY is required");
+
+function measuredHistory() {
+    return JSON.parse(readFileSync(historyPath, "utf8")).observations;
+}
+
 const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
 if (catalog.schema_version !== 1 || !Array.isArray(catalog.reactions)) {
 	throw new Error("invalid SynthonSpace tool catalog");
@@ -53,6 +60,60 @@ const validateParameters = {
 };
 
 export default function synthonSpaceTools(pi) {
+
+    pi.registerTool({
+        name: "get_measured_history",
+        label: "Read measured research history",
+        description: "Query evaluated candidates by ID or round. Concise results contain IDs, round, status and synthon_utility; request detailed for exact candidates and original research annotations. Follow next_offset. Unmeasured proposals are not exposed.",
+        parameters: {
+            type: "object",
+            properties: {
+                candidate_ids: { type: "array", items: { type: "string", minLength: 1 } },
+                round_index: { type: "integer", minimum: 0 },
+                sort_by: { type: "string", enum: ["recent", "utility_desc", "utility_asc"] },
+                response_format: { type: "string", enum: ["concise", "detailed"] },
+                offset: { type: "integer", minimum: 0 },
+                limit: { type: "integer", minimum: 1, maximum: 128 },
+            },
+            additionalProperties: false,
+        },
+        async execute(_id, params) {
+            const observations = measuredHistory();
+            const ids = new Set(params.candidate_ids ?? []);
+            const matched = observations.filter((row) =>
+                (ids.size === 0 || ids.has(row.candidate_id))
+                && (params.round_index === undefined || row.round_index === params.round_index),
+            );
+            const sortBy = params.sort_by ?? "recent";
+            matched.sort((a, b) => {
+                if (sortBy === "recent") return b.round_index - a.round_index;
+                if (a.synthon_utility === null) return b.synthon_utility === null ? 0 : 1;
+                if (b.synthon_utility === null) return -1;
+                return sortBy === "utility_desc" ? b.synthon_utility - a.synthon_utility : a.synthon_utility - b.synthon_utility;
+            });
+            const offset = params.offset ?? 0;
+            const page = [];
+            let bytes = 0;
+            for (const row of matched.slice(offset, offset + (params.limit ?? 16))) {
+                const value = params.response_format === "detailed" ? row : {
+                    candidate_id: row.candidate_id, round_index: row.round_index,
+                    evaluation_status: row.evaluation_status, synthon_utility: row.synthon_utility,
+                };
+                const size = Buffer.byteLength(JSON.stringify(value), "utf8");
+                if (page.length && bytes + size > 32000) break;
+                page.push(value);
+                bytes += size;
+            }
+            const known = new Set(observations.map((row) => row.candidate_id));
+            return jsonResult({
+                total: matched.length, offset,
+                next_offset: offset + page.length < matched.length ? offset + page.length : null,
+                observations: page,
+                unmeasured_or_unknown_ids: [...ids].filter((id) => !known.has(id)),
+            });
+        },
+    });
+
 	pi.registerTool({
 		name: "list_synthon_reactions",
 		label: "List SynthonSpace reactions",
@@ -128,7 +189,11 @@ export default function synthonSpaceTools(pi) {
 				if (!synthon) throw new Error(`synthon ${synthonId} is invalid for position ${slot.position}`);
 				return { position: slot.position, ...synthon };
 			});
-			return jsonResult({ valid: true, reaction_id: item.reaction_id, synthons });
+			const measured = measuredHistory().find((row) => row.reaction_id === item.reaction_id
+                && row.synthon_ids.length === params.synthon_ids.length
+                && row.synthon_ids.every((id, index) => id === params.synthon_ids[index]));
+            return jsonResult({ valid: true, reaction_id: item.reaction_id, synthons,
+                already_evaluated: measured !== undefined, candidate_id: measured?.candidate_id ?? null });
 		},
 	});
 }

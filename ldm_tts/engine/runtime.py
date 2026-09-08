@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Generic, Optional, TypeVar
 
 from ldm_tts.contracts import (
+    BatchCandidateEvaluator,
     Candidate,
     CandidateDomainAdapter,
     CandidateEvaluator,
@@ -228,6 +229,7 @@ class LDMEngine:
         *,
         state: LDMEngineState | None = None,
         context: Mapping[str, Any] | None = None,
+        finalize_runtime: bool = True,
     ) -> LDMEngineResult:
         active = state or LDMEngineState()
         rounds_run = 0
@@ -247,7 +249,9 @@ class LDMEngine:
                 if remaining_attempts == 0:
                     stop_reason = "evaluation_attempt_budget"
                     break
-                self.runtime.consume("outer_iterations")
+                self.runtime.consume_many(
+                    {"outer_iterations": 1}, usage_key=f"engine:round:{round_idx}"
+                )
                 self.runtime.status.update(
                     "running",
                     phase="reservoir_expansion",
@@ -335,6 +339,7 @@ class LDMEngine:
                     active.observations,
                     reservoir.candidates,
                     selection_count,
+                    round_idx=round_idx,
                     use_reservoir_order=expansion.selection_mode == "reservoir_order",
                 )
                 selected = self._resolve_selection(reservoir.candidates, selection)
@@ -353,51 +358,58 @@ class LDMEngine:
                 budget_exhausted = False
                 round_observations = 0
                 round_successes = 0
-                for candidate in selected:
-                    if config.target_successful_evaluations is not None:
-                        if round_successes >= desired:
+                if (
+                    isinstance(self.evaluator, BatchCandidateEvaluator)
+                    and not config.replace_failed_evaluations
+                ):
+                    batch_candidates: list[Candidate] = []
+                    for candidate in selected:
+                        try:
+                            self.runtime.consume_many(
+                                {
+                                    "selected_candidates": 1,
+                                    "external_evaluations": 1,
+                                    "expensive_evaluation_attempts": 1,
+                                }
+                            )
+                        except BudgetExceededError:
+                            budget_exhausted = True
+                            stop_reason = "external_evaluation_budget"
                             break
-                    elif round_observations >= desired:
-                        break
-                    try:
-                        self.runtime.consume_many(
-                            {
-                                "selected_candidates": 1,
-                                "external_evaluations": 1,
-                                "expensive_evaluation_attempts": 1,
-                            }
+                        batch_candidates.append(candidate)
+                    if batch_candidates:
+                        evaluations = self._evaluate_batch(batch_candidates)
+                        for candidate, evaluation in zip(
+                            batch_candidates, evaluations, strict=True
+                        ):
+                            round_observations += 1
+                            round_successes += self._record_evaluation(
+                                active, candidate, evaluation, round_idx
+                            )
+                else:
+                    for candidate in selected:
+                        if config.target_successful_evaluations is not None:
+                            if round_successes >= desired:
+                                break
+                        elif round_observations >= desired:
+                            break
+                        try:
+                            self.runtime.consume_many(
+                                {
+                                    "selected_candidates": 1,
+                                    "external_evaluations": 1,
+                                    "expensive_evaluation_attempts": 1,
+                                }
+                            )
+                        except BudgetExceededError:
+                            budget_exhausted = True
+                            stop_reason = "external_evaluation_budget"
+                            break
+                        evaluation = self._evaluate(candidate)
+                        round_observations += 1
+                        round_successes += self._record_evaluation(
+                            active, candidate, evaluation, round_idx
                         )
-                    except BudgetExceededError:
-                        budget_exhausted = True
-                        stop_reason = "external_evaluation_budget"
-                        break
-                    evaluation = self._evaluate(candidate)
-                    benchmark_jobs = evaluation.resource_usage.get("benchmark_jobs", 0)
-                    if benchmark_jobs:
-                        self.runtime.consume("benchmark_jobs", benchmark_jobs)
-                    if evaluation.succeeded:
-                        self.runtime.consume("successful_evaluations")
-                    representation = (
-                        self.surrogate_encoder.encode(candidate)
-                        if self.surrogate_encoder is not None and evaluation.succeeded
-                        else None
-                    )
-                    observation = Observation(
-                        candidate=candidate,
-                        evaluation=evaluation,
-                        surrogate=representation,
-                        round_idx=round_idx,
-                    )
-                    active.observations.append(observation)
-                    round_observations += 1
-                    if evaluation.succeeded:
-                        round_successes += 1
-                    self.runtime.record(
-                        "candidate_evaluated",
-                        observation.to_dict(),
-                        iteration=round_idx,
-                        candidate_id=candidate.candidate_id,
-                    )
 
                 active.next_round = round_idx + 1
                 rounds_run += 1
@@ -420,7 +432,16 @@ class LDMEngine:
                 }
                 else "stopped"
             )
-            self.runtime.finish(summary, status=terminal)
+            if finalize_runtime:
+                self.runtime.finish(summary, status=terminal)
+            else:
+                self.runtime.status.update(
+                    "running",
+                    phase="awaiting_external_driver",
+                    iteration=active.next_round,
+                    budget=self.runtime.budget,
+                    details=summary,
+                )
             return LDMEngineResult(active, rounds_run, stop_reason, summary)
         except Exception as exc:
             self.runtime.fail(exc)
@@ -432,6 +453,7 @@ class LDMEngine:
         candidates: Sequence[Candidate],
         count: int,
         *,
+        round_idx: int,
         use_reservoir_order: bool = False,
     ) -> BOSelectionResult:
         if use_reservoir_order or self.selector is None:
@@ -455,6 +477,7 @@ class LDMEngine:
                         else None
                     )
                 ),
+                metadata={"round_idx": observation.round_idx},
             )
             for observation in observations
             if observation.evaluation.succeeded
@@ -468,7 +491,9 @@ class LDMEngine:
             if self.surrogate_encoder is not None
             else {}
         )
-        return self.selector.select(candidates, representations, count=count)
+        return self.selector.select(
+            candidates, representations, count=count, round_idx=round_idx
+        )
 
     def _resolve_selection(
         self,
@@ -494,6 +519,76 @@ class LDMEngine:
             return EvaluationResult(candidate.candidate_id, "timed_out", error=str(exc))
         except Exception as exc:
             return EvaluationResult(candidate.candidate_id, "failed", error=str(exc))
+
+    def _evaluate_batch(
+        self, candidates: Sequence[Candidate]
+    ) -> tuple[EvaluationResult, ...]:
+        evaluator = self.evaluator
+        if not isinstance(evaluator, BatchCandidateEvaluator):
+            raise TypeError("batch evaluation requires BatchCandidateEvaluator")
+        try:
+            results = tuple(evaluator.evaluate_batch(candidates))
+        except TimeoutError as exc:
+            return tuple(
+                EvaluationResult(candidate.candidate_id, "timed_out", error=str(exc))
+                for candidate in candidates
+            )
+        except Exception as exc:
+            return tuple(
+                EvaluationResult(candidate.candidate_id, "failed", error=str(exc))
+                for candidate in candidates
+            )
+        if len(results) != len(candidates):
+            raise ValueError(
+                "batch evaluator result count does not match the candidate count"
+            )
+        validated: list[EvaluationResult] = []
+        for candidate, result in zip(candidates, results, strict=True):
+            if not isinstance(result, EvaluationResult):
+                raise TypeError("batch evaluator must return EvaluationResult objects")
+            if result.candidate_id != candidate.candidate_id:
+                raise ValueError(
+                    "batch evaluator results must preserve candidate order and ids"
+                )
+            try:
+                validated.append(self.objectives.validate_result(result))
+            except Exception as exc:
+                validated.append(
+                    EvaluationResult(candidate.candidate_id, "failed", error=str(exc))
+                )
+        return tuple(validated)
+
+    def _record_evaluation(
+        self,
+        state: LDMEngineState,
+        candidate: Candidate,
+        evaluation: EvaluationResult,
+        round_idx: int,
+    ) -> int:
+        benchmark_jobs = evaluation.resource_usage.get("benchmark_jobs", 0)
+        if benchmark_jobs:
+            self.runtime.consume("benchmark_jobs", benchmark_jobs)
+        if evaluation.succeeded:
+            self.runtime.consume("successful_evaluations")
+        representation = (
+            self.surrogate_encoder.encode(candidate)
+            if self.surrogate_encoder is not None and evaluation.succeeded
+            else None
+        )
+        observation = Observation(
+            candidate=candidate,
+            evaluation=evaluation,
+            surrogate=representation,
+            round_idx=round_idx,
+        )
+        state.observations.append(observation)
+        self.runtime.record(
+            "candidate_evaluated",
+            observation.to_dict(),
+            iteration=round_idx,
+            candidate_id=candidate.candidate_id,
+        )
+        return int(evaluation.succeeded)
 
     def _checkpoint(self, state: LDMEngineState) -> None:
         self.runtime.checkpoint(state.to_checkpoint())

@@ -117,6 +117,16 @@ class CandidateEvaluator(Protocol):
         """Evaluate one admitted candidate and return a classified outcome."""
 
 
+@runtime_checkable
+class BatchCandidateEvaluator(CandidateEvaluator, Protocol):
+    """Evaluator that scores a selected minibatch in one authoritative call."""
+
+    def evaluate_batch(
+        self, candidates: Sequence[Candidate]
+    ) -> Sequence[EvaluationResult]:
+        """Evaluate candidates in order and return one result per candidate."""
+
+
 class CallableCandidateEvaluator:
     """Local adapter around a deterministic or task-owned evaluation callable."""
 
@@ -309,6 +319,7 @@ def best_item(
 
 
 __all__ = [
+    "BatchCandidateEvaluator",
     "CandidateEvaluator",
     "CallableCandidateEvaluator",
     "EVALUATION_STATUSES",

@@ -467,6 +467,7 @@ class AntibodyGPSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         del representations
         if len(self.rows) < int(self.args.n_init):

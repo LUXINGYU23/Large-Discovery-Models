@@ -1,4 +1,30 @@
 schema_version: 1
+policy_fields:
+  gp_mean_source: base_selection.mean_source
+  gp_prior_clip_count: base_selection.prior_mean_clip_count
+  gp_residual_target_mean: base_selection.residual_target_mean
+  gp_residual_target_std: base_selection.residual_target_std
+  baseline_prediction_mean: compiled_policy.baseline_prediction_diagnostics.mean_mean
+  baseline_prediction_std: compiled_policy.baseline_prediction_diagnostics.mean_std
+  compiled_prediction_mean: compiled_policy.compiled_prediction_diagnostics.mean_mean
+  compiled_prediction_std: compiled_policy.compiled_prediction_diagnostics.mean_std
+  baseline_acquisition_mean: compiled_policy.baseline_prediction_diagnostics.acquisition_mean
+  baseline_acquisition_std: compiled_policy.baseline_prediction_diagnostics.acquisition_std
+  compiled_acquisition_mean: compiled_policy.compiled_prediction_diagnostics.acquisition_mean
+  compiled_acquisition_std: compiled_policy.compiled_prediction_diagnostics.acquisition_std
+  baseline_compiled_top10_overlap: compiled_policy.baseline_compiled_top10_overlap
+  q0_entropy: base_probability_entropy
+  tilted_entropy: probability_entropy
+  tilted_ess: probability_effective_sample_size
+  tilted_kl_from_q0: tilted_kl_from_q0
+  q0_tilted_topk_overlap: q0_tilted_topk_overlap
+policy_mean_fields:
+  - q0_entropy
+  - tilted_entropy
+  - tilted_ess
+  - tilted_kl_from_q0
+  - q0_tilted_topk_overlap
+  - baseline_compiled_top10_overlap
 name: synthonbench_pilot_evaluation
 task: synthonbench
 base_config: ../synthonbench/pilot_evaluation_base.yaml
@@ -8,18 +34,28 @@ cases:
       - args.scale="1M"
       - args.target="kif11"
       - args.oracle-kind="surrogate"
-methods: [ldm, harness, bo, llm]
+methods: [ldm, ldm_harness, ldm_harness_compiled, bo, llm, harness]
 method_overrides:
   ldm: []
-  harness:
-    - contract_profile="pilot_evaluation_harness"
-    - args.proposal-backend="harness"
+  ldm_harness:
+    - contract_profile="pilot_evaluation_ldm_harness"
     - args.harness-candidates-per-session=16
     - args.harness-thinking="max"
     - args.harness-wall-time-seconds=1800
     - args.harness-response-timeout=2100
-    - args.harness-image="ldm-pi-harness:latest"
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
     - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
+  ldm_harness_compiled:
+    - contract_profile="pilot_evaluation_ldm_harness_compiled"
+    - args.harness-candidates-per-session=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
+    - args.policy-capability=["ldm_weights@1","prior_mean@1"]
+    - args.policy-tool-budget=["web_search=8","fetch_content=16","get_search_content=16","resolve-library-id=4","query-docs=8"]
+    - args.policy-max-submission-attempts=3
   bo: []
   llm:
     - contract_profile="pilot_evaluation_direct_llm"
@@ -28,6 +64,14 @@ method_overrides:
     - args.proposal-candidates-per-request=1
     - args.proposal-max-workers=4
     - args.llm-max-tokens=256
+  harness:
+    - contract_profile="pilot_evaluation_harness"
+    - args.proposal-samples=16
+    - args.harness-thinking="max"
+    - args.harness-wall-time-seconds=1800
+    - args.harness-response-timeout=2100
+    - args.harness-sidecar-image="ldm-pi-harness:latest"
+    - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
 seeds: [0, 1, 2]
 optimization_rounds: 5
 initialization_mode: shared_random

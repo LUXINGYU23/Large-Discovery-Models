@@ -242,7 +242,11 @@ class TestRunnerHelpers:
             "task": "nanogpt",
             "mode": "mock",
             "env": {"LLM_API_KEY": "env-secret", "PUBLIC_SETTING": "visible"},
-            "args": {"api-key": "cli-secret", "model": "visible-model"},
+            "args": {
+                "api-key": "cli-secret",
+                "api-key-file": "/private/cli-key-file",
+                "model": "visible-model",
+            },
             "extra_args": ["--access-token=extra-secret"],
         }
 
@@ -250,7 +254,9 @@ class TestRunnerHelpers:
         public_plan = plan_for_json(plan)
 
         assert "cli-secret" in plan["argv"]
+        assert "/private/cli-key-file" in plan["argv"]
         assert "cli-secret" not in plan["command_display"]
+        assert "/private/cli-key-file" not in plan["command_display"]
         assert "extra-secret" not in plan["command_display"]
         assert public_plan["env_overrides"]["LLM_API_KEY"] == "***"
         assert public_plan["env_overrides"]["PUBLIC_SETTING"] == "visible"
@@ -258,6 +264,7 @@ class TestRunnerHelpers:
             "tasks/nanogpt/experiment.json"
         )
         assert "cli-secret" not in json.dumps(public_plan)
+        assert "/private/cli-key-file" not in json.dumps(public_plan)
         assert "extra-secret" not in json.dumps(public_plan)
 
     def test_cli_conversion_validation(self) -> None:

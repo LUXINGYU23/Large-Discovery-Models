@@ -8,6 +8,7 @@ import pytest
 
 from ldm_tts.contracts import (
     AcquisitionSpec,
+    BatchCandidateEvaluator,
     Candidate,
     CandidateDomainSpec,
     CandidateRejection,
@@ -25,7 +26,8 @@ from ldm_tts.contracts import (
     SurrogateSpaceSpec,
 )
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, unique_run_dir
-from ldm_tts.optimization.records import BOObservation, SurrogateVector
+from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.optimization.records import BOObservation, BOSelectionResult, SurrogateVector
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
 from ldm_tts.engine.expansion import DirectEmissionExpander, ExpansionRequest
@@ -37,6 +39,21 @@ from ldm_tts.campaign import (
 )
 from ldm_tts.optimization.gp import RBFGPSurrogate, RBFGPUCBSelector, select_max_ucb_record
 from ldm_tts.transport import CallableProposalClient, ProposalRequest
+
+
+@pytest.mark.parametrize("error", [OSError("disk failure"), KeyboardInterrupt()])
+def test_atomic_json_write_preserves_previous_state_on_interruption(tmp_path, monkeypatch, error):
+    path = tmp_path / "state.json"
+    atomic_json_write(path, {"epoch": 1})
+
+    def fail_replace(*_args):
+        raise error
+
+    monkeypatch.setattr("ldm_tts.engine.run_store.os.replace", fail_replace)
+    with pytest.raises(type(error)):
+        atomic_json_write(path, {"epoch": 2})
+    assert json.loads(path.read_text()) == {"epoch": 1}
+    assert list(tmp_path.iterdir()) == [path]
 
 
 @dataclass
@@ -376,6 +393,57 @@ def test_ldm_engine_runs_complete_lifecycle_and_persists_authoritative_state(
     )
 
 
+def test_ldm_engine_batches_supported_evaluators_and_can_defer_finalization(
+    tmp_path: Path,
+) -> None:
+    class RecordingBatchEvaluator:
+        def __init__(self) -> None:
+            self.batches: list[tuple[str, ...]] = []
+
+        def evaluate(self, candidate: Candidate) -> EvaluationResult:
+            return self.evaluate_batch((candidate,))[0]
+
+        def evaluate_batch(
+            self, candidates: list[Candidate] | tuple[Candidate, ...]
+        ) -> tuple[EvaluationResult, ...]:
+            self.batches.append(tuple(item.candidate_id for item in candidates))
+            return tuple(
+                EvaluationResult(
+                    candidate.candidate_id,
+                    "succeeded",
+                    {"score": float(candidate.payload)},
+                )
+                for candidate in candidates
+            )
+
+    evaluator = RecordingBatchEvaluator()
+    assert isinstance(evaluator, BatchCandidateEvaluator)
+    runtime = CampaignRuntime.open(tmp_path / "batched", task="integer_search")
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(
+            lambda _request: ExpansionResult(
+                proposals=(RawProposal(1, "mock"), RawProposal(2, "mock")),
+                selection_mode="reservoir_order",
+            )
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=evaluator,
+        runtime=runtime,
+    )
+
+    result = engine.run(
+        LDMEngineConfig(iterations=1, reservoir_size=2, evaluations_per_round=2),
+        finalize_runtime=False,
+    )
+
+    assert evaluator.batches == [("integer-1", "integer-2")]
+    assert [item.metrics["score"] for item in result.state.observations] == [1.0, 2.0]
+    status = json.loads((runtime.run_dir / "status.json").read_text())
+    assert status["status"] == "running"
+    assert status["phase"] == "awaiting_external_driver"
+
+
 def test_ldm_engine_classifies_evaluator_failures_and_stops_at_external_budget(
     tmp_path: Path,
 ) -> None:
@@ -451,6 +519,56 @@ def test_ldm_engine_enforces_task_contract_and_runs_encoded_selection(tmp_path: 
         )
 
 
+def test_ldm_engine_preserves_current_round_after_failed_measurements(tmp_path: Path) -> None:
+    class CapturingSelector:
+        def __init__(self) -> None:
+            self.history = ()
+
+        def describe(self):
+            return AcquisitionSpec("capture", ("score",), "maximize", "capture")
+
+        def fit(self, history):
+            self.history = tuple(history)
+
+        def select(self, candidates, representations, *, count=1, round_idx=0):
+            del representations
+            self.round_idx = round_idx
+            return BOSelectionResult((candidates[0].candidate_id,))
+
+    selector = CapturingSelector()
+    spec = replace(integer_task_spec(), surrogate=IntegerEncoder().describe())
+    engine = LDMEngine(
+        task_spec=spec,
+        expander=CallableReservoirExpander(
+            lambda request: ExpansionResult(proposals=(RawProposal(2, "mock"),))
+        ),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": 2.0}),
+        runtime=CampaignRuntime.open(tmp_path / "round-metadata", task="integer_search"),
+        selector=selector,
+        surrogate_encoder=IntegerEncoder(),
+    )
+    previous = Observation(
+        Candidate("integer-1", 1, "1"),
+        EvaluationResult("integer-1", "succeeded", {"score": 1.0}),
+        round_idx=4,
+    )
+
+    failed = Observation(
+        Candidate("integer-0", 0, "0"),
+        EvaluationResult("integer-0", "failed", error="oracle unavailable"),
+        round_idx=5,
+    )
+    result = engine.run(
+        LDMEngineConfig(iterations=7, reservoir_size=1),
+        state=LDMEngineState(observations=[previous, failed], next_round=6),
+    )
+    assert selector.round_idx == 6
+    assert len(selector.history) == 1
+    assert selector.history[0].metadata == {"round_idx": 4}
+    assert result.state.next_round == 7
+
+
 def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path: Path) -> None:
     spec = replace(integer_task_spec(), surrogate=IntegerEncoder().describe())
     runtime = CampaignRuntime.open(tmp_path / "initial-design", task="integer_search")
@@ -474,6 +592,36 @@ def test_ldm_engine_respects_expander_reservoir_order_with_a_surrogate(tmp_path:
     assert result.state.observations[0].candidate.payload == 1
     event = next(item for item in runtime.events() if item["event_type"] == "candidates_selected")
     assert event["payload"]["metadata"]["selection_source"] == "expander"
+
+
+def test_failed_expansion_resume_does_not_spend_the_round_budget_twice(tmp_path: Path) -> None:
+    run_dir = tmp_path / "retry-round"
+    attempts = 0
+
+    def expand(request):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("proposal interrupted")
+        return ExpansionResult(proposals=(RawProposal(request.round_idx, "mock"),))
+
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(expand),
+        candidate_domain=IntegerDomain(),
+        evaluator=CallableCandidateEvaluator(lambda candidate: {"score": 1.0}),
+        runtime=CampaignRuntime.open(
+            run_dir, task="integer_search", budget_limits={"outer_iterations": 1},
+        ),
+    )
+    config = LDMEngineConfig(iterations=1, reservoir_size=1)
+    with pytest.raises(RuntimeError, match="proposal interrupted"):
+        engine.run(config)
+    engine.runtime = CampaignRuntime.open(run_dir, task="integer_search", resume=True)
+    result = engine.run(config)
+    assert result.state.next_round == 1
+    assert len(result.state.observations) == 1
+    assert engine.runtime.budget.counters["outer_iterations"] == 1
 
 
 def test_ldm_engine_resumes_from_shared_checkpoint(tmp_path: Path) -> None:

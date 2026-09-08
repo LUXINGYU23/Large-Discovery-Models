@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "imageId": "synthonbench-research",
+  "rootfsSize": "8G",
+  "installPolicy": "session_overlay",
+  "recipeFiles": [
+    "Dockerfile",
+    "smoke.sh",
+    "lock/requirements.lock"
+  ],
+  "smokeScript": "smoke.sh"
+}

@@ -20,6 +20,7 @@ class ParsedSynthonProposal:
 
     request_index: int
     proposal_index: int
+    source_proposal_index: int
     payload: dict[str, object]
     slot_plan: ProposalSlotPlan
 
@@ -62,6 +63,7 @@ def parse_synthon_responses(
             proposals.append(ParsedSynthonProposal(
                 request_index=request_index,
                 proposal_index=plan.proposal_index,
+                source_proposal_index=plan.proposal_index,
                 payload=parse_synthon_response(response.text, plan),
                 slot_plan=plan,
             ))
@@ -125,18 +127,23 @@ def parse_synthon_batch_response(
     for item in items:
         proposal_index: int | None = None
         try:
-            proposal_index, payload = _batch_candidate(item)
+            proposal_index, source_proposal_index, payload = _batch_candidate(item)
             if proposal_index not in plans_by_index:
                 raise ValueError(f"proposal_index {proposal_index} is not assigned to this request")
             if proposal_index in seen:
                 raise ValueError(f"proposal_index {proposal_index} appears more than once")
             seen.add(proposal_index)
-            plan = plans_by_index[proposal_index]
+            if source_proposal_index not in plans_by_index:
+                raise ValueError(
+                    f"source_proposal_index {source_proposal_index} is not assigned to this request"
+                )
+            plan = plans_by_index[source_proposal_index]
             _validate_types(payload)
             validate_payload_against_plan(payload, plan)
             proposals.append(ParsedSynthonProposal(
                 request_index=request_index,
                 proposal_index=proposal_index,
+                source_proposal_index=source_proposal_index,
                 payload=payload,
                 slot_plan=plan,
             ))
@@ -176,17 +183,29 @@ def _load_json_object(text: Any) -> dict[str, object]:
     return dict(payload)
 
 
-def _batch_candidate(value: Any) -> tuple[int, dict[str, object]]:
+def _batch_candidate(value: Any) -> tuple[int, int, dict[str, object]]:
     if not isinstance(value, dict):
         raise TypeError("each batch candidate must be one JSON object")
-    if set(value) != {"proposal_index", "reaction_id", "synthon_ids"}:
+    if set(value) != {
+        "proposal_index",
+        "source_proposal_index",
+        "reaction_id",
+        "synthon_ids",
+    }:
         raise ValueError(
-            "each batch candidate must contain exactly proposal_index, reaction_id, and synthon_ids"
+            "each batch candidate must contain exactly proposal_index, "
+            "source_proposal_index, reaction_id, and synthon_ids"
         )
     proposal_index = value["proposal_index"]
     if isinstance(proposal_index, bool) or not isinstance(proposal_index, int):
         raise TypeError("proposal_index must be an integer")
-    return proposal_index, {
+    source_proposal_index = value["source_proposal_index"]
+    if (
+        isinstance(source_proposal_index, bool)
+        or not isinstance(source_proposal_index, int)
+    ):
+        raise TypeError("source_proposal_index must be an integer")
+    return proposal_index, source_proposal_index, {
         "reaction_id": value["reaction_id"],
         "synthon_ids": value["synthon_ids"],
     }

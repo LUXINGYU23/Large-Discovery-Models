@@ -341,6 +341,7 @@ class TiltedAcquisitionSelector:
         representations: Mapping[str, SurrogateVector],
         *,
         count: int = 1,
+        round_idx: int = 0,
     ) -> BOSelectionResult:
         del representations  # SMILES kernel/features are recomputed from payloads.
         records = [_record_from_candidate(candidate, self.cfg) for candidate in candidates]

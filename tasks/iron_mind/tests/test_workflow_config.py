@@ -77,8 +77,8 @@ def test_complete_ldm_profile_and_suites_lock_the_official_budget(
         assert config["args"]["iterations"] == 20
         assert config["args"]["proposal-samples"] == 64
         assert config["args"]["bo-pool-size"] == 32
-        assert config["args"]["alpha"] == 1.0
-        assert config["args"]["eta"] == 1.0
+        assert config["args"]["alpha"] == 2.0
+        assert config["args"]["eta"] == 0.25
         assert config["args"]["proposal-max-workers"] == 64
         assert config["args"]["evaluations-per-round"] == 1
         assert config["args"]["llm-max-tokens"] == 512
@@ -123,8 +123,8 @@ def test_mock_config_enables_collection_on_the_shared_ucb_path() -> None:
         "proposal-max-workers": 64,
         "evaluations-per-round": 1,
         "acquisition-beta": 1.0,
-        "alpha": 1.0,
-        "eta": 1.0,
+        "alpha": 2.0,
+        "eta": 0.25,
         "z-clip": 5.0,
         "prompt-policy": "portfolio_v1",
     }
@@ -176,20 +176,21 @@ def test_harness_smoke_config_is_portable_and_profile_locked(
     monkeypatch.setenv("IRON_MIND_WORK_ROOT", str(tmp_path / "work"))
     monkeypatch.setenv("IRON_MIND_DATA_ROOT", str(tmp_path / "data"))
     monkeypatch.setenv("IRON_MIND_RUNS_ROOT", str(tmp_path / "runs"))
-    config_path = CONFIG_ROOT / "harness_smoke.yaml"
+    config_path = CONFIG_ROOT / "ldm_harness_smoke.yaml"
     config = load_config(config_path)
     plan = build_plan(config, config_path)
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
-    profile = contract.profile("harness_official_smoke")
+    profile = contract.profile("ldm_harness_official_smoke")
 
-    assert plan["contract_profile"] == "harness_official_smoke"
+    assert plan["contract_profile"] == "ldm_harness_official_smoke"
     assert profile.budget["harness_turns"] == 4
-    assert config["args"]["proposal-backend"] == "harness"
+    assert config["args"]["search-method"] == "ldm_harness"
     assert config["args"]["proposal-mode"] == "none"
     assert config["args"]["harness-candidates-per-session"] == 16
     assert config["args"]["harness-thinking"] == "max"
     assert config["args"]["llm-url"] is None
     assert config["args"]["llm-model-name"] is None
     assert config["args"]["api-key"] is None
+    assert "--harness-sidecar-image" in plan["argv"]
     cache_value = plan["argv"][plan["argv"].index("--harness-cache-dir") + 1]
     assert Path(cache_value) == tmp_path / "work" / "gondolin-cache"

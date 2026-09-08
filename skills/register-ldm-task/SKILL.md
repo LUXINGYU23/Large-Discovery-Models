@@ -1,6 +1,6 @@
 ---
 name: register-ldm-task
-description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, direct or research-harness proposal backend, metric roles, qualification evidence, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, durable budget/status reporting, or staged real-run qualification.
+description: Add, repair, and qualify a manifest-registered LDM task in this repository, including its scientific contract, direct or persistent Harness proposals, and optional compiled policy. Use for task implementation and registration; use run-ldm-task to execute an existing task.
 ---
 
 # Register And Qualify An LDM Task
@@ -15,6 +15,9 @@ authoritative human-facing repository contract when present.
 Read [references/harness-proposals.md](references/harness-proposals.md) only
 when a task will use persistent research sessions, task-provided tools,
 `AGENTS.md` profiles, or the shared `ldm_tts.harness` client.
+Read [references/harness-compiled-policy.md](references/harness-compiled-policy.md)
+when a separate Harness session will compile a task-local GP prior mean or LDM
+weight schedule.
 
 ## Establish The Contract
 
@@ -25,9 +28,9 @@ Before scaffolding, discover or ask for:
   generator, edits a candidate, or updates the expansion schema;
 - the surrogate representation, dimension policy, encoder, and version;
 - the benchmark source URL, immutable commit, and task path;
-- the proposal execution mode (direct request, persistent research harness, or
-  both), provider kind, required wire API, endpoint preflight, and collection
-  boundary;
+- the proposal execution mode (direct request, persistent research Harness, or
+  both), whether an independent compiled-policy Harness is active, provider
+  kind, required wire API, endpoint preflight, and collection boundary;
 - reported, optimized, and diagnostic metrics with directions;
 - one expensive evaluation and its official per-candidate limits;
 - search, LLM-attempt, expensive-evaluation, and baseline budgets;
@@ -70,6 +73,13 @@ and real evaluator checks support `qualified`.
    model requests. For a persistent research backend, implement the task's
    `ReservoirExpander` around `HarnessClient` on either engine path; do not
    create a second optimization loop.
+   Keep compact measured-history lookup, annotated file admission, duplicate
+   semantics, and research Skill selection task-local. Use the Harness
+   registration reference for fixed minibatches, recovery, and guest smoke
+   checks; do not copy another task's scientific features or runtime libraries.
+   A compiled-policy method must keep proposal generation unchanged and attach
+   one task-local `PolicyResearchController` to the existing selector path; do
+   not let the policy Agent select candidates or replace the Campaign.
    Reuse `ldm_tts.optimization.search`, `ldm_tts.optimization.gp`, and
    `ldm_tts.optimization.acquisition`
    behind those adapters before adding task-local infrastructure.
@@ -166,7 +176,8 @@ evaluator rather than a standalone benchmark agent.
 - Count LLM calls, valid search states, selected candidates, expensive attempts,
   successful evaluations, benchmark jobs, and outer iterations separately.
   Count Harness turns plus measured web, Context7, and artifact usage when that
-  backend is active.
+  backend is active. Count proposal and compiled-policy Harness usage
+  separately when both are active.
 - Serialize every declared budget counter, including zeros, and preserve true
   fractional values while writing integral values as JSON integers.
 - Use expensive evaluations, not wall time or generated states, as the default
@@ -181,6 +192,9 @@ evaluator rather than a standalone benchmark agent.
 - Keep task-owned candidate identity and submission validation outside the
   generic Harness. Return indexed, actionable rejection codes and messages so a
   provisional submission can be corrected before the turn commits.
+- Keep compiled-policy features, scientific validation, residual-GP wiring, and
+  capability selection task-local. Execute accepted artifacts through an
+  isolated runner, never through host `import`, `exec`, or `eval`.
 - Store artifact references relative to the run directory. Prefer a portable
   `result.json` and `trajectory.csv` for completed campaigns.
 - Represent detached work with a backend-neutral durable execution handle, not

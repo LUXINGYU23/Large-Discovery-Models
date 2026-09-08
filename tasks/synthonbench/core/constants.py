@@ -29,9 +29,19 @@ DEFAULT_GP_SIGNAL_STD = 1.0
 DEFAULT_GP_MEAN_STD = 1.0
 DEFAULT_GP_OBSERVATION_NOISE_STD = 1.0
 DEFAULT_GP_REACTION_WEIGHT = 1.0
-DEFAULT_ACQUISITION_ETA = 1.0
+DEFAULT_ACQUISITION_ALPHA = 2.0
+DEFAULT_ACQUISITION_ETA = 0.25
 DEFAULT_LLM_MAX_TOKENS = 2048
 DEFAULT_LLM_EXTRA_BODY_JSON = '{"thinking":{"type":"disabled"}}'
 
 Q0_METADATA_KEY = "synthonbench_empirical_q0"
 DATA_MANIFEST_NAME = "synthonbench_manifest.json"
+FORBIDDEN_QUERY_PATTERNS = (
+    r"synthon\s*bench",
+    r"mireklzicar[/\\]synthonbench",
+)
+FORBIDDEN_QUERY_TERMS = (
+    "synthonbench",
+    "mireklzicar/synthonbench",
+    OFFICIAL_SOURCE_COMMIT,
+)

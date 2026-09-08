@@ -1,8 +1,9 @@
 import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
+	createSyntheticSourceInfo,
 	createAgentSession,
 	DefaultResourceLoader,
 	ModelRuntime,
@@ -14,38 +15,44 @@ import {
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TUnsafe } from "typebox";
-import { GondolinController } from "./gondolin.js";
-import { PolicyController } from "./policy.js";
+import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
+import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
+import { McpToolBridge } from "./mcp.js";
+import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
+import { TurnExecutionError } from "./protocol.js";
 import type {
 	HarnessLimits,
 	HarnessProfileConfig,
 	InitializeFrame,
 	SessionTurnInput,
+	SubmissionError,
+	SubmittedArtifact,
 	SubmissionValidator,
 } from "./protocol.js";
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
-import { atomicJson, canonicalSha256, sha256 } from "./trace.js";
+import {
+	snapshotSubmissionArtifacts,
+	verifySubmissionRecord,
+	type TerminalSubmission,
+} from "./submission.js";
+import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const RESOURCE_DIRECTORY = ".ldm-resources";
 const MODEL_CONTEXT_WINDOW = 262_144;
 const COMPACTION_SETTINGS = {
 	enabled: true,
 	reserveTokens: 16_384,
 	keepRecentTokens: 20_000,
 };
-
-interface CandidateSubmission {
-	submissionId: string;
-	candidates: Array<Record<string, unknown>>;
-}
-
-type SubmissionParameters = {
-	candidates: Array<Record<string, unknown>>;
-};
+const GUEST_RUNTIME_INSTRUCTIONS = `## Guest runtime
+- /workspace is an isolated writable research workspace, not a checkout of the project repository. Do not use git status to inspect the project. Git is available only for cloning public research material when useful.
+- Use the registered read and write tools for files. apply_patch is not available in the guest.
+- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.`;
 
 interface SavedSubmission {
-	submission: CandidateSubmission;
-	tools: { webCalls: number; context7Calls: number };
+	submission: TerminalSubmission;
+	toolUsage: ToolUsageSnapshot;
 }
 
 export interface CommittedTurn {
@@ -57,13 +64,20 @@ export interface CommittedTurn {
 	historyToSeq: number;
 	historyDigest: string;
 	inputDigest: string;
-	submission: CandidateSubmission;
+	replayed: boolean;
+	submissionStatus: "accepted" | "rejected";
+	submissionId: string;
+	submissionJson: string;
+	submissionDigest: string;
+	submission: Record<string, unknown>;
+	submittedArtifacts: SubmittedArtifact[];
+	validationErrors: SubmissionError[];
 	usage: {
 		providerCalls: number;
-		webCalls: number;
-		context7Calls: number;
+		toolCalls: Record<string, number>;
 		artifactBytes: number;
 	};
+	toolBudget: ToolUsageSnapshot["toolBudget"];
 	artifacts: {
 		turn: string;
 		session: string | undefined;
@@ -72,7 +86,7 @@ export interface CommittedTurn {
 
 function isInside(root: string, value: string): boolean {
 	const path = relative(resolve(root), resolve(value));
-	return path === "" || (!path.startsWith("..") && !path.startsWith("/"));
+	return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
 function packageRoot(packageName: string): string {
@@ -82,6 +96,12 @@ function packageRoot(packageName: string): string {
 
 function selectedSkills(skills: Skill[], directories: string[]): Skill[] {
 	return skills.filter((skill) => directories.some((directory) => isInside(directory, skill.filePath)));
+}
+
+function guestResourcePath(hostResourceRoot: string, value: string): string {
+	if (!isInside(hostResourceRoot, value)) throw new Error(`resource path escaped snapshot: ${value}`);
+	const suffix = relative(hostResourceRoot, value).split(sep).join(posix.sep);
+	return suffix ? posix.join(GUEST_RESOURCE_ROOT, suffix) : GUEST_RESOURCE_ROOT;
 }
 
 async function optionalJson<T>(path: string): Promise<T | undefined> {
@@ -97,17 +117,55 @@ async function directorySha256(root: string): Promise<string> {
 	const files: Array<{ path: string; sha256: string }> = [];
 	async function visit(directory: string): Promise<void> {
 		const entries = await readdir(directory, { withFileTypes: true });
-		for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+		entries.sort((left, right) => Buffer.compare(
+			Buffer.from(left.name),
+			Buffer.from(right.name),
+		));
+		for (const entry of entries) {
 			const path = join(directory, entry.name);
 			if (entry.isDirectory()) await visit(path);
 			else if (entry.isFile()) files.push({
 				path: relative(root, path).replaceAll("\\", "/"),
 				sha256: sha256(await readFile(path)),
 			});
+			else throw new Error(`unsupported skill resource entry: ${path}`);
 		}
 	}
 	await visit(root);
 	return canonicalSha256(files);
+}
+
+export async function pinInitialization(root: string, identity: unknown): Promise<string> {
+	const digest = canonicalSha256(identity);
+	const manifestPath = join(root, "manifest.json");
+	const previous = await optionalJson<{ initializationSha256?: string }>(manifestPath);
+	if (previous) {
+		if (previous.initializationSha256 !== digest) {
+			throw new Error("Harness initialization identity changed; restore the original configuration and runtime or use a new artifact root");
+		}
+	} else {
+		try {
+			if ((await readdir(join(root, "sessions"))).length) {
+				throw new Error("Harness sessions exist without an initialization manifest");
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		}
+		await atomicJson(manifestPath, { initializationSha256: digest });
+	}
+	return digest;
+}
+
+async function copyDirectory(source: string, target: string): Promise<void> {
+	await mkdir(target, { recursive: true });
+	const entries = await readdir(source, { withFileTypes: true });
+	for (const entry of entries) {
+		const sourcePath = join(source, entry.name);
+		const targetPath = join(target, entry.name);
+		if (entry.isDirectory()) await copyDirectory(sourcePath, targetPath);
+		else if (entry.isFile()) await copyFile(sourcePath, targetPath);
+		else throw new Error(`unsupported skill resource entry: ${sourcePath}`);
+	}
 }
 
 async function runtimePackages(): Promise<Record<string, string>> {
@@ -126,11 +184,17 @@ async function runtimePackages(): Promise<Record<string, string>> {
 		gondolin: version("@earendil-works/gondolin"),
 		piWebAccess: version("pi-web-access"),
 		context7: version("@upstash/context7-pi"),
+		mcpClient: version("@modelcontextprotocol/client"),
 		packageLockSha256: sha256(lockBody),
 	};
 }
 
-function sessionTools(context7Enabled: boolean, taskTools: string[]): string[] {
+function sessionTools(
+	context7Enabled: boolean,
+	taskTools: string[],
+	terminalTool: string,
+	mcpTools: string[] = [],
+): string[] {
 	return [
 		"read",
 		"write",
@@ -140,63 +204,63 @@ function sessionTools(context7Enabled: boolean, taskTools: string[]): string[] {
 		"get_search_content",
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
-		"submit_candidates",
+		...mcpTools,
+		terminalTool,
 	];
 }
 
-class SubmissionController {
-	private readonly parameters: TUnsafe<SubmissionParameters>;
+function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[] {
+	return servers.flatMap((server) =>
+		server.tools.map((tool) => "mcp__" + server.serverId + "__" + tool),
+	);
+}
+
+export class SubmissionController {
+	private readonly parameters: TUnsafe<Record<string, unknown>>;
 	private providerRequests = 0;
 	private attemptIndex = 0;
-	private submissionRequired = false;
 	private profileId = "";
 	private turnId = "";
-	private value: CandidateSubmission | undefined;
-	private persist: ((submission: CandidateSubmission) => Promise<void>) | undefined;
+	private turnRoot = "";
+	private value: TerminalSubmission | undefined;
+	private persist: ((submission: TerminalSubmission) => Promise<void>) | undefined;
 	private validate: SubmissionValidator | undefined;
 
 	constructor(
-		private readonly expected: number,
-		candidateSchema: Record<string, unknown>,
+		private readonly config: InitializeFrame,
+		private readonly workspace: string,
 	) {
-		this.parameters = Type.Unsafe<SubmissionParameters>({
-			type: "object",
-			properties: {
-				candidates: {
-					type: "array",
-					items: candidateSchema,
-					minItems: expected,
-					maxItems: expected,
-				},
-			},
-			required: ["candidates"],
-			additionalProperties: false,
-		});
+		this.parameters = Type.Unsafe<Record<string, unknown>>(
+			config.submissionContract.payloadSchema,
+		);
 	}
 
-	begin(
+	async begin(
 		profileId: string,
 		turnId: string,
-		persist: (submission: CandidateSubmission) => Promise<void>,
+		turnRoot: string,
+		persist: (submission: TerminalSubmission) => Promise<void>,
 		validate: SubmissionValidator,
-		recovering: boolean,
-	): void {
+	): Promise<void> {
 		this.profileId = profileId;
 		this.turnId = turnId;
+		this.turnRoot = turnRoot;
 		this.providerRequests = 0;
 		this.attemptIndex = 0;
-		this.submissionRequired = recovering;
+		try {
+			for (const name of await readdir(join(turnRoot, "attempts"))) {
+				if (/^\d+$/.test(name)) this.attemptIndex = Math.max(this.attemptIndex, Number(name));
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		}
 		this.value = undefined;
 		this.persist = persist;
 		this.validate = validate;
 	}
 
-	get submission(): CandidateSubmission | undefined {
+	get submission(): TerminalSubmission | undefined {
 		return this.value;
-	}
-
-	requireSubmission(): void {
-		this.submissionRequired = true;
 	}
 
 	createExtension(): ExtensionFactory {
@@ -208,12 +272,6 @@ class SubmissionController {
 				}
 				this.providerRequests += 1;
 				if (this.value) return payload;
-				if (this.submissionRequired) {
-					return {
-						...payload,
-						tool_choice: { type: "function", name: "submit_candidates" },
-					};
-				}
 				if (this.providerRequests > 1) return payload;
 				return {
 					...payload,
@@ -223,74 +281,106 @@ class SubmissionController {
 		};
 	}
 
-	tool(): ToolDefinition<TUnsafe<SubmissionParameters>> {
+	tool(): ToolDefinition<TUnsafe<Record<string, unknown>>> {
+		const toolName = this.config.submissionContract.toolName;
 		return {
-			name: "submit_candidates",
-			label: "Submit candidates",
-			description: "Submit the complete ordered candidate minibatch. Rejected entries must be replaced and resubmitted.",
-			promptSnippet: "submit_candidates: submit the complete ordered candidate minibatch",
+			name: toolName,
+			label: "Submit result",
+			description: "Submit the complete structured result. Validation errors must be repaired before resubmission.",
+			promptSnippet: `${toolName}: submit the complete structured result`,
 			parameters: this.parameters,
 			executionMode: "sequential",
 			execute: async (_toolCallId, params) => {
-				if (this.value) throw new Error("submit_candidates may be called only once per turn");
-				this.submissionRequired = true;
+				if (this.value) throw new Error(`${toolName} may be called only once per turn`);
 				this.attemptIndex += 1;
-				if (params.candidates.length !== this.expected) {
-					throw new Error(
-						`Candidate minibatch rejected: submit_candidates requires exactly ${this.expected} candidates; `
-						+ `received ${params.candidates.length}. Add replacements and resubmit the complete minibatch.`,
-					);
-				}
-				const invalidIndex = params.candidates.findIndex(
-					(candidate) => !candidate || typeof candidate !== "object" || Array.isArray(candidate),
-				);
-				if (invalidIndex >= 0) {
-					throw new Error(`Candidate minibatch rejected: candidate at index ${invalidIndex} must be an object.`);
-				}
 				if (!this.validate) throw new Error("submission validator is not initialized");
+				const submission = { ...params };
+				const attemptRoot = join(
+					this.turnRoot,
+					"attempts",
+					this.attemptIndex.toString().padStart(4, "0"),
+				);
+				let artifacts: SubmittedArtifact[];
+				try {
+					artifacts = await snapshotSubmissionArtifacts(
+						this.config.submissionContract.artifactRules,
+						this.workspace,
+						this.config.artifactRoot,
+						this.turnRoot,
+						this.attemptIndex,
+						submission,
+					);
+				} catch (error) {
+					await rm(attemptRoot, { recursive: true, force: true });
+					throw error;
+				}
+				const submissionJson = canonicalJson({ artifacts, submission });
+				const submissionDigest = sha256(submissionJson);
 				const decision = await this.validate({
 					profileId: this.profileId,
 					turnId: this.turnId,
 					attemptIndex: this.attemptIndex,
-					candidates: params.candidates,
+					submission,
+					artifacts,
+					submissionJson,
+					submissionDigest,
 				});
-				if (decision.accepted !== (decision.rejected.length === 0)) {
+				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
 					throw new Error("submission validator returned an inconsistent decision");
 				}
-				if (!decision.accepted) {
+				await atomicJson(join(attemptRoot, "validation.json"), {
+					attemptIndex: this.attemptIndex,
+					decision: decision.decision,
+					errors: decision.errors,
+					submission,
+					submissionJson,
+					submissionDigest,
+					artifacts,
+				});
+				if (decision.decision === "retry") {
 					throw new Error(
-						"Candidate minibatch rejected by the task validator. Replace every rejected entry, "
-						+ `preserve the other entries, and resubmit the complete ${this.expected}-candidate minibatch. `
-						+ `Rejection report: ${JSON.stringify({
-							accepted: false,
-							rejected: decision.rejected,
-							required_replacements: decision.rejected.length,
-						})}`,
+						"Submission rejected by the task validator. Repair the reported paths and resubmit. "
+						+ `Validation report: ${JSON.stringify(decision)}`,
 					);
 				}
-				const submission: CandidateSubmission = {
-					submissionId: `${this.turnId}-submission`,
-					candidates: params.candidates,
+				const terminal: TerminalSubmission = {
+					submissionStatus: decision.decision === "accept" ? "accepted" : "rejected",
+					submissionId: `${this.turnId}-submission-${this.attemptIndex}`,
+					submissionDigest,
+					submission,
+					submittedArtifacts: artifacts,
+					validationErrors: decision.errors,
+					submissionJson,
 				};
 				if (!this.persist) throw new Error("submission turn is not initialized");
-				await this.persist(submission);
-				this.value = submission;
-				this.submissionRequired = false;
+				await this.persist(terminal);
+				this.value = terminal;
 				return {
-					content: [{ type: "text", text: "Candidate minibatch accepted. End this turn now." }],
-					details: { submissionId: this.value.submissionId, count: params.candidates.length },
+					content: [{
+						type: "text",
+						text: decision.decision === "accept"
+							? "Submission accepted. End this turn now."
+							: "Submission rejected and the turn is closed.",
+					}],
+					details: {
+						submissionId: terminal.submissionId,
+						status: terminal.submissionStatus,
+					},
 				};
 			},
 		};
 	}
+
 }
 
-class PersistentProfileSession {
+export class PersistentProfileSession {
 	private readonly profileRoot: string;
 	private readonly workspace: string;
+	private readonly resourceRoot: string;
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
 	private readonly gondolin: GondolinController;
+	private readonly mcp: McpToolBridge;
 	private readonly submissions: SubmissionController;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
@@ -301,16 +391,30 @@ class PersistentProfileSession {
 		private readonly profile: HarnessProfileConfig,
 		private readonly config: InitializeFrame,
 		private readonly proxy: ProviderProxy,
+		guestRuntime: ResolvedGuestRuntime,
+		namedSecrets: Readonly<Record<string, string>>,
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
+		this.resourceRoot = join(this.workspace, RESOURCE_DIRECTORY);
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
-		this.policy = new PolicyController(config.networkPolicy, config.webSearch.providers);
-		this.gondolin = new GondolinController(this.workspace, config.networkPolicy);
-		this.submissions = new SubmissionController(
-			profile.candidatesPerTurn,
-			config.candidateSchema,
+		this.policy = new PolicyController(
+			config.networkPolicy,
+			config.webSearch.providers,
+			config.limits.toolCallBudgets,
 		);
+		this.gondolin = new GondolinController(
+			this.workspace,
+			this.resourceRoot,
+			config.networkPolicy,
+			guestRuntime,
+		);
+		this.mcp = new McpToolBridge(
+			config.mcpServers,
+			namedSecrets,
+			`ldm-pi-${config.campaignId}-${profile.profileId}`,
+		);
+		this.submissions = new SubmissionController(config, this.workspace);
 	}
 
 	async initialize(): Promise<void> {
@@ -325,11 +429,13 @@ class PersistentProfileSession {
 		if (this.skillDirSha256.some((value, index) => value !== this.profile.skillDirSha256[index])) {
 			throw new Error(`skill directory digest mismatch for profile ${this.profile.profileId}`);
 		}
+		const skillDirectories = await this.snapshotResources(agents);
 		for (const extension of this.config.toolExtensions) {
 			if (sha256(await readFile(extension.path)) !== extension.sha256) {
 				throw new Error(`tool extension digest mismatch: ${extension.path}`);
 			}
 		}
+		await this.mcp.initialize();
 		const providerId = `ldm-harness-${this.profile.profileId}`;
 		const agentDirectory = join(this.profileRoot, "pi-agent");
 		await mkdir(agentDirectory, { recursive: true });
@@ -387,7 +493,6 @@ class PersistentProfileSession {
 			extensionPaths.push(join(packageRoot("@upstash/context7-pi"), "extensions", "context7.ts"));
 		}
 		extensionPaths.push(...this.config.toolExtensions.map((extension) => extension.path));
-		const skillDirectories = this.profile.skillDirs.map((directory) => resolve(directory));
 		const loader = new DefaultResourceLoader({
 			cwd: this.workspace,
 			agentDir: agentDirectory,
@@ -403,13 +508,26 @@ class PersistentProfileSession {
 			noThemes: true,
 			noContextFiles: true,
 			skillsOverride: ({ skills, diagnostics }) => ({
-				skills: selectedSkills(skills, skillDirectories),
+				skills: selectedSkills(skills, skillDirectories).map((skill) => {
+					const filePath = guestResourcePath(this.resourceRoot, skill.filePath);
+					const baseDir = posix.dirname(filePath);
+					return {
+						...skill,
+						filePath,
+						baseDir,
+						sourceInfo: createSyntheticSourceInfo(filePath, {
+							source: "task-local",
+							scope: "project",
+							baseDir,
+						}),
+					};
+				}),
 				diagnostics,
 			}),
 			agentsFilesOverride: () => ({
-				agentsFiles: [{ path: this.profile.agentsPath, content: agents }],
+				agentsFiles: [{ path: posix.join(GUEST_RESOURCE_ROOT, "AGENTS.md"), content: agents }],
 			}),
-			appendSystemPromptOverride: () => [],
+			appendSystemPromptOverride: () => [GUEST_RUNTIME_INSTRUCTIONS],
 		});
 		await loader.reload();
 		const extensionErrors = loader.getExtensions().errors;
@@ -427,14 +545,34 @@ class PersistentProfileSession {
 			resourceLoader: loader,
 			settingsManager: settings,
 			sessionManager: manager,
-			customTools: [this.submissions.tool()],
+			customTools: [...this.mcp.toolDefinitions(), this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.config.submissionContract.toolName,
+				configuredMcpToolNames(this.config.mcpServers),
 			),
 		});
 		this.session = session;
 		this.historyCursor = await this.recoverHistoryCursor();
+	}
+
+	private async snapshotResources(agents: string): Promise<string[]> {
+		await rm(this.resourceRoot, { recursive: true, force: true });
+		await mkdir(this.resourceRoot, { recursive: true });
+		const agentsPath = join(this.resourceRoot, "AGENTS.md");
+		await writeFile(agentsPath, agents, "utf8");
+		const skillDirectories: string[] = [];
+		for (const [index, configuredDirectory] of this.profile.skillDirs.entries()) {
+			const source = resolve(configuredDirectory);
+			const target = join(this.resourceRoot, "skills", String(index), basename(source));
+			await copyDirectory(source, target);
+			if (await directorySha256(target) !== this.skillDirSha256[index]) {
+				throw new Error(`skill snapshot digest mismatch for profile ${this.profile.profileId}`);
+			}
+			skillDirectories.push(target);
+		}
+		return skillDirectories;
 	}
 
 	async runTurn(input: SessionTurnInput, validate: SubmissionValidator): Promise<CommittedTurn> {
@@ -452,9 +590,10 @@ class PersistentProfileSession {
 			) {
 				throw new Error(`committed turn digest mismatch: ${input.turnId}`);
 			}
+			await verifySubmissionRecord(priorCommit, this.config.artifactRoot);
 			this.acceptCursor(input, true);
 			this.historyCursor = input.historyToSeq;
-			return priorCommit;
+			return { ...priorCommit, replayed: true };
 		}
 		this.acceptCursor(input, false);
 
@@ -469,43 +608,65 @@ class PersistentProfileSession {
 		const savedSubmission = await optionalJson<SavedSubmission>(submissionPath);
 		if (savedSubmission) {
 			const provider = await this.proxy.recoveredTurnSummary(turnRoot, input.turnId);
-			return this.commit(input, savedSubmission.submission, provider, savedSubmission.tools);
+			return this.commit(input, savedSubmission.submission, provider, savedSubmission.toolUsage, true);
 		}
+		await this.policy.begin(input.forbiddenQueryTerms, join(turnRoot, "tool-budget.json"));
 
-		this.submissions.begin(
+		await this.submissions.begin(
 			this.profile.profileId,
 			input.turnId,
+			turnRoot,
 			(value) => atomicJson(submissionPath, {
 				submission: value,
-				tools: this.policy.snapshot(),
+				toolUsage: this.policy.snapshot(),
 			} satisfies SavedSubmission),
 			validate,
-			priorInput !== undefined,
 		);
-		this.policy.begin(input.forbiddenQueryTerms);
 		await this.proxy.beginTurn(
 			this.profile.profileId,
 			this.session.sessionManager.getSessionId(),
 			input.turnId,
 			turnRoot,
 		);
-		let submission: CandidateSubmission | undefined;
+		let submission: TerminalSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
-		let policySummary: { webCalls: number; context7Calls: number };
+		let policySummary: ToolUsageSnapshot;
+		let failure: Error | undefined;
 		try {
-			await this.promptWithTimeout(input.message, this.config.limits);
+			await this.promptWithTimeout(
+				`${priorInput
+					? `Continue the interrupted turn from your existing research and files. The history and submission contract are unchanged. Your previous submission was not accepted; repair any reported errors and call ${this.config.submissionContract.toolName} with the complete result. Tool budgets have not reset.`
+					: input.message}\n\n${this.policy.budgetMessage()}`,
+				this.config.limits,
+			);
 			submission = this.submissions.submission;
 			if (!submission) {
 				const lastMessage = this.session.messages.at(-1);
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error") {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
-				throw new Error(`session ${this.profile.profileId} ended without submit_candidates`);
+				throw new Error(
+					`session ${this.profile.profileId} ended without ${this.config.submissionContract.toolName}`,
+				);
 			}
+		} catch (error) {
+			failure = error instanceof Error ? error : new Error(String(error));
 		} finally {
 			providerSummary = await this.proxy.endTurn(this.profile.profileId);
 			policySummary = this.policy.end();
 		}
+		if (failure) {
+			throw new TurnExecutionError(failure.message, [{
+				profileId: input.profileId,
+				turnId: input.turnId,
+				usage: {
+					providerCalls: providerSummary.providerCalls,
+					toolCalls: policySummary.toolCalls,
+					artifactBytes: providerSummary.artifactBytes,
+				},
+			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|\b(?:408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
+		}
+		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);
 	}
 
@@ -514,31 +675,58 @@ class PersistentProfileSession {
 		const sessionFile = this.session.sessionManager.getSessionFile();
 		return {
 			profileId: this.profile.profileId,
-			candidatesPerTurn: this.profile.candidatesPerTurn,
 			agentsSha256: this.agentsSha256,
 			skills: this.skillDirSha256.map((value, index) => ({ directoryIndex: index, sha256: value })),
 			sessionId: this.session.sessionManager.getSessionId(),
 			session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,
 			workspace: relative(this.config.artifactRoot, this.workspace),
+			environmentSnapshot: relative(
+				this.config.artifactRoot,
+				join(this.profileRoot, "environment_snapshot.json"),
+			),
 		};
 	}
 
+	mcpManifest(): Array<Record<string, unknown>> {
+		return this.mcp.manifest().map((server) => ({ profileId: this.profile.profileId, ...server }));
+	}
+
 	async close(): Promise<void> {
-		if (this.session) {
-			await this.session.abort();
-			this.session.dispose();
-			this.session = undefined;
+		try {
+			if (this.session) {
+				this.session.abortCompaction();
+				await this.session.abort();
+				this.session.dispose();
+				this.session = undefined;
+			}
+		} finally {
+			try {
+				const snapshot = await this.gondolin.environmentSnapshot();
+				await atomicJson(join(this.profileRoot, "environment_snapshot.json"), snapshot ?? {
+					status: "guest_not_started",
+				});
+			} catch (error) {
+				await atomicJson(join(this.profileRoot, "environment_snapshot.json"), {
+					error: (error as Error).message,
+				});
+			} finally {
+				try {
+					await this.gondolin.close();
+				} finally {
+					await this.mcp.close();
+				}
+			}
 		}
-		await this.gondolin.close();
 	}
 
 	private async promptWithTimeout(message: string, limits: HarnessLimits): Promise<void> {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const session = this.session;
 		const options = { expandPromptTemplates: false, source: "rpc" as const };
+		let expired = false;
 		const run = async () => {
 			await session.prompt(message, options);
-			while (!this.submissions.submission) {
+			while (!expired && !this.submissions.submission) {
 				const lastMessage = session.messages.at(-1);
 				const errorMessage = lastMessage?.role === "assistant"
 					? lastMessage.errorMessage?.toLowerCase()
@@ -555,25 +743,31 @@ class PersistentProfileSession {
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error" && !interrupted) {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
-				this.submissions.requireSubmission();
 				await session.prompt(
 					interrupted
 						? "The previous provider stream ended before your submission was accepted. "
-							+ "Do not research again. Call submit_candidates now for the same assigned items using your prior analysis."
-						: "The research phase is complete. Call submit_candidates now with the complete ordered minibatch. "
-							+ "Do not perform more research or add narrative output.",
+							+ `Continue from your existing work, use tools to complete or repair it, and call ${this.config.submissionContract.toolName} when ready.`
+						: `No submission has been accepted. Address any validation errors, use the available tools as needed, and call ${this.config.submissionContract.toolName} with the complete result.`,
 					options,
 				);
 			}
 		};
 		let timer: NodeJS.Timeout | undefined;
 		const timeout = new Promise<never>((_resolve, reject) => {
-			timer = setTimeout(() => reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`)), limits.wallTimeSeconds * 1000);
+			timer = setTimeout(() => {
+				expired = true;
+				reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`));
+			}, limits.wallTimeSeconds * 1000);
 		});
+		const pending = run();
 		try {
-			await Promise.race([run(), timeout]);
+			await Promise.race([pending, timeout]);
 		} catch (error) {
-			if ((error as Error).message.includes("wall-time limit")) await session.abort();
+			if (expired) {
+				session.abortCompaction();
+				await session.abort();
+				await pending.catch(() => undefined);
+			}
 			throw error;
 		} finally {
 			if (timer) clearTimeout(timer);
@@ -582,11 +776,13 @@ class PersistentProfileSession {
 
 	private async commit(
 		input: SessionTurnInput,
-		submission: CandidateSubmission,
+		submission: TerminalSubmission,
 		provider: ProviderTurnSummary,
-		tools: { webCalls: number; context7Calls: number },
+		toolUsage: ToolUsageSnapshot,
+		replayed = false,
 	): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
+		await verifySubmissionRecord(submission, this.config.artifactRoot);
 		const sessionFile = this.session.sessionManager.getSessionFile();
 		const commit: CommittedTurn = {
 			profileId: this.profile.profileId,
@@ -597,13 +793,14 @@ class PersistentProfileSession {
 			historyToSeq: input.historyToSeq,
 			historyDigest: input.historyDigest,
 			inputDigest: input.inputDigest,
-			submission,
+			replayed,
+			...submission,
 			usage: {
 				providerCalls: provider.providerCalls,
-				webCalls: tools.webCalls,
-				context7Calls: tools.context7Calls,
+				toolCalls: toolUsage.toolCalls,
 				artifactBytes: provider.artifactBytes,
 			},
+			toolBudget: toolUsage.toolBudget,
 			artifacts: {
 				turn: relative(this.config.artifactRoot, join(this.profileRoot, "turns", input.turnId)),
 				session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,
@@ -638,6 +835,7 @@ class PersistentProfileSession {
 			.sort((left, right) => left.roundIndex - right.roundIndex);
 		let cursor = 0;
 		for (const commit of commits) {
+			await verifySubmissionRecord(commit, this.config.artifactRoot);
 			if (commit.historyFromSeq !== cursor || commit.historyToSeq < cursor) {
 				throw new Error(`invalid committed history chain for profile ${this.profile.profileId}`);
 			}
@@ -651,15 +849,27 @@ export class PiSessionPool {
 	private readonly sessions = new Map<string, PersistentProfileSession>();
 	private readonly proxy: ProviderProxy;
 
-	constructor(private readonly config: InitializeFrame, apiKey: string) {
+	constructor(
+		private readonly config: InitializeFrame,
+		apiKey: string,
+		private readonly namedSecrets: Readonly<Record<string, string>> = {},
+	) {
 		this.proxy = new ProviderProxy(config.baseUrl, apiKey, config.campaignId);
 	}
 
 	async initialize(): Promise<void> {
 		await mkdir(this.config.artifactRoot, { recursive: true });
+		const guestRuntime = await resolveGuestRuntime(this.config.taskId, this.config.guestRuntime);
+		const packages = await runtimePackages();
+		const { requestId: _requestId, artifactRoot: _artifactRoot, ...configuration } = this.config;
+		const { assetDir: _assetDir, ...guestIdentity } = guestRuntime;
+		const initializationSha256 = await pinInitialization(this.config.artifactRoot, {
+			configuration, guestRuntime: guestIdentity, packages,
+			implementationSha256: await directorySha256(join(APP_ROOT, "dist")),
+			policyRunnerSha256: sha256(await readFile(join(APP_ROOT, "policy_runner.py"))),
+		});
 		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
 			agentsSha256: profile.agentsSha256,
-			candidatesPerTurn: profile.candidatesPerTurn,
 			profileId: profile.profileId,
 			skillDirSha256: profile.skillDirSha256,
 		})));
@@ -681,11 +891,18 @@ export class PiSessionPool {
 		);
 		await this.proxy.start();
 		for (const profile of this.config.profiles) {
-			const session = new PersistentProfileSession(profile, this.config, this.proxy);
+			const session = new PersistentProfileSession(
+				profile,
+				this.config,
+				this.proxy,
+				guestRuntime,
+				this.namedSecrets,
+			);
 			this.sessions.set(profile.profileId, session);
 		}
 		await Promise.all([...this.sessions.values()].map((session) => session.initialize()));
 		await atomicJson(join(this.config.artifactRoot, "manifest.json"), {
+			initializationSha256,
 			protocolVersion: this.config.protocolVersion,
 			campaignId: this.config.campaignId,
 			taskId: this.config.taskId,
@@ -698,7 +915,22 @@ export class PiSessionPool {
 			thinking: this.config.thinking,
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
-			candidateSchemaSha256: this.config.candidateSchemaSha256,
+			submissionContractSha256: this.config.submissionContractSha256,
+			submissionContract: {
+				contractId: this.config.submissionContract.contractId,
+				toolName: this.config.submissionContract.toolName,
+				artifactRules: this.config.submissionContract.artifactRules,
+				maxValidationAttempts: this.config.submissionContract.maxValidationAttempts,
+			},
+			guestRuntime: {
+				imageRef: guestRuntime.imageRef,
+				recipeSha256: guestRuntime.recipeSha256,
+				buildId: guestRuntime.buildId,
+				manifestSha256: guestRuntime.manifestSha256,
+				architecture: guestRuntime.architecture,
+				rootfsSize: guestRuntime.rootfsSize,
+				installPolicy: guestRuntime.installPolicy,
+			},
 			profileSetSha256,
 			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
 			networkPolicy: this.config.networkPolicy,
@@ -708,17 +940,15 @@ export class PiSessionPool {
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
+				this.config.submissionContract.toolName,
+				configuredMcpToolNames(this.config.mcpServers),
 			),
 			toolExtensions: this.config.toolExtensions,
+			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),
 			topology: {
 				profileCount: this.config.profiles.length,
-				candidatesPerTurn: this.config.profiles.map((profile) => profile.candidatesPerTurn),
-				totalCandidatesPerRound: this.config.profiles.reduce(
-					(total, profile) => total + profile.candidatesPerTurn,
-					0,
-				),
 			},
-			packages: await runtimePackages(),
+			packages,
 			profiles: [...this.sessions.values()].map((session) => session.manifestEntry()),
 		});
 	}
@@ -731,14 +961,32 @@ export class PiSessionPool {
 		for (const input of inputs) {
 			if (!expected.delete(input.profileId)) throw new Error(`unknown or duplicate profile: ${input.profileId}`);
 		}
-		return Promise.all(inputs.map(
+		const results = await Promise.allSettled(inputs.map(
 			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate) as Promise<CommittedTurn>,
 		));
+		const failed = results.find((result) => result.status === "rejected"
+			&& !(result.reason instanceof TurnExecutionError && result.reason.retryable))
+			?? results.find((result) => result.status === "rejected");
+		if (failed?.status === "rejected") {
+			throw new TurnExecutionError(String(failed.reason), results.flatMap((result) => {
+				if (result.status === "rejected") {
+					return result.reason instanceof TurnExecutionError ? result.reason.turnUsage : [];
+				}
+				return result.value.replayed ? [] : [{
+					profileId: result.value.profileId,
+					turnId: result.value.turnId,
+					usage: result.value.usage,
+				}];
+			}), results.every((result) => result.status === "fulfilled"
+				|| (result.reason instanceof TurnExecutionError && result.reason.retryable)));
+		}
+		return results.map((result) => (result as PromiseFulfilledResult<CommittedTurn>).value);
 	}
 
 	async close(): Promise<void> {
+		const proxyClose = this.proxy.close();
 		await Promise.allSettled([...this.sessions.values()].map((session) => session.close()));
 		this.sessions.clear();
-		await this.proxy.close();
+		await proxyClose;
 	}
 }

@@ -6,17 +6,28 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
+from ldm_tts.harness import (
+    POLICY_CAPABILITIES,
+    parse_tool_call_budgets,
+)
+from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
+from tasks.iron_mind.core.ldm_policy import DEFAULT_ALPHA, DEFAULT_ETA
 from tasks.iron_mind.core.prompting import (
     DEFAULT_PROMPT_POLICY,
     PROMPT_POLICIES,
     validate_prompt_policy,
 )
-from tasks.iron_mind.core.ldm_policy import DEFAULT_ETA
-from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
 from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
 from tasks.iron_mind.core.provider import parse_openai_extra_body_json
-from tasks.iron_mind.core.search import INITIALIZATION_MODES, SEARCH_METHODS
-
+from tasks.iron_mind.core.search import (
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
+    INITIALIZATION_MODES,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
+    SEARCH_METHODS,
+)
 
 DEFAULT_PROPOSAL_SAMPLES = 64
 DEFAULT_BO_POOL_SIZE = 32
@@ -30,7 +41,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
     parser.add_argument("--mock", action="store_true")
     parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
-    parser.add_argument("--proposal-backend", choices=("direct", "harness"), default="direct")
     parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
@@ -40,7 +50,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--proposal-max-workers", type=int, default=DEFAULT_PROPOSAL_MAX_WORKERS)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--acquisition-beta", type=float, default=1.0)
-    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
     parser.add_argument("--eta", type=float, default=DEFAULT_ETA)
     parser.add_argument("--z-clip", type=float, default=5.0)
     parser.add_argument("--out-dir", type=Path, default=Path("runs"))
@@ -64,7 +74,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=tuple(sorted(PROMPT_POLICIES)),
         default=DEFAULT_PROMPT_POLICY,
     )
-    parser.add_argument("--harness-image", default="ldm-pi-harness:latest")
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument("--harness-candidates-per-session", type=int, default=16)
     parser.add_argument(
         "--harness-thinking",
@@ -72,6 +82,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="max",
     )
     parser.add_argument("--harness-api-key-file", type=Path)
+    parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
@@ -85,7 +96,44 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--campaign-index", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--harness-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one tool per Agent turn; repeat for additional tools.",
+    )
+    parser.add_argument(
+        "--policy-capability",
+        action="append",
+        choices=tuple(sorted(POLICY_CAPABILITIES)),
+        help="Enable one compiled-policy capability; repeat to select both capabilities.",
+    )
+    parser.add_argument(
+        "--policy-tool-budget",
+        action="append",
+        metavar="NAME=COUNT",
+        help="Limit one policy-Agent tool per turn; repeat for additional tools.",
+    )
+    parser.add_argument("--policy-max-submission-attempts", type=int)
+    args = parser.parse_args(argv)
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = [
+            value for value in DEFAULT_NETWORK_TOOL_BUDGETS
+            if args.harness_context7 or not value.startswith(("resolve-library-id=", "query-docs="))
+        ]
+    if args.search_method == COMPILED_POLICY_METHOD:
+        if args.policy_tool_budget is None:
+            args.policy_tool_budget = [
+                value
+                for value in DEFAULT_NETWORK_TOOL_BUDGETS
+                if args.harness_context7
+                or not value.startswith(("resolve-library-id=", "query-docs="))
+            ]
+        if args.policy_capability is None:
+            args.policy_capability = sorted(POLICY_CAPABILITIES)
+        if args.policy_max_submission_attempts is None:
+            args.policy_max_submission_attempts = 3
+    return args
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -97,15 +145,43 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--proposal-samples must be positive")
     if args.bo_pool_size < 1:
         raise SystemExit("--bo-pool-size must be positive")
-    if args.search_method == "ldm" and args.proposal_samples <= args.bo_pool_size:
+    if (
+        args.search_method in ACQUISITION_TILTED_METHODS
+        and args.proposal_samples <= args.bo_pool_size
+    ):
         raise SystemExit("--proposal-samples must exceed --bo-pool-size")
     if args.proposal_max_workers < 1:
         raise SystemExit("--proposal-max-workers must be positive")
-    if args.harness_candidates_per_session < 1 or args.harness_wall_time_seconds < 1:
-        raise SystemExit("Harness candidate and wall-time limits must be positive")
+    if (
+        args.search_method in PARALLEL_HARNESS_METHODS
+        and args.harness_candidates_per_session < 1
+    ):
+        raise SystemExit("--harness-candidates-per-session must be positive")
+    if args.harness_wall_time_seconds < 1:
+        raise SystemExit("--harness-wall-time-seconds must be positive")
     if not math.isfinite(args.harness_response_timeout) or args.harness_response_timeout <= 0:
         raise SystemExit("--harness-response-timeout must be finite and positive")
-    if args.proposal_backend == "harness":
+    try:
+        tool_budgets = parse_tool_call_budgets(
+            args.harness_tool_budget,
+            excluded_tools=("submit_candidates",),
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(tool_budgets):
+        raise SystemExit("Context7 tools cannot have budgets when Context7 is disabled")
+    if args.search_method == COMPILED_POLICY_METHOD:
+        _validate_policy_options(args)
+    elif any(
+        value is not None
+        for value in (
+            args.policy_capability,
+            args.policy_tool_budget,
+            args.policy_max_submission_attempts,
+        )
+    ):
+        raise SystemExit("Policy options require --search-method=ldm_harness_compiled")
+    if args.search_method in PARALLEL_HARNESS_METHODS:
         expected = len(HARNESS_PROFILE_IDS) * args.harness_candidates_per_session
         if args.proposal_samples != expected:
             raise SystemExit(
@@ -113,11 +189,12 @@ def validate_args(args: argparse.Namespace) -> None:
             )
     if args.evaluations_per_round != 1:
         raise SystemExit("Iron Mind requires --evaluations-per-round=1")
-    _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
-    _validate_non_negative(args.alpha, "--alpha")
-    _validate_non_negative(args.eta, "--eta")
-    if not math.isfinite(args.z_clip) or args.z_clip <= 0:
-        raise SystemExit("--z-clip must be finite and positive")
+    if args.search_method != "harness":
+        _validate_non_negative(args.acquisition_beta, "--acquisition-beta")
+        _validate_non_negative(args.alpha, "--alpha")
+        _validate_non_negative(args.eta, "--eta")
+        if not math.isfinite(args.z_clip) or args.z_clip <= 0:
+            raise SystemExit("--z-clip must be finite and positive")
     if not math.isfinite(args.llm_temperature) or not 0.0 <= args.llm_temperature <= 2.0:
         raise SystemExit("--llm-temperature must be finite and between 0 and 2")
     try:
@@ -139,12 +216,32 @@ def _validate_non_negative(value: float, option: str) -> None:
         raise SystemExit(f"{option} must be finite and non-negative")
 
 
+def _validate_policy_options(args: argparse.Namespace) -> None:
+    try:
+        policy_tool_budgets = parse_tool_call_budgets(
+            args.policy_tool_budget,
+            excluded_tools=("submit_optimization_policy",),
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not args.harness_context7 and {"resolve-library-id", "query-docs"} & set(
+        policy_tool_budgets
+    ):
+        raise SystemExit(
+            "Context7 tools cannot have policy budgets when Context7 is disabled"
+        )
+    if args.policy_max_submission_attempts < 1:
+        raise SystemExit("--policy-max-submission-attempts must be positive")
+    if len(args.policy_capability) != len(set(args.policy_capability)):
+        raise SystemExit("--policy-capability values must be unique")
+
+
 def _validate_search_mode(args: argparse.Namespace) -> None:
-    if args.proposal_backend == "harness":
-        if args.search_method != "ldm":
-            raise SystemExit("--proposal-backend=harness is available only with --search-method=ldm")
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
         if args.proposal_mode != "none":
-            raise SystemExit("--proposal-backend=harness requires --proposal-mode=none")
+            raise SystemExit(
+                f"--search-method={args.search_method} requires --proposal-mode=none"
+            )
         return
     model_method = args.search_method in {"ldm", "llm"}
     if args.mock and model_method and args.proposal_mode not in {"callable", "openai"}:

@@ -1,17 +1,19 @@
 import { createInterface } from "node:readline";
 import { PiSessionPool } from "./session.js";
 import {
-	PROTOCOL_VERSION,
 	ProtocolError,
+	TurnExecutionError,
 	parseFrame,
 	type InputFrame,
 	type SubmissionValidationDecision,
 	type SubmissionValidationRequest,
 	type SubmissionValidationResultFrame,
 } from "./protocol.js";
+import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { Redactor } from "./trace.js";
 
 let apiKey: string | undefined;
+let namedSecrets: Record<string, string> | undefined;
 let campaignId: string | undefined;
 let pool: PiSessionPool | undefined;
 let redactor = new Redactor([]);
@@ -22,6 +24,7 @@ type CommandFrame = Exclude<InputFrame, SubmissionValidationResultFrame>;
 class SubmissionValidationBroker {
 	private readonly pending = new Map<string, {
 		requestId: string;
+		submissionDigest: string;
 		resolve: (decision: SubmissionValidationDecision) => void;
 		reject: (error: Error) => void;
 	}>();
@@ -34,7 +37,12 @@ class SubmissionValidationBroker {
 		this.nextId += 1;
 		const validationId = `${frame.requestId}-validation-${this.nextId.toString().padStart(6, "0")}`;
 		const result = new Promise<SubmissionValidationDecision>((resolve, reject) => {
-			this.pending.set(validationId, { requestId: frame.requestId, resolve, reject });
+			this.pending.set(validationId, {
+				requestId: frame.requestId,
+				submissionDigest: request.submissionDigest,
+				resolve,
+				reject,
+			});
 		});
 		respondTo(frame, "submission_validation_requested", { validationId, ...request });
 		return result;
@@ -42,11 +50,15 @@ class SubmissionValidationBroker {
 
 	resolve(frame: SubmissionValidationResultFrame): void {
 		const pending = this.pending.get(frame.validationId);
-		if (!pending || pending.requestId !== frame.requestId) {
+		if (
+			!pending
+			|| pending.requestId !== frame.requestId
+			|| pending.submissionDigest !== frame.submissionDigest
+		) {
 			throw new ProtocolError("invalid_state", `unknown submission validation: ${frame.validationId}`);
 		}
 		this.pending.delete(frame.validationId);
-		pending.resolve({ accepted: frame.accepted, rejected: frame.rejected });
+		pending.resolve({ decision: frame.decision, errors: frame.errors });
 	}
 
 	rejectAll(error: Error): void {
@@ -69,13 +81,14 @@ function respondTo(
 	respond({
 		type,
 		requestId: frame.requestId,
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: SIDECAR_RELEASE_VERSION,
 		campaignId: frame.campaignId,
 		...fields,
 	});
 }
 
 function errorCode(error: unknown): string {
+	if (error instanceof TurnExecutionError && error.retryable) return "recoverable_turn_error";
 	return error instanceof ProtocolError ? error.code : "sidecar_error";
 }
 
@@ -83,9 +96,16 @@ async function close(): Promise<void> {
 	if (closing) return;
 	closing = true;
 	validations.rejectAll(new Error("harness sidecar is closing"));
-	await pool?.close();
+	const activePool = pool;
 	pool = undefined;
-	apiKey = undefined;
+	try {
+		await activePool?.close();
+	} finally {
+		apiKey = undefined;
+		namedSecrets = undefined;
+		campaignId = undefined;
+		redactor = new Redactor([]);
+	}
 }
 
 process.on("SIGTERM", () => {
@@ -95,20 +115,23 @@ process.on("SIGINT", () => {
 	void close().finally(() => process.exit(130));
 });
 
+respond({ type: "ready", protocolVersion: SIDECAR_RELEASE_VERSION });
+
 async function handle(frame: CommandFrame): Promise<boolean> {
 	if (frame.type === "bootstrap_secret") {
-		if (apiKey || pool) throw new ProtocolError("invalid_state", "bootstrap_secret is accepted exactly once before initialize");
+		if (apiKey || namedSecrets || pool) throw new ProtocolError("invalid_state", "bootstrap_secret is accepted exactly once before initialize");
 		apiKey = frame.apiKey;
+		namedSecrets = frame.namedSecrets;
 		campaignId = frame.campaignId;
-		redactor = new Redactor([apiKey]);
+		redactor = new Redactor([apiKey, ...Object.values(namedSecrets)]);
 		respondTo(frame, "secret_bootstrapped");
 		return true;
 	}
 	if (frame.campaignId !== campaignId) throw new ProtocolError("invalid_state", "campaignId changed after bootstrap");
 	if (frame.type === "initialize") {
-		if (!apiKey) throw new ProtocolError("invalid_state", "bootstrap_secret must precede initialize");
+		if (!apiKey || !namedSecrets) throw new ProtocolError("invalid_state", "bootstrap_secret must precede initialize");
 		if (pool) throw new ProtocolError("invalid_state", "sidecar is already initialized");
-		pool = new PiSessionPool(frame, apiKey);
+		pool = new PiSessionPool(frame, apiKey, namedSecrets);
 		try {
 			await pool.initialize();
 		} catch (error) {
@@ -117,6 +140,7 @@ async function handle(frame: CommandFrame): Promise<boolean> {
 			throw error;
 		}
 		apiKey = undefined;
+		namedSecrets = undefined;
 		respondTo(frame, "initialized", {
 			profiles: frame.profiles.map((profile) => profile.profileId),
 			manifest: "manifest.json",
@@ -162,7 +186,7 @@ for await (const line of lines) {
 		respond({
 			type: "error",
 			requestId,
-			protocolVersion: PROTOCOL_VERSION,
+			protocolVersion: SIDECAR_RELEASE_VERSION,
 			campaignId: requestCampaignId ?? campaignId,
 			error: { code: errorCode(error), message: redactor.text((error as Error).message) },
 		});
@@ -188,9 +212,14 @@ for await (const line of lines) {
 		try {
 			if (!(await handle(frame))) lines.close();
 		} catch (error) {
+			const failure = {
+				code: errorCode(error),
+				message: redactor.text((error as Error).message),
+				...(error instanceof TurnExecutionError ? { turnUsage: error.turnUsage } : {}),
+			};
 			validations.rejectAll(error as Error);
 			respondTo(frame, "error", {
-				error: { code: errorCode(error), message: redactor.text((error as Error).message) },
+				error: failure,
 			});
 		}
 	})();

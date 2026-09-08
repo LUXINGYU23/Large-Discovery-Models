@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 const catalogPath = process.env.LDM_IRON_MIND_CATALOG;
 if (!catalogPath) throw new Error("LDM_IRON_MIND_CATALOG is required");
 
+const historyPath = process.env.LDM_IRON_MIND_HISTORY;
+if (!historyPath) throw new Error("LDM_IRON_MIND_HISTORY is required");
+
+function measuredHistory() {
+    return JSON.parse(readFileSync(historyPath, "utf8")).observations;
+}
+
 const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
 if (catalog.schema_version !== 1 || !Array.isArray(catalog.factors) || !Array.isArray(catalog.candidates)) {
 	throw new Error("invalid Iron Mind reaction-space catalog");
@@ -56,6 +63,60 @@ const validateParameters = {
 };
 
 export default function reactionSpaceTools(pi) {
+
+    pi.registerTool({
+        name: "get_measured_history",
+        label: "Read measured research history",
+        description: "Query evaluated candidates by ID or round. Concise results contain IDs, round, status and reaction_score; request detailed for exact candidates and original research annotations. Follow next_offset. Unmeasured proposals are not exposed.",
+        parameters: {
+            type: "object",
+            properties: {
+                candidate_ids: { type: "array", items: { type: "string", minLength: 1 } },
+                round_index: { type: "integer", minimum: 0 },
+                sort_by: { type: "string", enum: ["recent", "utility_desc", "utility_asc"] },
+                response_format: { type: "string", enum: ["concise", "detailed"] },
+                offset: { type: "integer", minimum: 0 },
+                limit: { type: "integer", minimum: 1, maximum: 128 },
+            },
+            additionalProperties: false,
+        },
+        async execute(_id, params) {
+            const observations = measuredHistory();
+            const ids = new Set(params.candidate_ids ?? []);
+            const matched = observations.filter((row) =>
+                (ids.size === 0 || ids.has(row.candidate_id))
+                && (params.round_index === undefined || row.round_index === params.round_index),
+            );
+            const sortBy = params.sort_by ?? "recent";
+            matched.sort((a, b) => {
+                if (sortBy === "recent") return b.round_index - a.round_index;
+                if (a.reaction_score === null) return b.reaction_score === null ? 0 : 1;
+                if (b.reaction_score === null) return -1;
+                return sortBy === "utility_desc" ? b.reaction_score - a.reaction_score : a.reaction_score - b.reaction_score;
+            });
+            const offset = params.offset ?? 0;
+            const page = [];
+            let bytes = 0;
+            for (const row of matched.slice(offset, offset + (params.limit ?? 16))) {
+                const value = params.response_format === "detailed" ? row : {
+                    candidate_id: row.candidate_id, round_index: row.round_index,
+                    evaluation_status: row.evaluation_status, reaction_score: row.reaction_score,
+                };
+                const size = Buffer.byteLength(JSON.stringify(value), "utf8");
+                if (page.length && bytes + size > 32000) break;
+                page.push(value);
+                bytes += size;
+            }
+            const known = new Set(observations.map((row) => row.candidate_id));
+            return jsonResult({
+                total: matched.length, offset,
+                next_offset: offset + page.length < matched.length ? offset + page.length : null,
+                observations: page,
+                unmeasured_or_unknown_ids: [...ids].filter((id) => !known.has(id)),
+            });
+        },
+    });
+
 	pi.registerTool({
 		name: "describe_reaction_space",
 		label: "Describe reaction space",
@@ -110,7 +171,9 @@ export default function reactionSpaceTools(pi) {
 			if (!candidatesByKey.has(JSON.stringify(normalized))) {
 				throw new Error("candidate is not present in the source-pinned reaction table");
 			}
-			return jsonResult({ valid: true, candidate: normalized });
+			const measured = measuredHistory().find((row) => key(row) === key(normalized));
+            return jsonResult({ valid: true, candidate: normalized,
+                already_evaluated: measured !== undefined, candidate_id: measured?.candidate_id ?? null });
 		},
 	});
 }

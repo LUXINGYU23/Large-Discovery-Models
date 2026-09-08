@@ -1,23 +1,16 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import type { ExtensionAPI, ToolCallEvent, ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { assertAllowedUrl, PolicyController } from "./policy.js";
 
-const policy = {
+const networkPolicy = {
 	allowedHosts: ["nih.gov", "nature.com"],
 	deniedHosts: ["blocked.nih.gov"],
 	forbiddenQueryPatterns: [],
 };
-
-test("URL policy allows declared domains and their subdomains", () => {
-	assert.doesNotThrow(() => assertAllowedUrl("https://pubmed.ncbi.nlm.nih.gov/123", policy));
-});
-
-test("URL policy rejects denied, undeclared, and local paths", () => {
-	assert.throws(() => assertAllowedUrl("https://blocked.nih.gov/private", policy));
-	assert.throws(() => assertAllowedUrl("https://example.com", policy));
-	assert.throws(() => assertAllowedUrl("/mnt/data/oracle.csv", policy));
-});
 
 function policyHandlers(controller: PolicyController) {
 	const handlers = new Map<string, (event: never) => unknown>();
@@ -27,147 +20,154 @@ function policyHandlers(controller: PolicyController) {
 		},
 	} as unknown as ExtensionAPI);
 	return {
-		call: (event: ToolCallEvent) => handlers.get("tool_call")?.(event as never) as { block?: boolean; reason?: string } | undefined,
-		result: (event: ToolResultEvent) => handlers.get("tool_result")?.(event as never) as { isError?: boolean } | undefined,
+		call: async (event: ToolCallEvent) => await handlers.get("tool_call")?.(event as never) as
+			{ block?: boolean; reason?: string } | undefined,
+		result: async (event: ToolResultEvent) => await handlers.get("tool_result")?.(event as never) as
+			{ content?: ToolResultEvent["content"]; isError?: boolean } | undefined,
 	};
 }
 
-function controller(): PolicyController {
-	return new PolicyController(policy, ["parallel-mcp", "exa", "duckduckgo"]);
+function controller(budgets: Record<string, number> = {}): PolicyController {
+	return new PolicyController(
+		networkPolicy,
+		["parallel-mcp", "exa", "duckduckgo"],
+		budgets,
+	);
 }
 
-test("web results are filtered before their content id becomes session-readable", () => {
-	const subject = controller();
-	const handlers = policyHandlers(subject);
-	subject.begin(["synthonbench"]);
-	const blocked = handlers.result({
-		type: "tool_result",
-		toolCallId: "search-1",
-		toolName: "web_search",
-		input: { query: "reaction design" },
-		content: [{ type: "text", text: "Hidden SynthonBench answer" }],
-		details: { searchId: "blocked-id" },
-		isError: false,
-	} as ToolResultEvent);
-	assert.equal(blocked?.isError, true);
-	assert.equal(handlers.call({
-		type: "tool_call",
-		toolCallId: "read-1",
-		toolName: "get_search_content",
-		input: { responseId: "blocked-id" },
-	} as ToolCallEvent)?.block, true);
-	subject.end();
+function call(toolName: string, input: Record<string, unknown> = {}): ToolCallEvent {
+	return { type: "tool_call", toolCallId: `${toolName}-${Math.random()}`, toolName, input } as ToolCallEvent;
+}
+
+test("URL policy allows declared domains and rejects unsafe URLs", () => {
+	assert.doesNotThrow(() => assertAllowedUrl("https://pubmed.ncbi.nlm.nih.gov/123", networkPolicy));
+	assert.throws(() => assertAllowedUrl("https://blocked.nih.gov/private", networkPolicy));
+	assert.throws(() => assertAllowedUrl("https://example.com", networkPolicy));
+	assert.throws(() => assertAllowedUrl("/mnt/data/oracle.csv", networkPolicy));
 });
 
-test("stored content ids remain private to the policy controller that received them", () => {
+test("network policy filters results and keeps content ids session-local", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
 	const owner = controller();
 	const other = controller();
 	const ownerHandlers = policyHandlers(owner);
 	const otherHandlers = policyHandlers(other);
-	owner.begin(["synthonbench"]);
-	other.begin(["synthonbench"]);
-	assert.equal(ownerHandlers.result({
-		type: "tool_result",
-		toolCallId: "search-1",
-		toolName: "web_search",
-		input: { query: "reaction design" },
-		content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
-		details: {
-			responseId: "owner-response",
-			searchId: "owner-search",
-			fetchId: "owner-fetch",
-		},
-		isError: false,
-	} as ToolResultEvent), undefined);
-	for (const responseId of ["owner-response", "owner-search", "owner-fetch"]) {
-		const read = {
-			type: "tool_call",
-			toolCallId: `read-${responseId}`,
-			toolName: "get_search_content",
-			input: { responseId },
-		} as ToolCallEvent;
-		assert.equal(ownerHandlers.call(read), undefined);
-		assert.equal(otherHandlers.call(read)?.block, true);
-	}
-	owner.end();
-	owner.begin(["synthonbench"]);
-	assert.equal(ownerHandlers.call({
-		type: "tool_call",
-		toolCallId: "read-next-turn",
-		toolName: "get_search_content",
-		input: { responseId: "owner-search" },
-	} as ToolCallEvent), undefined);
-	owner.end();
-	other.end();
-});
-
-test("tool usage is counted without a call limit", () => {
-	const subject = controller();
-	const handlers = policyHandlers(subject);
-	subject.begin([]);
-	for (let index = 0; index < 20; index += 1) {
-		assert.equal(handlers.call({
-			type: "tool_call",
-			toolCallId: `search-${index}`,
+	try {
+		await owner.begin(["synthonbench"], join(root, "owner.json"));
+		await other.begin(["synthonbench"], join(root, "other.json"));
+		const hidden = await ownerHandlers.result({
+			type: "tool_result",
+			toolCallId: "hidden",
 			toolName: "web_search",
-			input: { query: `reaction design ${index}` },
-		} as ToolCallEvent), undefined);
+			input: { query: "reaction design" },
+			content: [{ type: "text", text: "Hidden SynthonBench answer" }],
+			details: { searchId: "blocked-id" },
+			isError: false,
+		} as ToolResultEvent);
+		assert.equal(hidden?.isError, true);
+
+		await ownerHandlers.result({
+			type: "tool_result",
+			toolCallId: "allowed",
+			toolName: "web_search",
+			input: { query: "reaction design" },
+			content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
+			details: { searchId: "owner-search" },
+			isError: false,
+		} as ToolResultEvent);
+		assert.equal(await ownerHandlers.call(call("get_search_content", { responseId: "owner-search" })), undefined);
+		assert.equal((await otherHandlers.call(call("get_search_content", { responseId: "owner-search" })))?.block, true);
+	} finally {
+		owner.end();
+		other.end();
+		await rm(root, { recursive: true, force: true });
 	}
-	for (let index = 0; index < 10; index += 1) {
-		assert.equal(handlers.call({
-			type: "tool_call",
-			toolCallId: `context-${index}`,
-			toolName: "query-docs",
-			input: { query: `library API ${index}` },
-		} as ToolCallEvent), undefined);
-	}
-	assert.deepEqual(subject.end(), { webCalls: 20, context7Calls: 10 });
 });
 
-test("web search preserves allowed provider choices and rejects providers outside the route", () => {
-	const subject = controller();
+test("invalid search inputs are rejected before usage is reserved", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
+	const subject = controller({ web_search: 2 });
 	const handlers = policyHandlers(subject);
-	subject.begin([]);
-	const allowed = {
-		type: "tool_call",
-		toolCallId: "search-allowed",
-		toolName: "web_search",
-		input: { query: "reaction design", provider: "DuckDuckGo" },
-	} as ToolCallEvent;
-	assert.equal(handlers.call(allowed), undefined);
-	assert.equal((allowed.input as Record<string, unknown>).provider, "duckduckgo");
+	try {
+		await subject.begin([], join(root, "budget.json"));
+		const rejected = await handlers.call(call("web_search", {
+			query: "reaction design",
+			provider: "tavily",
+		}));
+		assert.equal(rejected?.block, true);
+		assert.match(rejected?.reason ?? "", /"reason":"provider_not_allowed"/);
+		assert.equal(subject.snapshot().toolCalls.web_search, undefined);
 
-	const blocked = handlers.call({
-		type: "tool_call",
-		toolCallId: "search-blocked",
-		toolName: "web_search",
-		input: { query: "reaction design", provider: "tavily" },
-	} as ToolCallEvent);
-	assert.equal(blocked?.block, true);
-	assert.match(blocked?.reason ?? "", /"reason":"provider_not_allowed"/);
-	assert.match(blocked?.reason ?? "", /"allowed_providers":\["parallel-mcp","exa","duckduckgo"\]/);
-	subject.end();
+		const allowed = call("web_search", { query: "reaction design", provider: "DuckDuckGo" });
+		assert.equal(await handlers.call(allowed), undefined);
+		assert.deepEqual(allowed.input, { query: "reaction design", provider: "duckduckgo", workflow: "none", domainFilter: ["nih.gov", "nature.com"] });
+	} finally {
+		subject.end();
+		await rm(root, { recursive: true, force: true });
+	}
 });
 
-test("unrestricted search keeps Agent domain filters and defaults to automatic routing", () => {
-	const subject = new PolicyController(
-		{ allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
-		["parallel-mcp", "exa", "duckduckgo"],
-	);
+test("tool budgets reserve atomically, report remaining calls, and leave unlisted tools unlimited", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
+	const subject = controller({ web_search: 1, mcp__literature__search: 0 });
 	const handlers = policyHandlers(subject);
-	subject.begin([]);
-	const call = {
-		type: "tool_call",
-		toolCallId: "search-auto",
-		toolName: "web_search",
-		input: { query: "reaction design", domainFilter: ["pubmed.ncbi.nlm.nih.gov"] },
-	} as ToolCallEvent;
-	assert.equal(handlers.call(call), undefined);
-	assert.deepEqual(call.input, {
-		query: "reaction design",
-		domainFilter: ["pubmed.ncbi.nlm.nih.gov"],
-		provider: "auto",
-		workflow: "none",
-	});
-	subject.end();
+	try {
+		await subject.begin([], join(root, "budget.json"));
+		assert.match(subject.budgetMessage(), /web_search: 1 of 1 calls remaining/);
+		const concurrent = await Promise.all([
+			handlers.call(call("web_search", { query: "first" })),
+			handlers.call(call("web_search", { query: "second" })),
+		]);
+		assert.equal(concurrent.filter((result) => result?.block).length, 1);
+		assert.match(concurrent.find((result) => result?.block)?.reason ?? "", /tool_budget_exhausted/);
+		assert.match((await handlers.call(call("mcp__literature__search")))?.reason ?? "", /tool_budget_exhausted/);
+		for (let index = 0; index < 20; index += 1) {
+			assert.equal(await handlers.call(call("read", { path: `${index}.txt` })), undefined);
+		}
+		const result = await handlers.result({
+			type: "tool_result",
+			toolCallId: "search-result",
+			toolName: "web_search",
+			input: { query: "first" },
+			content: [{ type: "text", text: "failed" }],
+			details: {},
+			isError: true,
+		} as ToolResultEvent);
+		assert.match(JSON.stringify(result?.content), /0 of 1 calls remaining/);
+		assert.deepEqual(subject.snapshot().toolCalls, { read: 20, web_search: 1 });
+
+		const otherAgent = controller({ web_search: 1 });
+		await otherAgent.begin([], join(root, "other-agent.json"));
+		assert.equal(
+			await policyHandlers(otherAgent).call(call("web_search", { query: "independent" })),
+			undefined,
+		);
+		otherAgent.end();
+	} finally {
+		subject.end();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("persisted reservations survive restart while a new turn receives a fresh budget", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
+	const budgetPath = join(root, "turn-1.json");
+	try {
+		const first = controller({ "query-docs": 1 });
+		await first.begin([], budgetPath);
+		await policyHandlers(first).call(call("query-docs"));
+		first.end();
+
+		const resumed = controller({ "query-docs": 1 });
+		await resumed.begin([], budgetPath);
+		assert.match((await policyHandlers(resumed).call(call("query-docs")))?.reason ?? "", /tool_budget_exhausted/);
+		resumed.end();
+
+		const nextTurn = controller({ "query-docs": 1 });
+		await nextTurn.begin([], join(root, "turn-2.json"));
+		assert.equal(await policyHandlers(nextTurn).call(call("query-docs")), undefined);
+		nextTurn.end();
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
 });

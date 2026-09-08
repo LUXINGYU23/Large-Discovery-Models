@@ -3,21 +3,27 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from ldm_tts.engine import LDMEngineState
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.transport import ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
-
+from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
 from tasks.iron_mind.core.provider import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )
-from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
+from tasks.iron_mind.core.search import (
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
+)
 
 
 def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
@@ -39,10 +45,34 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
         "successful_evaluations": selected,
         "benchmark_jobs": selected,
     }
-    if args.proposal_backend == "harness":
-        budget["harness_turns"] = search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method in PERSISTENT_HARNESS_METHODS:
+        profile_count = (
+            len(HARNESS_PROFILE_IDS)
+            if args.search_method in PARALLEL_HARNESS_METHODS
+            else 1
+        )
+        budget["harness_turns"] = search_rounds * profile_count
+        if args.search_method == COMPILED_POLICY_METHOD:
+            budget["policy_harness_turns"] = search_rounds
+        else:
+            budget.update(
+                policy_harness_turns=0,
+                policy_provider_requests=0,
+                policy_tool_calls=0,
+                policy_validation_submissions=0,
+                policy_artifact_bytes=0,
+                policy_wall_time_seconds=0,
+            )
     else:
         budget["llm_requests"] = proposal_requests if args.proposal_mode == "openai" else 0
+        budget.update(
+            policy_harness_turns=0,
+            policy_provider_requests=0,
+            policy_tool_calls=0,
+            policy_validation_submissions=0,
+            policy_artifact_bytes=0,
+            policy_wall_time_seconds=0,
+        )
     return budget
 
 
@@ -60,16 +90,18 @@ def campaign_budget(
 def _proposal_requests(args: Any, search_rounds: int) -> int:
     if args.search_method == "bo":
         return 0
-    if args.proposal_backend == "harness":
+    if args.search_method in PARALLEL_HARNESS_METHODS:
         return search_rounds * len(HARNESS_PROFILE_IDS)
+    if args.search_method == "harness":
+        return search_rounds
     per_round = args.proposal_samples if args.search_method == "ldm" else args.evaluations_per_round
     return search_rounds * per_round
 
 
 def _valid_candidates(args: Any, domain_size: int, initial: int, search_rounds: int) -> int:
-    if args.search_method == "ldm":
+    if args.search_method in ACQUISITION_TILTED_METHODS:
         return initial + search_rounds * args.proposal_samples
-    if args.search_method == "llm":
+    if args.search_method in {"llm", "harness"}:
         return initial + search_rounds * args.evaluations_per_round
     remaining = max(0, domain_size - initial)
     return initial + sum(
@@ -85,6 +117,10 @@ def jsonable_args(args: Any) -> dict[str, Any]:
         key: str(value) if isinstance(value, Path) else value
         for key, value in vars(args).items()
         if key != "api_key"
+        and not (
+            key.startswith("policy_")
+            and args.search_method != COMPILED_POLICY_METHOD
+        )
     }
 
 
@@ -106,7 +142,7 @@ def provider_settings(args: Any) -> OpenAIProviderSettings:
         api_key=args.api_key,
     )
     key_file = getattr(args, "harness_api_key_file", None)
-    if getattr(args, "proposal_backend", "direct") == "harness" and key_file is not None:
+    if args.search_method in PERSISTENT_HARNESS_METHODS and key_file is not None:
         api_key = Path(key_file).expanduser().read_text(encoding="utf-8").strip()
         if not api_key:
             raise ValueError("harness API key file is empty")

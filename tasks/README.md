@@ -165,6 +165,11 @@ when the task uses surrogate-guided selection. Keep the procedure adapter
 limited to CLI parsing, `LDMTaskSpec` construction, dependency preparation, and
 campaign dispatch.
 
+The engine supplies `round_idx` to `AcquisitionSelector.select` independently of
+the successful observations passed to `fit`. Forward it through selector
+decorators and use it for round-scoped policies and artifacts; do not infer the
+current campaign round from the last successful measurement.
+
 The campaign algorithm creates authoritative `Candidate`, `EvaluationResult`, and
 `Observation` records. Do not introduce task-local equivalents unless the task
 payload needs a private intermediate record behind an engine adapter.
@@ -175,7 +180,7 @@ directly when an official evaluator lifecycle cannot be represented by a
 budgets, events, checkpoints, status, and final summaries to those shared
 components rather than assembling parallel task-local lifecycle machinery.
 
-### Optional Research Harness Backend
+### Optional Research Harness Backends
 
 A task may implement reservoir expansion with persistent Agent sessions through
 the public `ldm_tts.harness` package. The Harness remains behind the task's
@@ -194,9 +199,24 @@ task-defined duplicate rule so the Agent can replace rejected entries in the
 same session. Accept a complete minibatch before computing empirical proposal
 mass or running acquisition.
 
+Large or annotated minibatches may be submitted as immutable workspace file
+snapshots. Keep task-defined research notes in candidate metadata and preserve
+all contributing notes through canonical admission and measured checkpoints.
+Prefer compact measurement indexes plus task-local paginated detail and
+membership tools. Runtime Skills are task resources loaded on demand, with
+pinned attribution and dependencies exercised by the task guest smoke.
+
+A Harness-Compiled LDM method keeps that proposal path unchanged and adds one
+independent policy `HarnessClient`. The task owns its numeric feature encoder,
+`OptimizationPolicyAdapter`, residual-GP wiring, policy profile, and capability
+contract. The policy Agent submits a complete `optimization_policy.py`; it must
+not select candidates or change the kernel, uncertainty, acquisition, pool,
+evaluator, or budget. Snapshot and execute the artifact through the isolated
+policy runner, never the host interpreter.
+
 Harness-native sessions and redacted provider request/response records belong
-under the ignored run directory. They are raw research traces, not automatic
-`ldm-2.0` training rows. See the
+under the ignored run directory. Keep proposal and policy roots separate. They
+are raw research traces, not automatic `ldm-2.0` training rows. See the
 [Research Harness integration guide](../docs/research-harness.md) and the
 [Pi sidecar contract](../harnesses/pi/README.md).
 

@@ -1,17 +1,17 @@
-"""Task-owned SynthonBench assembly for LDM, BO, and direct-LLM comparisons."""
+"""Task-owned assembly for SynthonBench campaign methods."""
 
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
-from ldm_tts.harness import HarnessClient, HarnessProfile
+from ldm_tts.harness import HarnessClient, HarnessProfile, PolicyResearchController
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
 
@@ -19,6 +19,7 @@ from tasks.synthonbench.core import task_spec as task_contracts
 from tasks.synthonbench.core.candidate import SynthonCandidateDomain
 from tasks.synthonbench.core.catalog import SynthonProposalCatalog
 from tasks.synthonbench.core.constants import (
+    DEFAULT_ACQUISITION_ALPHA,
     DEFAULT_ACQUISITION_ETA,
     DEFAULT_GP_REACTION_WEIGHT,
     OBJECTIVE_NAME,
@@ -27,10 +28,17 @@ from tasks.synthonbench.core.evaluator import OfficialSynthonEvaluator
 from tasks.synthonbench.core.harness import SynthonHarnessExpander
 from tasks.synthonbench.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
+from tasks.synthonbench.core.optimization_policy import (
+    SynthonOptimizationPolicyAdapter,
+)
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, validate_prompt_policy
 from tasks.synthonbench.core.proposals import SynthonBenchProposalExpander
 from tasks.synthonbench.core.search import (
+    ACQUISITION_TILTED_METHODS,
+    COMPILED_POLICY_METHOD,
     INITIALIZATION_MODES,
+    PARALLEL_HARNESS_METHODS,
+    PERSISTENT_HARNESS_METHODS,
     RandomSynthonPoolExpander,
     SEARCH_METHODS,
     SynthonInitializationExpander,
@@ -67,15 +75,18 @@ class CampaignComponentOptions:
     gp_observation_noise_std: float = 1.0
     gp_reaction_weight: float = DEFAULT_GP_REACTION_WEIGHT
     acquisition_beta: float = 1.0
-    alpha: float = 1.0
+    alpha: float = DEFAULT_ACQUISITION_ALPHA
     eta: float = DEFAULT_ACQUISITION_ETA
     z_clip: float = 5.0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
     before_requests: Callable[[int], None] | None = None
-    proposal_backend: str = "direct"
     harness_client: HarnessClient | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
-    account_harness_usage: Callable[[dict[str, int]], None] | None = None
+    harness_candidates_per_profile: int = 0
+    harness_wall_time_seconds: int = 1800
+    account_harness_usage: Callable[..., object] | None = None
+    policy_controller: PolicyResearchController | None = None
+    policy_adapter: SynthonOptimizationPolicyAdapter | None = None
 
     def __post_init__(self) -> None:
         if self.search_method not in SEARCH_METHODS:
@@ -90,23 +101,29 @@ class CampaignComponentOptions:
             self.proposal_candidates_per_request,
         ) < 1:
             raise ValueError("Proposal, pool, and evaluation counts must be positive")
-        if self.search_method == "ldm" and self.proposal_samples <= self.bo_pool_size:
+        if (
+            self.search_method in ACQUISITION_TILTED_METHODS
+            and self.proposal_samples <= self.bo_pool_size
+        ):
             raise ValueError("LDM proposal samples must exceed the BO pool size")
-        if self.evaluations_per_round > self.bo_pool_size and self.search_method != "llm":
+        if self.evaluations_per_round > self.bo_pool_size and self.search_method not in {"llm", "harness"}:
             raise ValueError("BO-based methods require evaluations_per_round <= bo_pool_size")
-        if self.proposal_backend not in {"direct", "harness"}:
-            raise ValueError("proposal_backend must be direct or harness")
-        if self.proposal_backend == "harness":
-            if self.search_method != "ldm":
-                raise ValueError("The harness backend is available only for LDM search")
+        if self.search_method in PERSISTENT_HARNESS_METHODS:
             if self.harness_client is None or not self.harness_profiles:
                 raise ValueError("Harness search requires a client and profile set")
-            expected = sum(profile.candidates_per_turn for profile in self.harness_profiles)
+            if self.harness_candidates_per_profile < 1:
+                raise ValueError("Harness candidate count per profile must be positive")
+            expected = len(self.harness_profiles) * self.harness_candidates_per_profile
             if self.proposal_samples != expected:
                 raise ValueError("proposal_samples must equal the harness minibatch total")
         elif self.search_method in {"ldm", "llm"} and self.client is None:
             raise ValueError("Direct model search methods require a proposal client")
-        if self.proposal_backend == "direct" and self.search_method in {"ldm", "llm"}:
+        if self.search_method == COMPILED_POLICY_METHOD:
+            if self.policy_controller is None or self.policy_adapter is None:
+                raise ValueError("Compiled Harness LDM requires a policy controller and adapter")
+        elif self.policy_controller is not None or self.policy_adapter is not None:
+            raise ValueError("Policy components are only valid for compiled Harness LDM")
+        if self.search_method in {"ldm", "llm"}:
             breadth = (
                 self.proposal_samples
                 if self.search_method == "ldm"
@@ -116,8 +133,9 @@ class CampaignComponentOptions:
                 raise ValueError(
                     "direct proposal breadth must divide evenly by candidates per request"
                 )
-        _validate_options(self)
-        if self.proposal_backend == "direct":
+        if self.search_method != "harness":
+            _validate_options(self)
+        if self.search_method in {"ldm", "llm"}:
             validate_prompt_policy(self.prompt_policy)
 
 
@@ -145,7 +163,7 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         acquisition=(
             selector.describe()
             if selector is not None
-            else task_contracts.build_direct_acquisition()
+            else task_contracts.build_direct_acquisition(options.search_method)
         ),
         proposal_samples=options.proposal_samples,
         evaluations_per_round=options.evaluations_per_round,
@@ -158,7 +176,6 @@ def build_campaign_components(options: CampaignComponentOptions) -> CampaignComp
         prompt_policy=options.prompt_policy,
         search_method=options.search_method,
         initialization_mode=options.initialization_mode,
-        proposal_backend=options.proposal_backend,
         harness_profile_count=len(options.harness_profiles),
     )
     domain = SynthonCandidateDomain(official_task.space, reactions, options.target, options.sink)
@@ -180,6 +197,9 @@ def build_synthon_selector(
     *, encoder: SynthonNystromEncoder, selection_seed: int, gp_signal_std: float,
     gp_mean_std: float, gp_observation_noise_std: float, acquisition_beta: float,
     alpha: float, eta: float, z_clip: float, bo_pool_size: int, proposal_samples: int,
+    policy_controller: PolicyResearchController | None = None,
+    policy_adapter: SynthonOptimizationPolicyAdapter | None = None,
+    policy_mode: bool = False,
 ) -> AcquisitionTiltedSelector:
     """Build the existing empirical-q0 LDM selector."""
 
@@ -190,6 +210,9 @@ def build_synthon_selector(
         ),
         alpha=alpha, eta=eta, z_clip=z_clip, seed=selection_seed,
         pool_size=bo_pool_size, proposal_sample_count=proposal_samples,
+        policy_controller=policy_controller,
+        policy_adapter=policy_adapter,
+        policy_mode=policy_mode,
     )
 
 
@@ -211,7 +234,7 @@ def build_base_synthon_selector(
 
 
 def _search_components(options: CampaignComponentOptions, reactions):
-    if options.search_method == "llm":
+    if options.search_method in {"llm", "harness"}:
         return None, None
     encoder = SynthonNystromEncoder(
         options.official_task.space, reactions, landmark_count=options.gp_landmarks,
@@ -229,6 +252,9 @@ def _search_components(options: CampaignComponentOptions, reactions):
         gp_mean_std=options.gp_mean_std, gp_observation_noise_std=options.gp_observation_noise_std,
         acquisition_beta=options.acquisition_beta, alpha=options.alpha, eta=options.eta,
         z_clip=options.z_clip, bo_pool_size=options.bo_pool_size, proposal_samples=options.proposal_samples,
+        policy_controller=options.policy_controller,
+        policy_adapter=options.policy_adapter,
+        policy_mode=options.search_method == COMPILED_POLICY_METHOD,
     )
 
 
@@ -237,16 +263,20 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
         search: ReservoirExpander = RandomSynthonPoolExpander(
             options.official_task.space, reactions, seed=options.selection_seed
         )
-    elif options.proposal_backend == "harness":
+    elif options.search_method in PERSISTENT_HARNESS_METHODS:
         assert options.harness_client is not None
         search = SynthonHarnessExpander(
             options.harness_client,
             domain,
             target=options.target,
             profiles=options.harness_profiles,
+            candidates_per_profile=options.harness_candidates_per_profile,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
+            attach_empirical_q0=options.search_method in PARALLEL_HARNESS_METHODS,
             account=options.account_harness_usage,
+            artifact_root=options.runtime.run_dir / "harness",
+            wall_time_seconds=options.harness_wall_time_seconds,
         )
     else:
         catalog = SynthonProposalCatalog(
@@ -272,7 +302,7 @@ def _expander(options: CampaignComponentOptions, domain: SynthonCandidateDomain,
     return InitialRoundReservoirExpander(
         initializer=SynthonInitializationExpander(
             options.official_task.space, reactions, seed=options.selection_seed,
-            attach_q0=options.search_method == "ldm",
+            attach_q0=options.search_method in ACQUISITION_TILTED_METHODS,
         ),
         search_expander=search,
         initial_reservoir_size=options.evaluations_per_round,

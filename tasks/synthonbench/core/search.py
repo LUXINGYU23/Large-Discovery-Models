@@ -19,7 +19,20 @@ from tasks.synthonbench.core.space_order import (
 
 
 INITIALIZATION_MODES = ("none", "shared_random")
-SEARCH_METHODS = ("ldm", "bo", "llm")
+COMPILED_POLICY_METHOD = "ldm_harness_compiled"
+ACQUISITION_TILTED_METHODS = frozenset(
+    ("ldm", "ldm_harness", COMPILED_POLICY_METHOD)
+)
+PARALLEL_HARNESS_METHODS = frozenset(("ldm_harness", COMPILED_POLICY_METHOD))
+PERSISTENT_HARNESS_METHODS = frozenset((*PARALLEL_HARNESS_METHODS, "harness"))
+SEARCH_METHODS = (
+    "ldm",
+    "ldm_harness",
+    COMPILED_POLICY_METHOD,
+    "bo",
+    "llm",
+    "harness",
+)
 
 
 class SynthonInitializationExpander:
@@ -149,6 +162,13 @@ def _round_seed(seed: int, round_idx: int) -> int:
 
 
 __all__ = [
-    "INITIALIZATION_MODES", "RandomSynthonPoolExpander", "SEARCH_METHODS",
-    "SynthonInitializationExpander", "sample_unique_products",
+    "ACQUISITION_TILTED_METHODS",
+    "COMPILED_POLICY_METHOD",
+    "INITIALIZATION_MODES",
+    "PARALLEL_HARNESS_METHODS",
+    "PERSISTENT_HARNESS_METHODS",
+    "RandomSynthonPoolExpander",
+    "SEARCH_METHODS",
+    "SynthonInitializationExpander",
+    "sample_unique_products",
 ]
