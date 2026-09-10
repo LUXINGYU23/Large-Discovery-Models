@@ -8,8 +8,12 @@ empirical rationale, not novelty for its own sake.
 
 ## Research records
 
-Each object in `candidates.json` must contain exactly `mutations`,
-`change_summary`, and `rationale`. Write concise English notes before evaluation:
+Each object in `candidates.json` requires `mutations`, `change_summary`, and
+`rationale`; optional `comparison_candidate_ids` must name exact measured IDs.
+Load precise records from the tools' read-only `guest_file.path` in scripts,
+without copying IDs or DNA from prose. Unfiltered history exports contain the
+complete evaluated set; private proposals and compaction notes are not exclusions.
+Write concise English notes before evaluation:
 one sentence describing the actual change and one stating its testable hypothesis,
 expected effect, or control purpose. Identify any measured comparison explicitly.
 Keep detailed calculations and citations in separate workspace notes. Update the

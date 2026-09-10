@@ -450,6 +450,7 @@ export class PersistentProfileSession {
 						id: this.config.model,
 						name: this.config.model,
 						reasoning: true,
+						compat: { supportsStrictMode: true },
 						thinkingLevelMap: {
 							off: "none",
 							minimal: "minimal",
@@ -558,7 +559,8 @@ export class PersistentProfileSession {
 	}
 
 	private async snapshotResources(agents: string): Promise<string[]> {
-		await rm(this.resourceRoot, { recursive: true, force: true });
+		// Keep task-owned data files referenced by the persistent session.
+		await rm(join(this.resourceRoot, "skills"), { recursive: true, force: true });
 		await mkdir(this.resourceRoot, { recursive: true });
 		const agentsPath = join(this.resourceRoot, "AGENTS.md");
 		await writeFile(agentsPath, agents, "utf8");
@@ -664,7 +666,7 @@ export class PersistentProfileSession {
 					toolCalls: policySummary.toolCalls,
 					artifactBytes: providerSummary.artifactBytes,
 				},
-			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|\b(?:408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
+			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
 		}
 		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);

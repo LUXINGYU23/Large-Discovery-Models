@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const catalogPath = process.env.LDM_SYNTHON_SPACE_CATALOG;
 if (!catalogPath) throw new Error("LDM_SYNTHON_SPACE_CATALOG is required");
@@ -19,6 +21,16 @@ const reactions = new Map(catalog.reactions.map((reaction) => [reaction.reaction
 
 function jsonResult(value) {
 	return { content: [{ type: "text", text: JSON.stringify(value) }], details: value };
+}
+
+function exportData(ctx, value) {
+	const body = JSON.stringify(value);
+	const sha256 = createHash("sha256").update(body).digest("hex");
+	const directory = join(ctx.cwd, ".ldm-resources", "research");
+	mkdirSync(directory, { recursive: true });
+	const path = join(directory, `${sha256}.json`);
+	if (!existsSync(path)) writeFileSync(path, body);
+	return { path: `/workspace/.ldm-resources/research/${sha256}.json`, sha256 };
 }
 
 function reaction(value) {
@@ -63,6 +75,7 @@ export default function synthonSpaceTools(pi) {
 
     pi.registerTool({
         name: "get_measured_history",
+        promptGuidelines: ["Read exact records from guest_file.path in sandbox scripts. The file includes all matching detailed rows, independent of pagination or response_format. Omit candidate_ids and round_index to export the complete authoritative evaluated set; previous proposal files are not exclusions."],
         label: "Read measured research history",
         description: "Query evaluated candidates by ID or round. Concise results contain IDs, round, status and synthon_utility; request detailed for exact candidates and original research annotations. Follow next_offset. Unmeasured proposals are not exposed.",
         parameters: {
@@ -77,7 +90,7 @@ export default function synthonSpaceTools(pi) {
             },
             additionalProperties: false,
         },
-        async execute(_id, params) {
+        async execute(_id, params, _signal, _update, ctx) {
             const observations = measuredHistory();
             const ids = new Set(params.candidate_ids ?? []);
             const matched = observations.filter((row) =>
@@ -106,6 +119,10 @@ export default function synthonSpaceTools(pi) {
             }
             const known = new Set(observations.map((row) => row.candidate_id));
             return jsonResult({
+                guest_file: exportData(ctx, {
+                    complete_evaluated_history: ids.size === 0 && params.round_index === undefined,
+                    observations: matched,
+                }),
                 total: matched.length, offset,
                 next_offset: offset + page.length < matched.length ? offset + page.length : null,
                 observations: page,
@@ -141,10 +158,10 @@ export default function synthonSpaceTools(pi) {
 	pi.registerTool({
 		name: "search_synthon_space",
 		label: "Search official SynthonSpace",
-		description: "Retrieve valid official synthons and public SMILES for one reaction, optionally restricted to a slot or text query.",
+		description: "Retrieve valid official synthons and public SMILES for one reaction, optionally restricted to a slot or text query. guest_file contains all matching synthons for scripts; the response is paginated.",
 		promptSnippet: "search_synthon_space: inspect exact legal synthon IDs and structures for a chosen reaction",
 		parameters: searchParameters,
-		async execute(_id, params) {
+		async execute(_id, params, _signal, _update, ctx) {
 			const item = reaction(params.reaction_id);
 			const offset = params.offset ?? 0;
 			const limit = params.limit ?? 30;
@@ -153,21 +170,23 @@ export default function synthonSpaceTools(pi) {
 				? item.positions
 				: item.positions.filter((slot) => slot.position === params.position);
 			if (slots.length === 0) throw new Error("position is not valid for this reaction");
+			const matchedSlots = slots.map((slot) => {
+				const matches = query
+					? slot.synthons.filter((synthon) => synthon.smiles.toLowerCase().includes(query)
+						|| String(synthon.synthon_id).includes(query))
+					: slot.synthons;
+				return { position: slot.position, synthons: matches };
+			});
 			return jsonResult({
+				guest_file: exportData(ctx, { reaction_id: item.reaction_id, slots: matchedSlots }),
 				reaction_id: item.reaction_id,
-				slots: slots.map((slot) => {
-					const matches = query
-						? slot.synthons.filter((synthon) => synthon.smiles.toLowerCase().includes(query)
-							|| String(synthon.synthon_id).includes(query))
-						: slot.synthons;
-					return {
-						position: slot.position,
-						total_matches: matches.length,
-						offset,
-						next_offset: offset + limit < matches.length ? offset + limit : null,
-						synthons: matches.slice(offset, offset + limit),
-					};
-				}),
+				slots: matchedSlots.map((slot) => ({
+					position: slot.position,
+					total_matches: slot.synthons.length,
+					offset,
+					next_offset: offset + limit < slot.synthons.length ? offset + limit : null,
+					synthons: slot.synthons.slice(offset, offset + limit),
+				})),
 			});
 		},
 	});

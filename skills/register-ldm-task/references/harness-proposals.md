@@ -24,6 +24,11 @@ to the other. Qualify the exact configured endpoint with an actual request and
 verify the transmitted body or nonzero reasoning-token accounting; a value in
 YAML alone does not prove that the provider honored it.
 
+Verify the effective tool schema too. If a tool depends on omitted arguments,
+exercise omission through the selected SDK and endpoint. Prefer the SDK's
+existing strict-mode capability over payload rewriting or invented placeholder
+values. Generation constraints never replace authoritative task validation.
+
 Concurrent direct sampling must tolerate transient provider throttling without
 turning a requested batch into a smaller one. Use bounded transport retries
 with backoff for the same logical proposal, and set any shared circuit-breaker
@@ -59,6 +64,11 @@ and guest settings. Keep `HarnessPoolConfig` and the shared client backend-neutr
   round and rank before requesting detail. Project records from engine
   observations; do not create a second optimization history. Proposal and
   policy sessions may share that projection read-only.
+- Let scripts consume exact scientific inputs without model transcription.
+  Export queried records into the existing read-only guest resource directory
+  with stable identities and digests. State whether files contain a filtered
+  subset or the full measured set. Mutable drafts and private proposal notes
+  are not authoritative history, even after compaction.
 - Enforce exact historical membership in task validation, including failed
   evaluations when the task forbids reevaluation. Expose the same membership
   check to the Agent. Do not rely on its context or compaction memory.
@@ -70,6 +80,9 @@ and guest settings. Keep `HarnessPoolConfig` and the shared client backend-neutr
   candidate metadata rather than the oracle payload. Preserve all contributing
   notes across canonical admission and checkpointing; return them with measured
   history, not unmeasured cross-session proposals.
+  Validate any structured comparison references against the declared evidence
+  source and return indexed repair errors. Do not impose a parent-tree schema
+  on tasks whose research does not use one.
 - Return one stable, actionable `HarnessSubmissionError` with a JSON Pointer,
   code, message, and repair hint for each invalid entry. Return `retry` until a
   complete valid minibatch is available; use `reject_turn` only when the
@@ -88,6 +101,8 @@ and guest settings. Keep `HarnessPoolConfig` and the shared client backend-neutr
   or a fixed quota. When historical repeats are forbidden, only evaluated
   candidates belong to the exclusion set; prior unmeasured proposals remain
   eligible. Sessions must not invent a private exclusion set.
+  Publish the same actual sampling facts to proposal and policy Agents; static
+  instructions must not contradict the configured repeat or replicate rules.
 - Select task-relevant Skills on demand; do not inject their full text on every
   turn. Pin adapted sources and licenses, remove irrelevant workflows, and
   preinstall only the dependencies promised by the profile. Run a guest smoke

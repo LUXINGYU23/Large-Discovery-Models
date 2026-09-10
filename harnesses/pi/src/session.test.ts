@@ -107,6 +107,16 @@ test("partial-turn continuation keeps history and classifies execution failures"
 	const root = await mkdtemp(join(tmpdir(), "ldm-failed-turn-"));
 	try {
 		const messages: string[] = [];
+		const failures = [
+			"session wall-time limit reached: 1800s",
+			"provider response failed: server_error: An error occurred while processing your request.",
+			"provider response failed: internal_server_error: Try again later.",
+			"provider response failed: overloaded_error: Try again later.",
+			"provider response failed: rate_limit_exceeded: Slow down.",
+			"provider response failed: request_timeout: Try again later.",
+			"provider response failed: 401 unauthorized",
+			"provider response failed: insufficient_quota: Check billing.",
+		];
 		const profile = Object.assign(Object.create(PersistentProfileSession.prototype), {
 			profileRoot: join(root, "sessions/research"),
 			profile: { profileId: "research" }, config: { artifactRoot: root, limits: {}, submissionContract: { toolName: "submit_candidates" } },
@@ -116,7 +126,7 @@ test("partial-turn continuation keeps history and classifies execution failures"
 			proxy: { beginTurn: async () => {}, endTurn: async () => ({ providerCalls: 3, artifactBytes: 120 }) },
 			promptWithTimeout: async (message: string) => {
 				messages.push(message);
-				throw new Error(messages.length === 1 ? "session wall-time limit reached: 1800s" : "provider response failed: 401 unauthorized");
+				throw new Error(failures[messages.length - 1]);
 			},
 		});
 		await assert.rejects(profile.runTurn({
@@ -128,9 +138,15 @@ test("partial-turn continuation keeps history and classifies execution failures"
 				usage: { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120 } }]);
 			return true;
 		});
-		await assert.rejects(profile.runTurn({
-			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
-		}, async () => ({})), (error: unknown) => error instanceof TurnExecutionError && !error.retryable);
+		for (let index = 1; index < failures.length; index += 1) {
+			await assert.rejects(profile.runTurn({
+				profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
+			}, async () => ({})), (error: unknown) => {
+				assert.ok(error instanceof TurnExecutionError);
+				assert.equal(error.retryable, index < failures.length - 2, failures[index]);
+				return true;
+			});
+		}
 		assert.match(messages[0]!, /ORIGINAL_HISTORY/);
 		assert.doesNotMatch(messages[1]!, /ORIGINAL_HISTORY/);
 		assert.match(messages[1]!, /Continue the interrupted turn.*Tool budgets have not reset/);

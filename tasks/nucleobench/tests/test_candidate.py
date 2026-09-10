@@ -8,6 +8,7 @@ import pytest
 
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from ldm_tts.data import DataCollectionSink, read_jsonl
+from ldm_tts.engine.run_store import CampaignRuntime
 from tasks.nucleobench.core.candidate import (
     CandidatePayloadError,
     MutationContext,
@@ -17,6 +18,7 @@ from tasks.nucleobench.core.candidate import (
 )
 from tasks.nucleobench.core.cases import get_case
 from tasks.nucleobench.core.evaluator import NucleoBenchEvaluator
+from tasks.nucleobench.core.oracles.official import RecordingSequenceModel
 
 
 def _context() -> MutationContext:
@@ -147,8 +149,15 @@ def test_domain_collects_only_admitted_collectable_patches(tmp_path: Path) -> No
     assert "A" * 200 not in (tmp_path / "collection" / "ldm_ir.jsonl").read_text()
 
 
-def test_batch_evaluator_rebuilds_sequences_once_at_the_oracle_boundary() -> None:
-    domain = NucleoBenchCandidateDomain(_context())
+@pytest.mark.parametrize(
+    ("batch_size", "expected_calls"),
+    [(None, [3]), (1, [1, 1, 1]), (2, [2, 1]), (8, [3])],
+)
+def test_batch_evaluator_preserves_scores_order_and_oracle_accounting(
+    tmp_path: Path, batch_size: int | None, expected_calls: list[int]
+) -> None:
+    context = _context()
+    domain = NucleoBenchCandidateDomain(context)
     candidates = [
         domain.admit(
             RawProposal(
@@ -156,17 +165,50 @@ def test_batch_evaluator_rebuilds_sequences_once_at_the_oracle_boundary() -> Non
                 "test",
             )
         )
-        for position, base in ((0, "C"), (1, "G"))
+        for position, base in ((0, "C"), (1, "G"), (2, "T"))
     ]
     assert all(isinstance(candidate, Candidate) for candidate in candidates)
     received: list[str] = []
 
     def score(sequences):
         received.extend(sequences)
-        return [-1.0, -2.0]
+        return [-1.0 if sequence[0] == "C" else -2.0 for sequence in sequences]
 
-    results = NucleoBenchEvaluator(_context(), score).evaluate_batch(candidates)
+    runtime = CampaignRuntime.open(tmp_path / "run", task="nucleobench")
+    model = RecordingSequenceModel(score, runtime)
+    results = NucleoBenchEvaluator(
+        context, model, batch_size=batch_size
+    ).evaluate_batch(candidates)
 
-    assert received == ["C" + "A" * 199, "AG" + "A" * 198]
-    assert [result.metrics["utility"] for result in results] == [1.0, 2.0]
+    assert received == ["C" + "A" * 199, "AG" + "A" * 198, "AAT" + "A" * 197]
+    assert [result.metrics["utility"] for result in results] == [1.0, 2.0, 2.0]
+    assert [result.candidate_id for result in results] == [
+        item.candidate_id for item in candidates
+    ]
+    assert runtime.budget.counters["official_model_sequences"] == 3
+    assert runtime.budget.counters["official_model_calls"] == len(expected_calls)
+    assert [
+        event["payload"]["batch_size"]
+        for event in runtime.events()
+        if event["event_type"] == "official_model_called"
+    ] == expected_calls
+    assert all(result.resource_usage["oracle_calls"] == 1.0 for result in results)
     assert all("sequence" not in result.artifacts for result in results)
+
+
+def test_evaluator_rejects_a_partial_microbatch_result() -> None:
+    context = _context()
+    domain = NucleoBenchCandidateDomain(context)
+    candidate = domain.admit(
+        RawProposal({"mutations": [{"position": 0, "base": "C"}]}, "test")
+    )
+    with pytest.raises(ValueError, match="wrong number of energies"):
+        NucleoBenchEvaluator(context, lambda sequences: [], batch_size=1).evaluate_batch(
+            [candidate]
+        )
+
+
+@pytest.mark.parametrize("batch_size", [0, -1, True, 1.5])
+def test_evaluator_rejects_invalid_microbatch_size(batch_size) -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        NucleoBenchEvaluator(_context(), lambda sequences: [], batch_size=batch_size)

@@ -6,6 +6,11 @@ web extensions, task-defined terminal submission, and raw model-provider
 transport capture. Task validation, optimization history, `q0`, GP inference,
 acquisition, and evaluation remain in Python.
 
+The Responses model declares `supportsStrictMode` so Pi explicitly transmits
+each tool's strict policy. Ordinary tools use `strict:false`, preserving omitted
+optional arguments instead of provider-side schema normalization. Task validators
+still enforce complete submissions and scientific legality before commit.
+
 For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
 [`docs/research-harness.md`](../../docs/research-harness.md).
@@ -169,6 +174,9 @@ counts. If a provider stream ends before a committed batch, the sidecar
 continues the existing work with tools available for repair within the same
 wall-time window and retains every raw attempt. Partial-turn recovery continues
 attempt numbering rather than replacing earlier artifact snapshots.
+Transient provider failures, including structured `server_error` responses,
+use the task's recovery window and backoff. Already committed sessions are
+replayed without regeneration; authentication and contract errors remain fatal.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
 artifacts, read-only task resources, and the selected guest cache explicitly.

@@ -29,7 +29,13 @@ but reserve time to validate, evaluate, repair, and submit one terminal action.
 Use the returned `guest_snapshot.directory` to load the read-only authoritative
 `arrays.npz` and JSON feature contract for sandbox calculations. Do not
 reconstruct numeric rows by hand. Use `prediction_feedback` to audit measured
-prediction errors. When weight design is enabled, also compare default logit
+prediction errors. Read `weight_context.proposal_sampling` for the actual
+session count, minibatch size and repeat rule; frequency is preference, not
+independent experimental replication. Use SciPy for tie-aware rank statistics,
+grouped by measurement round; constant inputs have undefined correlation.
+Use `get_measured_history`'s read-only `guest_file` to load exact comparisons
+and their validated `comparison_candidate_ids` without copying long IDs.
+When weight design is enabled, also compare default logit
 ranges, per-candidate probabilities, and `optimization_progress` in the weight
 context. Frozen errors concern measured
 selections only, not the entire domain. Deliberate occurrence repetitions

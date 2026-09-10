@@ -54,9 +54,10 @@ def test_catalog_covers_the_pinned_public_suite() -> None:
     }
     states = {case.case_id: case.state for case in cases}
     assert states["malinois_k562"] == "qualified"
+    assert states["enformer_muscle_not_liver"] == "qualified"
     assert states["rinalmo_mrl"] == "planned"
     assert set(states.values()) == {"planned", "prepared", "qualified"}
-    assert sum(state == "prepared" for state in states.values()) == 15
+    assert sum(state == "prepared" for state in states.values()) == 14
 
     upstream = json.loads(
         (TASK_ROOT / "resources" / "upstream_contract.json").read_text(encoding="utf-8")
@@ -104,10 +105,22 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
         "benchmark_comparable": False,
         "execution_profile": "qualification",
         "hardware_profile": "n1-highmem-16-cpu",
+        "oracle_batch_size": 1,
         "initialization_evaluations": 1,
         "termination_kind": "rounds",
         "total_rounds": 2,
     }
+
+
+def test_oracle_minibatch_is_independent_of_the_selection_batch() -> None:
+    common = ["--case-id", "enformer_muscle_not_liver", "--evaluations-per-round", "128"]
+    args = parse_args(common)
+    assert args.oracle_batch_size == 4
+    args = parse_args([*common, "--oracle-batch-size", "8"])
+    assert args.oracle_batch_size == 8 and args.evaluations_per_round == 128
+    assert parse_args(["--evaluations-per-round", "128"]).oracle_batch_size == 128
+    with pytest.raises(SystemExit):
+        parse_args(["--oracle-batch-size", "0"])
 
 
 def test_every_declared_case_builds_the_same_dry_run_workflow(capsys) -> None:

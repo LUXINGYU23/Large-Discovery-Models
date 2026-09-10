@@ -255,8 +255,8 @@ file is not exposed to the agent shell. Every submitted tuple is validated
 again against the official Python object before entering LDM.
 
 Each session writes `candidates.json` with only a `candidates` array and submits
-`{"artifact_path":"candidates.json"}`. Each entry contains exactly
-`reaction_id`, `synthon_ids`, `change_summary`, and `rationale`; the two
+`{"artifact_path":"candidates.json"}`. Each entry contains
+`reaction_id`, `synthon_ids`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`; the two
 English research notes describe the chemical change and its hypothesis.
 The task validates the immutable snapshot, official tuple, historical
 exclusion, annotations, and exact count before commit. Each minibatch must
@@ -267,6 +267,15 @@ A prior proposal that remains unmeasured is still eligible. Equal new tuples
 from different sessions remain separate raw occurrences for empirical `q0`,
 and all contributing research notes survive canonical deduplication into the
 measured record. There is no profile-balanced correction or per-session `q0`.
+
+History and synthon searches also return a read-only `guest_file` with a path
+and SHA-256, containing all matching detailed records independently of response
+pagination. An unfiltered history export is the complete evaluated set. Scripts
+load exact IDs and SMILES from these files; private proposal files are not
+exclusions. Optional `comparison_candidate_ids` must refer to measured records;
+unknown IDs receive indexed repair errors. References remain metadata, not
+oracle inputs or GP features. `weight_context.proposal_sampling` supplies the
+policy with the actual session count, panel size and repeat rules.
 
 Both proposal methods load the comprehensive template and task-local
 `rdkit`, `experimental-design`, `scientific-critical-thinking`, and

@@ -20,6 +20,15 @@ class NucleoBenchEvaluator:
 
     context: MutationContext
     score_sequences: Callable[[Sequence[str]], Sequence[float]]
+    batch_size: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.batch_size is not None and (
+            isinstance(self.batch_size, bool)
+            or not isinstance(self.batch_size, int)
+            or self.batch_size < 1
+        ):
+            raise ValueError("oracle batch size must be a positive integer")
 
     def evaluate(self, candidate: Candidate) -> EvaluationResult:
         return self.evaluate_batch((candidate,))[0]
@@ -42,9 +51,14 @@ class NucleoBenchEvaluator:
                 rebuild_sequence(self.context.start_sequence, item.payload["mutations"])
             )
 
-        energies = tuple(self.score_sequences(sequences))
-        if len(energies) != len(candidates):
-            raise ValueError("batch scorer returned the wrong number of energies")
+        batch_size = self.batch_size or max(1, len(sequences))
+        energies = []
+        for offset in range(0, len(sequences), batch_size):
+            batch = sequences[offset:offset + batch_size]
+            batch_energies = tuple(self.score_sequences(batch))
+            if len(batch_energies) != len(batch):
+                raise ValueError("batch scorer returned the wrong number of energies")
+            energies.extend(batch_energies)
 
         results = []
         for candidate, item, raw_energy in zip(

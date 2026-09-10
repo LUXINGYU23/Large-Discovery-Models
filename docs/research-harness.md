@@ -44,6 +44,11 @@ private research transcript. A task sends initial measurement indexes and then
 monotonic deltas. Its tools and validator check the authoritative evaluated set;
 full candidate details can be retrieved on demand.
 
+The reference tasks' query tools also export exact data into read-only guest
+files. The tool returns a guest-visible path and SHA-256; scripts read those
+files without retranscribing model-visible records. Content and filtering remain
+task-owned. Private proposal files never become authoritative measurement history.
+
 ## Shared Interface
 
 The public `ldm_tts.harness` package provides:
@@ -170,6 +175,9 @@ Task-local history tools may filter by ID or round, sort, and paginate detailed
 records with original research notes. Build this read-only projection from
 engine observations, not private session transcripts. Annotation schemas,
 candidate identity, and within-session duplicate rules remain task-owned.
+The reference tasks accept optional `comparison_candidate_ids` in research
+annotations and validate every supplied ID against measured history. These
+references do not change candidate identity, `q0`, or numerical GP features.
 Independent profiles may share an instruction template without sharing private
 workspaces. Load selected Skills on demand and keep their dependencies in the
 task guest recipe; the shared Harness must not import scientific packages.

@@ -381,6 +381,7 @@ def test_rejection_reasons_identify_invalid_values_notes_and_duplicates(
         _submission(tmp_path, {"candidates": rows}),
         domain,
         {history.canonical_key},
+        measured_candidate_ids={history.candidate_id},
         artifact_root=tmp_path,
         candidate_count=5,
     )
@@ -410,10 +411,35 @@ def test_invalid_file_shape_and_count(tmp_path, domain_and_payloads, payload):
         domain,
         set(),
         artifact_root=tmp_path,
+        measured_candidate_ids=set(),
         candidate_count=1,
     )
     assert validation.decision == "retry"
     assert validation.errors[0].code == "invalid_candidate_file"
+
+
+def test_comparison_reference_repair_and_annotation_preservation(tmp_path, domain_and_payloads):
+    domain, payloads = domain_and_payloads
+    measured = _observation(domain, payloads[0], round_idx=0)
+    candidate = _annotated(payloads[1])
+    candidate["comparison_candidate_ids"] = ["mistyped-id"]
+    def validate():
+        return _validate_submission(
+            _submission(tmp_path, {"candidates": [candidate]}), domain, {measured.canonical_key},
+            measured_candidate_ids={measured.candidate_id}, artifact_root=tmp_path, candidate_count=1,
+        )
+    rejected = validate()
+    assert rejected.errors[0].code == "unknown_comparison_candidate"
+    assert rejected.errors[0].path == "/candidates/0/comparison_candidate_ids/0"
+    assert "mistyped-id" in rejected.errors[0].message
+    candidate["comparison_candidate_ids"] = [measured.candidate_id]
+    assert validate().decision == "accept"
+    from tasks.synthonbench.core.harness import _submission_candidate
+    prepared, annotation = _submission_candidate(candidate, domain)
+    assert annotation["comparison_candidate_ids"] == [measured.candidate_id]
+    assert "comparison_candidate_ids" not in prepared.payload
+    candidate["comparison_candidate_ids"] = measured.candidate_id
+    assert validate().errors[0].code == "invalid_comparison_reference"
 
 
 def test_snapshot_admission_rejects_tampering(tmp_path, domain_and_payloads):
@@ -423,7 +449,7 @@ def test_snapshot_admission_rejects_tampering(tmp_path, domain_and_payloads):
 
     def validate(value):
         return _validate_submission(
-            value, domain, set(), artifact_root=tmp_path, candidate_count=1
+            value, domain, set(), measured_candidate_ids=set(), artifact_root=tmp_path, candidate_count=1
         )
 
     assert validate(submitted).decision == "accept"
@@ -498,18 +524,39 @@ def test_history_tool_reads_fresh_pages_and_checks_exact_membership(
     extension = Path(__file__).parents[1] / "resources/harness/tools/synthon_space.mjs"
     script = """
 import assert from 'node:assert/strict';
-import {writeFileSync} from 'node:fs';
+import {readFileSync, writeFileSync} from 'node:fs';
+import {dirname} from 'node:path';
+import {createHash} from 'node:crypto';
 const {default: load} = await import(process.argv[1]);
 const tools = new Map();
 load({registerTool: tool => tools.set(tool.name, tool)});
-const read = async args => (await tools.get('get_measured_history').execute('test', args)).details;
+const ctx = {cwd: dirname(process.env.LDM_SYNTHONBENCH_HISTORY)};
+const read = async args => (await tools.get('get_measured_history').execute('test', args, undefined, undefined, ctx)).details;
+const exported = result => {
+  const body = readFileSync(result.guest_file.path.replace('/workspace', ctx.cwd));
+  assert.equal(createHash('sha256').update(body).digest('hex'), result.guest_file.sha256);
+  return JSON.parse(body);
+};
 const validate = async args => (await tools.get('validate_synthon_candidate').execute('test', args)).details;
 const rows = JSON.parse(process.argv[2]);
 const candidates = JSON.parse(process.argv[3]);
+const search = async args => (await tools.get('search_synthon_space').execute('test', args, undefined, undefined, ctx)).details;
+const reaction = JSON.parse(readFileSync(process.env.LDM_SYNTHON_SPACE_CATALOG, 'utf8')).reactions[0];
+const space = await search({reaction_id: reaction.reaction_id, limit: 1});
+assert.deepEqual(exported(space).slots, reaction.positions);
+assert.equal(space.slots[0].synthons.length, 1);
+const position = reaction.positions[0].position;
+const query = String(reaction.positions[0].synthons[0].synthon_id);
+const filtered = exported(await search({reaction_id: reaction.reaction_id, position, query}));
+assert.deepEqual(filtered.slots, [{position, synthons: reaction.positions[0].synthons.filter(s => s.smiles.toLowerCase().includes(query) || String(s.synthon_id).includes(query))}]);
 assert.equal((await read({})).total, 0);
 assert.equal((await validate(candidates[0])).already_evaluated, false);
 writeFileSync(process.env.LDM_SYNTHONBENCH_HISTORY, JSON.stringify({observations: rows}));
 assert.equal((await read({limit: 1})).next_offset, 1);
+assert.equal(exported(await read({limit: 1})).observations.length, rows.length);
+assert.equal(exported(await read({})).complete_evaluated_history, true);
+assert.equal(exported(await read({round_index: 0})).complete_evaluated_history, false);
+assert.deepEqual(exported(await read({candidate_ids: [rows[0].candidate_id]})).observations, [rows[0]]);
 assert.deepEqual((await read({offset: 1, limit: 1, response_format: 'detailed'})).observations, [rows[1]]);
 assert.deepEqual((await read({round_index: 0, response_format: 'detailed'})).observations, [rows[0]]);
 assert.equal((await read({candidate_ids: [rows[0].candidate_id]})).observations[0].research_annotations, undefined);

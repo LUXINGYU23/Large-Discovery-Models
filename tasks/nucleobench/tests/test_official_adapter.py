@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 from argparse import Namespace
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -396,6 +397,12 @@ def test_official_loader_dispatches_every_model_family(
         device=lambda value: value,
         cuda=SimpleNamespace(is_available=lambda: False),
     )
+
+    @contextmanager
+    def inference_mode():
+        yield
+
+    fake_torch.inference_mode = inference_mode
     fake_lightning = SimpleNamespace(
         LightningModel=SimpleNamespace(
             load_from_checkpoint=lambda *_args, **_kwargs: "checkpoint"

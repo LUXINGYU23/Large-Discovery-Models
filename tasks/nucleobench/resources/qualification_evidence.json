@@ -45,17 +45,19 @@
       "status": "passed",
       "evidence": [
         "config/nucleobench/malinois_k562_seed_qualification.yaml",
-        "tasks/nucleobench/resources/verification_record.json"
+        "tasks/nucleobench/resources/verification_record.json",
+        "tasks/nucleobench/resources/enformer_qualification.json"
       ],
-      "description": "The first paired start was evaluated by the unchanged source-pinned Malinois oracle."
+      "description": "Paired starts were evaluated by the source-pinned Malinois and Enformer oracles."
     },
     "tiny_campaign_verified": {
       "status": "passed",
       "evidence": [
         "config/nucleobench/malinois_k562_tiny_campaign.yaml",
-        "tasks/nucleobench/resources/verification_record.json"
+        "tasks/nucleobench/resources/verification_record.json",
+        "tasks/nucleobench/resources/enformer_qualification.json"
       ],
-      "description": "Direct LDM, four-session LDM Harness, one-session direct Harness, and completed-campaign resume paths passed real two-round qualification."
+      "description": "Malinois direct LDM, four-session LDM Harness, one-session direct Harness, and completed-campaign resume paths passed real two-round qualification. Enformer passed two active Harness-Compiled rounds with eight proposal sessions and minibatched official inference."
     },
     "campaign_qualified": {
       "status": "pending",

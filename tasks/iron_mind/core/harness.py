@@ -233,6 +233,9 @@ class IronMindHarnessExpander:
                     submission,
                     self.domain,
                     evaluated,
+                    measured_candidate_ids={
+                        item.candidate_id for item in request.observations
+                    },
                     artifact_root=self.artifact_root,
                     candidate_count=self.candidates_per_profile,
                 ),
@@ -332,6 +335,7 @@ class IronMindHarnessExpander:
                 else "Every accepted distinct candidate is directly measured."
             ),
             "novelty_contract": {
+                "session_count": len(self.profiles),
                 "evaluated_candidates_are_forbidden": True,
                 "prior_unmeasured_submissions_may_be_reproposed": True,
                 "same_round_cross_session_agreement_is_allowed": True,
@@ -339,6 +343,9 @@ class IronMindHarnessExpander:
                 "repeated_occurrences_contribute_to_empirical_q0": self.attach_empirical_q0,
             },
             "submission_contract": {
+                "optional_candidate_fields": {
+                    "comparison_candidate_ids": "Exact measured IDs from get_measured_history; omit if no measured comparison applies.",
+                },
                 "tool": "submit_candidates",
                 "artifact_path": "candidates.json",
                 "candidate_count": self.candidates_per_profile,
@@ -463,14 +470,22 @@ class IronMindHarnessExpander:
 
 def _submission_candidate(candidate: Any, domain: IronMindCandidateDomain):
     fields = {*_CANDIDATE_FIELDS, "change_summary", "rationale"}
-    if not isinstance(candidate, dict) or set(candidate) != fields:
-        raise ValueError(f"Each candidate must contain exactly {sorted(fields)}.")
+    if (
+        not isinstance(candidate, dict)
+        or not fields <= set(candidate)
+        or set(candidate) - fields - {"comparison_candidate_ids"}
+    ):
+        raise ValueError(
+            f"Each candidate requires {sorted(fields)} and may include comparison_candidate_ids."
+        )
     annotation = {}
     for name in ("change_summary", "rationale"):
         value = candidate[name]
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{name} must be a non-empty short English research note.")
         annotation[name] = value.strip()
+    if "comparison_candidate_ids" in candidate:
+        annotation["comparison_candidate_ids"] = candidate["comparison_candidate_ids"]
     payload = {name: candidate[name] for name in _CANDIDATE_FIELDS}
     return prepare_candidate_payload(payload, domain.schema, domain.table), annotation
 
@@ -480,6 +495,7 @@ def _validate_submission(
     domain: IronMindCandidateDomain,
     evaluated: set[str],
     *,
+    measured_candidate_ids: set[str],
     artifact_root: Path,
     candidate_count: int,
 ) -> HarnessSubmissionValidation:
@@ -550,6 +566,27 @@ def _validate_submission(
                 )
             )
         first_index_by_key.setdefault(key, index)
+        references = candidate.get("comparison_candidate_ids", [])
+        if not isinstance(references, list):
+            errors.append(
+                HarnessSubmissionError(
+                    f"{path}/comparison_candidate_ids",
+                    "invalid_comparison_reference",
+                    "comparison_candidate_ids must be an array of exact measured candidate IDs.",
+                    "Read IDs from get_measured_history; omit the field when no measured comparison applies.",
+                )
+            )
+            continue
+        for reference_index, reference in enumerate(references):
+            if not isinstance(reference, str) or reference not in measured_candidate_ids:
+                errors.append(
+                    HarnessSubmissionError(
+                        f"{path}/comparison_candidate_ids/{reference_index}",
+                        "unknown_comparison_candidate",
+                        f"Comparison reference {reference!r} is not an authoritative measured candidate ID.",
+                        "Copy the exact ID from get_measured_history's guest_file, or remove an unsupported comparison.",
+                    )
+                )
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors

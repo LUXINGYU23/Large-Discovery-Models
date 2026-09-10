@@ -28,13 +28,12 @@ This odds equation is the most useful way to reason about the controls:
 - Multiplying both by the same positive constant preserves the logit direction
   but changes softmax concentration, like inverse temperature.
 
-Same-round duplicate occurrences, including deliberate repetitions within one
-proposal minibatch, are meaningful mass in (q_0); they are not a validation
-defect. A proposing Agent may allocate several occurrence slots to one legal,
-historically unseen candidate when its evidence warrants stronger mass.
+Same-round accepted duplicate occurrences are meaningful mass in (q_0).
+Within-session repetition is allowed only when proposal_sampling declares it;
+otherwise frequency comes from cross-session agreement.
 Historical evaluated candidates have already been rejected before this stage.
 Multiplicity is an allocation of belief, not a count of independent experiments.
-Repeated slots from one session can dominate mass without stronger evidence.
+When permitted, repeated slots can dominate mass without stronger evidence.
 Being selected is not a successful objective measurement; being left unmeasured
 is not evidence for extra confidence. Do not reward vote escalation itself.
 
@@ -52,6 +51,10 @@ The stage string is provenance only. It has no computational effect.
 ## Read the diagnostics correctly
 
 The exact `weight_context` is in the exported `input.json["execution_context"]`.
+Read `proposal_sampling` for the actual number of sessions, slots per session,
+and within-session repeat rule. With unique panels, frequency comes from
+cross-session agreement; otherwise it may also express one Agent's repeated
+preference. Neither is independent experimental replication.
 It includes history size, pool and occurrence counts, task defaults, a (q_0)
 summary, and a baseline-acquisition summary. `candidate_predictions` adds each
 pool member's q0, raw GP mean/std/UCB, normalized acquisition, and default
@@ -67,6 +70,29 @@ an old q0 against the current pool's maximum; use its saved relative mass or
 rank within its original pool. First-draw probability is not the inclusion
 probability for a multi-candidate evaluation batch.
 
+For exploratory rank checks, use the research guest's SciPy, not
+`argsort(argsort(values))`, which arbitrarily breaks ties. Group frozen
+feedback by measurement round before calculating correlations:
+
+```python
+import numpy as np
+from scipy.stats import spearmanr
+
+def selected_round_spearman(rows, signal):
+    x = np.asarray([row[signal] for row in rows], dtype=float)
+    y = np.asarray([row["measured_utility"] for row in rows], dtype=float)
+    if len(x) < 2 or not (np.isfinite(x).all() and np.isfinite(y).all()):
+        return None
+    if np.ptp(x) == 0 or np.ptp(y) == 0:
+        return None
+    return float(spearmanr(x, y).statistic)
+```
+
+`None` means undefined, not zero correlation. Tied values receive average
+ranks, and permuting paired rows must leave the result unchanged. These are
+descriptions of adaptively selected points, not causal or whole-pool estimates.
+Research dependencies such as SciPy remain outside the submitted NumPy-only policy.
+
 Read `requested_evaluation_batch` and `effective_evaluation_batch` from the
 weight context, and compare the effective batch with the current pool size.
 A large batch can include most candidates even when the first-draw distribution
@@ -75,6 +101,12 @@ evaluated set. Do not claim selection benefit from entropy or first-draw odds
 alone. With `benchmark_time`, judge the value of further research and information
 gathering against the remaining opportunity to evaluate candidates. Time pressure
 does not itself establish surrogate reliability or proposal quality.
+
+On a fixed pool of N candidates with a complete batch of B, two weight policies
+can replace at most `min(B, N - B)` members of that batch. Check this opportunity
+before expensive policy research. Repeatedly choosing among drafts on the same
+historical folds can overfit those folds; a brief justified keep or baseline
+decision can be preferable to another search over uninformative diagnostics.
 
 Separate three questions:
 

@@ -165,6 +165,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-seconds", type=int)
     parser.add_argument("--reservoir-size", type=int, default=4)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
+    parser.add_argument("--oracle-batch-size", type=int)
     parser.add_argument("--proposal-samples", type=int)
     parser.add_argument("--bo-pool-size", type=int)
     parser.add_argument("--proposal-candidates-per-request", type=int)
@@ -238,6 +239,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _apply_derived_args(args: argparse.Namespace) -> None:
     if args.iterations is None and args.termination_kind == "rounds":
         args.iterations = 2
+    if args.oracle_batch_size is None:
+        case = MOCK_CASE if args.mock else get_case(args.case_id)
+        args.oracle_batch_size = (
+            4 if case.model_family == "enformer" else args.evaluations_per_round
+        )
     if args.proposal_mode is None:
         args.proposal_mode = (
             "openai" if args.search_method in {"ldm", "llm"} else "none"
@@ -286,6 +292,7 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     positive_counts = (
         "reservoir_size",
         "evaluations_per_round",
+        "oracle_batch_size",
         "proposal_samples",
         "bo_pool_size",
         "proposal_candidates_per_request",
@@ -565,6 +572,7 @@ def _execution_summary(args: argparse.Namespace) -> dict[str, Any]:
         "initialization_evaluations": 1,
         "benchmark_comparable": args.execution_profile == "official_benchmark" and args.resume_from is None,
         "hardware_profile": args.hardware_profile,
+        "oracle_batch_size": args.oracle_batch_size,
     }
 
 
@@ -748,6 +756,12 @@ def _run_real(
                     default_alpha=args.alpha,
                     default_eta=args.eta,
                     enabled_capabilities=tuple(args.policy_capability),
+                    proposal_sampling={
+                        "session_count": len(harness_client.config.profiles),
+                        "candidates_per_session": args.harness_candidates_per_session,
+                        "within_session_repeats_allowed": not args.harness_unique_candidates,
+                        "cross_session_agreement_allowed": True,
+                    },
                     evaluations_per_round=args.evaluations_per_round,
                     benchmark_clock=benchmark_clock,
                     measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
@@ -797,7 +811,9 @@ def _run_real(
     try:
         official = load_official_case(args.source_dir, prepared, runtime)
         state = _campaign_state(runtime, args.resume_from is not None)
-        evaluator = NucleoBenchEvaluator(prepared.context, official.model)
+        evaluator = NucleoBenchEvaluator(
+            prepared.context, official.model, batch_size=args.oracle_batch_size
+        )
         if not state.observations:
             runtime.consume("outer_iterations")
             state = initialize_designer_state(prepared.context, evaluator, runtime)
@@ -1325,6 +1341,7 @@ def _oracle_manifest(
             "model_name": prepared.context.case.model_name,
             "model_artifact_sha256": file_digest(prepared.model_artifact),
             "model_init_args": prepared.model_init_args,
+            "inference_batch_size": args.oracle_batch_size,
         },
         "official_runner": {
             "proposals_per_round": OFFICIAL_PROPOSALS_PER_ROUND,

@@ -98,9 +98,23 @@ sequences to check that its intended alternatives and controls actually change
 the claimed features, including relevant native motifs and motif interactions.
 Replace cosmetic padding with a useful comparison or a defensible opportunity
 for improvement. Keep each candidate's purpose in its existing `rationale`;
-do not add submission fields.
+keep detailed evidence in research notes.
 
 ## Candidate construction and submission
+
+Load exact data from tool-returned `guest_file.path` with JSON in your scripts;
+the file is read-only and identified by SHA-256. An unfiltered
+`get_measured_history` exports the complete evaluated set; filters restrict the
+file's records but pagination restricts only the displayed response. Refresh
+this input after new measurements. Private notes, previous proposal files and
+compaction summaries cannot override current eligibility. Keep measured inputs
+separate from writable drafts; never use the output candidates.json as history.
+
+When a design compares against measured candidates, put their exact IDs in the
+optional `comparison_candidate_ids` array. Copy IDs programmatically from the
+history file; unknown references are rejected with their item index. Omit this
+field for a hypothesis without measured comparisons. Valid references establish
+identity, not the correctness of a claimed mechanism; verify actual differences.
 
 - Every patch is relative to the original paired start, not the current best
   sequence. Retrieve a measured parent's exact bases with `get_sequence_window`
@@ -125,7 +139,7 @@ do not add submission fields.
   objects, not just the design labels or an earlier intermediate list.
 - Write `/workspace/candidates.json` with code. Its only top-level field is
   `candidates`, an array of exactly the requested count of objects containing
-  exactly `mutations`, `change_summary`, and `rationale`. Mutation entries contain
+  `mutations`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`. Mutation entries contain
   only integer `position` and `base`. Each English note is one short sentence:
   describe the actual change, then its testable hypothesis, expected effect, or
   control purpose. Identify any measured comparison explicitly. Keep detailed

@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -257,6 +258,7 @@ class NucleoBenchHarnessExpander:
                 submission,
                 self.domain.context,
                 evaluated,
+                measured_candidate_ids={item.candidate_id for item in request.observations},
                 artifact_root=self.artifact_root,
                 candidate_count=self.candidates_per_profile,
                 allow_repeated_occurrences=self.allow_repeated_occurrences,
@@ -308,7 +310,7 @@ class NucleoBenchHarnessExpander:
         benchmark_time = (
             None if self.benchmark_clock is None else self.benchmark_clock.snapshot()
         )
-        return tuple(
+        turns = tuple(
             HarnessTurn(
                 profile_id=profile.profile_id,
                 turn_id=_turn_id(
@@ -328,6 +330,7 @@ class NucleoBenchHarnessExpander:
                     request,
                     candidate_count=self.candidates_per_profile,
                     observations=summarize_measured_observations(serialized_history),
+                    session_count=len(self.profiles),
                     allow_repeated_occurrences=self.allow_repeated_occurrences,
                     attach_empirical_q0=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
@@ -341,6 +344,25 @@ class NucleoBenchHarnessExpander:
             )
             for profile in self.profiles
         )
+        restored = []
+        for turn in turns:
+            input_path = self.artifact_root / "sessions" / turn.profile_id / "turns" / turn.turn_id / "input.json"
+            if input_path.exists():
+                saved = json.loads(input_path.read_text(encoding="utf-8"))
+                old_prefix, old_body = saved["message"].split("\n\n", 1)
+                prefix, body = turn.message.split("\n\n", 1)
+                old_payload, payload = json.loads(old_body), json.loads(body)
+                # Replay the original round clock, but reject changes to any task semantics.
+                if "benchmark_time" in payload and "benchmark_time" in old_payload:
+                    for name in ("elapsed_seconds", "remaining_seconds"):
+                        payload["benchmark_time"][name] = old_payload["benchmark_time"][name]
+                if prefix != old_prefix or payload != old_payload:
+                    raise ValueError(f"Persisted Harness turn message changed: {turn.turn_id}")
+                turn = replace(turn, message=saved["message"])
+                if turn.to_dict() != saved:
+                    raise ValueError(f"Persisted Harness turn identity changed: {turn.turn_id}")
+            restored.append(turn)
+        return tuple(restored)
 
     def _proposals(
         self,
@@ -469,6 +491,7 @@ def _turn_message(
     *,
     candidate_count: int,
     observations: Sequence[dict[str, object]],
+    session_count: int,
     allow_repeated_occurrences: bool,
     attach_empirical_q0: bool,
     initial: bool,
@@ -517,6 +540,7 @@ def _turn_message(
             "description": "Concise results list IDs, utility and mutation count. Query by candidate IDs or round, sort by utility or recency, and page with next_offset. Use response_format=detailed to read exact patches and original design notes for selected IDs. Unmeasured proposals are not shared.",
         },
         "novelty_contract": {
+            "session_count": session_count,
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
             "required_not_evaluated_candidate_count": candidate_count,
@@ -527,6 +551,9 @@ def _turn_message(
         },
         "sequence_tools": list(HARNESS_TOOL_NAMES),
         "submission_contract": {
+            "optional_candidate_fields": {
+                "comparison_candidate_ids": "Exact measured IDs from get_measured_history; omit if no measured comparison applies.",
+            },
             "tool": "submit_candidates",
             "arguments": {"artifact_path": "candidates.json"},
             "file_format": {"candidates": [{
@@ -558,7 +585,7 @@ def _turn_message(
                 else "Your minibatch must contain distinct rebuilt sequences. Reordering a patch does not create a new candidate. Cross-session agreement remains allowed."
             ),
             "Build candidates.json with code and inspect counts and uniqueness without printing the entire array. Use validate_mutations for uncertain patches; submit_candidates validates the complete file.",
-            "Every candidate must include concise English change_summary and rationale strings. Name any comparison candidate explicitly. These notes are frozen before evaluation, do not affect candidate identity or q0, and must match the final patch after repairs. Keep detailed calculations and citations in your research notes.",
+            "Every candidate must include concise English change_summary and rationale strings. Use optional comparison_candidate_ids for exact measured references copied from get_measured_history's guest_file. Unknown references are rejected. Notes do not affect identity or q0 and must match the repaired patch.",
             "Use /workspace or relative paths in sandbox commands and scripts; sidecar paths under /artifacts are not mounted inside the guest.",
             "If a local check fails, fix its cause; do not disable assertions or bypass validation.",
             "On rejection, edit only the reported file entries, recheck the complete batch, and submit the same file path again. Do not retranscribe candidates in tool arguments.",
@@ -578,13 +605,13 @@ def _turn_message(
 def _submission_candidate(
     candidate: dict[str, Any],
     context: MutationContext,
-) -> tuple[PreparedMutationCandidate, dict[str, str]]:
-    fields = {"mutations", "change_summary", "rationale"}
+) -> tuple[PreparedMutationCandidate, dict[str, Any]]:
+    fields = {"mutations", "change_summary", "rationale", "comparison_candidate_ids"}
     extra = set(candidate) - fields
     if extra or "mutations" not in candidate:
         raise CandidatePayloadError(
             "invalid_candidate",
-            "Each submitted candidate must contain exactly mutations, change_summary, and rationale; "
+            "Each submitted candidate requires mutations, change_summary, and rationale, with optional comparison_candidate_ids; "
             f"unexpected fields: {sorted(extra)}.",
         )
     annotation = {}
@@ -596,6 +623,8 @@ def _submission_candidate(
                 metadata={"field": name},
             )
         annotation[name] = value.strip()
+    if "comparison_candidate_ids" in candidate:
+        annotation["comparison_candidate_ids"] = candidate["comparison_candidate_ids"]
     return prepare_candidate_payload({"mutations": candidate["mutations"]}, context), annotation
 
 
@@ -631,6 +660,7 @@ def _validate_submission(
     context: MutationContext,
     evaluated: set[str],
     *,
+    measured_candidate_ids: set[str],
     artifact_root: Path,
     candidate_count: int,
     allow_repeated_occurrences: bool,
@@ -711,6 +741,27 @@ def _validate_submission(
             )
             continue
         first_index_by_key.setdefault(prepared.canonical_key, index)
+        references = candidate.get("comparison_candidate_ids", [])
+        if not isinstance(references, list):
+            errors.append(
+                HarnessSubmissionError(
+                    f"{path}/comparison_candidate_ids",
+                    "invalid_comparison_reference",
+                    "comparison_candidate_ids must be an array of exact measured candidate IDs.",
+                    "Read IDs from get_measured_history; omit the field when no measured comparison applies.",
+                )
+            )
+            continue
+        for reference_index, reference in enumerate(references):
+            if not isinstance(reference, str) or reference not in measured_candidate_ids:
+                errors.append(
+                    HarnessSubmissionError(
+                        f"{path}/comparison_candidate_ids/{reference_index}",
+                        "unknown_comparison_candidate",
+                        f"Comparison reference {reference!r} is not an authoritative measured candidate ID.",
+                        "Copy the exact ID from get_measured_history's guest_file, or remove an unsupported comparison.",
+                    )
+                )
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors

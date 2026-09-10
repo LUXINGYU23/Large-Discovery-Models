@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const contextPath = process.env.LDM_NUCLEOBENCH_CONTEXT;
 if (!contextPath) throw new Error("LDM_NUCLEOBENCH_CONTEXT is required");
@@ -20,6 +21,16 @@ const editable = new Set(editablePositions);
 
 function jsonResult(value) {
 	return { content: [{ type: "text", text: JSON.stringify(value) }], details: value };
+}
+
+function exportData(ctx, value) {
+	const body = JSON.stringify(value);
+	const sha256 = createHash("sha256").update(body).digest("hex");
+	const directory = join(ctx.cwd, ".ldm-resources", "research");
+	mkdirSync(directory, { recursive: true });
+	const path = join(directory, `${sha256}.json`);
+	if (!existsSync(path)) writeFileSync(path, body);
+	return { path: `/workspace/.ldm-resources/research/${sha256}.json`, sha256 };
 }
 
 function exactObject(value, fields, label) {
@@ -83,6 +94,7 @@ function validatePatch(mutations) {
 export default function sequenceContextTools(pi) {
     pi.registerTool({
         name: "get_measured_history",
+        promptGuidelines: ["Read exact records from guest_file.path in sandbox scripts. The file includes all matching detailed rows, independent of pagination or response_format. Omit candidate_ids and round_index to export the complete authoritative evaluated set; previous proposal files are not exclusions."],
         label: "Read measured sequence history",
         description: "Query measured history by ID or round. Default concise results contain IDs, utility and mutation count; request detailed for exact patches and original design notes. Sort by utility or recency, and follow next_offset for more. Unmeasured proposals are not exposed.",
         promptSnippet: "get_measured_history: revisit measured results and the hypotheses that motivated them",
@@ -98,7 +110,7 @@ export default function sequenceContextTools(pi) {
             },
             additionalProperties: false,
         },
-        async execute(_id, params) {
+        async execute(_id, params, _signal, _update, ctx) {
             const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
             const ids = new Set(params.candidate_ids ?? []);
             const matched = observations.filter((row) =>
@@ -124,6 +136,10 @@ export default function sequenceContextTools(pi) {
                 bytes += size;
             }
             return jsonResult({
+                guest_file: exportData(ctx, {
+                    complete_evaluated_history: ids.size === 0 && params.round_index === undefined,
+                    observations: matched,
+                }),
                 total: matched.length,
                 offset,
                 next_offset: offset + page.length < matched.length ? offset + page.length : null,
@@ -137,11 +153,12 @@ export default function sequenceContextTools(pi) {
     pi.registerTool({
 		name: "get_task_context",
 		label: "Get sequence-design task context",
-		description: "Return paired-start metadata and the public biological target.",
+		description: "Return paired-start metadata and the public biological target. guest_file contains the exact start_sequence and editable_positions for scripts.",
 		promptSnippet: "get_task_context: inspect the configured sequence-design context",
 		parameters: { type: "object", properties: {}, additionalProperties: false },
-		async execute() {
+		async execute(_id, _params, _signal, _update, ctx) {
 			return jsonResult({
+				guest_file: exportData(ctx, context),
 				case: context.case,
 				paired_start: {
 					start_set_digest: pairedStart.start_set_digest,
@@ -168,7 +185,7 @@ export default function sequenceContextTools(pi) {
 			required: ["start", "end_exclusive"],
 			additionalProperties: false,
 		},
-		async execute(_id, params) {
+		async execute(_id, params, _signal, _update, ctx) {
 			if (!Number.isInteger(params.start) || !Number.isInteger(params.end_exclusive)
 				|| params.start < 0 || params.start >= params.end_exclusive
 				|| params.end_exclusive > startSequence.length) {
@@ -183,7 +200,8 @@ export default function sequenceContextTools(pi) {
 				sequence = sequenceFromPatch(measured.mutations);
 			}
 			const bases = sequence.slice(params.start, params.end_exclusive);
-			return jsonResult({
+			const window = {
+				candidate_id: params.candidate_id ?? null,
 				start: params.start,
 				end_exclusive: params.end_exclusive,
 				bases,
@@ -191,7 +209,8 @@ export default function sequenceContextTools(pi) {
 				editable_positions: editablePositions.filter(
 					(position) => params.start <= position && position < params.end_exclusive,
 				),
-			});
+			};
+			return jsonResult({ ...window, guest_file: exportData(ctx, window) });
 		},
 	});
 

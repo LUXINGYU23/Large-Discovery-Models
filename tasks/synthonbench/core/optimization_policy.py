@@ -66,6 +66,7 @@ class SynthonOptimizationPolicyAdapter:
         gp_kernel_jitter: float,
         default_alpha: float,
         default_eta: float,
+        proposal_sampling: Mapping[str, Any],
         enabled_capabilities: Sequence[str] = ("prior_mean@1", "ldm_weights@1"),
     ) -> None:
         if seed < 0:
@@ -89,6 +90,7 @@ class SynthonOptimizationPolicyAdapter:
         self.features = feature_encoder
         self.target = target
         self.seed = seed
+        self.proposal_sampling = dict(proposal_sampling)
         self.acquisition_beta = float(acquisition_beta)
         self.gp_parameters = {
             "signal_std": float(gp_signal_std),
@@ -194,6 +196,7 @@ class SynthonOptimizationPolicyAdapter:
                 "target_scale": target_scale,
             },
             "weight_context": {
+                "proposal_sampling": self.proposal_sampling,
                 "seed": self.seed,
                 "history_size": len(history),
                 "unique_candidate_count": len(candidates),

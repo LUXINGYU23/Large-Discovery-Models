@@ -145,6 +145,13 @@ The pinned Malinois wrapper uses its official CPU path because its CUDA output
 does not match the NumPy values expected by the source-pinned runner. Enformer
 uses CUDA when available.
 
+For long-sequence cases, set `args.oracle-batch-size` to limit each inference
+call without changing `args.evaluations-per-round`. Enformer defaults to four
+sequences per call; a 128-candidate evaluation round therefore runs 32 inference
+minibatches before advancing optimization. Adjust this size to measured CPU or
+GPU throughput and available memory. Actual model calls and candidate evaluations
+are recorded separately.
+
 ## 6. Run the Six-Method Pilot Evaluation
 
 Review the resolved matrix first:

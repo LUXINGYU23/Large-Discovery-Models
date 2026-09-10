@@ -19,17 +19,24 @@ The task's mutation and submission contracts remain authoritative.
 Patches use zero-based coordinates relative to the original paired start.
 Fetch a measured parent with `get_sequence_window(candidate_id=..., start=...,
 end_exclusive=...)`; omit `candidate_id` for the original start. The returned
-`bases` and `bases_sha256` identify that exact window. Save the bases and verify
+`guest_file.path` contains exact `bases` and `bases_sha256`. Load it and verify
 their ASCII SHA-256 before computing changes, rather than manually transcribing
 a long mutation list. For a 200-base Malinois sequence, retrieve the complete
 window. For longer cases, retain each window's absolute coordinate offset.
 
 Derive every submitted patch against the original start, not the measured parent.
-For complete-sequence windows saved as `reference_window` and `parent_window`:
+For complete-sequence windows, pass the two tool-returned guest paths to this
+script; do not recreate JSON or DNA literals from the displayed result:
 
 ```python
 from Bio.Seq import Seq
 from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+reference_window = json.loads(Path(sys.argv[1]).read_text())
+parent_window = json.loads(Path(sys.argv[2]).read_text())
 
 reference = reference_window["bases"]
 parent = parent_window["bases"]

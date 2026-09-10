@@ -363,6 +363,7 @@ def test_submission_validation_returns_actionable_mutation_reasons(tmp_path) -> 
         ),
         MOCK_CONTEXT,
         {historical.canonical_key},
+        measured_candidate_ids={historical.candidate_id},
         artifact_root=tmp_path,
         candidate_count=7,
         allow_repeated_occurrences=True,
@@ -386,6 +387,7 @@ def test_submission_validation_returns_actionable_mutation_reasons(tmp_path) -> 
         MOCK_CONTEXT,
         set(),
         artifact_root=tmp_path,
+        measured_candidate_ids=set(),
         candidate_count=2,
         allow_repeated_occurrences=False,
     )
@@ -444,6 +446,36 @@ def test_direct_harness_uses_one_session_without_q0(tmp_path) -> None:
     )
     assert result.selection_mode == "reservoir_order"
     assert client.recovery_timeout_seconds == 120
+
+
+def test_wall_time_resume_replays_original_turns_without_resetting_recovery_budget(tmp_path):
+    client = FakeHarnessClient(tmp_path, {
+        profile: [[_payloads()[index + 1]]]
+        for index, profile in enumerate(HARNESS_PROFILE_IDS)
+    })
+    expander = _expander(client)
+    clock = {"max_seconds": 43200, "elapsed_seconds": 3600.0, "remaining_seconds": 39600.0}
+    expander.benchmark_clock = SimpleNamespace(snapshot=lambda: dict(clock))
+    request = ExpansionRequest(round_idx=1, reservoir_size=4)
+    expander.expand(request)
+    original = client.batches[-1]
+    for turn in original:
+        path = tmp_path / "sessions" / turn.profile_id / "turns" / turn.turn_id / "input.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(turn.to_dict()), encoding="utf-8")
+    clock.update(elapsed_seconds=4200.0, remaining_seconds=39000.0)
+    expander.expand(request)
+    assert client.batches[-1] == original
+    assert client.recovery_timeout_seconds == 39000.0
+
+    saved = original[-1].to_dict()
+    path.write_text(json.dumps({**saved, "inputDigest": "0" * 64}), encoding="utf-8")
+    with pytest.raises(ValueError, match="turn identity changed"):
+        expander.expand(request)
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    expander.candidates_per_profile = 2
+    with pytest.raises(ValueError, match="turn message changed"):
+        expander.expand(replace(request, reservoir_size=8))
 
 
 def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
@@ -625,6 +657,7 @@ def _submission(root, payload, *, profile_id="target_biology", turn_id="turn-1",
 def test_candidate_file_shape_and_count_are_validated(tmp_path, payload, reason):
     validation = _validate_submission(
         _submission(tmp_path, payload), MOCK_CONTEXT, set(),
+        measured_candidate_ids=set(),
         artifact_root=tmp_path, candidate_count=1, allow_repeated_occurrences=True,
     )
     assert validation.decision == "retry"
@@ -638,6 +671,7 @@ def test_candidate_file_uses_snapshot_and_rejects_corruption(tmp_path):
     def validate(value):
         return _validate_submission(
             value, MOCK_CONTEXT, set(), artifact_root=tmp_path,
+            measured_candidate_ids=set(),
             candidate_count=1, allow_repeated_occurrences=False,
         )
     assert validate(submitted).decision == "accept"
@@ -649,6 +683,30 @@ def test_candidate_file_uses_snapshot_and_rejects_corruption(tmp_path):
         submitted.artifacts[0], sha256=hashlib.sha256(b"{broken").hexdigest(), size_bytes=7,
     ),))
     assert validate(malformed).decision == "retry"
+
+
+def test_comparison_reference_repair_and_annotation_preservation(tmp_path):
+    measured = _observation(_payloads()[0], round_idx=0)
+    candidate = _annotated(_payloads()[1])
+    candidate["comparison_candidate_ids"] = ["mistyped-id"]
+    def validate():
+        return _validate_submission(
+            _submission(tmp_path, {"candidates": [candidate]}), MOCK_CONTEXT, {measured.canonical_key},
+            measured_candidate_ids={measured.candidate_id}, artifact_root=tmp_path,
+            candidate_count=1, allow_repeated_occurrences=False,
+        )
+    rejected = validate()
+    assert rejected.errors[0].code == "unknown_comparison_candidate"
+    assert rejected.errors[0].path == "/candidates/0/comparison_candidate_ids/0"
+    assert "mistyped-id" in rejected.errors[0].message
+    candidate["comparison_candidate_ids"] = [measured.candidate_id]
+    assert validate().decision == "accept"
+    from tasks.nucleobench.core.harness import _submission_candidate
+    prepared, annotation = _submission_candidate(candidate, MOCK_CONTEXT)
+    assert annotation["comparison_candidate_ids"] == [measured.candidate_id]
+    assert "comparison_candidate_ids" not in prepared.payload
+    candidate["comparison_candidate_ids"] = measured.candidate_id
+    assert validate().errors[0].code == "invalid_comparison_reference"
 
 
 def _annotated(payload: dict) -> dict:
@@ -713,6 +771,7 @@ def test_research_notes_survive_selection_history_and_policy_projection(tmp_path
     )
     adapter = NucleoOptimizationPolicyAdapter(
         NucleoPolicyFeatureEncoder(MOCK_CONTEXT), seed=42, gp_config=HammingGPUCBConfig(),
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         default_alpha=2.0, default_eta=0.25, measured_history_path=tmp_path / MEASURED_HISTORY_FILE,
     )
     with_notes = adapter.build_selection_round(**kwargs)
@@ -734,6 +793,7 @@ def test_candidate_research_note_errors_are_indexed(tmp_path, field, value):
         candidate[field] = value
     validation = _validate_submission(
         _submission(tmp_path, {"candidates": [candidate]}), MOCK_CONTEXT, set(),
+        measured_candidate_ids=set(),
         artifact_root=tmp_path, candidate_count=1, allow_repeated_occurrences=False,
     )
     assert validation.decision == "retry"
@@ -759,24 +819,38 @@ def test_history_tool_reads_filtered_fresh_snapshot(tmp_path):
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {dirname} from 'node:path';
 const {default: load} = await import(process.argv[1]);
 const tools = new Map();
 load({registerTool: tool => tools.set(tool.name, tool)});
-const read = async args => (await tools.get('get_measured_history').execute('test', args)).details;
-const window = async args => (await tools.get('get_sequence_window').execute('test', args)).details;
+const ctx = {cwd: dirname(process.env.LDM_NUCLEOBENCH_HISTORY)};
+const read = async args => (await tools.get('get_measured_history').execute('test', args, undefined, undefined, ctx)).details;
+const window = async args => (await tools.get('get_sequence_window').execute('test', args, undefined, undefined, ctx)).details;
+const exported = result => {
+  const body = readFileSync(result.guest_file.path.replace('/workspace', ctx.cwd));
+  assert.equal(createHash('sha256').update(body).digest('hex'), result.guest_file.sha256);
+  return JSON.parse(body);
+};
 const start = JSON.parse(readFileSync(process.env.LDM_NUCLEOBENCH_CONTEXT)).paired_start.start_sequence;
 const sha = bases => createHash('sha256').update(bases, 'ascii').digest('hex');
 assert.equal((await read({})).total, 1);
 const initial = await window({start: 0, end_exclusive: start.length});
 assert.equal(initial.bases, start);
 assert.equal(initial.bases_sha256, sha(start));
-assert.deepEqual(await window({candidate_id: 'start', start: 0, end_exclusive: start.length}), initial);
+assert.equal((await window({candidate_id: 'start', start: 0, end_exclusive: start.length})).bases, initial.bases);
+assert.deepEqual(exported(initial).bases, start);
+const task = (await tools.get('get_task_context').execute('test', {}, undefined, undefined, ctx)).details;
+assert.equal(exported(task).paired_start.start_sequence, start);
 const rows = [
   {candidate_id: 'start', round_index: 0, mutations: [], research_annotations: []},
   {candidate_id: 'measured', round_index: 1, mutations: [{position: 0, base: 'C'}, {position: 2, base: 'G'}], research_annotations: [{rationale: 'Original hypothesis.'}]},
 ];
 writeFileSync(process.env.LDM_NUCLEOBENCH_HISTORY, JSON.stringify({observations: rows}));
 assert.equal((await read({limit: 1})).next_offset, 1);
+assert.equal(exported(await read({limit: 1})).observations.length, 2);
+assert.equal(exported(await read({})).complete_evaluated_history, true);
+assert.equal(exported(await read({round_index: 1})).complete_evaluated_history, false);
+assert.deepEqual(exported(await read({candidate_ids: ['measured']})).observations, [rows[1]]);
 assert.deepEqual((await read({offset: 1, response_format: 'detailed'})).observations, [rows[0]]);
 assert.deepEqual((await read({round_index: 1, response_format: 'detailed'})).observations, [rows[1]]);
 assert.deepEqual((await read({candidate_ids: ['measured'], response_format: 'detailed'})).observations, [rows[1]]);

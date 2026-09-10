@@ -40,8 +40,11 @@ Harness validation, and official adapters remain under this directory.
 
 The 17-case source contract is stored in
 [`resources/cases/catalog.json`](resources/cases/catalog.json).
-`malinois_k562` is qualified through a real start evaluation and tiny
-campaign. Fifteen additional published cases have digest-pinned preparation
+`malinois_k562` and `enformer_muscle_not_liver` are qualified through real
+start evaluations and tiny campaigns. Enformer qualification includes two
+active Harness-Compiled rounds with physical inference minibatches; see
+[`resources/enformer_qualification.json`](resources/enformer_qualification.json).
+Fourteen additional published cases have digest-pinned preparation
 contracts. RiNALMo remains planned because the official 100-sequence paired
 start set is not present in the published benchmark artifacts.
 
@@ -89,9 +92,13 @@ algorithm:
    task-local exact normalized-Hamming GP to previous official measurements.
 6. Compute GP-UCB, robustly standardize it, and sample without replacement from
    `pi(x) proportional to q0(x)^alpha * exp(eta * robust_z(UCB(x)))`.
-7. Rebuild the selected full sequences and evaluate the complete minibatch in
-   one official model call. Each candidate is still charged as one official
-   oracle evaluation.
+7. Rebuild and evaluate the selected full sequences through the official model.
+   `--oracle-batch-size` controls the inference minibatch independently of the
+   selection batch. Enformer defaults to four sequences without gradients to
+   bound memory use; other families default to the full evaluation batch.
+   Every actual model call is recorded, and each candidate is charged as one
+   official oracle evaluation. History advances only after the selected batch
+   has completed.
 
 Only measured candidates are historical exclusions. A candidate proposed in an
 earlier round but not selected for evaluation remains eligible. This preserves
@@ -204,8 +211,8 @@ continues to load only its task-local `compile-ldm-policy` Skill.
 
 Candidate Agents write `candidates.json` in their workspace with code, then call
 `submit_candidates({"artifact_path":"candidates.json"})`. The file contains only
-a `candidates` array of the requested number of objects, each containing exactly
-`mutations`, `change_summary`, and `rationale`. The two notes are concise English
+a `candidates` array of the requested number of objects, each containing
+`mutations`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`. The two notes are concise English
 sentences describing the actual change and its pre-evaluation hypothesis,
 expected effect, or control purpose. Pi
 snapshots the file; task-local Python validates that exact snapshot's digest,
@@ -224,6 +231,20 @@ returns the index; `response_format="detailed"` returns exact patches and origin
 annotations. Pages stop before exceeding 32 KB after the first complete record;
 `next_offset` identifies the next page. Only measured candidates are shared; unmeasured
 proposals remain in their private sessions and immutable submissions.
+
+History queries return a read-only `guest_file` with a path and SHA-256. It
+contains all matching detailed records, independently of response pagination.
+An unfiltered query exports the complete evaluated set; filtered exports are
+not complete exclusion sets. `get_task_context` exports the exact paired start
+and editable mask, and `get_sequence_window` exports the exact requested window.
+Research scripts load these files directly. Draft candidate files and private
+proposal history are not measurement inputs.
+
+Optional `comparison_candidate_ids` identify measured contrasts, not mandatory
+parents. Unknown IDs return indexed `unknown_comparison_candidate` errors.
+Accepted references stay in research metadata and measured history, not the
+oracle payload or GP features. The policy's `weight_context.proposal_sampling`
+records the actual session count, panel size and repeat rules.
 
 `get_sequence_window` returns a zero-based half-open window of the original
 start, or of a measured sequence when `candidate_id` is supplied. It returns
