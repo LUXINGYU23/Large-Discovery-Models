@@ -131,6 +131,7 @@ def test_pilot_rounds_and_bo_proposal_pool_are_configurable() -> None:
     ])
     assert args.iterations == 21 and args.proposal_samples == 128
     assert args.initialization_evaluations == args.evaluations_per_round == 1
+    assert describe_ldm_task(args).reservoir.max_size == 128
     with pytest.raises(SystemExit):
         parse_args(["--search-method", "bo", "--evaluations-per-round", "2",
                     "--proposal-samples", "1"])

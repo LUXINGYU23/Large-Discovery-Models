@@ -29,6 +29,7 @@ def build_task_spec(
     *,
     search_method: str = "ldm",
     evaluations_per_round: int = 1,
+    proposal_samples: int | None = None,
     proposal_max_workers: int = 4,
     harness_profile_count: int = 4,
     harness_candidates_per_session: int | None = None,
@@ -139,7 +140,9 @@ def build_task_spec(
     elif search_method == "bo":
         response_name = "mutation_patch_json"
         response_spaces = (_single_response_space(),)
-        reservoir_size = 4 * evaluations_per_round
+        reservoir_size = 4 * evaluations_per_round if proposal_samples is None else proposal_samples
+        if reservoir_size < evaluations_per_round:
+            raise ValueError("BO proposal samples must cover the evaluation batch")
         proposal_name = "bo_mutation_search"
         proposal_parameters = {
             "request_count": 0,
