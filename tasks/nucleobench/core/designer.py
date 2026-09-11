@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Sequence
+
 from ldm_tts.contracts import Observation
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.run_store import CampaignRuntime
@@ -116,6 +119,20 @@ class NucleoBenchDesigner:
             if len(samples) == n_samples:
                 break
         return samples
+
+    def measured_sample_energies(self, sequences: Sequence[str]) -> list[float]:
+        """Export existing measurements without spending another oracle query."""
+        measured = {
+            item.evaluation.metadata["sequence_sha256"]: item.metrics["energy"]
+            for item in self.state.observations if item.evaluation.succeeded
+        }
+        digests = [hashlib.sha256(sequence.encode()).hexdigest() for sequence in sequences]
+        if any(digest not in measured for digest in digests):
+            raise ValueError("official export requested a sequence without a measurement")
+        self.engine.runtime.record("official_export_scores_reused", {
+            "sequence_sha256": digests, "count": len(digests),
+        })
+        return [float(measured[digest]) for digest in digests]
 
     def is_finished(self) -> bool:
         return self._finished

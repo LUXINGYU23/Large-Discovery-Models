@@ -875,7 +875,8 @@ def _run_real(
             )
             report = run_official_driver(
                 run_loop=official.run_loop,
-                model=official.model,
+                model=(designer.measured_sample_energies
+                       if args.termination_kind == "rounds" else official.model),
                 designer=designer,
                 all_args=all_args,
                 runtime=runtime,
