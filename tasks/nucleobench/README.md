@@ -112,6 +112,8 @@ creates separate persistent sessions sharing the same `AGENTS.md`, with distinct
 session IDs, histories, and workspaces. `--proposal-samples`
 must equal their product. LDM requires
 `evaluations-per-round <= bo-pool-size < proposal-samples`.
+For pure BO, `--proposal-samples` independently controls the score-blind search
+pool and must cover the evaluation batch; it defaults to four times that batch.
 If repeated occurrences leave fewer unique candidates than the evaluation
 batch, evaluate those candidates without adding proposals or duplicate oracle
 evaluations. Occurrence frequencies still define `q0`.

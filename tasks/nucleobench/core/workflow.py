@@ -352,11 +352,10 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         )
     if args.execution_profile == "pilot_evaluation" and (
         args.termination_kind != "rounds"
-        or args.iterations != 12
         or args.initialization_mode != "shared_start"
     ):
         parser.error(
-            "pilot_evaluation requires 12 rounds and shared_start initialization"
+            "pilot_evaluation requires round termination and shared_start initialization"
         )
     if args.execution_profile == "official_benchmark" and (
         args.termination_kind != "wall_time"
@@ -374,7 +373,9 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         tuple(args.harness_profile) != HARNESS_PROFILE_IDS or args.harness_unique_candidates
     ):
         parser.error("Custom Harness sampling settings require a parallel Harness method")
-    if args.proposal_samples != expected_samples:
+    if args.search_method == "bo" and args.proposal_samples < args.evaluations_per_round:
+        parser.error("BO proposal samples must cover the evaluation batch")
+    if args.search_method != "bo" and args.proposal_samples != expected_samples:
         parser.error(
             f"--proposal-samples must equal {expected_samples} for {args.search_method}"
         )

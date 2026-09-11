@@ -18,7 +18,6 @@ SUPPORTED_METHODS = (
     "llm",
     "harness",
 )
-BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
 
 
@@ -146,8 +145,6 @@ def _methods(value: Any) -> tuple[str, ...]:
         raise ValueError(f"pilot evaluation methods must come from {list(SUPPORTED_METHODS)}")
     if len(set(methods)) != len(methods):
         raise ValueError("pilot evaluation methods must be unique")
-    if not BASELINE_METHODS <= set(methods):
-        raise ValueError("pilot evaluation methods must include ldm, bo, and llm")
     return methods
 
 
@@ -176,8 +173,8 @@ def _cases(value: Any) -> tuple[EvaluationCase, ...]:
 
 
 def _seeds(value: Any) -> tuple[int, ...]:
-    if not isinstance(value, list) or len(value) != 3:
-        raise ValueError("pilot evaluation requires exactly three seeds")
+    if not isinstance(value, list) or not value:
+        raise ValueError("pilot evaluation seeds must be a non-empty list")
     if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in value):
         raise ValueError("pilot evaluation seeds must be non-negative integers")
     if len(set(value)) != len(value):

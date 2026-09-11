@@ -12,7 +12,8 @@ full benchmark campaign. A registered task may expose six methods:
 | `llm` | Direct model API | None; evaluate the requested minibatch |
 | `harness` | One persistent research Agent | None; evaluate the requested minibatch |
 
-Every committed matrix uses three seeds. Methods share the same task case,
+The supplied matrices use three seeds. Custom matrices may choose any non-empty
+set of distinct seeds and supported methods. Methods share the same task case,
 initialization, optimization rounds, oracle, and real-evaluation count. The
 task continues to own candidate identity, prompts, proposal refill, surrogate,
 acquisition, and scientific dependencies.
@@ -143,6 +144,10 @@ Direct model methods may yield fewer valid evaluations when their fixed request
 budget produces malformed or repeated candidates. Harness methods instead use
 in-session rejection and refill to deliver their complete accepted minibatch.
 
+Automatic method verdicts compare against both `bo` and `llm`, and require a
+strict majority of paired seeds to win. Matrices without both baselines still
+produce scores and trajectories, but omit those verdicts.
+
 ## Registering Another Task
 
 1. Implement the applicable method names in the normal task procedure. All
@@ -153,7 +158,7 @@ in-session rejection and refill to deliver their complete accepted minibatch.
    A compiled method also needs a task-local feature and policy adapter,
    residual-GP path, independent policy profile, isolated artifact runner, and
    explicit policy budgets.
-3. Add `config/pilot_evaluation/<task>.yaml` with cases, exactly three seeds,
+3. Add `config/pilot_evaluation/<task>.yaml` with cases, distinct seeds,
    method profiles, trajectory columns, and optional result fields. Do not add
    task-specific branches to `ldm_tts.pilot_evaluation`.
 4. Add config and execution coverage, run `--dry-run`, and verify a task-local

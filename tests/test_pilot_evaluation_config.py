@@ -4,13 +4,36 @@ from __future__ import annotations
 
 from pathlib import Path
 from dataclasses import replace
+import json
 
 import pytest
+import yaml
 
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_custom_matrix_accepts_two_seeds_and_selected_methods(tmp_path) -> None:
+    path = REPO_ROOT / "config/pilot_evaluation/nucleobench.yaml"
+    raw = yaml.safe_load(path.read_text())
+    raw.update(
+        base_config=str(REPO_ROOT / "config/nucleobench/malinois_k562_pilot_base.yaml"),
+        seeds=[42, 43], methods=["ldm_harness_compiled", "harness", "bo"],
+        optimization_rounds=20, output_root=str(tmp_path / "runs"),
+    )
+    raw["method_overrides"] = {key: raw["method_overrides"][key] for key in raw["methods"]}
+    custom = tmp_path / "matrix.yaml"
+    custom.write_text(json.dumps(raw))
+    spec = load_pilot_evaluation_spec(custom)
+    assert spec.seeds == (42, 43) and spec.iterations == 21
+    assert spec.methods == ("ldm_harness_compiled", "harness", "bo")
+    for seeds in ([], [42, 42]):
+        raw["seeds"] = seeds
+        custom.write_text(json.dumps(raw))
+        with pytest.raises(ValueError, match="seeds"):
+            load_pilot_evaluation_spec(custom)
 
 
 def test_iron_mind_matrix_expands_to_the_planned_two_case_design(monkeypatch, tmp_path) -> None:

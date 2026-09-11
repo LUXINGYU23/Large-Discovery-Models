@@ -303,6 +303,9 @@ def _verdict(rows, aggregates, direction: str) -> dict[str, Any]:
     for case in sorted({item["case"] for item in rows}):
         summary = {item["method"]: item for item in aggregates if item["case"] == case}
         result = {"case": case}
+        if not {"bo", "llm"} <= summary.keys():
+            cases.append(result)
+            continue
         for method in ("ldm", "ldm_harness", _COMPILED_METHOD, "harness"):
             if method not in summary:
                 continue
@@ -335,7 +338,7 @@ def _method_verdict(rows, case, summary, method, better):
     )
     better_auc = all(better(candidate["mean_round_auc"], item["mean_round_auc"]) for item in baselines)
     worse_final = any(better(item["mean_final_best"], candidate["mean_final_best"]) for item in baselines)
-    if better_auc and wins >= 2:
+    if better_auc and wins > len(seeds) / 2:
         return "promising", wins
     if worse_final and wins == 0:
         return "not_promising", wins

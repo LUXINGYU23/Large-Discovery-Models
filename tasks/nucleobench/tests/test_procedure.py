@@ -123,6 +123,19 @@ def test_oracle_minibatch_is_independent_of_the_selection_batch() -> None:
         parse_args(["--oracle-batch-size", "0"])
 
 
+def test_pilot_rounds_and_bo_proposal_pool_are_configurable() -> None:
+    args = parse_args([
+        "--search-method", "bo", "--execution-profile", "pilot_evaluation",
+        "--initialization-mode", "shared_start", "--iterations", "21",
+        "--evaluations-per-round", "1", "--proposal-samples", "128",
+    ])
+    assert args.iterations == 21 and args.proposal_samples == 128
+    assert args.initialization_evaluations == args.evaluations_per_round == 1
+    with pytest.raises(SystemExit):
+        parse_args(["--search-method", "bo", "--evaluations-per-round", "2",
+                    "--proposal-samples", "1"])
+
+
 def test_every_declared_case_builds_the_same_dry_run_workflow(capsys) -> None:
     for case in load_case_catalog():
         assert main(["--case-id", case.case_id, "--dry-run"]) == 0
