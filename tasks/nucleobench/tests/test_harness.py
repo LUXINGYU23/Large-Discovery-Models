@@ -15,7 +15,9 @@ import pytest
 
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation, RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest
+from ldm_tts.engine.run_store import BudgetLedger
 from ldm_tts.harness import (
+    HarnessError,
     HarnessSubmissionRequest,
     HarnessSubmittedArtifact,
     HarnessTurnResult,
@@ -220,9 +222,9 @@ def test_parallel_sessions_preserve_within_and_cross_profile_consensus_for_q0(tm
     }
     attempts[HARNESS_PROFILE_IDS[0]] = [[payloads[0], payloads[0]]]
     client = FakeHarnessClient(tmp_path, attempts)
-    usage = []
+    usage = BudgetLedger(limits={})
 
-    result = _expander(client, candidates_per_profile=2, account=usage.append).expand(
+    result = _expander(client, candidates_per_profile=2, account=usage.consume_many).expand(
         ExpansionRequest(round_idx=1, reservoir_size=8)
     )
 
@@ -249,15 +251,36 @@ def test_parallel_sessions_preserve_within_and_cross_profile_consensus_for_q0(tm
         assert admitted.canonical_key == NucleoBenchCandidateDomain(MOCK_CONTEXT).admit(
             RawProposal(proposal.payload, "without_notes")
         ).canonical_key
-    assert usage == [
-        {"proposal_attempts": 4, "harness_turns": 4},
-        {
-            "llm_requests": 8,
-            "harness_tool_calls": 8,
-            "harness_validation_submissions": 4,
-            "harness_artifact_bytes": 200,
-        },
-    ]
+    assert usage.counters["proposal_attempts"] == usage.counters["harness_turns"] == 4
+    assert usage.counters["llm_requests"] == usage.counters["harness_tool_calls"] == 8
+    assert usage.counters["harness_validation_submissions"] == 4
+    assert usage.counters["harness_artifact_bytes"] == 200
+
+
+def test_failed_harness_usage_survives_resume_without_counting_turns_twice(tmp_path, monkeypatch):
+    client = FakeHarnessClient(tmp_path, {
+        profile: [[_payloads()[index + 1]]]
+        for index, profile in enumerate(HARNESS_PROFILE_IDS)
+    })
+    ledger = BudgetLedger(limits={"harness_turns": 4, "proposal_attempts": 4})
+    expander = _expander(client, account=ledger.consume_many)
+    request = ExpansionRequest(round_idx=1, reservoir_size=4)
+    run_turn = client.run_turn
+
+    def fail(*args, **kwargs):
+        raise HarnessError("session wall-time limit reached", retryable=True,
+                           turn_usage={HARNESS_PROFILE_IDS[0]: {"providerCalls": 1}})
+
+    monkeypatch.setattr(client, "run_turn", fail)
+    with pytest.raises(HarnessError):
+        expander.expand(request)
+    assert ledger.counters["llm_requests"] == 1
+    monkeypatch.setattr(client, "run_turn", run_turn)
+    expander.expand(request)
+    expander.expand(request)
+    assert ledger.counters["harness_turns"] == ledger.counters["proposal_attempts"] == 4
+    assert ledger.counters["llm_requests"] == 8
+    assert ledger.counters["harness_wall_time_seconds"] > 0
 
 
 def test_unique_parallel_batch_repairs_canonical_duplicates_but_keeps_cross_session_q0(tmp_path):
@@ -445,7 +468,7 @@ def test_direct_harness_uses_one_session_without_q0(tmp_path) -> None:
         for item in result.proposals
     )
     assert result.selection_mode == "reservoir_order"
-    assert client.recovery_timeout_seconds == 120
+    assert client.recovery_timeout_seconds == 240
 
 
 def test_wall_time_resume_replays_original_turns_without_resetting_recovery_budget(tmp_path):

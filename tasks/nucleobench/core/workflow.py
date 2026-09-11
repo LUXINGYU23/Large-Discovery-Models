@@ -790,7 +790,7 @@ def _run_real(
                     account=runtime.consume_many,
                     recovery_budget=lambda: (
                         float(benchmark_clock.snapshot()["remaining_seconds"])
-                        if benchmark_clock is not None else float(args.harness_wall_time_seconds)
+                        if benchmark_clock is not None else 2.0 * args.harness_wall_time_seconds
                     ),
                 )
                 encoder, selector = build_surrogate_components(

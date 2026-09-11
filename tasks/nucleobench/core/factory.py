@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.harness import HarnessClient, HarnessProfile, PolicyResearchController
@@ -106,7 +107,7 @@ def build_proposal_expander(
     first_active_round: int = 1,
     max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
     before_requests: Callable[[int], None] | None = None,
-    account: Callable[[dict[str, int]], None] | None = None,
+    account: Callable[..., Any] | None = None,
     benchmark_clock: BenchmarkClock | None = None,
 ) -> ReservoirExpander:
     """Build the sole task-local proposal path for one campaign method."""

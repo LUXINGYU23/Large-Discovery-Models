@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
@@ -17,6 +18,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
+    HarnessError,
     HarnessProfile,
     HarnessSubmissionContract,
     HarnessSubmissionError,
@@ -204,7 +206,7 @@ class NucleoBenchHarnessExpander:
         attach_empirical_q0: bool,
         allow_repeated_occurrences: bool,
         artifact_root: Path,
-        account: Callable[[dict[str, int]], None] | None = None,
+        account: Callable[..., Any] | None = None,
         benchmark_clock: BenchmarkClock | None = None,
     ) -> None:
         if not profiles:
@@ -245,27 +247,41 @@ class NucleoBenchHarnessExpander:
                 {
                     "proposal_attempts": len(turns),
                     "harness_turns": len(turns),
-                }
+                },
+                usage_key=f"harness:round:{request.round_idx}",
             )
-        results = self.client.run_turn(
-            turns,
-            recovery_timeout_seconds=(
-                float(self.benchmark_clock.snapshot()["remaining_seconds"])
-                if self.benchmark_clock is not None
-                else float(self.client.config.limits.wall_time_seconds)
-            ),
-            submission_validator=lambda submission: _validate_submission(
-                submission,
-                self.domain.context,
-                evaluated,
-                measured_candidate_ids={item.candidate_id for item in request.observations},
-                artifact_root=self.artifact_root,
-                candidate_count=self.candidates_per_profile,
-                allow_repeated_occurrences=self.allow_repeated_occurrences,
-            ),
-        )
-        if self.account is not None:
-            self.account(_usage_counts(results))
+        started = time.perf_counter()
+        usage_by_profile: dict[str, Mapping[str, Any]] = {}
+        try:
+            results = self.client.run_turn(
+                turns,
+                recovery_timeout_seconds=(
+                    float(self.benchmark_clock.snapshot()["remaining_seconds"])
+                    if self.benchmark_clock is not None
+                    else 2.0 * self.client.config.limits.wall_time_seconds
+                ),
+                submission_validator=lambda submission: _validate_submission(
+                    submission,
+                    self.domain.context,
+                    evaluated,
+                    measured_candidate_ids={item.candidate_id for item in request.observations},
+                    artifact_root=self.artifact_root,
+                    candidate_count=self.candidates_per_profile,
+                    allow_repeated_occurrences=self.allow_repeated_occurrences,
+                ),
+            )
+            usage_by_profile = {result.profile_id: result.usage for result in results}
+        except HarnessError as exc:
+            usage_by_profile = exc.turn_usage
+            raise
+        finally:
+            if self.account is not None:
+                for turn in turns:
+                    self.account(
+                        _usage_counts(usage_by_profile.get(turn.profile_id, {})),
+                        usage_key=f"harness:{turn.turn_id}",
+                    )
+                self.account({"harness_wall_time_seconds": time.perf_counter() - started})
         sampling_mode = (
             "persistent_parallel_research_sessions"
             if self.attach_empirical_q0
@@ -769,21 +785,19 @@ def _validate_submission(
     )
 
 
-def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
-    return {
-        "llm_requests": sum(int(result.usage["providerCalls"]) for result in results),
-        "harness_tool_calls": sum(
-            sum(int(count) for count in result.usage["toolCalls"].values())
-            for result in results
-        ),
-        "harness_validation_submissions": sum(
-            int(result.usage.get("validationSubmissions", 0))
-            for result in results
-        ),
-        "harness_artifact_bytes": sum(
-            int(result.usage["artifactBytes"]) for result in results
-        ),
+def _usage_counts(usage: Mapping[str, Any]) -> dict[str, int]:
+    counts = {
+        counter: int(usage[key])
+        for key, counter in (
+            ("providerCalls", "llm_requests"),
+            ("validationSubmissions", "harness_validation_submissions"),
+            ("artifactBytes", "harness_artifact_bytes"),
+        )
+        if key in usage
     }
+    if "toolCalls" in usage:
+        counts["harness_tool_calls"] = sum(int(count) for count in usage["toolCalls"].values())
+    return counts
 
 
 def _candidate_lineage(

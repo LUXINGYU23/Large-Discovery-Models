@@ -103,6 +103,10 @@ algorithm:
 Round-limited runs reuse recorded energies when the official runner exports
 measured samples, so result reporting does not consume additional oracle
 queries. Official wall-time runs retain the runner's export scoring behavior.
+Round-limited Harness calls allow twice the per-session time limit for recovery;
+completed submissions are replayed while unfinished sessions continue. Official
+wall-time runs use their remaining campaign time. Recovery preserves cumulative
+model usage and does not charge the same logical proposal turn twice.
 
 Only measured candidates are historical exclusions. A candidate proposed in an
 earlier round but not selected for evaluation remains eligible. This preserves
