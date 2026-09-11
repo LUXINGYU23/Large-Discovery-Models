@@ -114,6 +114,7 @@ test("partial-turn continuation keeps history and classifies execution failures"
 			"provider response failed: overloaded_error: Try again later.",
 			"provider response failed: rate_limit_exceeded: Slow down.",
 			"provider response failed: request_timeout: Try again later.",
+			"provider response failed: terminated",
 			"provider response failed: 401 unauthorized",
 			"provider response failed: insufficient_quota: Check billing.",
 		];

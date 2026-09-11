@@ -666,7 +666,7 @@ export class PersistentProfileSession {
 					toolCalls: policySummary.toolCalls,
 					artifactBytes: providerSummary.artifactBytes,
 				},
-			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
+			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|^provider response failed: terminated$|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
 		}
 		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);
