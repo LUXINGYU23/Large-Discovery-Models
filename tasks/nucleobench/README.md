@@ -222,6 +222,13 @@ unresolved hypotheses after feedback and choose their balance from comparative
 measurements and remaining time, without fixed role assignments or slot quotas.
 Previously proposed but unmeasured candidates remain eligible unchanged.
 
+Researchers construct and save valid designs incrementally before scaling or
+refining a panel. The Biopython Skill supplies a fixed-length editing example
+using exact task files and measured-parent patches. Task legality checks remain
+mandatory; motif and composition diagnostics test biological hypotheses.
+Contradictory diagnostics require repairing or revising the affected design
+and its notes, while preserving unrelated valid candidates.
+
 All candidate roles, including the direct `harness` researcher, expose the same
 on-demand Skills: `biopython` for sequence reconstruction and motif analysis,
 `experimental-design` for matched controls and factorial contrasts,

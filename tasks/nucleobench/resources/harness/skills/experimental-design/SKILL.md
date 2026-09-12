@@ -36,6 +36,14 @@ A control that damages the leading program is not a competitive alternative
 program. Give an alternative a plausible implementation and a comparison that
 can distinguish a weak implementation from a weak hypothesis.
 
+Check that construction requirements are mutually consistent before expanding
+a panel. Requiring a motif in an inserted module while forbidding it anywhere
+in the final sequence is infeasible. Hold useful native background fixed when
+possible, build one interpretable contrast first, and save valid designs
+incrementally. A difficult control should not prevent unrelated hypotheses
+from being submitted. If a diagnostic contradicts the intended contrast,
+revise that design or its interpretation and document the discrepancy.
+
 ## Factorial Designs
 
 For a few interacting features, a full factorial can test main effects and

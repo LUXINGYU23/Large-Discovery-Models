@@ -60,4 +60,6 @@ The turn has a 30-minute limit; leave time to validate and repair the submission
   through `submit_candidates`, which validates the complete file. Use
   `validate_mutations` for uncertain patches; do not print or retranscribe the array.
 - Follow the turn's uniqueness contract. Repair rejected file entries by index,
-  recheck the whole batch, and resubmit the path. Do not disable failed assertions.
+  recheck the whole batch, and resubmit the path. Keep task legality checks
+  mandatory; diagnose biological proxy failures and revise the affected design
+  or its rationale, while preserving unrelated valid candidates.

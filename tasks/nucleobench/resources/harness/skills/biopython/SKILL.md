@@ -1,6 +1,6 @@
 ---
 name: biopython
-description: Reconstruct and compare DNA candidates, manipulate FASTA, scan both strands with motif matrices, and verify sequence changes before interpreting an experiment. Use when writing or checking sequence-analysis code for this campaign.
+description: Build fixed-length DNA candidates from exact task files, reconstruct measured parents, and scan motifs on both strands. Read before writing sequence-construction or motif-analysis code for this campaign.
 license: MIT
 metadata:
   runtime: Python 3.11 with Biopython 1.88 and NumPy is preinstalled in the research guest.
@@ -13,6 +13,11 @@ metadata:
 Use the installed library for biological operations. Start with the supplied
 sequence context and measured history; save reusable analysis in the workspace.
 The task's mutation and submission contracts remain authoritative.
+
+For candidate construction, use the small working example in
+[references/panel-construction.md](references/panel-construction.md). It retains
+the exact parent background and derives absolute, start-relative patches.
+Test one design end to end before extending it to the requested panel.
 
 ## Reconstruct Before Comparing
 
@@ -67,6 +72,12 @@ from string replacement or overlapping module writes.
   construct a PSSM. Record the pseudocount, background, and score threshold.
 - Scan both strands. A consensus-string match is a proxy, not measured binding
   or expression; a toy matrix is not a verified biological motif.
+- For a sourced IUPAC consensus, use `Bio.SeqUtils.nt_search` with the forward
+  consensus and `str(Seq(consensus).reverse_complement())`. Both searches operate
+  on the forward sequence, so both return forward coordinates; do not reverse
+  those coordinates a second time. Motif names are not consensus strings.
+  See the [Biopython sequence-search API](https://biopython.org/docs/latest/api/Bio.SeqUtils.html#Bio.SeqUtils.nt_search)
+  for its `[pattern, position, ...]` return format.
 - Compare the complete reconstructed candidate and its named control, including
   native sites, reverse-strand sites, overlaps, spacing, and composition. Do not
   infer that a motif was removed just because the inserted module was changed.
@@ -107,3 +118,12 @@ Write Python source with the native `write` tool, then execute it with `bash`.
 Do not include shell heredoc delimiters or shell commands inside a `.py` file.
 Check a small example before generating the full panel. The submission file
 must contain exactly the fields and candidate count specified by the turn.
+
+Keep sequence legality separate from biological diagnostics. Length, editable
+coordinates, the submission schema, novelty, and required uniqueness are hard
+constraints. Motif matches, absence filters, and composition preferences depend
+on the research hypothesis. A contradiction means repairing the implementation
+or revising that hypothesis and its notes, not retrying the same impossible
+construction. In particular, inspect fixed modules before searching for a
+motif-free spacer or shuffled background. Never label a failed diagnostic as
+passed; preserve useful candidates from unrelated hypotheses.

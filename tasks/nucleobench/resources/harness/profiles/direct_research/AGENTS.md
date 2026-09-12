@@ -33,6 +33,14 @@ Maintain hypotheses across turns and revise them when measurements disagree. Com
 
 The sandbox preinstalls Biopython, pyfaidx, NumPy/SciPy/pandas/scikit-learn, Matplotlib/Logomaker, ViennaRNA Python bindings, and SeqKit/BEDTools/SAMtools/MAFFT. Use these tools before installing extra packages unless a specific analysis requires more.
 
+Read the `biopython` Skill before sequence construction or motif scanning.
+Test its fixed-length editing pattern on one candidate end to end, then save
+valid entries incrementally and maintain a complete draft panel early. Improve
+entries in place. An unfinished motif analysis or a failing constructor for one
+design should not erase the working panel. Check fixed modules against any
+proposed exclusions before searching for spacers; a forbidden match already
+inside a fixed module cannot be repaired by changing its filler.
+
 Balance strong exploitation with a small number of informative alternatives when uncertainty warrants it. The turn has a hard 30-minute wall-time. Manage research depth yourself, but retain enough time to validate and submit the complete minibatch before the deadline.
 
 ## Boundaries and submission
@@ -42,4 +50,4 @@ Balance strong exploitation with a small number of informative alternatives when
 - Only candidates in evaluated_candidates are forbidden. Earlier unmeasured proposals remain legal.
 - Use only editable zero-based positions and bases that differ from the paired start.
 - Write `/workspace/candidates.json` with code: its only field is `candidates`, containing exactly the requested number of mutation-patch objects. Every rebuilt sequence in your batch must be distinct. Submit `{"artifact_path":"candidates.json"}` through `submit_candidates`; do not copy the array into tool arguments.
-- The complete file is checked before acceptance. Use `validate_mutations` for uncertain individual patches. Repair indexed file entries from the returned reasons, recheck the whole batch, and resubmit the path. Do not bypass failed assertions.
+- The complete file is checked before acceptance. Use `validate_mutations` for uncertain individual patches. Repair indexed file entries from the returned reasons, recheck the whole batch, and resubmit the path. Keep task legality checks mandatory. A failed biological proxy check calls for diagnosing the code or revising that design and its rationale, not blocking unrelated valid candidates or claiming the failed hypothesis was verified.

@@ -39,6 +39,10 @@ initialization or routine fitting. Use the guest-visible paths in
 the skill list. Reuse a method after learning it; do not reread every Skill
 or generate a separate report every turn.
 
+Read `biopython` before writing sequence-construction or motif-scanning code.
+Start with its fixed-length construction example and test one candidate through
+reconstruction, legality checks, and serialization before scaling the panel.
+
 Maintain concise research notes and reusable scripts across turns. Keep the
 leading hypothesis, credible unresolved alternatives, relevant supporting and
 contradicting measured candidate IDs, and the next comparison that would change
@@ -155,9 +159,24 @@ identity, not the correctness of a claimed mechanism; verify actual differences.
   session. Recheck uniqueness after every replacement: a newly chosen
   replacement can duplicate a different entry that was previously valid.
   Update the change summary and rationale to match every repaired patch.
-- Fix failed checks rather than disabling assertions or using `python -O`.
+- Keep task legality checks mandatory. A failed motif, spacing, or composition
+  check can instead contradict your biological hypothesis or its implementation.
+  Diagnose it on one construct, then repair the code, revise that design and its
+  rationale, or replace it. Do not report the failed claim as verified. Keep
+  unrelated valid entries; never disable task validation or use `python -O`.
+
+Build the panel incrementally. Persist validated entries as they become ready,
+reach a complete draft early, then improve individual entries without discarding
+the working panel. Use short runnable scripts instead of generating a large,
+untested all-or-nothing builder. Check whether fixed modules already conflict
+with proposed exclusion motifs before searching for a spacer: changing filler
+cannot remove a forbidden site that is wholly inside a fixed module. Motif-free
+backgrounds are not a task requirement. Preserve the exact parent background
+when it serves the hypothesis, and quantify unwanted matches as diagnostics.
 
 The turn has a hard 30-minute wall-time. End open-ended research by minute 20,
 attempt the complete submission by minute 25, and reserve the remaining time
-for validation and repairs. Never seek task implementations, evaluator models
+for validation and repairs. Track elapsed wall time in your scratch workflow;
+after an interruption, inspect existing files and finish the panel before
+starting further research. Never seek task implementations, evaluator models
 or weights, evaluation tables, hidden scores, or other benchmark-only assets.

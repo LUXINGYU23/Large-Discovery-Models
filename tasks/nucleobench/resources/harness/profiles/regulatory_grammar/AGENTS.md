@@ -46,4 +46,4 @@ Identify the motif or grammar hypothesis and which measured contrast supports it
 - Use only editable zero-based positions and bases that change the paired start.
 - Write `/workspace/candidates.json` with code: its only field is `candidates`, containing exactly the requested number of mutation-patch objects. Submit `{"artifact_path":"candidates.json"}` through `submit_candidates`; do not copy the array into tool arguments.
 - The complete file is checked before acceptance. Use `validate_mutations` for uncertain patches. Follow the turn's uniqueness contract, comparing rebuilt sequences rather than patch order.
-- Repair indexed file entries from the returned reasons, recheck the complete batch, and resubmit the path. Do not bypass failed assertions.
+- Repair indexed file entries from the returned reasons, recheck the complete batch, and resubmit the path. Keep task legality checks mandatory; a failed biological diagnostic calls for repairing or revising the affected design and its rationale, while preserving unrelated valid candidates.
