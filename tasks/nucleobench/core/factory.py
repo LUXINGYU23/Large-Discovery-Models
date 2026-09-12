@@ -109,6 +109,7 @@ def build_proposal_expander(
     before_requests: Callable[[int], None] | None = None,
     account: Callable[..., Any] | None = None,
     benchmark_clock: BenchmarkClock | None = None,
+    surrogate_query_config: HammingGPUCBConfig | None = None,
 ) -> ReservoirExpander:
     """Build the sole task-local proposal path for one campaign method."""
 
@@ -144,6 +145,7 @@ def build_proposal_expander(
             ),
             account=account,
             benchmark_clock=benchmark_clock,
+            surrogate_query_config=surrogate_query_config,
         )
     if search_method not in {"ldm", "llm"}:
         raise ValueError(

@@ -140,6 +140,20 @@ editable-mask order. Its kernel is
 from a fixed grid by marginal likelihood. The GP standardizes observed utility,
 uses bounded best-plus-recent history, and applies GP-UCB.
 
+Candidate Harness sessions can optionally use `--harness-surrogate-query`.
+Before each research round, the task fits and freezes a baseline GP on measured
+history. All candidate sessions query that same snapshot with `query_surrogate`,
+using a candidate batch or a workspace JSON file. The tool exports predictions
+in original utility units, latent standard deviation, raw UCB, and fit status;
+its inline response previews the first eight entries. Results are independent
+of the query batch, and repeated queries are cached within each session and
+snapshot. Queries do not evaluate or submit candidates, alter history, or add
+proposal occurrences to `q0`. Cold-start predictions are labelled `neutral_prior`.
+The tool is disabled by default and is not loaded into the policy session.
+The compiled-policy GP used for final selection may differ from this baseline.
+Frozen snapshots are stored under `harness/surrogate/`; query exports remain
+in each session workspace alongside its research records.
+
 `ldm_harness_compiled` keeps that kernel, variance model, UCB rule, pool,
 candidate budget, and evaluator unchanged. A separate persistent
 `policy_architect` session receives public mutation-summary features and

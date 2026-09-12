@@ -242,3 +242,10 @@ between independent sessions is preserved as empirical `q0` mass; the BO pool,
 compiled policy, and selection rule remain unchanged. The earlier specialist
 roles remain selectable through the same `--harness-profile` option. Omit
 `--harness-unique-candidates` to permit within-session multiplicity.
+
+To let candidate researchers inspect the current baseline GP, add
+`--set args.harness-surrogate-query=true` to a Harness configuration. The
+`query_surrogate` tool accepts batches or candidate JSON files and returns
+predicted utility, latent uncertainty, raw UCB, and snapshot identity. It uses
+only measured history and does not spend oracle evaluations. Leave this
+option unset for the default research workflow without GP queries.

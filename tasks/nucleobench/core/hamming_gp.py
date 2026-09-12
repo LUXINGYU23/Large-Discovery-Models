@@ -18,11 +18,13 @@ from ldm_tts.optimization import (
 from ldm_tts.optimization.acquisition import make_acquisition
 from tasks.nucleobench.core.candidate import MutationContext, prepare_candidate_payload
 from tasks.nucleobench.core.digests import canonical_json_sha256
+from tasks.nucleobench.core.hamming_posterior import (
+    MIN_VARIANCE, code_matrix, normalized_hamming_kernel, residual_moments,
+)
 
 ENCODER_ALGORITHM = "editable_categorical_hamming_v1"
 ENCODER_PATH = "tasks.nucleobench.core.hamming_gp:NucleotideHammingEncoder"
 BASE_CODE = {"A": 0.0, "C": 1.0, "G": 2.0, "T": 3.0}
-MIN_VARIANCE = 1.0e-12
 PRIOR_MEAN_CLIP = 8.0
 
 
@@ -280,20 +282,11 @@ class HammingGPUCBSelector:
         feature: SurrogateVector,
         prior_mean: float,
     ) -> BOPrediction:
-        if self._fit_status == "neutral_prior":
-            residual_mean = 0.0
-            std = self._target_scale
-        else:
-            assert self._codes is not None
-            assert self._cholesky is not None
-            assert self._alpha is not None
-            assert self._length_scale is not None
-            code = np.asarray(feature.values, dtype=float)
-            cross = normalized_hamming_kernel(code, self._codes, self._length_scale)
-            residual_mean = float((cross @ self._alpha)[0])
-            projected = np.linalg.solve(self._cholesky, cross.T)
-            variance_z = max(1.0 - float(np.sum(projected * projected)), MIN_VARIANCE)
-            std = self._target_scale * math.sqrt(variance_z)
+        residuals, deviations = residual_moments(
+            feature.values, self._codes, self._cholesky, self._alpha, self._length_scale,
+        )
+        residual_mean = float(residuals[0])
+        std = self._target_scale * float(deviations[0])
         mean = self._target_mean + self._target_scale * (
             prior_mean + residual_mean
         )
@@ -311,6 +304,17 @@ class HammingGPUCBSelector:
                 "residual_mean_standardized": residual_mean,
             },
         )
+
+    def posterior_snapshot(self) -> dict[str, object]:
+        return {
+            **self._summary(),
+            "objective_name": self.objective_name,
+            "feature_version": self.feature_version,
+            "beta": self.config.beta,
+            "training_codes": None if self._codes is None else self._codes.tolist(),
+            "cholesky": None if self._cholesky is None else self._cholesky.tolist(),
+            "alpha": None if self._alpha is None else self._alpha.tolist(),
+        }
 
     def _summary(self) -> dict[str, object]:
         return {
@@ -344,26 +348,6 @@ def _prior_vector(
         raise ValueError(f"Hamming GP {label} must be a finite aligned vector")
     clip_count = int(np.count_nonzero(np.abs(raw) > PRIOR_MEAN_CLIP))
     return np.clip(raw, -PRIOR_MEAN_CLIP, PRIOR_MEAN_CLIP), clip_count
-
-
-def normalized_hamming_kernel(
-    left: Sequence[float] | np.ndarray,
-    right: Sequence[float] | np.ndarray,
-    length_scale: float,
-) -> np.ndarray:
-    """Return exp(-normalized Hamming distance / length_scale)."""
-
-    if not math.isfinite(length_scale) or length_scale <= 0.0:
-        raise ValueError("length_scale must be finite and positive")
-    left_array = _code_matrix(left)
-    right_array = _code_matrix(right)
-    if left_array.shape[1] != right_array.shape[1]:
-        raise ValueError("Hamming kernel inputs must have the same dimension")
-    distances = np.mean(
-        left_array[:, None, :] != right_array[None, :, :],
-        axis=2,
-    )
-    return np.exp(-distances / length_scale)
 
 
 def _working_set(
@@ -454,22 +438,7 @@ def _validate_vector(vector: SurrogateVector, dimension: int, version: str) -> N
         raise ValueError(
             "Hamming GP representation does not match the configured encoder"
         )
-    _code_matrix(vector.values)
-
-
-def _code_matrix(values: Sequence[float] | np.ndarray) -> np.ndarray:
-    array = np.asarray(values, dtype=float)
-    if array.ndim == 1:
-        array = array[None, :]
-    if array.ndim != 2 or not array.shape[1] or not np.all(np.isfinite(array)):
-        raise ValueError("categorical Hamming codes must be a finite non-empty matrix")
-    if (
-        np.any(array < 0.0)
-        or np.any(array > 3.0)
-        or not np.allclose(array, np.rint(array))
-    ):
-        raise ValueError("categorical Hamming codes must be integers in [0, 3]")
-    return array
+    code_matrix(vector.values)
 
 
 __all__ = [

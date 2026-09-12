@@ -546,14 +546,15 @@ def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
 
 
 @pytest.mark.parametrize("policy", [False, True])
-def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy):
+@pytest.mark.parametrize("surrogate_query", [False, True])
+def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy, surrogate_query):
     args = parse_args([
         "--search-method", "ldm_harness_compiled",
         "--harness-cache-dir", str(tmp_path / "cache"),
         "--harness-tool-budget", "web_search=3",
         "--policy-tool-budget", "web_search=2",
         "--no-harness-context7",
-    ])
+    ] + (["--harness-surrogate-query"] if surrogate_query else []))
     profiles = policy_harness_profile() if policy else harness_profiles()
     provider = ProviderSettings("https://provider.example/v1", "research-model", "test-secret")
     client = _harness_client(
@@ -570,6 +571,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
     assert config.context7_enabled is False
     assert [server.server_id for server in config.mcp_servers] == (["ldm_policy"] if policy else [])
     assert config.tool_extensions[0].tool_names == HARNESS_TOOL_NAMES
+    enabled_query = surrogate_query and not policy
+    assert any("query_surrogate" in tool.tool_names for tool in config.tool_extensions) is enabled_query
     command = "\n".join(client.command)
     root = tmp_path / ("policy_harness" if policy else "harness")
     history = "/measured_history/observations.json" if policy else "/artifacts/measured_history/observations.json"
@@ -577,6 +580,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
     assert f"LDM_NUCLEOBENCH_HISTORY={history}" in command
     assert ("dst=/measured_history,readonly" in command) is policy
     assert ("dst=/public/task_README.md,readonly" in command) is policy
+    assert ("dst=/task_runtime/hamming_posterior.py,readonly" in command) is enabled_query
+    assert ("LDM_NUCLEOBENCH_SURROGATE=" in command) is enabled_query
     assert "test-secret" not in command
     context = json.loads((root / "sequence_context.json").read_text())
     assert context["paired_start"]["start_sequence"] == MOCK_CONTEXT.start_sequence

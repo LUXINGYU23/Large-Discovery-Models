@@ -213,6 +213,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument("--harness-tool-budget", action="append", metavar="NAME=COUNT")
+    parser.add_argument("--harness-surrogate-query", action="store_true")
     parser.add_argument(
         "--policy-capability",
         action="append",
@@ -289,6 +290,8 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.harness_surrogate_query and args.search_method not in PERSISTENT_HARNESS_METHODS:
+        parser.error("--harness-surrogate-query requires a persistent Harness method")
     positive_counts = (
         "reservoir_size",
         "evaluations_per_round",
@@ -929,6 +932,7 @@ def _real_engine(
         harness_candidates_per_session=args.harness_candidates_per_session,
         harness_unique_candidates=args.harness_unique_candidates,
         benchmark_clock=benchmark_clock,
+        surrogate_query_config=_gp_config(args) if args.harness_surrogate_query else None,
         campaign_id=runtime.run_id,
         first_active_round=1,
         max_workers=args.proposal_max_workers,
@@ -1106,6 +1110,14 @@ def _harness_client(
         artifact_root / "sequence_context.json",
     )
     mounts = [(resource_root, "/resources", True)]
+    surrogate_query = args.harness_surrogate_query and not policy
+    query_environment = {}
+    if surrogate_query:
+        mounts.append((
+            TASK_ROOT / "core/hamming_posterior.py", "/task_runtime/hamming_posterior.py", True,
+        ))
+        query_environment["LDM_NUCLEOBENCH_SURROGATE"] = "/artifacts/surrogate"
+        query_environment["PYTHONPATH"] = "/task_runtime"
     mcp_servers = mcp.servers
     if policy:
         submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
@@ -1138,6 +1150,7 @@ def _harness_client(
             environment={
                 "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
                 "LDM_NUCLEOBENCH_HISTORY": history_path,
+                **query_environment,
             },
             mounts=mounts,
         ),
@@ -1153,7 +1166,7 @@ def _harness_client(
             seed=args.campaign_index,
             submission_contract=submission_contract,
             guest_runtime=harness_guest_runtime(),
-            tool_extensions=harness_tool_extensions(),
+            tool_extensions=harness_tool_extensions(surrogate_query=surrogate_query),
             mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
             limits=HarnessLimits(
@@ -1400,6 +1413,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
             args.search_method == "harness" or args.harness_unique_candidates
         ),
         "thinking": args.harness_thinking,
+        "surrogate_query": args.harness_surrogate_query,
         "wall_time_seconds": args.harness_wall_time_seconds,
         "response_timeout_seconds": args.harness_response_timeout,
         "tool_call_budgets": parse_tool_call_budgets(

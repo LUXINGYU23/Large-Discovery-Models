@@ -44,6 +44,8 @@ from tasks.nucleobench.core.proposals import attach_empirical_base_measure
 from tasks.nucleobench.core.constants import TASK_ID
 from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
 from tasks.nucleobench.core.research import serialize_measured_observations, summarize_measured_observations, write_measured_history
+from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
+from tasks.nucleobench.core.surrogate_query import write_surrogate_snapshot
 
 HARNESS_PROFILE_IDS = (
     "target_biology",
@@ -177,14 +179,21 @@ def _profile(profile_id: str, *, session_id: str | None = None) -> HarnessProfil
     )
 
 
-def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
-    return (
+def harness_tool_extensions(*, surrogate_query: bool = False) -> tuple[HarnessToolExtension, ...]:
+    extensions = (
         HarnessToolExtension(
             Path("/resources/tools/sequence_context.mjs"),
             file_sha256(_LOCAL_TOOL_PATH),
             HARNESS_TOOL_NAMES,
         ),
     )
+    if surrogate_query:
+        extensions += (HarnessToolExtension(
+            Path("/resources/tools/query_surrogate.mjs"),
+            file_sha256(_LOCAL_RESOURCE_ROOT / "tools/query_surrogate.mjs"),
+            ("query_surrogate",),
+        ),)
+    return extensions
 
 
 def harness_guest_runtime() -> PiGuestRuntime:
@@ -208,6 +217,7 @@ class NucleoBenchHarnessExpander:
         artifact_root: Path,
         account: Callable[..., Any] | None = None,
         benchmark_clock: BenchmarkClock | None = None,
+        surrogate_query_config: HammingGPUCBConfig | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("NucleoBench harness requires at least one profile")
@@ -229,6 +239,7 @@ class NucleoBenchHarnessExpander:
         self.artifact_root = artifact_root.resolve()
         self.account = account
         self.benchmark_clock = benchmark_clock
+        self.surrogate_query_config = surrogate_query_config
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -319,6 +330,10 @@ class NucleoBenchHarnessExpander:
         history = _history_delta(request, self.first_active_round)
         serialized_history = serialize_measured_observations(history, self.domain.context)
         write_measured_history(self.artifact_root, request.observations, self.domain.context)
+        surrogate_query = (
+            write_surrogate_snapshot(request, self.domain.context, self.surrogate_query_config, self.artifact_root)
+            if self.surrogate_query_config is not None else None
+        )
         history_to_seq = len(request.observations)
         history_from_seq = history_to_seq - len(history)
         history_digest = canonical_sha256(serialized_history)
@@ -355,6 +370,7 @@ class NucleoBenchHarnessExpander:
                     history_digest=history_digest,
                     context=self.domain.context,
                     benchmark_time=benchmark_time,
+                    surrogate_query=surrogate_query,
                 ),
                 forbidden_query_terms=forbidden_query_terms,
             )
@@ -516,6 +532,7 @@ def _turn_message(
     history_digest: str,
     context: MutationContext,
     benchmark_time: dict[str, float | int] | None = None,
+    surrogate_query: dict[str, object] | None = None,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
@@ -609,6 +626,16 @@ def _turn_message(
     }
     if benchmark_time is not None:
         payload["benchmark_time"] = benchmark_time
+    if surrogate_query is not None:
+        payload["surrogate_query"] = surrogate_query
+        payload["sequence_tools"].append("query_surrogate")
+        payload["constraints"].append(
+            "query_surrogate supplies a frozen baseline GP from this round's measured history. "
+            "Compare hypotheses in batches and inspect the exported result file before retaining or revising designs. "
+            "A neutral_prior has insufficient history for data-driven ranking. Keep scientifically motivated alternatives and controls; "
+            "high predicted UCB is not a measurement. Explain material disagreements in your existing rationale notes. "
+            "The final compiled-policy GP may differ. Queries neither submit proposals nor add frequency mass to q0."
+        )
     return (
         "Continue your persistent sequence-design research role. Use your "
         "session history, new measurements, public evidence, scratch analysis, and the "

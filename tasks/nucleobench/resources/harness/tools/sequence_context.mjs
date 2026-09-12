@@ -7,7 +7,7 @@ if (!contextPath) throw new Error("LDM_NUCLEOBENCH_CONTEXT is required");
 const historyPath = process.env.LDM_NUCLEOBENCH_HISTORY;
 if (!historyPath) throw new Error("LDM_NUCLEOBENCH_HISTORY is required");
 
-const context = JSON.parse(readFileSync(contextPath, "utf8"));
+export const context = JSON.parse(readFileSync(contextPath, "utf8"));
 if (context.schema_version !== 1 || !context.case || !context.paired_start) {
 	throw new Error("invalid sequence-design context");
 }
@@ -23,7 +23,7 @@ function jsonResult(value) {
 	return { content: [{ type: "text", text: JSON.stringify(value) }], details: value };
 }
 
-function exportData(ctx, value) {
+export function exportData(ctx, value) {
 	const body = JSON.stringify(value);
 	const sha256 = createHash("sha256").update(body).digest("hex");
 	const directory = join(ctx.cwd, ".ldm-resources", "research");
@@ -65,8 +65,8 @@ function sequenceFromPatch(mutations) {
 	return sequence.join("");
 }
 
-function validatePatch(mutations) {
-	if (!Array.isArray(mutations) || mutations.length === 0) {
+export function validatePatch(mutations, allowEmpty = false) {
+    if (!Array.isArray(mutations) || (!allowEmpty && mutations.length === 0)) {
 		throw new Error("mutations must be a non-empty array");
 	}
 	const seen = new Set();
