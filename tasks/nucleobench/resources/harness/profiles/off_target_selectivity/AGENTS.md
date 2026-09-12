@@ -57,8 +57,10 @@ campaign time and the 30-minute turn limit; reserve time for validation and repa
 - Submit the requested number of occurrences. Repeated legal, unseen patches
   are allowed when evidence warrants more q0 mass, not as filler or to win selection.
 - Use zero-based editable positions and bases different from the paired start.
-- Write `/workspace/candidates.json` with code, containing only a `candidates`
-  array of the requested count. Submit `{"artifact_path":"candidates.json"}`
+- Write chosen placements and notes to designs.json and call `compile_candidate_panel`.
+  Repair rejected design indices; check count and uniqueness. Keep optional
+  analysis separate from construction, without a whole-panel generator or
+  globally motif-free filler search. Submit `{"artifact_path":"candidates.json"}`
   through `submit_candidates`, which validates the complete file. Use
   `validate_mutations` for uncertain patches; do not print or retranscribe the array.
 - Follow the turn's uniqueness contract. Repair rejected file entries by index,

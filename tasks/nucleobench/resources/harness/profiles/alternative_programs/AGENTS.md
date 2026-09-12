@@ -56,8 +56,10 @@ prioritize hypotheses that can be delivered and tested, leaving time for repair.
   mass when evidence warrants it; repeated legal unseen patches are allowed, but
   do not fill the batch by unsupported repetition.
 - Use start-relative substitutions at editable zero-based positions.
-- Write `/workspace/candidates.json` with code, containing only a `candidates`
-  array of the requested count. Submit `{"artifact_path":"candidates.json"}`
+- Write chosen placements and notes to designs.json and call `compile_candidate_panel`.
+  Repair rejected design indices; check count and uniqueness. Keep optional
+  analysis separate from construction, without a whole-panel generator or
+  globally motif-free filler search. Submit `{"artifact_path":"candidates.json"}`
   through `submit_candidates`, which validates the complete file. Use
   `validate_mutations` for uncertain patches; do not print or retranscribe the array.
 - Follow the turn's uniqueness contract. Repair rejected file entries by index,

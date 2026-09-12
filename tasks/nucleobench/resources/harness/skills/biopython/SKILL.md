@@ -1,6 +1,6 @@
 ---
 name: biopython
-description: Build fixed-length DNA candidates from exact task files, reconstruct measured parents, and scan motifs on both strands. Read before writing sequence-construction or motif-analysis code for this campaign.
+description: Compile chosen DNA edits with the task's candidate tool and analyze exact sequences, motif matrices, and composition with Biopython. Use for parent reconstruction, motif analysis, or candidate construction.
 license: MIT
 metadata:
   runtime: Python 3.11 with Biopython 1.88 and NumPy is preinstalled in the research guest.
@@ -14,10 +14,12 @@ Use the installed library for biological operations. Start with the supplied
 sequence context and measured history; save reusable analysis in the workspace.
 The task's mutation and submission contracts remain authoritative.
 
-For candidate construction, use the small working example in
-[references/panel-construction.md](references/panel-construction.md). It retains
-the exact parent background and derives absolute, start-relative patches.
-Test one design end to end before extending it to the requested panel.
+For candidate construction, write compact edit data and call the registered
+`compile_candidate_panel` tool. It retains the exact parent background and
+derives absolute, start-relative patches. See the input format and repair
+workflow in [references/panel-construction.md](references/panel-construction.md).
+Do not reimplement the constructor as a large Python script. Keep independent
+scientific analysis in scratch files; it does not gate patch serialization.
 
 ## Reconstruct Before Comparing
 
@@ -29,35 +31,10 @@ their ASCII SHA-256 before computing changes, rather than manually transcribing
 a long mutation list. For a 200-base Malinois sequence, retrieve the complete
 window. For longer cases, retain each window's absolute coordinate offset.
 
-Derive every submitted patch against the original start, not the measured parent.
-For complete-sequence windows, pass the two tool-returned guest paths to this
-script; do not recreate JSON or DNA literals from the displayed result:
-
-```python
-from Bio.Seq import Seq
-from hashlib import sha256
-import json
-from pathlib import Path
-import sys
-
-reference_window = json.loads(Path(sys.argv[1]).read_text())
-parent_window = json.loads(Path(sys.argv[2]).read_text())
-
-reference = reference_window["bases"]
-parent = parent_window["bases"]
-for window in (reference_window, parent_window):
-    assert sha256(window["bases"].encode("ascii")).hexdigest() == window["bases_sha256"]
-# Apply the intended substitutions to a copy of parent before deriving the patch.
-sequence = parent
-assert len(sequence) == len(reference)
-assert set(sequence) <= set("ACGT")
-patch = [
-    {"position": i, "base": new}
-    for i, (old, new) in enumerate(zip(reference, sequence))
-    if old != new
-]
-reverse = str(Seq(sequence).reverse_complement())
-```
+The compiler derives every patch against the original start, including all
+inherited parent changes. Supply its `parent_candidate_id` rather than manually
+transcribing a measured mutation list. For analysis, load the returned JSON
+window, verify `sha256(bases.encode("ascii"))`, and use `Bio.Seq.Seq` operations.
 
 For equal-length substitution-only candidates, compare original coordinates
 directly. A gapped alignment is not the mutation identity. Check editable
@@ -86,6 +63,7 @@ For forward-coordinate hits on both strands:
 
 ```python
 import numpy as np
+from Bio.Seq import Seq
 
 # pssm is built from a verified matrix; sequence is the complete DNA sequence.
 hits = []
@@ -124,6 +102,7 @@ coordinates, the submission schema, novelty, and required uniqueness are hard
 constraints. Motif matches, absence filters, and composition preferences depend
 on the research hypothesis. A contradiction means repairing the implementation
 or revising that hypothesis and its notes, not retrying the same impossible
-construction. In particular, inspect fixed modules before searching for a
-motif-free spacer or shuffled background. Never label a failed diagnostic as
-passed; preserve useful candidates from unrelated hypotheses.
+construction. Preserve parent bases outside deliberate edits; do not search for
+globally motif-free spacers or perfect shuffles. Never label a failed diagnostic
+as passed; qualify the affected claim or revise that placement, retaining useful
+candidates from unrelated hypotheses.

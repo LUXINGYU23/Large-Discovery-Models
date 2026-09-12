@@ -77,6 +77,7 @@ HARNESS_FORBIDDEN_TERMS = (
     "move37-labs/nucleobench",
 )
 HARNESS_TOOL_NAMES = (
+    "compile_candidate_panel",
     "get_task_context",
     "get_measured_history",
     "get_sequence_window",
@@ -617,13 +618,13 @@ def _turn_message(
                 if allow_repeated_occurrences
                 else "Your minibatch must contain distinct rebuilt sequences. Reordering a patch does not create a new candidate. Cross-session agreement remains allowed."
             ),
-            "Build candidates.json with code and inspect counts and uniqueness without printing the entire array. Use validate_mutations for uncertain patches; submit_candidates validates the complete file.",
+            "Write your chosen edits as compact designs.json data and call compile_candidate_panel to construct candidates.json. Its registered description specifies placements and optional measured-parent IDs. Keep all intended designs in that input file; the tool preserves valid entries and reports rejected design indices. Reach the requested complete draft before optional extended analysis. Do not write a custom full-panel constructor. submit_candidates remains the final admission check.",
             "Every candidate must include concise English change_summary and rationale strings. Use optional comparison_candidate_ids for exact measured references copied from get_measured_history's guest_file. Unknown references are rejected. Notes do not affect identity or q0 and must match the repaired patch.",
             "Use /workspace or relative paths in sandbox commands and scripts; sidecar paths under /artifacts are not mounted inside the guest.",
-            "Before writing sequence-construction or motif code, read the loaded biopython Skill once and use its construction example. Load exact bases from guest_file rather than copying DNA strings or coordinates from prose.",
+            "Use compile_candidate_panel for fixed-length editing, parent inheritance, and patch serialization. Read the biopython Skill when doing motif or other sequence analysis; use the installed library rather than coding an IUPAC matcher. Load exact bases from guest_file rather than copying long DNA strings or coordinates from prose.",
             "Build and validate one hypothesis-driven candidate end to end, then save each valid entry incrementally. Maintain a complete draft panel early and improve entries in place; do not make the whole panel depend on one unfinished analysis or long generator.",
             "Task legality is mandatory: preserve length, editable coordinates, base changes, history exclusion, the requested count, and the turn's uniqueness rule. Motif absence, consensus matches, composition targets, and predicted effects are research hypotheses, not additional benchmark constraints. Diagnose a failed check on one construct: repair a coding error, or revise the contradicted design and its rationale. Keep unrelated valid entries. Never bypass task validation or claim a failed biological check passed.",
-            "Before searching for a spacer or background, check that fixed inserted modules do not already violate your proposed motif exclusions. Prefer retaining the exact parent background where a redesign is unnecessary. Use short executable construction steps and concise diagnostics; reserve time to complete and submit the full panel instead of repeating an unchanged failing analysis.",
+            "Preserve exact parent bases outside chosen placements. Do not search for globally motif-free filler or a perfect shuffle: unintended motif matches are scientific diagnostics, not admission gates. Revise the claim, change the placement, or choose another design. Keep scratch analyses independent of candidate construction and reserve time for full submission.",
             "On rejection, edit only the reported file entries, recheck the complete batch, and submit the same file path again. Do not retranscribe candidates in tool arguments.",
         ],
     }

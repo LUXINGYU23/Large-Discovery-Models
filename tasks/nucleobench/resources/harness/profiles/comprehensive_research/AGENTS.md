@@ -39,9 +39,9 @@ initialization or routine fitting. Use the guest-visible paths in
 the skill list. Reuse a method after learning it; do not reread every Skill
 or generate a separate report every turn.
 
-Read `biopython` before writing sequence-construction or motif-scanning code.
-Start with its fixed-length construction example and test one candidate through
-reconstruction, legality checks, and serialization before scaling the panel.
+Use `compile_candidate_panel` for candidate construction. Supply your chosen
+placements and notes as data; do not write a whole-panel generator. Read
+`biopython` before motif analysis and use its installed library operations.
 
 Maintain concise research notes and reusable scripts across turns. Keep the
 leading hypothesis, credible unresolved alternatives, relevant supporting and
@@ -124,9 +124,9 @@ identity, not the correctness of a claimed mechanism; verify actual differences.
   sequence. Retrieve a measured parent's exact bases with `get_sequence_window`
   and its candidate ID; verify `bases_sha256` in code before editing. Then
   compute the new sequence's complete difference from the original start.
-- Use only editable zero-based positions. Include each position once, and omit
-  bases unchanged from the paired start. Construct the complete candidate array
-  in a scratch file using code; do not manually maintain long mutation lists.
+- Use only editable zero-based positions. The compiler preserves parent bases
+  outside your placements and omits bases unchanged from the paired start.
+  Its input file contains all intended designs; its output is candidates.json.
 - Follow the turn's novelty contract. When within-session uniqueness is required,
   compare rebuilt sequences or sorted patch tuples; reordered edits are the same
   candidate. Cross-session agreement is allowed and need not be avoided.
@@ -135,13 +135,10 @@ identity, not the correctness of a claimed mechanism; verify actual differences.
   evaluating. Do not build a forbidden set from previous candidate files or
   private submission history; not being selected is neither failure nor evidence
   against a design.
-- Before submitting, check the actual final array in Python: its length must
-  equal the requested count, and when uniqueness is required the set of sorted
-  `(position, base)` patch tuples must have that same length. Rebuild every
-  sequence from the original start, verify that each edit changes its base, and
-  compare against the supplied measured exclusions. Check the final serialized
-  objects, not just the design labels or an earlier intermediate list.
-- Write `/workspace/candidates.json` with code. Its only top-level field is
+- Check the compiler's candidate count, distinct count and rejected design
+  indices against the turn contract. Repair the compact input and recompile;
+  compilation never fills missing slots or submits a partial batch for you.
+- The compiler writes `/workspace/candidates.json`. Its only top-level field is
   `candidates`, an array of exactly the requested count of objects containing
   `mutations`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`. Mutation entries contain
   only integer `position` and `base`. Each English note is one short sentence:
@@ -165,14 +162,15 @@ identity, not the correctness of a claimed mechanism; verify actual differences.
   rationale, or replace it. Do not report the failed claim as verified. Keep
   unrelated valid entries; never disable task validation or use `python -O`.
 
-Build the panel incrementally. Persist validated entries as they become ready,
-reach a complete draft early, then improve individual entries without discarding
-the working panel. Use short runnable scripts instead of generating a large,
-untested all-or-nothing builder. Check whether fixed modules already conflict
-with proposed exclusion motifs before searching for a spacer: changing filler
-cannot remove a forbidden site that is wholly inside a fixed module. Motif-free
-backgrounds are not a task requirement. Preserve the exact parent background
-when it serves the hypothesis, and quantify unwanted matches as diagnostics.
+Keep the complete chosen design list in `designs.json` and call
+`compile_candidate_panel({"designs_path":"designs.json"})` as it grows. Invalid
+designs are reported individually; other compiled entries are retained.
+Reach the requested full draft before extended motif analysis or literature
+retrieval, then improve individual designs if useful time remains. Preserve
+native background outside deliberate placements. Do not search for globally
+motif-free filler or a perfect shuffle. Quantify unwanted matches as diagnostics,
+revise the affected claim or placement, and keep unrelated candidates moving.
+Optional scientific analysis must not be a prerequisite for serializing designs.
 
 The turn has a hard 30-minute wall-time. End open-ended research by minute 20,
 attempt the complete submission by minute 25, and reserve the remaining time

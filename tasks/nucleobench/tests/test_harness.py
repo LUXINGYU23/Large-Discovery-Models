@@ -907,6 +907,86 @@ for (const args of [{start: -1, end_exclusive: 4}, {start: 0, end_exclusive: sta
     )
 
 
+def test_compiler_retains_parents_reports_errors_and_preserves_occurrences(tmp_path):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is required to execute the Pi task extension")
+    context_path = tmp_path / "context.json"
+    write_harness_sequence_context(MOCK_CONTEXT, context_path)
+    history_path = tmp_path / "history.json"
+    history_path.write_text(json.dumps({"observations": [
+        {"candidate_id": "start", "mutations": []},
+        {"candidate_id": "parent", "mutations": [
+            {"base": "G", "position": 4}, {"base": "C", "position": 0},
+        ]},
+    ]}))
+    (tmp_path.parent / "outside.json").write_text("untouched")
+    script = r"""
+import assert from 'node:assert/strict';
+import {readFileSync, writeFileSync, symlinkSync, unlinkSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+const {default: load} = await import(process.argv[1]);
+const tools = new Map(); load({registerTool: tool => tools.set(tool.name, tool)});
+const ctx = {cwd: dirname(process.env.LDM_NUCLEOBENCH_CONTEXT)};
+const call = async path => (await tools.get('compile_candidate_panel').execute('test', {designs_path: path}, undefined, undefined, ctx)).details;
+const file = join(ctx.cwd, 'designs.json');
+const output = join(ctx.cwd, 'candidates.json');
+const make = placements => ({placements, change_summary: 'Replace the chosen bases.', rationale: 'Test the chosen sequence hypothesis.'});
+const edit = (start, bases) => ({start, bases});
+const parent = {...make([edit(0,'A'), edit(2,'T'), edit(2,'T')]), parent_candidate_id:'parent', comparison_candidate_ids:['parent']};
+const designs = [make([edit(0,'G')]), make([edit(1,'C')]), parent, make([edit(0,'G')]),
+    make([edit(0,'G'),edit(0,'T')]), make([edit(0,'C'),edit(4,'G')]),
+    make([edit(2,'N')]), {...parent, parent_candidate_id:'unknown'},
+    {...parent, comparison_candidate_ids:['unknown']}, make([edit(2,'A')])];
+writeFileSync(file, JSON.stringify({designs}));
+const result = await call('/workspace/designs.json');
+assert.deepEqual(result.output_design_indices, [0,2,3]);
+assert.equal(result.unique_candidate_count, 2);
+assert.deepEqual(result.duplicate_design_groups, [[0,3]]);
+assert.deepEqual(result.rejected.map(x=>x.design_index), [1,4,5,6,7,8,9]);
+for (const [index, reason] of [[1,'non-editable'],[4,'conflicting'],[5,'historical_duplicate'],[6,'A/C/G/T'],[7,'parent'],[8,'comparison_candidate_ids']]) {
+    assert.ok(result.rejected.find(x=>x.design_index===index).reason.includes(reason));
+}
+const candidates = JSON.parse(readFileSync(output)).candidates;
+assert.deepEqual(candidates[1].mutations, [{position:2,base:'T'},{position:4,base:'G'}]);
+assert.deepEqual(candidates[1].comparison_candidate_ids, ['parent']);
+assert.deepEqual(candidates[0], candidates[2]);
+writeFileSync(file, JSON.stringify({designs:[designs[0],parent,make([edit(6,'T')])]}));
+const repaired = await call('designs.json');
+assert.deepEqual(repaired.rejected, []);
+assert.equal(repaired.candidate_count, 3);
+assert.deepEqual(JSON.parse(readFileSync(output)).candidates.slice(0,2), candidates.slice(0,2));
+const history = JSON.parse(readFileSync(process.env.LDM_NUCLEOBENCH_HISTORY));
+history.observations.push({candidate_id:'new', mutations:candidates[0].mutations});
+writeFileSync(process.env.LDM_NUCLEOBENCH_HISTORY,JSON.stringify(history));
+assert.deepEqual((await call('designs.json')).rejected.map(x=>x.design_index),[0]);
+await assert.rejects(call('candidates.json'), /separate/);
+await assert.rejects(call('../outside.json'), /inside this session/);
+symlinkSync(join(ctx.cwd,'../outside.json'),join(ctx.cwd,'external.json'));
+await assert.rejects(call('external.json'), /inside this session/);
+unlinkSync(output); symlinkSync(join(ctx.cwd,'../outside.json'),output);
+await assert.rejects(call('designs.json'), /regular workspace file/);
+assert.equal(readFileSync(join(ctx.cwd,'../outside.json'),'utf8'),'untouched');
+unlinkSync(output);
+console.log(JSON.stringify({candidates}));
+"""
+    extension = Path(__file__).parents[1] / "resources/harness/tools/sequence_context.mjs"
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script, extension.resolve().as_uri()],
+        env={**os.environ, "LDM_NUCLEOBENCH_CONTEXT": str(context_path),
+             "LDM_NUCLEOBENCH_HISTORY": str(history_path)},
+        capture_output=True, text=True, check=True,
+    )
+    submission = _submission(tmp_path, json.loads(result.stdout))
+    arguments = dict(measured_candidate_ids={"parent"}, artifact_root=tmp_path, candidate_count=3)
+    assert _validate_submission(submission, MOCK_CONTEXT, set(),
+                                allow_repeated_occurrences=True, **arguments).decision == "accept"
+    unique = _validate_submission(submission, MOCK_CONTEXT, set(),
+                                  allow_repeated_occurrences=False, **arguments)
+    assert unique.decision == "retry"
+    assert any(error.code == "same_session_duplicate" for error in unique.errors)
+
+
 def _payloads() -> list[dict[str, list[dict[str, object]]]]:
     return [
         {"mutations": [{"position": position, "base": base}]}

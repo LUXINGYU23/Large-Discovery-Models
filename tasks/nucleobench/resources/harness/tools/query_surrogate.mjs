@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
-import { context, exportData, validatePatch } from "./sequence_context.mjs";
+import { context, exportData, validatePatch, workspaceFile } from "./sequence_context.mjs";
 
 const snapshotRoot = process.env.LDM_NUCLEOBENCH_SURROGATE;
 if (!snapshotRoot) throw new Error("LDM_NUCLEOBENCH_SURROGATE is required");
@@ -11,18 +11,6 @@ const runner = join(dirname(fileURLToPath(import.meta.url)), "query_posterior.py
 const baseCodes = { A: 0, C: 1, G: 2, T: 3 };
 const positions = context.paired_start.editable_positions;
 const start = context.paired_start.start_sequence;
-
-function workspaceFile(cwd, path) {
-    if (typeof path !== "string" || !path) throw new Error("artifact_path must name a candidate JSON file");
-    const local = path.startsWith("/workspace/") ? path.slice("/workspace/".length) : path;
-    if (isAbsolute(local)) throw new Error("artifact_path must be relative to /workspace");
-    const resolved = realpathSync(join(cwd, local));
-    const offset = relative(realpathSync(cwd), resolved);
-    if (offset === ".." || offset.startsWith(".." + sep) || isAbsolute(offset)) {
-        throw new Error("artifact_path must stay inside this session's workspace");
-    }
-    return resolved;
-}
 
 function predict(input, signal) {
     return new Promise((resolve, reject) => {

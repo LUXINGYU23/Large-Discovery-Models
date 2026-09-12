@@ -206,7 +206,7 @@ and alternative regulatory programs. Candidate-generation roles load committed
 `AGENTS.md` files and four task-local scientific Skills. They can use the isolated
 task guest, web and
 Context7 tools, configured MCP servers, and task-local structured tools for
-paired-start context, sequence windows, mutable regions, mutation validation,
+paired-start context, sequence windows, mutable regions, candidate compilation, mutation validation,
 and measured research history.
 
 The `comprehensive_research` role combines these perspectives in one lead
@@ -222,12 +222,14 @@ unresolved hypotheses after feedback and choose their balance from comparative
 measurements and remaining time, without fixed role assignments or slot quotas.
 Previously proposed but unmeasured candidates remain eligible unchanged.
 
-Researchers construct and save valid designs incrementally before scaling or
-refining a panel. The Biopython Skill supplies a fixed-length editing example
-using exact task files and measured-parent patches. Task legality checks remain
-mandatory; motif and composition diagnostics test biological hypotheses.
-Contradictory diagnostics require repairing or revising the affected design
-and its notes, while preserving unrelated valid candidates.
+Researchers write their chosen placements and annotations to a design file.
+The task-local `compile_candidate_panel` tool applies fixed-length edits to the
+exact start or measured parent and writes `candidates.json`. It reports rejected
+design indices independently, preserves repeated occurrences, and neither
+selects designs nor fills missing slots. The Biopython Skill documents the
+[design format](resources/harness/skills/biopython/references/panel-construction.md).
+Motif and composition analyses remain scientific diagnostics, separate from
+construction; the original submission contract still checks the full batch.
 
 All candidate roles, including the direct `harness` researcher, expose the same
 on-demand Skills: `biopython` for sequence reconstruction and motif analysis,
@@ -240,7 +242,7 @@ injected every turn. Sources, adaptation scope, and licenses are documented in
 [the attribution](resources/harness/skills/ATTRIBUTION.md). The policy architect
 continues to load only its task-local `compile-ldm-policy` Skill.
 
-Candidate Agents write `candidates.json` in their workspace with code, then call
+Candidate Agents construct `candidates.json` in their workspace, then call
 `submit_candidates({"artifact_path":"candidates.json"})`. The file contains only
 a `candidates` array of the requested number of objects, each containing
 `mutations`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`. The two notes are concise English
@@ -368,8 +370,8 @@ still waits for the complete configured occurrence count. Fatal provider or
 protocol errors stop execution rather than silently dropping a profile.
 
 Round-limited runs also continue transient proposal-session failures, with a
-recovery-start window equal to `--harness-wall-time-seconds`. Each attempt keeps
-the configured session deadline. Accepted submissions are reused, and recovery
+recovery window of twice `--harness-wall-time-seconds`, including the first
+attempt. Each attempt keeps the configured session deadline. Accepted submissions are reused, and recovery
 does not request extra proposal occurrences or oracle evaluations.
 
 ## Provider and External Data

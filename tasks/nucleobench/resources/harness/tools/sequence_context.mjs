@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 const contextPath = process.env.LDM_NUCLEOBENCH_CONTEXT;
 if (!contextPath) throw new Error("LDM_NUCLEOBENCH_CONTEXT is required");
@@ -31,6 +31,18 @@ export function exportData(ctx, value) {
 	const path = join(directory, `${sha256}.json`);
 	if (!existsSync(path)) writeFileSync(path, body);
 	return { path: `/workspace/.ldm-resources/research/${sha256}.json`, sha256 };
+}
+
+export function workspaceFile(cwd, path) {
+    if (typeof path !== "string" || !path) throw new Error("path must name a workspace JSON file");
+    const local = path.startsWith("/workspace/") ? path.slice("/workspace/".length) : path;
+    if (isAbsolute(local)) throw new Error("path must be relative to /workspace");
+    const resolved = realpathSync(join(cwd, local));
+    const offset = relative(realpathSync(cwd), resolved);
+    if (offset === ".." || offset.startsWith(".." + sep) || isAbsolute(offset)) {
+        throw new Error("path must stay inside this session's workspace");
+    }
+    return resolved;
 }
 
 function exactObject(value, fields, label) {
@@ -91,10 +103,105 @@ export function validatePatch(mutations, allowEmpty = false) {
 	};
 }
 
+function compileDesign(design, measured) {
+    if (!design || typeof design !== "object" || Array.isArray(design)) throw new Error("design must be an object");
+    const { parent_candidate_id, placements, change_summary, rationale, comparison_candidate_ids, ...extra } = design;
+    if (Object.keys(extra).length) throw new Error("unknown design fields: " + Object.keys(extra).join(", "));
+    if (typeof change_summary !== "string" || !change_summary.trim()
+        || typeof rationale !== "string" || !rationale.trim()) {
+        throw new Error("change_summary and rationale must be non-empty English notes");
+    }
+    if (!Array.isArray(placements) || !placements.length) throw new Error("placements must be a non-empty array");
+    const parent = parent_candidate_id === undefined ? null : measured.get(parent_candidate_id);
+    if (parent_candidate_id !== undefined && !parent) throw new Error("unknown measured parent_candidate_id: " + parent_candidate_id);
+    const edits = new Map((parent?.mutations ?? []).map(({ position, base }) => [position, base]));
+    const writes = new Map();
+    for (const [index, placement] of placements.entries()) {
+        exactObject(placement, ["start", "bases"], `placements[${index}]`);
+        if (!Number.isInteger(placement.start) || typeof placement.bases !== "string"
+            || !/^[ACGT]+$/.test(placement.bases)) {
+            throw new Error(`placements[${index}] needs an integer start and a non-empty A/C/G/T string`);
+        }
+        for (const [offset, base] of [...placement.bases].entries()) {
+            const position = placement.start + offset;
+            if (!editable.has(position)) throw new Error(`placements[${index}] writes non-editable position ${position}`);
+            if (writes.has(position) && writes.get(position) !== base) throw new Error(`conflicting placements at position ${position}`);
+            writes.set(position, base);
+            if (startSequence[position] === base) edits.delete(position);
+            else edits.set(position, base);
+        }
+    }
+    const mutations = validatePatch([...edits].map(([position, base]) => ({ position, base }))).mutations;
+    const candidate = { mutations, change_summary: change_summary.trim(), rationale: rationale.trim() };
+    if (comparison_candidate_ids !== undefined) {
+        if (!Array.isArray(comparison_candidate_ids) || comparison_candidate_ids.some(id => !measured.has(id))) {
+            throw new Error("comparison_candidate_ids must contain only exact measured IDs");
+        }
+        candidate.comparison_candidate_ids = comparison_candidate_ids;
+    }
+    return candidate;
+}
+
 export default function sequenceContextTools(pi) {
     pi.registerTool({
+        name: "compile_candidate_panel",
+        label: "Compile sequence designs into candidate patches",
+        description: "Read the complete designs JSON file and rebuild candidates.json without writing a sequence-construction script. File shape: {designs:[{parent_candidate_id?: measured ID, placements:[{start: absolute integer, bases: concrete DNA}], change_summary: string, rationale: string, comparison_candidate_ids?: measured IDs}]}. Omit parent_candidate_id for the original start. Placements replace equal-length spans; other parent bases are retained. Each design is checked independently. This does not evaluate, rank, fill missing slots, or submit candidates.",
+        promptSnippet: "compile_candidate_panel: reliably construct the full candidate file from your chosen edits and notes",
+        promptGuidelines: [
+            "Write compact design data with the write tool, then compile; do not rewrite a whole-panel constructor or search for motif-free filler. Use exact parent backgrounds unless a specific design requires replacement.",
+            "Keep every intended design in the input file. Fix rejected design indices and recompile; successful designs remain in the output. Duplicates are reported and preserved; follow the turn's uniqueness contract. Submit only after the requested count and legality checks pass.",
+            "Motif/composition diagnostics belong in research notes, not compilation gates. A failed proxy claim requires correcting the affected rationale or redesigning that entry; it must not block unrelated candidates.",
+        ],
+        parameters: {
+            type: "object", properties: { designs_path: { type: "string", minLength: 1 } },
+            required: ["designs_path"], additionalProperties: false,
+        },
+        async execute(_id, params, _signal, _update, ctx) {
+            const inputPath = workspaceFile(ctx.cwd, params.designs_path);
+            const outputPath = join(ctx.cwd, "candidates.json");
+            if (inputPath === outputPath) throw new Error("keep the designs input separate from candidates.json output");
+            const input = JSON.parse(readFileSync(inputPath, "utf8"));
+            exactObject(input, ["designs"], "design file");
+            if (!Array.isArray(input.designs) || !input.designs.length) throw new Error("designs must be a non-empty array");
+            const { observations } = JSON.parse(readFileSync(historyPath, "utf8"));
+            const measured = new Map(observations.map(row => [row.candidate_id, row]));
+            const identity = mutations => JSON.stringify(mutations.map(({ position, base }) => [position, base]).sort((a, b) => a[0] - b[0]));
+            const evaluated = new Set(observations.map(row => identity(row.mutations)));
+            const candidates = [], rejected = [], designIndices = [], groups = new Map();
+            for (const [index, design] of input.designs.entries()) {
+                try {
+                    const candidate = compileDesign(design, measured);
+                    const key = identity(candidate.mutations);
+                    if (evaluated.has(key)) throw new Error("historical_duplicate: the complete rebuilt sequence was already measured");
+                    candidates.push(candidate);
+                    designIndices.push(index);
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(index);
+                } catch (error) {
+                    rejected.push({ design_index: index, reason: error.message });
+                }
+            }
+            const stat = lstatSync(outputPath, { throwIfNoEntry: false });
+            if (stat && !stat.isFile()) throw new Error("candidate output must be a regular workspace file");
+            const temporary = outputPath + "." + randomUUID() + ".tmp";
+            try {
+                writeFileSync(temporary, JSON.stringify({ candidates }), { flag: "wx" });
+                renameSync(temporary, outputPath);
+            } finally {
+                rmSync(temporary, { force: true });
+            }
+            return jsonResult({
+                artifact_path: "candidates.json", candidate_count: candidates.length,
+                unique_candidate_count: groups.size, output_design_indices: designIndices,
+                duplicate_design_groups: [...groups.values()].filter(indices => indices.length > 1), rejected,
+                next_step: "Repair rejected entries in the complete design file and recompile. Check the turn's count and uniqueness contract, then call submit_candidates. Compilation alone is not submission.",
+            });
+        },
+    });
+    pi.registerTool({
         name: "get_measured_history",
-        promptGuidelines: ["Read exact records from guest_file.path in sandbox scripts. The file includes all matching detailed rows, independent of pagination or response_format. Omit candidate_ids and round_index to export the complete authoritative evaluated set; previous proposal files are not exclusions."],
+        promptGuidelines: ["Read exact records from guest_file.path in sandbox scripts. The file includes all matching detailed rows, independent of pagination or response_format. These rows contain mutations; compute their mutation count as len(row['mutations']), rather than expecting the concise preview's hamming_distance field. Omit candidate_ids and round_index to export the complete authoritative evaluated set; previous proposal files are not exclusions."],
         label: "Read measured sequence history",
         description: "Query measured history by ID or round. Default concise results contain IDs, utility and mutation count; request detailed for exact patches and original design notes. Sort by utility or recency, and follow next_offset for more. Unmeasured proposals are not exposed.",
         promptSnippet: "get_measured_history: revisit measured results and the hypotheses that motivated them",
