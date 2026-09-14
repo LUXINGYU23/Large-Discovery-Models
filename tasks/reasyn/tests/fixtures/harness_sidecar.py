@@ -6,7 +6,6 @@ This fixture never calls an LLM. Every trace row is labeled synthetic_fixture.
 import hashlib
 import json
 import sys
-from importlib.metadata import version
 from pathlib import Path
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else "molecular"
@@ -44,7 +43,11 @@ def choose_ldm_weights(context):
 '''
 
 
-print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
+# A task's independently locked environment does not install the root Python
+# distribution. The wire release belongs to the actual sidecar package.
+sidecar_package = Path(__file__).resolve().parents[4] / "harnesses/pi/package.json"
+protocol_version = json.loads(sidecar_package.read_text())["version"]
+print(json.dumps({"type": "ready", "protocolVersion": protocol_version}), flush=True)
 for line in sys.stdin:
     frame = json.loads(line)
     common = {key: frame[key] for key in ("requestId", "protocolVersion", "campaignId")}

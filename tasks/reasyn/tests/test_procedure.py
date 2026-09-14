@@ -1,5 +1,7 @@
 import ast
 import json
+import os
+from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
@@ -155,7 +157,10 @@ def test_reconstruction_full_denominator_and_stereo():
 
 def test_auc_matches_released_source_formula():
     np = pytest.importorskip("numpy")
-    source = workflow.REPO_ROOT.parent / "ReaSyn-reasyn_v2/scripts/optimize_tdc.py"
+    upstream = Path(
+        os.environ.get("REASYN_ROOT", workflow.REPO_ROOT.parent / "ReaSyn-reasyn_v2")
+    )
+    source = upstream / "scripts/optimize_tdc.py"
     if not source.exists():
         pytest.skip("supplied upstream archive unavailable")
     tree = ast.parse(source.read_text())

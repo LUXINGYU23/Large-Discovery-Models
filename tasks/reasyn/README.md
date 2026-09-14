@@ -37,6 +37,16 @@ the target verbatim gives credit only when the frozen stock/reaction replay
 actually supports a pathway. Zero-reaction stock entries are allowed, matching
 the released sampler.
 
+Parameter identifiability matters for reconstruction: the current expansion
+assigns a distinct seed to each occurrence, so each query/seed identity has
+count one and its per-trial q0 is uniform. For a fixed pool, prior and eta,
+changing alpha alone adds a common logit constant and cannot change selection
+probabilities. Repeated molecular queries still receive multiple trial entries
+and therefore more total probability. In contrast, TDC aggregates repeated
+products and can have nonuniform q0, where alpha directly affects selection.
+Changing the query/seed identity to make alpha effective would be an algorithm
+change, not a tuning-only adjustment.
+
 ## Scientific contract and changes
 
 Primary local evidence is in `resources/source_provenance.json` and the
@@ -163,6 +173,39 @@ claim. For a targeted debug run, call the task module with `--target-smiles`,
 `tdc_10000` separately for each released oracle and seed; do not average partial
 or missing oracle runs. `scripts/aggregate_tdc_results.py` enforces the full
 13-by-3 inventory and 10k real-call condition.
+
+For paper-scale reconstruction tables, `scripts/aggregate_reconstruction_results.py`
+requires a predeclared JSON suite with `benchmark: reconstruction`, `seeds: [0,1,2]`,
+the complete ordered `targets` and frozen `assets` dictionaries for all three
+datasets, `methods`, and `cases`. Each method declares `id`, `label`,
+`search_method`, `proposal_mode`, `model`, and `trials_per_target` (1 or 4);
+search methods also freeze `settings_by_dataset` before evaluation. Each case
+declares `method`, `dataset`, `seed`, and its run `path`. Paths may be relative to
+the manifest. Run with the chemistry task environment:
+
+```bash
+python tasks/reasyn/scripts/aggregate_reconstruction_results.py /path/to/suite.json \
+  --output /path/to/report
+```
+
+The checker requires every 1,000-target, three-seed case, verifies individual
+completion and selected projection receipts, checks frozen assets/model IDs and
+paper projector settings, and recomputes all four metrics. Completed empty
+projections contribute zero; missing or unfinished targets are not silently
+dropped. It emits a 12-metric horizontal Markdown table and full-precision JSON,
+using mean and population standard deviation (`ddof=0`) across seeds, consistent
+with the existing TDC aggregator's convention. Passing this result audit does
+not independently attest source cleanliness, identical upstream trajectories,
+or global SOTA.
+
+An explicitly requested full-dataset single-seed run can instead declare
+`replication_protocol: single_seed` and `seeds: [42]`. It still requires every
+1,000-target dataset for every method, checks the exact seed in every receipt,
+and emits all twelve metric point estimates without CI or a fabricated
+cross-seed standard deviation. This is full dataset scale, not the paper's
+three-replicate statistical protocol. The original three-seed contract remains
+the default; dropping seeds from it without declaring the alternate protocol
+is rejected.
 
 ## Persistent research and pilot comparison
 

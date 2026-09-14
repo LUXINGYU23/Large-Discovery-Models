@@ -106,6 +106,24 @@ def test_reconstruction_repeated_query_seeds_are_distinct_probability_identities
     assert all(c.metadata[Q0_METADATA_KEY]["identity_space"] == "canonical_query_and_sampling_seed" for c in reservoir.candidates)
 
 
+def test_reconstruction_uniform_seed_q0_makes_alpha_invariant():
+    # Independent seed identities preserve molecular multiplicity through the
+    # number of trial entries, not through unequal per-entry q0 weights.
+    client = Targets([["CCO", "CCO"], ["CCO", "CCN"]])
+    result = ReaSynExpander(options("reconstruction"), Projector(), Sink(),
+                           target="CCO", client=client).expand(ExpansionRequest(0, 4))
+    candidates = ReservoirBuilder(ReaSynDomain("reconstruction", mock=True)).build(result.proposals).candidates
+    q0 = empirical_base_masses(candidates)
+    scores = [0.1 if c.payload["target_smiles"] == "CCO" else 0.9 for c in candidates]
+    reference = tilted_distribution(q0, scores, alpha=1.0, eta=1.0)[0]
+    for alpha in (0.0, 0.5, 2.0, 10.0):
+        probabilities = tilted_distribution(q0, scores, alpha=alpha, eta=1.0)[0]
+        np.testing.assert_allclose(probabilities, reference, rtol=1e-12, atol=1e-12)
+    baseline = tilted_distribution(q0, scores, alpha=2.0, eta=0.0)[0]
+    assert sum(p for p, c in zip(baseline, candidates) if c.payload["target_smiles"] == "CCO") == pytest.approx(0.75)
+    assert not np.allclose(tilted_distribution(q0, scores, alpha=1.0, eta=0.5)[0], reference)
+
+
 def test_full_history_product_rejections_refill_and_keep_current_round_occurrences():
     # First entry is outside the compact 12-observation prompt window.
     history = (observed("CCO"),) + tuple(observed("CCN") for _ in range(12))

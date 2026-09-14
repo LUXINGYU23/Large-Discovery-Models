@@ -26,6 +26,27 @@ def fixture():
     return json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
 
 
+def test_runner_repeated_profile_and_budget_flags_preserve_all_entries():
+    common = ["--mock", "--search-method", "harness"]
+    repeated = parse_args(common + [
+        "--harness-profile", "geometry_research",
+        "--harness-profile", "structure_audit",
+        "--harness-tool-budget", "bash=4",
+        "--harness-tool-budget", "web_search=2",
+    ])
+    grouped = parse_args(common + [
+        "--harness-profile", "geometry_research", "structure_audit",
+        "--harness-tool-budget", "bash=4", "web_search=2",
+    ])
+    assert repeated.harness_profile == grouped.harness_profile == [
+        "geometry_research", "structure_audit",
+    ]
+    assert repeated.harness_tool_budget == grouped.harness_tool_budget == [
+        "bash=4", "web_search=2",
+    ]
+    assert parse_args(common).harness_profile == grouped.harness_profile
+
+
 class Poison:
     def __getattribute__(self, name):
         raise AssertionError("Read hidden judge state")

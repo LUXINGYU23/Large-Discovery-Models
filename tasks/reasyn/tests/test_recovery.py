@@ -194,6 +194,11 @@ def test_mock_pilot_matrix_completes_with_shared_initialization_and_no_model_cos
     from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
     from ldm_tts.pilot_evaluation.execution import run_evaluation
 
+    # The synthetic matrix must also run from a source archive without .git.
+    # Repository provenance enforcement is covered by the shared pilot tests.
+    monkeypatch.setattr("ldm_tts.pilot_evaluation.execution._repository_state", lambda: {
+        "commit": "synthetic-task-test", "dirty": False, "source": "test_fixture",
+    })
     # Plotting is independently covered by shared pilot tests; this task-level
     # integration test keeps the declared NumPy/PyYAML/pytest environment sufficient.
     monkeypatch.setattr("ldm_tts.pilot_evaluation.reporting._plot", lambda *args: None)

@@ -76,7 +76,7 @@ def parse_args(argv=None):
     )
     parser.add_argument("--service-retry-allowance", type=int, default=3)
     parser.add_argument(
-        "--harness-profile", nargs="+", default=["geometry_research", "structure_audit"]
+        "--harness-profile", nargs="+", action="extend", default=None
     )
     parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
     parser.add_argument(
@@ -96,15 +96,17 @@ def parse_args(argv=None):
     parser.add_argument(
         "--harness-tool-budget",
         nargs="+",
-        default=[
-            "web_search=8",
-            "fetch_content=16",
-            "get_search_content=16",
-            "resolve-library-id=4",
-            "query-docs=8",
-            "bash=64",
-        ],
+        action="extend",
+        default=None,
     )
+    default_harness_tool_budgets = [
+        "web_search=8",
+        "fetch_content=16",
+        "get_search_content=16",
+        "resolve-library-id=4",
+        "query-docs=8",
+        "bash=64",
+    ]
     parser.add_argument("--harness-mcp-config", type=Path, default=None)
     parser.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
     parser.add_argument(
@@ -149,6 +151,12 @@ def parse_args(argv=None):
         help="Provider reasoning controls; never put credentials here",
     )
     args = parser.parse_args(argv)
+    # The shared config runner repeats list-valued flags. Preserve all entries
+    # both in that form and in a grouped, interactive command-line invocation.
+    if args.harness_profile is None:
+        args.harness_profile = ["geometry_research", "structure_audit"]
+    if args.harness_tool_budget is None:
+        args.harness_tool_budget = default_harness_tool_budgets
     if args.proposal_mode in {"mock", "callable"}:
         args.mock = True
     if args.resume_from is not None:
