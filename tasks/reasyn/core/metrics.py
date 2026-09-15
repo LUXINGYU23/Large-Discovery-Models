@@ -68,16 +68,11 @@ def reconstruction_metrics(targets, rows, *, mock=False, diversity=None):
     if not targets or len(set(targets)) != len(targets):
         raise ValueError("targets must be nonempty and unique after canonicalization")
     groups = {t: [] for t in targets}
-    seen = set()
     for row in rows:
         target = canonicalize(row["target"], mock=mock, stereo=False)
         if target not in groups:
             raise ValueError("output target outside the requested manifest")
         smi = canonicalize(row["smiles"], mock=mock, stereo=False)
-        signature = (target, smi, row.get("synthesis", ""))
-        if signature in seen:
-            continue
-        seen.add(signature)
         groups[target].append(
             {**row, "smiles": smi, "score": similarity(target, smi, mock=mock)}
         )

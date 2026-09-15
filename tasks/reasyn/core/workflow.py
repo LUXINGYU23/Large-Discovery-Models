@@ -28,6 +28,7 @@ from ldm_tts.contracts import (
     SurrogateSpaceSpec,
 )
 from ldm_tts.data import DataCollectionSink
+from ldm_tts.engine.runtime import consume_proposal_attempts
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir, BudgetExceededError
 from ldm_tts.engine.reporting import load_successful_observations
 from .selection import TanimotoGPSelector, AcquisitionTiltedSelector
@@ -45,7 +46,7 @@ from .chemistry import canonicalize
 from .evaluator import ReconstructionEvaluator, TDCOracleEvaluator
 from .metrics import ORACLES, WIDTH_ONE, reconstruction_metrics, top_auc, top_mean
 from .projector import Projector, ProjectionInterruptedError
-from .proposals import ReaSynExpander, ProposalExhausted
+from .proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander, ProposalExhausted
 from .surrogate import MoleculeEncoder
 from ldm_tts.harness import HarnessError, PolicyResearchController, DockerPolicyExecutor
 from .harness import HarnessTargetSource, create_client
@@ -166,6 +167,10 @@ def parse_args(argv=None):
     if args.run_name and (Path(args.run_name).name != args.run_name or args.run_name in (".", "..")):
         p.error("run-name must be a single directory name")
     args.upstream_root = args.upstream_root.expanduser().resolve()
+    if args.harness_cache_dir:
+        args.harness_cache_dir = args.harness_cache_dir.expanduser().resolve()
+    if args.harness_mcp_config:
+        args.harness_mcp_config = args.harness_mcp_config.expanduser().resolve()
     if args.proposal_mode == "auto":
         args.proposal_mode = "mock" if args.mock else "openai"
     if args.proposal_mode == "mock" and not args.mock:
@@ -349,6 +354,36 @@ def _jsonable(args):
     return {k: convert(v) for k, v in vars(args).items() if k != "provider_api_key"}
 
 
+def _direct_provider_api_key():
+    return os.environ.get(
+        "LLM_API_KEY",
+        os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
+    )
+
+
+def _harness_provider_api_key():
+    return os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+
+
+def _preflight_harness_provider(args):
+    if not args.llm_url or not args.llm_model:
+        raise ValueError("Set LLM_BASE_URL and LLM_MODEL_NAME for real Harness proposals")
+    if not getattr(args, "provider_api_key", ""):
+        raise EndpointRequestError(
+            "Set LLM_API_KEY or OPENAI_API_KEY for real Harness proposals"
+        )
+    client = OpenAICompatibleProposalClient(
+        url=args.llm_url,
+        model=args.llm_model,
+        api_key=args.provider_api_key,
+        timeout_seconds=args.harness_response_timeout,
+        max_tokens=args.llm_max_tokens,
+        max_retries=0,
+        wire_api="responses",
+    )
+    return {"backend": "harness", "wire_api": "responses", **client.preflight()}
+
+
 def _targets(args):
     if args.benchmark == "tdc":
         return [""]
@@ -380,6 +415,112 @@ def _targets(args):
     return targets
 
 
+def _file_hash(path):
+    h = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1048576), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _directory_hash(root):
+    root = Path(root).resolve()
+    entries = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
+            continue
+        entries.append({"path": path.relative_to(root).as_posix(), "sha256": _file_hash(path)})
+    return hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _harness_component_digests(args):
+    if args.proposal_mode != "harness":
+        return {}
+    digests = {
+        "resource_tree": _directory_hash(TASK_ROOT / "resources/harness"),
+        "harness_mcp_config": None,
+    }
+    if args.harness_mcp_config:
+        digests["harness_mcp_config"] = _file_hash(args.harness_mcp_config)
+    return digests
+
+
+def _scientific_identity(args, configuration, target, contract):
+    identity_keys = (
+        "benchmark",
+        "mock",
+        "oracle",
+        "seed",
+        "proposal_mode",
+        "num_cycles",
+        "search_width",
+        "exhaustiveness",
+        "num_editflow_samples",
+        "model_paths",
+        "fpindex",
+        "rxn_matrix",
+        "additional_fpindex",
+        "reservoir_size",
+        "evaluations_per_round",
+        "max_oracle_calls",
+        "llm_model",
+        "llm_max_tokens",
+        "max_results",
+        "projection_time_limit",
+        "projection_timeout",
+        "device",
+        "evaluator_python",
+        "gp_history_limit",
+        "acquisition_beta", "acquisition_alpha", "acquisition_eta", "acquisition_z_clip",
+        "search_method", "proposal_batch_size", "bo_pool_size", "max_replenishment_batches",
+        "recovery_attempts", "projection_retry_targets", "initialization_mode",
+        "proposal_recovery_seed_span",
+        "harness_sessions", "harness_thinking", "harness_tool_budget",
+        "harness_sidecar_image", "policy_runner_image", "harness_mcp_config",
+        "harness_wall_time_seconds", "harness_response_timeout",
+    )
+    scientific = {k: configuration[k] for k in identity_keys}
+    scientific["bo_targets"] = getattr(args, "bo_targets", [])
+    scientific["original_target"] = target
+    scientific["source_archive_digest"] = contract.benchmark["source_commit"]
+    scientific["asset_digests"] = args.asset_digests
+    scientific["harness_component_digests"] = configuration["harness_component_digests"]
+    return scientific
+
+
+def _status_recovery_pass(status_payload):
+    details = status_payload.get("details", {}) if isinstance(status_payload, dict) else {}
+    value = details.get("proposal_recovery_pass") if isinstance(details, dict) else None
+    if value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("status proposal_recovery_pass must be a nonnegative integer")
+    return value
+
+
+def _proposal_recovery_details(expander):
+    value = getattr(expander, "recovery_pass", 0)
+    if value:
+        return {"proposal_recovery_pass": value}
+    return None
+
+
+def _proposal_recovery_seed_span(args, run_dir, *, resume):
+    config_path = Path(run_dir) / "config.json"
+    if resume and config_path.exists():
+        original = json.loads(config_path.read_text())
+        value = original.get("proposal_recovery_seed_span", original.get("iterations"))
+    else:
+        value = max(
+            DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
+            args.iterations,
+            args.max_oracle_calls,
+        )
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("proposal_recovery_seed_span must be a positive integer")
+    return value
+
+
 def _check_assets(args):
     args.asset_digests = {}
     if args.mock:
@@ -398,17 +539,10 @@ def _check_assets(args):
     if missing:
         raise FileNotFoundError("Missing ReaSyn assets: " + ", ".join(missing))
 
-    def file_hash(path):
-        h = hashlib.sha256()
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1048576), b""):
-                h.update(chunk)
-        return h.hexdigest()
-
     # Hash once before all target campaigns. Same-path asset replacement cannot
     # silently reuse cached products or resume an incompatible scientific run.
     for path in sorted(set(paths) | set((args.upstream_root / "reasyn").rglob("*.py"))):
-        args.asset_digests[str(path)] = file_hash(path)
+        args.asset_digests[str(path)] = _file_hash(path)
     pinned = json.loads((TASK_ROOT / "resources/source_provenance.json").read_text())[
         "files"
     ]
@@ -416,12 +550,12 @@ def _check_assets(args):
     for name, expected in pinned.items():
         if name.startswith(prefix) and name.endswith((".py", ".yml")):
             path = args.upstream_root / name[len(prefix) :]
-            actual = file_hash(path)
+            actual = _file_hash(path)
             if actual != expected:
                 raise ValueError(
                     "Supplied upstream source differs from pinned archive: " + name
                 )
-    args.asset_digests["adapter_projection_worker"] = file_hash(
+    args.asset_digests["adapter_projection_worker"] = _file_hash(
         TASK_ROOT / "core/projection_worker.py"
     )
 
@@ -527,47 +661,23 @@ def main(argv=None):
 
 def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     run_dir.mkdir(parents=True, exist_ok=True)
-    previous_status = json.loads((run_dir / "status.json").read_text()).get("status", "") if resume and (run_dir / "status.json").exists() else ""
+    previous_status_payload = (
+        json.loads((run_dir / "status.json").read_text())
+        if resume and (run_dir / "status.json").exists()
+        else {}
+    )
+    previous_status = previous_status_payload.get("status", "")
+    previous_proposal_recovery_pass = _status_recovery_pass(previous_status_payload)
     # Preserve scientific config across resume; only iterations may extend.
     configuration = _jsonable(args)
+    proposal_recovery_seed_span = _proposal_recovery_seed_span(args, run_dir, resume=resume)
+    args.proposal_recovery_seed_span = proposal_recovery_seed_span
     configuration.update(proposal_samples=args.reservoir_size,
         proposal_candidates_per_request=args.proposal_batch_size,
-        proposal_counting="bounded_minibatches")
-    identity_keys = (
-        "benchmark",
-        "mock",
-        "oracle",
-        "seed",
-        "proposal_mode",
-        "num_cycles",
-        "search_width",
-        "exhaustiveness",
-        "num_editflow_samples",
-        "model_paths",
-        "fpindex",
-        "rxn_matrix",
-        "additional_fpindex",
-        "reservoir_size",
-        "evaluations_per_round",
-        "max_oracle_calls",
-        "llm_model",
-        "llm_max_tokens",
-        "max_results",
-        "projection_time_limit",
-        "projection_timeout",
-        "device",
-        "evaluator_python",
-        "gp_history_limit",
-        "acquisition_beta", "acquisition_alpha", "acquisition_eta", "acquisition_z_clip",
-        "search_method", "proposal_batch_size", "bo_pool_size", "max_replenishment_batches",
-        "recovery_attempts", "projection_retry_targets", "initialization_mode",
-        "harness_sessions", "harness_thinking", "harness_tool_budget",
-    )
-    scientific = {k: configuration[k] for k in identity_keys}
-    scientific["bo_targets"] = getattr(args, "bo_targets", [])
-    scientific["original_target"] = target
-    scientific["source_archive_digest"] = contract.benchmark["source_commit"]
-    scientific["asset_digests"] = args.asset_digests
+        proposal_counting="bounded_minibatches",
+        proposal_recovery_seed_span=proposal_recovery_seed_span,
+        harness_component_digests=_harness_component_digests(args))
+    scientific = _scientific_identity(args, configuration, target, contract)
     identity_path = run_dir / "scientific_identity.json"
     if identity_path.exists() and json.loads(identity_path.read_text()) != scientific:
         raise ValueError("resume scientific configuration mismatch")
@@ -576,6 +686,8 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     projector = Projector(args, run_dir)
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     client = None
+    if args.proposal_mode == "harness" and (not args.llm_url or not args.llm_model):
+        raise ValueError("Set LLM_BASE_URL and LLM_MODEL_NAME for real Harness proposals")
     if args.proposal_mode == "openai" and args.search_method != "bo":
         if not args.llm_url or not args.llm_model:
             raise ValueError(
@@ -584,10 +696,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         client = OpenAICompatibleProposalClient(
             url=args.llm_url,
             model=args.llm_model,
-            api_key=os.environ.get(
-                "LLM_API_KEY",
-                os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
-            ),
+            api_key=_direct_provider_api_key(),
             max_tokens=args.llm_max_tokens,
             max_retries=0,
         )
@@ -616,8 +725,10 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     batches_per_round = math.ceil(args.reservoir_size / args.proposal_batch_size) + args.max_replenishment_batches
     request_cap = (args.iterations + args.recovery_attempts) * batches_per_round
     proposal_cap = args.reservoir_size + args.max_replenishment_batches * args.proposal_batch_size
-    projection_cap = (cap if target else args.iterations * proposal_cap) + args.projection_retry_targets
+    projection_rounds = args.iterations if target else args.iterations + args.recovery_attempts
+    projection_cap = (cap if target else projection_rounds * proposal_cap) + args.projection_retry_targets
     uses_harness = args.proposal_mode == "harness"
+    provider_preflight_required = client is not None or uses_harness
     extra = {
         "llm_requests": request_cap if client else 0,
         "proposal_request_attempts": request_cap if (client or uses_harness) else 0,
@@ -635,7 +746,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             if resume and (run_dir / "budget.json").exists()
             else 1
         )
-        if client
+        if provider_preflight_required
         else 0,
     }
     budget = CampaignBudget(
@@ -678,8 +789,18 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
                 "projection_cycle_allowance": count * args.num_cycles,
             }
         )
+        proposal_recovery_pass = 0
         if resume and (previous_status.startswith("paused") or previous_status == "failed"):
-            runtime.consume("recovery_attempts")
+            consumed = runtime.consume("recovery_attempts")
+            if previous_status == "paused_proposal_exhausted":
+                proposal_recovery_pass = int(consumed)
+                runtime.record(
+                    "proposal_recovery_pass_started",
+                    {"proposal_recovery_pass": proposal_recovery_pass},
+                )
+            else:
+                proposal_recovery_pass = previous_proposal_recovery_pass
+        search_expander.recovery_pass = proposal_recovery_pass
         def before_request():
             amounts = {"proposal_request_attempts": 1}
             if client:
@@ -688,7 +809,10 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         search_expander.before_request = before_request
         if uses_harness:
             provider_args = copy(args)
-            provider_args.provider_api_key = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+            provider_args.provider_api_key = _harness_provider_api_key()
+            runtime.consume("endpoint_preflight_requests")
+            preflight = _preflight_harness_provider(provider_args)
+            runtime.record("endpoint_preflight_succeeded", preflight)
             harness_client = create_client(provider_args, run_dir / "harness", runtime.run_id, target)
             harness_clients.append(harness_client)
             harness_client.start()
@@ -746,7 +870,8 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         status = "paused_projection_interrupted" if isinstance(exc, ProjectionInterruptedError) else "paused_endpoint_unavailable"
         if runtime:
             runtime.pause(status, phase="proposal_or_projection",
-                message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.")
+                message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.",
+                details=_proposal_recovery_details(search_expander))
             report = _report(args, runtime, target)
             report["status"] = status
             atomic_json_write(run_dir / "result.json", report)
@@ -757,15 +882,25 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         runtime = holder.get("runtime")
         runtime.record("proposal_replenishment_exhausted", exc.metadata)
         if exc.attempts:
-            runtime.consume("proposal_attempts", len(exc.attempts))
-        runtime.pause("paused_proposal_exhausted", phase="proposal_replenishment", message=str(exc))
+            consume_proposal_attempts(runtime, exc.attempts)
+        runtime.pause(
+            "paused_proposal_exhausted",
+            phase="proposal_replenishment",
+            message=str(exc),
+            details=_proposal_recovery_details(search_expander),
+        )
         report = _report(args, runtime, target)
         report.update(status="paused_proposal_exhausted", proposal_diagnostics=exc.metadata)
         atomic_json_write(run_dir / "result.json", report)
         return report, 1
     except BudgetExceededError as exc:
         runtime = holder.get("runtime")
-        runtime.pause("paused_resource_budget", phase="resource_budget", message=str(exc))
+        runtime.pause(
+            "paused_resource_budget",
+            phase="resource_budget",
+            message=str(exc),
+            details=_proposal_recovery_details(search_expander),
+        )
         report = _report(args, runtime, target)
         report["status"] = "paused_resource_budget"
         atomic_json_write(run_dir / "result.json", report)

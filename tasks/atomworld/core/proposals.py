@@ -8,7 +8,10 @@ from pathlib import Path
 
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from ldm_tts.data import DataCollectionSink, make_complete_design_ir
-from ldm_tts.engine.expansion import ExpansionResult
+from ldm_tts.engine.expansion import (
+    ExpansionResult,
+    attach_proposal_attempt_receipt,
+)
 from ldm_tts.transport import ProposalRequest, ProposalResponse
 from tasks.atomworld.core.data import write_json
 
@@ -249,7 +252,10 @@ class BlindRefinementExpander:
                 raise ValueError(
                     "Resume draft does not match immutable prompt schedule"
                 )
-            response = ProposalResponse(**record["response"])
+            response = attach_proposal_attempt_receipt(
+                ProposalResponse(**record["response"]),
+                f"attempts/{request.round_idx:06d}.json",
+            )
         else:
             if self.runtime is not None:
                 self.runtime.consume(
@@ -263,6 +269,10 @@ class BlindRefinementExpander:
                         "round_idx": request.round_idx,
                     },
                 )
+            )
+            response = attach_proposal_attempt_receipt(
+                response,
+                f"attempts/{request.round_idx:06d}.json",
             )
             generated_output = response.text
             tool_error = None

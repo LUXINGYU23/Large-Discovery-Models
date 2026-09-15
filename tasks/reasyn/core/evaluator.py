@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 from ldm_tts.contracts import EvaluationResult
+from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 from ldm_tts.engine.run_store import atomic_json_write
 from .chemistry import canonicalize, similarity
 
@@ -77,6 +78,13 @@ class TDCOracleEvaluator:
         else:
             self.entries = []
 
+    def _candidate_smiles(self, candidate):
+        return canonicalize(candidate.payload["smiles"], mock=self.args.mock)
+
+    def evaluation_attempt_usage_key(self, candidate):
+        smi = self._candidate_smiles(candidate)
+        return f"reasyn_tdc_oracle:{self.args.oracle}:{int(self.args.mock)}:{smi}"
+
     def _save(self):
         atomic_json_write(
             self.path,
@@ -88,7 +96,7 @@ class TDCOracleEvaluator:
         )
 
     def evaluate(self, candidate):
-        smi = canonicalize(candidate.payload["smiles"], mock=self.args.mock)
+        smi = self._candidate_smiles(candidate)
         found = next((r for r in self.entries if r["smiles"] == smi), None)
         if found:
             if found["status"] != "completed":
@@ -136,5 +144,9 @@ class TDCOracleEvaluator:
                 "oracle_cache": "oracle_cache.json",
             },
             resource_usage={"benchmark_jobs": 1},
-            metadata={"oracle_call_index": found["call_index"], "mock": self.args.mock},
+            metadata={
+                "oracle_call_index": found["call_index"],
+                EVALUATION_ATTEMPT_RECEIPT_KEY: self.evaluation_attempt_usage_key(candidate),
+                "mock": self.args.mock,
+            },
         )

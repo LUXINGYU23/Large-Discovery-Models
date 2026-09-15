@@ -13,6 +13,7 @@ from ldm_tts.contracts.task import ObjectiveSpec
 
 EvaluationStatus = Literal["succeeded", "failed", "timed_out", "invalid"]
 EVALUATION_STATUSES = frozenset({"succeeded", "failed", "timed_out", "invalid"})
+EVALUATION_ATTEMPT_RECEIPT_KEY = "ldm_evaluation_attempt_receipt"
 
 
 @dataclass(frozen=True)
@@ -336,6 +337,7 @@ __all__ = [
     "CandidateEvaluationPreparer",
     "CandidateEvaluator",
     "CallableCandidateEvaluator",
+    "EVALUATION_ATTEMPT_RECEIPT_KEY",
     "EVALUATION_STATUSES",
     "EvaluationResult",
     "EvaluationStatus",

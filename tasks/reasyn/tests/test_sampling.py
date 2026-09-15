@@ -10,8 +10,10 @@ from ldm_tts.contracts import RawProposal, ReservoirBuilder
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
+from tasks.reasyn.core import workflow
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.chemistry import MOCK_SMILES
+from tasks.reasyn.core.projector import Projector as ReaSynProjector
 from tasks.reasyn.core.proposals import ProposalExhausted, ReaSynExpander
 from tasks.reasyn.core.sampling import (
     Q0_METADATA_KEY,
@@ -166,6 +168,63 @@ def test_failed_second_minibatch_replays_first_response_without_endpoint_call(tm
     assert len(resumed.requests) == 1
     assert resumed.requests[0].metadata["minibatch_index"] == 1
     assert [p.payload["target_smiles"] for p in result.proposals] == ["CCO", "CCN", "CCC", "CCCO"]
+
+
+def test_recovery_seed_span_keeps_projector_receipts_stable_after_iteration_extension(tmp_path):
+    first_args = workflow.parse_args([
+        "--mock",
+        "--benchmark",
+        "tdc",
+        "--proposal-mode",
+        "openai",
+        "--llm-url",
+        "http://fixture.invalid/v1",
+        "--llm-model",
+        "fixture",
+        "--iterations",
+        "1",
+        "--reservoir-size",
+        "1",
+    ])
+    first_args.asset_digests = {}
+    first_args.proposal_recovery_seed_span = 17
+    first = ReaSynExpander(
+        first_args,
+        ReaSynProjector(first_args, tmp_path),
+        Sink(),
+        client=Targets([["CCO"]]),
+    )
+    first.recovery_pass = 1
+    first.expand(ExpansionRequest(0, 1))
+    request_path = tmp_path / "projections/recovery-000001/round-000000/batch-000000/request.json"
+    before = json.loads(request_path.read_text())
+
+    resumed_args = workflow.parse_args([
+        "--mock",
+        "--benchmark",
+        "tdc",
+        "--proposal-mode",
+        "openai",
+        "--llm-url",
+        "http://fixture.invalid/v1",
+        "--llm-model",
+        "fixture",
+        "--iterations",
+        "3",
+        "--reservoir-size",
+        "1",
+    ])
+    resumed_args.asset_digests = {}
+    resumed_args.proposal_recovery_seed_span = first_args.proposal_recovery_seed_span
+    resumed = ReaSynExpander(
+        resumed_args,
+        ReaSynProjector(resumed_args, tmp_path),
+        Sink(),
+        client=Targets([]),
+    )
+    resumed.recovery_pass = 1
+    resumed.expand(ExpansionRequest(0, 1))
+    assert json.loads(request_path.read_text()) == before
 
 
 def test_projection_occurrence_index_cannot_silently_merge_equal_queries():

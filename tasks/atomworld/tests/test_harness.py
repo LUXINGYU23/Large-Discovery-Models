@@ -12,6 +12,7 @@ from ldm_tts.harness import (
     HarnessSubmissionRequest,
     HarnessTurnResult,
 )
+from ldm_tts.transport.openai import EndpointRequestError
 from tasks.atomworld.core.data import TASK_ROOT
 from tasks.atomworld.core.harness import (
     AtomWorldHarnessExpander,
@@ -24,6 +25,15 @@ from tasks.atomworld.core.workflow import parse_args, run
 
 def fixture():
     return json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
+
+
+def real_fixture_payload():
+    data = fixture()
+    sample = data["public"][0]
+    return [sample], {sample["sample_id"]: data["private"][0]["target_cif"]}, {
+        "dataset_kind": "unit_real_fixture",
+        "paper_split_verified": False,
+    }
 
 
 def test_runner_repeated_profile_and_budget_flags_preserve_all_entries():
@@ -156,6 +166,174 @@ def test_persistent_repair_history_and_full_campaign_resume(tmp_path):
         ),
     )
     assert second.projected["extended_final_accuracy"] == 1
+
+
+def test_real_harness_preflight_runs_before_first_sidecar_turn(tmp_path, monkeypatch):
+    calls = []
+
+    class PreflightClient:
+        def __init__(self, **kwargs):
+            calls.append(("preflight_client", kwargs["wire_api"], kwargs["api_key"]))
+
+        def preflight(self):
+            calls.append("preflight")
+            return {"status": "ok", "request_model": "fixture", "response_model": "fixture"}
+
+    def factory(*args, **kwargs):
+        calls.append("factory")
+        return ResearchClient(*args, **kwargs)
+
+    monkeypatch.setattr("tasks.atomworld.core.workflow.load_prepared", lambda data_dir: real_fixture_payload())
+    monkeypatch.setattr("tasks.atomworld.core.workflow.load_official_evaluator",
+                        lambda upstream: lambda *args, **kwargs: SimpleNamespace(
+                            correct=True, wrong_type=None, rmsd=None, max_dist=None))
+    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr("tasks.atomworld.core.harness.public_validation",
+                        lambda text, mock=False: {"parseable": text != "invalid"})
+    monkeypatch.setenv("LDM_LLM_API_KEY", "must-not-appear-in-artifacts")
+    args = parse_args([
+        "--data-dir", str(tmp_path / "data"),
+        "--search-method", "harness",
+        "--llm-url", "http://fixture.invalid/v1",
+        "--llm-model-name", "fixture",
+        "--out-dir", str(tmp_path / "run"),
+    ])
+
+    result = run(args, harness_client_factory=factory)
+
+    assert calls[:3] == [
+        ("preflight_client", "responses", "must-not-appear-in-artifacts"),
+        "preflight",
+        "factory",
+    ]
+    preflight = json.loads((result.runtime.run_dir / "endpoint_preflight.json").read_text())
+    assert preflight["backend"] == "harness"
+    assert preflight["wire_api"] == "responses"
+    assert result.runtime.budget.counters["endpoint_preflights"] == 1
+    events = [
+        json.loads(line)
+        for line in (result.runtime.run_dir / "events.jsonl").read_text().splitlines()
+    ]
+    assert any(event["event_type"] == "endpoint_preflight_succeeded" for event in events)
+    for file in result.runtime.run_dir.rglob("*"):
+        if file.is_file():
+            assert "must-not-appear-in-artifacts" not in file.read_text()
+
+
+def test_mock_default_harness_preflights_provider_before_sidecar(tmp_path, monkeypatch):
+    calls = []
+
+    class PreflightClient:
+        def __init__(self, **kwargs):
+            calls.append(("preflight_client", kwargs["wire_api"], kwargs["api_key"]))
+
+        def preflight(self):
+            calls.append("preflight")
+            return {"status": "ok", "request_model": "fixture", "response_model": "fixture"}
+
+    def factory(*args, **kwargs):
+        calls.append("factory")
+        return ResearchClient(*args, **kwargs)
+
+    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
+    monkeypatch.setenv("LLM_API_KEY", "mock-harness-secret")
+    args = parse_args([
+        "--mock",
+        "--search-method", "harness",
+        "--llm-url", "http://fixture.invalid/v1",
+        "--llm-model-name", "fixture",
+        "--out-dir", str(tmp_path / "run"),
+    ])
+
+    result = run(args)
+
+    assert calls[:3] == [
+        ("preflight_client", "responses", "mock-harness-secret"),
+        "preflight",
+        "factory",
+    ]
+    assert result.runtime.budget.counters["endpoint_preflights"] == 1
+    assert json.loads((result.runtime.run_dir / "endpoint_preflight.json").read_text())[
+        "backend"
+    ] == "harness"
+
+
+def test_mock_default_harness_preflight_failure_happens_before_sidecar(tmp_path, monkeypatch):
+    calls = []
+
+    def factory(*args, **kwargs):
+        pytest.fail("Harness sidecar should not start without provider settings")
+
+    for name in (
+        "LLM_BASE_URL",
+        "LDM_LLM_URL",
+        "OPENAI_BASE_URL",
+        "LLM_MODEL_NAME",
+        "LDM_LLM_MODEL",
+        "OPENAI_MODEL",
+        "LLM_API_KEY",
+        "LDM_LLM_API_KEY",
+        "OPENAI_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
+    args = parse_args([
+        "--mock",
+        "--search-method", "harness",
+        "--out-dir", str(tmp_path / "run"),
+    ])
+
+    with pytest.raises(EndpointRequestError):
+        run(args)
+
+    assert calls == []
+    status = json.loads((args.out_dir / "status.json").read_text())
+    assert status["status"] == "paused_endpoint"
+    assert status["phase"] == "preflight"
+    assert json.loads((args.out_dir / "budget.json").read_text())["counters"][
+        "endpoint_preflights"
+    ] == 1
+    assert not (args.out_dir / "harness").exists()
+
+
+def test_real_harness_preflight_failure_happens_before_sidecar(tmp_path, monkeypatch):
+    calls = []
+
+    class PreflightClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def preflight(self):
+            calls.append("preflight")
+            raise EndpointRequestError("fixture endpoint rejected key")
+
+    def factory(*args, **kwargs):
+        pytest.fail("Harness sidecar should not start before provider preflight passes")
+
+    monkeypatch.setattr("tasks.atomworld.core.workflow.load_prepared", lambda data_dir: real_fixture_payload())
+    monkeypatch.setattr("tasks.atomworld.core.workflow.load_official_evaluator",
+                        lambda upstream: lambda *args, **kwargs: SimpleNamespace(
+                            correct=True, wrong_type=None, rmsd=None, max_dist=None))
+    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setenv("LLM_API_KEY", "fixture-secret")
+    args = parse_args([
+        "--data-dir", str(tmp_path / "data"),
+        "--search-method", "harness",
+        "--llm-url", "http://fixture.invalid/v1",
+        "--llm-model-name", "fixture",
+        "--out-dir", str(tmp_path / "run"),
+    ])
+
+    with pytest.raises(EndpointRequestError):
+        run(args, harness_client_factory=factory)
+
+    assert calls == ["preflight"]
+    status = json.loads((args.out_dir / "status.json").read_text())
+    assert status["status"] == "paused_endpoint"
+    assert status["phase"] == "preflight"
+    assert json.loads((args.out_dir / "budget.json").read_text())["counters"]["endpoint_preflights"] == 1
+    assert not (args.out_dir / "harness").exists()
 
 
 def test_harness_never_reads_judge_and_isolates_questions(tmp_path):

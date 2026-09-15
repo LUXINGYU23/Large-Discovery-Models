@@ -172,7 +172,10 @@ claim. For a targeted debug run, call the task module with `--target-smiles`,
 `--dataset custom` and `--out-dir`. A suite runner can call
 `tdc_10000` separately for each released oracle and seed; do not average partial
 or missing oracle runs. `scripts/aggregate_tdc_results.py` enforces the full
-13-by-3 inventory and 10k real-call condition.
+13-by-3 inventory, 10k real-call condition, and a predeclared shared
+`scientific_identity.json` configuration with `oracle`/`seed` omitted. If a
+field is intentionally oracle-specific, declare it under `oracle_overrides`
+before aggregation.
 
 For paper-scale reconstruction tables, `scripts/aggregate_reconstruction_results.py`
 requires a predeclared JSON suite with `benchmark: reconstruction`, `seeds: [0,1,2]`,

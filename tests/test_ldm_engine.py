@@ -29,7 +29,11 @@ from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, uniqu
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.optimization.records import BOObservation, BOSelectionResult, SurrogateVector
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
-from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
+from ldm_tts.engine.expansion import (
+    CallableReservoirExpander,
+    ExpansionResult,
+    attach_proposal_attempt_receipt,
+)
 from ldm_tts.engine.expansion import DirectEmissionExpander, ExpansionRequest
 from ldm_tts.campaign import (
     CampaignBudget,
@@ -820,7 +824,12 @@ def test_preparation_failure_is_resumable_before_any_evaluation_charge(tmp_path,
         task_spec=integer_task_spec(),
         expander=CallableReservoirExpander(lambda request: ExpansionResult(
             proposals=(RawProposal(1, "mock"), RawProposal(2, "mock")),
-            attempts=(ProposalResponse(text="cached independent response"),),
+            attempts=(
+                attach_proposal_attempt_receipt(
+                    ProposalResponse(text="cached independent response"),
+                    "fixture/round-000000/response.json",
+                ),
+            ),
         )),
         candidate_domain=IntegerDomain(), evaluator=evaluator, runtime=runtime,
     )
@@ -836,3 +845,61 @@ def test_preparation_failure_is_resumable_before_any_evaluation_charge(tmp_path,
     assert engine.runtime.budget.counters["proposal_attempts"] == 1
     assert engine.runtime.budget.counters["valid_search_candidates"] == 2
     assert engine.runtime.budget.counters["expensive_evaluation_attempts"] == 2
+
+
+def test_preparation_failure_retried_fresh_proposal_counts_again(tmp_path):
+    from ldm_tts.contracts import CandidateEvaluationPreparer
+    from ldm_tts.transport import ProposalResponse
+
+    class PreparingEvaluator:
+        fail = True
+
+        def prepare_evaluations(self, candidates):
+            if self.fail:
+                self.fail = False
+                raise RuntimeError("preparation interrupted")
+
+        def evaluate(self, candidate):
+            return EvaluationResult(
+                candidate.candidate_id,
+                "succeeded",
+                {"score": float(candidate.payload)},
+            )
+
+    calls = 0
+
+    def expand(_request):
+        nonlocal calls
+        calls += 1
+        return ExpansionResult(
+            proposals=(RawProposal(calls, "mock"),),
+            attempts=(ProposalResponse(text=f"fresh response {calls}"),),
+        )
+
+    evaluator = PreparingEvaluator()
+    assert isinstance(evaluator, CandidateEvaluationPreparer)
+    run_dir = tmp_path / "fresh-retry"
+    runtime = CampaignRuntime.open(run_dir, task="integer_search", budget_limits={
+        "outer_iterations": 1, "proposal_attempts": 2,
+        "valid_search_candidates": 1, "expensive_evaluation_attempts": 1,
+    })
+    engine = LDMEngine(
+        task_spec=integer_task_spec(),
+        expander=CallableReservoirExpander(expand),
+        candidate_domain=IntegerDomain(),
+        evaluator=evaluator,
+        runtime=runtime,
+    )
+    config = LDMEngineConfig(iterations=1, reservoir_size=1, evaluations_per_round=1)
+
+    with pytest.raises(RuntimeError, match="preparation interrupted"):
+        engine.run(config)
+    assert runtime.budget.counters["proposal_attempts"] == 1
+
+    engine.runtime = CampaignRuntime.open(run_dir, task="integer_search", resume=True)
+    result = engine.run(config)
+
+    assert calls == 2
+    assert len(result.state.observations) == 1
+    assert engine.runtime.budget.counters["outer_iterations"] == 1
+    assert engine.runtime.budget.counters["proposal_attempts"] == 2

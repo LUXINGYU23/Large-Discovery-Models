@@ -10,13 +10,19 @@ from pathlib import Path
 
 from ldm_tts.contracts import CandidateRejection, RawProposal
 from ldm_tts.data import make_complete_design_ir
-from ldm_tts.engine.expansion import ExpansionResult
+from ldm_tts.engine.expansion import (
+    ExpansionResult,
+    attach_proposal_attempt_receipt,
+)
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.transport import ProposalRequest, ProposalResponse
 from ldm_tts.transport.parsing import load_json_object
 from .candidate import ReaSynDomain
 from .chemistry import MOCK_SMILES, canonicalize
 from .sampling import attach_empirical_base_measure
+
+
+DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN = 1_000_000
 
 
 def parse_targets(text, *, count, mock=False):
@@ -50,6 +56,7 @@ class ReaSynExpander:
         self.args, self.projector, self.sink = args, projector, sink
         self.target, self.client = target, client
         self.before_request = None
+        self.recovery_pass = 0
 
     def expand(self, request):
         sample_count = request.reservoir_size
@@ -72,6 +79,9 @@ class ReaSynExpander:
         batches_attempted = 0
         # The seed stride covers every bounded refill slot, including rejections.
         stride = sample_count + refill_limit * batch_size
+        recovery_pass = self._recovery_pass()
+        round_span = self._recovery_seed_span(request)
+        round_seed_index = recovery_pass * round_span + request.round_idx
         for minibatch_index in range(max_batches):
             if len(proposals) >= sample_count and len(unique_keys) >= required_unique:
                 break
@@ -82,11 +92,12 @@ class ReaSynExpander:
             offset = targets_requested
             targets_requested += n
             batches_attempted += 1
-            seed = self.args.seed + request.round_idx * stride + offset
+            seed = self.args.seed + round_seed_index * stride + offset
             lineage = []
             proposal_request = self._request(
                 request, count=n, minibatch_index=minibatch_index,
                 history=full_history, excluded_products=excluded_products, feedback=feedback,
+                recovery_pass=recovery_pass, recovery_seed_span=round_span,
             )
             if self.client:
                 response = self._propose(proposal_request)
@@ -105,27 +116,29 @@ class ReaSynExpander:
                 pool = list(getattr(self.args, "bo_targets", MOCK_SMILES if self.args.mock else ()))
                 if not pool:
                     raise ValueError("BO requires a score-blind projection target pool")
-                random.Random(self.args.seed + request.round_idx).shuffle(pool)
+                random.Random(self.args.seed + round_seed_index).shuffle(pool)
                 targets = [pool[(offset + i) % len(pool)] for i in range(n)]
             elif self.args.proposal_mode == "baseline":
                 if self.args.benchmark != "reconstruction":
                     raise ValueError("baseline mode is only defined for reconstruction")
                 targets = [self.target] * n
             else:
-                targets = [MOCK_SMILES[(request.round_idx * sample_count + offset + i) % len(MOCK_SMILES)] for i in range(n)]
+                targets = [MOCK_SMILES[(round_seed_index * sample_count + offset + i) % len(MOCK_SMILES)] for i in range(n)]
                 targets = parse_targets(json.dumps({"candidates": [{"target_smiles": s} for s in targets]}), count=n, mock=True)
                 self._collect(targets, recent_history, request.round_idx, synthetic=True)
             if self.args.benchmark == "reconstruction":
                 proposed = tuple(
                     RawProposal({"target_smiles": s, "sampling_seed": seed + i}, "ldm_projection_query",
                                 {"minibatch_index": minibatch_index, "proposal_index": offset + i,
+                                 **({"proposal_recovery_pass": recovery_pass} if recovery_pass else {}),
                                  **({"harness_lineage": lineage[i]} if lineage else {})})
                     for i, s in enumerate(targets)
                 )
             else:
+                identity = self._batch_identity(request.round_idx, minibatch_index, recovery_pass)
                 rows, artifact = self.projector.project(
                     targets, sampling_seed=seed,
-                    identity=f"round-{request.round_idx:06d}/batch-{minibatch_index:06d}",
+                    identity=identity,
                 )
                 chosen = self._first_per_occurrence(rows, targets)
                 proposed = tuple(
@@ -135,6 +148,7 @@ class ReaSynExpander:
                         {"pathway_verified": True, "minibatch_index": minibatch_index,
                          "proposal_index": offset + index, "projection_target": targets[index],
                          "sampling_seed": seed + index,
+                         **({"proposal_recovery_pass": recovery_pass} if recovery_pass else {}),
                          **({"harness_lineage": lineage[index]} if lineage else {})},
                     )
                     for index, row in chosen.items()
@@ -156,6 +170,7 @@ class ReaSynExpander:
                     proposals.append(proposal)
                     unique_keys.add(admitted.canonical_key)
         metadata = {
+            "round_idx": request.round_idx,
             "mode": self.args.proposal_mode,
             "sampling_mode": "independent_minibatch_requests",
             "minibatch_count": batches_attempted,
@@ -165,6 +180,8 @@ class ReaSynExpander:
             "required_unique_candidates": required_unique,
             "max_replenishment_batches": refill_limit,
             "replenishment_batches": max(0, batches_attempted - initial_batches),
+            "proposal_recovery_pass": recovery_pass,
+            "proposal_recovery_seed_span": round_span,
             "projection_target_limit": stride if self.args.benchmark == "tdc" else 0,
             "history_exclusion_count": len(evaluated_keys),
             "rejection_counts": dict(rejection_counts), "rejection_feedback": feedback,
@@ -209,7 +226,18 @@ class ReaSynExpander:
             for o in request.observations
         ]
 
-    def _request(self, request, *, count, minibatch_index, history, excluded_products, feedback):
+    def _request(
+        self,
+        request,
+        *,
+        count,
+        minibatch_index,
+        history,
+        excluded_products,
+        feedback,
+        recovery_pass,
+        recovery_seed_span,
+    ):
         goal = (f"Reconstruct original molecule {self.target} as closely as possible."
                 if self.args.benchmark == "reconstruction" else f"Maximize the TDC oracle {self.args.oracle}.")
         metadata = {
@@ -219,12 +247,22 @@ class ReaSynExpander:
             "benchmark": self.args.benchmark, "original_target": self.target,
             "sampling_mode": "independent_minibatch_requests",
         }
+        if recovery_pass:
+            metadata["proposal_recovery_pass"] = recovery_pass
+            metadata["proposal_recovery_seed_span"] = recovery_seed_span
+        recovery_note = (
+            f" This is recovery pass {recovery_pass} for the same scientific round; "
+            "use the rejection feedback to explore fresh projection targets."
+            if recovery_pass
+            else ""
+        )
         return ProposalRequest(
             messages=(
                 {"role": "system", "content": "Guide frozen ReaSyn synthesis projection using molecular reasoning and measured feedback. Suggest chemically valid targets; the task verifies synthesis. Output JSON only."},
                 {"role": "user", "content": goal + f" Propose exactly {count} projection target SMILES. "
                  + 'Format: {"candidates":[{"target_smiles":"CCO"}]}. Do not claim oracle scores. '
                  + "Within-round repeated targets are allowed and allocate empirical proposal probability; each occurrence has an independent projection seed. "
+                 + recovery_note
                  + "Recent measured history: " + json.dumps(history[-12:], sort_keys=True)
                  + " Complete measured product exclusion list (do not reproduce these projected products): " + json.dumps(excluded_products)
                  + " Rejections requiring repair: " + json.dumps(feedback, sort_keys=True)},
@@ -238,25 +276,68 @@ class ReaSynExpander:
         cache = None
         digest = hashlib.sha256(json.dumps({"messages": request.messages, "metadata": request.metadata}, sort_keys=True).encode()).hexdigest()
         if root is not None:
-            cache = Path(root) / "proposal_batches" / f"round-{request.metadata['round_idx']:06d}" / f"batch-{request.metadata['minibatch_index']:06d}.json"
+            cache = self._batch_cache_path(
+                Path(root),
+                request.metadata["round_idx"],
+                request.metadata["minibatch_index"],
+                int(request.metadata.get("proposal_recovery_pass", 0)),
+            )
+            receipt = cache.relative_to(Path(root)).as_posix()
             if cache.exists():
                 record = json.loads(cache.read_text())
                 if record["request_sha256"] != digest:
                     raise ValueError("proposal minibatch resume request mismatch")
                 data = record["response"]
                 data["tool_calls"] = tuple(data.get("tool_calls", ()))
-                return ProposalResponse(**data)
+                return attach_proposal_attempt_receipt(ProposalResponse(**data), receipt)
         if self.before_request:
             self.before_request()
         response = self.client.propose(request)
         if cache is not None:
+            response = attach_proposal_attempt_receipt(response, receipt)
             atomic_json_write(cache, {"request_sha256": digest, "response": response.to_dict()})
         return response
 
     def _write_diagnostics(self, round_idx, metadata):
         root = getattr(self.projector, "run_dir", None)
         if root is not None:
-            atomic_json_write(Path(root) / "proposal_batches" / f"round-{round_idx:06d}" / "diagnostics.json", metadata)
+            recovery_pass = int(metadata.get("proposal_recovery_pass", 0))
+            atomic_json_write(
+                self._batch_cache_path(Path(root), round_idx, 0, recovery_pass).parent / "diagnostics.json",
+                metadata,
+            )
+
+    @staticmethod
+    def _batch_identity(round_idx, minibatch_index, recovery_pass=0):
+        suffix = f"round-{round_idx:06d}/batch-{minibatch_index:06d}"
+        if recovery_pass:
+            return f"recovery-{recovery_pass:06d}/{suffix}"
+        return suffix
+
+    @staticmethod
+    def _batch_cache_path(root, round_idx, minibatch_index, recovery_pass=0):
+        parent = Path(root) / "proposal_batches"
+        if recovery_pass:
+            parent = parent / f"recovery-{recovery_pass:06d}"
+        return parent / f"round-{round_idx:06d}" / f"batch-{minibatch_index:06d}.json"
+
+    def _recovery_pass(self):
+        value = getattr(self, "recovery_pass", 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError("proposal recovery pass must be a nonnegative integer")
+        return value
+
+    def _recovery_seed_span(self, request):
+        value = getattr(self.args, "proposal_recovery_seed_span", None)
+        if value is None:
+            value = max(
+                DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
+                request.round_idx + 1,
+                int(getattr(self.args, "max_oracle_calls", 0) or 0),
+            )
+        if isinstance(value, bool) or not isinstance(value, int) or value <= request.round_idx:
+            raise ValueError("proposal recovery seed span must exceed the active round index")
+        return value
 
     def _collect(self, targets, history, round_idx, *, synthetic):
         ir = make_complete_design_ir(

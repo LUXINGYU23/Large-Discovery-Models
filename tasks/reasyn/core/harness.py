@@ -149,13 +149,23 @@ class HarnessTargetSource:
         meta = request.metadata
         count = meta["count"]
         round_index, batch = meta["round_idx"], meta.get("minibatch_index", 0)
-        if any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in (count, round_index, batch)) or count < 1:
+        recovery_pass = meta.get("proposal_recovery_pass", 0)
+        if (
+            any(
+                isinstance(v, bool) or not isinstance(v, int) or v < 0
+                for v in (count, round_index, batch, recovery_pass)
+            )
+            or count < 1
+        ):
             raise ValueError("Harness count must be positive; round and minibatch indices nonnegative")
         history = list(meta.get("history", []))
         self._write_history(history)
         selected = self.session_profiles[:min(count, len(self.session_profiles))]
         counts = {p.profile_id: count // len(selected) + int(i < count % len(selected)) for i, p in enumerate(selected)}
-        batch_root = self.root / "proposal_turns" / f"round-{round_index:06d}" / f"batch-{batch:06d}"
+        turn_root = self.root / "proposal_turns"
+        if recovery_pass:
+            turn_root = turn_root / f"recovery-{recovery_pass:06d}"
+        batch_root = turn_root / f"round-{round_index:06d}" / f"batch-{batch:06d}"
         request_digest = canonical_sha256({
             "metadata": meta, "profiles": [profile.to_dict() for profile in selected], "counts": counts,
             "benchmark": self.args.benchmark, "target": self.target, "oracle": self.args.oracle,

@@ -11,6 +11,7 @@ from ldm_tts.transport import ProposalClient, ProposalRequest, ProposalResponse
 
 
 SELECTION_MODES = ("acquisition", "reservoir_order")
+PROPOSAL_ATTEMPT_RECEIPT_KEY = "ldm_proposal_attempt_receipt"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,21 @@ class ExpansionResult:
             raise ValueError("expansion must emit proposals or update the expansion schema")
         if self.selection_mode not in SELECTION_MODES:
             raise ValueError(f"unknown expansion selection mode: {self.selection_mode!r}")
+
+
+def attach_proposal_attempt_receipt(
+    response: ProposalResponse,
+    receipt_id: Any,
+) -> ProposalResponse:
+    """Mark a response as backed by a durable proposal-attempt receipt."""
+
+    value = str(receipt_id).strip()
+    if not value:
+        raise ValueError("proposal attempt receipt_id must not be empty")
+    return replace(
+        response,
+        metadata={**response.metadata, PROPOSAL_ATTEMPT_RECEIPT_KEY: value},
+    )
 
 
 @runtime_checkable
@@ -136,6 +152,8 @@ __all__ = [
     "ExpansionRequest",
     "ExpansionResult",
     "InitialRoundReservoirExpander",
+    "PROPOSAL_ATTEMPT_RECEIPT_KEY",
     "ReservoirExpander",
     "SELECTION_MODES",
+    "attach_proposal_attempt_receipt",
 ]

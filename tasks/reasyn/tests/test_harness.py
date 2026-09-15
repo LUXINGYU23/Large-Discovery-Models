@@ -29,6 +29,7 @@ from tasks.reasyn.core.proposals import ReaSynExpander
 from tasks.reasyn.core.sampling import attach_empirical_base_measure, empirical_base_masses
 from tasks.reasyn.core.selection import AcquisitionTiltedSelector, TanimotoGPSelector
 from tasks.reasyn.core.surrogate import MoleculeEncoder
+from tasks.reasyn.core import workflow
 from tasks.reasyn.core.workflow import parse_args
 
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
@@ -67,6 +68,60 @@ def request(round_idx=0, history=(), *, batch=0):
 
 def jsonl(path):
     return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def harness_identity(options, target="", source_commit="fixture-source"):
+    options.asset_digests = {}
+    options.proposal_recovery_seed_span = max(
+        workflow.DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
+        options.iterations,
+        options.max_oracle_calls,
+    )
+    configuration = workflow._jsonable(options)
+    configuration.update(
+        proposal_samples=options.reservoir_size,
+        proposal_candidates_per_request=options.proposal_batch_size,
+        proposal_counting="bounded_minibatches",
+        harness_component_digests=workflow._harness_component_digests(options),
+    )
+    contract = SimpleNamespace(benchmark={"source_commit": source_commit})
+    return workflow._scientific_identity(options, configuration, target, contract)
+
+
+def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):
+    mcp = tmp_path / "mcp.yaml"
+    mcp.write_text("servers: {}\n")
+    base_argv = [
+        "--mock",
+        "--search-method",
+        "harness",
+        "--harness-mcp-config",
+        str(mcp),
+        "--harness-sidecar-image",
+        "sidecar:one",
+        "--policy-runner-image",
+        "policy:one",
+    ]
+    identity = harness_identity(parse_args(base_argv))
+    changed_image = harness_identity(parse_args([
+        *base_argv[:-4],
+        "--harness-sidecar-image",
+        "sidecar:two",
+        "--policy-runner-image",
+        "policy:one",
+    ]))
+    assert identity["harness_sidecar_image"] == "sidecar:one"
+    assert identity["policy_runner_image"] == "policy:one"
+    assert identity["harness_mcp_config"] == str(mcp.resolve())
+    assert identity["harness_component_digests"]["resource_tree"]
+    assert identity != changed_image
+
+    mcp.write_text("servers:\n  local:\n    transport: stdio\n    command: node\n    tools: [search]\n")
+    changed_mcp = harness_identity(parse_args(base_argv))
+    assert identity["harness_component_digests"]["harness_mcp_config"] != (
+        changed_mcp["harness_component_digests"]["harness_mcp_config"]
+    )
+    assert identity != changed_mcp
 
 
 def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path):
@@ -133,6 +188,22 @@ def test_partial_session_recovery_replays_frozen_inputs_and_cumulative_usage(tmp
     assert ledger.counters["harness_validation_submissions"] == 4
     # The first session researched only once even though the barrier was retried.
     assert len(jsonl(root / "fixture_provider.jsonl")) == 2
+
+
+def test_proposal_recovery_pass_uses_separate_harness_turn_cache(tmp_path):
+    root = tmp_path / "harness"
+    ledger = BudgetLedger({})
+    options = args()
+    with client(root) as transport:
+        source = HarnessTargetSource(transport, root, options, account=ledger.consume_many)
+        source.propose(request())
+        recovery = request()
+        recovery.metadata["proposal_recovery_pass"] = 1
+        source.propose(recovery)
+    assert (root / "proposal_turns/round-000000/batch-000000/response.json").is_file()
+    assert (
+        root / "proposal_turns/recovery-000001/round-000000/batch-000000/response.json"
+    ).is_file()
 
 
 def test_committed_cursor_replays_native_turn_before_projection_cache_handoff(tmp_path):

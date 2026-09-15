@@ -4,11 +4,17 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
+from ldm_tts.contracts import (
+    Candidate,
+    CandidateRejection,
+    RawProposal,
+)
+from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 from ldm_tts.data import validate_ir_record
 from ldm_tts.data.rendering import render_prose
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
+from ldm_tts.transport.openai import EndpointRequestError
 from tasks.reasyn.core import workflow
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.evaluator import TDCOracleEvaluator
@@ -155,6 +161,25 @@ def test_reconstruction_full_denominator_and_stereo():
         )
 
 
+def test_reconstruction_diversity_preserves_duplicate_product_occurrences():
+    captured = []
+    rows = [
+        {"target": "CCO", "smiles": "CCO", "synthesis": "CCO"},
+        {"target": "CCO", "smiles": "CCO", "synthesis": "CCO"},
+    ]
+
+    result = reconstruction_metrics(
+        ["CCO"],
+        rows,
+        mock=True,
+        diversity=lambda values: captured.append(list(values)) or 0.25,
+    )
+
+    assert captured == [["CCO", "CCO"]]
+    assert result["per_target"][0]["output_count"] == 2
+    assert result["product_diversity"] == 0.25
+
+
 def test_auc_matches_released_source_formula():
     np = pytest.importorskip("numpy")
     upstream = Path(
@@ -198,7 +223,9 @@ def test_oracle_dedup_and_hard_cap(tmp_path):
             smiles, {"smiles": smiles, "projection_artifact": "projection.json"}, smiles
         )
 
-    assert evaluator.evaluate(candidate("OCC")).metrics["oracle_score"] == 0.7
+    first = evaluator.evaluate(candidate("OCC"))
+    assert first.metrics["oracle_score"] == 0.7
+    assert first.metadata[EVALUATION_ATTEMPT_RECEIPT_KEY].endswith(":CCO")
     assert evaluator.evaluate(candidate("CCO")).metrics["oracle_score"] == 0.7
     assert calls == ["CCO"]
     assert evaluator.evaluate(candidate("CCN")).status == "invalid"
@@ -207,6 +234,69 @@ def test_oracle_dedup_and_hard_cap(tmp_path):
     )
     assert resumed.evaluate(candidate("CCO")).metrics["oracle_score"] == 0.7
     assert len(resumed.entries) == 1
+
+
+def test_tdc_cached_oracle_resume_does_not_double_charge_evaluation(tmp_path, monkeypatch):
+    from ldm_tts.engine.runtime import LDMEngine
+
+    original_checkpoint = LDMEngine._checkpoint
+    interrupted = {"done": False}
+
+    def flaky_checkpoint(self, state):
+        if state.observations and not interrupted["done"]:
+            interrupted["done"] = True
+            raise RuntimeError("fixture stopped after oracle receipt")
+        return original_checkpoint(self, state)
+
+    monkeypatch.setattr(LDMEngine, "_checkpoint", flaky_checkpoint)
+    root = tmp_path / "tdc-cache-replay"
+    argv = [
+        "--mock",
+        "--benchmark",
+        "tdc",
+        "--iterations",
+        "1",
+        "--reservoir-size",
+        "1",
+        "--evaluations-per-round",
+        "1",
+        "--out-dir",
+        str(root),
+    ]
+    with pytest.raises(RuntimeError, match="fixture stopped after oracle receipt"):
+        workflow.main(argv)
+    assert not (root / "checkpoint.json").exists()
+    before = json.loads((root / "budget.json").read_text())["counters"]
+    assert before["oracle_calls"] == 1
+    assert before["external_evaluations"] == 1
+    assert before["expensive_evaluation_attempts"] == 1
+    assert before["successful_evaluations"] == 1
+    cache = json.loads((root / "oracle_cache.json").read_text())["entries"]
+    assert len(cache) == 1 and cache[0]["status"] == "completed"
+
+    assert workflow.main(argv + ["--resume-from", str(root)]) == 0
+    after = json.loads((root / "budget.json").read_text())["counters"]
+    assert after["oracle_calls"] == 1
+    assert after["selected_candidates"] == 1
+    assert after["external_evaluations"] == 1
+    assert after["expensive_evaluation_attempts"] == 1
+    assert after["successful_evaluations"] == 1
+    assert after["benchmark_jobs"] == 1
+    assert after["recovery_attempts"] == 1
+
+
+def test_resume_keeps_original_recovery_seed_span_when_iterations_extend(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "config.json").write_text(json.dumps({
+        "iterations": 1,
+        "proposal_recovery_seed_span": 12345,
+    }))
+    args = workflow.parse_args(["--mock", "--iterations", "5"])
+    assert workflow._proposal_recovery_seed_span(args, run, resume=True) == 12345
+
+    (run / "config.json").write_text(json.dumps({"iterations": 2}))
+    assert workflow._proposal_recovery_seed_span(args, run, resume=True) == 2
 
 
 def test_tanimoto_gp_transfers_to_related_heldout_molecules():
@@ -280,8 +370,10 @@ def test_completed_resume_preserves_preflight_count_and_keeps_credentials_privat
             assert "must-not-appear-in-artifacts" not in file.read_text()
 
 
-def test_malformed_model_action_exhausts_bounded_repair_without_measurement(tmp_path, monkeypatch):
+def test_malformed_model_action_recovery_uses_fresh_batches(tmp_path, monkeypatch):
     class Client:
+        requests = 0
+
         def __init__(self, **kwargs):
             pass
 
@@ -289,6 +381,11 @@ def test_malformed_model_action_exhausts_bounded_repair_without_measurement(tmp_
             return {"ok": True}
 
         def propose(self, request):
+            Client.requests += 1
+            if Client.requests > 5:
+                return ProposalResponse(
+                    text='{"candidates":[{"target_smiles":"CCO"}]}'
+                )
             return ProposalResponse(
                 text='{"candidates":[{"target_smiles":"not-valid"}]}'
             )
@@ -319,6 +416,135 @@ def test_malformed_model_action_exhausts_bounded_repair_without_measurement(tmp_
     assert "invalid_projection_targets" in (tmp_path / "run/events.jsonl").read_text()
     result = json.loads((tmp_path / "run/benchmark_result.json").read_text())
     assert result["target_count"] == 1 and result["reconstruction_rate"] == 0
+    assert workflow.main(argv + ["--resume-from", str(tmp_path / "run")]) == 0
+    after = json.loads((tmp_path / "run/budget.json").read_text())["counters"]
+    assert after["proposal_attempts"] == after["llm_requests"] == after["proposal_request_attempts"] == 6
+    assert after["recovery_attempts"] == 1
+    assert after["successful_evaluations"] == 1
+    fresh_batch = tmp_path / "run/proposal_batches/recovery-000001/round-000000/batch-000000.json"
+    assert fresh_batch.is_file()
+    fresh_record = json.loads(fresh_batch.read_text())
+    assert fresh_record["response"]["metadata"]["ldm_proposal_attempt_receipt"] == (
+        "proposal_batches/recovery-000001/round-000000/batch-000000.json"
+    )
+    assert json.loads((tmp_path / "run/status.json").read_text())["status"] == "completed"
+
+
+def test_harness_provider_preflight_runs_before_sidecar_and_is_counted(tmp_path, monkeypatch):
+    calls = []
+
+    class PreflightClient:
+        def __init__(self, **kwargs):
+            calls.append(("preflight_client", kwargs["wire_api"], kwargs["api_key"]))
+
+        def preflight(self):
+            calls.append("preflight")
+            return {"status": "ok", "request_model": "fixture", "response_model": "fixture"}
+
+    class Harness:
+        def start(self):
+            calls.append("start")
+
+        def close(self):
+            calls.append("close")
+
+    class Source:
+        def __init__(self, *args, **kwargs):
+            calls.append("source")
+
+        def propose(self, request):
+            calls.append("proposal")
+            return ProposalResponse(text=json.dumps({"candidates": [{"target_smiles": "CCO"}]}))
+
+    def fake_create_client(*args, **kwargs):
+        calls.append("create_client")
+        return Harness()
+
+    monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr(workflow, "create_client", fake_create_client)
+    monkeypatch.setattr(workflow, "HarnessTargetSource", Source)
+    monkeypatch.setenv("LLM_API_KEY", "must-not-appear-in-artifacts")
+    root = tmp_path / "run"
+    argv = [
+        "--mock",
+        "--search-method",
+        "harness",
+        "--llm-url",
+        "http://fixture.invalid/v1",
+        "--llm-model",
+        "fixture",
+        "--iterations",
+        "1",
+        "--reservoir-size",
+        "1",
+        "--out-dir",
+        str(root),
+    ]
+
+    assert workflow.main(argv) == 0
+
+    assert calls[:5] == [
+        ("preflight_client", "responses", "must-not-appear-in-artifacts"),
+        "preflight",
+        "create_client",
+        "start",
+        "source",
+    ]
+    assert "proposal" in calls
+    counters = json.loads((root / "budget.json").read_text())["counters"]
+    assert counters["endpoint_preflight_requests"] == 1
+    assert counters["proposal_request_attempts"] == 1
+    events = [json.loads(line) for line in (root / "events.jsonl").read_text().splitlines()]
+    preflight = [event for event in events if event["event_type"] == "endpoint_preflight_succeeded"]
+    assert preflight[0]["payload"]["backend"] == "harness"
+    assert preflight[0]["payload"]["wire_api"] == "responses"
+    for file in root.rglob("*"):
+        if file.is_file():
+            assert "must-not-appear-in-artifacts" not in file.read_text()
+
+
+def test_harness_provider_preflight_failure_pauses_before_sidecar(tmp_path, monkeypatch):
+    calls = []
+
+    class PreflightClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def preflight(self):
+            calls.append("preflight")
+            raise EndpointRequestError("fixture endpoint rejected key")
+
+    def fake_create_client(*args, **kwargs):
+        pytest.fail("Harness sidecar should not start before provider preflight passes")
+
+    monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr(workflow, "create_client", fake_create_client)
+    monkeypatch.setenv("LLM_API_KEY", "fixture-secret")
+    root = tmp_path / "run"
+    argv = [
+        "--mock",
+        "--search-method",
+        "harness",
+        "--llm-url",
+        "http://fixture.invalid/v1",
+        "--llm-model",
+        "fixture",
+        "--iterations",
+        "1",
+        "--reservoir-size",
+        "1",
+        "--out-dir",
+        str(root),
+    ]
+
+    assert workflow.main(argv) == 2
+
+    assert calls == ["preflight"]
+    assert json.loads((root / "status.json").read_text())["status"] == "paused_endpoint_unavailable"
+    counters = json.loads((root / "budget.json").read_text())["counters"]
+    assert counters["endpoint_preflight_requests"] == 1
+    assert counters["proposal_request_attempts"] == 0
+    assert not (root / "harness").exists()
 
 
 def test_cached_projection_rechecks_boundary(tmp_path):

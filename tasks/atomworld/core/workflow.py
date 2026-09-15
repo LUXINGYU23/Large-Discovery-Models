@@ -39,6 +39,35 @@ from tasks.atomworld.core.proposals import AtomWorldDomain, BlindRefinementExpan
 from tasks.atomworld.core.task_spec import describe_ldm_task
 
 
+def _provider_api_key():
+    return os.environ.get(
+        "LLM_API_KEY",
+        os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
+    )
+
+
+def _harness_provider_preflight(args):
+    if not args.llm_url or not args.llm_model_name:
+        raise EndpointRequestError(
+            "Set LLM_BASE_URL and LLM_MODEL_NAME or the corresponding CLI options"
+        )
+    if not _provider_api_key():
+        raise EndpointRequestError(
+            "Set LLM_API_KEY, LDM_LLM_API_KEY, or OPENAI_API_KEY for Harness proposals"
+        )
+    client = OpenAICompatibleProposalClient(
+        url=args.llm_url,
+        model=args.llm_model_name,
+        api_key=_provider_api_key(),
+        timeout_seconds=args.harness_response_timeout,
+        max_tokens=args.llm_max_tokens,
+        temperature=args.llm_temperature,
+        max_retries=0,
+        wire_api="responses",
+    )
+    return {"backend": "harness", "wire_api": "responses", **client.preflight()}
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mock", action="store_true")
@@ -261,6 +290,7 @@ def project_result(
     dataset_manifest: dict,
     proposal_format="cif",
     search_method="llm",
+    runtime=None,
 ) -> dict:
     # Never select engine.best: it is a hidden-answer oracle. Fixed last-submission reporting.
     by_key = {
@@ -275,6 +305,17 @@ def project_result(
             path = run_dir / "attempts" / f"{ordinal:06d}.json"
             raw = json.loads(path.read_text()) if path.exists() else None
             evaluation = by_key.get(raw["canonical_key"]) if raw else None
+            if evaluation is not None and not evaluation.succeeded:
+                message = (
+                    evaluation.error
+                    or f"evaluation status {evaluation.status}"
+                )
+                error = RuntimeError(
+                    f"AtomWorld evaluation failed for round {ordinal:06d}: {message}"
+                )
+                if runtime is not None:
+                    runtime.fail(error)
+                raise error
             details.append(
                 {
                     "attempt": attempt + 1,
@@ -390,6 +431,9 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
     )
     run_dir.mkdir(parents=True, exist_ok=True)
     harness_mode = args.search_method != "llm"
+    harness_provider_preflight_required = harness_mode and (
+        not args.mock or harness_client_factory is None
+    )
     if client is None and not harness_mode:
         if args.mock:
             client = CallableProposalClient(
@@ -411,12 +455,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
             client = OpenAICompatibleProposalClient(
                 url=args.llm_url,
                 model=args.llm_model_name,
-                api_key=os.environ.get(
-                    "LLM_API_KEY",
-                    os.environ.get(
-                        "LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")
-                    ),
-                ),
+                api_key=_provider_api_key(),
                 timeout_seconds=args.llm_timeout,
                 max_tokens=args.llm_max_tokens,
                 temperature=args.llm_temperature,
@@ -511,16 +550,19 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         expander.runtime = runtime
         checkpoint = runtime.load_checkpoint() if args.resume else None
         completed = bool(checkpoint and checkpoint.get("next_round", 0) >= rounds)
-        if (
-            not args.mock
-            and not harness_mode
-            and not completed
-            and hasattr(client, "preflight")
+        if not completed and (
+            harness_provider_preflight_required
+            or (not args.mock and hasattr(client, "preflight"))
         ):
             runtime.consume("endpoint_preflights")
             try:
-                report = client.preflight()
+                report = (
+                    _harness_provider_preflight(args)
+                    if harness_provider_preflight_required
+                    else client.preflight()
+                )
                 write_json(run_dir / "endpoint_preflight.json", report)
+                runtime.record("endpoint_preflight_succeeded", report)
             except EndpointRequestError:
                 runtime.pause(
                     "paused_endpoint",
@@ -537,7 +579,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                     rounds=rounds,
                     reservoir_size=1,
                     batch_size=1,
-                    target_observations=rounds,
+                    target_successful_evaluations=rounds,
                     max_evaluation_attempts=rounds,
                     max_empty_reservoir_rounds=rounds + 1,
                     extra_limits={
@@ -553,7 +595,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                         ),
                         "mock_model_requests": rounds if args.mock else 0,
                         "endpoint_preflights": 0
-                        if args.mock or harness_mode
+                        if args.mock and not harness_provider_preflight_required
                         else args.service_retry_allowance + 1,
                         "geometry_tool_calls": rounds
                         if args.proposal_format == "operations"
@@ -583,17 +625,24 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                     dataset_manifest=manifest,
                     proposal_format=args.proposal_format,
                     search_method=args.search_method,
+                    runtime=runtime,
                 ),
             ),
             CampaignRecipe(describe_ldm_task(args), expander, domain, evaluator),
         )
     except EndpointRequestError:
         if runtime_ref:
-            runtime_ref[0].pause(
-                "paused_endpoint",
-                phase="proposal",
-                message="Endpoint unavailable; resume the same run after recovery",
-            )
+            status_path = runtime_ref[0].run_dir / "status.json"
+            status = json.loads(status_path.read_text()) if status_path.exists() else {}
+            if not (
+                status.get("status") == "paused_endpoint"
+                and status.get("phase") == "preflight"
+            ):
+                runtime_ref[0].pause(
+                    "paused_endpoint",
+                    phase="proposal",
+                    message="Endpoint unavailable; resume the same run after recovery",
+                )
         raise
     except HarnessError:
         if runtime_ref:

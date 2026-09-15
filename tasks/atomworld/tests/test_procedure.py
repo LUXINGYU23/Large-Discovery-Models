@@ -239,6 +239,57 @@ def test_final_answer_is_not_best_or_last_valid(tmp_path):
     assert result.projected["oracle_any_attempt_accuracy_diagnostic"] == 1
 
 
+def test_official_judge_failure_is_not_reported_as_wrong_answer(tmp_path, monkeypatch):
+    data = fixture()
+    sample = data["public"][0]
+    sample_id = sample["sample_id"]
+    targets = {sample_id: data["private"][0]["target_cif"]}
+    manifest = {
+        "dataset_kind": "local_released_subset",
+        "paper_split_verified": False,
+    }
+    monkeypatch.setattr(
+        "tasks.atomworld.core.workflow.load_prepared",
+        lambda _data_dir: ([sample], targets, manifest),
+    )
+
+    def failing_official(*_args, **_kwargs):
+        raise RuntimeError("judge runtime unavailable")
+
+    monkeypatch.setattr(
+        "tasks.atomworld.core.workflow.load_official_evaluator",
+        lambda _upstream: failing_official,
+    )
+    args = parse_args(
+        [
+            "--data-dir",
+            str(tmp_path / "data"),
+            "--attempts-per-sample",
+            "1",
+            "--out-dir",
+            str(tmp_path / "campaign"),
+        ]
+    )
+
+    with pytest.raises(RuntimeError, match="judge runtime unavailable"):
+        run(
+            args,
+            client=CallableProposalClient(
+                lambda _request: data["mock_outputs"][sample_id][0]
+            ),
+        )
+
+    status = json.loads((args.out_dir / "status.json").read_text())
+    assert status["status"] == "failed"
+    assert "judge runtime unavailable" in status["message"]
+    assert not (args.out_dir / "result.json").exists()
+    evaluation = json.loads((args.out_dir / "checkpoint.json").read_text())["state"][
+        "observations"
+    ][0]["evaluation"]
+    assert evaluation["status"] == "failed"
+    assert evaluation["error"] == "judge runtime unavailable"
+
+
 def test_operations_real_tool_and_official_judge(tmp_path):
     pytest.importorskip("ase")
     pytest.importorskip("pymatgen")
