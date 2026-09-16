@@ -36,10 +36,11 @@ Common failures:
 
 Do not hide validation failures behind broad exceptions, silent constant
 fallbacks, or clipping. Draft diagnostics use the last available chronological
-holdouts with GP hyperparameters fitted only on each training prefix and then
-frozen. They are development checks on already measured history, not an
-untouched test set or a counterfactual optimization run. The online task can
-refit hyperparameters after applying a mean. Check subsequent frozen-prediction
+whole-round holdouts. Each earlier training prefix uses the fixed Tanimoto
+kernel and jitter, and derives normalization from its bounded most-recent
+measured window. The mean does not change these choices online or in diagnostics.
+These are development checks on already measured history, not an untouched test
+set or a counterfactual optimization run. Check subsequent frozen-prediction
 feedback before claiming predictive improvement.
 
 Passing these tools proves executability and reports diagnostics, not scientific
@@ -47,8 +48,10 @@ validity. Holdout GP RMSE assesses the mean, not alpha/eta; a lower concentratio
 or changed first-draw distribution does not prove higher reward. Audit the
 weight function separately, including what it returns when improvement stops,
 feedback is ambiguous, or both signals lack support. A residual sign is not a
-ranking test. Compare historical proposal confidence using that measurement's
-frozen pool-relative fields, never the current pool's maximum.
+ranking test. Read the exact ReaSyn fields listed in ldm-curriculum.md. Historical
+q0_relative_to_max refers to allocated trial mass in that measurement's original
+pool, not current-pool mass or a group-level rank. No competition-rank or
+optimization-progress object is supplied.
 
 Terminal payloads are exact:
 

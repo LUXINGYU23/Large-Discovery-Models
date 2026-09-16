@@ -400,6 +400,9 @@ def project_result(
         "paper_split_verified": dataset_manifest.get("paper_split_verified", False),
         "sample_count": count,
         "attempts_per_sample": attempts,
+        "schedule_completed": result.state.next_round >= count * attempts and all(
+            item["error"] is None for row in rows for item in row["attempts"]
+        ),
         "one_shot_accuracy": sum(row["one_shot_correct"] for row in rows) / count,
         "extended_final_accuracy": sum(row["final_correct"] for row in rows) / count
         if attempts > 1
@@ -420,6 +423,8 @@ def project_result(
     if search_method in LDM_METHODS:
         payload["ldm_diagnostics"] = summarize_rounds(ldm_rounds)
     write_json(run_dir / "result.json", payload)
+    if not payload["schedule_completed"] and runtime is not None:
+        runtime.finish({**result.summary, "schedule_completed": False}, status="stopped")
     if search_method in HARNESS_METHODS:
         kinds = ("harness", "policy_harness") if (
             search_method == "harness_public_audit" or
@@ -580,6 +585,8 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         "llm_reasoning": args.llm_reasoning,
         "llm_temperature": args.llm_temperature,
         "llm_extra_body_json": args.llm_extra_body_json,
+        "resolved_generation_body": generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                                    extra_body=json.loads(args.llm_extra_body_json)),
         "search_method": args.search_method,
         "campaign_index": args.campaign_index,
         "service_retry_allowance": args.service_retry_allowance,
@@ -744,6 +751,7 @@ def main(argv=None):
                 "task": "atomworld",
                 "run_dir": str(result.runtime.run_dir),
                 "mode": "mock" if args.mock else "real",
+                "schedule_completed": result.projected["schedule_completed"],
                 "one_shot_accuracy": result.projected["one_shot_accuracy"],
                 "extended_final_accuracy": result.projected["extended_final_accuracy"],
                 "official_paper_score_claimed": False,
@@ -751,4 +759,4 @@ def main(argv=None):
             indent=2,
         )
     )
-    return 0
+    return 0 if result.projected["schedule_completed"] else 1

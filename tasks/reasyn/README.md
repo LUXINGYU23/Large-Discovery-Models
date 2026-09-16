@@ -57,7 +57,14 @@ can be `chat_completions` for direct calls. `--llm-reasoning` defaults to `off`,
 Harness requires Responses and uses the same generation settings; its legacy
 `--harness-thinking` alias must agree with `--llm-reasoning`. These settings are
 frozen in scientific identity and recorded in the native Harness manifest.
+`off` and `none` explicitly disable reasoning with `reasoning.effort=none` on
+Responses (or `reasoning_effort=none` on direct Chat Completions). They never
+mean endpoint defaults; unsupported efforts fail preflight without silent omission.
 Rebuild the shared sidecar for the new provider-request options.
+Candidate and policy sessions both use the shared recovery mechanism with a
+window of twice `--harness-wall-time-seconds`; a retryable policy failure falls
+back only after that allowance is exhausted. Non-retryable failures can fall
+back immediately and remain explicitly marked degraded.
 
 When a proposal batch is smaller than the session pool, durable allocation
 receipts rotate through every configured session, including across refills and

@@ -74,8 +74,8 @@ standardized residual.
 The finite-pool LDM distribution is
 
 ```text
-log q(x) = alpha * log(q0(x) + epsilon)
-           + eta * robust_z(acquisition(x)) - log Z.
+log p_i = alpha * log(q0_group_i + epsilon) - log(group_trial_count_i)
+          + eta * robust_z(acquisition_i) - log Z.
 ```
 
 For reconstruction, q0 groups canonical queries while evaluation identities
@@ -89,8 +89,10 @@ same allocation, including after BO-pool maintenance.
 
 `alpha` controls proposal-frequency preference; `eta` controls task-GP acquisition
 influence. A zero prior mean does not remove the GP posterior or its uncertainty.
-The weights' ratio changes the balance and their common scale changes the
-concentration. Both must be finite and non-negative. Use the authoritative
+The weights' ratio changes the balance. Common scaling changes the group and
+acquisition terms, not the fixed group-to-trial allocation; it is not an inverse
+temperature for full trial logits when group sizes differ. Both must be finite
+and non-negative. Use the authoritative
 context defaults as the starting policy; this adapter does not claim a released
 ReaSyn LDM weight baseline.
 Adapt from evidence, without fixed round schedules or host-imposed weight floors.

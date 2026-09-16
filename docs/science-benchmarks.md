@@ -6,7 +6,8 @@ reporting remain inside their task packages.
 
 | Task | Research and candidate generation | Scientific feedback and selection |
 | --- | --- | --- |
-| AtomWorld | Direct CIF/refinement, packaged geometry operations, persistent parallel Harness research, independent public-audit policy | Input CIF, public instruction and syntax feedback only. Target CIF and hidden judge metrics never enter research. The last scheduled submission determines accuracy. |
+| AtomWorld blind baselines | Direct CIF/refinement, packaged geometry operations, persistent parallel Harness research, independent public-audit policy | Input CIF, public instruction and syntax feedback only; no judge feedback. The last scheduled submission determines accuracy. |
+| AtomWorld LDM extension | Direct or persistent Harness proposal pools, fixed residual RBF GP/UCB, optional independent compiled policy | Same-question past scalar correctness is available for optimization. Private targets, judge diagnostics and cross-question history stay inaccessible. This is not the official no-feedback protocol; report the last scheduled submission, not the best observed answer. |
 | ReaSyn reconstruction | Direct or persistent Harness projection queries, exact molecular GP with empirical proposal frequency and optional independent compiled policy | Query plus restart seed identifies a projection trial. Similarity is measured against the original reconstruction target. Failures remain in the requested target denominator. |
 | ReaSyn TDC | Molecular research, frozen ReaSyn projection, canonical-product admission, empirical-q0/GP-UCB sampling | Only selected unique products consume oracle calls. Previously measured products trigger bounded replenishment. Full-budget AUC remains unavailable for partial campaigns. |
 
@@ -20,19 +21,24 @@ inputs with source/asset digest checks.
 ## Sampling and recovery
 
 ReaSyn requests independent minibatches and retains legal occurrences before
-canonical deduplication. Reconstruction probability identities preserve independent
-restart seeds; TDC identities refer to canonical projected products. Its LDM rule
-is `alpha * log(q0 + epsilon) + eta * robust_z(UCB)`, with a separately sized BO
-pool and reproducible sampling without replacement. Reconstruction fixes alpha
-at 1 and disables compiled weight adjustment; its policy can change only the
-prior mean. Direct and BO baselines are
-separately named and do not claim these semantics.
+canonical deduplication. Reconstruction q0 groups canonical queries; independent
+restart seeds distinguish scientific evaluation trials, not proposal groups.
+TDC groups canonical projected products. The trial logit is
+`alpha * log(q0_group + epsilon) - log(group_trial_count) + eta * robust_z(UCB)`.
+Each surviving query's mass is divided across its retained trials after separate
+BO-pool maintenance; TDC has one trial per product group. Sampling is reproducible
+and without replacement. Compiled policies can change both the standardized
+prior mean and alpha/eta in both ReaSyn benchmarks. Direct and BO baselines are
+separately named and do not claim these LDM sampling semantics.
 
 Projection workers persist each completed target, including empty results. Serial
 batch deadlines include the per-target allowance, and resume reuses verified
 completed rows and deterministic seeds. Endpoint/projection recovery and proposal
 replenishment have separate finite limits; neither increases scientific rounds
 or the oracle budget. An incomplete campaign returns a nonzero status.
+Completed oracle/judge receipts replay without charging another evaluation;
+fresh calls still obey both EngineConfig and durable ledger limits. Ambiguous
+interrupted judge calls are surfaced, not silently repeated or scored incorrect.
 
 ## Research Harness and pilots
 
@@ -67,7 +73,7 @@ and the task's official evaluator assets. Do not upgrade qualification or report
 paper scores from mock/fake-sidecar tests.
 
 The [2026-09-08 review verification record](validation/science_benchmarks_review_20260908.json)
-maps all seven findings to their implementation and records the final test lanes:
+maps that earlier review's findings to their implementation and records its test lanes:
 60 AtomWorld tests, 71 ReaSyn tests with RDKit, and 508 shared/lightweight tests
 with four optional skips. The lanes overlap. Live provider/KVM acceptance remains
 pending, as stated in the record.

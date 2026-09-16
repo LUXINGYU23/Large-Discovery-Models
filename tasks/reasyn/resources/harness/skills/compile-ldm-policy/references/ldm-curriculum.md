@@ -1,183 +1,111 @@
-# LDM Curriculum Weights
+# ReaSyn LDM Curriculum Weights
 
-Harness-Compiled LDM combines empirical proposal occurrences with the fixed
-task acquisition on the maintained finite pool.
+The host combines measured-history GP/UCB with empirical proposal occurrences.
+The policy changes only alpha and eta, never candidate identities, kernel,
+representation, evaluation budget, or the sampling algorithm.
 
-## Distribution
+## Query Groups and Independent Trials
 
-Let `q0(x) > 0` be empirical proposal mass and let
-`a_tilde(x) = robust_z(a(x))`. The implemented distribution is
+Legal repeated occurrences are retained, including repeats within one session.
+For reconstruction, canonical query SMILES defines the proposal group; each
+occurrence receives an independent sampling seed and evaluation identity.
+A previously seen query is not a previously evaluated trial. For TDC, the group
+is the canonical projected product; repeated products contribute proposal mass
+before deduplication, but only previously unmeasured products are eligible.
 
-```text
-q(x) = exp(alpha * log(q0(x) + epsilon) + eta * a_tilde(x)) / Z
-```
+On the maintained BO pool, let Q_g be the normalized empirical mass of group g
+and n_g its number of retained trials. Pool maintenance preserves the original
+occurrence counts for surviving groups, renormalizes across these groups and
+allocates each group's mass equally to its retained trials. The candidate-aligned
+`q0` is Q_g/n_g, not Q_g. Read `q0_group_mass` and `group_trial_count` rather than
+inferring group mass from row counts after pool maintenance.
 
-and therefore, for two pool members,
-
-```text
-log(q(x_i) / q(x_j))
-  = alpha * log((q0(x_i) + epsilon) / (q0(x_j) + epsilon))
-    + eta * (a_tilde(x_i) - a_tilde(x_j)).
-```
-
-This odds equation is the most useful way to reason about the controls:
-
-- `alpha` scales preference from same-round proposal frequency.
-- `eta` scales the influence of the task GP's acquisition.
-- Their ratio changes which source dominates.
-- Multiplying both by the same positive constant preserves the logit direction
-  but changes softmax concentration, like inverse temperature.
-
-Independent cross-session agreement contributes repeated occurrences to (q_0).
-Each session submits distinct candidates; within-session repetition is rejected.
-Historical evaluated candidates have already been rejected before this stage.
-Multiplicity is an allocation of belief, not a count of independent experiments.
-Being selected is not a successful objective measurement; being left unmeasured
-is not evidence for extra confidence. Do not reward vote escalation itself.
-
-Useful limiting cases are:
-
-- `alpha=1, eta=0`: sample from empirical (q_0).
-- `alpha=0, eta>0`: ignore occurrence frequency and use acquisition tilt.
-- `alpha>0, eta=0`: ignore acquisition.
-- `alpha=0, eta=0`: uniform over the maintained pool; both final-selection
-  signals are disabled. Earlier q0-weighted pool admission still applies.
-- task defaults `alpha=2.0, eta=0.25`: reproduce the fixed LDM baseline.
-
-The stage string is provenance only. It has no computational effect.
-
-## Read the diagnostics correctly
-
-The exact `weight_context` is in the exported `input.json["execution_context"]`.
-It includes history size, pool and occurrence counts, task defaults, a (q_0)
-summary, and a baseline-acquisition summary. `candidate_predictions` adds each
-pool member's q0, raw GP mean/std/UCB, normalized acquisition, and default
-first-draw probability. `normalization` records the exact robust-z clip.
-`prediction_feedback` compares frozen zero-mean/active GP predictions with the
-subsequent measurements; `optimization_progress` records measured improvement.
-These errors are selected-point evidence, not accuracy on the whole space.
-
-Each measured prediction carries its original `pool_size`, competition ranks
-(1 is best, ties share rank), `q0_relative_to_max`, `first_draw_probability`,
-and alpha/eta. These are frozen in the measurement's own round. Do not compare
-an old q0 against the current pool's maximum; use its saved relative mass or
-rank within its original pool. First-draw probability is not the inclusion
-probability for a multi-candidate evaluation batch.
-
-Read `requested_evaluation_batch` and `effective_evaluation_batch` from the
-weight context, and compare the effective batch with the current pool size.
-A large batch can include most candidates even when the first-draw distribution
-is concentrated. If the whole pool is evaluated, no weight choice changes the
-evaluated set. Do not claim selection benefit from entropy or first-draw odds
-alone. With `benchmark_time`, judge the value of further research and information
-gathering against the remaining opportunity to evaluate candidates. Time pressure
-does not itself establish surrogate reliability or proposal quality.
-
-Separate three questions:
-
-- **Prediction:** an error or standardized residual concerns the utility
-  prediction at that measured point. A positive residual means underprediction,
-  not that GP ranking or acquisition has been validated.
-- **Ranking:** compare predictions frozen under the same model and history
-  against multiple subsequent measurements from that round. A round with one
-  measured point provides no within-round ranking test. A nonconstant UCB
-  alone is not evidence of useful ordering.
-- **Decision:** assess observed progress and contradictions under the actual
-  selection distribution. GP holdout RMSE does not depend on alpha/eta and
-  cannot validate a weight change. Selected-point feedback does not reveal
-  the rewards of alternative unmeasured candidates.
-
-Both q0 and acquisition can be wrong, especially on sparsely measured or
-confounded regions. Distinguish missing calibration from measured contradictions.
-The configured baseline is a working decision rule under uncertainty, not a new
-claim that must be proved from scratch each round. With little evidence, retain
-it or the last justified nondegenerate policy. A zero mean still leaves a GP
-posterior and UCB exploration; sparse data do not imply that eta should be zero.
-
-Use entropy, ESS and weighted logit ranges to check actual influence, not as
-optimization objectives. In particular, maximum ESS through alpha=eta=0 abandons
-both final-selection signals. Tiny positive weights are not a meaningful repair.
-Changing or suppressing a signal should answer a concrete observed failure or
-testable opportunity, rather than express a generic preference for neutrality.
-
-Before choosing weights, calculate pairwise log-odds for a high-frequency
-candidate and a contrasting high-acquisition candidate. Check whether the
-proposed weights can materially change the distribution. For example, a 20:1
-q0 ratio contributes about 6 logit units at alpha=2, whereas eta=0.25 with z
-clipped to [-2,2] contributes at most 1. No GP ranking can overcome that gap.
-Use the actual task clip and evidence rather than adopting these example values.
-
-For a pool of size (N):
+For trial i in group g(i), the actual first-draw distribution is:
 
 ```text
-ESS(q0) = 1 / sum_x q0(x)^2,       1 <= ESS <= N
-H(q0)   = -sum_x q0(x) log q0(x),  0 <= H <= log N.
+logit_i = alpha * log(Q_g(i) + epsilon) - log(n_g(i)) + eta * z_i
+p_i = exp(logit_i) / sum_j exp(logit_j)
+z_i = robust_z(UCB_i)
+
+log(p_i / p_j)
+  = alpha * log((Q_g(i) + epsilon) / (Q_g(j) + epsilon))
+    - log(n_g(i) / n_g(j)) + eta * (z_i - z_j)
 ```
 
-Use `ESS/N` or `H/log(N)` when comparing different pool sizes. Low values mean
-proposal mass is concentrated; they do not say whether the consensus is
-scientifically correct. If baseline acquisition is effectively constant,
-robust normalization becomes zero and changing `eta` cannot create a ranking.
+TDC has n_g=1. Alpha scales group-frequency preference; eta scales acquisition
+influence. Their ratio controls this balance. Common scaling changes the group
+preference/acquisition terms but does NOT scale the fixed -log(n_g) allocation.
+It is an inverse temperature for the entire trial distribution only when all
+retained group sizes are equal.
 
-Weights should reflect an explicit hypothesis about:
+Useful limits:
 
-1. how independent and credible the current proposal consensus is;
-2. whether measured history supports the task surrogate and compiled mean;
-3. whether acquisition meaningfully separates the current pool;
-4. whether recent real evaluations are improving or contradicting prior beliefs.
+- alpha=1, eta=0 reproduces the allocated empirical trial mass, up to epsilon.
+- alpha=0, eta>0 removes group-frequency preference but keeps trial allocation.
+- alpha>0, eta=0 uses only group-frequency preference and trial allocation.
+- alpha=eta=0 is uniform across query groups, then across each group's trials.
+  For three A trials and one B trial: [1/6, 1/6, 1/6, 1/2], not four quarters.
+  Earlier q0-weighted pool maintenance still affects which trials are available.
 
-No single entropy, ESS, history-size, or round threshold is sufficient. The host
-does not impose a trust gate, so extreme weights are legal but must be justified
-by stronger evidence than ordinary defaults.
+Use `default_alpha` and `default_eta` from the authoritative weight context.
+Current CLI defaults are 1.0 and 1.0; they are adapter defaults, not a released
+ReaSyn LDM baseline. The stage string records evidence provenance only.
+Multiplicity is proposal preference, not additional measured scientific evidence.
 
-## Evidence-defined curriculum
+## Exact Diagnostics
 
-A curriculum state is a diagnosis of the current evidence, not a range of round
-numbers. Do not branch on `round_index`, and do not infer readiness from history
-size alone. Use the current proposal and acquisition summaries together with
-measured progress and contradictions in the research snapshot.
+Read `input.json["execution_context"]["weight_context"]`. It contains:
 
-- **Baseline:** calibration is unavailable or inconclusive and no concrete
-  failure justifies changing the configured weights. Retain the working LDM
-  balance while collecting measurements; no custom artifact is necessary.
-- **Proposal-led:** the surrogate is still prior-like, acquisition is nearly
-  flat or unstable, and proposal consensus has a defensible scientific basis.
-  Favor `alpha` relative to `eta`.
-- **Balanced:** proposal mass and acquisition provide distinct, credible signals
-  without a clear conflict. Choose weights whose actual logit contributions
-  express that balance; the numerical defaults need not be balanced.
-- **Acquisition-led:** measured evidence supports the residual model,
-  acquisition separates the pool, and recent evaluations validate its ranking
-  better than proposal frequency. Increase `eta` relative to `alpha`.
-- **Recovery:** comparative measurements contradict the dominant proposal
-  family or acquisition ordering. Reduce the implicated source and compare the
-  resulting odds with the baseline and active policy. A stall motivates
-  diagnosis; by itself it does not establish that both sources are harmful.
-  Test the rule on plausible stalled and contradictory contexts, not only the
-  current successful point.
+- `history_size`, `unique_candidate_count`, `valid_proposal_occurrences`,
+  `requested_evaluation_batch`, `effective_evaluation_batch`, and defaults.
+- `q0_summary`: group scope, group_count, entropy and maximum group mass.
+  `trial_base_summary`: allocated-trial entropy and maximum trial mass.
+- `baseline_acquisition_summary`: mean and std; `acquisition`: UCB name,
+  score direction and beta; `normalization`: robust-z epsilon, mad_scale, z_clip.
+- `candidate_predictions`: candidate_id, q0, group_trial_count, q0_group_mass,
+  baseline_mean, baseline_std, baseline_acquisition, normalized_acquisition,
+  default_selection_probability.
+- `prediction_feedback` (added by the shared controller): summary, measurements,
+  omitted_older_measurements. Summary reports count and, when matched
+  measurements exist, baseline/active RMSE and MAE.
 
-Transitions may be non-monotone. Moving back to proposal-led needs independent
-support for proposal quality, not just an acquisition failure. Expected
-improvement and the information value of a discriminating experiment are
-different reasons for retaining meaningful probability on alternatives.
+Feedback measurements join frozen predictions to subsequently observed utility
+by round and candidate identity. They include baseline/active mean, std and
+acquisition; q0, group mass/count, normalized acquisition, logit,
+selection_probability, first_draw_probability, q0_relative_to_max, pool_size,
+alpha, eta, round_index and measured_utility. The relative q0 is the TRIAL mass
+relative to the maximum in that original pool, not a query-group confidence.
+No competition ranks, `optimization_progress`, or `benchmark_time` object is
+promised by this adapter. Derive a clearly labeled progress summary from
+available measured history if needed; do not assume fields from another task.
 
-Keep decisions legible:
+First-draw probability is not the inclusion probability for a multi-trial batch.
+A batch covering the entire pool leaves no weight-dependent choice of evaluated
+set. Entropy, ESS, KL and selection changes are descriptive, not proof of reward.
+For comparing normalized entropy or ESS, use the number of groups for group
+mass and the number of retained trials for trial mass; never mix the two.
 
-- start from the task defaults; retain them when no change is justified;
-- change one or both weights only when the current snapshot provides a reason;
-- make the weight audit explicit even when the prior mean is unchanged;
-- record the reason in session analysis and use a stable evidence-state label;
-- evaluate the active artifact on every new snapshot before `keep`;
-- do not modify weights merely to make rounds look adaptive.
+## Evidence-Driven Changes
 
-## Relation to guided BO
+Start from the configured baseline or last justified policy. Sparse history and
+a zero compiled mean still leave a GP posterior and UCB exploration. Missing
+calibration is not evidence that acquisition or proposal preference is harmful.
 
-The proposal term is a strictly positive support preference, while the compiled
-mean is a belief about expected utility. They are not interchangeable. ColaBO
-shows how user beliefs over function properties can guide BO while retaining
-support across the domain; LGBO shows a tractable mean-shift route for continuous
-semantic guidance. This implementation uses the lighter task-local mean plus
-finite-pool LDM tilt and does not claim either paper's full guarantees.
+Separate predictive error, within-round ranking and decision quality. A positive
+residual means underprediction, not a validated acquisition ordering. One
+measured trial provides no within-round ranking test. Held-out RMSE evaluates
+the mean, not alpha/eta, and selected-point feedback cannot reveal rewards of
+unmeasured alternatives.
 
-- Hvarfner et al., [A General Framework for User-Guided Bayesian Optimization](https://arxiv.org/abs/2311.14645).
-- Yuan et al., [LLM-Guided Bayesian Optimization](https://arxiv.org/abs/2605.17976).
+Before changing weights, calculate the full pairwise log-odds above, including
+group-size allocation, using the actual z_clip. Audit the resulting distribution
+with `evaluate_policy_draft`; do not maximize ESS as an optimization objective.
+Use a baseline, proposal-led, balanced, acquisition-led or recovery stage only
+when the measured evidence supports that diagnosis. Never select a stage from
+round number or history size alone. A stall motivates investigation; it does
+not establish that both signals should be removed.
+
+Record the hypothesis and evidence in session analysis, validate a complete
+artifact, and reevaluate the active artifact on each new snapshot before keep.
+The mean models standardized utility; proposal mass models finite-pool support
+preference. These roles are not interchangeable.

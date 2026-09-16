@@ -27,10 +27,12 @@ mu_z(x) = h_t(x) + k(x, X) [K(X, X) + noise]^-1 (z - h_t(X))
 mu_u(x) = location_t + scale_t * mu_z(x).
 ```
 
-The task may fit its existing kernel hyperparameters to residuals, but generated
-code never performs GP inference. Predictive variance, numerical linear algebra,
-and acquisition remain task-owned. A zero (h_t) recovers the static task
-baseline.
+ReaSyn fixes the Tanimoto kernel and 1e-5 diagonal jitter. Its bounded most-recent
+training window determines utility location and scale (standard deviation with
+a 0.1 floor), independently of the compiled mean. There is no residual-dependent
+hyperparameter fitting. Generated code never performs GP inference. Predictive
+variance, numerical linear algebra and UCB remain task-owned. A zero (h_t)
+recovers the static task baseline with the same covariance.
 
 A mean shifts beliefs away from observations; nearby measured residuals let the
 GP correct it. Unsupported structure can still bias unobserved regions. Model
@@ -65,11 +67,12 @@ Start with (h_t(x)=0). Add only structure that has support:
 - Prefer a weak fixed scientific contrast or a ridge-shrunk additive model.
   A typical linear form is
   `theta = solve(Phi.T @ Phi + lambda * P, Phi.T @ z)`.
-- Treat one-hot and compositional groups as collinear. Use centered group
-  effects, a reference level, or ridge regularization instead of interpreting
-  arbitrary full-rank coefficients causally.
-- Require observations on multiple combinations before adding interactions.
-  Confounded factor combinations do not identify separate causal effects.
+- Fingerprint columns are hashed and may collide; they have no fixed chemical
+  names. Regularize correlated columns rather than assigning a specific
+  functional group or causal interpretation to an index.
+- Require measured support before adding interactions. Repeated reconstruction
+  queries share features despite independent trial seeds; do not mistake them
+  for distinct chemical coverage.
 - Bound extrapolation by design. Do not rely on the runner's final
   `mean_clip`; repeated clipping means the model is too aggressive.
 - Return zeros for empty history unless a weak, explicit public prior is
@@ -90,8 +93,10 @@ are available. Until two measured rounds exist, holdout evidence is unavailable.
 
 The tool reports raw-utility RMSE and per-fold predictions, plus current-pool
 first-draw probabilities for default and draft policies. These probabilities
-are not batch inclusion probabilities. The GP hyperparameters are frozen for
-this diagnostic; the actual online task retains its existing refitting rules.
+are not batch inclusion probabilities. Both diagnostic and online GP fits use
+the fixed Tanimoto kernel, jitter, training-window limit and measured-label
+normalization. Full history remains available to the policy; GP operators have
+zero weights on observations outside their bounded training window.
 
 The Agent has already seen the historical holdout labels, so repeated draft
 selection can overfit these development checks. Use the independently frozen

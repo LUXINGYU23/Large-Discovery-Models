@@ -54,7 +54,12 @@ class GPPrediction:
 
 
 class RBFGPSurrogate:
-    """Standardized exact GP with a stable prior/fallback for sparse history."""
+    """Standardized exact GP with a stable prior/fallback for sparse history.
+
+    Scaling floors and the minimum fit size are fixed configuration, independent
+    of the residual mean. None floors preserve legacy std-plus-epsilon scaling;
+    explicit floors use max(measured std, floor).
+    """
 
     def __init__(
         self,
@@ -66,6 +71,9 @@ class RBFGPSurrogate:
         prior_std: float = 0.25,
         feature_version: str = "",
         residual_prior_mean: Sequence[float] | None = None,
+        min_training_observations: int = 2,
+        feature_scale_floor: float | None = None,
+        target_scale_floor: float | None = None,
     ) -> None:
         self.observations = [
             item.to_bo(feature_version=feature_version)
@@ -83,6 +91,16 @@ class RBFGPSurrogate:
         self.prior_mean = float(prior_mean)
         self.prior_std = max(1.0e-9, float(prior_std))
         self.feature_version = str(feature_version)
+        if (isinstance(min_training_observations, bool)
+                or not isinstance(min_training_observations, int)
+                or min_training_observations < 1):
+            raise ValueError("min_training_observations must be a positive integer")
+        for value in (feature_scale_floor, target_scale_floor):
+            if value is not None and (not math.isfinite(value) or value <= 0):
+                raise ValueError("GP scale floors must be finite and positive")
+        self.min_training_observations = min_training_observations
+        self.feature_scale_floor = feature_scale_floor
+        self.target_scale_floor = target_scale_floor
         self.residual_prior_mean = (
             None if residual_prior_mean is None else np.asarray(residual_prior_mean, dtype=float)
         )
@@ -96,7 +114,7 @@ class RBFGPSurrogate:
         self._fit()
 
     def _fit(self) -> None:
-        if not self.observations or (len(self.observations) < 2 and self.residual_prior_mean is None):
+        if len(self.observations) < self.min_training_observations:
             return
         dimensions = {len(item.feature_vector) for item in self.observations}
         if len(dimensions) != 1:
@@ -105,14 +123,13 @@ class RBFGPSurrogate:
         self.y = np.asarray([item.scalar_score for item in self.observations], dtype=float)
         self.x_mean = self.X.mean(axis=0)
         self.x_std = self.X.std(axis=0) + 1.0e-8
+        if self.feature_scale_floor is not None:
+            self.x_std = np.maximum(self.X.std(axis=0), self.feature_scale_floor)
         self.Xz = (self.X - self.x_mean) / self.x_std
         self.y_mean = float(self.y.mean())
         self.y_std = float(self.y.std() + 1.0e-9)
-        if self.residual_prior_mean is not None:
-            # Freeze normalization on measured labels, never on compiled residuals.
-            self.x_std = np.maximum(self.X.std(axis=0), 1.0)
-            self.Xz = (self.X - self.x_mean) / self.x_std
-            self.y_std = max(float(self.y.std()), 0.1)
+        if self.target_scale_floor is not None:
+            self.y_std = max(float(self.y.std()), self.target_scale_floor)
         yz = (self.y - self.y_mean) / self.y_std
         if self.residual_prior_mean is not None:
             yz = yz - self.residual_prior_mean
@@ -182,8 +199,8 @@ class RBFGPSurrogate:
     def posterior_projection(self, vectors) -> dict[str, np.ndarray]:
         """Frozen residual-GP operator for task-owned policy diagnostics."""
         query = np.asarray(vectors, dtype=float)
-        if not self.ready or self.residual_prior_mean is None:
-            raise ValueError("diagnostics require a fitted residual GP")
+        if not self.ready:
+            raise ValueError("diagnostics require a fitted GP")
         if query.ndim != 2 or query.shape[1] != self.X.shape[1] or not np.isfinite(query).all():
             raise ValueError("diagnostic queries must align with finite GP features")
         cross = _rbf_kernel((query - self.x_mean) / self.x_std, self.Xz, self.lengthscale)

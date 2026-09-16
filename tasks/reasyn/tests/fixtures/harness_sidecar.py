@@ -63,6 +63,12 @@ for line in sys.stdin:
         response = {"type": "initialized", **common, "profiles": PROFILES, "manifest": "fixture_manifest.json"}
     elif frame["type"] == "run_turn":
         trace(ROOT / "fixture_requests.jsonl", {"turns": frame["turns"]})
+        if MODE == "policy_retry" and not (ROOT / "fixture_interrupted").exists():
+            (ROOT / "fixture_interrupted").touch()
+            print(json.dumps({"type": "error", **common, "error": {
+                "code": "recoverable_turn_error", "message": "synthetic transient policy failure",
+            }}), flush=True)
+            continue
         results = []
         interrupted = False
         for item in frame["turns"]:

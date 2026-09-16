@@ -360,6 +360,31 @@ def test_real_policy_controller_shared_runner_repairs_shape_and_replays(tmp_path
     assert (root / "rounds/round_003/result.json").exists()
 
 
+def test_workflow_policy_uses_shared_recovery_before_persisting_fallback(tmp_path, monkeypatch):
+    controllers = []
+    def controller(**kwargs):
+        assert kwargs["recovery_budget"]() == 14
+        result = PolicyResearchController(**kwargs)
+        controllers.append(result)
+        return result
+
+    monkeypatch.setattr(workflow, "PolicyResearchController", controller)
+    monkeypatch.setattr(workflow, "DockerPolicyExecutor", lambda *args: AuthoredFixtureExecutor())
+    monkeypatch.setattr(workflow, "_preflight_harness_provider", lambda args: {"status": "synthetic_fixture"})
+    monkeypatch.setattr(workflow, "create_client", lambda args, root, *rest, policy=False: client(
+        root, policy=policy, count=2, mode="policy_retry" if policy else "molecular"))
+    root = tmp_path / "run"
+    assert workflow.main(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness_compiled",
+                          "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+                          "--harness-wall-time-seconds", "7", "--harness-sessions", "2",
+                          "--iterations", "2", "--reservoir-size", "2", "--out-dir", str(root)]) == 0
+    assert len(controllers) == 1
+    turns = jsonl(root / "policy_harness/fixture_requests.jsonl")
+    assert len(turns) >= 2 and turns[0]["turns"] == turns[1]["turns"]
+    results = [json.loads(p.read_text()) for p in (root / "policy_harness/rounds").glob("*/result.json")]
+    assert results and all(row["source"] == "artifact" and not row["degraded"] for row in results)
+
+
 def test_actual_guest_tools_register_query_full_history_and_preserve_reconstruction_identity(tmp_path):
     import os
     import shutil

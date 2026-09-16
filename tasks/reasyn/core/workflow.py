@@ -507,6 +507,10 @@ def _scientific_identity(args, configuration, target, contract):
         "harness_wall_time_seconds", "harness_response_timeout",
     )
     scientific = {k: configuration[k] for k in identity_keys}
+    scientific["resolved_generation_body"] = generation_body(
+        wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+        extra_body=json.loads(args.llm_extra_body_json),
+    )
     scientific["bo_targets"] = getattr(args, "bo_targets", [])
     scientific["original_target"] = target
     scientific["source_archive_digest"] = contract.benchmark["source_commit"]
@@ -860,7 +864,8 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
                 selector.policy_adapter = adapter
                 selector.policy_controller = PolicyResearchController(client=policy_client, adapter=adapter,
                     executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
-                        resolve_policy_user(args)), root=run_dir / "policy_harness", account=runtime.consume_many)
+                        resolve_policy_user(args)), root=run_dir / "policy_harness", account=runtime.consume_many,
+                    recovery_budget=lambda: args.harness_wall_time_seconds * 2)
 
         if not target:
             evaluator.before_oracle = lambda: runtime.consume("oracle_calls")

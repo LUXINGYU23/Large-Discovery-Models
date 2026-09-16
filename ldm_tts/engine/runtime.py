@@ -249,12 +249,9 @@ class LDMEngine:
                 if completed is not None:
                     stop_reason = completed
                     break
-                remaining_attempts = (
-                    None
-                    if self._uses_evaluation_attempt_receipts()
-                    else _remaining_evaluation_attempts(self.runtime, active, config)
-                )
-                if remaining_attempts == 0:
+                remaining_attempts = _remaining_evaluation_attempts(self.runtime, active, config)
+                can_replay = self._uses_evaluation_attempt_receipts()
+                if remaining_attempts == 0 and not can_replay:
                     stop_reason = "evaluation_attempt_budget"
                     break
                 self.runtime.consume_many(
@@ -342,7 +339,7 @@ class LDMEngine:
                         or len(reservoir.candidates)
                     )
                 selection_count = min(selection_count, len(reservoir.candidates))
-                if remaining_attempts is not None:
+                if remaining_attempts is not None and not can_replay:
                     selection_count = min(selection_count, remaining_attempts)
                 selection = self._select(
                     active.observations,
@@ -383,11 +380,14 @@ class LDMEngine:
                     batch_candidates: list[Candidate] = []
                     for candidate in selected:
                         try:
-                            self._consume_evaluation_attempt(candidate)
+                            if not self._consume_evaluation_attempt(candidate, active, config):
+                                budget_exhausted = True
+                                stop_reason = "evaluation_attempt_budget"
+                                continue
                         except BudgetExceededError:
                             budget_exhausted = True
                             stop_reason = "external_evaluation_budget"
-                            break
+                            continue
                         batch_candidates.append(candidate)
                     if batch_candidates:
                         evaluations = self._evaluate_batch(batch_candidates)
@@ -406,11 +406,14 @@ class LDMEngine:
                         elif round_observations >= desired:
                             break
                         try:
-                            self._consume_evaluation_attempt(candidate)
+                            if not self._consume_evaluation_attempt(candidate, active, config):
+                                budget_exhausted = True
+                                stop_reason = "evaluation_attempt_budget"
+                                continue
                         except BudgetExceededError:
                             budget_exhausted = True
                             stop_reason = "external_evaluation_budget"
-                            break
+                            continue
                         evaluation = self._evaluate(candidate)
                         round_observations += 1
                         round_successes += self._record_evaluation(
@@ -501,25 +504,37 @@ class LDMEngine:
             candidates, representations, count=count, round_idx=round_idx
         )
 
-    def _consume_evaluation_attempt(self, candidate: Candidate) -> None:
-        usage_key = self._evaluation_attempt_usage_key(candidate)
+    def _consume_evaluation_attempt(
+        self, candidate: Candidate, state: LDMEngineState, config: LDMEngineConfig
+    ) -> bool:
+        receipt = self._evaluation_attempt_usage_key(candidate)
+        usage_key = f"engine:evaluation_attempt:{receipt}" if receipt is not None else None
+        paid = self.runtime.budget.metadata.get("cumulative_usage", {}).get(usage_key, {})
+        # Only this durable operation may replay at the limit, not every candidate
+        # handled by an evaluator that happens to expose a receipt hook.
+        if paid.get("external_evaluations", 0) < 1 and (
+            _remaining_evaluation_attempts(self.runtime, state, config) == 0
+        ):
+            return False
         self.runtime.consume_many(
             {
                 "selected_candidates": 1,
                 "external_evaluations": 1,
                 "expensive_evaluation_attempts": 1,
             },
-            usage_key=(
-                f"engine:evaluation_attempt:{usage_key}"
-                if usage_key is not None
-                else None
-            ),
+            usage_key=usage_key,
         )
+        return True
 
     def _uses_evaluation_attempt_receipts(self) -> bool:
         return getattr(self.evaluator, "evaluation_attempt_usage_key", None) is not None
 
     def _evaluation_attempt_usage_key(self, candidate: Candidate) -> str | None:
+        """Task hook promises durable replay, or refusal of an ambiguous retry.
+
+        Fresh external calls must use fresh keys (or None), never a reused
+        candidate key without a durable evaluation receipt behind it.
+        """
         keyer = getattr(self.evaluator, "evaluation_attempt_usage_key", None)
         if keyer is None:
             return None

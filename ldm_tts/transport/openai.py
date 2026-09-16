@@ -54,8 +54,10 @@ def generation_body(*, wire_api, reasoning="off", extra_body=None):
         raise ValueError("Reasoning option does not match the configured wire API")
     if key in body:
         raise ValueError("Use llm-reasoning for reasoning effort; do not duplicate it in extra-body")
-    if reasoning != "off":
-        body[key] = {"effort": reasoning} if wire_api == "responses" else reasoning
+    # Off means disabled, not the endpoint's (potentially reasoning-enabled) default.
+    # Providers that reject `none` must fail preflight rather than silently omit it.
+    effort = "none" if reasoning == "off" else reasoning
+    body[key] = {"effort": effort} if wire_api == "responses" else effort
     return body
 
 

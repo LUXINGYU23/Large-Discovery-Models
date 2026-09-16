@@ -37,6 +37,10 @@ Direct and Harness runs expose `--llm-wire-api`, `--llm-reasoning`,
 `--llm-temperature` and `--llm-extra-body-json`. Defaults are Responses, off, 0.0
 and an empty object. Direct calls also support Chat Completions; Harness requires
 Responses. `--harness-thinking` remains an alias that must agree with reasoning.
+`off` and `none` both explicitly send `reasoning.effort=none` on Responses
+(or `reasoning_effort=none` on direct Chat Completions), never endpoint defaults.
+Endpoints that do not support the chosen effort fail preflight; no silent
+parameter omission or fallback is performed.
 The schedule freezes these settings and the native manifest records the actual
 Harness request options. Rebuild the shared sidecar when using this protocol.
 Both paths preflight configured providers before research, including Harness
@@ -112,10 +116,10 @@ uv run --locked --project tasks/atomworld python -m tasks.atomworld.ldm_task.pro
 
 Resume the actual printed run directory with the same settings. Accepted attempt files are replayed without repeated calls; interrupted Harness turns use their native session journals and immutable turn IDs. A completed run performs no new model or judge work. Do not mount the private campaign root into any agent process.
 
-The run includes shared lifecycle/checkpoint/budget files, `result.json`, `trajectory.csv`, `attempts/*.json`, and private `evaluations/*.json`. Native proposal traces live under `harness/sample_*/`; policy traces under `policy_harness/sample_*/`. Each pool retains the shared sidecar manifest, persistent session events, submission validation and raw provider transport records. Research outputs remain distinct from direct CIF SFT collection; no tool-derived CIF is misrepresented as a direct model response.
+The run includes shared lifecycle/checkpoint/budget files, `result.json`, `trajectory.csv`, `attempts/*.json`, and private `evaluations/<round>/*.json`. Completed judge receipts bind the sample, scheduled round, submission and target digest; replay restores the score without another judge call or budget charge. An interrupted call without a completed receipt is reported as ambiguous, not silently retried. `schedule_completed=false` makes the CLI return nonzero. Native proposal traces live under `harness/sample_*/`; policy traces under `policy_harness/sample_*/`. Each pool retains the shared sidecar manifest, persistent session events, submission validation and raw provider transport records. Research outputs remain distinct from direct CIF SFT collection; no tool-derived CIF is misrepresented as a direct model response.
 
 `config/pilot_evaluation/atomworld.yaml` compares `ldm`, `ldm_harness` and `ldm_harness_compiled` with matched two-draft breadth, the explicit `final_submission` protocol and one public question per case. It supports `--search-method`, `--campaign-index`, `--initialization-mode`, `--iterations`, `--run-name`, `--proposal-mode` and `--resume-from`. Here `shared_start` means the same public input question, with no free objective measurement; all revisions are counted. Final score always belongs to the last scheduled selection, not the highest observed score. Blind baselines may reuse an earlier identical answer's judge observation; LDM uses distinct per-round submission identities.
 
 ## Verification status
 
-Qualification remains **draft/scaffolded** until a real provider → persistent research/tool use → repaired submission → official evaluation loop, including subsequent history updates and native traces, is verified on the required host. Deterministic protocol tests, mock accuracy, and local geometry/judge parity are regression evidence, not live agent benchmark results. Historical local verification records retain their original scope. See [the current repair record](../../docs/reviews/pr9-adapter-repair.md) for validation and environmental limits.
+Qualification remains **draft/scaffolded** until a real provider → persistent research/tool use → repaired submission → official evaluation loop is verified on a Linux/KVM host with the required images, endpoint credentials and official assets. At a fixed code revision, acceptance must cover at least two rounds, policy artifacts, subsequent history updates, native/provider traces and interrupt/resume accounting. Deterministic protocol tests, mock accuracy, and local geometry/judge parity are regression evidence, not live agent benchmark results. Historical local verification records retain their original scope; live acceptance remains pending. Feedback-enabled LDM qualification is distinct from reproducing the official no-feedback protocol.

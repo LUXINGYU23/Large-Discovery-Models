@@ -513,7 +513,9 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
     ]
     assert payload["profiles"][0]["skillDirs"] == ["/resources/skills/crystal_geometry"]
     assert payload["limits"]["toolCallBudgets"]["bash"] == 64
-    assert payload["providerRequestBody"] == {"temperature": 0.0, "max_output_tokens": 8192}
+    assert payload["providerRequestBody"] == {
+        "temperature": 0.0, "max_output_tokens": 8192, "reasoning": {"effort": "none"},
+    }
     assert set(json.loads((root / "public_task.json").read_text())) == {
         "sample_id",
         "action_name",

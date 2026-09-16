@@ -96,7 +96,8 @@ def make_gp(history, args, prior=None):
     return RBFGPSurrogate(
         selected, lengthscale=args.gp_lengthscale, noise=args.gp_noise,
         feature_version=FEATURE_VERSION,
-        residual_prior_mean=np.zeros(len(selected)) if prior is None else prior[-args.gp_history_limit:],
+        min_training_observations=1, feature_scale_floor=1.0, target_scale_floor=0.1,
+        residual_prior_mean=None if prior is None else prior[-args.gp_history_limit:],
     )
 
 
