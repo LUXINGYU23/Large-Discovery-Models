@@ -11,6 +11,7 @@ from ldm_tts.harness import (
     HarnessError,
     HarnessSubmissionRequest,
     HarnessTurnResult,
+    HarnessSubmittedArtifact, file_sha256,
 )
 from ldm_tts.transport.openai import EndpointRequestError
 from tasks.atomworld.core.data import TASK_ROOT
@@ -21,6 +22,7 @@ from tasks.atomworld.core.harness import (
 )
 from tasks.atomworld.core.optimization_policy import FEATURE_NAMES, public_policy_input
 from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.proposals import extract_cif
 
 
 def fixture():
@@ -70,6 +72,13 @@ class ResearchClient:
         self.root, self.sample, self.calls, self.closed = root, sample, [], False
         self.outputs = fixture()["mock_outputs"][fixture()["public"][0]["sample_id"]]
 
+    def artifact(self, turn, attempt, text):
+        path = self.root / "snapshots" / f"{turn.turn_id}_{attempt}.cif"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        return HarnessSubmittedArtifact("/artifact_path", "answer.cif", str(path.relative_to(self.root)),
+                                        file_sha256(path), path.stat().st_size)
+
     def run_turn(self, turns, *, submission_validator, recovery_timeout_seconds=0):
         self.calls.append(turns)
         results = []
@@ -78,17 +87,19 @@ class ResearchClient:
                 turn.profile_id,
                 turn.turn_id,
                 1,
-                {"generated_output": "invalid", "rationale": "draft"},
+                {"artifact_path": "answer.cif", "rationale": "draft"},
+                (self.artifact(turn, 1, "invalid"),),
             )
             rejection = submission_validator(invalid)
             assert rejection.decision == "retry"
             assert rejection.errors[0].code == "invalid_cif"
             payload = {
-                "generated_output": self.outputs[min(len(self.calls) - 1, 1)],
+                "artifact_path": "answer.cif",
                 "rationale": "Checked the public Cartesian transformation.",
             }
             request = HarnessSubmissionRequest(
-                turn.profile_id, turn.turn_id, 2, payload
+                turn.profile_id, turn.turn_id, 2, payload,
+                (self.artifact(turn, 2, extract_cif(self.outputs[min(len(self.calls) - 1, 1)])),),
             )
             assert submission_validator(request).decision == "accept"
             results.append(
@@ -106,7 +117,7 @@ class ResearchClient:
                     submission_id=turn.turn_id,
                     submission_digest=request.digest,
                     submission=payload,
-                    submitted_artifacts=(),
+                    submitted_artifacts=request.artifacts,
                     validation_errors=(),
                     usage={
                         "providerCalls": 2,
@@ -168,6 +179,58 @@ def test_persistent_repair_history_and_full_campaign_resume(tmp_path):
     assert second.projected["extended_final_accuracy"] == 1
 
 
+def test_journal_replay_after_receipt_interruption_counts_turn_once(tmp_path, monkeypatch):
+    from tasks.atomworld.core import harness
+    saved, provider_barriers = {}, []
+
+    class JournalClient(ResearchClient):
+        def run_turn(self, turns, **kwargs):
+            key = tuple(turn.turn_id for turn in turns)
+            if key not in saved:
+                provider_barriers.append(key)
+                saved[key] = super().run_turn(turns, **kwargs)
+            return saved[key]
+
+    write = harness.write_json
+    interrupted = False
+
+    def crash(path, value):
+        nonlocal interrupted
+        if path.parent.name == "attempts" and not interrupted:
+            interrupted = True
+            raise HarnessError("interrupted before attempt receipt")
+        write(path, value)
+
+    monkeypatch.setattr(harness, "write_json", crash)
+    args = parse_args(["--mock", "--search-method", "harness", "--iterations", "1",
+                       "--out-dir", str(tmp_path / "campaign")])
+    with pytest.raises(HarnessError, match="before attempt"):
+        run(args, harness_client_factory=JournalClient)
+    before = json.loads((args.out_dir / "budget.json").read_text())["counters"]
+    assert before["harness_turns"] == 2 and before["llm_requests"] == 4
+    args.resume = True
+    result = run(args, harness_client_factory=JournalClient)
+    assert len(provider_barriers) == 1
+    assert result.runtime.budget.counters["harness_turns"] == 2
+    assert result.runtime.budget.counters["llm_requests"] == 4
+    attempt = json.loads((args.out_dir / "attempts/000000.json").read_text())
+    assert attempt["rationale"]
+    assert all("generated_output" not in item["submission"] for item in attempt["sessions"])
+
+
+def test_cif_submission_verifies_immutable_snapshot(tmp_path):
+    from tasks.atomworld.core.harness import validate_answer
+    client = ResearchClient(parse_args(["--mock"]), tmp_path, fixture()["public"][0])
+    artifact = client.artifact(SimpleNamespace(turn_id="test"), 1, extract_cif(client.outputs[0]))
+    request = HarnessSubmissionRequest("geometry_research", "test", 1,
+        {"artifact_path": "answer.cif", "rationale": "Public geometry"}, (artifact,))
+    assert validate_answer(request, root=tmp_path, mock=True).decision == "accept"
+    (tmp_path / artifact.snapshot_path).write_text("data_tampered")
+    validation = validate_answer(request, root=tmp_path, mock=True)
+    assert validation.decision == "retry"
+    assert validation.errors[0].code == "invalid_artifact"
+
+
 def test_real_harness_preflight_runs_before_first_sidecar_turn(tmp_path, monkeypatch):
     calls = []
 
@@ -189,7 +252,7 @@ def test_real_harness_preflight_runs_before_first_sidecar_turn(tmp_path, monkeyp
                             correct=True, wrong_type=None, rmsd=None, max_dist=None))
     monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
     monkeypatch.setattr("tasks.atomworld.core.harness.public_validation",
-                        lambda text, mock=False: {"parseable": text != "invalid"})
+                            lambda text, mock=False: {"parseable": "invalid" not in text})
     monkeypatch.setenv("LDM_LLM_API_KEY", "must-not-appear-in-artifacts")
     args = parse_args([
         "--data-dir", str(tmp_path / "data"),
@@ -450,6 +513,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
     ]
     assert payload["profiles"][0]["skillDirs"] == ["/resources/skills/crystal_geometry"]
     assert payload["limits"]["toolCallBudgets"]["bash"] == 64
+    assert payload["providerRequestBody"] == {"temperature": 0.0, "max_output_tokens": 8192}
     assert set(json.loads((root / "public_task.json").read_text())) == {
         "sample_id",
         "action_name",
@@ -522,6 +586,6 @@ def test_interrupted_harness_resumes_same_turn_without_losing_answer_budget(tmp_
     result = run(args, harness_client_factory=factory)
     assert interrupted_turns[0].turn_id == resumed_clients[0].calls[0][0].turn_id
     assert result.runtime.budget.counters["outer_iterations"] == 2
-    assert result.runtime.budget.counters["harness_turns"] == 6
+    assert result.runtime.budget.counters["harness_turns"] == 4
     assert len(result.projected["samples"][0]["attempts"]) == 2
     assert result.projected["extended_final_accuracy"] == 1

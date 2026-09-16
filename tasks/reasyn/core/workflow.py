@@ -40,6 +40,7 @@ from ldm_tts.registration.experiment import (
 from ldm_tts.transport.openai import (
     OpenAICompatibleProposalClient,
     EndpointRequestError,
+    WIRE_APIS, REASONING_LEVELS, generation_body,
 )
 from .candidate import ReaSynDomain
 from .chemistry import canonicalize
@@ -124,7 +125,7 @@ def parse_args(argv=None):
     p.add_argument("--harness-docker-host", default="")
     p.add_argument("--harness-container-user", default="auto")
     p.add_argument("--harness-cache-dir", type=Path)
-    p.add_argument("--harness-thinking", choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"), default="high")
+    p.add_argument("--harness-thinking", choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"))
     p.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     p.add_argument("--harness-response-timeout", type=int, default=2100)
     p.add_argument("--harness-mcp-config", type=Path)
@@ -143,6 +144,10 @@ def parse_args(argv=None):
         default=os.environ.get("LLM_MODEL_NAME", os.environ.get("LDM_LLM_MODEL", "")),
     )
     p.add_argument("--llm-max-tokens", type=int, default=4096)
+    p.add_argument("--llm-wire-api", choices=WIRE_APIS, default="responses")
+    p.add_argument("--llm-reasoning", choices=REASONING_LEVELS)
+    p.add_argument("--llm-temperature", type=float, default=0.7)
+    p.add_argument("--llm-extra-body-json", default="{}")
     p.add_argument("--out-dir", type=Path, default=Path("runs/reasyn"))
     p.add_argument("--resume-from", type=Path)
     p.add_argument("--dry-run", action="store_true")
@@ -154,6 +159,22 @@ def parse_args(argv=None):
     if args.proposal_mode == "none":
         args.proposal_mode = "auto"
     harness_method = args.search_method in ("harness", "ldm_harness", "ldm_harness_compiled")
+    if args.llm_reasoning is not None and args.harness_thinking is not None and args.llm_reasoning != args.harness_thinking:
+        p.error("llm-reasoning and harness-thinking must agree")
+    args.llm_reasoning = args.llm_reasoning or args.harness_thinking or "off"
+    args.harness_thinking = "off" if args.llm_reasoning == "none" else args.llm_reasoning
+    try:
+        extra = json.loads(args.llm_extra_body_json)
+        if not isinstance(extra, dict):
+            raise ValueError("llm-extra-body-json must be an object")
+        generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning, extra_body=extra)
+        args.llm_extra_body_json = json.dumps(extra, sort_keys=True)
+        if not math.isfinite(args.llm_temperature) or not 0 <= args.llm_temperature <= 2:
+            raise ValueError("llm-temperature must be finite and between 0 and 2")
+    except ValueError as exc:
+        p.error(str(exc))
+    if harness_method and args.llm_wire_api != "responses":
+        p.error("Harness requires llm-wire-api responses")
     if harness_method:
         if args.proposal_mode not in ("auto", "harness"):
             p.error("Harness methods require proposal-mode auto or harness; mock controls the evaluator only")
@@ -294,7 +315,7 @@ def describe_ldm_task(args):
             name="direct_proposal_order" if direct else "empirical_q0_tanimoto_gp_ucb" if args.search_method.startswith("ldm") else "tanimoto_gp_ucb",
             objective_names=(objective,),
             score_direction="maximize",
-            selection_rule="Task-local empirical q0 with alpha*log(q0+epsilon)+eta*robust_z(UCB) sampling" if args.search_method.startswith("ldm") else "GP-UCB" if args.search_method == "bo" else "Direct proposal order",
+            selection_rule="Empirical group q0 with alpha*log(group_q0+epsilon)-log(group_trial_count)+eta*robust_z(UCB) sampling" if args.search_method.startswith("ldm") else "GP-UCB" if args.search_method == "bo" else "Direct proposal order",
             parameters={
                 "beta": args.acquisition_beta,
                 "history_limit": args.gp_history_limit,
@@ -335,6 +356,8 @@ def describe_ldm_task(args):
         ),
         metadata={
             "benchmark": args.benchmark,
+            "policy_capabilities": ["prior_mean@1", "ldm_weights@1"],
+            "alpha_configurable": True,
             "mock": args.mock,
             "proposal_mode": args.proposal_mode,
             "search_method": args.search_method,
@@ -362,7 +385,7 @@ def _direct_provider_api_key():
 
 
 def _harness_provider_api_key():
-    return os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+    return _direct_provider_api_key()
 
 
 def _preflight_harness_provider(args):
@@ -380,6 +403,9 @@ def _preflight_harness_provider(args):
         max_tokens=args.llm_max_tokens,
         max_retries=0,
         wire_api="responses",
+        temperature=args.llm_temperature,
+        extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                   extra_body=json.loads(args.llm_extra_body_json)),
     )
     return {"backend": "harness", "wire_api": "responses", **client.preflight()}
 
@@ -465,6 +491,7 @@ def _scientific_identity(args, configuration, target, contract):
         "max_oracle_calls",
         "llm_model",
         "llm_max_tokens",
+        "llm_wire_api", "llm_reasoning", "llm_temperature", "llm_extra_body_json",
         "max_results",
         "projection_time_limit",
         "projection_timeout",
@@ -485,6 +512,8 @@ def _scientific_identity(args, configuration, target, contract):
     scientific["source_archive_digest"] = contract.benchmark["source_commit"]
     scientific["asset_digests"] = args.asset_digests
     scientific["harness_component_digests"] = configuration["harness_component_digests"]
+    if args.benchmark == "reconstruction":
+        scientific["q0_identity_version"] = "canonical_query_group_trial_allocation_v1"
     return scientific
 
 
@@ -699,6 +728,10 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             api_key=_direct_provider_api_key(),
             max_tokens=args.llm_max_tokens,
             max_retries=0,
+            wire_api=args.llm_wire_api,
+            temperature=args.llm_temperature,
+            extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                       extra_body=json.loads(args.llm_extra_body_json)),
         )
     expander = ReaSynExpander(args, projector, sink, target=target, client=client)
     evaluator = (
@@ -822,7 +855,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
                 policy_client = create_client(provider_args, run_dir / "policy_harness", runtime.run_id, target, policy=True)
                 harness_clients.append(policy_client)
                 policy_client.start()
-                adapter = ReaSynPolicyAdapter(encoder, alpha=args.acquisition_alpha, eta=args.acquisition_eta, seed=args.seed,
+                adapter = ReaSynPolicyAdapter(encoder, benchmark=args.benchmark, alpha=args.acquisition_alpha, eta=args.acquisition_eta, seed=args.seed,
                     history_limit=args.gp_history_limit, beta=args.acquisition_beta, z_clip=args.acquisition_z_clip)
                 selector.policy_adapter = adapter
                 selector.policy_controller = PolicyResearchController(client=policy_client, adapter=adapter,
@@ -920,6 +953,11 @@ def resolve_policy_user(args):
 
 
 def _report(args, runtime, target):
+    if args.proposal_mode == "harness":
+        kinds = ("harness", "policy_harness") if args.search_method == "ldm_harness_compiled" else ("harness",)
+        atomic_json_write(runtime.run_dir / "harness_provenance.json", {
+            "schema_version": 1, "pools": {kind: [f"{kind}/manifest.json"] for kind in kinds},
+        })
     checkpoint = runtime.run_dir / "checkpoint.json"
     observations = load_successful_observations(checkpoint) if checkpoint.exists() else []
     events = runtime.events()

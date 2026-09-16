@@ -8,6 +8,7 @@ args:
   attempts-per-sample: 4
   harness-profile: [geometry_research, structure_audit]
   harness-cache-dir: ${ATOMWORLD_HARNESS_CACHE}
-  harness-thinking: high
+  llm-reasoning: high
+  llm-wire-api: responses
   harness-max-submission-attempts: 3
   out-dir: runs/harness

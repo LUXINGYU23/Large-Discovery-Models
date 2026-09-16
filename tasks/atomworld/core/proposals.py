@@ -166,7 +166,13 @@ class AtomWorldDomain:
                 proposal.source,
             )
         key = canonical_key(payload["sample_id"], text)
-        candidate = Candidate(f"aw-{key[:24]}", dict(payload), key, proposal.source)
+        if "submission_round" in proposal.metadata:
+            round_idx = proposal.metadata["submission_round"]
+            if isinstance(round_idx, bool) or not isinstance(round_idx, int) or round_idx < 0:
+                return CandidateRejection("invalid_submission_round", "Invalid scheduled submission identity")
+            key = hashlib.sha256(f"{key}:{round_idx}".encode()).hexdigest()
+        candidate = Candidate(f"aw-{key[:24]}", dict(payload), key, proposal.source,
+                              metadata=dict(proposal.metadata))
         # Malformed CIF is a scoreable benchmark answer (official format/parsing error),
         # but never becomes training data. This preserves the one-shot denominator.
         if (

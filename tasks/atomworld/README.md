@@ -10,13 +10,42 @@ This task uses the shared `run_campaign → LDMEngine → CampaignRuntime` lifec
 | `extended_reasoning.yaml` | Four direct CIF revisions | Previous draft and public syntax checks |
 | `extended_operations.yaml` | Four bounded JSON operation plans | Previous plan, public tool errors and syntax checks |
 | `harness.yaml` | Persistent parallel research sessions | Current public question and public draft history |
-| `blind_harness_compiled.yaml` | Persistent research plus independent compiled public audit | Public drafts and structure features; empty objective-label history |
+| `harness_public_audit.yaml` | Persistent research plus independent compiled public audit | Public drafts and structure features; empty objective-label history |
+| `ldm.yaml` | Direct reservoir plus fixed GP/UCB and empirical-q0 sampling | Past same-question scalar correctness |
+| `ldm_harness.yaml` | Persistent research reservoir plus the same LDM selector | Past same-question scalar correctness |
+| `ldm_harness_compiled.yaml` | LDM plus independently compiled residual prior and alpha/eta | Measured history, fixed-GP diagnostics and current unmeasured candidate features |
 
-The task never passes `ExpansionRequest.observations`, `parent`, acquisition feedback, target CIFs, judge errors, RMSD or correctness values to proposal or policy agents. Public syntax validation uses no target. The Harness starts a separate pool for each question; each research profile has its own persistent session, receives compact incremental draft updates, and can query complete public history on demand. Two profiles run independently in parallel, each submitting exactly one CIF answer per revision. The ordinary Harness selects a profile by the declared `(revision + campaign_index) % profile_count` rotation, before any judge call. Only that answer is evaluated.
+Blind baselines never pass `ExpansionRequest.observations`, `parent`, acquisition feedback or correctness to agents. LDM methods expose only already measured scalar correctness for the current question; never target CIFs, judge errors, RMSD, future scores or cross-question history. Public syntax validation uses no target. The Harness starts a separate pool for each question; each research profile has its own persistent session, receives compact incremental draft updates, and can query complete history on demand. Two profiles run independently in parallel, each submitting exactly one CIF answer per revision. The ordinary blind Harness selects a profile by `(revision + campaign_index) % profile_count`; LDM uses the selector described below. Only the selected answer is evaluated.
 
-The compiled extension uses a separate `PolicyResearchController` and persistent policy session per question. It can submit, validate, repair and execute a deterministic NumPy artifact with the shared `prior_mean@1` interface. The interface here represents an **untrained standardized public plausibility prior** over the simultaneous drafts. No GP is fitted and no objective labels are synthesized. The prior ranks only the current revision; ties choose the first configured profile. Zero prior is the explicit fallback. This method is named `blind_harness_compiled`, not LDM/BO. Its scores are hypotheses, not benchmark measurements. It must be reported separately from the paper's direct-answer baselines.
+`ldm_harness_compiled` implements the same algorithmic structure as NucleoBench: empirical proposal frequencies before canonical deduplication, an independently maintained BO pool, a measured-history residual GP, fixed UCB, and Gumbel sampling proportional to `q0**alpha * exp(eta * robust_z(UCB))`. The AtomWorld representation is signed-log public input-to-draft geometry, with a fixed exact RBF kernel. The first round of each question uses proposal frequencies without objective feedback. Later rounds fit the GP to measured scalar correctness and run an independent `PolicyResearchController` session with both `prior_mean@1` and `ldm_weights@1`. Compiled history priors are subtracted before fitting and query priors added afterward; covariance remains fixed. Policy diagnostics compare chronological holdouts and actual selection probabilities. No prior argmax is used in LDM.
 
-Each proposed Harness answer is checked against its strict submission schema and public CIF parser before acceptance. Explicit JSON-pointer rejection reasons return to the same session for repair, up to `--harness-max-submission-attempts`. A missing or rejected session fails the strict barrier; it never silently reduces the requested count. Direct malformed outputs retain the original baseline behavior: the official judge scores them incorrect. Missing final answers remain incorrect; `oracle_any_attempt_accuracy_diagnostic` is an offline diagnostic, never an answer-selection rule.
+The optional `harness_public_audit` remains a separate blind baseline with empty label history and an untrained public prior. It is not the implementation of `ldm_harness_compiled`.
+
+Each Harness session submits a raw `answer.cif` file plus rationale. The host verifies its immutable snapshot digest and size before public CIF parsing. Explicit JSON-pointer rejection reasons return to the same session for repair, up to `--harness-max-submission-attempts`. A missing or rejected session fails the strict barrier; it never silently reduces the requested count. Direct malformed outputs retain the original baseline behavior: the official judge scores them incorrect. Missing final answers remain incorrect; `oracle_any_attempt_accuracy_diagnostic` is an offline diagnostic, never an answer-selection rule.
+
+LDM runs declare `feedback_protocol=measured_correctness_optimization`. This is
+an explicit feedback-enabled optimization extension, distinct from the paper's
+blind-answer protocol. The official evaluator is unchanged; target structures
+remain private. Do not report these runs as official no-feedback paper results.
+`--proposal-samples` controls direct LDM breadth; Harness breadth is one draft
+per configured research profile. `--bo-pool-size`, `--acquisition-alpha`,
+`--acquisition-eta`, `--ucb-beta`, `--z-clip` and the `--gp-*` settings are frozen
+on resume. Independent submissions can repeat a CIF in later rounds, with a
+new scheduled evaluation identity and charge; within-round duplicates add q0.
+
+Direct and Harness runs expose `--llm-wire-api`, `--llm-reasoning`,
+`--llm-temperature` and `--llm-extra-body-json`. Defaults are Responses, off, 0.0
+and an empty object. Direct calls also support Chat Completions; Harness requires
+Responses. `--harness-thinking` remains an alias that must agree with reasoning.
+The schedule freezes these settings and the native manifest records the actual
+Harness request options. Rebuild the shared sidecar when using this protocol.
+Both paths preflight configured providers before research, including Harness
+with mock scoring.
+
+History messages contain a compact draft index and preserve the original
+rationale. `get_public_history` accepts `draft_ids` and `detail=detailed` to
+retrieve selected CIFs and rationales. Only LDM runs also expose measured past
+scalar correctness; unmeasured proposals have no label.
 
 ## Installation and data
 
@@ -44,7 +73,7 @@ The evaluator retains last-CIF-tag extraction, nonprimitive parsing, species-cou
 
 ## Direct and Harness runs
 
-Configure the existing provider environment (`LLM_BASE_URL`, `LLM_MODEL_NAME`, `LLM_API_KEY`). Compatibility aliases are `LDM_LLM_*` and `OPENAI_*`. Keep credentials in the protected environment or configured MCP secret references. Direct methods use Chat Completions and a separate endpoint preflight; the shared Pi Harness uses its Responses provider transport and records original provider messages.
+Configure the existing provider environment (`LLM_BASE_URL`, `LLM_MODEL_NAME`, `LLM_API_KEY`). Compatibility aliases are `LDM_LLM_*` and `OPENAI_*`. Keep credentials in the protected environment or configured MCP secret references. Direct methods use the selected wire API and a separate endpoint preflight; the shared Pi Harness uses Responses and records the effective provider request bodies.
 
 ```bash
 uv run --locked --project tasks/atomworld python scripts/run_ldm_tts.py config/atomworld/extended_operations.yaml
@@ -63,7 +92,8 @@ Set `ATOMWORLD_HARNESS_CACHE` to that cache before running the configs:
 
 ```bash
 uv run --locked --project tasks/atomworld python scripts/run_ldm_tts.py config/atomworld/harness.yaml
-uv run --locked --project tasks/atomworld python scripts/run_ldm_tts.py config/atomworld/blind_harness_compiled.yaml
+uv run --locked --project tasks/atomworld python scripts/run_ldm_tts.py config/atomworld/harness_public_audit.yaml
+uv run --locked --project tasks/atomworld python scripts/run_ldm_tts.py config/atomworld/ldm_harness_compiled.yaml
 ```
 
 The guest includes ASE, NumPy, pymatgen and the delivered `atomworld_tools` package. Agents obtain task context and paginated history through structured tools and execute geometry or scratch analysis themselves using the guest's `bash` tool. Task roles and selected skills are digest-bound resources. Shared network/MCP policies and per-tool budgets are wired through `PiHarnessConfig`; `--harness-mcp-config` loads optional shared MCP configuration. The compiled policy runs in a separate network-disabled, read-only, resource-limited Docker container.
@@ -84,8 +114,8 @@ Resume the actual printed run directory with the same settings. Accepted attempt
 
 The run includes shared lifecycle/checkpoint/budget files, `result.json`, `trajectory.csv`, `attempts/*.json`, and private `evaluations/*.json`. Native proposal traces live under `harness/sample_*/`; policy traces under `policy_harness/sample_*/`. Each pool retains the shared sidecar manifest, persistent session events, submission validation and raw provider transport records. Research outputs remain distinct from direct CIF SFT collection; no tool-derived CIF is misrepresented as a direct model response.
 
-`config/pilot_evaluation/atomworld.yaml` uses the explicit `final_submission` pilot protocol and one public question per case. It supports `--search-method`, `--campaign-index`, `--initialization-mode`, `--iterations`, `--run-name`, `--proposal-mode` and `--resume-from`. Here `shared_start` means the same public input question, with no free objective measurement; all revisions are counted. Repeated final CIFs legitimately reuse judge observations, while the trajectory retains every scheduled submission.
+`config/pilot_evaluation/atomworld.yaml` compares `ldm`, `ldm_harness` and `ldm_harness_compiled` with matched two-draft breadth, the explicit `final_submission` protocol and one public question per case. It supports `--search-method`, `--campaign-index`, `--initialization-mode`, `--iterations`, `--run-name`, `--proposal-mode` and `--resume-from`. Here `shared_start` means the same public input question, with no free objective measurement; all revisions are counted. Final score always belongs to the last scheduled selection, not the highest observed score. Blind baselines may reuse an earlier identical answer's judge observation; LDM uses distinct per-round submission identities.
 
 ## Verification status
 
-Qualification remains **draft/scaffolded** until a real provider → persistent research/tool use → repaired submission → official evaluation loop, including a subsequent public-history update and native traces, is verified on the required host. Deterministic protocol tests, mock accuracy, and local geometry/judge parity are useful regression evidence and are not live agent benchmark results. Historical local verification records are preserved as historical evidence, not current qualification. See `resources/review_verification.json` for the current repair validation and environmental limits.
+Qualification remains **draft/scaffolded** until a real provider → persistent research/tool use → repaired submission → official evaluation loop, including subsequent history updates and native traces, is verified on the required host. Deterministic protocol tests, mock accuracy, and local geometry/judge parity are regression evidence, not live agent benchmark results. Historical local verification records retain their original scope. See [the current repair record](../../docs/reviews/pr9-adapter-repair.md) for validation and environmental limits.

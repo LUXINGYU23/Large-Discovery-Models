@@ -26,8 +26,9 @@ LDM then samples without replacement using
 Euclidean RBF space. Mock features are explicitly synthetic hash features.
 
 Reconstruction queries may repeat with different task-assigned sampling seeds:
-these are different stochastic projection trials. Their q0 identities include
-both canonical query and sampling seed. In TDC, one independent projection
+these are different stochastic projection trials. Their evaluation identities
+include canonical query and sampling seed; q0 groups occurrences by canonical
+query alone. In TDC, one independent projection
 occurrence contributes its first verified product, and products converging from
 different queries accumulate frequency under the same canonical product
 identity. Within-round occurrences remain legal. Products in the TDC track
@@ -37,15 +38,33 @@ the target verbatim gives credit only when the frozen stock/reaction replay
 actually supports a pathway. Zero-reaction stock entries are allowed, matching
 the released sampler.
 
-Parameter identifiability matters for reconstruction: the current expansion
-assigns a distinct seed to each occurrence, so each query/seed identity has
-count one and its per-trial q0 is uniform. For a fixed pool, prior and eta,
-changing alpha alone adds a common logit constant and cannot change selection
-probabilities. Repeated molecular queries still receive multiple trial entries
-and therefore more total probability. In contrast, TDC aggregates repeated
-products and can have nonuniform q0, where alpha directly affects selection.
-Changing the query/seed identity to make alpha effective would be an algorithm
-change, not a tuning-only adjustment.
+Both reconstruction and TDC expose `prior_mean@1` and `ldm_weights@1`.
+Reconstruction allocates a retained query group's empirical mass uniformly to
+its retained independent trials, then uses per-trial logits
+`alpha*log(group_q0+epsilon) - log(group_trial_count) + eta*robust_z(UCB)`.
+This avoids counting multiplicity twice and makes alpha effective: with three
+trials of query A and one of B, equal acquisitions give A total first-draw mass
+0.5, 0.75 and 0.9 for alpha 0, 1 and 2 respectively. BO-pool maintenance preserves
+the original frequency of each surviving query group. Trial seeds, independent
+projection receipts and diversity multiplicity remain unchanged. This grouping
+version is frozen in scientific identity; pre-change reconstruction runs cannot
+silently resume under the new sampling rule. TDC's one-group-per-product rule
+and oracle deduplication are unchanged.
+
+Provider settings are explicit: `--llm-wire-api` defaults to `responses` and
+can be `chat_completions` for direct calls. `--llm-reasoning` defaults to `off`,
+`--llm-temperature` to 0.7, and `--llm-extra-body-json` to an empty object.
+Harness requires Responses and uses the same generation settings; its legacy
+`--harness-thinking` alias must agree with `--llm-reasoning`. These settings are
+frozen in scientific identity and recorded in the native Harness manifest.
+Rebuild the shared sidecar for the new provider-request options.
+
+When a proposal batch is smaller than the session pool, durable allocation
+receipts rotate through every configured session, including across refills and
+resumes. The history tool defaults to a compact index; use `detail=detailed`,
+`candidate_ids`, `round`, `sort_by` and `order` for selected evidence.
+Pilot diagnostics record baseline/compiled predictions, prior impact, q0 and
+tilted entropy, effective sample size, KL divergence and top-k overlap.
 
 ## Scientific contract and changes
 

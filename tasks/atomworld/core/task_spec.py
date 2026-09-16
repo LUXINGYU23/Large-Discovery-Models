@@ -1,5 +1,8 @@
 """Runtime-faithful science and search contract."""
 
+from dataclasses import replace
+from pathlib import Path
+
 from ldm_tts.contracts import (
     AcquisitionSpec,
     CandidateDomainSpec,
@@ -18,7 +21,7 @@ def describe_ldm_task(args=None):
     tool_mode = getattr(args, "proposal_format", "cif") == "operations"
     method = getattr(args, "search_method", "llm")
     response_space = "operation_plan" if tool_mode else "cif_answer"
-    return LDMTaskSpec(
+    spec = LDMTaskSpec(
         task="atomworld",
         candidate_domain=CandidateDomainSpec(
             "atomworld_answer",
@@ -84,11 +87,34 @@ def describe_ldm_task(args=None):
             evaluation_policy="each_submission",
         ),
         metadata={
+            "ldm_applicable": False,
             "feedback_policy": "no targets, judge scores, judge errors, oracle parent or cross-question answers",
             "comparison": "one-shot and extended compute reported separately",
             "search_method": method,
             "compiled_policy": "public plausibility prior with empty label history; no hidden-score GP"
-            if method == "blind_harness_compiled"
+            if method == "harness_public_audit"
             else "disabled",
         },
+    )
+    from .methods import LDM_METHODS, HARNESS_METHODS
+    from .selection import AtomWorldLDMSelector, GeometryEncoder
+
+    if method not in LDM_METHODS:
+        return spec
+    breadth = len(args.harness_profile) if method in HARNESS_METHODS else args.proposal_samples
+    return replace(
+        spec,
+        objectives=(ObjectiveSpec("correct", "maximize", "Past measured scalar correctness; no target CIF or judge diagnostics exposed"),),
+        acquisition=AtomWorldLDMSelector(args, [], Path(".")).describe(),
+        surrogate=GeometryEncoder([]).describe(),
+        reservoir=replace(spec.reservoir, max_size=breadth,
+            deduplication_key="sha256(sample_id + canonical answer + scheduled round); q0 counts answer occurrences within each round"),
+        proposal_search=ProposalSearchSpec("measured_feedback_research", breadth=breadth,
+            depth=attempts, beam_width=1, evaluation_policy="one_selected_submission_per_round"),
+        metadata={"ldm_applicable": True, "search_method": method,
+            "feedback_protocol": "measured_correctness_optimization",
+            "comparison": "Feedback-enabled optimization extension; not the official blind-refinement protocol",
+            "policy_capabilities": ["prior_mean@1", "ldm_weights@1"] if method == "ldm_harness_compiled" else [],
+            "policy_warm_start": "q0-only before the first measurement of each sample",
+            "final_selection": "last scheduled sampled answer, never best-of hidden judge scores"},
     )

@@ -5,12 +5,12 @@ from dataclasses import replace
 import numpy as np
 
 from ldm_tts.harness import PolicyCapabilityContract, PolicyRoundInput, HarnessSubmissionError
-from .sampling import tilted_distribution
+from .sampling import tilted_distribution, empirical_group_sizes
 from .selection import TanimotoGPSelector
 
 
 class ReaSynPolicyAdapter:
-    def __init__(self, encoder, *, alpha, eta, seed, history_limit=256, beta=1.0, z_clip=5.0):
+    def __init__(self, encoder, *, alpha, eta, seed, history_limit=256, beta=1.0, z_clip=5.0, benchmark="tdc"):
         self.encoder, self.seed = encoder, seed
         self.history_limit, self.beta, self.z_clip = history_limit, beta, z_clip
         self.diagnostic_gp = TanimotoGPSelector(
@@ -51,9 +51,11 @@ class ReaSynPolicyAdapter:
             raise ValueError("policy query matrix does not match the molecular feature width")
         y = np.asarray([h.scalar_score for h in history], dtype=float)
         acquisition = np.asarray([p.acquisition_score for p in baseline_predictions], dtype=float)
+        group_sizes = empirical_group_sizes(candidates)
         probabilities, _, normalized = tilted_distribution(
             q0, acquisition, alpha=self.contract.default_alpha, eta=self.contract.default_eta,
             z_clip=self.z_clip,
+            group_sizes=group_sizes,
         )
         projection = self.diagnostic_gp.posterior_projection(history, qx)
         location, scale = projection["location_scale"]
@@ -70,12 +72,19 @@ class ReaSynPolicyAdapter:
             "requested_evaluation_batch": requested_evaluation_batch,
             "effective_evaluation_batch": min(requested_evaluation_batch, len(candidates)),
             "default_alpha": self.contract.default_alpha, "default_eta": self.contract.default_eta,
-            "q0_summary": {"entropy": float(-np.sum(q0 * np.log(q0 + 1e-12))), "max": float(q0.max())},
+            "q0_summary": {
+                "scope": "canonical_query_or_product_groups",
+                "group_count": int(round(float(np.sum(1 / group_sizes)))),
+                "entropy": float(-np.sum(q0 * np.log(q0 * group_sizes + 1e-12))),
+                "max": float(np.max(q0 * group_sizes)),
+            },
+            "trial_base_summary": {"entropy": float(-np.sum(q0 * np.log(q0 + 1e-12))), "max": float(q0.max())},
             "baseline_acquisition_summary": {"mean": float(acquisition.mean()), "std": float(acquisition.std())},
             "acquisition": {"name": "ucb", "score_direction": "maximize", "beta": self.beta},
             "normalization": {"name": "robust_z", "epsilon": 1e-12, "mad_scale": 1.4826, "z_clip": self.z_clip},
             "candidate_predictions": [
                 {"candidate_id": c.candidate_id, "q0": float(q0[i]),
+                 "group_trial_count": int(group_sizes[i]), "q0_group_mass": float(q0[i] * group_sizes[i]),
                  "baseline_mean": p.scalar_mean, "baseline_std": p.scalar_std,
                  "baseline_acquisition": p.acquisition_score,
                  "normalized_acquisition": float(normalized[i]),
@@ -104,7 +113,7 @@ class ReaSynPolicyAdapter:
                 "fixed_model": "Exact Tanimoto residual GP on the most recent measured training window; utilities standardized on that same window.",
                 "feature_interpretation": "Fingerprint indices are hashed and have no fixed chemical names.",
                 "gp_history_limit": self.history_limit, "kernel_jitter": 1e-5, "utility_scale_floor": 0.1,
-                "sampling": "alpha * log(q0 + epsilon) + eta * robust_z(UCB); sampling without replacement",
+                "sampling": "alpha * log(query_group_q0 + epsilon) - log(group_trial_count) + eta * robust_z(UCB); independent trials sampled without replacement. TDC has one trial per product group.",
                 "history_tool": "get_measured_history", "proposal_pool": {
                     "unique_candidate_count": len(candidates), "valid_proposal_occurrences": valid_proposal_occurrences},
                 "candidate_catalog": [{"candidate_id": c.candidate_id,

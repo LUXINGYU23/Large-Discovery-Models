@@ -1,13 +1,14 @@
-name: atomworld_blind_harness_compiled
+name: atomworld_harness_public_audit
 task: atomworld
-algorithm: blind_harness_compiled
+algorithm: harness_public_audit
 mode: real
 args:
   data-dir: ${ATOMWORLD_DATA_ROOT}
-  search-method: blind_harness_compiled
+  search-method: harness_public_audit
   attempts-per-sample: 4
   harness-profile: [geometry_research, structure_audit]
   harness-cache-dir: ${ATOMWORLD_HARNESS_CACHE}
-  harness-thinking: high
+  llm-reasoning: high
+  llm-wire-api: responses
   harness-max-submission-attempts: 3
-  out-dir: runs/blind_harness_compiled
+  out-dir: runs/harness_public_audit

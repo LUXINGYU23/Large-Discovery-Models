@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from ldm_tts.transport.openai import (
     EndpointCircuitBreaker,
     EndpointRequestError,
     OpenAICompatibleProposalClient,
+    WIRE_APIS, REASONING_LEVELS, generation_body,
 )
 from tasks.atomworld.core.data import (
     DEFAULT_UPSTREAM,
@@ -37,6 +39,8 @@ from tasks.atomworld.core.data import (
 from tasks.atomworld.core.evaluator import AtomWorldEvaluator, load_official_evaluator
 from tasks.atomworld.core.proposals import AtomWorldDomain, BlindRefinementExpander
 from tasks.atomworld.core.task_spec import describe_ldm_task
+from tasks.atomworld.core.methods import LDM_METHODS, HARNESS_METHODS
+from tasks.atomworld.core.selection import AtomWorldLDMSelector, GeometryEncoder, summarize_rounds
 
 
 def _provider_api_key():
@@ -64,6 +68,8 @@ def _harness_provider_preflight(args):
         temperature=args.llm_temperature,
         max_retries=0,
         wire_api="responses",
+        extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                   extra_body=json.loads(args.llm_extra_body_json)),
     )
     return {"backend": "harness", "wire_api": "responses", **client.preflight()}
 
@@ -88,7 +94,7 @@ def parse_args(argv=None):
     parser.add_argument("--attempts-per-sample", type=int, default=1)
     parser.add_argument(
         "--search-method",
-        choices=("llm", "harness", "blind_harness_compiled"),
+        choices=("llm", "harness", "harness_public_audit", *LDM_METHODS),
         default="llm",
     )
     parser.add_argument(
@@ -98,6 +104,15 @@ def parse_args(argv=None):
         help="Pilot alias for scheduled attempts per sample",
     )
     parser.add_argument("--campaign-index", type=int, default=0)
+    parser.add_argument("--proposal-samples", type=int, default=8)
+    parser.add_argument("--bo-pool-size", type=int, default=32)
+    parser.add_argument("--acquisition-alpha", type=float, default=1.0)
+    parser.add_argument("--acquisition-eta", type=float, default=1.0)
+    parser.add_argument("--ucb-beta", type=float, default=1.0)
+    parser.add_argument("--z-clip", type=float, default=5.0)
+    parser.add_argument("--gp-history-limit", type=int, default=128)
+    parser.add_argument("--gp-lengthscale", type=float, default=1.5)
+    parser.add_argument("--gp-noise", type=float, default=1e-4)
     parser.add_argument(
         "--initialization-mode",
         choices=("shared_start", "independent"),
@@ -116,7 +131,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--harness-thinking",
         choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"),
-        default="high",
+        default=None,
     )
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument("--harness-response-timeout", type=float, default=2100)
@@ -174,12 +189,22 @@ def parse_args(argv=None):
     parser.add_argument("--llm-max-tokens", type=int, default=8192)
     parser.add_argument("--llm-timeout", type=float, default=180.0)
     parser.add_argument("--llm-temperature", type=float, default=0.0)
+    parser.add_argument("--llm-wire-api", choices=WIRE_APIS, default="responses")
+    parser.add_argument("--llm-reasoning", choices=REASONING_LEVELS)
     parser.add_argument(
         "--llm-extra-body-json",
         default="{}",
         help="Provider reasoning controls; never put credentials here",
     )
     args = parser.parse_args(argv)
+    if args.llm_reasoning is not None and args.harness_thinking is not None and args.llm_reasoning != args.harness_thinking:
+        parser.error("llm-reasoning and harness-thinking must agree")
+    args.llm_reasoning = args.llm_reasoning or args.harness_thinking or "off"
+    args.harness_thinking = "off" if args.llm_reasoning == "none" else args.llm_reasoning
+    if args.search_method in HARNESS_METHODS and args.llm_wire_api != "responses":
+        parser.error("Harness requires llm-wire-api responses")
+    if not math.isfinite(args.llm_temperature) or not 0 <= args.llm_temperature <= 2:
+        parser.error("llm-temperature must be finite and between 0 and 2")
     # The shared config runner repeats list-valued flags. Preserve all entries
     # both in that form and in a grouped, interactive command-line invocation.
     if args.harness_profile is None:
@@ -200,11 +225,19 @@ def parse_args(argv=None):
         parser.error("attempts-per-sample must be positive and limit nonnegative")
     if args.campaign_index < 0 or args.service_retry_allowance < 0:
         parser.error("campaign-index and service-retry-allowance must be nonnegative")
+    if min(args.proposal_samples, args.bo_pool_size, args.gp_history_limit) < 1:
+        parser.error("LDM proposal, BO pool and history counts must be positive")
+    if any(not math.isfinite(v) or v < 0 for v in (args.acquisition_alpha, args.acquisition_eta, args.ucb_beta)):
+        parser.error("LDM alpha, eta and beta must be finite and nonnegative")
+    if any(not math.isfinite(v) or v <= 0 for v in (args.z_clip, args.gp_lengthscale, args.gp_noise)):
+        parser.error("LDM scales and noise must be finite and positive")
+    if args.search_method in LDM_METHODS and args.proposal_format != "cif":
+        parser.error("LDM optimizes complete CIF proposals")
     if args.tools_root is not None:
         parser.error(
             "--tools-root is obsolete: bounded geometry tools now ship inside this task"
         )
-    if args.search_method != "llm":
+    if args.search_method in HARNESS_METHODS:
         from ldm_tts.harness import parse_tool_call_budgets
         from tasks.atomworld.core.harness import harness_profiles
 
@@ -246,6 +279,11 @@ def parse_args(argv=None):
         parser.error("llm-extra-body-json must be a JSON object")
     if not isinstance(extra, dict):
         parser.error("llm-extra-body-json must be a JSON object")
+    try:
+        generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning, extra_body=extra)
+        args.llm_extra_body_json = json.dumps(extra, sort_keys=True)
+    except ValueError as exc:
+        parser.error(str(exc))
     if any(
         any(
             word in key.lower()
@@ -298,6 +336,7 @@ def project_result(
         for observation in result.state.observations
     }
     rows = []
+    ldm_rounds = []
     for sample_index, sample in enumerate(samples):
         details = []
         for attempt in range(attempts):
@@ -305,6 +344,8 @@ def project_result(
             path = run_dir / "attempts" / f"{ordinal:06d}.json"
             raw = json.loads(path.read_text()) if path.exists() else None
             evaluation = by_key.get(raw["canonical_key"]) if raw else None
+            if raw and search_method in LDM_METHODS:
+                ldm_rounds.append({"round": ordinal, "sample_id": sample["sample_id"], **raw["selection"]})
             if evaluation is not None and not evaluation.succeeded:
                 message = (
                     evaluation.error
@@ -348,6 +389,9 @@ def project_result(
         }
     payload = {
         "task": "atomworld",
+        "qualification": "draft",
+        "ldm_applicability": "measured_feedback_optimization" if search_method in LDM_METHODS else "blind_baseline",
+        "feedback_protocol": "measured_correctness_optimization" if search_method in LDM_METHODS else "blind_refinement",
         "mode": "mock" if mock else "real",
         "proposal_format": proposal_format,
         "search_method": search_method,
@@ -373,7 +417,18 @@ def project_result(
         if mock
         else "Released local subset; not a verified paper test split",
     }
+    if search_method in LDM_METHODS:
+        payload["ldm_diagnostics"] = summarize_rounds(ldm_rounds)
     write_json(run_dir / "result.json", payload)
+    if search_method in HARNESS_METHODS:
+        kinds = ("harness", "policy_harness") if (
+            search_method == "harness_public_audit" or
+            (search_method == "ldm_harness_compiled" and attempts > 1)
+        ) else ("harness",)
+        write_json(run_dir / "harness_provenance.json", {
+            "schema_version": 1,
+            "pools": {kind: [f"{kind}/sample_{i:06d}/manifest.json" for i in range(count)] for kind in kinds},
+        })
     with (run_dir / "trajectory.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -430,7 +485,9 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         else unique_run_dir(args.out_dir).resolve()
     )
     run_dir.mkdir(parents=True, exist_ok=True)
-    harness_mode = args.search_method != "llm"
+    harness_mode = args.search_method in HARNESS_METHODS
+    ldm_mode = args.search_method in LDM_METHODS
+    proposal_samples = len(args.harness_profile) if harness_mode else args.proposal_samples if ldm_mode else 1
     harness_provider_preflight_required = harness_mode and (
         not args.mock or harness_client_factory is None
     )
@@ -460,7 +517,8 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                 max_tokens=args.llm_max_tokens,
                 temperature=args.llm_temperature,
                 max_retries=0,
-                extra_body=extra,
+                wire_api=args.llm_wire_api,
+                extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning, extra_body=extra),
                 breaker=EndpointCircuitBreaker(failure_threshold=1),
             )
     official = None if args.mock else load_official_evaluator(args.upstream_root)
@@ -475,6 +533,10 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
             client_factory=harness_client_factory or make_client,
             policy_executor=policy_executor,
         )
+    elif ldm_mode:
+        from tasks.atomworld.core.ldm_proposals import AtomWorldLDMExpander
+
+        expander = AtomWorldLDMExpander(samples, args, run_dir, client)
     else:
         expander = BlindRefinementExpander(
             samples,
@@ -486,13 +548,15 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         )
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     domain = AtomWorldDomain(samples, sink=sink, mock=args.mock)
+    selector = AtomWorldLDMSelector(args, samples, run_dir, expander=expander) if ldm_mode else None
+    encoder = GeometryEncoder(samples, mock=args.mock) if ldm_mode else None
     rounds = len(samples) * args.attempts_per_sample
     contract, profile = load_active_experiment_contract()
     contract = contract or load_experiment_contract(TASK_ROOT / "experiment.json")
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     config.update(
         evaluations_per_round=1,
-        proposal_samples=len(args.harness_profile) if harness_mode else 1,
+        proposal_samples=proposal_samples,
         harness_candidates_per_session=1 if harness_mode else 0,
     )
     # These immutable values prevent resuming against a different task schedule or endpoint policy.
@@ -512,11 +576,20 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         else {},
         "llm_model_name": args.llm_model_name,
         "llm_max_tokens": args.llm_max_tokens,
+        "llm_wire_api": args.llm_wire_api,
+        "llm_reasoning": args.llm_reasoning,
         "llm_temperature": args.llm_temperature,
         "llm_extra_body_json": args.llm_extra_body_json,
         "search_method": args.search_method,
         "campaign_index": args.campaign_index,
         "service_retry_allowance": args.service_retry_allowance,
+        "ldm_configuration": {
+            "feedback_protocol": "measured_correctness_optimization",
+            "proposal_samples": proposal_samples,
+            **{key: config[key] for key in ("bo_pool_size", "acquisition_alpha", "acquisition_eta", "ucb_beta",
+                                            "z_clip", "gp_history_limit", "gp_lengthscale", "gp_noise")},
+            "feature_version": encoder.version,
+        } if ldm_mode else None,
     }
     if harness_mode:
         from ldm_tts.harness import canonical_sha256
@@ -577,23 +650,23 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                 run_dir=run_dir,
                 budget=CampaignBudget(
                     rounds=rounds,
-                    reservoir_size=1,
+                    reservoir_size=proposal_samples if ldm_mode else 1,
                     batch_size=1,
                     target_successful_evaluations=rounds,
                     max_evaluation_attempts=rounds,
                     max_empty_reservoir_rounds=rounds + 1,
                     extra_limits={
-                        "proposal_attempts": rounds,
+                        "proposal_attempts": rounds * proposal_samples + args.service_retry_allowance,
                         **(
                             {}
                             if harness_mode
                             else {
                                 "llm_requests": 0
                                 if args.mock
-                                else rounds + args.service_retry_allowance
+                                else rounds * proposal_samples + args.service_retry_allowance
                             }
                         ),
-                        "mock_model_requests": rounds if args.mock else 0,
+                        "mock_model_requests": rounds * proposal_samples if args.mock else 0,
                         "endpoint_preflights": 0
                         if args.mock and not harness_provider_preflight_required
                         else args.service_retry_allowance + 1,
@@ -606,7 +679,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                         if harness_mode
                         else 0,
                         "policy_harness_turns": rounds
-                        if args.search_method == "blind_harness_compiled"
+                        if args.search_method in ("harness_public_audit", "ldm_harness_compiled")
                         else 0,
                     },
                 ),
@@ -628,7 +701,8 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                     runtime=runtime,
                 ),
             ),
-            CampaignRecipe(describe_ldm_task(args), expander, domain, evaluator),
+            CampaignRecipe(describe_ldm_task(args), expander, domain, evaluator,
+                           selector=selector, surrogate_encoder=encoder),
         )
     except EndpointRequestError:
         if runtime_ref:

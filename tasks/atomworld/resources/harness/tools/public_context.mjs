@@ -19,17 +19,26 @@ export default function publicContextTools(pi) {
     });
     pi.registerTool({
         name: "get_public_history", label: "Read public draft history",
-        description: "Page through previously submitted drafts and syntax checks for this question only. No judge measurements or correctness labels are available.",
+        description: "Query drafts by ID for this question. Blind runs expose no labels; feedback-optimization runs include only explicitly measured past scalar correctness, never targets or judge internals.",
         parameters: { type: "object", additionalProperties: false, properties: {
             offset: { type: "integer", minimum: 0 },
             limit: { type: "integer", minimum: 1, maximum: 16 },
+            draft_ids: { type: "array", maxItems: 16, items: { type: "string" } },
+            detail: { type: "string", enum: ["concise", "detailed"] },
         } },
         async execute(_id, params) {
             const offset = params.offset ?? 0, limit = params.limit ?? 4;
             if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 16) throw new Error("Invalid pagination");
             const { drafts } = JSON.parse(readFileSync(join(root, "public_history.json"), "utf8"));
-            const page = drafts.slice(offset, offset + limit).map(({ round_idx, generated_output, public_validation }) => ({ round_idx, generated_output, public_validation }));
-            return result({ drafts: page, total: drafts.length, next_offset: offset + limit < drafts.length ? offset + limit : null });
+            const detail = params.detail ?? "concise";
+            if (!["concise", "detailed"].includes(detail) || (params.draft_ids !== undefined && (!Array.isArray(params.draft_ids) || params.draft_ids.length > 16 || params.draft_ids.some(id => typeof id !== "string")))) throw new Error("Invalid draft query");
+            const rows = drafts.filter(row => !params.draft_ids || params.draft_ids.includes(row.draft_id));
+            const page = rows.slice(offset, offset + limit).map(row => detail === "detailed" ? row : {
+                draft_id: row.draft_id, round_idx: row.round_idx, public_validation: row.public_validation,
+                output_sha256: row.output_sha256, rationale_preview: (row.rationale ?? "").slice(0, 160),
+                ...(row.correct !== undefined ? { correct: row.correct, candidate_id: row.candidate_id } : {}),
+            });
+            return result({ drafts: page, total: rows.length, next_offset: offset + limit < rows.length ? offset + limit : null });
         },
     });
     pi.registerTool({

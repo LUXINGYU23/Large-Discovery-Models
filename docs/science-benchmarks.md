@@ -23,7 +23,9 @@ ReaSyn requests independent minibatches and retains legal occurrences before
 canonical deduplication. Reconstruction probability identities preserve independent
 restart seeds; TDC identities refer to canonical projected products. Its LDM rule
 is `alpha * log(q0 + epsilon) + eta * robust_z(UCB)`, with a separately sized BO
-pool and reproducible sampling without replacement. Direct and BO baselines are
+pool and reproducible sampling without replacement. Reconstruction fixes alpha
+at 1 and disables compiled weight adjustment; its policy can change only the
+prior mean. Direct and BO baselines are
 separately named and do not claim these semantics.
 
 Projection workers persist each completed target, including empty results. Serial
@@ -38,8 +40,14 @@ Each task provides digest-bound roles, research Skills, structured history tools
 submission validators and a guest-image recipe. Shared Harness clients own native
 session persistence, provider traces, MCP tools and validation/repair. Independent
 policy sessions use the shared compiled-policy controller and isolated executor.
-The AtomWorld policy sees public draft features only; it is a blind audit policy,
-not a GP/LDM method using hidden correctness.
+AtomWorld implements `ldm`, `ldm_harness` and `ldm_harness_compiled` as an explicit
+measured-feedback optimization extension: same-question past scalar correctness,
+fixed residual RBF GP/UCB, empirical q0 and Gumbel sampling. Compiled sessions
+control both prior_mean@1 and ldm_weights@1. Private targets, judge internals and
+cross-question history stay inaccessible. Blind baselines remain available;
+their protocol is distinct from feedback-enabled LDM. ReaSyn reconstruction
+also enables both capabilities, grouping q0 by query while retaining independent
+trial seeds and allocating each query's probability across its surviving trials.
 
 Pilot matrices are in `config/pilot_evaluation/atomworld.yaml` and
 `config/pilot_evaluation/reasyn.yaml`. AtomWorld declares the task-neutral

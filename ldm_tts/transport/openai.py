@@ -24,6 +24,39 @@ from ldm_tts.transport.openai_http import (
 )
 
 WIRE_APIS = ("chat_completions", "responses")
+REASONING_LEVELS = ("off", "none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def generation_body(*, wire_api, reasoning="off", extra_body=None):
+    """Resolve explicit reasoning controls without overriding task protocol fields."""
+    if wire_api not in WIRE_APIS or reasoning not in REASONING_LEVELS:
+        raise ValueError("Invalid provider wire API or reasoning level")
+    body = dict(extra_body or {})
+    reserved = {"model", "input", "messages", "stream", "tools", "tool_choice",
+                "instructions", "max_tokens", "max_output_tokens", "temperature"}
+    if reserved & body.keys():
+        raise ValueError("extra-body cannot override protocol fields or explicit generation options")
+
+    def check_secrets(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if any(word in key.lower() for word in ("api_key", "authorization", "password", "secret", "token_key")):
+                    raise ValueError("Credentials must be supplied through environment variables")
+                check_secrets(item)
+        elif isinstance(value, list):
+            for item in value:
+                check_secrets(item)
+
+    check_secrets(body)
+    key = "reasoning" if wire_api == "responses" else "reasoning_effort"
+    other = "reasoning_effort" if wire_api == "responses" else "reasoning"
+    if other in body:
+        raise ValueError("Reasoning option does not match the configured wire API")
+    if key in body:
+        raise ValueError("Use llm-reasoning for reasoning effort; do not duplicate it in extra-body")
+    if reasoning != "off":
+        body[key] = {"effort": reasoning} if wire_api == "responses" else reasoning
+    return body
 
 
 class EndpointCircuitOpen(EndpointRequestError):
@@ -266,6 +299,8 @@ def _numeric_usage(value: Any) -> dict[str, int | float]:
 
 __all__ = [
     "WIRE_APIS",
+    "REASONING_LEVELS",
+    "generation_body",
     "EndpointCircuitBreaker",
     "EndpointCircuitOpen",
     "EndpointRequestError",

@@ -32,3 +32,19 @@ trajectory:
   objective_column: score
   direction: maximize
 result_fields: {}
+policy_fields:
+  baseline_prediction_mean: compiled_policy.baseline_prediction_diagnostics.mean_mean
+  compiled_prediction_mean: compiled_policy.compiled_prediction_diagnostics.mean_mean
+  prediction_mean_abs_change: compiled_policy.prediction_mean_abs_change
+  baseline_acquisition_mean: compiled_policy.baseline_prediction_diagnostics.acquisition_mean
+  compiled_acquisition_mean: compiled_policy.compiled_prediction_diagnostics.acquisition_mean
+  q0_entropy: base_probability_entropy
+  tilted_entropy: probability_entropy
+  tilted_ess: probability_effective_sample_size
+  tilted_kl_from_q0: tilted_kl_from_q0
+  q0_tilted_topk_overlap: q0_tilted_topk_overlap
+policy_mean_fields:
+  - prediction_mean_abs_change
+  - tilted_kl_from_q0
+  - tilted_ess
+  - q0_tilted_topk_overlap

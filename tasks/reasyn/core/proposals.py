@@ -185,7 +185,8 @@ class ReaSynExpander:
             "projection_target_limit": stride if self.args.benchmark == "tdc" else 0,
             "history_exclusion_count": len(evaluated_keys),
             "rejection_counts": dict(rejection_counts), "rejection_feedback": feedback,
-            "q0_identity_space": "canonical_query_and_sampling_seed" if self.args.benchmark == "reconstruction" else "canonical_product",
+            "q0_identity_space": "canonical_query" if self.args.benchmark == "reconstruction" else "canonical_product",
+            "evaluation_identity_space": "canonical_query_and_sampling_seed" if self.args.benchmark == "reconstruction" else "canonical_product",
         }
         if len(proposals) < sample_count or len(unique_keys) < required_unique:
             metadata["stop_reason"] = "proposal_replenishment_budget_exhausted"
@@ -218,6 +219,7 @@ class ReaSynExpander:
     def _history(request):
         return [
             {"candidate_id": o.candidate.candidate_id,
+             "round_idx": getattr(o, "round_idx", None),
              "smiles": o.candidate.payload.get("smiles", o.candidate.payload.get("target_smiles")),
              **({"sampling_seed": o.candidate.payload["sampling_seed"]} if "sampling_seed" in o.candidate.payload else {}),
              **({"research_annotations": o.candidate.metadata["research_annotations"]}

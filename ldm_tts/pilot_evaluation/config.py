@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ldm_tts.cli.runner import load_config
+from ldm_tts.registration.registry import get_task_definition
 
 
 SUPPORTED_METHODS = (
@@ -17,7 +18,6 @@ SUPPORTED_METHODS = (
     "bo",
     "llm",
     "harness",
-    "blind_harness_compiled",
 )
 BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
@@ -107,7 +107,9 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     raw = load_config(resolved)
     _require_exact_keys(raw)
     protocol = raw.get("selection_protocol", "best_so_far")
-    methods = _methods(raw.get("methods"), require_baselines=protocol != "final_submission")
+    task = _required_string(raw.get("task"), "task")
+    declared = get_task_definition(task).pilot_evaluation.get("methods", {})
+    methods = _methods(raw.get("methods"), require_baselines=protocol != "final_submission", declared=declared)
     policy_fields = raw.get("policy_fields", {})
     policy_mean_fields = raw.get("policy_mean_fields", [])
     if not isinstance(policy_fields, dict) or not isinstance(policy_mean_fields, list):
@@ -145,12 +147,13 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 
-def _methods(value: Any, *, require_baselines: bool = True) -> tuple[str, ...]:
+def _methods(value: Any, *, require_baselines: bool = True, declared=()) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
         raise ValueError("pilot evaluation methods must be a non-empty list")
     methods = tuple(value)
-    if any(not isinstance(item, str) or item not in SUPPORTED_METHODS for item in methods):
-        raise ValueError(f"pilot evaluation methods must come from {list(SUPPORTED_METHODS)}")
+    supported = (*SUPPORTED_METHODS, *declared)
+    if any(not isinstance(item, str) or item not in supported for item in methods):
+        raise ValueError(f"pilot evaluation methods must come from {list(supported)}")
     if len(set(methods)) != len(methods):
         raise ValueError("pilot evaluation methods must be unique")
     if require_baselines and not BASELINE_METHODS <= set(methods):

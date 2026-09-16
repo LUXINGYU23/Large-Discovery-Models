@@ -45,7 +45,10 @@ export class ProviderProxy {
 	private server: Server | undefined;
 	private port: number | undefined;
 
-	constructor(baseUrl: string, private readonly apiKey: string, private readonly campaignId: string) {
+	constructor(baseUrl: string, private readonly apiKey: string, private readonly campaignId: string,
+		private readonly requestBody: Record<string, unknown> = {}) {
+		const reserved = ["model", "input", "messages", "stream", "tools", "tool_choice", "instructions"];
+		if (reserved.some((key) => key in requestBody)) throw new Error("provider options cannot override protocol fields");
 		this.targetBaseUrl = new URL(baseUrl);
 		if (this.targetBaseUrl.protocol !== "http:" && this.targetBaseUrl.protocol !== "https:") {
 			throw new Error("provider base URL must use HTTP(S)");
@@ -140,7 +143,12 @@ export class ProviderProxy {
 			if (!active) return await this.reject(response, 409, "profile has no active turn");
 			active.requestCount += 1;
 			const requestId = `${active.turnId}-provider-${active.requestCount}`;
-			const body = await this.readRequest(request);
+			let body = await this.readRequest(request);
+			if (request.method === "POST" && segments.join("/") === "responses" && Object.keys(this.requestBody).length) {
+				const payload = JSON.parse(body.toString("utf8"));
+				if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("provider request must be an object");
+				body = Buffer.from(JSON.stringify({ ...payload, ...this.requestBody }));
+			}
 			const capturedRequest = this.redactor.buffer(body);
 			const target = joinTargetUrl(this.targetBaseUrl, segments.join("/"), incoming.search);
 			await active.trace.writeRaw(join("provider", `${requestId}.request.bin`), capturedRequest);
@@ -154,6 +162,8 @@ export class ProviderProxy {
 			headers.authorization = `Bearer ${this.apiKey}`;
 			headers.host = target.host;
 			headers["accept-encoding"] = "identity";
+			delete headers["transfer-encoding"];
+			headers["content-length"] = String(body.length);
 
 			const requester = target.protocol === "https:" ? httpsRequest : httpRequest;
 			const upstream = requester(

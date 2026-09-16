@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ldm_tts.registration.experiment import (
@@ -41,6 +41,7 @@ class TaskDefinition:
     manifest_path: Path
     dependency_checker: str | None = None
     experiment_contract_path: Path | None = None
+    pilot_evaluation: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ def load_task_manifest(
         "task_id",
         "description",
         "dependency_checker",
+        "pilot_evaluation",
     }
     unknown = sorted(str(key) for key in data if key not in allowed_keys)
     if unknown:
@@ -138,6 +140,18 @@ def load_task_manifest(
                 "expected 'python.module:function'."
             )
 
+    pilot = data.get("pilot_evaluation", {})
+    if not isinstance(pilot, dict) or set(pilot) - {"methods", "submission_adapter"}:
+        raise TaskRegistrationError("pilot_evaluation requires methods and/or submission_adapter")
+    methods = pilot.get("methods", {})
+    if not isinstance(methods, dict) or any(
+        not TASK_ID_PATTERN.fullmatch(name) or mode not in {"none", "openai", "callable"}
+        for name, mode in methods.items()
+    ):
+        raise TaskRegistrationError("pilot methods must map method names to proposal modes")
+    hook = pilot.get("submission_adapter")
+    if hook is not None and (not isinstance(hook, str) or not HOOK_PATTERN.fullmatch(hook)):
+        raise TaskRegistrationError("pilot submission_adapter must be 'python.module:function'")
     relative_root = Path("tasks") / task_id
     contract_path = relative_root / EXPERIMENT_CONTRACT_NAME
     return TaskDefinition(
@@ -147,6 +161,7 @@ def load_task_manifest(
         module=f"tasks.{task_id}.ldm_task.procedure",
         manifest_path=relative_root / TASK_MANIFEST_NAME,
         dependency_checker=dependency_checker,
+        pilot_evaluation=pilot,
         experiment_contract_path=(
             contract_path if (repository_root / contract_path).is_file() else None
         ),

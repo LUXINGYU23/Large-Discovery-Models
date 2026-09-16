@@ -7,6 +7,7 @@ It is deliberately not advertised as objective-trained LDM/GP optimization.
 from __future__ import annotations
 
 from io import StringIO
+import hashlib
 
 import numpy as np
 
@@ -112,9 +113,13 @@ def public_policy_input(round_index, sample, answers, history, *, mock=False):
         history_rounds=(),
         measured_observations=(),
         research_snapshot={
-            "public_task": dict(sample),
-            "public_draft_history": history,
-            "current_drafts": [dict(answer.submission) for answer in answers],
+            "public_task": {key: value for key, value in sample.items() if key != "input_cif"},
+            "public_task_access": "get_public_task",
+            "public_draft_history": [{k: v for k, v in row.items() if k != "generated_output"} for row in history],
+            "current_drafts": [{"draft_id": f"current_{i}", "rationale": answer.submission["rationale"],
+                "output_sha256": hashlib.sha256(answer.submission["generated_output"].encode()).hexdigest()}
+                for i, answer in enumerate(answers)],
+            "draft_access": "get_public_history with draft_ids and detail=detailed",
             "feedback_policy": "No correctness labels, hidden targets, judge errors or objective history. All priors are unverified public structural hypotheses. No GP is fitted. Only this revision's drafts are ranked; the last scheduled revision remains the final answer.",
         },
         execution_context={
@@ -123,7 +128,7 @@ def public_policy_input(round_index, sample, answers, history, *, mock=False):
                 "target_scale": 1.0,
                 "feature_names": list(FEATURE_NAMES),
                 "feature_semantics": "ASE geometry features compare only the public input to each draft. Availability flags mark unsupported parsing or unequal atom counts. Same-order displacements are Cartesian angstroms without periodic matching and may change under site reordering; species_changes counts substitutions at corresponding indices. They are public invariants, not correctness labels or hidden judge distances. Mock geometry features are explicitly unavailable.",
-                "public_task": dict(sample),
+                "public_task": {key: value for key, value in sample.items() if key != "input_cif"},
                 "scale_semantics": "Untrained standardized plausibility prior, never a measured correctness score",
             },
             "weight_context": {"default_alpha": 0.0, "default_eta": 0.0},
@@ -133,7 +138,14 @@ def public_policy_input(round_index, sample, answers, history, *, mock=False):
 
 def select_public_answer(expander, sample_index, round_index, sample, answers, history):
     client, root = expander._client(sample_index, policy=True)
-    write_json(root / "public_history.json", {"drafts": history})
+    write_json(root / "public_history.json", {"drafts": [*history, *[
+        {"draft_id": f"current_{i}", "round_idx": round_index,
+         "generated_output": answer.submission["generated_output"],
+         "rationale": answer.submission["rationale"],
+         "public_validation": public_validation(answer.submission["generated_output"], mock=expander.args.mock),
+         "output_sha256": hashlib.sha256(answer.submission["generated_output"].encode()).hexdigest()}
+        for i, answer in enumerate(answers)
+    ]]})
     if sample_index not in expander.controllers:
         args = expander.args
         executor = expander.policy_executor or DockerPolicyExecutor(
@@ -148,7 +160,7 @@ def select_public_answer(expander, sample_index, round_index, sample, answers, h
             adapter=PublicAuditPolicyAdapter(),
             executor=executor,
             root=root,
-            account=(lambda counts: expander.runtime.consume_many(counts))
+            account=expander.runtime.consume_many
             if expander.runtime
             else None,
             recovery_budget=lambda: float(args.harness_recovery_seconds),

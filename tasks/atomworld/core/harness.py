@@ -7,14 +7,16 @@ and acquisition feedback are deliberately outside this module's data boundary.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionResult
 from ldm_tts.harness import (
     HarnessClient,
+    HarnessArtifactRule,
     HarnessError,
     HarnessLimits,
     HarnessNetworkPolicy,
@@ -32,19 +34,22 @@ from ldm_tts.harness import (
 from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.harness.mcp import load_harness_mcp_config
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
+from ldm_tts.transport.openai import generation_body
 from tasks.atomworld.core.data import TASK_ROOT, write_json
 from tasks.atomworld.core.proposals import (
     MAX_OUTPUT_CHARS,
     canonical_key,
     public_validation,
 )
+from tasks.atomworld.core.methods import LDM_METHODS
+from tasks.atomworld.core.selection import measured_history, pool_result
 
 RESOURCE_ROOT = TASK_ROOT / "resources/harness"
 PROFILE_IDS = ("geometry_research", "structure_audit")
 TOOL_NAMES = ("get_public_task", "get_public_history", "get_geometry_contract")
 
 
-def harness_profiles(ids=PROFILE_IDS):
+def harness_profiles(ids=PROFILE_IDS, *, compiled=False):
     if (
         not ids
         or len(set(ids)) != len(ids)
@@ -58,7 +63,7 @@ def harness_profiles(ids=PROFILE_IDS):
             skill_dirs=(
                 Path("/resources/skills")
                 / (
-                    "public_audit_policy"
+                    ("compile_ldm_policy" if compiled else "public_audit_policy")
                     if name == "policy_architect"
                     else "crystal_geometry"
                 ),
@@ -69,7 +74,7 @@ def harness_profiles(ids=PROFILE_IDS):
                     RESOURCE_ROOT
                     / "skills"
                     / (
-                        "public_audit_policy"
+                        ("compile_ldm_policy" if compiled else "public_audit_policy")
                         if name == "policy_architect"
                         else "crystal_geometry"
                     )
@@ -88,35 +93,52 @@ def submission_contract(max_attempts=3):
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "generated_output": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": MAX_OUTPUT_CHARS,
-                },
+                "artifact_path": {"type": "string", "const": "answer.cif"},
                 "rationale": {"type": "string", "minLength": 1, "maxLength": 8000},
             },
-            "required": ["generated_output", "rationale"],
+            "required": ["artifact_path", "rationale"],
         },
+        artifact_rules=(HarnessArtifactRule("/artifact_path", (".cif",), MAX_OUTPUT_CHARS),),
         max_validation_attempts=max_attempts,
     )
 
 
-def validate_answer(request, *, mock=False):
+def read_answer(request, root):
+    if request.submission.get("artifact_path") != "answer.cif" or len(request.artifacts) != 1:
+        raise ValueError("Submit answer.cif as the sole immutable artifact")
+    artifact = request.artifacts[0]
+    path = (Path(root) / artifact.snapshot_path).resolve()
+    if (artifact.path_pointer != "/artifact_path" or artifact.relative_path != "answer.cif"
+            or not path.is_relative_to(Path(root).resolve()) or not path.is_file()):
+        raise ValueError("CIF snapshot must be inside this session's artifact root")
+    if path.stat().st_size > MAX_OUTPUT_CHARS:
+        raise ValueError("CIF artifact exceeds the output limit")
+    body = path.read_bytes()
+    if len(body) != artifact.size_bytes or hashlib.sha256(body).hexdigest() != artifact.sha256:
+        raise ValueError("CIF snapshot digest/size mismatch")
+    return "<cif>" + body.decode("utf-8").strip() + "</cif>"
+
+
+def validate_answer(request, *, root, mock=False):
     value = request.submission
     errors = []
-    if set(value) != {"generated_output", "rationale"} or request.artifacts:
+    if set(value) != {"artifact_path", "rationale"}:
         errors.append(
             HarnessSubmissionError(
                 "",
                 "invalid_fields",
-                "Submit exactly generated_output and rationale, with no artifacts.",
+                "Submit exactly artifact_path=answer.cif and rationale.",
             )
         )
-    text = value.get("generated_output")
+    try:
+        text = read_answer(request, root)
+    except (ValueError, OSError, UnicodeError) as exc:
+        text = None
+        errors.append(HarnessSubmissionError("/artifact_path", "invalid_artifact", str(exc)))
     if not isinstance(text, str) or not 0 < len(text) <= MAX_OUTPUT_CHARS:
         errors.append(
             HarnessSubmissionError(
-                "/generated_output",
+                "/artifact_path",
                 "invalid_output",
                 "Return a nonempty complete CIF answer within the output limit.",
             )
@@ -124,10 +146,10 @@ def validate_answer(request, *, mock=False):
     elif not public_validation(text, mock=mock)["parseable"]:
         errors.append(
             HarnessSubmissionError(
-                "/generated_output",
+                "/artifact_path",
                 "invalid_cif",
                 "The public CIF syntax check failed.",
-                "Repair a complete <cif>...</cif> block and resubmit in this session.",
+                "Repair the complete CIF in answer.cif and resubmit in this session.",
             )
         )
     rationale = value.get("rationale")
@@ -154,7 +176,8 @@ def make_client(args, root, sample, *, policy=False):
     if not (root / "public_history.json").exists():
         write_json(root / "public_history.json", {"drafts": []})
     profiles = harness_profiles(
-        ("policy_architect",) if policy else args.harness_profile
+        ("policy_architect",) if policy else args.harness_profile,
+        compiled=args.search_method == "ldm_harness_compiled",
     )
     if policy:
         from ldm_tts.harness import policy_submission_contract
@@ -163,7 +186,10 @@ def make_client(args, root, sample, *, policy=False):
     else:
         contract = submission_contract(args.harness_max_submission_attempts)
     mcp = load_harness_mcp_config(args.harness_mcp_config)
-    servers = (*mcp.servers, policy_mcp_server()) if policy else mcp.servers
+    servers = (*mcp.servers, policy_mcp_server(**({
+        "diagnostics_path": "/resources/policy_diagnostics.py",
+        "diagnostics_sha256": file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
+    } if args.search_method == "ldm_harness_compiled" else {}))) if policy else mcp.servers
     cache = args.harness_cache_dir.expanduser().resolve()
     (cache / "runtime-overlays").mkdir(parents=True, exist_ok=True)
     command = ["docker"]
@@ -233,6 +259,11 @@ def make_client(args, root, sample, *, policy=False):
             ),
             mcp_servers=servers,
             thinking=args.harness_thinking,
+            provider_request_body={
+                "temperature": args.llm_temperature, "max_output_tokens": args.llm_max_tokens,
+                **generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                  extra_body=json.loads(args.llm_extra_body_json)),
+            },
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(
@@ -294,11 +325,19 @@ class AtomWorldHarnessExpander:
     def expand(self, request):
         index, attempt = divmod(request.round_idx, self.args.attempts_per_sample)
         sample = self.samples[index]
-        path = self.run_dir / "attempts" / f"{request.round_idx:06d}.json"
+        ldm = self.args.search_method in LDM_METHODS
+        measurements = measured_history(request.observations, sample["sample_id"]) if ldm else []
+        input_digest = canonical_sha256({"sample": sample, "round": request.round_idx,
+                                         "measured": measurements}) if ldm else None
+        path = self.run_dir / ("proposal_pools" if ldm else "attempts") / f"{request.round_idx:06d}.json"
         if path.exists():
             record = json.loads(path.read_text())
             if record["sample_id"] != sample["sample_id"]:
                 raise ValueError("Resumed Harness answer differs from scheduled sample")
+            if ldm:
+                if record["input_digest"] != input_digest:
+                    raise ValueError("Resumed LDM research has different measured history")
+                return pool_result(record)
             return self._result(record)
         client, root = self._client(index)
         history = []
@@ -309,25 +348,39 @@ class AtomWorldHarnessExpander:
             )
             history.append(
                 {
-                    key: draft[key]
-                    for key in ("round_idx", "generated_output", "public_validation")
+                    "draft_id": f"round_{ordinal:06d}",
+                    "round_idx": ordinal,
+                    "generated_output": draft["generated_output"],
+                    "public_validation": draft["public_validation"],
+                    "rationale": draft.get("rationale", ""),
+                    "output_sha256": hashlib.sha256(draft["generated_output"].encode()).hexdigest(),
                 }
             )
+        if ldm:
+            by_round = {row["round_idx"]: row for row in measurements}
+            for row in history:
+                measured = by_round.get(row["round_idx"])
+                if measured is not None:
+                    row.update(candidate_id=measured["candidate_id"], correct=measured["correct"])
         write_json(root / "public_history.json", {"drafts": history})
-        delta = history[-1:]
+        delta = [{k: v for k, v in row.items() if k != "generated_output"} for row in history[-1:]]
         digest = canonical_sha256(delta)
         message = json.dumps(
             {
                 "message_type": "public_history_delta"
                 if attempt
                 else "public_task_bootstrap",
-                "sample": sample,
+                "sample": {key: value for key, value in sample.items() if key != "input_cif"},
+                "public_task_access": "get_public_task",
                 "revision": attempt,
                 "new_public_drafts": delta,
                 "history_count": len(history),
                 "history_access": "get_public_history",
                 "required_answers_per_session": 1,
-                "instructions": "Research the public geometry in your persistent sandbox. Read crystal_geometry skill, use structured tools, inspect CIF with ASE/pymatgen, and submit exactly one complete answer and rationale. Correct rejected syntax in the same session. Judges, private answers and accuracy feedback are unavailable. Prior drafts are hypotheses, not evidence of correctness. Each scheduled revision replaces the previous final answer.",
+                "feedback_protocol": "measured_correctness_optimization" if ldm else "blind_refinement",
+                "instructions": "Research the public geometry in your persistent sandbox. Read crystal_geometry skill, use structured tools, inspect CIF with ASE/pymatgen, write a complete raw CIF to answer.cif, and submit artifact_path plus rationale. Correct rejected syntax in the same session. " + (
+                    "Past measured scalar correctness is available in the history. Use that evidence to refine hypotheses; unmeasured drafts have no label. Targets and judge internals remain unavailable. The fixed host GP/UCB and q0 sampler select one draft from all sessions for evaluation."
+                    if ldm else "Judges, private answers and accuracy feedback are unavailable. Prior drafts are hypotheses, not evidence of correctness. Each scheduled revision replaces the previous final answer."),
             },
             sort_keys=True,
         )
@@ -345,12 +398,16 @@ class AtomWorldHarnessExpander:
             for profile in client.config.profiles
         )
         if self.runtime:
-            self.runtime.consume("harness_turns", len(turns))
+            for turn in turns:
+                self.runtime.consume_many(
+                    {"harness_turns": 1},
+                    usage_key=f"atomworld:{index}:{turn.turn_id}",
+                )
         try:
             results = client.run_turn(
                 turns,
                 submission_validator=lambda value: validate_answer(
-                    value, mock=self.args.mock
+                    value, root=root, mock=self.args.mock
                 ),
                 recovery_timeout_seconds=self.args.harness_recovery_seconds,
             )
@@ -371,7 +428,7 @@ class AtomWorldHarnessExpander:
                 "Harness must commit exactly one answer per independent session"
             )
         ordered = [by_id[turn.profile_id] for turn in turns]
-        for result in ordered:
+        for turn, result in zip(turns, ordered, strict=True):
             from ldm_tts.harness import HarnessSubmissionRequest
 
             validation = validate_answer(
@@ -382,18 +439,35 @@ class AtomWorldHarnessExpander:
                     result.submission,
                     result.submitted_artifacts,
                 ),
-                mock=self.args.mock,
+                root=root, mock=self.args.mock,
             )
             if (
                 result.submission_status != "accepted"
                 or validation.decision != "accept"
+                or result.turn_id != turn.turn_id
+                or result.input_digest != turn.input_digest
             ):
                 raise RuntimeError(
                     f"Harness submission rejected for {result.profile_id}; repair allowance exhausted"
                 )
+        native_sessions = [asdict(result) for result in ordered]
+        ordered = [replace(result, submission={
+            **result.submission,
+            "generated_output": read_answer(HarnessSubmissionRequest(
+                result.profile_id, result.turn_id, 1, result.submission, result.submitted_artifacts,
+            ), root),
+        }) for result in ordered]
+        if ldm:
+            record = {"sample_id": sample["sample_id"], "action_name": sample["action_name"],
+                      "round_idx": request.round_idx, "input_digest": input_digest,
+                      "drafts": [{"generated_output": r.submission["generated_output"],
+                                  "rationale": r.submission["rationale"]} for r in ordered],
+                      "sessions": native_sessions, "history": history}
+            write_json(path, record)
+            return pool_result(record)
         selected_index = (attempt + self.args.campaign_index) % len(ordered)
         selection = {"method": "predeclared_profile_rotation", "index": selected_index}
-        if self.args.search_method == "blind_harness_compiled":
+        if self.args.search_method == "harness_public_audit":
             from tasks.atomworld.core.optimization_policy import select_public_answer
 
             selected_index, selection = select_public_answer(
@@ -406,13 +480,14 @@ class AtomWorldHarnessExpander:
             "attempt": attempt,
             "round_idx": request.round_idx,
             "generated_output": selected.submission["generated_output"],
+            "rationale": selected.submission["rationale"],
             "canonical_key": canonical_key(
                 sample["sample_id"], selected.submission["generated_output"]
             ),
             "public_validation": public_validation(
                 selected.submission["generated_output"], mock=self.args.mock
             ),
-            "sessions": [asdict(result) for result in ordered],
+            "sessions": native_sessions,
             "selection": selection,
         }
         write_json(path, record)

@@ -9,6 +9,7 @@ from .sampling import (
     Q0_METADATA_KEY,
     candidate_set_seed,
     empirical_base_masses,
+    empirical_group_sizes,
     gumbel_top_k,
     tilted_distribution,
 )
@@ -149,7 +150,7 @@ class AcquisitionTiltedSelector:
             name="ldm_tanimoto_gp_ucb",
             objective_names=base.objective_names,
             score_direction="sample",
-            selection_rule="Sample alpha * log(q0 + epsilon) + eta * robust_z(UCB) without replacement",
+            selection_rule="Sample alpha * log(group_q0 + epsilon) - log(group_trial_count) + eta * robust_z(UCB) without replacement",
             parameters={
                 "base_acquisition": base.name, **base.parameters,
                 "alpha": self.alpha, "eta": self.eta, "z_clip": self.z_clip,
@@ -182,6 +183,7 @@ class AcquisitionTiltedSelector:
         else:
             pool = reservoir
         q0 = empirical_base_masses(pool)
+        group_sizes = empirical_group_sizes(pool)
         valid_occurrences = reservoir[0].metadata[Q0_METADATA_KEY]["valid_occurrence_count"]
         if self.policy_controller is not None:
             # A previous call may have fitted a compiled residual prior. Always
@@ -208,6 +210,7 @@ class AcquisitionTiltedSelector:
         acquisition = np.asarray([p.acquisition_score for p in active.predictions], dtype=float)
         probability, logits, normalized = tilted_distribution(
             q0, acquisition, alpha=alpha, eta=eta, z_clip=self.z_clip,
+            group_sizes=group_sizes,
         )
         selection_seed = candidate_set_seed(self.seed, round_idx, pool, phase="ldm_selection")
         indices = gumbel_top_k(probability, count, seed=selection_seed)
@@ -215,6 +218,8 @@ class AcquisitionTiltedSelector:
             {
                 "candidate_id": candidate.candidate_id,
                 "q0": float(q0[i]), "normalized_acquisition": float(normalized[i]),
+                "q0_group_mass": float(q0[i] * group_sizes[i]),
+                "group_trial_count": int(group_sizes[i]),
                 "logit": float(logits[i]), "selection_probability": float(probability[i]),
                 "baseline_mean": baseline.predictions[i].scalar_mean,
                 "baseline_std": baseline.predictions[i].scalar_std,
@@ -230,6 +235,7 @@ class AcquisitionTiltedSelector:
         ]
         if policy is not None:
             self.policy_controller.record_predictions(round_idx, records)
+        diagnostic_k = max(1, min(count, len(pool)))
         metadata = {
             "kernel": "tanimoto", "proposal_reservoir_size": len(reservoir),
             "bo_pool_size": len(pool), "bo_pool_size_requested": self.pool_size,
@@ -239,6 +245,14 @@ class AcquisitionTiltedSelector:
             "selection_q0_scope": "conditioned_on_maintained_bo_pool",
             "alpha": alpha, "eta": eta, "z_clip": self.z_clip,
             "selection_seed": selection_seed, "distribution": records,
+            "base_probability_entropy": float(-np.sum(q0 * np.log(q0))),
+            "q0_group_entropy": float(-np.sum(q0 * np.log(q0 * group_sizes))),
+            "q0_group_count": int(round(float(np.sum(1 / group_sizes)))),
+            "probability_entropy": float(-np.sum(probability * np.log(np.maximum(probability, 1e-300)))),
+            "probability_effective_sample_size": float(1 / np.sum(probability ** 2)),
+            "tilted_kl_from_q0": float(np.sum(probability * np.log(np.maximum(probability, 1e-300) / q0))),
+            "q0_tilted_topk_overlap": len(set(np.argsort(q0)[-diagnostic_k:]) &
+                                          set(np.argsort(probability)[-diagnostic_k:])) / diagnostic_k,
         }
         if policy is not None:
             metadata["compiled_policy"] = {
@@ -246,6 +260,14 @@ class AcquisitionTiltedSelector:
                 "epoch_id": policy.epoch_id, "artifact_sha256": policy.artifact_digest,
                 "source": policy.source, "degraded": policy.degraded,
                 "stage": policy.stage, "alpha": alpha, "eta": eta,
+                "prediction_mean_abs_change": float(np.mean([
+                    abs(b.scalar_mean - a.scalar_mean)
+                    for b, a in zip(baseline.predictions, active.predictions, strict=True)
+                ])),
+                **{name + "_prediction_diagnostics": {
+                    "mean_mean": float(np.mean([p.scalar_mean for p in selected.predictions])),
+                    "acquisition_mean": float(np.mean([p.acquisition_score for p in selected.predictions])),
+                } for name, selected in (("baseline", baseline), ("compiled", active))},
             }
         predictions = tuple(
             BOPrediction.scalar(

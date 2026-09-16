@@ -15,12 +15,13 @@ from ldm_tts.registration.dependencies import (
     plan_check_context,
 )
 from tasks.atomworld.core.data import DEFAULT_UPSTREAM
+from tasks.atomworld.core.methods import HARNESS_METHODS
 
 
 def check_dependencies(plan, *, include_optional=True):
     task, args, env, cwd, mode = plan_check_context(plan)
     mock = bool(args.get("mock") or mode == "mock")
-    harness = args.get("search-method", "llm") in {"harness", "blind_harness_compiled"}
+    harness = args.get("search-method", "llm") in HARNESS_METHODS
     if mock:
         checks = [
             ok(
@@ -82,7 +83,7 @@ def check_dependencies(plan, *, include_optional=True):
                 task, "ase", "ASE required by bounded geometry tools"
             )
         )
-    if args.get("search-method", "llm") in {"harness", "blind_harness_compiled"}:
+    if harness:
         checks.append(
             (ok if shutil.which("docker") else fail)(
                 task,

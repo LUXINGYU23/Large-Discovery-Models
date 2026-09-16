@@ -65,6 +65,7 @@ class RBFGPSurrogate:
         prior_mean: float = 0.0,
         prior_std: float = 0.25,
         feature_version: str = "",
+        residual_prior_mean: Sequence[float] | None = None,
     ) -> None:
         self.observations = [
             item.to_bo(feature_version=feature_version)
@@ -82,12 +83,20 @@ class RBFGPSurrogate:
         self.prior_mean = float(prior_mean)
         self.prior_std = max(1.0e-9, float(prior_std))
         self.feature_version = str(feature_version)
+        self.residual_prior_mean = (
+            None if residual_prior_mean is None else np.asarray(residual_prior_mean, dtype=float)
+        )
+        if self.residual_prior_mean is not None and (
+            self.residual_prior_mean.shape != (len(self.observations),)
+            or not np.isfinite(self.residual_prior_mean).all()
+        ):
+            raise ValueError("residual prior must align with finite measured history")
         self.ready = False
         self.fit_status = "prior" if not observations else "fallback"
         self._fit()
 
     def _fit(self) -> None:
-        if len(self.observations) < 2:
+        if not self.observations or (len(self.observations) < 2 and self.residual_prior_mean is None):
             return
         dimensions = {len(item.feature_vector) for item in self.observations}
         if len(dimensions) != 1:
@@ -99,7 +108,14 @@ class RBFGPSurrogate:
         self.Xz = (self.X - self.x_mean) / self.x_std
         self.y_mean = float(self.y.mean())
         self.y_std = float(self.y.std() + 1.0e-9)
+        if self.residual_prior_mean is not None:
+            # Freeze normalization on measured labels, never on compiled residuals.
+            self.x_std = np.maximum(self.X.std(axis=0), 1.0)
+            self.Xz = (self.X - self.x_mean) / self.x_std
+            self.y_std = max(float(self.y.std()), 0.1)
         yz = (self.y - self.y_mean) / self.y_std
+        if self.residual_prior_mean is not None:
+            yz = yz - self.residual_prior_mean
         kernel = _rbf_kernel(self.Xz, self.Xz, self.lengthscale)
         kernel = kernel + self.noise * np.eye(len(self.Xz))
         try:
@@ -126,6 +142,7 @@ class RBFGPSurrogate:
         vector: Sequence[float],
         *,
         beta: float = 1.0,
+        query_prior_mean: float = 0.0,
     ) -> BOPrediction:
         """Return the canonical task-neutral prediction record."""
 
@@ -146,6 +163,12 @@ class RBFGPSurrogate:
             variance_z = max(1.0 - float((projected * projected).sum()), 1.0e-9)
             mean = self.y_mean + mean_z * self.y_std
             std = math.sqrt(variance_z) * self.y_std
+        if not np.isfinite(query_prior_mean):
+            raise ValueError("query prior must be finite")
+        if query_prior_mean and (self.residual_prior_mean is None or not self.ready):
+            raise ValueError("query prior requires a fitted residual GP")
+        if self.residual_prior_mean is not None and self.ready:
+            mean += self.y_std * query_prior_mean
         acquisition = make_acquisition("ucb", minimize=(False,), beta=max(0.0, beta))
         acquisition_score = float(acquisition.score(mean, std))
         return BOPrediction.scalar(
@@ -155,6 +178,21 @@ class RBFGPSurrogate:
             acquisition_score=acquisition_score,
             metadata={"surrogate": "exact_rbf_gp", "fit_status": self.fit_status},
         )
+
+    def posterior_projection(self, vectors) -> dict[str, np.ndarray]:
+        """Frozen residual-GP operator for task-owned policy diagnostics."""
+        query = np.asarray(vectors, dtype=float)
+        if not self.ready or self.residual_prior_mean is None:
+            raise ValueError("diagnostics require a fitted residual GP")
+        if query.ndim != 2 or query.shape[1] != self.X.shape[1] or not np.isfinite(query).all():
+            raise ValueError("diagnostic queries must align with finite GP features")
+        cross = _rbf_kernel((query - self.x_mean) / self.x_std, self.Xz, self.lengthscale)
+        v = np.linalg.solve(self.L, cross.T)
+        return {
+            "weights": np.linalg.solve(self.L.T, v).T,
+            "std": self.y_std * np.sqrt(np.maximum(1.0 - (v * v).sum(axis=0), 1e-9)),
+            "location_scale": np.asarray([self.y_mean, self.y_std]),
+        }
 
     def summary(self) -> dict[str, Any]:
         scores = [item.scalar_score for item in self.observations]

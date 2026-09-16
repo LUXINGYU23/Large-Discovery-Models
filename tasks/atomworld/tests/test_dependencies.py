@@ -61,7 +61,7 @@ def test_mock_harness_dependency_check_accepts_masked_provider_settings(tmp_path
                 "argv": [
                     "--mock",
                     "--search-method",
-                    "blind_harness_compiled",
+                    "harness_public_audit",
                     "--llm-url",
                     "https://provider.example/v1",
                     "--llm-model-name",

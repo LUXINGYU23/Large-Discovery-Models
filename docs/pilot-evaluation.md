@@ -169,16 +169,26 @@ Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
 
 The default `selection_protocol: best_so_far` retains the fixed optimization
 matrix and its LDM/BO/direct baselines. Tasks whose last answer is authoritative
-can set `selection_protocol: final_submission`. This protocol requires one
-scheduled submission per round and one sample per pilot case, permits repeated
-candidate identities, checks scores against recorded evaluations, and reports
-the final submission without selecting an earlier answer from hidden scores.
-Missing or rejected submissions receive zero under this protocol.
-It permits the `llm`, `harness`, and `blind_harness_compiled` comparison without
-inventing an inapplicable LDM or BO baseline. The existing
-`optimization_rounds + 1` field convention counts scheduled submissions in this
-protocol; the first submission is a baseline observation, not oracle-guided
-initialization.
+can set `selection_protocol: final_submission`. The shared reporter consumes
+normalized rows with `step`, `candidate_id`, `canonical_key`, `objective`, and
+`status` (succeeded or missing), requiring one row per scheduled step. It permits
+repeated measured candidates and checks their keys and objective values against
+checkpoint evaluations. Missing-submission penalties are task-defined.
+`optimization_rounds + 1` counts scheduled submissions under this protocol.
+
+Tasks can declare `pilot_evaluation.methods` in `task.json`, mapping additional
+task-local method names to proposal modes, and a `submission_adapter` hook using
+`python.module:function`. The hook receives the spec, raw trajectory, checkpoint
+observations, run directory and result, audits task receipts and returns normalized
+rows. AtomWorld owns its one-question schedule, attempt numbering, zero penalty,
+first/final accuracy checks and `harness_public_audit` method in this adapter.
+
+New child runs declare native Harness manifests in `harness_provenance.json`:
+`{"schema_version": 1, "pools": {"research": ["native/manifest.json"]}}`.
+Paths are relative to the child directory. Multiple pools align by index and
+must share campaign/task/seed identity at each index. The runner validates and
+hashes those manifests without deriving layout from a task-local method name.
+Existing standard optimization methods retain their conventional layout fallback.
 
 Adapters with projection-driven rejection can declare
 `proposal_counting: bounded_minibatches` in their persisted campaign config.

@@ -16,6 +16,7 @@ from ldm_tts.harness import (
 from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
 from ldm_tts.transport import ProposalResponse
+from ldm_tts.transport.openai import generation_body
 from .chemistry import canonicalize
 
 RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources/harness"
@@ -124,6 +125,11 @@ def create_client(args, root, campaign_id, target, *, policy=False):
                 diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
             )) if policy else mcp.servers,
             thinking=args.harness_thinking, context7_enabled=False,
+            provider_request_body={
+                "temperature": args.llm_temperature, "max_output_tokens": args.llm_max_tokens,
+                **generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
+                                  extra_body=json.loads(args.llm_extra_body_json)),
+            },
             limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget, excluded_tools=(contract.tool_name,))),
             network_policy=HarnessNetworkPolicy(forbidden_query_patterns=("benchmark_result", "oracle_cache", "checkpoint")),
@@ -160,12 +166,27 @@ class HarnessTargetSource:
             raise ValueError("Harness count must be positive; round and minibatch indices nonnegative")
         history = list(meta.get("history", []))
         self._write_history(history)
-        selected = self.session_profiles[:min(count, len(self.session_profiles))]
-        counts = {p.profile_id: count // len(selected) + int(i < count % len(selected)) for i, p in enumerate(selected)}
         turn_root = self.root / "proposal_turns"
         if recovery_pass:
             turn_root = turn_root / f"recovery-{recovery_pass:06d}"
         batch_root = turn_root / f"round-{round_index:06d}" / f"batch-{batch:06d}"
+        allocation_path = batch_root / "allocation.json"
+        cursor_path = self.root / "session_allocation.json"
+        cursor = json.loads(cursor_path.read_text())["next_occurrence"] if cursor_path.exists() else 0
+        if allocation_path.exists():
+            allocation = json.loads(allocation_path.read_text())
+        else:
+            allocation = {"start": cursor, "count": count}
+            atomic_json_write(allocation_path, allocation)
+        if allocation["count"] != count:
+            raise ValueError("Harness session allocation changed on resume")
+        # Reconcile a crash between reserving a barrier and advancing its cursor.
+        next_occurrence = max(cursor, allocation["start"] + count)
+        if not cursor_path.exists() or next_occurrence != cursor:
+            atomic_json_write(cursor_path, {"next_occurrence": next_occurrence})
+        selected = tuple(self.session_profiles[(allocation["start"] + i) % len(self.session_profiles)]
+                         for i in range(min(count, len(self.session_profiles))))
+        counts = {p.profile_id: count // len(selected) + int(i < count % len(selected)) for i, p in enumerate(selected)}
         request_digest = canonical_sha256({
             "metadata": meta, "profiles": [profile.to_dict() for profile in selected], "counts": counts,
             "benchmark": self.args.benchmark, "target": self.target, "oracle": self.args.oracle,

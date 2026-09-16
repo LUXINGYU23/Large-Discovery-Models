@@ -19,6 +19,7 @@ from tasks.reasyn.core.sampling import (
     Q0_METADATA_KEY,
     attach_empirical_base_measure,
     empirical_base_masses,
+    empirical_group_sizes,
     robust_z,
     tilted_distribution,
 )
@@ -98,32 +99,55 @@ def test_independent_minibatches_preserve_product_occurrences_before_dedup():
     assert projector.calls[0][1] + 2 == projector.calls[1][1]
 
 
-def test_reconstruction_repeated_query_seeds_are_distinct_probability_identities():
+def test_reconstruction_seeds_are_distinct_trials_in_one_probability_group():
     client = Targets([["CCO", "CCO"], ["CCO", "CCO"]])
     result = ReaSynExpander(options("reconstruction"), Projector(), Sink(), target="CCO", client=client).expand(ExpansionRequest(0, 4))
     reservoir = ReservoirBuilder(ReaSynDomain("reconstruction", mock=True)).build(result.proposals)
     assert len(reservoir.candidates) == 4
     assert {c.payload["sampling_seed"] for c in reservoir.candidates} == {7, 8, 9, 10}
     assert np.allclose(empirical_base_masses(reservoir.candidates), [0.25] * 4)
-    assert all(c.metadata[Q0_METADATA_KEY]["identity_space"] == "canonical_query_and_sampling_seed" for c in reservoir.candidates)
+    assert all(c.metadata[Q0_METADATA_KEY]["identity_space"] == "canonical_query" for c in reservoir.candidates)
+    assert empirical_group_sizes(reservoir.candidates) == pytest.approx([4] * 4)
 
 
-def test_reconstruction_uniform_seed_q0_makes_alpha_invariant():
-    # Independent seed identities preserve molecular multiplicity through the
-    # number of trial entries, not through unequal per-entry q0 weights.
+def test_reconstruction_alpha_tilts_query_groups_without_double_counting_trials():
     client = Targets([["CCO", "CCO"], ["CCO", "CCN"]])
     result = ReaSynExpander(options("reconstruction"), Projector(), Sink(),
                            target="CCO", client=client).expand(ExpansionRequest(0, 4))
     candidates = ReservoirBuilder(ReaSynDomain("reconstruction", mock=True)).build(result.proposals).candidates
     q0 = empirical_base_masses(candidates)
     scores = [0.1 if c.payload["target_smiles"] == "CCO" else 0.9 for c in candidates]
-    reference = tilted_distribution(q0, scores, alpha=1.0, eta=1.0)[0]
-    for alpha in (0.0, 0.5, 2.0, 10.0):
-        probabilities = tilted_distribution(q0, scores, alpha=alpha, eta=1.0)[0]
-        np.testing.assert_allclose(probabilities, reference, rtol=1e-12, atol=1e-12)
-    baseline = tilted_distribution(q0, scores, alpha=2.0, eta=0.0)[0]
-    assert sum(p for p, c in zip(baseline, candidates) if c.payload["target_smiles"] == "CCO") == pytest.approx(0.75)
-    assert not np.allclose(tilted_distribution(q0, scores, alpha=1.0, eta=0.5)[0], reference)
+    sizes = empirical_group_sizes(candidates)
+    for alpha, expected in ((0.0, 0.5), (1.0, 0.75), (2.0, 0.9)):
+        probability = tilted_distribution(q0, scores, alpha=alpha, eta=0, group_sizes=sizes)[0]
+        assert sum(p for p, c in zip(probability, candidates) if c.payload["target_smiles"] == "CCO") == pytest.approx(expected)
+    tilted = tilted_distribution(q0, scores, alpha=1, eta=1, group_sizes=sizes)[0]
+    assert not np.allclose(tilted, q0)
+    # Maintaining one trial from each group must not erase original query frequency.
+    pool = tuple(next(c for c in candidates if c.payload["target_smiles"] == s) for s in ("CCO", "CCN"))
+    assert empirical_base_masses(pool) == pytest.approx([0.75, 0.25])
+
+    from tasks.reasyn.resources.harness.policy_diagnostics import selection_probability
+    normalization = {"name": "robust_z", "epsilon": 1e-12, "mad_scale": 1.4826, "z_clip": 5}
+    assert selection_probability(q0, scores, 1, 1, normalization, sizes) == pytest.approx(tilted)
+
+
+def test_reconstruction_selector_preserves_trial_identity_and_applies_group_alpha():
+    proposals = attach_empirical_base_measure(tuple(RawProposal(
+        {"target_smiles": smiles, "sampling_seed": i}, "fixture",
+    ) for i, smiles in enumerate(("CCO", "CCO", "CCO", "CCN"))), benchmark="reconstruction", mock=True)
+    candidates = ReservoirBuilder(ReaSynDomain("reconstruction", mock=True)).build(proposals).candidates
+    encoder = MoleculeEncoder(mock=True)
+    representations = {c.candidate_id: encoder.encode(c) for c in candidates}
+    cco_ids = {c.candidate_id for c in candidates if c.payload["target_smiles"] == "CCO"}
+    for alpha, expected in ((0, 0.5), (1, 0.75), (2, 0.9)):
+        selector = AcquisitionTiltedSelector(TanimotoGPSelector(objective_name="utility", feature_version=encoder.version),
+                                             alpha=alpha, eta=0, seed=0, pool_size=4)
+        selector.fit(())
+        selected = selector.select(candidates, representations, count=4)
+        assert set(selected.selected_candidate_ids) == {c.candidate_id for c in candidates}
+        assert sum(row["selection_probability"] for row in selected.metadata["distribution"]
+                   if row["candidate_id"] in cco_ids) == pytest.approx(expected)
 
 
 def test_full_history_product_rejections_refill_and_keep_current_round_occurrences():
@@ -311,6 +335,10 @@ def test_selector_applies_compiled_prior_and_weights():
     assert result.metadata["compiled_policy"]["epoch_id"] == "e1"
     assert [row["selection_probability"] for row in result.metadata["distribution"]] == pytest.approx([0.25] * 4)
     assert all(row["active_mean"] > row["baseline_mean"] for row in result.metadata["distribution"])
+    assert result.metadata["probability_entropy"] == pytest.approx(np.log(4))
+    assert result.metadata["probability_effective_sample_size"] == pytest.approx(4)
+    assert result.metadata["tilted_kl_from_q0"] > 0
+    assert result.metadata["compiled_policy"]["prediction_mean_abs_change"] > 0
     repeated = selector.select(candidates, representations, round_idx=1)
     assert repeated.to_dict() == result.to_dict()
 

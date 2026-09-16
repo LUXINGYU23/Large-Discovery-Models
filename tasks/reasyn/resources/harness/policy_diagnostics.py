@@ -78,13 +78,14 @@ def evaluate_policy_draft(prior, inputs, outputs):
             raise ValueError("this task requires maximization UCB diagnostics")
         rows = context["candidate_predictions"]
         mass = np.asarray([row["q0"] for row in rows])
+        sizes = np.asarray([row.get("group_trial_count", 1) for row in rows])
         baseline_acquisition = np.asarray([row["baseline_acquisition"] for row in rows])
         scale = arrays["diagnostic_current_location_scale"][1]
         delta = scale * (query_prior - arrays["diagnostic_current_weights"] @ history_prior)
         acquisition = baseline_acquisition + delta
         normalization = context["normalization"]
-        before = selection_probability(mass, baseline_acquisition, context["default_alpha"], context["default_eta"], normalization)
-        after = selection_probability(mass, acquisition, weights["alpha"], weights["eta"], normalization)
+        before = selection_probability(mass, baseline_acquisition, context["default_alpha"], context["default_eta"], normalization, sizes)
+        after = selection_probability(mass, acquisition, weights["alpha"], weights["eta"], normalization, sizes)
         result["current_pool"] = {
             "scope": "first_draw_probabilities_under_fixed_baseline_gp; no query labels",
             "probability_total_variation": float(np.abs(after - before).sum() / 2),
@@ -100,13 +101,14 @@ def evaluate_policy_draft(prior, inputs, outputs):
     return result
 
 
-def selection_probability(mass, acquisition, alpha, eta, normalization):
+def selection_probability(mass, acquisition, alpha, eta, normalization, group_sizes=None):
     if normalization["name"] != "robust_z":
         raise ValueError("this task requires robust_z normalization")
     if normalization["epsilon"] != 1e-12 or normalization["mad_scale"] != 1.4826:
         raise ValueError("unsupported robust_z constants")
     z = robust_z_acquisition(acquisition, normalization["z_clip"])
     epsilon = normalization["epsilon"]
-    logits = alpha * np.log(mass + epsilon) + eta * z
+    sizes = np.ones_like(mass) if group_sizes is None else np.asarray(group_sizes)
+    logits = alpha * np.log(mass * sizes + epsilon) - np.log(sizes) + eta * z
     probability = np.exp(logits - logits.max())
     return probability / probability.sum()

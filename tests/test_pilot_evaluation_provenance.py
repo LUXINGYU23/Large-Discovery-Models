@@ -37,6 +37,29 @@ def test_repository_state_rejects_unversioned_archive(monkeypatch: pytest.Monkey
         execution._repository_state()
 
 
+def test_child_declares_provenance_without_method_or_directory_inference(tmp_path):
+    root = tmp_path / "child"
+    for pool in ("research", "audit"):
+        path = root / "native" / pool / "receipt.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"campaignId": "campaign", "taskId": "fixture", "seed": 1,
+            "limits": {}, "profiles": [{"profileId": pool}]}))
+    (root / "harness_provenance.json").write_text(json.dumps({"schema_version": 1,
+        "pools": {"proposals": ["native/research/receipt.json"], "review": ["native/audit/receipt.json"]}}))
+    spec = SimpleNamespace(output_root=tmp_path, selection_protocol="final_submission")
+    run = SimpleNamespace(run_dir=root, method="custom_review")
+    entry = {}
+    execution._mark_completed(entry, spec, run)
+    assert entry["status"] == "completed"
+    assert entry["harness"]["review"][0]["artifact"] == "child/native/audit/receipt.json"
+    path = root / "native/audit/receipt.json"
+    data = json.loads(path.read_text())
+    data["seed"] = 2
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="identities differ"):
+        execution._mark_completed({}, spec, run)
+
+
 def test_harness_provenance_keeps_only_redacted_release_fields(tmp_path: Path) -> None:
     run_dir = tmp_path / "campaigns" / "case" / "harness" / "seed_0"
     manifest_path = run_dir / "harness" / "manifest.json"

@@ -27,7 +27,8 @@ args:
   recovery-attempts: 3
   harness-sessions: 4
   harness-sidecar-image: ldm-pi-harness:latest
-  harness-thinking: high
+  llm-reasoning: high
+  llm-wire-api: responses
   harness-wall-time-seconds: 1800
   harness-response-timeout: 2100
   harness-tool-budget:

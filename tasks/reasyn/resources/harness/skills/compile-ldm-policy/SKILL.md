@@ -78,6 +78,15 @@ log q(x) = alpha * log(q0(x) + epsilon)
            + eta * robust_z(acquisition(x)) - log Z.
 ```
 
+For reconstruction, q0 groups canonical queries while evaluation identities
+retain independent sampling seeds. The host allocates each query's mass to its
+surviving trials: use `q0_group_mass` and `group_trial_count` from candidate
+diagnostics, with logits `alpha*log(q0_group_mass+epsilon) -
+log(group_trial_count) + eta*robust_z(UCB)`. TDC has one trial per product group.
+Both capabilities remain enabled; alpha changes query preference rather than
+being canceled by uniform per-seed frequencies. Diagnostics implement this
+same allocation, including after BO-pool maintenance.
+
 `alpha` controls proposal-frequency preference; `eta` controls task-GP acquisition
 influence. A zero prior mean does not remove the GP posterior or its uncertainty.
 The weights' ratio changes the balance and their common scale changes the
@@ -85,7 +94,8 @@ concentration. Both must be finite and non-negative. Use the authoritative
 context defaults as the starting policy; this adapter does not claim a released
 ReaSyn LDM weight baseline.
 Adapt from evidence, without fixed round schedules or host-imposed weight floors.
-Both weights at zero remove both signals from final selection. Do not choose
+Both weights at zero remove both signals from query-group selection (uniform
+across query groups, then within their retained trials). Do not choose
 that state, or numerically negligible weights, merely to maximize ESS or avoid
 uncalibrated predictions. An unsupported new mean calls for zero mean, not zero
 acquisition weight.

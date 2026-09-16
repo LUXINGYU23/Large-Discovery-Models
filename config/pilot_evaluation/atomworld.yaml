@@ -1,17 +1,17 @@
 schema_version: 1
-name: atomworld_public_question_refinement
+name: atomworld_measured_feedback_ldm
 task: atomworld
 selection_protocol: final_submission
-base_config: ../atomworld/harness.yaml
+base_config: ../atomworld/ldm_harness_compiled.yaml
 cases:
   - id: first_public_sample
     overrides:
       - args.limit=1
-methods: [llm, harness, blind_harness_compiled]
+methods: [ldm, ldm_harness, ldm_harness_compiled]
 method_overrides:
-  llm: []
-  harness: []
-  blind_harness_compiled: []
+  ldm: [args.proposal-samples=2]
+  ldm_harness: []
+  ldm_harness_compiled: []
 seeds: [0, 1, 2]
 optimization_rounds: 3
 initialization_mode: shared_start
@@ -24,3 +24,7 @@ trajectory:
 result_fields:
   one_shot_accuracy: one_shot_accuracy
   extended_final_accuracy: extended_final_accuracy
+  compiled_rounds: ldm_diagnostics.compiled_rounds
+  mean_prior_prediction_change: ldm_diagnostics.mean_prior_prediction_change
+  mean_selection_entropy: ldm_diagnostics.mean_selection_entropy
+  mean_effective_sample_size: ldm_diagnostics.mean_effective_sample_size

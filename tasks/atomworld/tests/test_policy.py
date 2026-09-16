@@ -62,6 +62,13 @@ def test_public_geometric_prior_features_compare_input_only():
 
 
 class PolicyClient:
+    expects_measured = False
+    source = """import numpy as np
+POLICY_API_VERSION = 1
+CAPABILITIES = {"prior_mean": 1}
+def compute_prior_mean(history_features, history_utilities, query_features, context):
+    return query_features[:, 3] / 1000000.0
+"""
     def __init__(self, args, root, sample, *, policy=False):
         self.root, self.turns, self.closed = root, [], False
 
@@ -72,7 +79,7 @@ class PolicyClient:
         assert len(turns) == 1
         turn = turns[0]
         self.turns.append(turn)
-        assert json.loads(turn.message)["new_measured_observations"] == []
+        assert bool(json.loads(turn.message)["new_measured_observations"]) == self.expects_measured
         # Policy syntax/schema rejection returns to the same persistent session.
         bad = HarnessSubmissionRequest(
             turn.profile_id, turn.turn_id, 1, {"action": "guess"}
@@ -80,12 +87,7 @@ class PolicyClient:
         assert submission_validator(bad).decision == "retry"
         path = self.root / "snapshots" / f"{turn.round_index}.py"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("""import numpy as np
-POLICY_API_VERSION = 1
-CAPABILITIES = {"prior_mean": 1}
-def compute_prior_mean(history_features, history_utilities, query_features, context):
-    return query_features[:, 3] / 1000000.0
-""")
+        path.write_text(self.source)
         artifact = HarnessSubmittedArtifact(
             "/artifact_path",
             "optimization_policy.py",
@@ -141,7 +143,7 @@ def test_independent_compiled_agent_executes_public_artifact_and_resumes(tmp_pat
         [
             "--mock",
             "--search-method",
-            "blind_harness_compiled",
+            "harness_public_audit",
             "--iterations",
             "2",
             "--out-dir",

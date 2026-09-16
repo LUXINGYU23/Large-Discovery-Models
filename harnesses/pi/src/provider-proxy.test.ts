@@ -80,3 +80,35 @@ test("provider proxy rejects credentials embedded in the base URL", () => {
 		/base URL must not contain credentials/,
 	);
 });
+
+test("provider proxy applies and traces the declared generation settings", async () => {
+	let received: Record<string, unknown> = {};
+	const upstream = createServer(async (request, response) => {
+		let body = "";
+		for await (const chunk of request) body += chunk.toString();
+		received = JSON.parse(body);
+		assert.equal(Number(request.headers["content-length"]), Buffer.byteLength(body));
+		response.end("ok");
+	});
+	await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+	const address = upstream.address();
+	assert(address && typeof address !== "string");
+	const root = await mkdtemp(join(tmpdir(), "ldm-provider-settings-"));
+	const settings = { temperature: 0.4, max_output_tokens: 1024, reasoning: { effort: "high" }, top_p: 0.9 };
+	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "unit-test-token", "campaign", settings);
+	try {
+		await proxy.start();
+		await proxy.beginTurn("research", "session", "turn", root);
+		const response = await fetch(proxy.baseUrl("research") + "/responses", {
+			method: "POST", body: JSON.stringify({ model: "fixture", input: [], temperature: 1 }),
+		});
+		assert.equal(await response.text(), "ok");
+		await proxy.endTurn("research");
+		assert.deepEqual(received, { model: "fixture", input: [], ...settings });
+		assert.deepEqual(JSON.parse(await readFile(join(root, "provider/turn-provider-1.request.bin"), "utf8")), received);
+	} finally {
+		await proxy.close();
+		await new Promise<void>((resolve) => upstream.close(() => resolve()));
+	}
+	assert.throws(() => new ProviderProxy("https://provider.example/v1", "fixture", "campaign", { tools: [] }), /protocol fields/);
+});

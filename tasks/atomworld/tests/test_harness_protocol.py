@@ -40,15 +40,20 @@ for line in sys.stdin:
         results=[]
         for turn in frame["turns"]:
             context=json.loads(turn["message"])
-            source=context["sample"]["input_cif"]
-            output="<cif>" + execute_operations(source, [{"op":"move", "index":0, "d_pos":[1,0,0]}]) + "</cif>"
+            source=json.loads((root / "public_task.json").read_text())["input_cif"]
+            output=execute_operations(source, [{"op":"move", "index":0, "d_pos":[1,0,0]}])
             for attempt, text in enumerate(["invalid CIF", output], 1):
-                submission={"generated_output":text, "rationale":"Applied the public Cartesian displacement using the delivered geometry implementation."}
-                encoded=json.dumps({"submission":submission, "artifacts":[]},sort_keys=True,separators=(",", ":"))
+                path=root / "snapshots" / f"{turn['turnId']}_{attempt}.cif"
+                path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_text(text)
+                artifacts=[{"pathPointer":"/artifact_path", "relativePath":"answer.cif", "snapshotPath":str(path.relative_to(root)),
+                    "sha256":hashlib.sha256(path.read_bytes()).hexdigest(), "sizeBytes":path.stat().st_size}]
+                submission={"artifact_path":"answer.cif", "rationale":"Applied the public Cartesian displacement using the delivered geometry implementation."}
+                encoded=json.dumps({"submission":submission, "artifacts":artifacts},sort_keys=True,separators=(",", ":"))
                 digest=hashlib.sha256(encoded.encode()).hexdigest()
                 send(frame, "submission_validation_requested", validationId=f"{turn['turnId']}_{attempt}",
                     profileId=turn["profileId"], turnId=turn["turnId"], attemptIndex=attempt,
-                    submission=submission, artifacts=[], submissionJson=encoded, submissionDigest=digest)
+                    submission=submission, artifacts=artifacts, submissionJson=encoded, submissionDigest=digest)
                 validation=json.loads(next(sys.stdin))
                 log({"type":"validation", "turn":turn["turnId"], "decision":validation["decision"], "errors":validation["errors"]})
                 assert validation["decision"] == ("retry" if attempt == 1 else "accept")
@@ -57,7 +62,7 @@ for line in sys.stdin:
                 **{key:turn[key] for key in ("profileId","turnId","roundIndex","historyFromSeq","historyToSeq","historyDigest","inputDigest")},
                 "sessionId":turn["profileId"], "replayed":False, "submissionStatus":"accepted",
                 "submissionId":turn["turnId"], "submissionJson":encoded, "submissionDigest":digest,
-                "submission":submission, "submittedArtifacts":[], "validationErrors":[],
+                "submission":submission, "submittedArtifacts":artifacts, "validationErrors":[],
                 "usage":{"providerCalls":0,"toolCalls":{"geometry_fixture":1},"artifactBytes":0},
                 "toolBudget":{}, "artifacts":{"session":"fixture-session", "turn":"fixture-turn"}})
         send(frame, "turn_committed", turns=results)
@@ -71,6 +76,8 @@ def test_shared_client_runs_geometry_repair_history_and_evaluation(tmp_path):
 
     def factory(args, root, sample, *, policy=False):
         roots.append(root)
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "public_task.json").write_text(json.dumps(sample))
         client = HarnessClient(
             [
                 sys.executable,

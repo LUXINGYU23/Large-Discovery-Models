@@ -47,12 +47,12 @@ def args():
     return options
 
 
-def client(root, *, mode="molecular", policy=False):
+def client(root, *, mode="molecular", policy=False, count=2):
     root.mkdir(parents=True, exist_ok=True)
     return HarnessClient(
         (sys.executable, "-u", str(FIXTURE), mode), api_key="synthetic-fixture-secret",
         config=HarnessPoolConfig(
-            artifact_root=root, profiles=profiles(2, policy=policy), campaign_id="protocol-fixture",
+            artifact_root=root, profiles=profiles(count, policy=policy), campaign_id="protocol-fixture",
             task_id="reasyn", case_id="synthetic", seed=0,
             submission_contract=policy_submission_contract() if policy else submission_contract(),
         ), response_timeout_seconds=10,
@@ -164,6 +164,34 @@ def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path)
     authoritative = json.loads((root / "measured_history.json").read_text())["observations"]
     assert len(authoritative) == 2
     assert authoritative[0]["research_annotations"][0]["rationale"].startswith("fixture independent")
+
+
+def test_small_batches_rotate_all_sessions_and_replay_durable_allocations(tmp_path):
+    root = tmp_path / "harness"
+    requests = [replace(request(batch=i), metadata={**request(batch=i).metadata, "count": 4})
+                for i in range(3)]
+    with client(root, count=8) as transport:
+        source = HarnessTargetSource(transport, root, args())
+        source.propose(requests[0])
+        source.propose(requests[1])
+    with client(root, count=8) as transport:
+        source = HarnessTargetSource(transport, root, args())
+        source.propose(requests[0])
+        source.propose(requests[2])
+    sent = jsonl(root / "fixture_requests.jsonl")
+    assert [[turn["profileId"] for turn in row["turns"]] for row in sent] == [
+        [p.profile_id for p in profiles(8)[:4]],
+        [p.profile_id for p in profiles(8)[4:]],
+        [p.profile_id for p in profiles(8)[:4]],
+    ]
+
+
+def test_reconstruction_policy_exposes_prior_and_effective_query_weights():
+    adapter = ReaSynPolicyAdapter(MoleculeEncoder(mock=True), benchmark="reconstruction",
+                                 alpha=1, eta=1, seed=0)
+    assert set(adapter.capability_contract().enabled_capabilities) == {"prior_mean@1", "ldm_weights@1"}
+    for alpha in ("0", "0.5", "2", "10"):
+        assert parse_args(["--mock", "--benchmark", "reconstruction", "--acquisition-alpha", alpha]).acquisition_alpha == float(alpha)
 
 
 def test_partial_session_recovery_replays_frozen_inputs_and_cumulative_usage(tmp_path):
@@ -341,7 +369,7 @@ def test_actual_guest_tools_register_query_full_history_and_preserve_reconstruct
     context = tmp_path / "context.json"
     context.write_text(json.dumps({"benchmark": "tdc", "oracle": "jnk3"}))
     history = tmp_path / "history.json"
-    rows = [{"candidate_id": f"c-{i}", "smiles": "CCO", "metrics": {"oracle_score": 0.3},
+    rows = [{"candidate_id": f"c-{i}", "smiles": "CCO", "round_idx": i // 10, "metrics": {"oracle_score": i / 140},
              "research_annotations": [{"rationale": "measured hypothesis"}]} for i in range(140)]
     history.write_text(json.dumps({"observations": rows}))
     script = r'''
@@ -356,7 +384,14 @@ const call = async (name, params = {}) => (await tools.get(name).execute("fixtur
 assert.equal((await call("describe_reasyn_task")).oracle, "jnk3");
 const page = await call("get_measured_history", {offset: 128, limit: 12});
 assert.equal(page.total, 140); assert.equal(page.observations.length, 12); assert.equal(page.next_offset, null);
-assert.equal(page.observations[0].research_annotations[0].rationale, "measured hypothesis");
+assert.equal(page.observations[0].annotation_count, 1);
+assert.equal(page.observations[0].research_annotations, undefined);
+const detailed = await call("get_measured_history", {candidate_ids: ["c-0", "c-139"], detail: "detailed"});
+assert.equal(detailed.observations.length, 2);
+assert.equal(detailed.observations[0].research_annotations[0].rationale, "measured hypothesis");
+const ranked = await call("get_measured_history", {round: 11, sort_by: "score", order: "desc", limit: 2});
+assert.equal(ranked.total, 10);
+assert.deepEqual(ranked.observations.map(row => row.candidate_id), ["c-119", "c-118"]);
 const exact = await call("get_measured_history", {candidate_id: "c-0"});
 assert.equal(exact.observations.length, 1);
 const products = await call("check_measured_product", {smiles: ["CCO", "CCN"]});

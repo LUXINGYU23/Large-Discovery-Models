@@ -214,31 +214,39 @@ def _matrix_complete(spec: PilotEvaluationSpec, manifest: dict[str, Any]) -> boo
 
 
 def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _EvaluationRun) -> None:
-    if getattr(spec, "selection_protocol", "best_so_far") == "final_submission" and "harness" in run.method:
+    declaration = run.run_dir / "harness_provenance.json"
+    if declaration.exists():
+        data = _read_json(declaration)
+        if data.get("schema_version") != 1 or not isinstance(data.get("pools"), dict) or not data["pools"]:
+            raise ValueError("Invalid child Harness provenance declaration")
         pools = {}
-        kinds = ("harness", "policy_harness") if "compiled" in run.method else ("harness",)
-        for kind in kinds:
-            root = run.run_dir / kind
-            paths = [root / "manifest.json"] if (root / "manifest.json").is_file() else sorted(root.glob("*/manifest.json"))
-            if not paths:
-                raise ValueError(f"completed submission campaign lacks native {kind} manifests")
-            pools[kind] = [_harness_manifest_provenance(path, spec.output_root) for path in paths]
-        if len(kinds) == 2:
-            if len(pools["harness"]) != len(pools["policy_harness"]):
-                raise ValueError("submission proposal/policy pool counts differ")
-            for proposal, policy in zip(pools["harness"], pools["policy_harness"], strict=True):
-                if any(proposal[field] is None or proposal[field] != policy[field] for field in ("campaign_id", "task_id", "seed")):
-                    raise ValueError("submission proposal/policy identities differ")
+        for name, paths in data["pools"].items():
+            if not isinstance(paths, list) or not paths:
+                raise ValueError("Harness provenance pools require manifest paths")
+            manifests = []
+            for relative in paths:
+                path = (run.run_dir / relative).resolve()
+                if not path.is_relative_to(run.run_dir.resolve()):
+                    raise ValueError("Harness manifest must be inside its child run")
+                manifests.append(_harness_manifest_provenance(path, spec.output_root))
+            pools[name] = manifests
+        if len(pools) > 1:
+            if len({len(pool) for pool in pools.values()}) != 1:
+                raise ValueError("Declared Harness pools have different identity counts")
+            for receipts in zip(*pools.values(), strict=True):
+                for field in ("campaign_id", "task_id", "seed"):
+                    if receipts[0][field] is None or any(row[field] != receipts[0][field] for row in receipts):
+                        raise ValueError("Declared Harness pool identities differ")
         entry["harness"] = pools
-    elif run.method in {_COMPILED_METHOD, "blind_harness_compiled"}:
-        entry["harness"] = _compiled_harness_provenance(
-            run.run_dir,
-            spec.output_root,
-        )
+    elif getattr(spec, "selection_protocol", "best_so_far") == "final_submission":
+        # Scheduled-submission adapters declare their own optional pool topology.
+        if _read_json(run.run_dir / "budget.json").get("counters", {}).get("harness_turns", 0):
+            raise ValueError("Harness child must emit harness_provenance.json")
+    elif run.method == _COMPILED_METHOD:
+        entry["harness"] = _compiled_harness_provenance(run.run_dir, spec.output_root)
     elif run.method in {"ldm_harness", "harness"}:
         entry["harness"] = _harness_manifest_provenance(
-            run.run_dir / "harness" / "manifest.json",
-            spec.output_root,
+            run.run_dir / "harness" / "manifest.json", spec.output_root,
         )
     entry.update(
         status="completed",
@@ -302,6 +310,7 @@ def _harness_manifest_provenance(
         "wire_api": manifest.get("wireApi"),
         "model": manifest.get("model"),
         "thinking": manifest.get("thinking"),
+        "provider_request_body": manifest.get("providerRequestBody", {}),
         "profile_set_sha256": manifest.get("profileSetSha256"),
         "profiles": profiles,
         "guest_runtime": manifest.get("guestRuntime"),
@@ -312,7 +321,12 @@ def _harness_manifest_provenance(
 
 
 def _proposal_mode(config: dict[str, Any], method: str) -> str:
-    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness", "blind_harness_compiled"}:
+    from ldm_tts.registration.registry import get_task_definition
+
+    declared = get_task_definition(config["task"]).pilot_evaluation.get("methods", {})
+    if method in declared:
+        return declared[method]
+    if method in {"bo", "ldm_harness", _COMPILED_METHOD, "harness"}:
         return "none"
     return "callable" if config.get("mode") == "mock" else "openai"
 

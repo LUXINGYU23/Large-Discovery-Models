@@ -1,7 +1,7 @@
 """Task-local empirical proposal measure and finite-pool LDM sampling.
 
-Reconstruction uses a canonical query plus its independent projection seed as
-the probability identity. TDC uses the canonical projected product. Repeated
+Reconstruction groups probability by canonical query while retaining independent
+projection seeds as evaluation identities. TDC uses the canonical product. Repeated
 unmeasured products contribute occurrences before the shared reservoir dedups.
 """
 
@@ -30,33 +30,38 @@ def attach_empirical_base_measure(proposals, *, benchmark, mock, observations=()
         if isinstance(candidate, CandidateRejection):
             raise ValueError(f"invalid trusted proposal: {candidate.message}")
         if candidate.canonical_key not in evaluated:
-            admitted.append((proposal, candidate.canonical_key))
-    counts = Counter(key for _, key in admitted)
+            group = candidate.payload["target_smiles"] if benchmark == "reconstruction" else candidate.canonical_key
+            admitted.append((proposal, candidate.canonical_key, group))
+    counts = Counter(group for _, _, group in admitted)
     annotations = {}
-    for proposal, key in admitted:
+    for proposal, key, _ in admitted:
         lineage = proposal.metadata.get("harness_lineage")
         if isinstance(lineage, dict):
             annotations.setdefault(key, []).append(dict(lineage))
     total = sum(counts.values())
-    space = "canonical_query_and_sampling_seed" if benchmark == "reconstruction" else "canonical_product"
+    space = "canonical_query" if benchmark == "reconstruction" else "canonical_product"
     return tuple(
         replace(proposal, metadata={
             **proposal.metadata,
             **({"research_annotations": annotations[key]} if key in annotations else {}),
             Q0_METADATA_KEY: {
                 "identity_space": space,
-                "occurrence_count": counts[key],
+                "group_key": group,
+                "occurrence_count": counts[group],
                 "valid_occurrence_count": total,
-                "probability": counts[key] / total,
+                "probability": counts[group] / total,
             },
         })
-        for proposal, key in admitted
+        for proposal, key, group in admitted
     )
 
 
 def empirical_base_masses(candidates):
-    counts = []
+    counts = {}
     totals = set()
+    keys = []
+    if len({c.canonical_key for c in candidates}) != len(candidates):
+        raise ValueError("ReaSyn q0 contains duplicated candidate identities")
     for candidate in candidates:
         record = candidate.metadata.get(Q0_METADATA_KEY, {})
         count = record.get("occurrence_count")
@@ -67,14 +72,30 @@ def empirical_base_masses(candidates):
         probability = record.get("probability")
         if probability is None or not np.isclose(float(probability), count / total):
             raise ValueError("ReaSyn empirical q0 does not match occurrence counts")
-        counts.append(count)
+        key = record.get("group_key", candidate.canonical_key)
+        if key in counts and counts[key] != count:
+            raise ValueError("ReaSyn q0 group counts are inconsistent")
+        counts[key] = count
+        keys.append(key)
         totals.add(total)
     if len(totals) > 1:
         raise ValueError("ReaSyn empirical q0 totals are inconsistent")
-    if counts and sum(counts) > next(iter(totals)):
+    if counts and sum(counts.values()) > next(iter(totals)):
         raise ValueError("ReaSyn q0 contains duplicated candidate identities")
-    values = np.asarray(counts, dtype=float)
+    sizes = Counter(keys)
+    if any(sizes[key] > count for key, count in counts.items()):
+        raise ValueError("ReaSyn q0 has more trials than proposal occurrences")
+    # Condition on retained query groups, then allocate each group's mass to
+    # its surviving independent trials (also after BO-pool maintenance).
+    values = np.asarray([counts[key] / sizes[key] for key in keys], dtype=float)
     return values / values.sum() if len(values) else values
+
+
+def empirical_group_sizes(candidates):
+    keys = [c.metadata.get(Q0_METADATA_KEY, {}).get(
+        "group_key", c.payload.get("target_smiles", c.canonical_key)) for c in candidates]
+    sizes = Counter(keys)
+    return np.asarray([sizes[key] for key in keys], dtype=float)
 
 
 def robust_z(values, *, clip=5.0):
@@ -94,7 +115,7 @@ def robust_z(values, *, clip=5.0):
     return np.clip((values - center) / (scale + EPSILON), -clip, clip)
 
 
-def tilted_distribution(q0, acquisition, *, alpha, eta, z_clip=5.0):
+def tilted_distribution(q0, acquisition, *, alpha, eta, z_clip=5.0, group_sizes=None):
     if any(not np.isfinite(weight) or weight < 0 for weight in (alpha, eta)):
         raise ValueError("LDM alpha and eta must be finite and nonnegative")
     q0 = np.asarray(q0, dtype=float)
@@ -104,7 +125,10 @@ def tilted_distribution(q0, acquisition, *, alpha, eta, z_clip=5.0):
     normalized = robust_z(acquisition, clip=z_clip)
     if q0.shape != normalized.shape:
         raise ValueError("q0 and acquisition vectors must align")
-    logits = alpha * np.log(q0 + EPSILON) + eta * normalized
+    sizes = np.ones_like(q0) if group_sizes is None else np.asarray(group_sizes, dtype=float)
+    if sizes.shape != q0.shape or not np.isfinite(sizes).all() or np.any(sizes < 1):
+        raise ValueError("q0 trial group sizes must be positive and candidate-aligned")
+    logits = alpha * np.log(q0 * sizes + EPSILON) - np.log(sizes) + eta * normalized
     probabilities = np.exp(logits - np.max(logits))
     return probabilities / probabilities.sum(), logits, normalized
 

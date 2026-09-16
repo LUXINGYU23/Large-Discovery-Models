@@ -27,7 +27,7 @@
       {
         "name": "correct",
         "direction": "maximize",
-        "description": "Logged official per-answer objective only; no target-based optimization or answer selection"
+        "description": "Official per-answer objective; past scalar measurements train LDM methods, while blind baselines never expose them"
       }
     ],
     "diagnostic": [
@@ -51,8 +51,10 @@
       "primitive_cell": false,
       "stol": 0.5,
       "distance_units": "normalized_dimensionless",
-      "feedback": "public syntax only",
+      "feedback": "Blind baselines: public syntax only. LDM: past same-question scalar correctness, never private targets or judge internals.",
       "selection": "last scheduled answer",
+      "ldm_applicable": true,
+      "ldm_protocol": "measured_correctness_optimization; distinct from official blind refinement",
       "paper_actions": [
         "change_atom_action",
         "remove_atom_action",
@@ -69,16 +71,19 @@
       "source_commit_note": "Archive contains no Git metadata; SHA-256 inventory pins local files.",
       "proposal_modes": {
         "mock": "deterministic; no endpoint preflight",
-        "real": "OpenAI-compatible Chat Completions; preflight required",
+        "real": "Explicit Responses or Chat Completions with matched reasoning controls; preflight required",
         "harness": "Persistent sample-isolated Pi Harness sessions; Responses provider; task-local submission repair",
-        "blind_harness_compiled": "Independent compiled public-audit prior; no objective history or fitted GP"
+        "harness_public_audit": "Independent compiled public-audit prior; no objective history or fitted GP",
+        "ldm": "Direct measured-feedback reservoir; empirical q0, fixed residual RBF GP/UCB and Gumbel sampling",
+        "ldm_harness": "Persistent research reservoir with the same measured-feedback LDM selector",
+        "ldm_harness_compiled": "Independent policy session compiles prior_mean@1 and ldm_weights@1 on actual measured history; fixed GP/UCB and sampling"
       },
       "collection_modes": {
         "cif": "Accepted parseable CIF output \u2192 canonical ldm-2.0 IR",
         "operations": "Raw plans/tool records only; no CIF model-output collection"
       },
-      "harness_feedback": "Public current question and public draft/syntax history only; no judge artifacts, targets, objective observations or cross-question answers",
-      "harness_selection": "Predeclared profile rotation; compiled extension uses untrained public structural prior within the current revision; last revision remains final"
+      "harness_feedback": "Sample-isolated research; measured-feedback LDM additionally exposes only past scalar correctness. Never mount judge artifacts, targets or cross-question answers.",
+      "harness_selection": "Blind harness uses predeclared profile rotation. LDM samples q0^alpha exp(eta robust_z(UCB)) from the maintained pool; last scheduled selected answer remains final."
     },
     "per_candidate_limits": {
       "answers_per_round": 1,
