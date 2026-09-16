@@ -1,8 +1,10 @@
-# Ready-to-Run LDM Examples with Delta-Infra
+# Ready-to-Run LDM Examples
 
 This directory contains reproducible runbooks and artifacts from running Large
-Discovery Model (LDM) campaigns on **Delta-Infra**. Start here when you want to
-run an existing small-molecule, antibody, AI4Bio, or discrete causal-discovery
+Discovery Model (LDM) campaigns on **Delta-Infra** or an existing GPU host.
+The minimal ReaSyn example uses an existing host over SSH and does not require
+Delta-Infra. Start here when you want to
+run an existing ReaSyn, small-molecule, antibody, AI4Bio, or discrete causal-discovery
 campaign, or use an existing run as a reference for registering a new LDM task.
 
 ## What is Delta-Infra?
@@ -23,6 +25,9 @@ The examples use the infrastructure in two complementary ways:
   requires one.
 
 ## Install Delta-Infra
+
+This section is only needed for the Delta-Infra workflows; skip it for the
+SSH-based ReaSyn example.
 
 The [Delta-Infra quickstart](https://delta-infra-dashboard.yangtzeailab.com/docs/quickstart/account)
 recommends the interactive installer below. It installs the CLI globally,
@@ -99,6 +104,7 @@ delta-cli sandbox kill <sandbox_id>
 
 | Goal | Start here | What the recorded run demonstrates |
 | --- | --- | --- |
+| Run the minimal ReaSyn example | [ReaSyn workflow](./run_reasyn/REASYN_WORKFLOW.md) | Real DeepSeek-V4-Flash proposals, LDM/GP-UCB selection, and two frozen ReaSyn projection trials for one Enamine target. A tiny integration example, not a paper-scale score; runtime results are not checked in, and no Delta-Infra or Harness is required. |
 | Run a small-molecule campaign | [Small-molecule workflow](./run_small_molecule_w_delta_infra/DELTA_CLI_WORKFLOW.md) | Real Qwen inference, AutoDock Vina scoring against KRAS G12D, activity prediction, and EHVI search. The included result is a deliberately stopped partial 30/100 campaign. |
 | Run an antibody campaign | [Antibody workflow](./run_antibody_w_delta_infra/DELTA_CLI_WORKFLOW.md) | Real Qwen CDRH3 proposals and 20 managed AntBO/Absolut evaluations for antigen `1ADQ_A`. |
 | Register and run a custom task | [Task-registration workflow](run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) | Manifest-based registration and a 20-iteration diagnostic campaign for adaptive LLM KV-cache quantization. The recorded campaign is non-official and the task remains `draft`. |

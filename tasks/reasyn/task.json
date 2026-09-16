@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "reasyn",
+  "description": "LDM-guided ReaSyn synthesizable reconstruction and released TDC goal-directed evaluation.",
+  "dependency_checker": "tasks.reasyn.ldm_task.dependencies:check_dependencies"
+}

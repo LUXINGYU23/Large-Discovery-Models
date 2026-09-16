@@ -1,0 +1,120 @@
+"""Runtime-faithful science and search contract."""
+
+from dataclasses import replace
+from pathlib import Path
+
+from ldm_tts.contracts import (
+    AcquisitionSpec,
+    CandidateDomainSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ProposalSearchSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
+    ResponseSpaceSpec,
+    SurrogateSpaceSpec,
+)
+
+
+def describe_ldm_task(args=None):
+    attempts = getattr(args, "attempts_per_sample", 1)
+    tool_mode = getattr(args, "proposal_format", "cif") == "operations"
+    method = getattr(args, "search_method", "llm")
+    response_space = "operation_plan" if tool_mode else "cif_answer"
+    spec = LDMTaskSpec(
+        task="atomworld",
+        candidate_domain=CandidateDomainSpec(
+            "atomworld_answer",
+            "structured_text",
+            None,
+            "Public sample ID plus raw model output containing a complete CIF",
+            constraints={
+                "max_output_chars": 1000000,
+                "malformed_cif": "officially scored as incorrect",
+            },
+        ),
+        objectives=(
+            ObjectiveSpec(
+                "correct",
+                "maximize",
+                "Official per-answer correctness; hidden from refinement and final-answer choice",
+            ),
+        ),
+        response_spaces=(
+            ResponseSpaceSpec(
+                response_space,
+                "json" if tool_mode else "text",
+                parser="json.loads + tasks.atomworld.core.geometry.execute_operations"
+                if tool_mode
+                else "tasks.atomworld.core.proposals.extract_cif",
+                description="Bounded geometry operation list produces a scored CIF"
+                if tool_mode
+                else "Last <cif>...</cif> block, as in the official evaluator",
+            ),
+        ),
+        acquisition=AcquisitionSpec(
+            "chronological_submission",
+            ("correct",),
+            "maximize",
+            "Evaluate the sole submitted answer; final answer is the last scheduled attempt, independent of score",
+        ),
+        reservoir=ReservoirSpec(
+            "cif_submissions",
+            (
+                ReservoirExpansionSpec(
+                    "answer", "emit_candidate", response_space, True
+                ),
+                ReservoirExpansionSpec(
+                    "blind_self_review",
+                    "edit_candidate",
+                    response_space,
+                    True,
+                    description="Original question, previous draft and public syntax feedback only",
+                ),
+            ),
+            "tasks.atomworld.core.proposals.AtomWorldDomain",
+            "sha256(sample_id + canonical answer)",
+            max_size=1,
+        ),
+        surrogate=SurrogateSpaceSpec(
+            "none", "No surrogate: target-blind chronological refinement", "none"
+        ),
+        proposal_search=ProposalSearchSpec(
+            "persistent_blind_research" if method != "llm" else "blind_refinement",
+            breadth=1,
+            depth=attempts,
+            beam_width=1,
+            evaluation_policy="each_submission",
+        ),
+        metadata={
+            "ldm_applicable": False,
+            "feedback_policy": "no targets, judge scores, judge errors, oracle parent or cross-question answers",
+            "comparison": "one-shot and extended compute reported separately",
+            "search_method": method,
+            "compiled_policy": "public plausibility prior with empty label history; no hidden-score GP"
+            if method == "harness_public_audit"
+            else "disabled",
+        },
+    )
+    from .methods import LDM_METHODS, HARNESS_METHODS
+    from .selection import AtomWorldLDMSelector, GeometryEncoder
+
+    if method not in LDM_METHODS:
+        return spec
+    breadth = len(args.harness_profile) if method in HARNESS_METHODS else args.proposal_samples
+    return replace(
+        spec,
+        objectives=(ObjectiveSpec("correct", "maximize", "Past measured scalar correctness; no target CIF or judge diagnostics exposed"),),
+        acquisition=AtomWorldLDMSelector(args, [], Path(".")).describe(),
+        surrogate=GeometryEncoder([]).describe(),
+        reservoir=replace(spec.reservoir, max_size=breadth,
+            deduplication_key="sha256(sample_id + canonical answer + scheduled round); q0 counts answer occurrences within each round"),
+        proposal_search=ProposalSearchSpec("measured_feedback_research", breadth=breadth,
+            depth=attempts, beam_width=1, evaluation_policy="one_selected_submission_per_round"),
+        metadata={"ldm_applicable": True, "search_method": method,
+            "feedback_protocol": "measured_correctness_optimization",
+            "comparison": "Feedback-enabled optimization extension; not the official blind-refinement protocol",
+            "policy_capabilities": ["prior_mean@1", "ldm_weights@1"] if method == "ldm_harness_compiled" else [],
+            "policy_warm_start": "q0-only before the first measurement of each sample",
+            "final_selection": "last scheduled sampled answer, never best-of hidden judge scores"},
+    )

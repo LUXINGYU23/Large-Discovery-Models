@@ -1,0 +1,28 @@
+{
+  "source_url": "https://github.com/NVIDIA-BioNeMo/ReaSyn/tree/reasyn_v2",
+  "paper": "https://arxiv.org/abs/2509.16084",
+  "git_commit": null,
+  "archive_digest": "2c129c3e88788a6b04a26b3314bee86fe192f6576793ca7b22e4f94a191a4661",
+  "note": "Local source archives have no .git. These SHA256 values identify supplied files, not an upstream Git commit.",
+  "files": {
+    "ReaSyn-reasyn_v2/README.md": "6b5e2d1988e51c247ef68976193f84641b31a1f1698608c4ae85301435a765d7",
+    "ReaSyn-reasyn_v2/scripts/optimize_tdc.py": "89e87cd38824364045d57cf88d781ff56f6d7ab0c31a5f8bb162e164b8f1ff7e",
+    "ReaSyn-reasyn_v2/scripts/eval_recon.py": "00dc3645f5f7cfa6c8433af04d0b8e959f75d59d20c9ff99bc8224318b3e1108",
+    "ReaSyn-reasyn_v2/reasyn/sampler/sampler.py": "f2e684b1027005e671f025a6b8fcc7c830b30484c8fde26f2b97ac1f1e7d2bbf",
+    "ReaSyn-reasyn_v2/reasyn/sampler/parallel.py": "dca58a8b8e3114b650cd025d95c85b62ec394ad32847a7aaa58f31f6ded17c3f",
+    "ReaSyn-reasyn_v2/reasyn/utils/sample_utils.py": "81ebfd118f6bc42163d4946e4b639ef7d934f76147e1ebf82ac2793b595d66bd",
+    "ReaSyn-reasyn_v2/reasyn/chem/stack.py": "1d99748186e9361ddfb6811e6cbc97b558154a99def0d13b815079f1387d5c9c",
+    "ReaSyn-reasyn_v2/reasyn/chem/mol.py": "53a1bdb6f1f35f6e4993a8311f18736a2fbed9a1009c1f08cda430a38aff5884",
+    "ReaSyn-reasyn_v2/reasyn/utils/hparams_tdc.yml": "780df6e668adf353d58dbf4a0af021c161042e80cabd08b901aa116ad8b07e8f",
+    "ReaSyn-reasyn_v2/configs/train_ar.yml": "6fad41d2ee3e23a5900231c921032d99cf7190e649eb7cd2cb7663a93e0df0bd",
+    "ReaSyn-reasyn_v2/configs/train_eb.yml": "3820ac0e8d9a8fcff7a5200e6b547b8d3e059ab9ba79bcf36df84e81835b6b68",
+    "ReaSyn-reasyn_v2/data/test_zinc250k.txt": "59e0f5b4cb40d1c784a4505a1451338a1c4621e68ce1febd4e826a393f47be01",
+    "ReaSyn-reasyn_v2/data/building_blocks/building_blocks_zinc250k.txt": "96da92294b151cc7cd90d1baf055f913aa4d77d047fe80997fca06d759aad775",
+    "ReaSyn-reasyn_v2/env.yml": "942c1017d9af3a7ec412fe5105512e1889bf0deb4688181a155e8e75c478fc09",
+    "reasyn-arxiv/5_experiments.tex": "768f159e5889e322fcbd4d579b74ed8dc047993e0d339846e8d2e18d2d7b249a",
+    "reasyn-arxiv/7_appendix.tex": "934c651c5cbb9f14a9006c4ebf055edf6f48cbeac4697f8da71520e9abb8ee02",
+    "reasyn-arxiv/tables/pmo.tex": "06c63abc4c0fc777a0f3068b8cb22ed56dc291d7b1eed9aa2d5a5d7c124b242d",
+    "reasyn-arxiv/tables/reconstruction.tex": "1dcfd7b07334496ad33bef30b1f1c1307a0286c160b5e5c24a2c066c781effe1"
+  },
+  "url_verification": "2026-09-06: legacy NVIDIA-Digital-Bio URL redirects to NVIDIA-BioNeMo; current official repository displays reasyn_v2 branch and the supplied paper title."
+}

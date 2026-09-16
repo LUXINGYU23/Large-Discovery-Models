@@ -1,0 +1,5 @@
+name: science_benchmarks_mock
+description: Service-free shared-campaign integration checks for AtomWorld and ReaSyn.
+experiments:
+  - ../atomworld/mock.yaml
+  - ../reasyn/mock.yaml

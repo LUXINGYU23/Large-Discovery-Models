@@ -1,0 +1,12 @@
+name: atomworld_one_shot
+task: atomworld
+algorithm: direct_reasoning
+mode: real
+contract_profile: one_shot
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  proposal-format: cif
+  attempts-per-sample: 1
+  llm-max-tokens: 8192
+  llm-temperature: 0.0
+  out-dir: runs/one_shot

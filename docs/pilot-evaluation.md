@@ -164,3 +164,35 @@ Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
 - `config/pilot_evaluation/iron_mind.yaml`
 - `config/pilot_evaluation/synthonbench.yaml`
 - `config/pilot_evaluation/nucleobench.yaml`
+
+## Final-submission and replenished-sampling protocols
+
+The default `selection_protocol: best_so_far` retains the fixed optimization
+matrix and its LDM/BO/direct baselines. Tasks whose last answer is authoritative
+can set `selection_protocol: final_submission`. The shared reporter consumes
+normalized rows with `step`, `candidate_id`, `canonical_key`, `objective`, and
+`status` (succeeded or missing), requiring one row per scheduled step. It permits
+repeated measured candidates and checks their keys and objective values against
+checkpoint evaluations. Missing-submission penalties are task-defined.
+`optimization_rounds + 1` counts scheduled submissions under this protocol.
+
+Tasks can declare `pilot_evaluation.methods` in `task.json`, mapping additional
+task-local method names to proposal modes, and a `submission_adapter` hook using
+`python.module:function`. The hook receives the spec, raw trajectory, checkpoint
+observations, run directory and result, audits task receipts and returns normalized
+rows. AtomWorld owns its one-question schedule, attempt numbering, zero penalty,
+first/final accuracy checks and `harness_public_audit` method in this adapter.
+
+New child runs declare native Harness manifests in `harness_provenance.json`:
+`{"schema_version": 1, "pools": {"research": ["native/manifest.json"]}}`.
+Paths are relative to the child directory. Multiple pools align by index and
+must share campaign/task/seed identity at each index. The runner validates and
+hashes those manifests without deriving layout from a task-local method name.
+Existing standard optimization methods retain their conventional layout fallback.
+
+Adapters with projection-driven rejection can declare
+`proposal_counting: bounded_minibatches` in their persisted campaign config.
+Reporting validates the configured minibatch and replenishment bounds, including
+the separate count of persistent research sessions. These adapters must still
+complete the same scientific round/evaluation budget and paired initialization.
+Synthetic protocol tests do not satisfy real Harness qualification.

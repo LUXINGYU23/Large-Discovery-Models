@@ -74,6 +74,7 @@ class PiHarnessConfig(HarnessPoolConfig):
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
     web_search: PiWebSearch = field(default_factory=PiWebSearch)
     context7_enabled: bool = True
+    provider_request_body: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
@@ -124,6 +125,7 @@ class PiHarnessConfig(HarnessPoolConfig):
             "networkPolicy": self.network_policy.to_dict(),
             "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
+            **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
         }
 
 

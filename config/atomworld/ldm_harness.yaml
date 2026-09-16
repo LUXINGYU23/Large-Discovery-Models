@@ -1,0 +1,17 @@
+name: atomworld_ldm_harness
+task: atomworld
+algorithm: ldm_harness
+mode: real
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  search-method: ldm_harness
+  attempts-per-sample: 4
+  bo-pool-size: 32
+  acquisition-alpha: 1.0
+  acquisition-eta: 1.0
+  harness-profile: [geometry_research, structure_audit]
+  harness-cache-dir: ${ATOMWORLD_HARNESS_CACHE}
+  llm-reasoning: high
+  llm-wire-api: responses
+  harness-max-submission-attempts: 3
+  out-dir: runs/atomworld/ldm_harness

@@ -1,0 +1,21 @@
+{
+  "name": "reasyn_reconstruction_zinc250k_original",
+  "task": "reasyn",
+  "algorithm": "projection_baseline",
+  "mode": "real",
+  "contract_profile": "reconstruction_zinc250k_original",
+  "args": {
+    "benchmark": "reconstruction",
+    "dataset": "zinc250k",
+    "target-limit": 1000,
+    "search-width": 8,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 100,
+    "max-results": 100,
+    "evaluations-per-round": 1,
+    "iterations": 1,
+    "num-cycles": 16,
+    "reservoir-size": 1,
+    "proposal-mode": "baseline"
+  }
+}

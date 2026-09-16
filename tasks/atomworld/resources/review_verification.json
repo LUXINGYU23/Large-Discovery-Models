@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-08",
+  "qualification": "draft",
+  "live_agent_loop_verified": false,
+  "checks": {
+    "locked_task_environment": "uv sync --locked --project tasks/atomworld --group dev: passed; Python 3.11",
+    "task_tests": "60 passed, zero skipped",
+    "official_geometry_parity": "All ten bounded operations checked against the available pinned official source",
+    "harness_protocol": "Actual shared HarnessClient JSONL subprocess, deterministic sidecar, real public geometry execution, task rejection and repair, persistent session IDs, second public-history update, evaluation and resume checks passed. No model provider was used.",
+    "compiled_policy": "Independent PolicyResearchController executed a fixed test artifact through the actual shared policy_runner, with empty objective history, public features, submission repair, persisted epochs and completed-run resume. Test artifact execution was local; production uses Docker isolation.",
+    "guest_dependencies": "Hash-locked guest requirements installed into an independent environment; the delivered guest smoke.sh passed locally. This does not certify Docker/KVM image boot.",
+    "registration": "Task registration/layout valid; formal evidence remains scaffolded",
+    "pilot": "External final_submission integration completed three llm mock seeds with three scheduled revisions each; numeric trajectory and repeated-answer accounting verified",
+    "whitespace": "git diff --check passed"
+  },
+  "guest_runtime": {
+    "imageRef": "ldm/atomworld-research:6d46fd14a3b5",
+    "recipeSha256": "6d46fd14a3b57016e877e5ecaf8411cdd23c9e50a36d5b7bc33e04ee65f81403",
+    "rootfsSize": "3G",
+    "installPolicy": "session_overlay"
+  },
+  "tests_sha256": {
+    "tests/test_geometry.py": "ad256ec79da5685bd61d1b17548f6188039fcbc356420fa6ec5040b3bc80e981",
+    "tests/test_harness.py": "5520896cb9c0f8d69512594fb49bccbfc36541ec710ff047ab8251d4541e9315",
+    "tests/test_harness_protocol.py": "2c3d83ba9e8385fc53e9221d0426b3bc486ed39ab65123d3516607669b57a39b",
+    "tests/test_policy.py": "5c991024f4b4134d8afa6c7f81a51a2da5112b27f1f602eca4a1992c70c9bd83",
+    "tests/test_procedure.py": "2637b0635422624b7d606160164640b257139c2a08f91c13d5204bddc72983f4"
+  },
+  "remaining_real_validation": [
+    "A Linux Docker/KVM host with the built shared sidecar and task guest",
+    "A configured real Responses provider",
+    "A real two-revision agent research/tool/submission/official-evaluation loop and inspection of native session/provider traces"
+  ],
+  "limitations": "Current host had no working Docker daemon/KVM execution or configured provider credentials. Deterministic protocol tests and mock scores are not live-agent qualification or paper benchmark scores."
+}

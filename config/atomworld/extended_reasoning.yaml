@@ -1,0 +1,12 @@
+name: atomworld_extended_reasoning
+task: atomworld
+algorithm: target_blind_refinement
+mode: real
+contract_profile: extended_reasoning
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  proposal-format: cif
+  attempts-per-sample: 4
+  llm-max-tokens: 8192
+  llm-temperature: 0.0
+  out-dir: runs/extended_reasoning

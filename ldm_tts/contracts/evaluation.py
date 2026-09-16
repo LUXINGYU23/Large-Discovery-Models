@@ -13,6 +13,7 @@ from ldm_tts.contracts.task import ObjectiveSpec
 
 EvaluationStatus = Literal["succeeded", "failed", "timed_out", "invalid"]
 EVALUATION_STATUSES = frozenset({"succeeded", "failed", "timed_out", "invalid"})
+EVALUATION_ATTEMPT_RECEIPT_KEY = "ldm_evaluation_attempt_receipt"
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,19 @@ class CandidateEvaluator(Protocol):
 
     def evaluate(self, candidate: Candidate) -> EvaluationResult:
         """Evaluate one admitted candidate and return a classified outcome."""
+
+
+@runtime_checkable
+class CandidateEvaluationPreparer(Protocol):
+    """Optional resumable preparation before scientific evaluation is charged.
+
+    Implementations persist reusable work under candidate identity and keep
+    authoritative oracle evaluation in ``evaluate``. Preparation exceptions
+    propagate to the campaign owner instead of becoming failed observations.
+    """
+
+    def prepare_evaluations(self, candidates: Sequence[Candidate]) -> None:
+        """Prepare the selected candidates, reusing any durable completed work."""
 
 
 @runtime_checkable
@@ -320,8 +334,10 @@ def best_item(
 
 __all__ = [
     "BatchCandidateEvaluator",
+    "CandidateEvaluationPreparer",
     "CandidateEvaluator",
     "CallableCandidateEvaluator",
+    "EVALUATION_ATTEMPT_RECEIPT_KEY",
     "EVALUATION_STATUSES",
     "EvaluationResult",
     "EvaluationStatus",
