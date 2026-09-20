@@ -1,0 +1,35 @@
+{
+  "name": "reasyn_reconstruction_ldm_harness_tiny",
+  "task": "reasyn",
+  "algorithm": "ldm_harness",
+  "mode": "real",
+  "description": "Small persistent research integration run; draft scientific qualification.",
+  "args": {
+    "benchmark": "reconstruction",
+    "search-method": "ldm_harness",
+    "proposal-mode": "harness",
+    "iterations": 2,
+    "proposal-samples": 4,
+    "proposal-batch-size": 4,
+    "bo-pool-size": 4,
+    "evaluations-per-round": 1,
+    "num-cycles": 1,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 4,
+    "harness-sessions": 4,
+    "harness-sidecar-image": "ldm-pi-harness:latest",
+    "llm-reasoning": "high",
+    "llm-wire-api": "responses",
+    "harness-wall-time-seconds": 1800,
+    "harness-response-timeout": 2100,
+    "harness-tool-budget": [
+      "describe_reasyn_task=8",
+      "get_measured_history=16",
+      "check_measured_product=32"
+    ],
+    "recovery-attempts": 3,
+    "max-replenishment-batches": 4,
+    "target-limit": 1,
+    "search-width": 8
+  }
+}

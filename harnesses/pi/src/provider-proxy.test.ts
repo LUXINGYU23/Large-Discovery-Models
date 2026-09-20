@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ProviderProxy } from "./provider-proxy.js";
+import { streamSimple } from "@earendil-works/pi-ai/api/openai-responses";
 
 test("provider proxy captures raw stream chunks while redacting credentials", async () => {
 	const secret = "unit-test-provider-secret";
@@ -80,3 +81,76 @@ test("provider proxy rejects credentials embedded in the base URL", () => {
 		/base URL must not contain credentials/,
 	);
 });
+
+test("provider proxy applies and traces the declared generation settings", async () => {
+	let received: Record<string, unknown> = {};
+	const upstream = createServer(async (request, response) => {
+		let body = "";
+		for await (const chunk of request) body += chunk.toString();
+		received = JSON.parse(body);
+		assert.equal(Number(request.headers["content-length"]), Buffer.byteLength(body));
+		response.end("ok");
+	});
+	await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+	const address = upstream.address();
+	assert(address && typeof address !== "string");
+	const root = await mkdtemp(join(tmpdir(), "ldm-provider-settings-"));
+	const settings = { temperature: 0.4, max_output_tokens: 1024, reasoning: { effort: "high" }, top_p: 0.9 };
+	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "unit-test-token", "campaign", settings);
+	try {
+		await proxy.start();
+		await proxy.beginTurn("research", "session", "turn", root);
+		const response = await fetch(proxy.baseUrl("research") + "/responses", {
+			method: "POST", body: JSON.stringify({ model: "fixture", input: [], temperature: 1 }),
+		});
+		assert.equal(await response.text(), "ok");
+		await proxy.endTurn("research");
+		assert.deepEqual(received, { model: "fixture", input: [], ...settings });
+		assert.deepEqual(JSON.parse(await readFile(join(root, "provider/turn-provider-1.request.bin"), "utf8")), received);
+	} finally {
+		await proxy.close();
+		await new Promise<void>((resolve) => upstream.close(() => resolve()));
+	}
+	assert.throws(() => new ProviderProxy("https://provider.example/v1", "fixture", "campaign", { tools: [] }), /protocol fields/);
+});
+
+for (const [thinking, effort] of [["off", "none"], ["high", "high"]] as const) {
+	test(`actual Pi SDK ${thinking} request preserves the explicit Direct reasoning effort`, async () => {
+		let received: Record<string, unknown> = {};
+		const upstream = createServer(async (request, response) => {
+			let body = "";
+			for await (const chunk of request) body += chunk.toString();
+			received = JSON.parse(body);
+			response.writeHead(200, { "content-type": "text/event-stream" });
+			response.end(`data: ${JSON.stringify({ type: "response.completed", response: {
+				id: "fixture", status: "completed", output: [], usage: { input_tokens: 1, output_tokens: 0 },
+			} })}\n\n`);
+		});
+		await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+		const address = upstream.address();
+		assert(address && typeof address !== "string");
+		const root = await mkdtemp(join(tmpdir(), "ldm-reasoning-parity-"));
+		const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "fixture", "campaign", {
+			reasoning: { effort },
+		});
+		try {
+			await proxy.start();
+			await proxy.beginTurn("research", "session", "turn", root);
+			const stream = streamSimple({
+				id: "fixture", name: "fixture", api: "openai-responses", provider: "ldm-harness-research",
+				baseUrl: proxy.baseUrl("research"), reasoning: true, thinkingLevelMap: { off: "none", high: "high" },
+				input: ["text"], contextWindow: 4096, maxTokens: 128,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			}, { messages: [{ role: "user", content: "OK", timestamp: 0 }] }, {
+				apiKey: "sidecar-proxy-token", ...(thinking === "off" ? {} : { reasoning: thinking }), maxRetries: 0,
+			});
+			const result = await stream.result();
+			assert.notEqual(result.stopReason, "error", result.errorMessage);
+			assert.deepEqual(received.reasoning, { effort });
+			assert.equal((await proxy.endTurn("research")).providerCalls, 1);
+		} finally {
+			await proxy.close();
+			await new Promise<void>((resolve) => upstream.close(() => resolve()));
+		}
+	});
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "imageId": "atomworld-research",
+  "rootfsSize": "3G",
+  "installPolicy": "session_overlay",
+  "recipeFiles": [
+    "Dockerfile",
+    "requirements.txt",
+    "smoke.sh",
+    "atomworld_tools/__init__.py",
+    "atomworld_tools/executor.py",
+    "atomworld_tools/schema.py",
+    "requirements.lock",
+    ".dockerignore"
+  ],
+  "smokeScript": "smoke.sh"
+}

@@ -99,6 +99,7 @@ export interface InitializeFrame extends CommonFrame {
 	wireApi: "responses";
 	model: string;
 	thinking: ThinkingLevel;
+	providerRequestBody?: Record<string, unknown>;
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -620,7 +621,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
-		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled", "providerRequestBody",
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -713,6 +714,7 @@ export function parseFrame(line: string): InputFrame {
 		wireApi: "responses",
 		model: string(data.model, "model"),
 		thinking,
+		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

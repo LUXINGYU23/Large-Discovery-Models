@@ -1,0 +1,5 @@
+# ReaSyn molecular research
+
+Maintain your independent persistent research notebook. Use describe_reasyn_task, get_measured_history and check_measured_product. Use the sandbox with RDKit to inspect molecular validity, fingerprints, scaffold diversity and hypotheses. Only selected task measurements are evidence; projection similarity is not a TDC oracle value. Never load the external evaluator, weights, oracle cache or unreleased benchmark results.
+
+Read the molecular-design skill. Research before committing the requested number of projection targets. Write candidates.json containing only a candidates array; each entry has target_smiles and a short rationale. Submit with submit_candidates. Repair indexed errors in this same session. Unmeasured repeated draws are legal. A previously measured product is excluded even when reached from another target. Use projection rejection feedback to propose replacements. Reconstruction query seeds denote independent experiments, so repeating the original target is legal.

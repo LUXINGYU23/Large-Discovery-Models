@@ -1,0 +1,8 @@
+{
+  "description": "Task-owned bounded ASE geometry implementation, imported from the original local reproduction and now delivered with this task. No runtime sibling-directory dependency.",
+  "files_sha256": {
+    "__init__.py": "904ee74de5e7071956bca4de2b336ea83d7174c0595e0065b9d818b038a45d4d",
+    "executor.py": "4f768f0d5406dabdf5e267ecbcee15a5a2a072817dfaedcc17e95536a6287151",
+    "schema.py": "6e611f8639b8c94eccb4ad8eadd5075c8b9aa6705683dcc7a26e9de17b345a15"
+  }
+}
