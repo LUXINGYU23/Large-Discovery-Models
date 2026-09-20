@@ -96,3 +96,50 @@ def test_incomplete_success_is_resumable_and_never_returns_a_short_batch(tmp_pat
     monkeypatch.setattr("tasks.reasyn.core.projector.subprocess.run", run)
     with pytest.raises(ProjectionInterruptedError, match="1/2 targets checkpointed"):
         projector.project(["CCO", "CCN"], sampling_seed=0, identity="short")
+
+
+def test_reconstruction_receipt_binds_target_query_seed_configuration_and_completed_output(tmp_path):
+    from ldm_tts.contracts import RawProposal
+    from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
+    from tasks.reasyn.core.candidate import ReaSynDomain
+    from tasks.reasyn.core.evaluator import ReconstructionEvaluator
+
+    args = parse_args(["--mock"])
+    projector = Projector(args, tmp_path)
+    charged = []
+    projector.before_project = charged.append
+    domain = ReaSynDomain("reconstruction", mock=True)
+    trials = [domain.admit(RawProposal({"target_smiles": query, "sampling_seed": seed}, "fixture"))
+              for query, seed in (("CCO", 1), ("CCO", 2), ("CCN", 1))]
+    evaluator = ReconstructionEvaluator(args, projector, "CCO")
+    with pytest.raises(ValueError, match="receipt request mismatch"):
+        evaluator.evaluation_attempt_usage_key(trials[0])
+    assert charged == []  # A key lookup must never start a projection.
+    evaluator.prepare_evaluations(trials)
+    keys = [evaluator.evaluation_attempt_usage_key(c) for c in trials]
+    assert len(set(keys)) == 3
+    assert ReconstructionEvaluator(args, projector, "CCN").evaluation_attempt_usage_key(trials[0]) != keys[0]
+    first = evaluator.evaluate(trials[0])
+    assert first.metadata[EVALUATION_ATTEMPT_RECEIPT_KEY] == keys[0]
+    assert evaluator.evaluate(trials[0]) == first
+    assert charged == [1, 1, 1]
+    args.num_cycles += 1
+    with pytest.raises(ValueError, match="receipt request mismatch"):
+        evaluator.evaluation_attempt_usage_key(trials[0])
+    args.num_cycles -= 1
+    args.asset_digests = {"checkpoint": "changed"}
+    with pytest.raises(ValueError, match="receipt request mismatch"):
+        evaluator.evaluation_attempt_usage_key(trials[0])
+    args.asset_digests = {}
+    output = tmp_path / first.artifacts["projection"]
+    request = json.loads((output.parent / "request.json").read_text())
+    write_progress(output, request, [], set(), mock=True)
+    with pytest.raises(ValueError, match="requires a completed result"):
+        evaluator.evaluation_attempt_usage_key(trials[0])
+    write_progress(output, request, [], {0}, mock=True)
+    empty_key = evaluator.evaluation_attempt_usage_key(trials[0])
+    assert empty_key != keys[0]  # Empty-but-complete projections are also identifiable trials.
+    empty = evaluator.evaluate(trials[0])
+    assert empty.metrics["output_count"] == empty.metrics["similarity"] == 0
+    assert empty.metadata[EVALUATION_ATTEMPT_RECEIPT_KEY] == empty_key
+    assert charged == [1, 1, 1]

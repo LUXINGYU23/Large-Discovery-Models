@@ -9,6 +9,7 @@ from ldm_tts.contracts import EvaluationResult
 from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 from ldm_tts.engine.run_store import atomic_json_write
 from .chemistry import canonicalize, similarity
+from .projection_worker import request_digest
 
 
 class ReconstructionEvaluator:
@@ -16,6 +17,21 @@ class ReconstructionEvaluator:
         self.args = args
         self.projector = projector
         self.target = target
+
+    def evaluation_attempt_usage_key(self, candidate):
+        payload = candidate.payload
+        receipt = self.projector.completed_receipt(
+            [payload["target_smiles"]], sampling_seed=payload["sampling_seed"],
+            identity=candidate.candidate_id,
+        )
+        identity = {
+            "original_target": canonicalize(self.target, mock=self.args.mock),
+            "query": canonicalize(payload["target_smiles"], mock=self.args.mock),
+            "sampling_seed": payload["sampling_seed"],
+            "mock": self.args.mock,
+            "projection": receipt,
+        }
+        return f"reasyn_reconstruction:{request_digest(identity)}"
 
     def prepare_evaluations(self, candidates):
         """Checkpoint selected projections before charging scientific trials.
@@ -59,6 +75,7 @@ class ReconstructionEvaluator:
             metadata={
                 "original_target": self.target,
                 "projection_query": p["target_smiles"],
+                EVALUATION_ATTEMPT_RECEIPT_KEY: self.evaluation_attempt_usage_key(candidate),
                 "mock": self.args.mock,
             },
         )

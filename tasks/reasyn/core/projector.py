@@ -5,7 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 from ldm_tts.engine.run_store import atomic_json_write
-from .projection_worker import load_progress, write_progress
+from .projection_worker import load_progress, request_digest, write_progress
 
 
 class ProjectionInterruptedError(RuntimeError):
@@ -24,11 +24,8 @@ class Projector:
         self.run_dir = Path(run_dir)
         self.before_project = None
 
-    def project(self, targets, *, sampling_seed, identity):
-        folder = self.run_dir / "projections" / identity
-        folder.mkdir(parents=True, exist_ok=True)
-        output = folder / "result.json"
-        request = {
+    def _request(self, targets, sampling_seed):
+        return {
             "asset_digests": getattr(self.args, "asset_digests", {}),
             "targets": targets,
             "sampling_seed": sampling_seed,
@@ -49,6 +46,25 @@ class Projector:
                 "time_limit": self.args.projection_time_limit,
             },
         }
+
+    def completed_receipt(self, targets, *, sampling_seed, identity):
+        """Identify verified completed work without starting a projection."""
+        request = self._request(targets, sampling_seed)
+        folder = self.run_dir / "projections" / identity
+        request_path = folder / "request.json"
+        if not request_path.exists() or json.loads(request_path.read_text()) != request:
+            raise ValueError("projection receipt request mismatch")
+        progress = load_progress(folder / "result.json", request)
+        if progress is None or not progress["complete"]:
+            raise ValueError("projection receipt requires a completed result")
+        self._validate(progress["rows"], targets)
+        return {"request_sha256": request_digest(request), "result_sha256": request_digest(progress)}
+
+    def project(self, targets, *, sampling_seed, identity):
+        folder = self.run_dir / "projections" / identity
+        folder.mkdir(parents=True, exist_ok=True)
+        output = folder / "result.json"
+        request = self._request(targets, sampling_seed)
         request_path = folder / "request.json"
         if request_path.exists():
             prior = json.loads(request_path.read_text())

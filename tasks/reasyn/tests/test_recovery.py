@@ -189,6 +189,61 @@ def test_reconstruction_preparation_resumes_same_selection_without_spending_tria
     assert len(selections) == 2 and selections[0] == selections[1]
 
 
+@pytest.mark.parametrize("interrupt_round", [0, 1])
+@pytest.mark.parametrize("batch_size", [1, 2])
+@pytest.mark.parametrize("window,error_type", [
+    ("after_evaluation", KeyboardInterrupt), ("before_checkpoint", KeyboardInterrupt),
+    ("before_checkpoint", RuntimeError),
+])
+def test_completed_reconstruction_trials_resume_without_duplicate_scientific_charges(
+    tmp_path, monkeypatch, interrupt_round, batch_size, window, error_type
+):
+    from ldm_tts.engine.runtime import LDMEngine
+    from tasks.reasyn.core.evaluator import ReconstructionEvaluator
+    from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
+
+    interrupted = False
+    evaluate = ReconstructionEvaluator.evaluate
+    checkpoint = LDMEngine._checkpoint
+    evaluations = 0
+    def after_evaluation(self, candidate):
+        nonlocal interrupted, evaluations
+        result = evaluate(self, candidate)
+        evaluations += 1
+        if window == "after_evaluation" and evaluations == (interrupt_round + 1) * batch_size and not interrupted:
+            interrupted = True
+            raise error_type("completed reconstruction trial interrupted")
+        return result
+    def before_checkpoint(self, state):
+        nonlocal interrupted
+        if window == "before_checkpoint" and state.next_round == interrupt_round + 1 and not interrupted:
+            interrupted = True
+            raise error_type("completed reconstruction trial interrupted")
+        return checkpoint(self, state)
+    monkeypatch.setattr(ReconstructionEvaluator, "evaluate", after_evaluation)
+    monkeypatch.setattr(LDMEngine, "_checkpoint", before_checkpoint)
+    root = tmp_path / "reconstruction"
+    argv = ["--mock", "--benchmark", "reconstruction", "--iterations", "2",
+            "--reservoir-size", str(batch_size), "--evaluations-per-round", str(batch_size), "--out-dir", str(root)]
+    with pytest.raises(error_type):
+        workflow.main(argv)
+    before = json.loads((root / "budget.json").read_text())
+    assert before["counters"]["external_evaluations"] == (interrupt_round + 1) * batch_size
+    assert workflow.main(argv + ["--resume-from", str(root)]) == 0
+    after = json.loads((root / "budget.json").read_text())
+    assert after["limits"] == before["limits"]
+    for name in ("projection_targets", "selected_candidates", "external_evaluations",
+                 "expensive_evaluation_attempts", "successful_evaluations", "benchmark_jobs"):
+        assert after["counters"][name] == 2 * batch_size
+    state = json.loads((root / "checkpoint.json").read_text())["state"]
+    assert len(state["observations"]) == 2 * batch_size
+    assert state["next_round"] == 2
+    keys = [row["evaluation"]["metadata"][EVALUATION_ATTEMPT_RECEIPT_KEY] for row in state["observations"]]
+    assert len(set(keys)) == 2 * batch_size
+    assert json.loads((root / "status.json").read_text())["status"] == "completed"
+    assert json.loads((root / "result.json").read_text())["successful_evaluations"] == 2 * batch_size
+
+
 def test_mock_pilot_matrix_completes_with_shared_initialization_and_no_model_cost(tmp_path, monkeypatch):
     from ldm_tts.cli.runner import load_config
     from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec

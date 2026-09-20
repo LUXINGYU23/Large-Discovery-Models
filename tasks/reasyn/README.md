@@ -313,6 +313,14 @@ defaults, a 32-target batch has 34,600 seconds instead of 3,600. Worker timeout
 or failure preserves progress and pauses the campaign for explicit resume. Completed TDC
 scores come from an ordered cache; an interrupted, charged oracle request is
 explicitly marked and refused on retry instead of silently evaluated again.
+Reconstruction attempt/result charges are bound to the original target,
+canonical query, independent sampling seed and verified projection request/result
+digests. Replaying a completed trial after a lost round checkpoint does not spend
+another scientific evaluation or benchmark job. Different seeds remain distinct
+trials. At zero evaluation allowance the Engine stops before proposal research,
+unless its budget ledger contains a paid evaluation from the uncheckpointed
+round; only those recorded candidates are recovered, without another proposal
+or policy selection.
 
 `events.jsonl`, `checkpoint.json`, `summary.json`, `budget.json`, `status.json`,
 `result.json`, `trajectory.csv`, `search_manifest.json`, `selection_record.json`
