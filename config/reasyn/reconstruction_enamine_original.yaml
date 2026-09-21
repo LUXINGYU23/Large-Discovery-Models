@@ -1,0 +1,21 @@
+{
+  "name": "reasyn_reconstruction_enamine_original",
+  "task": "reasyn",
+  "algorithm": "projection_baseline",
+  "mode": "real",
+  "contract_profile": "reconstruction_enamine_original",
+  "args": {
+    "benchmark": "reconstruction",
+    "dataset": "enamine",
+    "target-limit": 1000,
+    "search-width": 8,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 100,
+    "max-results": 100,
+    "evaluations-per-round": 1,
+    "iterations": 1,
+    "num-cycles": 12,
+    "reservoir-size": 1,
+    "proposal-mode": "baseline"
+  }
+}

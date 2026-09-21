@@ -1,0 +1,15 @@
+name: atomworld_ldm
+task: atomworld
+algorithm: ldm
+mode: real
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  search-method: ldm
+  attempts-per-sample: 4
+  proposal-samples: 8
+  bo-pool-size: 32
+  acquisition-alpha: 1.0
+  acquisition-eta: 1.0
+  llm-reasoning: high
+  llm-wire-api: responses
+  out-dir: runs/atomworld/ldm

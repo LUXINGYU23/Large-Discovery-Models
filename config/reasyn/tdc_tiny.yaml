@@ -1,0 +1,26 @@
+{
+  "name": "reasyn_tdc_tiny",
+  "task": "reasyn",
+  "algorithm": "ldm_gp_ucb",
+  "mode": "real",
+  "contract_profile": "tdc_tiny",
+  "args": {
+    "benchmark": "tdc",
+    "proposal-mode": "openai",
+    "iterations": 2,
+    "reservoir-size": 4,
+    "evaluations-per-round": 2,
+    "max-oracle-calls": 10000,
+    "num-cycles": 1,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 4,
+    "search-method": "ldm",
+    "proposal-batch-size": 2,
+    "bo-pool-size": 4,
+    "acquisition-alpha": 1.0,
+    "acquisition-eta": 1.0,
+    "acquisition-z-clip": 5.0,
+    "max-replenishment-batches": 4,
+    "recovery-attempts": 3
+  }
+}

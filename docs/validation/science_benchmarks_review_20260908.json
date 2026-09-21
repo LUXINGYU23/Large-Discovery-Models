@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-08",
+  "review_source_sha256": "54982c26d81bf243ee1044de35432cbb60a1207503ba132cf4538e1a899ed4a5",
+  "status": "code_remediation_verified_live_acceptance_pending",
+  "qualification": "draft",
+  "live_harness_verified": false,
+  "review_items": [
+    {
+      "id": 1,
+      "implementation": "Task-local persistent Harness proposal pools, structured tools, digest-bound resources, repair, native/provider trace wiring, independent compiled policy and pilot integration for both tasks. AtomWorld uses public-only blind audit and last-submission scoring.",
+      "validation": "Actual shared client/controller/runner with synthetic sidecars; live provider and Linux/KVM acceptance pending."
+    },
+    {
+      "id": 2,
+      "implementation": "Independent minibatches, canonical product vs query+seed occurrence identities, empirical q0 before deduplication, separate BO pool, alpha/eta robust-z UCB sampling."
+    },
+    {
+      "id": 3,
+      "implementation": "Original round and scientific evaluation limits preserved across endpoint/projection pause; separate bounded recovery; completed runs do not contact providers."
+    },
+    {
+      "id": 4,
+      "implementation": "All AtomWorld geometry execution code, research resources and guest recipe delivered in task; no sibling implementation dependency."
+    },
+    {
+      "id": 5,
+      "implementation": "Complete measured-product exclusion, current-round occurrence preservation, bounded projected-product replenishment and explicit nonzero incomplete status."
+    },
+    {
+      "id": 6,
+      "implementation": "Serial timeout scales with targets; atomic per-target results including empty results; cached targets reused after interruption. Selected reconstruction projections prepare before scientific evaluation accounting."
+    },
+    {
+      "id": 7,
+      "implementation": "Optional sklearn deserialization compatibility is lazy; mocked worker and projection tests pass in environment without sklearn or Torch."
+    }
+  ],
+  "test_lanes": [
+    {
+      "lane": "shared_and_lightweight_reasyn",
+      "tests": 512,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "passed": 508,
+      "artifact": "final-shared-reasyn-review.xml",
+      "sha256": "3e3d61efa313ab271e3c46b61ad148cf9b506d50585263865e5aa216e4b14483"
+    },
+    {
+      "lane": "reasyn_with_rdkit",
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 71,
+      "artifact": "final-reasyn-chemistry-review.xml",
+      "sha256": "11af3fdb7b5943914f4d8d82285e575f8916af5409ce0428b2b82ba47776db38"
+    },
+    {
+      "lane": "atomworld_with_ase_pymatgen",
+      "tests": 60,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 60,
+      "artifact": "final-atomworld-review.xml",
+      "sha256": "5a142d2f66a6ea89054a9e070dfd0194261d6606e3b035ae47782a1567c60585"
+    }
+  ],
+  "test_counts_overlap": true,
+  "pilots": {
+    "reasyn": "9 completed synthetic campaigns: ldm/bo/llm x 3 seeds; integrity valid.",
+    "atomworld": "3 completed synthetic llm campaigns using final_submission; last scheduled answer and repeated candidates verified."
+  },
+  "additional_checks": [
+    "Both task manifest/layout checks passed",
+    "All shipped task and pilot launch plans parsed",
+    "git diff --check passed",
+    "AtomWorld all ten geometry operations compared with local official implementation",
+    "AtomWorld guest locked dependencies installed and smoke tested locally"
+  ],
+  "remaining_live_requirements": [
+    "Configured Responses provider endpoint/model/credentials",
+    "Working Linux Docker/KVM host and built sidecar/guest images",
+    "ReaSyn AR/EB checkpoints, stock fingerprint index, reaction matrix and real evaluator environment",
+    "Real two-round agent tool/research/submission/evaluation traces for both tasks"
+  ],
+  "scientific_claims": "No live provider or GPU scientific result was produced; no qualification upgrade; mock scores and deterministic protocol traces are not paper benchmark results."
+}

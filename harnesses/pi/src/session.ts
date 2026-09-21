@@ -856,7 +856,7 @@ export class PiSessionPool {
 		apiKey: string,
 		private readonly namedSecrets: Readonly<Record<string, string>> = {},
 	) {
-		this.proxy = new ProviderProxy(config.baseUrl, apiKey, config.campaignId);
+		this.proxy = new ProviderProxy(config.baseUrl, apiKey, config.campaignId, config.providerRequestBody);
 	}
 
 	async initialize(): Promise<void> {
@@ -915,6 +915,7 @@ export class PiSessionPool {
 			model: this.config.model,
 			wireApi: this.config.wireApi,
 			thinking: this.config.thinking,
+			...(this.config.providerRequestBody ? { providerRequestBody: this.config.providerRequestBody } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
 			submissionContractSha256: this.config.submissionContractSha256,

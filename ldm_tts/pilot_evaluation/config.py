@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ldm_tts.cli.runner import load_config
+from ldm_tts.registration.registry import get_task_definition
 
 
 SUPPORTED_METHODS = (
@@ -57,8 +58,11 @@ class PilotEvaluationSpec:
     result_fields: dict[str, str]
     policy_fields: dict[str, str] = field(default_factory=dict)
     policy_mean_fields: tuple[str, ...] = ()
+    selection_protocol: str = "best_so_far"
 
     def __post_init__(self) -> None:
+        if self.selection_protocol not in ("best_so_far", "final_submission"):
+            raise ValueError("selection_protocol must be best_so_far or final_submission")
         if any(
             not isinstance(name, str) or not name
             or not isinstance(path, str) or not all(path.split("."))
@@ -91,6 +95,7 @@ class PilotEvaluationSpec:
             "result_fields": dict(self.result_fields),
             "policy_fields": dict(self.policy_fields),
             "policy_mean_fields": list(self.policy_mean_fields),
+            "selection_protocol": self.selection_protocol,
         }
 
 
@@ -100,7 +105,10 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     resolved = Path(path).resolve()
     raw = load_config(resolved)
     _require_exact_keys(raw)
-    methods = _methods(raw.get("methods"))
+    protocol = raw.get("selection_protocol", "best_so_far")
+    task = _required_string(raw.get("task"), "task")
+    declared = get_task_definition(task).pilot_evaluation.get("methods", {})
+    methods = _methods(raw.get("methods"), declared=declared)
     policy_fields = raw.get("policy_fields", {})
     policy_mean_fields = raw.get("policy_mean_fields", [])
     if not isinstance(policy_fields, dict) or not isinstance(policy_mean_fields, list):
@@ -108,7 +116,7 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     if any(not isinstance(name, str) for name in policy_mean_fields):
         raise ValueError("policy_mean_fields must contain field names")
     return PilotEvaluationSpec(
-        task=_required_string(raw.get("task"), "task"),
+        task=task,
         name=_required_string(raw.get("name"), "name"),
         base_config=_resolve_base_config(resolved, raw),
         cases=_cases(raw.get("cases")),
@@ -124,6 +132,7 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
         result_fields=_result_fields(raw.get("result_fields")),
         policy_fields=policy_fields,
         policy_mean_fields=tuple(policy_mean_fields),
+        selection_protocol=protocol,
     )
 
 
@@ -132,17 +141,18 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         "schema_version", "name", "task", "base_config", "cases", "methods", "method_overrides", "seeds",
         "optimization_rounds", "initialization_mode", "output_root", "trajectory", "result_fields",
     }
-    optional = {"policy_fields", "policy_mean_fields"}
+    optional = {"policy_fields", "policy_mean_fields", "selection_protocol"}
     if not expected <= set(raw) or set(raw) - expected - optional or raw.get("schema_version") != 1:
         raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 
-def _methods(value: Any) -> tuple[str, ...]:
+def _methods(value: Any, *, declared=()) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
         raise ValueError("pilot evaluation methods must be a non-empty list")
     methods = tuple(value)
-    if any(not isinstance(item, str) or item not in SUPPORTED_METHODS for item in methods):
-        raise ValueError(f"pilot evaluation methods must come from {list(SUPPORTED_METHODS)}")
+    supported = (*SUPPORTED_METHODS, *declared)
+    if any(not isinstance(item, str) or item not in supported for item in methods):
+        raise ValueError(f"pilot evaluation methods must come from {list(supported)}")
     if len(set(methods)) != len(methods):
         raise ValueError("pilot evaluation methods must be unique")
     return methods

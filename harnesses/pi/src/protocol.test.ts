@@ -36,6 +36,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		wireApi: "responses",
 		model: "model",
 		thinking: "max",
+		providerRequestBody: { temperature: 0.5, reasoning: { effort: "max" } },
 		taskId: "synthonbench",
 		caseId: "surrogate:1M:kif11",
 		seed: 1,
@@ -81,6 +82,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 	assert.equal(frame.type, "initialize");
 	if (frame.type === "initialize") {
 		assert.equal(frame.thinking, "max");
+		assert.deepEqual(frame.providerRequestBody, { temperature: 0.5, reasoning: { effort: "max" } });
 		assert.deepEqual(frame.submissionContract, submissionContract);
 		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
 		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");

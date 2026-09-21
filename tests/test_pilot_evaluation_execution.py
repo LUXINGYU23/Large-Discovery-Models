@@ -150,10 +150,11 @@ def test_dry_run_redacts_api_key_file_path(tmp_path: Path, capsys) -> None:
 def test_registered_matrices_build_all_method_plans(
     config_path: Path, monkeypatch, tmp_path: Path,
 ) -> None:
-    for task in ("IRON_MIND", "SYNTHONBENCH", "NUCLEOBENCH"):
+    for task in ("IRON_MIND", "SYNTHONBENCH", "NUCLEOBENCH", "REASYN", "ATOMWORLD"):
         for suffix in ("DATA_ROOT", "RUNS_ROOT", "WORK_ROOT", "SOURCE_ROOT", "API_KEY_FILE"):
             monkeypatch.setenv(f"{task}_{suffix}", str(tmp_path / task / suffix))
     monkeypatch.setenv("NUCLEOBENCH_START_SET_SHA256", "a" * 64)
+    monkeypatch.setenv("REASYN_BO_TARGETS", str(tmp_path / "bo_targets.txt"))
     spec = load_pilot_evaluation_spec(config_path)
     base = load_config(spec.base_config)
     contract = load_experiment_contract(
@@ -169,6 +170,11 @@ def test_registered_matrices_build_all_method_plans(
         assert _option(argv, "--campaign-index") == str(run.seed)
         mode = "openai" if run.method in {"ldm", "llm"} else "none"
         assert _option(argv, "--proposal-mode") == mode
+        if not plan["contract_profile"]:
+            # Draft adapters may expose executable pilots before qualification
+            # profiles exist; task-local tests validate their parser/budgets.
+            assert contract.qualification == "draft"
+            continue
         profile = contract.profile(plan["contract_profile"])
         if run.method == "harness":
             assert _option(argv, "--proposal-samples") == _option(argv, "--evaluations-per-round")

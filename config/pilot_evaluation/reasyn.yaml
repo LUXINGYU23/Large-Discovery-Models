@@ -1,0 +1,50 @@
+schema_version: 1
+name: reasyn_pilot_evaluation
+task: reasyn
+base_config: ../reasyn/pilot_evaluation_base.yaml
+cases:
+  - id: tdc_jnk3
+    overrides:
+      - args.oracle="jnk3"
+methods: [ldm, bo, llm, harness, ldm_harness, ldm_harness_compiled]
+method_overrides:
+  ldm: []
+  bo: []
+  llm:
+    - args.proposal-samples=2
+    - args.proposal-batch-size=1
+    - args.bo-pool-size=2
+  harness:
+    - args.harness-sessions=1
+    - args.proposal-samples=2
+    - args.proposal-batch-size=2
+    - args.bo-pool-size=2
+  ldm_harness: []
+  ldm_harness_compiled:
+    - args.policy-runner-image="ldm-pi-harness:latest"
+seeds: [0, 1, 2]
+optimization_rounds: 5
+initialization_mode: shared_start
+output_root: ${REASYN_RUNS_ROOT}/pilot_evaluation
+trajectory:
+  step_column: evaluation
+  step_kind: evaluation_index
+  objective_column: score
+  direction: maximize
+result_fields: {}
+policy_fields:
+  baseline_prediction_mean: compiled_policy.baseline_prediction_diagnostics.mean_mean
+  compiled_prediction_mean: compiled_policy.compiled_prediction_diagnostics.mean_mean
+  prediction_mean_abs_change: compiled_policy.prediction_mean_abs_change
+  baseline_acquisition_mean: compiled_policy.baseline_prediction_diagnostics.acquisition_mean
+  compiled_acquisition_mean: compiled_policy.compiled_prediction_diagnostics.acquisition_mean
+  q0_entropy: base_probability_entropy
+  tilted_entropy: probability_entropy
+  tilted_ess: probability_effective_sample_size
+  tilted_kl_from_q0: tilted_kl_from_q0
+  q0_tilted_topk_overlap: q0_tilted_topk_overlap
+policy_mean_fields:
+  - prediction_mean_abs_change
+  - tilted_kl_from_q0
+  - tilted_ess
+  - q0_tilted_topk_overlap

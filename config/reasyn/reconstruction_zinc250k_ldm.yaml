@@ -1,0 +1,29 @@
+{
+  "name": "reasyn_reconstruction_zinc250k_ldm",
+  "task": "reasyn",
+  "algorithm": "ldm_tanimoto_gp_ucb",
+  "mode": "real",
+  "contract_profile": "reconstruction_zinc250k_ldm",
+  "args": {
+    "benchmark": "reconstruction",
+    "dataset": "zinc250k",
+    "target-limit": 1000,
+    "search-width": 8,
+    "exhaustiveness": 4,
+    "num-editflow-samples": 100,
+    "max-results": 100,
+    "evaluations-per-round": 1,
+    "iterations": 4,
+    "num-cycles": 4,
+    "reservoir-size": 8,
+    "proposal-mode": "openai",
+    "search-method": "ldm",
+    "proposal-batch-size": 2,
+    "bo-pool-size": 8,
+    "acquisition-alpha": 1.0,
+    "acquisition-eta": 1.0,
+    "acquisition-z-clip": 5.0,
+    "max-replenishment-batches": 4,
+    "recovery-attempts": 3
+  }
+}

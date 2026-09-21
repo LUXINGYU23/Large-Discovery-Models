@@ -1,0 +1,12 @@
+[project]
+name = "ldm-tts-atomworld"
+version = "0.1.0"
+description = "Target-blind AtomWorld crystal manipulation through the shared LDM campaign"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24,<2", "pyyaml>=6", "pymatgen>=2024.1.26", "h5py>=3.10", "ase>=3.23"]
+
+[dependency-groups]
+dev = ["pytest>=7,<9"]
+
+[tool.uv]
+package = false

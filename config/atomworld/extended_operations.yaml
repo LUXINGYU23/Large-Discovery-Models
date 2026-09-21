@@ -1,0 +1,12 @@
+name: atomworld_extended_operations
+task: atomworld
+algorithm: bounded_geometry_tool_refinement
+mode: real
+contract_profile: extended_operations
+args:
+  data-dir: ${ATOMWORLD_DATA_ROOT}
+  proposal-format: operations
+  attempts-per-sample: 4
+  llm-max-tokens: 8192
+  llm-temperature: 0.0
+  out-dir: runs/extended_operations
