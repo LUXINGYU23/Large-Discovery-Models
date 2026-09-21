@@ -238,7 +238,7 @@ def _mark_completed(entry: dict[str, Any], spec: PilotEvaluationSpec, run: _Eval
                     if receipts[0][field] is None or any(row[field] != receipts[0][field] for row in receipts):
                         raise ValueError("Declared Harness pool identities differ")
         entry["harness"] = pools
-    elif getattr(spec, "selection_protocol", "best_so_far") == "final_submission":
+    elif spec.selection_protocol == "final_submission":
         # Scheduled-submission adapters declare their own optional pool topology.
         if _read_json(run.run_dir / "budget.json").get("counters", {}).get("harness_turns", 0):
             raise ValueError("Harness child must emit harness_provenance.json")

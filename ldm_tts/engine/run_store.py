@@ -79,16 +79,6 @@ class BudgetLedger:
         self.write()
         return updates
 
-    def set_counter(self, name: str, value: int | float) -> None:
-        value = _validated_number(value, f"counter {name}")
-        limit = self.limits.get(name)
-        if limit is not None and value > limit:
-            raise BudgetExceededError(
-                f"Budget {name!r} would be exceeded: {value} > {limit}"
-            )
-        self.counters[name] = value
-        self.write()
-
     def remaining(self, name: str) -> int | float | None:
         limit = self.limits.get(name)
         if limit is None:

@@ -25,6 +25,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- NucleoBench GP selection computes the candidate posterior as one batch,
+  preserving the UCB formula, compiled prior mean, and selection ordering.
 - Clarified that v0.1 is a release candidate and that built-in campaign
   contracts remain drafts pending qualification evidence.
 - Removed the G12D joblib binary from Git while retaining its checksum and
@@ -46,11 +48,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
-- Dropped the package-root compatibility aliases for
-  `tasks.nanogpt.core.expansion_schema` symbols (e.g. `OperationSchema`,
-  `operation_feature_dim`). Import them directly from
-  `tasks.nanogpt.core.expansion_schema` instead. These aliases could never work
-  from the built wheel, which ships only the `ldm_tts` package, and they coupled
-  the shared package to one task's internals.
+- Historical `ldm_tts` package-root aliases and their migration tests. Import
+  shared interfaces from their owning packages, such as `ldm_tts.contracts`,
+  `ldm_tts.engine`, and `ldm_tts.transport`; import task symbols from `tasks.<task>`.
 
 [Unreleased]: https://github.com/yzailab/Large-Discovery-Models/commits/ldm_engine

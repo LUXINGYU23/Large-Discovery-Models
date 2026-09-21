@@ -630,7 +630,6 @@ Key shared packages:
 | `ldm_tts.optimization.search` | Shared `single_turn`, best-of-N, tree, beam, and MCTS proposal traversal behind a generic engine protocol and registry. |
 | `ldm_tts.optimization.acquisition` | Shared `mean`, `EI`, `LCB`, `UCB`, and two-objective `EHVI` implementation behind one posterior-scoring interface. |
 | `ldm_tts.transport.parsing` | Shared LLM JSON extraction and validation helpers. |
-| `tasks.nanogpt.core.expansion_schema` | Structured expansion-schema parameters, surrogate representation dimensions, and compatibility helpers. |
 | `ldm_tts.optimization.records` | Lightweight BO records and protocols. |
 | `ldm_tts.engine` | Campaign orchestration, reservoir expansion, budgets, events, checkpoints, and run artifacts. |
 | `ldm_tts.transport` | Proposal transport interface, OpenAI-compatible adapter, and response parsing. |

@@ -257,11 +257,29 @@ class HammingGPUCBSelector:
         prior, self._query_prior_clip_count = _prior_vector(
             query_prior_mean, len(candidates), "query prior mean"
         )
+        residuals, deviations = residual_moments(
+            np.asarray([
+                representations[candidate.candidate_id].values for candidate in candidates
+            ]).reshape(len(candidates), self.feature_dimension),
+            self._codes, self._cholesky, self._alpha, self._length_scale,
+        )
+        means = self._target_mean + self._target_scale * (prior + residuals)
+        deviations = self._target_scale * deviations
+        acquisition = make_acquisition("ucb", minimize=(False,), beta=self.config.beta)
+        scores = acquisition.score(means, deviations)
         predictions = tuple(
-            self._predict(
-                candidate,
-                representations[candidate.candidate_id],
-                float(prior[index]),
+            BOPrediction.scalar(
+                candidate.candidate_id,
+                mean=float(means[index]),
+                std=float(deviations[index]),
+                acquisition_score=float(scores[index]),
+                metadata={
+                    "surrogate": "nucleobench_exact_hamming_gp",
+                    "fit_status": self._fit_status,
+                    "mean_source": self._mean_source,
+                    "prior_mean_standardized": float(prior[index]),
+                    "residual_mean_standardized": float(residuals[index]),
+                },
             )
             for index, candidate in enumerate(candidates)
         )
@@ -274,35 +292,6 @@ class HammingGPUCBSelector:
             tuple(item.candidate_id for item in ranked[:count]),
             predictions,
             metadata={"surrogate": self._summary(), "effective_beta": self.config.beta},
-        )
-
-    def _predict(
-        self,
-        candidate: Candidate,
-        feature: SurrogateVector,
-        prior_mean: float,
-    ) -> BOPrediction:
-        residuals, deviations = residual_moments(
-            feature.values, self._codes, self._cholesky, self._alpha, self._length_scale,
-        )
-        residual_mean = float(residuals[0])
-        std = self._target_scale * float(deviations[0])
-        mean = self._target_mean + self._target_scale * (
-            prior_mean + residual_mean
-        )
-        acquisition = make_acquisition("ucb", minimize=(False,), beta=self.config.beta)
-        return BOPrediction.scalar(
-            candidate.candidate_id,
-            mean=mean,
-            std=std,
-            acquisition_score=float(acquisition.score(mean, std)),
-            metadata={
-                "surrogate": "nucleobench_exact_hamming_gp",
-                "fit_status": self._fit_status,
-                "mean_source": self._mean_source,
-                "prior_mean_standardized": prior_mean,
-                "residual_mean_standardized": residual_mean,
-            },
         )
 
     def posterior_snapshot(self) -> dict[str, object]:

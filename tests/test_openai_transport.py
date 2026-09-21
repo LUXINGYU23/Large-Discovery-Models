@@ -8,8 +8,6 @@ from typing import Any
 
 import pytest
 
-import ldm_tts
-from ldm_tts import compat
 from ldm_tts.transport.openai_http import PREFLIGHT_MAX_TOKENS
 from ldm_tts.transport.openai import (
     EndpointRequestError,
@@ -225,9 +223,6 @@ def test_combined_preflight_returns_sanitized_model_artifact(
     assert isinstance(artifact["latency_seconds"], float)
     assert TOKEN not in json.dumps(artifact)
     assert "choices" not in artifact
-    assert compat.resolve("models_url") is models_url
-    assert ldm_tts.models_url is models_url
-    assert ldm_tts.preflight_openai_endpoint is preflight_openai_endpoint
 
 
 def test_endpoint_preflight_json_prompt(monkeypatch: pytest.MonkeyPatch) -> None:

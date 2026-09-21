@@ -53,6 +53,14 @@ def test_frozen_worker_matches_selection_and_is_batch_invariant(tmp_path, histor
     selector.fit(tuple(BOObservation.from_observation(item, objective_names=("utility",),
                        feature=encoder.encode(item.candidate)) for item in history))
     expected = selector.select(candidates, features).predictions
+    for candidate, prediction in zip(candidates, expected, strict=True):
+        single = selector.select([candidate], features).predictions[0]
+        np.testing.assert_allclose(
+            [single.scalar_mean, single.scalar_std, single.acquisition_score],
+            [prediction.scalar_mean, prediction.scalar_std, prediction.acquisition_score],
+            rtol=1e-10, atol=1e-10,
+        )
+    assert selector.select([], {}).predictions == ()
     env = {**os.environ, "PYTHONPATH": str(TASK / "core")}
 
     def query(items):
