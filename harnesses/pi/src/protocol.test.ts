@@ -26,7 +26,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		maxValidationAttempts: null,
 	};
 	const submissionContractJson = JSON.stringify(submissionContract);
-	const frame = parseFrame(JSON.stringify({
+	const input = {
 		type: "initialize",
 		requestId: "init-1",
 		protocolVersion: SIDECAR_RELEASE_VERSION,
@@ -78,7 +78,8 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
 		},
 		context7Enabled: true,
-	}));
+	};
+	const frame = parseFrame(JSON.stringify(input));
 	assert.equal(frame.type, "initialize");
 	if (frame.type === "initialize") {
 		assert.equal(frame.thinking, "max");
@@ -88,6 +89,15 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
+	const { providerRequestBody: _options, ...withoutOptions } = input;
+	assert.equal(parseFrame(JSON.stringify(withoutOptions)).type, "initialize");
+	const plugin = parseFrame(JSON.stringify({
+		...input,
+		solPi: { version: 1, actionFusion: true, observationPack: true, onlineContextCompact: true },
+		limits: { ...input.limits, toolCallBudgets: { obs_recall: 3 } },
+	}));
+	assert.equal(plugin.type, "initialize");
+	if (plugin.type === "initialize") assert.equal(plugin.solPi?.actionFusion, true);
 });
 
 test("parseFrame rejects a submission contract with a changed digest", () => {

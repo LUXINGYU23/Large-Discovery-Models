@@ -75,6 +75,7 @@ class PiHarnessConfig(HarnessPoolConfig):
     web_search: PiWebSearch = field(default_factory=PiWebSearch)
     context7_enabled: bool = True
     provider_request_body: dict[str, Any] = field(default_factory=dict)
+    sol_pi: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
@@ -101,6 +102,13 @@ class PiHarnessConfig(HarnessPoolConfig):
         }
         if self.context7_enabled:
             ordinary_tools.update(("resolve-library-id", "query-docs"))
+        if self.sol_pi is not None:
+            if self.sol_pi.get("actionFusion"):
+                ordinary_tools.add("edit")
+            if self.sol_pi.get("observationPack"):
+                ordinary_tools.add("obs_recall")
+            if self.sol_pi.get("onlineContextCompact"):
+                ordinary_tools.add("update_plan")
         if self.submission_contract.tool_name in ordinary_tools:
             raise ValueError("harness terminal tool conflicts with another available tool")
         unknown_budgets = set(self.limits.tool_call_budgets) - ordinary_tools
@@ -126,6 +134,7 @@ class PiHarnessConfig(HarnessPoolConfig):
             "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
+            **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
         }
 
 

@@ -36,6 +36,7 @@ import {
 	type TerminalSubmission,
 } from "./submission.js";
 import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
+import { createSolPiExtension, SOL_PI_GUEST_ARCHIVE, solPiTools } from "./sol-pi.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCE_DIRECTORY = ".ldm-resources";
@@ -171,7 +172,7 @@ async function copyDirectory(source: string, target: string): Promise<void> {
 async function runtimePackages(): Promise<Record<string, string>> {
 	const lockBody = await readFile(join(APP_ROOT, "package-lock.json"));
 	const lock = JSON.parse(lockBody.toString()) as {
-		packages?: Record<string, { version?: unknown }>;
+		packages?: Record<string, { version?: unknown; resolved?: string }>;
 	};
 	function version(name: string): string {
 		const value = lock.packages?.[`node_modules/${name}`]?.version;
@@ -185,6 +186,8 @@ async function runtimePackages(): Promise<Record<string, string>> {
 		piWebAccess: version("pi-web-access"),
 		context7: version("@upstash/context7-pi"),
 		mcpClient: version("@modelcontextprotocol/client"),
+		solPi: version("sol-pi"),
+		solPiSource: lock.packages?.["node_modules/sol-pi"]?.resolved ?? "",
 		packageLockSha256: sha256(lockBody),
 	};
 }
@@ -194,6 +197,7 @@ function sessionTools(
 	taskTools: string[],
 	terminalTool: string,
 	mcpTools: string[] = [],
+	solPi?: Record<string, unknown>,
 ): string[] {
 	return [
 		"read",
@@ -205,6 +209,7 @@ function sessionTools(
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
 		...mcpTools,
+		...solPiTools(solPi),
 		terminalTool,
 	];
 }
@@ -408,6 +413,7 @@ export class PersistentProfileSession {
 			this.resourceRoot,
 			config.networkPolicy,
 			guestRuntime,
+			config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {},
 		);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
@@ -420,6 +426,7 @@ export class PersistentProfileSession {
 	async initialize(): Promise<void> {
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
+		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
 		const agents = await readFile(this.profile.agentsPath, "utf8");
 		this.agentsSha256 = sha256(agents);
 		if (this.agentsSha256 !== this.profile.agentsSha256) {
@@ -494,6 +501,10 @@ export class PersistentProfileSession {
 			extensionPaths.push(join(packageRoot("@upstash/context7-pi"), "extensions", "context7.ts"));
 		}
 		extensionPaths.push(...this.config.toolExtensions.map((extension) => extension.path));
+		const solPi = this.config.solPi ? await createSolPiExtension(
+			this.config.solPi, agentDirectory, providerId, this.config.model,
+			() => this.gondolin.toolOptions(), join(this.sessionDirectory, "sol-pi"),
+		) : undefined;
 		const loader = new DefaultResourceLoader({
 			cwd: this.workspace,
 			agentDir: agentDirectory,
@@ -504,6 +515,7 @@ export class PersistentProfileSession {
 				this.gondolin.createExtension(),
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
+				...(solPi ? [solPi] : []),
 			],
 			noPromptTemplates: true,
 			noThemes: true,
@@ -552,6 +564,7 @@ export class PersistentProfileSession {
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
 				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
+				this.config.solPi,
 			),
 		});
 		this.session = session;
@@ -916,6 +929,7 @@ export class PiSessionPool {
 			wireApi: this.config.wireApi,
 			thinking: this.config.thinking,
 			...(this.config.providerRequestBody ? { providerRequestBody: this.config.providerRequestBody } : {}),
+			...(this.config.solPi ? { solPi: this.config.solPi } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
 			submissionContractSha256: this.config.submissionContractSha256,
@@ -945,6 +959,7 @@ export class PiSessionPool {
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
 				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
+				this.config.solPi,
 			),
 			toolExtensions: this.config.toolExtensions,
 			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),

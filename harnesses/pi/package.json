@@ -17,11 +17,16 @@
   },
   "dependencies": {
     "@earendil-works/gondolin": "0.12.0",
-    "@earendil-works/pi-coding-agent": "0.84.3",
+    "@earendil-works/pi-agent-core": "0.85.1",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "@upstash/context7-pi": "0.1.2",
     "pi-web-access": "0.25.0",
+    "jiti": "2.7.0",
+    "sol-pi": "https://codeload.github.com/NVlabs/SoL-Pi/tar.gz/bd005888b9b8a3fcdb511feb91fc27d3dfa8f2b1",
     "typebox": "1.3.7",
     "zod": "4.5.4"
   },

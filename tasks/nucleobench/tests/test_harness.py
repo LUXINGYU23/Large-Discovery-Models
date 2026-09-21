@@ -548,12 +548,19 @@ def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
 @pytest.mark.parametrize("policy", [False, True])
 @pytest.mark.parametrize("surrogate_query", [False, True])
 def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy, surrogate_query):
+    sol_pi = {"version": 1, "actionFusion": True, "observationPack": True,
+              "evidencePreservingReducer": True, "onlineContextCompact": True,
+              "cacheWriteReadRatio": 50}
+    plugin_path = tmp_path / "sol-pi.json"
+    plugin_path.write_text(json.dumps(sol_pi))
     args = parse_args([
         "--search-method", "ldm_harness_compiled",
         "--harness-cache-dir", str(tmp_path / "cache"),
         "--harness-tool-budget", "web_search=3",
         "--policy-tool-budget", "web_search=2",
         "--no-harness-context7",
+        "--harness-sol-pi-config", str(plugin_path),
+        "--llm-extra-body-json", '{"reasoning":{"effort":"max"}}',
     ] + (["--harness-surrogate-query"] if surrogate_query else []))
     profiles = policy_harness_profile() if policy else harness_profiles()
     provider = ProviderSettings("https://provider.example/v1", "research-model", "test-secret")
@@ -563,6 +570,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
         ResolvedHarnessMcpConfig(), policy=policy,
     )
     config = client.config
+    assert config.sol_pi == sol_pi
+    assert config.provider_request_body == {"reasoning": {"effort": "max"}}
     assert (config.base_url, config.model, config.thinking) == (provider.base_url, provider.model, "max")
     assert config.profiles == profiles
     assert config.submission_contract.tool_name == ("submit_optimization_policy" if policy else "submit_candidates")

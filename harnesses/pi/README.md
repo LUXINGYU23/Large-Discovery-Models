@@ -21,6 +21,48 @@ Build the release image from the repository root:
 docker build -t ldm-pi-harness:latest harnesses/pi
 ```
 
+Each image build resolves the current SoL-Pi `main` revision and installs its
+exact tested Pi package versions. The resolved pair is recorded in
+`/app/sol-pi-version.json`; session manifests also record package versions,
+the SoL-Pi source URL, and the effective lockfile digest. Pin the resulting
+image digest for an entire experiment and its resumes.
+
+## SoL-Pi
+
+SoL-Pi is disabled unless `PiHarnessConfig.sol_pi` supplies its configuration.
+NucleoBench exposes this through `--harness-sol-pi-config`:
+
+```json
+{
+  "version": 1,
+  "actionFusion": true,
+  "observationPack": true,
+  "evidencePreservingReducer": true,
+  "onlineContextCompact": true,
+  "cacheWriteReadRatio": 50
+}
+```
+
+Use the provider's cache-miss/cache-hit price ratio for
+`cacheWriteReadRatio`; the value above is an example, not a universal default.
+The effective `sol-pi.json` is saved in each session's `pi-agent` directory.
+The reducer uses that session's model and traced provider. Its calls and Pi
+compaction calls are included in the provider trace, alongside ordinary research
+requests. Provider request-body settings apply to all these calls.
+
+The upstream mechanisms remain unchanged. Action Fusion's file operations and
+follow-up commands use the task guest; its hash checks use the same shared
+workspace files. Observation and evidence archives remain under the native
+session directory and are mounted read-only at `/workspace/.sol-pi` for research.
+`obs_recall` retrieves archived observations; `update_plan` supplies boundaries
+for native compaction and continuation. Enabling the extension does not alter
+task submissions, measured-history validation, GP queries, or evaluation budgets.
+
+See the [SoL-Pi documentation](https://github.com/NVlabs/SoL-Pi) for mechanism
+details and the supported configuration schema.
+
+## Task Guest
+
 Before the first Harness run for a task, build its task-owned guest into a
 user-selected cache and run its offline smoke script:
 

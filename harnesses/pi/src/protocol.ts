@@ -100,6 +100,7 @@ export interface InitializeFrame extends CommonFrame {
 	model: string;
 	thinking: ThinkingLevel;
 	providerRequestBody?: Record<string, unknown>;
+	solPi?: Record<string, unknown>;
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -621,7 +622,9 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
-		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled", "providerRequestBody",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
+		...(data.solPi === undefined ? [] : ["solPi"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -687,6 +690,7 @@ export function parseFrame(line: string): InputFrame {
 	}
 
 	const profiles = parseProfiles(data.profiles);
+	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
@@ -694,6 +698,9 @@ export function parseFrame(line: string): InputFrame {
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
+		...(solPi?.actionFusion ? ["edit"] : []),
+		...(solPi?.observationPack ? ["obs_recall"] : []),
+		...(solPi?.onlineContextCompact ? ["update_plan"] : []),
 	]);
 	if (availableTools.has(submissionContract.toolName)) {
 		throw new ProtocolError("invalid_frame", "terminal tool conflicts with another available tool");
@@ -715,6 +722,7 @@ export function parseFrame(line: string): InputFrame {
 		model: string(data.model, "model"),
 		thinking,
 		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
+		...(solPi === undefined ? {} : { solPi }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

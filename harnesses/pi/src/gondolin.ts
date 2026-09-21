@@ -9,6 +9,7 @@ import {
 	type ExtensionFactory,
 	type ReadOperations,
 	type WriteOperations,
+	type ToolsOptions,
 } from "@earendil-works/pi-coding-agent";
 import type { NetworkPolicy } from "./protocol.js";
 import type { ResolvedGuestRuntime } from "./guest-image.js";
@@ -114,7 +115,56 @@ export class GondolinController {
 		private readonly hostResources: string,
 		private readonly networkPolicy: NetworkPolicy,
 		private readonly guestRuntime: ResolvedGuestRuntime,
+		private readonly readOnlyMounts: Record<string, string> = {},
 	) {}
+
+	async toolOptions(): Promise<ToolsOptions> {
+		const vm = await this.ensureVm();
+		const write = writeOperations(vm, this.hostWorkspace);
+		return {
+			read: { operations: readOperations(vm, this.hostWorkspace) },
+			write: { operations: write },
+			edit: { operations: {
+				readFile: (filePath) => vm.fs.readFile(guestPath(this.hostWorkspace, filePath)),
+				writeFile: write.writeFile,
+				access: async (filePath) => { await vm.fs.access(guestPath(this.hostWorkspace, filePath)); },
+			} },
+			bash: { operations: bashOperations(vm, this.hostWorkspace) },
+		};
+	}
+
+	private async ensureVm(): Promise<VM> {
+		if (this.vm) return this.vm;
+		if (!this.starting) {
+			this.starting = (async () => {
+				const { createHttpHooks, ReadonlyProvider, RealFSProvider, VM } = await import("@earendil-works/gondolin");
+				const { httpHooks, env } = createHttpHooks({
+					...(this.networkPolicy.allowedHosts.length > 0 ? { allowedHosts: this.networkPolicy.allowedHosts } : {}),
+					blockInternalRanges: false,
+					isRequestAllowed: (request) => !this.networkPolicy.deniedHosts.some(
+						(host) => hostMatches(new URL(request.url).hostname, host),
+					),
+				});
+				const created = await VM.create({
+					sessionLabel: `ldm-harness-${path.basename(this.hostWorkspace)}`,
+					sandbox: { imagePath: this.guestRuntime.assetDir },
+					rootfs: { mode: "cow", size: this.guestRuntime.rootfsSize },
+					httpHooks,
+					env,
+					vfs: { mounts: {
+						"/workspace": new RealFSProvider(this.hostWorkspace),
+						[GUEST_RESOURCE_ROOT]: new ReadonlyProvider(new RealFSProvider(this.hostResources)),
+						...Object.fromEntries(Object.entries(this.readOnlyMounts).map(
+							([guest, host]) => [guest, new ReadonlyProvider(new RealFSProvider(host))],
+						)),
+					} },
+				});
+				this.vm = created;
+				return created;
+			})().finally(() => { this.starting = undefined; });
+		}
+		return this.starting;
+	}
 
 	createExtension(): ExtensionFactory {
 		return (pi) => {
@@ -123,44 +173,7 @@ export class GondolinController {
 			const localWrite = createWriteTool(hostWorkspace);
 			const localBash = createBashTool(hostWorkspace);
 
-			const ensureVm = async (): Promise<VM> => {
-				if (this.vm) return this.vm;
-			if (!this.starting) {
-				this.starting = (async () => {
-					const { createHttpHooks, ReadonlyProvider, RealFSProvider, VM } = await import("@earendil-works/gondolin");
-					const { httpHooks, env } = createHttpHooks({
-							...(this.networkPolicy.allowedHosts.length > 0
-								? { allowedHosts: this.networkPolicy.allowedHosts }
-								: {}),
-							blockInternalRanges: false,
-							isRequestAllowed: (request) => {
-								const hostname = new URL(request.url).hostname;
-								return !this.networkPolicy.deniedHosts.some(
-									(host) => hostMatches(hostname, host),
-								);
-							},
-						});
-						const created = await VM.create({
-							sessionLabel: `ldm-harness-${path.basename(hostWorkspace)}`,
-							sandbox: { imagePath: this.guestRuntime.assetDir },
-							rootfs: { mode: "cow", size: this.guestRuntime.rootfsSize },
-							httpHooks,
-							env,
-							vfs: {
-								mounts: {
-									[GUEST_WORKSPACE]: new RealFSProvider(hostWorkspace),
-									[GUEST_RESOURCE_ROOT]: new ReadonlyProvider(new RealFSProvider(this.hostResources)),
-								},
-							},
-						});
-						this.vm = created;
-						return created;
-					})().finally(() => {
-						this.starting = undefined;
-					});
-				}
-				return this.starting;
-			};
+			const ensureVm = () => this.ensureVm();
 
 			pi.on("session_start", async () => {
 				await ensureVm();

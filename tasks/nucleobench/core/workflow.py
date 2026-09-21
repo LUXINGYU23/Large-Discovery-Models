@@ -207,6 +207,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--harness-thinking", choices=HARNESS_THINKING_LEVELS, default="max"
     )
     parser.add_argument("--harness-mcp-config", type=Path)
+    parser.add_argument("--harness-sol-pi-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
@@ -1169,6 +1170,8 @@ def _harness_client(
             tool_extensions=harness_tool_extensions(surrogate_query=surrogate_query),
             mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
+            sol_pi=_sol_pi_config(args),
+            provider_request_body=_parse_extra_body(args.llm_extra_body_json),
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(
@@ -1424,6 +1427,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "mcp_configured": args.harness_mcp_config is not None,
         "skills_loaded": True,
         "skill_ids": list(HARNESS_SKILL_IDS),
+        "sol_pi": _sol_pi_config(args),
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         description["policy_session"] = {
@@ -1432,6 +1436,15 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
             "editable_components": ["prior_mean", "alpha", "eta"],
         }
     return description
+
+
+def _sol_pi_config(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.harness_sol_pi_config is None:
+        return None
+    value = json.loads(args.harness_sol_pi_config.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("SoL-Pi configuration must be a JSON object")
+    return value
 
 
 def resolve_provider_settings(
