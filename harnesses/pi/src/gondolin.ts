@@ -166,7 +166,7 @@ export class GondolinController {
 		return this.starting;
 	}
 
-	createExtension(): ExtensionFactory {
+	createExtension(writeEnabled = true): ExtensionFactory {
 		return (pi) => {
 			const hostWorkspace = this.hostWorkspace;
 			const localRead = createReadTool(hostWorkspace);
@@ -187,7 +187,7 @@ export class GondolinController {
 					}).execute(id, params, signal, onUpdate);
 				},
 			});
-			pi.registerTool({
+			if (writeEnabled) pi.registerTool({
 				...localWrite,
 				async execute(id, params, signal, onUpdate) {
 					const active = await ensureVm();

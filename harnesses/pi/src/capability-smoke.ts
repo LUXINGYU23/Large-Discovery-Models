@@ -75,7 +75,8 @@ function writeEvents(response: import("node:http").ServerResponse, events: unkno
 }
 
 async function main(): Promise<void> {
-	const command = parseTaskGuestCommand(process.argv.slice(2));
+	const solPi = process.argv.includes("--sol-pi");
+	const command = parseTaskGuestCommand(process.argv.slice(2).filter((arg) => arg !== "--sol-pi"));
 	const cacheRoot = configureGuestCache(command.cacheDir);
 	process.env.TMPDIR = join(cacheRoot, "runtime-overlays");
 	await Promise.all([
@@ -93,6 +94,12 @@ async function main(): Promise<void> {
 		let body = "";
 		for await (const chunk of request) body += chunk.toString();
 		requestBodies.push(body);
+		if (solPi) {
+			const tools = JSON.parse(body).tools as Array<{ name: string; parameters: { properties: Record<string, unknown> } }>;
+			assert(tools.some((tool) => tool.name === "obs_recall"));
+			assert(tools.some((tool) => tool.name === "update_plan"));
+			assert(tools.find((tool) => tool.name === "write")?.parameters.properties.then_run);
+		}
 		call += 1;
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
@@ -101,9 +108,12 @@ async function main(): Promise<void> {
 				provider: "auto",
 			})));
 		} else if (call === 2) {
-			writeEvents(response, toolEvents(call, "bash", JSON.stringify({
+			const check = {
 				command: "if printf 'tamper' >> .ldm-resources/skills/0/capability-smoke/SKILL.md 2>/dev/null; then exit 9; fi; if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
-			})));
+			};
+			writeEvents(response, toolEvents(call, solPi ? "write" : "bash", JSON.stringify(solPi
+				? { path: "/workspace/proof.txt", content: "pending", then_run: check }
+				: check)));
 		} else if (call === 3) {
 			writeEvents(response, toolEvents(call, "read", JSON.stringify({
 				path: "/workspace/.ldm-resources/skills/0/capability-smoke/SKILL.md",
@@ -194,6 +204,10 @@ async function main(): Promise<void> {
 		wireApi: "responses",
 		model: "fake-responses-model",
 		thinking: "max",
+		...(solPi ? { solPi: {
+			version: 1, actionFusion: true, observationPack: true,
+			evidencePreservingReducer: true, onlineContextCompact: true, cacheWriteReadRatio: 50,
+		} } : {}),
 		taskId: recipe.taskId,
 		caseId: "local-smoke",
 		seed: 1,
@@ -324,8 +338,9 @@ async function main(): Promise<void> {
 		);
 
 
-		const sessionFiles = await readdir(join(root, "harness", "sessions", "target_sar", "pi-session"));
-		assert.equal(sessionFiles.filter((name) => name.endsWith(".jsonl")).length, 1);
+		const sessionFiles = (await readdir(join(root, "harness", "sessions", "target_sar", "pi-session")))
+			.filter((name) => name.endsWith(".jsonl"));
+		assert.equal(sessionFiles.length, 1);
 		const session = await readFile(join(root, "harness", "sessions", "target_sar", "pi-session", sessionFiles[0] as string), "utf8");
 		const readResults = session
 			.trim()

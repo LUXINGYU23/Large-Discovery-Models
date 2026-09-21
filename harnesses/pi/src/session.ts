@@ -512,7 +512,7 @@ export class PersistentProfileSession {
 			additionalExtensionPaths: extensionPaths,
 			additionalSkillPaths: skillDirectories,
 			extensionFactories: [
-				this.gondolin.createExtension(),
+				this.gondolin.createExtension(!this.config.solPi?.actionFusion),
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
 				...(solPi ? [solPi] : []),
@@ -568,6 +568,7 @@ export class PersistentProfileSession {
 			),
 		});
 		this.session = session;
+		await session.bindExtensions({});
 		this.historyCursor = await this.recoverHistoryCursor();
 	}
 
