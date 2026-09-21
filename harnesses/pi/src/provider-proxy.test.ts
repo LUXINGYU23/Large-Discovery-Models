@@ -95,13 +95,13 @@ test("provider proxy applies and traces the declared generation settings", async
 	const address = upstream.address();
 	assert(address && typeof address !== "string");
 	const root = await mkdtemp(join(tmpdir(), "ldm-provider-settings-"));
-	const settings = { temperature: 0.4, max_output_tokens: 1024, reasoning: { effort: "high" }, top_p: 0.9 };
+	const settings = { temperature: 0.4, max_output_tokens: 1024, reasoning: { effort: "high" }, top_p: 0.9, tool_choice: "auto" };
 	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "unit-test-token", "campaign", settings);
 	try {
 		await proxy.start();
 		await proxy.beginTurn("research", "session", "turn", root);
 		const response = await fetch(proxy.baseUrl("research") + "/responses", {
-			method: "POST", body: JSON.stringify({ model: "fixture", input: [], temperature: 1 }),
+			method: "POST", body: JSON.stringify({ model: "fixture", input: [], temperature: 1, tool_choice: "required" }),
 		});
 		assert.equal(await response.text(), "ok");
 		await proxy.endTurn("research");

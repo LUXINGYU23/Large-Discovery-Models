@@ -133,8 +133,9 @@ ordinary Pi behavior. The [sidecar guide](../../harnesses/pi/README.md#sol-pi)
 describes its four mechanisms, guest integration, and version recording.
 `args.llm-extra-body-json` also supplies provider options to all Harness model
 calls, including compaction and reduction. For DeepSeek Responses with thinking
-enabled at maximum effort, use `{"reasoning":{"effort":"max"}}` together with
-`args.harness-thinking=max`.
+enabled at maximum effort, use `{"reasoning":{"effort":"max"},"tool_choice":"auto"}`
+together with `args.harness-thinking=max`. DeepSeek thinking mode requires automatic
+tool choice; complete structured submissions remain enforced by the task validator.
 
 ## 5. Run the Qualified Tiny Campaign
 

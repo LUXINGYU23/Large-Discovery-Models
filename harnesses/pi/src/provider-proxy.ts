@@ -47,7 +47,7 @@ export class ProviderProxy {
 
 	constructor(baseUrl: string, private readonly apiKey: string, private readonly campaignId: string,
 		private readonly requestBody: Record<string, unknown> = {}) {
-		const reserved = ["model", "input", "messages", "stream", "tools", "tool_choice", "instructions"];
+		const reserved = ["model", "input", "messages", "stream", "tools", "instructions"];
 		if (reserved.some((key) => key in requestBody)) throw new Error("provider options cannot override protocol fields");
 		this.targetBaseUrl = new URL(baseUrl);
 		if (this.targetBaseUrl.protocol !== "http:" && this.targetBaseUrl.protocol !== "https:") {

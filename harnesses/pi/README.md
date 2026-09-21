@@ -48,7 +48,9 @@ Use the provider's cache-miss/cache-hit price ratio for
 The effective `sol-pi.json` is saved in each session's `pi-agent` directory.
 The reducer uses that session's model and traced provider. Its calls and Pi
 compaction calls are included in the provider trace, alongside ordinary research
-requests. Provider request-body settings apply to all these calls.
+requests. Provider request-body settings apply to all these calls. A provider that
+does not support forced tool use can set `tool_choice: "auto"` in those settings;
+the Harness still requires a validated terminal submission.
 
 The upstream mechanisms remain unchanged. Action Fusion's file operations and
 follow-up commands use the task guest; its hash checks use the same shared
