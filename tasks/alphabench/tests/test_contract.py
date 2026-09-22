@@ -75,7 +75,7 @@ def test_metric_boundaries_and_degeneracy():
     assert search_metrics([{"success": True, "metrics": {"ic": -1.}}])["gain"] == 0
     assert generation_costs([{"attempt_count": 1, "complete": True}, {"attempt_count": 5, "complete": False}]) == {
         "unit": "model attempts per logical generation step", "step_count": 2, "attempts_per_step": [1, 5],
-        "total_attempts": 6, "mean": 3, "failed_steps": 1}
+        "total_attempts": 6, "mean": 3, "failed_steps": 1, "interrupted_steps": 0}
     a = [{"date": "2022-01-03", "instrument": str(i), "score": float(i)} for i in range(3)]
     b = [{**row, "score": -row["score"]} for row in a]
     result = signal_diversity([{"candidate_id": "a", "scores": a}, {"candidate_id": "b", "scores": b}])

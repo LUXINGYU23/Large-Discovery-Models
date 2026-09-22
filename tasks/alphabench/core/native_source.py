@@ -20,6 +20,16 @@ SOURCE_HASHES = {
 }
 
 
+def verified_sources(root, hashes):
+    files = {}
+    for name, expected in hashes.items():
+        raw = (Path(root) / name).read_bytes()
+        if sha256(raw).hexdigest() != expected:
+            raise ValueError(f"pinned AlphaBench source changed: {name}")
+        files[name] = raw.decode("utf-8")
+    return files
+
+
 def patched_source(name, text):
     def replace(before, after):
         nonlocal text
@@ -66,13 +76,10 @@ def load_algorithms(source_root, private_root, scheduler):
     source_root, private_root = Path(source_root), Path(private_root)
     destination = private_root / "native_source"
     files, manifest = {}, {}
-    for name, expected in SOURCE_HASHES.items():
-        raw = (source_root / "searcher" / "algo" / name).read_bytes()
-        if sha256(raw).hexdigest() != expected:
-            raise ValueError(f"pinned AlphaBench source changed: searcher/algo/{name}")
-        body = patched_source(name, raw.decode("utf-8")).encode("utf-8")
+    for name, source in verified_sources(source_root / "searcher/algo", SOURCE_HASHES).items():
+        body = patched_source(name, source).encode("utf-8")
         files[name] = body
-        manifest[name] = {"source_sha256": expected, "patched_sha256": sha256(body).hexdigest()}
+        manifest[name] = {"source_sha256": SOURCE_HASHES[name], "patched_sha256": sha256(body).hexdigest()}
     manifest = {"files": manifest, "runtime_sha256": sha256(
         Path(__file__).with_name("native_runtime.py").read_bytes()).hexdigest(),
         "loader_sha256": sha256(Path(__file__).read_bytes()).hexdigest()}

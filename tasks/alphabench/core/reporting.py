@@ -44,7 +44,8 @@ def generation_costs(records):
     return {"unit": "model attempts per logical generation step", "step_count": len(records),
             "attempts_per_step": attempts, "total_attempts": sum(attempts),
             "mean": sum(attempts) / len(attempts) if attempts else None,
-            "failed_steps": sum(not record["complete"] for record in records)}
+            "failed_steps": sum(not record["complete"] and not record.get("interrupted", False) for record in records),
+            "interrupted_steps": sum(record.get("interrupted", False) for record in records)}
 
 
 def structure_diversity(expressions):

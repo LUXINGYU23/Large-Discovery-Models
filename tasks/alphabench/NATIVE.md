@@ -7,9 +7,9 @@
 同一运行恢复时不允许这些实现发生变化。源 checkout 不被修改。
 
 当前组件已经执行真实的官方 CoT/ToT/EA Python 算法和原生生成器，并接入
-模型请求、动态检查、整批 search 预算及私有 validation；尚未接入正式 workflow。
-source profiles、原生 cold 初始化和终局报告接线仍须完成。正式入口继续拒绝未完成的方法，
-本组件的通过不代表 W10 或完整 T3 已通过。
+模型请求、动态检查、整批 search 预算及私有 validation。matched 正式 workflow
+已接入原生 cold 初始化和终局报告；source profiles 仍待完成。当前验证使用
+synthetic oracle，不代表真实市场、W10 或完整 T3 已通过。
 
 ## 执行合同
 
@@ -71,6 +71,36 @@ IR/SFT 发布；原生不成功但含少量因子的返回值照常交回原算�
 冻结协议并传给 provider；[DeepSeek 官方说明](https://api-docs.deepseek.com/zh-cn/guides/responses_api/)
 指出思考模式下它不生效。因此 generation 同时记录请求值、不可用的有效值和
 `ignored_by_provider_in_thinking_mode`，不能宣称复现了旧模型的温度条件。
+
+cold 初始化同样执行固定 `searcher/pipeline.py` 的 `cold_start_generate`，移除
+模块导入副作用并将 30 替换为冻结的 `cold_seed_count`。原提示、五次修复和种子
+提取规则保留；即使原生 success 为 false，它返回的部分因素仍按原入口进入
+初始化评价。初始化为空时 EA 保留原行为，CoT/ToT 明确暂停为 `paused_no_valid_seeds`。
+
+EA 的下一代预生成可能与本代评价重叠。终局前先核对所有已发起的 model/check
+receipt。模型结果未知时暂停；已收到但尚未返回给算法的原始输出记作
+`interrupted` generation，`native_result=null`，独立报告中断数量，不能归为普通
+生成失败。其全部原始 occurrence 参与独立质量审计，已完成检查可复用。
+完成 generation 的 accepted action 由相同发布函数恢复，保留成对 IR/SFT。
+
+## matched workflow
+
+通过 `--protocol-file` 明确冻结 `native_parameters`，正式入口在初始化计费前
+检查完整参数集和固定源码。所有方法需 `oracle_workers`、`enable_reason`、
+`accept_threshold`；CoT 另需 `workers`，ToT 另需 `workers/N/top_k`，EA 另需
+`N/mutation_rate/crossover_rate/pool_size/seeds_top_k`。模型、温度和 rounds 使用
+同一个协议字段，拒绝无效或多余参数。原算法固定优化 RankIC，入口拒绝其他
+search objective，保留以 IC 选择 worker seed 的原行为。
+
+搜索只打开一个共享 runtime，不启动 LDMEngine。`result.json.execution.kind`
+区分 `native_reference` 和 `shared_engine`；原生输出包含原返回值、实际提交的
+状态和 `native_final_pool`。预算中断时原返回值为空，池来自停止前已提交的
+链/节点/种群。顶层 `final_pool` 仍是 matched 的完整成功观测集合，用于私有
+validation 选取和独立多样性评价，两者不会互相替换。
+
+`private/stages` 冻结原生完成结果。finalization 中断后从原结果及 receipt 继续，
+不重新生成候选，也不启动新搜索；已完成的运行只读重放。模型与检查结果未知
+时不会生成成功终局报告。
 
 ## 已验证及边界
 

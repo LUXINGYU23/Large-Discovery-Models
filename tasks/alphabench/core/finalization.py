@@ -14,7 +14,7 @@ from .reporting import daily_metrics, generation_costs, search_metrics, signal_d
 from .quality import audit_quality
 
 
-def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_budget):
+def finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget, *, execution):
     private = runtime.run_dir / "private"
     stages = Receipts(private / "stages")
     runtime.status.update("running", phase="validation_complete", budget=runtime.budget)
@@ -24,7 +24,7 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
         if row["success"]:
             candidate = domain.admit(RawProposal(row, "initialization"))
             pool[candidate.candidate_id] = (candidate, row["validation_position"], "initialization", row["validation"])
-    for observation in engine_result.state.observations:
+    for observation in observations:
         if observation.evaluation.succeeded and observation.candidate.source != "initialization":
             candidate = observation.candidate
             pool[candidate.candidate_id] = (candidate, candidate.metadata["attempt_position"], "search", None)
@@ -61,14 +61,14 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
                                   selection_digest=digest(selection)) if selection["selected"] else None
     quality = audit_quality(protocol, runtime, gateway)
     search_raw = [gateway.receipts.load(gateway.identity("search", item.candidate.metadata["attempt_position"], item.candidate))["response"]
-                  for item in engine_result.state.observations if item.candidate.source != "initialization"]
+                  for item in observations if item.candidate.source != "initialization"]
     expressions = [item[0].payload["expression"] for item in pool.values()]
     generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "generation").glob("*.json"))]
     initial_generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "initialization/generation").glob("*.json"))]
     prefix = "mock_" if gateway.mock else ""
     initial_raw = [{"success": item.evaluation.succeeded,
                     "metrics": {key.removeprefix(prefix): value for key, value in item.evaluation.metrics.items()}}
-                   for item in engine_result.state.observations if item.candidate.source == "initialization"]
+                   for item in observations if item.candidate.source == "initialization"]
     seed_manifest = json.loads((runtime.run_dir / "initialization/seed_manifest.json").read_text(encoding="utf-8"))
     shared_creation = initial_budget.get("metadata", {}).get("shared_seed_creation")
     creation_steps = shared_creation["generation_steps"] if shared_creation else initial_generation
@@ -92,7 +92,7 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
                       "selection_digest": digest(selection),
                       "structure": structure_diversity([row["candidate"]["expression"] for row in tested]),
                       "signal": signal_diversity([{"candidate_id": row["candidate_id"], "scores": row["raw"].get("scores", [])} for row in tested])}},
-              "budget": runtime.budget.snapshot(), "engine": engine_result.summary,
+              "budget": runtime.budget.snapshot(), "execution": execution,
               "qualification": "mock_verified" if gateway.mock else "unqualified"}
     # Mandatory analysis capability is checked before claiming a complete report.
     report["complete_t3"] = False
@@ -102,7 +102,7 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
     atomic_json_write(runtime.run_dir / "result.json", report)
     with (runtime.run_dir / "trajectory.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=("search_attempt", "candidate_id", "status", "objective")); writer.writeheader()
-        for index, item in enumerate(row for row in engine_result.state.observations if row.candidate.source != "initialization"):
+        for index, item in enumerate(row for row in observations if row.candidate.source != "initialization"):
             writer.writerow({"search_attempt": index+1, "candidate_id": item.candidate_id,
                              "status": item.evaluation.status,
                              "objective": item.evaluation.metrics.get(("mock_" if gateway.mock else "")+protocol.objective)})

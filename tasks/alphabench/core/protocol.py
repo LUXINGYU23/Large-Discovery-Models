@@ -33,6 +33,7 @@ class T3Protocol:
     wire_api: str = "responses"
     reasoning_effort: str = "max"
     temperature: float = .7
+    native_parameters: dict = field(default_factory=dict)
     forward_n: int = 1
     label: str = "close_return"
     objective: str = "rank_ic"
@@ -86,6 +87,8 @@ class T3Protocol:
             raise ValueError("provider endpoint differs from the approved contract")
         if type(self.temperature) not in {int, float} or not 0 <= self.temperature <= 2:
             raise ValueError("temperature must be finite and between zero and two")
+        if not isinstance(self.native_parameters, dict) or self.native_parameters and not self.method.startswith("alphabench_"):
+            raise ValueError("native_parameters belong only to a native method")
         if type(self.cold_seed_count) is not int or self.cold_seed_count < 0:
             raise ValueError("cold_seed_count must be a nonnegative integer")
         if not self.alpha158_groups or len(set(self.alpha158_groups)) != len(self.alpha158_groups) or set(self.alpha158_groups) - {"kbar", "price", "rolling"}:

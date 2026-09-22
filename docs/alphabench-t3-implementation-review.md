@@ -459,3 +459,61 @@ search billing, validation reconciliation, malformed job receipts and all three
 actual algorithms with both metered generation and evaluation. Two checks kill
 real subprocesses after ledger reservation or committed observation and verify
 that resumed physical search/validation calls and charges occur only once.
+
+## Change 14: native matched workflow, cold initialization and finalization
+
+Cross-check against W01/W07-W10/W14, X05/X06/X09 and Y04: the official CoT,
+ToT and EA now run through the registered task entry point on one shared search
+runtime, without starting a search LDMEngine. All required native parameters and
+fixed source hashes are checked before initialization incurs cost. The native
+cold initializer executes the pinned pipeline function with the frozen seed
+count; its extraction of partial factors is preserved even when the generator
+reports unsuccessful completion. Verified shared initialization bundles can
+cross method boundaries while preserving exactly the same initial information.
+
+Both search paths use the existing private validation, frozen selection, full
+test, combination, quality and collection finalizer. Reports distinguish the
+actual native return and native pool from the matched comparison pool. A whole
+batch budget stop uses only committed native state and does not invent a normal
+algorithm return. Durable search completion lets finalization resume without
+rerunning search or generation. Empty initialization follows the actual method
+requirements: CoT/ToT pause, while EA can generate its first population.
+
+Cross-check of EA's overlapping next-generation work found that terminal budget
+exhaustion could otherwise hide a completed model response or an unknown check.
+Settlement now inspects all begun model/check receipts after workers drain.
+Unknown outcomes pause. Completed output from abandoned generation retains all
+raw occurrences and reusable checks, has no fabricated native result, and is
+reported separately as interrupted. Completed accepted actions use the same
+publication function during execution and recovery. Canonical request JSON fixes
+action identity changes caused by persisted message-key ordering.
+
+The shared runner's named profiles now bind the complete protocol content digest
+as well as locked CLI arguments and E. The exact runner contract is snapshotted
+before paid work and its identity reaches the search runtime. Direct resume
+without runner environment variables still verifies that frozen contract;
+tampered snapshots and protocol contents are rejected. Three complete two-round
+mock profiles are registered, with dependency checks for the actual fixed source.
+
+Complexity review: replaced the engine-result wrapper in finalization with one
+explicit execution record; no compatibility alias remains. Reused the existing
+shared runtime, gateway, receipt store, collection exporter and finalizer.
+Source hash verification and native raw-item extraction each have one shared
+implementation. Removed duplicate accepted-action construction in recovery.
+No second search engine, copied algorithm loop, standalone checkpoint store or
+new dependency was introduced. Existing direct LLM/LDM behavior remains covered.
+
+Remote validation: the task suite passed 214 tests with one backend-environment
+module skipped. A subsequent focused run passed all 16 native workflow tests,
+including the added direct-resume contract check and nonempty paired collection
+assertions. Tests cover both oracle dialects, shared seed imports, empty seeds,
+whole-batch exhaustion, unknown requests and finalization reconciliation. Task
+registration and dependency validation passed. Actual shared-runner executions
+completed under `tasks/alphabench/runs/mock_4` through `mock_7`: native CoT used
+4 new search attempts, ToT and EA each used 8, and existing LDM used 2. All saved
+runner/protocol identities matched; each run completed test and quality stages.
+
+These runs use synthetic model/oracle responses. Native source-profile resolution,
+market/data qualification, persistent Harness, compiled policy and the remaining
+full-T3 gates are still pending. Neither W10 nor the requested two-round real
+DeepSeek acceptance is marked complete by these results.

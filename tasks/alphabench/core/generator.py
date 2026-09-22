@@ -30,7 +30,7 @@ class Generator:
             self.runtime.consume_many(amounts, usage_key=("engine:proposal_attempt:" if proposal else "task:model:") + key)
 
         try:
-            raw = self.receipts.execute(key, {"messages": messages, "protocol": self.protocol.identity}, reserve=reserve,
+            raw = self.receipts.execute(key, {"messages": messages, "protocol": self.protocol.identity, "logical": identity}, reserve=reserve,
                 operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host,
                 authorize=self.gateway.before_dispatch)
         except EndpointRequestError as exc:

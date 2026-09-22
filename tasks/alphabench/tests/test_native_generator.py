@@ -9,7 +9,7 @@ import typing
 import pytest
 
 from ldm_tts.contracts.evaluation import EvaluationPaused
-from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime
 from ldm_tts.transport import CallableProposalClient
 from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.core.gateway import OracleGateway
@@ -18,6 +18,7 @@ from tasks.alphabench.core.native_runtime import NativeRuntime
 from tasks.alphabench.core.native_source import load_algorithms
 from tasks.alphabench.core.protocol import T3Protocol, digest
 from tasks.alphabench.core.quality import audit_quality
+from tasks.alphabench.core.reporting import generation_costs
 from tasks.alphabench.core.workflow import make_client
 from tasks.alphabench.tests.test_native import SEEDS, SOURCE, source
 
@@ -71,6 +72,62 @@ def test_full_raw_output_tail_sampling_and_idempotent_replay(tmp_path, source, m
     new_native, replay, new_calls = build(tmp_path, [], monkeypatch)
     assert invoke(new_native, replay) == answer
     assert not new_calls and len(calls) == 1 and (tmp_path / "budget.json").read_bytes() == before
+
+
+def test_native_cold_start_retains_partial_factors_even_when_source_success_is_false(tmp_path, source, monkeypatch):
+    output = {"generated": [{"name": "a", "expression": "$close"}, {"name": "b", "expression": "$open"}]}
+    native, scheduler, calls = build(tmp_path, [output] + [{"generated": []}] * 4, monkeypatch,
+        protocol=T3Protocol(method="alphabench_ea", cold_seed_count=6))
+    seeds = scheduler.run(lambda: scheduler.callback("cold_start", native.cold_start)())
+    assert len(seeds) == 2 and len(calls) == 5
+    assert all(set(seed) == {"name", "expression"} for seed in seeds)
+    assert generation(tmp_path)["native_result"]["success"] is False
+    assert calls[0].messages[1]["content"].startswith("Generate diverse alpha factors for stock ranking.")
+
+
+def test_abandoned_generation_audits_all_returned_items_without_fabricating_a_native_return(tmp_path, source, monkeypatch):
+    output = {"generated": [{"name": str(index), "expression": expression}
+                            for index, expression in enumerate(("$close", "$open", "$volume"))]}
+    native, scheduler, calls = build(tmp_path, [output], monkeypatch)
+    send = native.gateway._send
+    def stop(request):
+        scheduler.stop(BudgetExceededError("peer stopped"), notify=False)
+        return send(request)
+    native.gateway.before_dispatch = scheduler._check
+    monkeypatch.setattr(native.gateway, "_send", stop)
+    with pytest.raises(BudgetExceededError):
+        invoke(native, scheduler, count=2)
+    assert native.settle() == {"interrupted_generations": 1}
+    saved = generation(tmp_path)
+    assert saved["native_result"] is None and len(saved["occurrences"]) == 3
+    assert len(calls) == 1 and not list((tmp_path / "accepted_actions").glob("*.json"))
+    assert generation_costs([saved])["interrupted_steps"] == 1
+    assert generation_costs([saved])["failed_steps"] == 0
+    monkeypatch.setattr(native.gateway, "_send", send)
+    audit = audit_quality(native.protocol, native.runtime, native.gateway)
+    assert audit["raw_occurrences"] == 3 and audit["complete"]
+    assert native.runtime.budget.counters["quality_checks"] == 2  # The completed in-generation check is reused.
+
+
+@pytest.mark.parametrize("phase", ["model", "check"])
+def test_native_stop_cannot_hide_an_unknown_generation_request(tmp_path, source, monkeypatch, phase):
+    def output(request):
+        if phase == "model":
+            scheduler.stop(BudgetExceededError("peer stopped"), notify=False)
+            raise OSError("model response lost")
+        return {"generated": [{"name": "a", "expression": "$close"}]}
+    native, scheduler, calls = build(tmp_path, output, monkeypatch)
+    if phase == "check":
+        def disconnect(request):
+            scheduler.stop(BudgetExceededError("peer stopped"), notify=False)
+            raise OSError("check response lost")
+        monkeypatch.setattr(native.gateway, "_send", disconnect)
+    native.gateway.before_dispatch = scheduler._check
+    with pytest.raises(BudgetExceededError):
+        invoke(native, scheduler, count=1)
+    with pytest.raises(EvaluationPaused, match="reconciliation"):
+        native.settle()
+    assert len(calls) == 1 and not list((tmp_path / "generation").glob("*.json"))
 
 
 @pytest.mark.parametrize("count,expected", [(5, True), (6, False)])

@@ -25,31 +25,97 @@
         "direction": "maximize"
       }
     ],
-    "diagnostic": [{"name": "generation_attempts_per_step", "direction": "minimize"}]
+    "diagnostic": [
+      {
+        "name": "generation_attempts_per_step",
+        "direction": "minimize"
+      }
+    ]
   },
   "evaluation": {
     "datasets": [
-      "synthetic_mock", "csi300", "csi500", "csi1000", "sp500", "nasdaq100"
+      "synthetic_mock",
+      "csi300",
+      "csi500",
+      "csi1000",
+      "sp500",
+      "nasdaq100"
     ],
     "settings": {
       "scope": "Full T3; all methods and backend/market rows remain required",
-      "protocols": ["ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"],
+      "protocols": [
+        "ldm_matched_v1",
+        "upstream_searcher_v1",
+        "upstream_benchmark_v1"
+      ],
       "model": "deepseek-flash",
       "endpoint": "https://api.deepseek.com/responses",
       "wire_api": "responses",
       "reasoning_effort": "max",
       "feedback": "Only committed search observations. Validation and test remain private.",
       "data_preparation": "Local international acquisition, SHA256 bundle transfer, remote offline verification.",
-      "qualification_note": "Data and remaining method/backend gates are incomplete; synthetic checks and development seed probes do not qualify full T3."
+      "qualification_note": "Data and remaining method/backend gates are incomplete; synthetic checks and development seed probes do not qualify full T3.",
+      "protocol_digests": {
+        "mock_ldm": "9a543bb051bb5bd867f9c202a0ae6f4d7e43b6f37b2ed580d161827ee91e962b",
+        "mock_native_cot": "eec92b2ec6ad49bbb76f1d8aec8fdfca0ea377f11a85dc618728ab8f153aec81",
+        "mock_native_tot": "f073cdde6af2ac56648bc35337fa5548f4e4e46737d53504165d8c3745e311e0",
+        "mock_native_ea": "190376f44686e30515d9374633a00e47240117e038544fcf5c05aad5d45caec4"
+      }
     },
-    "per_candidate_limits": {"generation_attempts": 5, "worker_timeout_seconds": 120}
+    "per_candidate_limits": {
+      "generation_attempts": 5,
+      "worker_timeout_seconds": 120
+    }
   },
   "budget": {},
   "profiles": {
     "mock_ldm": {
       "description": "Synthetic LDM lifecycle with initialization, private validation, frozen full test, analysis and replay",
-      "budget": {"search_evaluations": 2},
-      "locked_args": {"mock": true, "method": "ldm", "iterations": 1, "evaluations": 2}
+      "budget": {
+        "search_evaluations": 2
+      },
+      "locked_args": {
+        "mock": true,
+        "method": "ldm",
+        "iterations": 1,
+        "evaluations": 2
+      }
+    },
+    "mock_native_cot": {
+      "description": "Synthetic two-round native COT lifecycle with all private and final stages",
+      "budget": {
+        "search_evaluations": 12
+      },
+      "locked_args": {
+        "mock": true,
+        "method": "alphabench_cot",
+        "protocol_file": "tasks/alphabench/resources/protocols/native_cot_qualification.json",
+        "upstream_root": "/mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench"
+      }
+    },
+    "mock_native_tot": {
+      "description": "Synthetic two-round native TOT lifecycle with all private and final stages",
+      "budget": {
+        "search_evaluations": 12
+      },
+      "locked_args": {
+        "mock": true,
+        "method": "alphabench_tot",
+        "protocol_file": "tasks/alphabench/resources/protocols/native_tot_qualification.json",
+        "upstream_root": "/mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench"
+      }
+    },
+    "mock_native_ea": {
+      "description": "Synthetic two-round native EA lifecycle with all private and final stages",
+      "budget": {
+        "search_evaluations": 12
+      },
+      "locked_args": {
+        "mock": true,
+        "method": "alphabench_ea",
+        "protocol_file": "tasks/alphabench/resources/protocols/native_ea_qualification.json",
+        "upstream_root": "/mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench"
+      }
     }
   }
 }

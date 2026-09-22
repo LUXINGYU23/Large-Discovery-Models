@@ -49,16 +49,20 @@ def describe_ldm_task(args):
     protocol = resolve_protocol(args)
     objective = ("mock_" if args.mock else "") + protocol.objective
     guided = protocol.method in LDM_METHODS
+    native = protocol.method.startswith("alphabench_")
     return LDMTaskSpec(task="alphabench",
         candidate_domain=CandidateDomainSpec("factor_expression", "symbolic", None,
             "Full pinned T3 Qlib/Assay expressions; safe canonical AST identity"),
         objectives=(ObjectiveSpec(objective, "maximize", "Signed search-period cross-sectional daily correlation"),),
-        response_spaces=(ResponseSpaceSpec("factors", "json", "Named expressions in a candidates array"),),
-        acquisition=FactorSelector(objective).describe() if guided else AcquisitionSpec("reservoir_order", (objective,), "maximize", "Accepted response order"),
+        response_spaces=(ResponseSpaceSpec("factors", "json", "Named expressions in a generated array" if native else "Named expressions in a candidates array"),),
+        acquisition=FactorSelector(objective).describe() if guided else AcquisitionSpec(
+            protocol.method if native else "reservoir_order", (objective,), "maximize",
+            "Official native chain/tree/population decisions" if native else "Accepted response order"),
         reservoir=ReservoirSpec("factor_reservoir", (ReservoirExpansionSpec("factor_proposal", "emit_candidate", "factors", True,
             "Generate and repair complete causal factor expressions"),), "Static grammar followed by metered backend checks", "SHA256(grammar,dialect,canonical expression)"),
         surrogate=FactorEncoder().describe() if guided else SurrogateSpaceSpec("none", "No surrogate", "none"),
-        proposal_search=ProposalSearchSpec(protocol.method), metadata={"mock": args.mock, "protocol_digest": protocol.identity})
+        proposal_search=ProposalSearchSpec(protocol.method), metadata={"mock": args.mock, "protocol_digest": protocol.identity,
+            "execution": "native_reference" if native else "shared_campaign"})
 
 
 def main(argv=None):

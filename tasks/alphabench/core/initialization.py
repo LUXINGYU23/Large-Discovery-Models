@@ -145,9 +145,18 @@ def run_initialization(protocol, args, spec, client, run_dir):
                 if protocol.init_mode == "cold":
                     if protocol.cold_seed_count > protocol.budgets["initialization_evaluations"]:
                         raise ValueError("cold seed count exceeds the initialization evaluation budget")
-                    seeds = Generator(protocol, runtime, client, gateway, collection).generate(
-                        identity="initialization", count=protocol.cold_seed_count,
-                        instruction="Generate the initial factor pool.")[0]["candidates"] if protocol.cold_seed_count else []
+                    seeds = []
+                    if protocol.cold_seed_count:
+                        if protocol.method.startswith("alphabench_"):
+                            from .native_generator import NativeGenerator
+                            from .native_runtime import NativeRuntime
+                            native = NativeGenerator(protocol, runtime, client, gateway, collection, args.upstream_root)
+                            scheduler = NativeRuntime(runtime, gateway.host)
+                            seeds = scheduler.run(lambda: scheduler.callback("cold_start", native.cold_start)())
+                        else:
+                            seeds = Generator(protocol, runtime, client, gateway, collection).generate(
+                                identity="initialization", count=protocol.cold_seed_count,
+                                instruction="Generate the initial factor pool.")[0]["candidates"]
                 else:
                     seeds = source["seeds"]
                 seed_record = {"source_digest": digest(source), "seeds": seeds, "admissions": seed_admissions(seeds, protocol.backend)}

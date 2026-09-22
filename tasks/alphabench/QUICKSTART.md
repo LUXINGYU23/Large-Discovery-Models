@@ -1,6 +1,6 @@
 # AlphaBench T3 开发验证
 
-当前合同为 `draft`。以下流程验证注册、mock、恢复和数据获取；原生算法、Assay worker、Harness、compiled policy 及完整市场矩阵仍在实施中，不能把本流程称为完整 T3 验收。
+当前合同为 `draft`。以下流程验证注册、mock、恢复和数据获取；原生 source profiles、Assay 市场资格、Harness、compiled policy 及完整矩阵仍在实施中，不能把本流程称为完整 T3 验收。
 
 数值执行只在指定服务器进行，仓库位于 `/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation`。`uv.lock` 固定依赖，使用清华 PyPI 镜像；AlphaBench/Assay 源码和国际数据按 [DATA.md](DATA.md) 在本机取得并传输。
 
@@ -20,6 +20,22 @@ T3_PY=tasks/alphabench/.venv/bin/python
 ```
 
 mock 使用 `mock_ldm` 合同：30 个 synthetic 初始化种子、一轮 LDM、2 次 search 评价；同一共享 Campaign 执行私有 validation、冻结选择、完整 test 产物、组合和质量审计。每次新运行自动分配 `tasks/alphabench/runs/mock[_N]`，结果中的 `complete_t3` 保持 `false`。
+
+三种原生方法各有完整冻结的两轮资格配置，经同一共享 runner 启动：
+
+```bash
+"$T3_PY" scripts/run_ldm_tts.py config/alphabench/native_cot_mock.yaml
+"$T3_PY" scripts/run_ldm_tts.py config/alphabench/native_tot_mock.yaml
+"$T3_PY" scripts/run_ldm_tts.py config/alphabench/native_ea_mock.yaml
+```
+
+配置读取 `resources/protocols/native_*_qualification.json`，使用已离线传入的固定
+源码、三个 cold 种子和最多 12 次新 search 尝试。命名配置同时锁定协议文件的
+完整内容摘要；运行保存共享 runner 合同，直接恢复也继续验证这一身份。原算法完整执行，搜索使用独立
+共享 runtime，私有验证与终局阶段复用同一个 task 网关；结果标记
+`execution.kind=native_reference`。正式 matched 比较另用共同的
+`--initialization-bundle` 固定初始信息。恢复原生运行时提供相同的
+`--upstream-root /mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench`。
 
 终端返回绝对运行路径。检查该目录中的 `status.json`、`budget.json`、`result.json`、`selection_frozen.json` 和 `trajectory.csv`；初始化有独立的预算和 `seed_manifest.json`。IR/SFT 在 `ldm_data/` 下通过 `current.json` 指向成对完成的 generation，初始化与搜索分别记录。
 
