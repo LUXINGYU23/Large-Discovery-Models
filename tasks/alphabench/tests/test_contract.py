@@ -12,7 +12,7 @@ from tasks.alphabench.core.candidate import FactorDomain
 from tasks.alphabench.core.data import extract_archive
 from tasks.alphabench.core.grammar import ExpressionError, REGISTRY, parse_expression
 from tasks.alphabench.core.receipts import Receipts
-from tasks.alphabench.core.reporting import daily_metrics, generation_costs, search_metrics, signal_diversity
+from tasks.alphabench.core.reporting import daily_metrics, generation_costs, search_metrics, signal_diversity, structure_diversity
 from tasks.alphabench.core.selection import FactorEncoder
 
 
@@ -78,7 +78,28 @@ def test_metric_boundaries_and_degeneracy():
         "total_attempts": 6, "mean": 3, "failed_steps": 1}
     a = [{"date": "2022-01-03", "instrument": str(i), "score": float(i)} for i in range(3)]
     b = [{**row, "score": -row["score"]} for row in a]
-    assert signal_diversity([a, b])["diversity"] == 0
+    result = signal_diversity([{"candidate_id": "a", "scores": a}, {"candidate_id": "b", "scores": b}])
+    assert result["diversity"] == 0 and result["signed_mean_correlation"] == -1
+    assert result["pairs"][0]["finite_samples"] == 3
+
+
+def test_diversity_missing_samples_and_operator_structure_are_not_erased():
+    result = structure_diversity(["Mean($close,5)", "Ref($close,1)", "Abs(Mean($close,5))"])
+    assert result["mean"] == pytest.approx(4/3) and result["max"] == 2
+    assert result["normalized_mean"] == pytest.approx(2/3) and result["normalized_max"] == 1
+    assert structure_diversity(["$close+$open", "$close-$open"])["mean"] == 1
+    assert structure_diversity(["-close", "+close"])["mean"] == 1
+    assert structure_diversity(["Mean($close,5)", "Mean($close,20)"])["normalized_mean"] == 0
+    scores = [{"date": "2022-01-03", "instrument": str(i), "score": float(i)} for i in range(3)]
+    factors = [{"candidate_id": "a", "scores": scores}, {"candidate_id": "b", "scores": scores[1:]},
+               {"candidate_id": "c", "scores": []}]
+    result = signal_diversity(factors)
+    assert result["total_pairs"] == 3 and result["pair_count"] == 1
+    assert result["diversity"] is None and result["missing_candidates"] == ["c"]
+    assert result["pairs"][0]["finite_samples"] == 2
+    assert signal_diversity(factors[:2])["pairs"][0]["sample_index_digest"] == result["pairs"][0]["sample_index_digest"]
+    with pytest.raises(ValueError, match="duplicate factor score"):
+        signal_diversity([{"candidate_id": "a", "scores": scores + scores}])
 
 
 def test_data_archive_rejects_paths_and_links(tmp_path):

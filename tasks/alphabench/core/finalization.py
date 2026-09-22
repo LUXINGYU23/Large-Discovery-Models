@@ -28,19 +28,20 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
         if observation.evaluation.succeeded and observation.candidate.source != "initialization":
             candidate = observation.candidate
             pool[candidate.candidate_id] = (candidate, candidate.metadata["attempt_position"], "search", None)
-    ranked = []
+    ranked, validation_scores = [], []
     for candidate, position, source, raw in pool.values():
         if raw is None:
             receipt = gateway.receipts.load(gateway.identity("validation", position, candidate))
             if receipt is None or receipt["state"] != "completed":
                 raise ValueError("validation must complete before freezing test selection")
             raw = receipt["response"]
-        value = raw.get("metrics", {}).get(protocol.objective)
+        validation_scores.append({"candidate_id": candidate.candidate_id, "scores": raw.get("scores", [])})
+        value = raw.get("metrics", {}).get(protocol.validation_metric)
         if not raw["success"] or type(value) not in (int, float) or not math.isfinite(value):
             continue
         ranked.append({"candidate": candidate.to_dict(), "validation_score": value, "source": source})
     ranked.sort(key=lambda row: (-row["validation_score"], row["candidate"]["candidate_id"]))
-    selection = {"protocol": protocol.identity, "direction": protocol.direction,
+    selection = {"protocol": protocol.identity, "direction": protocol.direction, "validation_metric": protocol.validation_metric,
                  "stock_topk": protocol.stock_topk, "stock_n_drop": protocol.stock_n_drop,
                  "selected": ranked[:protocol.factor_select_n]}
     stages.accept("selection_frozen", selection)
@@ -83,8 +84,14 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
                   "initialization_cost_basis": "shared_source_creation" if shared_creation else "current_run"},
               "independent_combination": combination, "quality_audit": quality,
               "final_pool": [item[0].payload for item in pool.values()],
-              "structure_diversity": structure_diversity(expressions),
-              "test_signal_diversity": signal_diversity([row["raw"].get("scores", []) for row in tested]),
+              "diversity": {
+                  "final_pool": {"phase": "validation", "interval": protocol.interval("validation"),
+                      "scope": "all successful measured initialization and search candidates",
+                      "structure": structure_diversity(expressions), "signal": signal_diversity(validation_scores)},
+                  "test_selection": {"phase": "test", "interval": protocol.interval("test"),
+                      "selection_digest": digest(selection),
+                      "structure": structure_diversity([row["candidate"]["expression"] for row in tested]),
+                      "signal": signal_diversity([{"candidate_id": row["candidate_id"], "scores": row["raw"].get("scores", [])} for row in tested])}},
               "budget": runtime.budget.snapshot(), "engine": engine_result.summary,
               "qualification": "mock_verified" if gateway.mock else "unqualified"}
     # Mandatory analysis capability is checked before claiming a complete report.

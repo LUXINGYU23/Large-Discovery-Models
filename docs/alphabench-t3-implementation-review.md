@@ -248,3 +248,36 @@ skipped in the lightweight task environment and tested separately in its lock.
 Registration validation passes and continues to report draft/mock_verified.
 There are still no qualified Assay data snapshots; acquisition, complete
 operator numerical audits and the real matrix remain required for W06 closure.
+
+## Change 9: independent validation ranking and auditable diversity sets
+
+Cross-check against W09/W14 found that validation ranking reused the search
+objective, structural normalization used node counts instead of the fixed
+source's maximum pair distance, and arithmetic AST labels lost the actual
+operator. The frozen validation metric now independently accepts IC, RankIC,
+ICIR or RankICIR, with deterministic identity tie-breaking. Addition/subtraction
+and unary signs remain distinguishable after constants are removed. Distances
+use unit tree-edit costs and the documented maximum-distance normalization.
+
+Both required sets now have their own reports. The entire successful measured
+pool uses existing private validation scores, and the frozen test selection uses
+its test scores. No new free evaluation or pre-selection signal computation was
+introduced. Each correlation records candidate identities, shared and finite
+sample counts, sample-index digest and an explicit undefined reason. Missing
+member scores make the aggregate unavailable; missing pairs are not filled with
+zero. Scope, interval and selection identity are retained in the report.
+
+Complexity review: removed the superseded ambiguous diversity fields and the
+incorrect normalization; there is one projection for both sets. Reuses the
+existing validation responses and grammar rather than copying oracle artifacts
+or adding a metrics service. Portfolio/validation-selection controls are excluded
+from the common initialization contract because initialization evaluates and
+retains the same complete metric set independently of those later choices.
+
+Remote validation: 137 task tests pass, plus the separately pinned Assay tests
+from Change 8. Four complete mock campaigns demonstrate different validation
+winners while the search objective stays fixed. Numerical tests cover known
+tree distances, sign/operator distinctions, positive/negative correlation,
+pair sample alignment, missing members and duplicate sample rejection. Full
+W14 closure still requires native update events, preregistered run aggregation,
+and the remaining full-task quality/reporting/collection gates.

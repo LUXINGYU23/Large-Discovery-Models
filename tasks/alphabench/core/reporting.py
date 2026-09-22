@@ -6,6 +6,7 @@ import math
 import numpy as np
 
 from .grammar import parse_expression
+from .protocol import digest
 
 
 def daily_metrics(rows, *, direction=1, ddof=1):
@@ -52,33 +53,61 @@ def structure_diversity(expressions):
     def convert(node):
         if isinstance(node, ast.Constant):
             return None
-        label = node.func.id if isinstance(node, ast.Call) else node.id if isinstance(node, ast.Name) else type(node).__name__
+        label = (node.func.id if isinstance(node, ast.Call) else node.id if isinstance(node, ast.Name)
+                 else type(node.op).__name__ if isinstance(node, (ast.BinOp, ast.UnaryOp))
+                 else type(node.ops[0]).__name__ if isinstance(node, ast.Compare) else type(node).__name__)
         children = node.args if isinstance(node, ast.Call) else list(ast.iter_child_nodes(node))
         return zss.Node(label, [child for item in children if (child := convert(item)) is not None
                               and not isinstance(item, (ast.Load, ast.operator, ast.unaryop, ast.cmpop))])
     trees = [convert(parse_expression(expression, backend="assay").tree.body) for expression in expressions]
     trees = [tree for tree in trees if tree is not None]
-    pairs = [(float(zss.simple_distance(a, b)), max(1, len(list(a.iter())) + len(list(b.iter()))))
+    pairs = [float(zss.simple_distance(a, b, label_dist=lambda a, b: int(a != b)))
              for a, b in itertools.combinations(trees, 2)]
-    return {"pairs": len(pairs), "mean": float(np.mean([d for d, _ in pairs])) if pairs else None,
-            "max": max((d for d, _ in pairs), default=None),
-            "normalized_mean": float(np.mean([d/n for d, n in pairs])) if pairs else None,
-            "normalized_max": max((d/n for d, n in pairs), default=None)}
+    mean, maximum = (float(np.mean(pairs)), max(pairs)) if pairs else (None, None)
+    return {"pairs": len(pairs), "mean": mean, "max": maximum,
+            "normalized_mean": mean / maximum if maximum else (0. if pairs else None),
+            "normalized_max": 1. if maximum else (0. if pairs else None),
+            "normalization": "distance divided by maximum pairwise distance; zero maximum maps to zero",
+            "edit_cost": "unit insert/delete/relabel; constants removed",
+            "reason": None if pairs else "fewer_than_two_factor_trees"}
 
 
-def signal_diversity(score_sets):
-    correlations = []
-    for left, right in itertools.combinations(score_sets, 2):
-        a = {(item["date"], item["instrument"]): item["score"] for item in left}
-        b = {(item["date"], item["instrument"]): item["score"] for item in right}
-        keys = sorted(set(a)&set(b))
-        pairs = [(a[key], b[key]) for key in keys if a[key] is not None and b[key] is not None
-                 and math.isfinite(a[key]) and math.isfinite(b[key])]
-        if len(pairs) < 2: continue
-        values = np.array(pairs)
-        if np.any(values.std(axis=0) == 0): continue
-        correlations.append(float(np.corrcoef(values.T)[0, 1]))
-    return {"pair_count": len(correlations), "total_pairs": len(score_sets)*(len(score_sets)-1)//2,
-            "diversity": 1-float(np.mean(np.abs(correlations))) if correlations else None,
-            "signed_mean_correlation": float(np.mean(correlations)) if correlations else None,
-            "alignment": "intersection of date/instrument; finite pairs; constant series excluded"}
+def signal_diversity(factors):
+    ids = [item["candidate_id"] for item in factors]
+    if len(ids) != len(set(ids)):
+        raise ValueError("signal diversity requires distinct candidate identities")
+    indexed, missing = {}, []
+    for factor in factors:
+        values = {}
+        for item in factor["scores"]:
+            key = (item["date"], item["instrument"])
+            if key in values:
+                raise ValueError("duplicate factor score sample")
+            values[key] = item["score"]
+        indexed[factor["candidate_id"]] = values
+        if not values:
+            missing.append(factor["candidate_id"])
+    pairs = []
+    for left, right in itertools.combinations(ids, 2):
+        a, b = indexed[left], indexed[right]
+        shared = sorted(set(a) & set(b))
+        keys = [key for key in shared if all(type(value) in (int, float) and math.isfinite(value) for value in (a[key], b[key]))]
+        rho, reason = None, None
+        if len(keys) < 2:
+            reason = "insufficient_finite_samples"
+        else:
+            values = np.array([(a[key], b[key]) for key in keys])
+            if np.any(values.std(axis=0) == 0):
+                reason = "constant_series"
+            else:
+                rho = float(np.clip(np.corrcoef(values.T)[0, 1], -1., 1.))
+        pairs.append({"left": left, "right": right, "shared_samples": len(shared), "finite_samples": len(keys),
+                      "sample_index_digest": digest(keys), "correlation": rho, "reason": reason})
+    correlations = [row["correlation"] for row in pairs if row["correlation"] is not None]
+    available = bool(correlations) and not missing
+    return {"candidate_ids": ids, "candidate_set_digest": digest(sorted(ids)), "missing_candidates": missing,
+            "pair_count": len(correlations), "total_pairs": len(pairs), "pairs": pairs,
+            "diversity": 1-float(np.mean(np.abs(correlations))) if available else None,
+            "signed_mean_correlation": float(np.mean(correlations)) if available else None,
+            "reason": "missing_factor_scores" if missing else "no_defined_pairs" if not correlations else None,
+            "alignment": "intersection of date/instrument; jointly finite; undefined pairs excluded without imputation"}

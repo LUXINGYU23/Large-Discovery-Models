@@ -37,3 +37,5 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 - `accepted_actions/`：不可变 accepted action；IR/SFT 成对原子发布在数据收集目录，`current.json` 指向完整 generation。
 
 原始行情、环境、运行目录和完整 trace 不提交 Git。紧凑的来源与开发验证证据保留在 `resources/evidence/`。
+
+`protocol.validation_metric` 独立于 search objective，可冻结为 `rank_ic/ic/icir/rank_icir`，默认 `rank_ic`。最终池与 test selection 分别报告结构和信号多样性：前者复用全部已测成员的私有 validation scores，后者使用冻结集合的 test scores。每个信号 pair 保留有效样本数、样本索引 digest 和未定义原因；成员缺 scores 时整个集合的信号多样性不可用。AST 距离去常数、保留实际运算符，归一化使用该集合的最大成对距离。

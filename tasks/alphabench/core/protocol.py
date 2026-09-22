@@ -35,6 +35,7 @@ class T3Protocol:
     forward_n: int = 1
     label: str = "close_return"
     objective: str = "rank_ic"
+    validation_metric: str = "rank_ic"
     direction: int = 1
     random_seed: int = 42
     rounds: int = 2
@@ -76,6 +77,8 @@ class T3Protocol:
             raise ValueError("Assay portfolio settings belong only to the Assay backend")
         if self.objective not in {"ic", "rank_ic"} or self.direction not in {-1, 1}:
             raise ValueError("invalid frozen objective/direction")
+        if self.validation_metric not in {"ic", "rank_ic", "icir", "rank_icir"}:
+            raise ValueError("invalid frozen validation metric")
         if (self.model, self.wire_api, self.reasoning_effort) != ("deepseek-flash", "responses", "max"):
             raise ValueError("this campaign contract requires deepseek-flash / Responses / max")
         if self.endpoint != "https://api.deepseek.com/responses":
