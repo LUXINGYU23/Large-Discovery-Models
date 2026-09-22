@@ -313,3 +313,42 @@ against the bounded queue. The nine separate Assay tests also pass after the
 receipt split. Native algorithm scheduling/recovery and the shared Harness
 provider preauthorization protocol remain required next steps; this change does
 not claim those adapters are complete.
+
+## Change 11: pinned native algorithm execution and durable concurrent replay
+
+Cross-check against W10/X06 confirmed that retaining the real source requires
+both the nested execution order and native state transitions. The loader verifies
+all five original algorithm files, applies only import/state instrumentation and
+a ToT shared-best race fix, and saves the original/patched/runtime hashes. CoT
+chains, ToT trees and EA populations execute through the official create_algo.
+The original IC seed selection, survivor rules, thresholds, mutation/crossover
+and EA generation overlap remain in that code.
+
+The runtime records worker identities, leaf callback inputs/outputs, completion
+delivery, lock order, UUIDs, clocks and actual chain/node/population snapshots
+through the existing Campaign event writer. Completed callbacks replay without
+dispatch; incomplete callbacks still require durable request receipts. Replay
+validates the complete stored output set before execution, rejects changed
+inputs and releases waiting workers on control signals. Budget and pause signals
+escape upstream broad Exception handlers instead of becoming empty metrics.
+
+Complexity review: no copied search loop, second ledger/checkpoint database,
+source package installation or compatibility branch. State/clock/naming hooks
+use one event primitive. Removed duplicate input/output validation during replay
+after moving it to the earliest valid boundary. The four source callback seams
+remain explicit. Official generator integration and the atomic search-batch
+budget bridge are deliberately not advertised as finished or exposed through a
+working-name fallback. The workflow still rejects these unfinished methods.
+
+Remote validation: 164 task tests pass, with one Assay environment-only module
+skipped as before. The 21 native tests include all three original-versus-patched
+algorithms, exact completed replay, overlapping I/O, changed-input rejection,
+source tampering, and budget signals in generation and evaluation. Nine tests
+terminate real subprocesses after generation, evaluation or state commits and
+resume with the shared receipt/ledger machinery; completed physical calls stay
+at one. These crash points require no unknown in-flight receipt. Existing Host
+tests separately verify that unknown requests pause without POST retransmission.
+Scientific parity retains chain/generation/ranking order; only ToT's independent
+parallel-history ordering is normalized for separate-run comparisons, while
+same-run replay compares every field and list order exactly. W10 still needs the
+actual generator, budget/validation/finalization bridge and source profiles.
