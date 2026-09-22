@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "source_commit": "06179ef75140ce5d9b94405e4af243faddc70b9e",
+  "qualification": "fixture_verified",
+  "real_market_qualification": "blocked",
+  "entry_points": {
+    "parser": "assay.engine.parsing.parse",
+    "factor": "assay.engine.FactorEngine.evaluate",
+    "adjustment": "assay.data.store.adjust.forward_adjust",
+    "label": "assay.evaluator.forward_returns.forward_returns",
+    "metrics": "assay.evaluator.metrics.evaluate_ic",
+    "portfolio": "assay.portfolio.backtester.PortfolioBacktester.run",
+    "portfolio_export": "assay.portfolio.report.PortfolioReport.to_dict"
+  },
+  "adapter_changes": [
+    "Historical union with pre-entry time-series history and per-session cross-sectional membership",
+    "Point-in-time daily group vectors passed to the original cross-sectional kernels",
+    "Guide Tanh and Mask operators registered explicitly",
+    "Actual VWAP adjusted on the same basis as OHLC",
+    "Prepared factor matrices supplied to the native independent portfolio pipeline",
+    "Actual index benchmark and actual CN price-limit bands required",
+    "Signal identity includes expressions, direction and missing-value combination semantics"
+  ],
+  "verified_on": "remote server; Python 3.10; locked Assay environment; deterministic offline fixtures",
+  "tests": {
+    "file": "tasks/alphabench/tests/test_assay_execution.py",
+    "passed": 9,
+    "guide_operators_executed": {"qlib": 48, "assay": 36},
+    "numerical_cases": ["pre-entry rolling mean", "daily group changes", "single-horizon open-return IC", "split-adjusted VWAP", "Tanh", "Mask", "actual benchmark NAV"],
+    "operational_cases": ["independent CN/US portfolio", "combination", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
+  },
+  "remaining": [
+    "Qualified real data and complete offline preparation for each market",
+    "Full operator numerical qualification beyond execution coverage",
+    "Historical CN costs and trading-rule qualification",
+    "Physical worker interruption and unknown-outcome recovery matrix",
+    "Full real backend/market/method matrix"
+  ]
+}

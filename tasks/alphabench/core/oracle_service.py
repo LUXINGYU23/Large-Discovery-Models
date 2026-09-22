@@ -21,8 +21,8 @@ class OracleService:
     def __init__(self, config_path, root):
         self.config_path = Path(config_path)
         self.config = json.loads(self.config_path.read_text(encoding="utf-8"))
-        if self.config["backend"] != "qlib":
-            raise ValueError("the Assay adapter has not passed its full T3 capability gate")
+        if self.config["backend"] not in {"qlib", "assay"}:
+            raise ValueError("unknown oracle backend")
         self.root = Path(root)
         self.receipts = Receipts(self.root / "requests")
 
@@ -39,7 +39,7 @@ class OracleService:
 
     def execute(self, request):
         protocol = T3Protocol(**request["protocol"])
-        for key in ("backend", "data_digest", "environment_digest"):
+        for key in ("backend", "market", "data_digest", "environment_digest"):
             if getattr(protocol, key) != self.config[key]:
                 raise ValueError("oracle configuration identity mismatch: " + key)
         identity = request["request_id"]
@@ -72,7 +72,7 @@ class OracleService:
             return self.receipts.execute(identity, request, reserve=lambda: None, operation=operation)
 
     def health(self):
-        return {key: self.config[key] for key in ("backend", "data_digest", "environment_digest")} | {
+        return {key: self.config[key] for key in ("backend", "market", "data_digest", "environment_digest")} | {
             "capabilities": ["durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"]}
 
 

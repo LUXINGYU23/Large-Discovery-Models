@@ -28,7 +28,7 @@ class OracleGateway:
         required = {"durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"}
         if not required <= set(health.get("capabilities", [])):
             raise ValueError("oracle lacks full T3 capabilities")
-        if health.get("backend") != self.protocol.backend or health.get("data_digest") != self.protocol.data_digest:
+        if any(health.get(key) != getattr(self.protocol, key) for key in ("backend", "market", "data_digest")):
             raise ValueError("oracle identity differs from the frozen backend/data")
         if health.get("environment_digest") != self.protocol.environment_digest:
             raise ValueError("oracle environment differs from the frozen contract")

@@ -89,7 +89,7 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
               "qualification": "mock_verified" if gateway.mock else "unqualified"}
     # Mandatory analysis capability is checked before claiming a complete report.
     report["complete_t3"] = False
-    report["pending_capabilities"] = ["data_qualification", "native_algorithm_recovery", "assay_adapter",
+    report["pending_capabilities"] = ["data_qualification", "native_algorithm_recovery", "assay_market_qualification",
                                       "persistent_harness", "compiled_policy", "native_profiles",
                                       "full_metrics_and_quality_coverage", "crash_and_guest_isolation", "full_matrix_qualification"]
     atomic_json_write(runtime.run_dir / "result.json", report)

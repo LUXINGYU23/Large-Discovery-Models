@@ -127,15 +127,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
     request, config = json.loads(args.request.read_text(encoding="utf-8")), json.loads(args.config.read_text(encoding="utf-8"))
     started = time.monotonic()
-    if request["protocol"]["backend"] != "qlib":
-        raise ValueError("the Assay worker capability is not implemented")
     try:
-        result = qlib_evaluate(request, config)
+        if request["protocol"]["backend"] == "assay":
+            from .assay_adapter import assay_evaluate
+            result = assay_evaluate(request, config)
+        else:
+            result = qlib_evaluate(request, config)
     except (ValueError, SyntaxError, FloatingPointError) as exc:
         result = {"success": False, "error": str(exc), "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     result.update(request_id=request["request_id"], elapsed_seconds=time.monotonic() - started,
                   jobs=[{"job_id": request["request_id"] + ":0", "operation": request["operation"]}])
-    atomic_json_write(args.output, result)
+    atomic_json_write(args.output, clean(result))
     return 0
 
 

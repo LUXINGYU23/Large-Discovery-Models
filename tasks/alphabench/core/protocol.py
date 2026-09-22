@@ -50,6 +50,7 @@ class T3Protocol:
     worker_timeout: int = 120
     request_timeout: int = 180
     max_model_tokens: int = 32768
+    assay_portfolio: dict = field(default_factory=dict)
     budgets: dict = field(default_factory=lambda: {
         "model_requests": 120, "proposal_attempts": 100, "dynamic_checks": 400,
         "initialization_evaluations": 160, "validation_evaluations": 164,
@@ -69,6 +70,10 @@ class T3Protocol:
             raise ValueError("unknown filter profile")
         if self.backend == "qlib" and self.filter_profile == "assay_code_filter_v1":
             raise ValueError("Assay lint cannot validate a Qlib campaign")
+        if self.label not in ({"close_return"} if self.backend == "qlib" else {"close_return", "open_return"}):
+            raise ValueError("label is not supported by the selected backend")
+        if not isinstance(self.assay_portfolio, dict) or self.backend == "qlib" and self.assay_portfolio:
+            raise ValueError("Assay portfolio settings belong only to the Assay backend")
         if self.objective not in {"ic", "rank_ic"} or self.direction not in {-1, 1}:
             raise ValueError("invalid frozen objective/direction")
         if (self.model, self.wire_api, self.reasoning_effort) != ("deepseek-flash", "responses", "max"):

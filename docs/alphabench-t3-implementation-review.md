@@ -211,3 +211,40 @@ identity, zero import cost and full new E, changed scientific/mock identity,
 corrupt or unfinished receipts, substituted measurements, interrupted import,
 and byte-identical completed replay. Real data qualification, native execution
 and the remaining full T3 work packages are still open.
+
+## Change 8: offline Assay factor and independent portfolio worker
+
+Cross-check against W04/W06 found three incorrect native defaults for this task:
+period-end constituents, static group vectors and an equal-weight benchmark
+proxy. The adapter now loads the historical union, preserves pre-entry history,
+masks every cross-sectional operation by effective membership, and supplies
+per-session group labels and the actual index series. Native parser, numerical
+kernels, adjustment, IC and independent portfolio accounting remain in use.
+The guide's absent Tanh/Mask kernels are registered with their exact definitions.
+
+Every offline asset is content-verified on each worker invocation. Duplicate
+identities, unknown knowledge dates, insufficient interval/warmup coverage,
+missing tradability evidence and mismatched benchmark/market fail explicitly.
+Single-horizon labels carry their execution convention and purge n or n+1
+sessions. The two-week check returns no performance information. Full results
+retain raw IC and portfolio reports, scores, sample counts, NAV, costs, actions
+and holdings. The independent Assay configuration is fully frozen; Qlib drop
+parameters are not silently translated into another strategy. Combination
+identity includes its finite-factor averaging rule and frozen direction.
+
+Complexity review: one adapter subclasses the existing engine only at the
+historical cross-section boundary, and the existing backtester only at its
+prepared-input boundary. It does not reimplement numerical or accounting
+engines, introduce a second service or add a backend fallback. Knowledge-date
+checks share one helper; the old unconditional Assay rejection is removed.
+Health/dispatch now bind market for both backends. Portfolio-only settings are
+excluded from the shared initialization contract, where they have no effect.
+
+Remote validation: nine Assay tests pass, including all 84 guide operators,
+independent numerical boundary cases, CN/US portfolio fixtures, actual child
+process execution, completed replay with unchanged artifacts and market
+mismatch rejection. The task suite passes 132 tests, with the Assay module
+skipped in the lightweight task environment and tested separately in its lock.
+Registration validation passes and continues to report draft/mock_verified.
+There are still no qualified Assay data snapshots; acquisition, complete
+operator numerical audits and the real matrix remain required for W06 closure.
