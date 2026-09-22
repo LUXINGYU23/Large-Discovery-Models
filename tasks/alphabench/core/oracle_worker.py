@@ -9,6 +9,7 @@ import sys
 import time
 
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.contracts.evaluation import EvaluationPaused
 from .grammar import parse_expression
 from .protocol import T3Protocol
 
@@ -42,17 +43,18 @@ def qlib_evaluate(request, config):
     utils = load_source("t3_ffo_utils", root / "ffo/utils/utils.py")
     qlib.init(provider_uri=config["data_root"], region="cn" if protocol.market.startswith("csi") else "us",
               custom_ops=CUSTOM_OPS, expression_cache=None, dataset_cache=None, kernels=1)
-    calendar = D.calendar(start_time=request["start"], end_time=request["end"])
-    dates = [day for day in calendar if str(day)[:10] < request["end"]]
+    calendar = list(D.calendar())
+    if not calendar or str(calendar[0])[:10] > request["start"] or str(calendar[-1])[:10] < request["end"]:
+        raise EvaluationPaused("calendar does not bracket the complete requested interval", status="paused_data_coverage")
+    dates = [day for day in calendar if str(day)[:10] >= request["start"]
+             and (str(day)[:10] <= request["end"] if protocol.end_inclusive else str(day)[:10] < request["end"])]
     if not dates:
         raise ValueError("no trading sessions in the requested interval")
     expressions = request.get("expressions", [request.get("expression")])
     for expression in expressions:
         parse_expression(expression, backend="qlib")
-    labels = [item[1] for item in utils._build_forward_label_exprs(protocol.forward_n)]
-    if protocol.label != "close_return":
-        raise ValueError("Qlib label contract only admits the pinned close_return definition")
-    features = D.features(D.instruments(protocol.market), expressions + ([] if request["operation"] == "check" else labels),
+    instruments = D.instruments(protocol.market)
+    features = D.features(instruments, expressions,
                           start_time=dates[0], end_time=dates[-1])
     if features.empty:
         raise ValueError("no observations for the historical universe")
@@ -66,6 +68,7 @@ def qlib_evaluate(request, config):
     result = {"success": bool(finite.any()), "nan_ratio": float(factor.isna().mean()),
               "non_finite_ratio": float((~finite).mean()),
               "actual_start": str(dates[0])[:10], "actual_end": str(dates[-1])[:10],
+              "interval": {"start": request["start"], "end": request["end"], "end_inclusive": protocol.end_inclusive},
               "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     if request["operation"] == "check":
         result.update(utils._check_single_column(expressions[0], factor))
@@ -73,15 +76,25 @@ def qlib_evaluate(request, config):
         if not result["success"]:
             result["error"] = result["error_message"]
         return result
-    # Labels read future bars, but no label crossing a split may enter its statistics.
-    kept_dates = dates[:-protocol.forward_n]
-    purge = [str(day)[:10] for day in dates[-protocol.forward_n:]]
+    kept_dates = dates if protocol.end_inclusive else dates[:-protocol.forward_n]
+    if not kept_dates:
+        raise ValueError("no sessions remain after forward-label purge")
+    purge = [] if protocol.end_inclusive else [str(day)[:10] for day in dates[-protocol.forward_n:]]
+    label_end = calendar.index(kept_dates[-1]) + protocol.forward_n
+    if label_end >= len(calendar):
+        raise EvaluationPaused("calendar lacks future sessions required by the source forward labels", status="paused_data_coverage")
+    labels = [item[1] for item in utils._build_forward_label_exprs(protocol.forward_n)]
+    # Query only retained label rows; matched labels never read beyond their split.
+    label_values = D.features(instruments, labels, start_time=kept_dates[0], end_time=kept_dates[-1])
     kept = features.index.get_level_values("datetime").isin(kept_dates)
     factor = factor[kept].replace([np.inf, -np.inf], np.nan)
-    ic, rank_ic = [], []
+    label_values = label_values.reindex(factor.index)
+    ic, rank_ic, counts = [], [], []
     for offset in range(len(labels)):
-        a, b = utils._daily_ic_rankic(factor, features.iloc[:, len(expressions) + offset][kept])
+        label = label_values.iloc[:, offset]
+        a, b = utils._daily_ic_rankic(factor, label)
         ic.append(a); rank_ic.append(b)
+        counts.append((np.isfinite(factor) & np.isfinite(label)).groupby(level="datetime").sum())
     ic_daily = pd.concat(ic, axis=1).mean(axis=1)
     rank_daily = pd.concat(rank_ic, axis=1).mean(axis=1)
     if not ic_daily.notna().any():
@@ -90,11 +103,13 @@ def qlib_evaluate(request, config):
     turnover = utils._daily_turnover(factor)
     result["metrics"]["turnover"] = float(turnover.mean())
     result["daily"] = [{"date": str(day)[:10], "ic": value, "rank_ic": rank_daily.get(day),
+                        "n_samples_by_horizon": {str(k + 1): int(count.get(day, 0)) for k, count in enumerate(counts)},
                         "raw_turnover": turnover.get(day)} for day, value in ic_daily.items()]
     result["scores"] = [{"instrument": str(instrument), "date": str(day)[:10], "score": value}
                         for (instrument, day), value in factor.items()]
     result["label"] = {"expressions": labels, "semantics": "forward daily correlations averaged across horizons",
-                       "purged_dates": purge, "end_exclusive": request["end"]}
+                       "purged_dates": purge, "read_end": str(calendar[label_end])[:10],
+                       "boundary": "source_forward_reads" if protocol.end_inclusive else "purged_at_split"}
     if not request["fast"]:
         portfolio_module = load_source("t3_portfolio", root / "ffo/backtest/qlib/single_alpha_backtest.py")
         cn = protocol.market.startswith("csi")
@@ -138,6 +153,9 @@ def main(argv=None):
             result = assay_evaluate(request, config)
         else:
             result = qlib_evaluate(request, config)
+    except EvaluationPaused as exc:
+        result = {"success": False, "pause_status": exc.status, "error": str(exc),
+                  "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     except (ValueError, SyntaxError, FloatingPointError) as exc:
         result = {"success": False, "error": str(exc), "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     if request["operation"] == "check":

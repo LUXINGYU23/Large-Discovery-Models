@@ -20,6 +20,7 @@ from assay.evaluator.metrics import evaluate_ic
 from assay.evaluator.turnover import rank_autocorr
 from assay.portfolio.backtester import PortfolioBacktester
 from assay.portfolio.config import PortfolioBacktestConfig
+from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from .data import sha256
 from .grammar import parse_expression
@@ -101,8 +102,8 @@ def prepare_panel(request, protocol, config):
     manifest, calendar, assets = read_assets(config, protocol)
     start, end = dt.date.fromisoformat(request["start"]), dt.date.fromisoformat(request["end"])
     if calendar[0] > start or calendar[-1] < end:
-        raise ValueError("calendar does not bracket the complete requested interval")
-    days = [day for day in calendar if day < end]
+        raise EvaluationPaused("calendar does not bracket the complete requested interval", status="paused_data_coverage")
+    days = [day for day in calendar if (day <= end if protocol.end_inclusive else day < end)]
     if not days or not any(day >= start for day in days):
         raise ValueError("no trading sessions in the requested interval")
     members = assets["membership"]
@@ -266,6 +267,7 @@ def assay_evaluate(request, config):
     result = {"success": bool((active & finite).any()), "nan_ratio": float(np.isnan(factor[indices])[active].mean()),
               "non_finite_ratio": float((~finite[active]).mean()),
               "actual_start": str(days[indices[0]]), "actual_end": str(days[indices[-1]]),
+              "interval": {"start": request["start"], "end": request["end"], "end_inclusive": protocol.end_inclusive},
               "metrics": {}, "daily": [], "scores": [], "portfolio": None,
               "data_digest": digest(manifest), "history_origin": str(days[0]),
               "n_dates": len(indices), "n_observations": int(active.sum()), "n_finite": int((active & finite).sum())}
@@ -274,8 +276,10 @@ def assay_evaluate(request, config):
         return result
     label_execution = "next_open" if protocol.label == "open_return" else "next_close"
     farthest = protocol.forward_n + (label_execution == "next_open")
-    purge = indices[-farthest:]
-    indices = indices[:-farthest]
+    unavailable_tail = indices[-farthest:]
+    purge = [] if protocol.end_inclusive else unavailable_tail
+    if not protocol.end_inclusive:
+        indices = indices[:-farthest]
     if not len(indices):
         raise ValueError("no sessions remain after forward-label purge")
     labels = forward_returns(engine.field_matrix("close"), engine.field_matrix("open"),
@@ -295,7 +299,9 @@ def assay_evaluate(request, config):
                         if engine.membership[index, column]]
     result["raw_factor_report"] = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in ic.items()}
     result["label"] = {"horizons": [protocol.forward_n], "execution": label_execution,
-                       "semantics": "single horizon; native Assay forward_returns", "end_exclusive": request["end"],
+                       "semantics": "single horizon; native Assay forward_returns", "read_end": str(days[-1]),
+                       "boundary": "source_panel_tail" if protocol.end_inclusive else "purged_at_split",
+                       "unavailable_tail_dates": [str(days[i]) for i in unavailable_tail] if protocol.end_inclusive else [],
                        "purged_dates": [str(days[i]) for i in purge]}
     if not request["fast"]:
         if protocol.assay_portfolio.get("benchmark_symbol") != manifest["benchmark"]:

@@ -9,6 +9,7 @@ import pytest
 pytest.importorskip("assay")
 import polars as pl
 from assay.portfolio.config import PortfolioBacktestConfig
+from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from tasks.alphabench.core.assay_adapter import assay_evaluate, prepare_panel
 from tasks.alphabench.core.data import sha256
@@ -128,8 +129,39 @@ def test_open_label_purges_horizon_plus_entry_lag_and_check_exposes_no_returns(s
     assert check["n_dates"] == 20 and check["nan_ratio"] == 0
     with pytest.raises(ValueError, match="warmup"):
         assay_evaluate(dict(request, expression="ts_mean(close,100)"), config)
-    with pytest.raises(ValueError, match="complete requested interval"):
+    with pytest.raises(EvaluationPaused, match="complete requested interval"):
         assay_evaluate(dict(request, end="2021-01-01"), config)
+
+
+@pytest.mark.parametrize("label,horizon,tail", [("close_return", 3, 3), ("open_return", 3, 4)])
+@pytest.mark.parametrize("profile", ["ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"])
+def test_assay_source_keeps_inclusive_panel_tail_without_future_reads(snapshot, label, horizon, tail, profile):
+    request, config, _, days = snapshot
+    request["protocol"].update(profile=profile, label=label, forward_n=horizon)
+    request["end"] = str(days[30])
+    protocol = T3Protocol(**request["protocol"])
+    raw = assay_evaluate(request, config)
+    end = 30 if protocol.end_inclusive else 29
+    last = end if protocol.end_inclusive else end - tail
+    assert raw["actual_end"] == str(days[end]) and raw["label"]["read_end"] == str(days[end])
+    assert raw["interval"]["end_inclusive"] is protocol.end_inclusive
+    assert [row["date"] for row in raw["daily"]] == list(map(str, days[20:last + 1]))
+    if protocol.end_inclusive:
+        assert raw["label"]["purged_dates"] == []
+        assert raw["label"]["unavailable_tail_dates"] == list(map(str, days[end - tail + 1:end + 1]))
+        assert all(row["n_samples"] == 0 and np.isnan(row["ic"]) for row in raw["daily"][-tail:])
+    else:
+        assert raw["label"]["unavailable_tail_dates"] == []
+        assert raw["label"]["purged_dates"] == list(map(str, days[end - tail + 1:end + 1]))
+        assert all(row["n_samples"] > 0 for row in raw["daily"])
+    assert raw["metrics"]["ic"] == pytest.approx(np.nanmean([row["ic"] for row in raw["daily"]]))
+    # A later split must not alter source-window factors or returns.
+    future_event = pl.DataFrame({"event_id": ["future"], "symbol": ["S03"], "ex_date": [days[31]],
+        "as_of_date": [days[31]], "split_ratio": [2.], "dividend_cash": [0.]})
+    replace_asset(snapshot, "events", future_event)
+    unchanged = assay_evaluate(request, config)
+    assert clean(raw["daily"]) == clean(unchanged["daily"])
+    assert clean(raw["scores"]) == clean(unchanged["scores"])
 
 
 def test_actual_portfolio_and_combination_keep_source_reports_and_benchmark(snapshot):
@@ -145,6 +177,19 @@ def test_actual_portfolio_and_combination_keep_source_reports_and_benchmark(snap
     assert combined["portfolio"]["raw"]["factor_id"] != portfolio["raw"]["factor_id"]
     check = assay_evaluate(dict(request, operation="check", expression="safe_div(close,volume,fill=0)"), config)
     assert check["success"]
+
+
+def test_source_assay_portfolio_retains_the_inclusive_end_even_with_undefined_tail_ic(snapshot):
+    request, config, _, days = snapshot
+    request["protocol"].update(profile="upstream_searcher_v1", forward_n=3)
+    request.update(end=str(days[30]), fast=False)
+    result = assay_evaluate(request, config)
+    expected_dates = list(map(str, days[20:31]))
+    assert [row["date"] for row in result["daily"]] == expected_dates
+    assert [row["date"] for row in result["portfolio"]["daily"]] == expected_dates
+    assert result["portfolio"]["actions"] and result["portfolio"]["holdings"]
+    assert all(np.isnan(row["ic"]) for row in result["daily"][-3:])
+    assert result["portfolio"]["execution"]["config"]["period_end"] == str(days[30])
 
 
 def test_hash_missing_data_and_unsupported_controls_fail_explicitly(snapshot):
@@ -189,6 +234,9 @@ def test_bounded_worker_serializes_real_assay_outputs_and_invalid_results(snapsh
     assert saved == {str(file): file.read_bytes() for file in (tmp_path / "oracle").rglob("*.json")}
     invalid = service.execute(dict(request, request_id="b"*64, expression="close-close"))
     assert not invalid["success"] and "correlations" in invalid["error"]
+    missing_calendar = service.execute(dict(request, request_id="c"*64, end="2021-01-01"))
+    assert missing_calendar["pause_status"] == "paused_data_coverage"
+    assert len(missing_calendar["jobs"]) == 1 and not missing_calendar["metrics"]
     assert service.health()["market"] == "nasdaq100"
     wrong_market = dict(request, protocol=request["protocol"] | {"market": "sp500"})
     with pytest.raises(ValueError, match="market"):

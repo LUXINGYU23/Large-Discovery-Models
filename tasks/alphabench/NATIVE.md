@@ -187,3 +187,27 @@ Inf 与 NaN 分别记录。`assay_code_filter_v1` 调用固定 Assay 的无数�
 Assay lint 只产生 `assay_lint_success_rate`，不会伪造动态成功率或行情覆盖。
 检查响应若类型、耗时、比例或结果边界不符会暂停，已完成物理作业仍记账，
 恢复不重复派发。上述过滤实现不解除 source workflow 和真实数据资格的 gate。
+
+## 原生日期与标签边界
+
+后端按冻结 profile 处理请求端点，保存请求区间、实际因子区间和标签读取终点：
+
+| profile / 后端 | 请求终点 | 标签尾部 |
+| --- | --- | --- |
+| matched / Qlib | 不包含 | 删除最后 n 个信号日；标签查询只读到区间最后一个交易日 |
+| matched / Assay | 不包含 | close 删除 n 日，open 删除 n+1 日 |
+| source / Qlib | 包含 | 保留全部信号日，按原 FFO 标签读取之后 n 个交易日 |
+| source / Assay | 包含 | 不追加未来行情；保留原面板末尾的 n 或 n+1 行未定义 IC |
+
+Qlib 使用真实交易日历确定前向读取范围，日历不足时以 `paused_data_coverage`
+暂停，不记成因子质量失败。已启动作业照常记账，恢复读取既有 receipt，不
+自动重发。逐日另存每个
+forward horizon 的有效样本数。两种后端的完整 portfolio 使用各自保留的信号
+区间。Assay source 的尾部 IC 未定义不代表这些日期不参加 portfolio。
+
+端点规则按固定上游逐项核验。searcher 三段日期与 matched 相同，但包含终点，
+且没有 matched 的标签 purge。example 的搜索日期是 2023–2024；访问不存在的
+validation/test 区间会明确报错，不能自动继承 matched 日期。
+
+该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。source 入口到
+初始化、最终池和预算的完整接线仍未完成，因此尚未开放 source campaign。

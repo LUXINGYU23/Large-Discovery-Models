@@ -63,9 +63,18 @@ shortened to make a formula run.
 
 `label=close_return` means Assay `next_close`: close[t+n]/close[t]-1.
 `label=open_return` means `next_open`: open[t+1+n]/open[t+1]-1. Both request
-`horizons=[forward_n]`. Purge removes the last n or n+1 signal sessions so no
-label crosses the split. The raw Assay IC report, daily IC/RankIC, finite sample
-counts and scores remain available in the private oracle response.
+`horizons=[forward_n]`. The matched profile excludes the requested end and
+removes the last n or n+1 signal sessions so no label crosses the split.
+Source profiles include the requested end and retain the native panel tail:
+the pinned Assay service builds returns from the in-window panel, so its last
+n or n+1 IC rows have unavailable labels. Those rows remain NaN, with zero
+valid pairs; they are not converted to zero IC or filled by reading future bars.
+The portfolio still covers the full source interval. Events after that interval
+cannot change either the factor or label adjustment basis.
+
+The response records the requested interval and inclusion rule, actual dates,
+label read end, purged dates and unavailable tail dates. The raw Assay IC report,
+daily IC/RankIC, finite sample counts and scores remain Host-private.
 
 With `paper_filter_v1`, the check operation evaluates only factors and exports
 no returns, IC or scores. With `assay_code_filter_v1`, it instead invokes the

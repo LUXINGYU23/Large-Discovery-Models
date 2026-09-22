@@ -124,6 +124,23 @@ def test_invalid_check_evidence_pauses_without_losing_or_repeating_paid_work(tmp
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
 
 
+@pytest.mark.parametrize("phase", ["check", "search"])
+def test_missing_calendar_pauses_instead_of_becoming_a_bad_factor_and_preserves_cost(tmp_path, monkeypatch, phase):
+    gateway = metered_gateway(tmp_path, monkeypatch, oracle_job_slots=2)
+    candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
+    calls = []
+    def send(request):
+        calls.append(request)
+        return mock_oracle(request) | {"success": False, "pause_status": "paused_data_coverage",
+            "error": "calendar lacks future sessions", "metrics": {}, "daily": [], "scores": []}
+    monkeypatch.setattr(gateway, "_send", send)
+    for _ in range(2):
+        with pytest.raises(EvaluationPaused, match="calendar") as failure:
+            gateway.evaluate(candidate, phase=phase, position=0)
+        assert failure.value.status == "paused_data_coverage"
+    assert len(calls) == 1 and gateway.runtime.budget.counters["benchmark_jobs"] == 1
+
+
 def test_interrupted_host_releases_waiting_callback_before_stage_shutdown(monkeypatch):
     host = HostDispatcher()
     original_get = host.messages.get

@@ -146,10 +146,19 @@ class T3Protocol:
         return raw["success"] and ratios[0] <= .01
 
     def interval(self, phase):
+        if self.profile == "upstream_benchmark_v1":
+            if phase == "search":
+                return "2023-01-01", "2024-01-01"
+            if phase != "check":
+                raise ValueError("the source benchmark entry has no validation/test interval; an explicit extension is required")
         return {"search": ("2016-01-01", "2021-01-01"),
                 "validation": ("2021-01-01", "2022-01-01"),
                 "test": ("2022-01-01", "2025-01-01"),
                 "check": ("2020-01-01", "2020-01-15")}[phase]
+
+    @property
+    def end_inclusive(self):
+        return self.profile != "ldm_matched_v1"
 
 
 def verify_data_manifest(path: Path, protocol: T3Protocol):

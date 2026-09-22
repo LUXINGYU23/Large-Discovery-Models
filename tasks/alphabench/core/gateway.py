@@ -93,8 +93,14 @@ class OracleGateway:
                 any(not isinstance(job, dict) or not isinstance(job.get("job_id"), str) or not job["job_id"] for job in jobs) or
                 len({job["job_id"] for job in jobs}) != len(jobs)):
             raise EvaluationPaused("oracle job accounting is incomplete or exceeds permits")
-        if charge_jobs:
+        pause_status = result.get("pause_status")
+        if charge_jobs or pause_status is not None:
             self.host.call(lambda: self.runtime.consume_many({"benchmark_jobs": len(jobs)}, usage_key="task:oracle-result:" + digest(logical)))
+        if pause_status is not None:
+            if (not isinstance(pause_status, str) or not pause_status.startswith("paused_")
+                    or result.get("success") is not False or not isinstance(result.get("error"), str)):
+                raise EvaluationPaused("oracle returned malformed pause evidence")
+            raise EvaluationPaused(result["error"], status=pause_status)
         if request["operation"] == "check":
             try:
                 self.protocol.check_passed(result)

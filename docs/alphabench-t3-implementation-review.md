@@ -610,3 +610,56 @@ Local acquisition, hash-verified transfer and server-only numerical preparation
 remain the data workflow. Existing real-data gaps, source interval/final-pool
 integration, Harness/compiled methods and the complete T3 acceptance gates
 remain open; this filtering change does not qualify those capabilities.
+
+## Change 17: native interval boundaries and backend-specific label tails
+
+Cross-check against W04/W06/W09/W10 and the pinned source found that both
+workers always applied matched end exclusion and label purge. The source
+searcher and example both use inclusive endpoints, but the backends differ:
+FFO/Qlib Ref labels read later bars, whereas Assay service._build_engine reads
+only its requested panel and forward_returns leaves unavailable tail labels.
+Extending Assay's panel would change its source semantics and could change its
+corporate-action adjustment basis. The adapter now preserves each behavior.
+
+The existing profile determines endpoint inclusion. All seven pinned entry/
+method resolutions are checked against the task's declared intervals. The
+example keeps its actual 2023-2024 search dates; requesting its absent validation
+or test interval raises explicitly. It cannot inherit matched dates. Qlib
+computes the forward read end from its real calendar and queries only retained
+label rows; matched evaluation no longer even requests labels beyond its split.
+Source Qlib retains all inclusive signal dates. Assay source retains its
+undefined tail IC rows and still backtests the complete inclusive interval.
+Responses record requested/actual boundaries, label read end and tail treatment;
+Qlib also records each horizon's valid cross-sectional sample count.
+
+Calendar coverage failures use the existing EvaluationPaused control rather
+than generating bad-factor feedback. A completed worker response preserves its
+pause reason and physical-job receipt. The gateway charges that job exactly
+once even on the search path before propagating the pause. Replaying the same
+receipt does not dispatch or charge again. This applies to calendar coverage;
+it does not claim that every other data-qualification gate is now resolved.
+
+Complexity review: kept one worker path per backend and reused the frozen
+profile, source numerical functions, existing receipt protocol and pause type.
+Removed the obsolete end_exclusive-only output and the duplicated Qlib label
+validation already enforced by T3Protocol. Label expressions are constructed
+only for evaluation after the required calendar range is known. No compatibility
+adapter, date-policy hierarchy, extra configuration surface or package was added.
+
+Remote validation: 238 task tests passed; two environment-specific modules were
+run separately, with 17 Assay and six Qlib tests passing. Qlib daily correlations
+are checked against explicit multi-horizon arithmetic. Assay checks close/open
+tail lengths, undefined IC with zero valid pairs and isolation from a later
+split event. Full Qlib and Assay portfolios verify dates, positions, actions and
+costs, including Qlib's CN 100-share lots. A bounded real Assay worker verifies
+that missing-calendar output remains a metered pause.
+
+Qlib emitted 17 upstream empty-mean warnings. A diagnostic run promoting them
+to errors traced the first to the order-fulfillment indicator on an empty order
+array. The fixture was also corrected to exclude its benchmark from the trading
+universe, avoiding Qlib's adjusted-price mode; the final suite passed with the
+ordinary upstream warnings visible. No warning suppression or source patch was
+added. These are synthetic numerical/portfolio fixtures, not real-market or
+model-endpoint acceptance. Source workflow initialization/final-pool/budget
+wiring, remaining agent methods, data qualification and the full T3 gate remain
+unfinished.
