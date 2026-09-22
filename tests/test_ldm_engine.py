@@ -60,6 +60,46 @@ def test_atomic_json_write_preserves_previous_state_on_interruption(tmp_path, mo
     assert list(tmp_path.iterdir()) == [path]
 
 
+def test_campaign_resume_preserves_and_repairs_interrupted_utf8_event(tmp_path):
+    runtime = CampaignRuntime.open(tmp_path, task="test", budget_limits={"calls": 2})
+    runtime.consume_many({"calls": 1}, usage_key="model:one")
+    event = runtime.record("evaluation_completed", {"score": 1}, event_key="eval:one")
+    prefix, budget = runtime.event_path.read_bytes(), (tmp_path / "budget.json").read_bytes()
+    tail = b'{"message":"\xe4\xb8'
+    with runtime.event_path.open("ab") as handle:
+        handle.write(tail)
+    resumed = CampaignRuntime.open(tmp_path, task="test", resume=True)
+    assert resumed.event_path.read_bytes().startswith(prefix)
+    backup = next(tmp_path.glob("events.jsonl.incomplete-*.json"))
+    assert json.loads(backup.read_text()) == {"offset": len(prefix), "tail_hex": tail.hex()}
+    assert (tmp_path / "budget.json").read_bytes() == budget
+    assert resumed.record("evaluation_completed", {"score": 1}, event_key="eval:one") == event
+    resumed.record("after_recovery")
+    events = resumed.events()
+    assert [row["sequence"] for row in events] == list(range(len(events)))
+    assert sum(row["event_key"] == "eval:one" for row in events) == 1
+
+
+def test_campaign_resume_keeps_complete_event_without_final_newline(tmp_path):
+    runtime = CampaignRuntime.open(tmp_path, task="test")
+    runtime.record("evaluation_completed", event_key="eval:one")
+    runtime.event_path.write_bytes(runtime.event_path.read_bytes().rstrip(b"\r\n"))
+    resumed = CampaignRuntime.open(tmp_path, task="test", resume=True)
+    assert sum(row["event_key"] == "eval:one" for row in resumed.events()) == 1
+    assert not list(tmp_path.glob("events.jsonl.incomplete-*.json"))
+
+
+@pytest.mark.parametrize("corrupt", [b"{bad}\n", b"{bad}\n{unfinished"])
+def test_campaign_resume_refuses_corrupt_committed_events(tmp_path, corrupt):
+    runtime = CampaignRuntime.open(tmp_path, task="test")
+    damaged = runtime.event_path.read_bytes() + corrupt
+    runtime.event_path.write_bytes(damaged)
+    with pytest.raises(ValueError):
+        CampaignRuntime.open(tmp_path, task="test", resume=True)
+    assert runtime.event_path.read_bytes() == damaged
+    assert not list(tmp_path.glob("events.jsonl.incomplete-*.json"))
+
+
 @dataclass
 class IntegerDomain:
     maximum: int = 9

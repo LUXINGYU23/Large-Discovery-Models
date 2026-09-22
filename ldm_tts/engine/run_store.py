@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -277,7 +278,7 @@ class CampaignRuntime:
         )
 
         event_path = path / "events.jsonl"
-        events = _read_jsonl(event_path) if resume else []
+        events = _read_jsonl(event_path, repair_incomplete_tail=True) if resume else []
         runtime = cls(
             run_dir=path,
             task=task,
@@ -487,14 +488,34 @@ def unique_run_dir(path: Path) -> Path:
     raise RuntimeError(f"could not allocate a unique campaign directory beside {requested}")
 
 
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+def _read_jsonl(path: Path, *, repair_incomplete_tail: bool = False) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    data = path.read_bytes()
+    lines = data.splitlines(keepends=True)
+    records, offset = [], 0
+    for index, line in enumerate(lines):
+        try:
+            if line.strip():
+                records.append(json.loads(line.decode("utf-8")))
+        except ValueError:
+            if not repair_incomplete_tail or index != len(lines) - 1 or line.endswith(b"\n"):
+                raise
+            # Preserve the interrupted append before repairing the writable log.
+            backup = path.with_name(path.name + ".incomplete-" + hashlib.sha256(line).hexdigest() + ".json")
+            atomic_json_write(backup, {"offset": offset, "tail_hex": line.hex()})
+            with path.open("r+b") as handle:
+                handle.truncate(offset)
+                handle.flush()
+                os.fsync(handle.fileno())
+            return records
+        offset += len(line)
+    if repair_incomplete_tail and data and not data.endswith(b"\n"):
+        with path.open("ab") as handle:
+            handle.write(b"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    return records
 
 
 def _validated_numbers(

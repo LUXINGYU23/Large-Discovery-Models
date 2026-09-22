@@ -75,3 +75,22 @@ metrics/quality coverage; process crash and guest isolation checks; all 72
 method/backend/market rows and clean real reproduction. This commit only advances
 registration to `mock_verified`. The experiment stays `draft`, real data stays
 `blocked`, and reports keep `complete_t3=false`.
+
+## Change 3: recover an interrupted event append
+
+Cross-check against W02/W15: an interrupted last JSONL append must not prevent
+reconciliation of already completed evaluation receipts. Resume parses the
+committed prefix, saves an incomplete final fragment with its byte offset, and
+truncates only that fragment. A complete final event without a newline is kept
+and terminated before appending. Corruption in a terminated record still fails
+without modifying the log. Existing event keys and budget records survive.
+
+Complexity review: the existing JSONL reader owns this narrowly requested resume
+behavior; normal reads do not repair or suppress errors. No new log format,
+recovery subsystem, compatibility path or generic workflow layer was added.
+Repair assumes the existing single-writer campaign ownership contract.
+
+Validation on the remote server: 91 focused campaign/engine/reporting tests,
+490 shared tests (one skipped), and all 112 AlphaBench task tests pass. Tests
+cover interrupted UTF-8, a complete unterminated event, committed corruption,
+unchanged budgets, event-key deduplication and continued sequence numbering.
