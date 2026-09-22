@@ -94,3 +94,33 @@ Validation on the remote server: 91 focused campaign/engine/reporting tests,
 490 shared tests (one skipped), and all 112 AlphaBench task tests pass. Tests
 cover interrupted UTF-8, a complete unterminated event, committed corruption,
 unchanged budgets, event-key deduplication and continued sequence numbering.
+
+## Change 4: generation cost and complete quality denominators
+
+Cross-check against W14 and Spec section 13 found a mislabeled metric: the first
+threshold-crossing evaluation is a discovery diagnostic, whereas Search Cost
+counts model attempts per logical generation step. Reports now name these
+separately and retain failed steps, per-step counts, search-only statistics and
+statistics including initialization. Failed evaluations cannot establish a
+successful threshold crossing even if a malformed result includes an IC.
+
+Generation occurrences now reference their actual dynamic-check receipt. The
+frozen quality audit verifies request/response hashes, expression, protocol,
+interval and operation before reusing a result. An occurrence with its own
+check preserves that outcome. Previously unchecked duplicates reuse an existing
+check; unchecked new expressions use the independent quality budget. Exhausting
+that budget leaves the dynamic rates unavailable with explicit coverage, rather
+than treating unmeasured items as failures. Static invalid items remain known
+failures. Quality outcomes do not enter proposal history or training inputs.
+
+Complexity review: removed the obsolete metric names and the unconditional
+second evaluation of every checked expression. Kept receipt references in the
+existing occurrence journal and counters in the shared budget ledger; no cache
+service, compatibility projection or new reporting layer was introduced. Removed
+a redundant CLI parser assertion while retaining the complete procedure test.
+
+Validation: 114 remote task tests pass, including complete replay, failed-step
+cost, threshold boundaries, receipt contract mismatch and incomplete audit
+coverage. The fresh mock reaches full audit coverage with zero additional
+quality calls; completed replay leaves 185 persisted files unchanged. Other
+metrics, native methods, backend and matrix qualifications remain open.

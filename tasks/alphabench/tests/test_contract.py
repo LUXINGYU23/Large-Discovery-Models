@@ -12,7 +12,7 @@ from tasks.alphabench.core.candidate import FactorDomain
 from tasks.alphabench.core.data import extract_archive
 from tasks.alphabench.core.grammar import ExpressionError, REGISTRY, parse_expression
 from tasks.alphabench.core.receipts import Receipts
-from tasks.alphabench.core.reporting import daily_metrics, search_metrics, signal_diversity
+from tasks.alphabench.core.reporting import daily_metrics, generation_costs, search_metrics, signal_diversity
 from tasks.alphabench.core.selection import FactorEncoder
 
 
@@ -70,8 +70,12 @@ def test_metric_boundaries_and_degeneracy():
     assert report["ic_derived"] == {"mean": 0., "ir": 0., "winrate": 1/3, "skewness": 0.,
         "skewness_estimator": "central_moment_m3_over_m2_pow_1.5", "reason": None}
     assert report["rank_ic_derived"]["ir"] is None
-    assert search_metrics([{"metrics": {"ic": .03}}, {"metrics": {}}, {"metrics": {"ic": .031}}])["search_cost_attempts"] == 3
-    assert search_metrics([{"metrics": {"ic": -1.}}])["gain"] == 0
+    assert search_metrics([{"success": True, "metrics": {"ic": .03}}, {"success": False, "metrics": {"ic": .9}},
+                           {"success": True, "metrics": {"ic": .031}}])["threshold_discovery_evaluations"] == 3
+    assert search_metrics([{"success": True, "metrics": {"ic": -1.}}])["gain"] == 0
+    assert generation_costs([{"attempt_count": 1, "complete": True}, {"attempt_count": 5, "complete": False}]) == {
+        "unit": "model attempts per logical generation step", "step_count": 2, "attempts_per_step": [1, 5],
+        "total_attempts": 6, "mean": 3, "failed_steps": 1}
     a = [{"date": "2022-01-03", "instrument": str(i), "score": float(i)} for i in range(3)]
     b = [{**row, "score": -row["score"]} for row in a]
     assert signal_diversity([a, b])["diversity"] == 0

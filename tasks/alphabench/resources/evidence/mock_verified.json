@@ -1,18 +1,18 @@
 {
   "artifact_hashes": {
-    "budget.json": "c256a585808c0c36be69fb1c5b9a7b59d788e19e7f6a6cb591e515d9055fd3e5",
-    "checkpoint.json": "ebf63ab310f688814727df80f69a22678d5fd71a6b7bff273c74a439a474500b",
-    "events.jsonl": "fc6a5e291065c3213708ef595f16dfe0e852b94fe4dbd497688224aa75f6b2c9",
-    "result.json": "74737c6949b906537a7704f218166ae1cd1fb06ee251d29b34a9e411e4e8f3a7",
+    "budget.json": "2730b831286c66147c23aea80d1411ce242e5fb86b272d51be4a6c8d4a9ca768",
+    "checkpoint.json": "3fd3bb4c1518c83e692d2115aea78c6b810da413640976166d38fa89eb60a1b6",
+    "events.jsonl": "9116aeb8957ec7984bf9693a643344a7b471def84ba8fad10b75f9e49f00cb75",
+    "result.json": "2f8e2810da9ee86d9f4d19c526370bf51aba07a45ede0f02bfbfea9c0db84eeb",
     "selection_frozen.json": "4ba5753243cdb6473fa74da62599a7762da53ab239b51d24592228985dabbbd5",
-    "summary.json": "74737c6949b906537a7704f218166ae1cd1fb06ee251d29b34a9e411e4e8f3a7",
+    "summary.json": "2f8e2810da9ee86d9f4d19c526370bf51aba07a45ede0f02bfbfea9c0db84eeb",
     "trajectory.csv": "a36b0fc43c7d2fad821a1bd0d20c3a86e49ddfe1558d24e3ca0f1f1f717a0796"
   },
   "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
   "budget": {
     "counters": {
       "analysis_jobs": 1,
-      "benchmark_jobs": 53,
+      "benchmark_jobs": 45,
       "dynamic_checks": 8,
       "expensive_evaluation_attempts": 2,
       "external_evaluations": 2,
@@ -20,11 +20,11 @@
       "initialization_evaluations": 0,
       "model_requests": 2,
       "model_tokens": 0,
-      "oracle_job_slots": 304,
+      "oracle_job_slots": 288,
       "outer_iterations": 1,
       "policy_turns": 0,
       "proposal_attempts": 2,
-      "quality_checks": 8,
+      "quality_checks": 0,
       "selected_candidates": 2,
       "successful_evaluations": 2,
       "test_evaluations": 32,
@@ -56,24 +56,33 @@
     {
       "generation": "1adb1ddba3c1deea8a9b41608f025854dd9e533105cdcebfb7206139e82ea9c9",
       "ir_rows": 1,
-      "pointer": "initialization/ldm_data/alphabench/573c36fd0cee4403c96d2250ac2d48ac1da6ad8a6d2049fc080ae51b57d34be8/current.json",
+      "pointer": "initialization/ldm_data/alphabench/46e14fe783b16b3e3bd868a7f92a8ff214d79009a077acb4f1ee27e3c48f648b/current.json",
       "sft_rows": 1
     },
     {
-      "generation": "413eac28eb0f0f29302626530c03ece4e22a11a6995359b5971f8602696a1531",
+      "generation": "1bbbeb293fd71a9917905abd12ad13f538a3968a0f0246f4455c3a38be12bdac",
       "ir_rows": 2,
-      "pointer": "ldm_data/alphabench/f72d0d5be777cece7fd448829ff31289bc9cbbfcad45540bea42623b75b94f5f/current.json",
+      "pointer": "ldm_data/alphabench/534e9233b4e7e323cbf76f7b6e957e872b10b98f6deed656b3db38bfa25d8b60/current.json",
       "sft_rows": 2
     }
   ],
   "complete_t3": false,
   "completed_replay": {
-    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock\", \"status\": \"completed\", \"replayed\": true}",
-    "files": 193,
+    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_2\", \"status\": \"completed\", \"replayed\": true}",
+    "files": 185,
     "same_artifact_hashes": true
   },
-  "executed_at": "2026-09-22",
+  "executed_at": "2026-09-23",
   "host": "designated remote server",
+  "including_initialization": {
+    "attempts": 32,
+    "gain": 1.0,
+    "run_success": true,
+    "strict_comparison": ">",
+    "successful_measurements": 32,
+    "threshold": 0.03,
+    "threshold_discovery_evaluations": 1
+  },
   "initialization": {
     "budget": {
       "counters": {
@@ -118,21 +127,57 @@
         "validation_evaluations": 164
       }
     },
+    "generation_cost": {
+      "attempts_per_step": [
+        1
+      ],
+      "failed_steps": 0,
+      "mean": 1.0,
+      "step_count": 1,
+      "total_attempts": 1,
+      "unit": "model attempts per logical generation step"
+    },
     "seed_count": 30
   },
   "kind": "synthetic_development_gate",
   "profile": "mock_ldm",
   "protocol_digest": "d0a43ef060fa6e40cee227de6b054e4de408db86093ffa6adff0e5a118c5e8c1",
   "qualification": "mock_verified",
+  "quality_audit": {
+    "accepted_occurrences": 8,
+    "audited": 8,
+    "complete": true,
+    "coverage": 1.0,
+    "domain": "all raw occurrences from search model responses; excludes initialization",
+    "paper_dynamic_success_rate": 1.0,
+    "qlib_dynamic_success_rate": 1.0,
+    "raw_occurrences": 8,
+    "static_success_rate": 1.0,
+    "unavailable_reason": null,
+    "unique_admitted": 8,
+    "unique_checked": 8,
+    "unique_valid": 8
+  },
   "root": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation",
   "search": {
     "attempts": 2,
     "gain": 0.36666666666666664,
+    "generation_cost": {
+      "attempts_per_step": [
+        1,
+        1
+      ],
+      "failed_steps": 0,
+      "mean": 1.0,
+      "step_count": 2,
+      "total_attempts": 2,
+      "unit": "model attempts per logical generation step"
+    },
     "run_success": false,
-    "search_cost_attempts": null,
     "strict_comparison": ">",
     "successful_measurements": 2,
-    "threshold": 0.03
+    "threshold": 0.03,
+    "threshold_discovery_evaluations": null
   },
   "status": "completed",
   "test_factors": 32

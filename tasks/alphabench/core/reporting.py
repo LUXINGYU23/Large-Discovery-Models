@@ -28,14 +28,22 @@ def daily_metrics(rows, *, direction=1, ddof=1):
 
 
 def search_metrics(records):
-    ics = [record.get("metrics", {}).get("ic") for record in records]
+    ics = [record.get("metrics", {}).get("ic") if record["success"] else None for record in records]
     valid = [value for value in ics if type(value) in (int, float) and math.isfinite(value)]
     success = next((index+1 for index, value in enumerate(ics)
                     if type(value) in (int, float) and math.isfinite(value) and value > .03), None)
     return {"threshold": .03, "strict_comparison": ">", "attempts": len(records),
-            "successful_measurements": len(valid), "search_cost_attempts": success,
+            "successful_measurements": len(valid), "threshold_discovery_evaluations": success,
             "gain": max(0., min(max(valid, default=0.)/.03, 1.)),
             "run_success": success is not None}
+
+
+def generation_costs(records):
+    attempts = [record["attempt_count"] for record in records]
+    return {"unit": "model attempts per logical generation step", "step_count": len(records),
+            "attempts_per_step": attempts, "total_attempts": sum(attempts),
+            "mean": sum(attempts) / len(attempts) if attempts else None,
+            "failed_steps": sum(not record["complete"] for record in records)}
 
 
 def structure_diversity(expressions):

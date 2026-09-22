@@ -77,6 +77,7 @@ class Generator:
                     errors.append({"index": index, "code": "duplicate"})
                     continue
                 checked = self.gateway.evaluate(candidate, phase="check", position=[identity, attempt, index])
+                occurrence["check_receipt"] = self.gateway.identity("check", [identity, attempt, index], candidate)
                 valid = checked["success"]
                 if self.protocol.filter_profile == "paper_filter_v1":
                     valid = valid and checked.get("nan_ratio", 1) <= .01 and checked.get("elapsed_seconds", 31) <= 30

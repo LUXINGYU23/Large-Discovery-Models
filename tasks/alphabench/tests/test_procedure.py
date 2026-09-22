@@ -1,8 +1,7 @@
-from tasks.alphabench.ldm_task.procedure import main, parse_args
+from tasks.alphabench.ldm_task.procedure import main
 
 
 def test_mock_procedure(tmp_path, capsys) -> None:
-    assert parse_args(["--mock", "--iterations", "0"]).iterations == 0
     assert main([
         "--mock",
         "--iterations",

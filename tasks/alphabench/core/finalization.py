@@ -9,7 +9,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from .candidate import FactorDomain
 from .protocol import digest
 from .receipts import Receipts
-from .reporting import daily_metrics, search_metrics, signal_diversity, structure_diversity
+from .reporting import daily_metrics, generation_costs, search_metrics, signal_diversity, structure_diversity
 from .quality import audit_quality
 
 
@@ -61,9 +61,17 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
     search_raw = [gateway.receipts.load(gateway.identity("search", item.candidate.metadata["attempt_position"], item.candidate))["response"]
                   for item in engine_result.state.observations if item.candidate.source != "initialization"]
     expressions = [item[0].payload["expression"] for item in pool.values()]
+    generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "generation").glob("*.json"))]
+    initial_generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "initialization/generation").glob("*.json"))]
+    prefix = "mock_" if gateway.mock else ""
+    initial_raw = [{"success": item.evaluation.succeeded,
+                    "metrics": {key.removeprefix(prefix): value for key, value in item.evaluation.metrics.items()}}
+                   for item in engine_result.state.observations if item.candidate.source == "initialization"]
     report = {"task": "alphabench", "mock": gateway.mock, "protocol": protocol.to_dict(), "protocol_digest": protocol.identity,
-              "method": protocol.method, "initialization": {"seed_count": len(initial_pool), "budget": initial_budget},
-              "search": search_metrics(search_raw), "test": tested,
+              "method": protocol.method, "initialization": {"seed_count": len(initial_pool), "budget": initial_budget,
+                  "generation_cost": generation_costs(initial_generation)},
+              "search": {**search_metrics(search_raw), "generation_cost": generation_costs(generation)}, "test": tested,
+              "including_initialization": search_metrics(initial_raw + search_raw),
               "independent_combination": combination, "quality_audit": quality,
               "final_pool": [item[0].payload for item in pool.values()],
               "structure_diversity": structure_diversity(expressions),
