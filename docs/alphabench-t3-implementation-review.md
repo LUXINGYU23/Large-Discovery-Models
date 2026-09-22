@@ -727,3 +727,45 @@ real-market numerical qualification or the requested final two-round model
 acceptance. Assay's complete source contract, the example workflow's absent
 validation/test extension, remaining agent methods, data gaps and the full T3
 matrix remain open. The full goal and complete_t3=false are unchanged.
+
+## Change 19: bind Assay source searcher defaults
+
+Cross-check against frozen W06/W10 and the pinned AlphaBench bridge plus Assay
+service confirmed that the source searcher still rejected the Assay backend.
+Source resolution now verifies the Assay defaults and relevant AlphaBench
+bridge, records `next_open`, split adjustment, single horizon, period-end
+universe and the arguments the FFO route ignores, then validates the complete
+native portfolio config before any initialization cost. The Python adapter
+matches the source diagnostic failure behavior, including a `CONSTANT` warning
+that the FFO wrapper treats as failure. Actual service fixtures compare daily
+and aggregate IC for both CN and US, including explicit group input and a
+non-trading period-end snapshot. The three native methods now replay through
+both source backends with synthetic oracle responses. Source resolution reports
+cover all 63 method/config/backend/market combinations; these are configuration
+checks, not market evaluations.
+
+The non-trading boundary exposed one portfolio mismatch: the source factor
+universe is chosen at the requested end date, but the independent backtest
+configuration used the last trading date. Source portfolio dates now retain the
+requested inclusive interval and point-in-time cutoff; its daily NAV still
+ends on the last actual session. Matched portfolio dates remain the retained
+signal dates.
+
+Complexity review: the source path uses the existing resolver, worker, native
+algorithm, receipts and single `PortfolioBacktestConfig`. A small shared
+validator moves preflight checks out of the evaluation function so startup and
+execution apply the same rules. Matched panel selection remains unchanged. No
+new service, fallback path or duplicate task schema was added.
+
+Cross-check limitation: the plan requires a Host request to the Assay
+`/v1/portfolio/backtest` route. The current worker invokes the pinned Python
+portfolio entry directly to supply the frozen offline panel, so W06 remains
+open until the REST route can use the qualified task data store and its complete
+response is verified. Real data, operational recovery, remaining methods and
+the final real-model run are also pending.
+
+Remote verification on Python 3.10: Assay suite 21 passed; task suite 253 passed
+with two backend-specific modules skipped in the generic environment; shared
+suite 491 passed, one skipped. The shared runner completed as `mock_10`; replay
+preserved all 187 artifacts. Task registration, dependency validation, and
+runner dry-run passed. No real data or model endpoint was exercised.

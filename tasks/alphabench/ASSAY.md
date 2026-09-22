@@ -31,7 +31,7 @@ inside the manifest directory. All seven entries are mandatory:
 | `calendar` | UTF-8 file, one distinct ISO session date per line, ascending; includes the frozen history origin and brackets the requested interval. |
 | `prices` | Parquet: `date`, `symbol`, raw `open/high/low/close/volume/vwap`, `as_of_date`. VWAP is an actual source field, not an OHLC average. |
 | `events` | Parquet: native Assay action fields `event_id`, `symbol`, `ex_date`, `as_of_date`, `split_ratio`, `dividend_cash`. An empty but verified event table is permitted only when the qualified source establishes there were no actions. |
-| `membership` | Parquet: one `date/symbol/as_of_date` row per effective index constituent per session, including warmup. |
+| `membership` | Parquet: one `date/symbol/as_of_date` row per effective index constituent per session, including warmup. Retain full snapshots effective on non-trading dates too: source requests resolve the snapshot at the requested end date. |
 | `groups` | Parquet: `symbol`, `effective_date`, `as_of_date` and named string classification columns such as `sector`. Only documented historical labels may populate this asset. |
 | `execution` | Parquet: `date`, `symbol`, `as_of_date`, Boolean `tradable` for the full historical union, including names outside the index that may still be held. CN also requires actual raw `close/up_limit/down_limit`. |
 | `benchmark` | Parquet: `date`, `close` for the actual named index in `manifest.benchmark`. Every loaded session must be covered. |
@@ -45,7 +45,7 @@ produce a qualified snapshot; no command fabricates the missing inputs.
 
 ## Factor and label semantics
 
-The adapter loads the union of historical constituents with all prices from the
+The matched profile loads the union of historical constituents with all prices from the
 frozen history origin. Time-series operators retain pre-entry price history.
 Each cross-sectional operation sees only that session's actual membership.
 Group kernels run with each session's latest effective, already-known labels;
@@ -55,11 +55,35 @@ DSL forms, including expanded `advN` and positionalized `safe_div(fill=...)`.
 The registry adds the guide's exact `Tanh(x)` and `Mask(condition,value)` kernels,
 matching the task's Qlib extensions. It does not rewrite other operators.
 
-Adjustment uses native `forward_adjust`: split for US and total for CN, anchored
+Matched adjustment uses native `forward_adjust`: split for US and total for CN, anchored
 to the last loaded session. Actual VWAP receives the same price adjustment as
 OHLC. The frozen origin also determines recursive EMA initialization. Insufficient
 finite-window history fails explicitly; available history is never silently
 shortened to make a formula run.
+
+The source profile follows the pinned `AssayService` / `FactorEngine.from_store`:
+choose the latest historical universe snapshot at the requested end date and use
+that fixed cross-section throughout the inclusive requested interval. A snapshot
+effective on a non-trading end date still applies. Load no feature history before
+the requested start; native rolling warmup NaNs remain in the panel. Both CN and
+US use the source default `adj=split`. The FFO bridge does not forward `label`,
+so the effective source label is `next_open`, not its client's `close_return`.
+Source resolution freezes these defaults and verifies both repositories' files.
+
+Source evaluation runs the original `FactorEngine.diagnose`. Diagnostic errors
+and any `failure_mode`, including the `CONSTANT` warning, fail exactly as the FFO
+bridge does. Diagnostics remain in the private receipt. Missing correlations
+remain unavailable; the task does not adopt FFO's conversion of null metrics to
+zero. A factor with no finite daily IC is an unsuccessful evaluation.
+
+The unchanged FFO payload loads OHLCV and supplies no group data. Full guide
+support therefore explicitly extends that payload through the Python engine:
+actual adjusted VWAP, the guide's Tanh/Mask operators and supplied group labels.
+Source groups are the last known effective labels at the requested end, passed
+to the original kernels as one fixed vector, matching the service's explicit
+`group_data` argument. Matched groups remain point-in-time daily vectors. These
+extensions are recorded in `source_entry_contract`; they are not claims that
+the unchanged FFO transport supports those inputs.
 
 `label=close_return` means Assay `next_close`: close[t+n]/close[t]-1.
 `label=open_return` means `next_open`: open[t+1+n]/open[t+1]-1. Both request
@@ -73,7 +97,8 @@ The portfolio still covers the full source interval. Events after that interval
 cannot change either the factor or label adjustment basis.
 
 The response records the requested interval and inclusion rule, actual dates,
-label read end, purged dates and unavailable tail dates. The raw Assay IC report,
+panel policy, adjustment, feature history origin, label read end, purged dates
+and unavailable tail dates. The raw Assay IC report,
 daily IC/RankIC, finite sample counts and scores remain Host-private.
 
 With `paper_filter_v1`, the check operation evaluates only factors and exports
@@ -87,10 +112,24 @@ it is metered as `lint_checks`, separately from `dynamic_checks`.
 
 `T3Protocol.assay_portfolio` freezes every field of the pinned
 `PortfolioBacktestConfig.to_dict()`. The evaluator sets its period/as-of fields
-to the actual retained split, and returns the complete effective config. Its
+to the requested inclusive source interval or the actual retained matched split,
+and returns the complete effective config. Its
 market and universe must match the protocol. Qlib `stock_topk/stock_n_drop` are
 not translated into Assay controls; Assay uses its own weight construction,
 schedule, execution and accounting semantics.
+
+The original FFO Assay bridge ignores `fast=False` and does not run a portfolio.
+The independent portfolio is an explicit full-T3 extension. Source workflow
+preflight loads only the verified, dependency-free native config module and
+validates the complete configuration before initialization. The worker uses the
+same task constraints with the installed native config class; there is no second
+schema or implicit portfolio default. The frozen implementation plan requires
+Host to call `/v1/portfolio/backtest`; the current worker still calls the
+official Python `PortfolioBacktester.run` entry directly, so W06 remains open
+until the REST route is exercised against the qualified offline data store. The
+configured worker timeout is a task limit, not an original Assay compute limit.
+Unknown requests use the shared durable reconciliation contract instead of the
+bridge's three HTTP attempts.
 
 The actual index series is supplied as `benchmark=custom`, with an exact
 `benchmark_symbol` match to the data manifest. Trade and position logs and daily

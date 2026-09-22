@@ -152,8 +152,9 @@ tasks/alphabench/.venv/bin/python -m tasks.alphabench.core.source_profiles \
   --output /mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_sp500.json
 ```
 
-同一输出路径拒绝不同内容覆盖。已在服务器解析七个入口/方法组合在 CSI300、
-SP500 上的 14 份报告，索引见 `resources/evidence/source_profiles.json`。
+同一输出路径拒绝不同内容覆盖。`--backend assay` 解析 Assay 分支；固定 Assay
+源码位于 `--upstream-root` 的同级 `Assay/`，由数据准备流程安装。两种后端的
+来源报告索引见 `resources/evidence/source_profiles.json`。
 
 两套入口有不能合并的行为：
 
@@ -171,15 +172,15 @@ SP500 上的 14 份报告，索引见 `resources/evidence/source_profiles.json`�
 baseline 与搜索分别绑定现有回调；入口不导入 FFO/Qlib 或模型 SDK。返回原有
 局部结果用于报告，不复制搜索循环。参数、源文件和补丁摘要与调度日志共同保存。
 真实三算法已通过全组种子、并发、预算停止和完整重放测试；当前仍为 synthetic
-oracle 验证，尚未登记 source profile 或真实市场资格。
+oracle 验证；example 完整 workflow 与真实市场资格仍未通过。
 
-### Qlib searcher workflow
+### Searcher workflow
 
 选择 `profile=upstream_searcher_v1`、`method=alphabench_cot/tot/ea`，
 `native_parameters` 必须只有 `source_config`，值为上述对应 searcher YAML 的
 仓库相对路径。算法参数从已校验的原始配置与源码解析，不能再覆盖 N、worker、
 mutation/crossover 等值。协议中的 rounds、temperature、初始化、过滤、标签、
-最终因子数及持仓数须与来源一致；任何不一致在初始化付费前拒绝。
+最终因子数须与来源一致；Qlib 另核对持仓数。任何不一致在初始化付费前拒绝。
 `--dry-run` 同样核对来源并输出完整 `source_entry`，显示实际算法参数和协议差异。
 
 CoT/ToT 使用 30 条原生 cold 种子；EA 自动读取配置中的 125 条固定种子。
@@ -196,11 +197,22 @@ validation 同分时保留源顺序。每个成员都必须有有限 validation 
 在 test 前返回 `paused_incomplete_validation`。固定源码可回退到 search 排名，
 本 task 的完整 T3 合同禁止混排；该差异保存在 `source_entry_contract` 中。
 信号多样性按成员位置形成配对，重复公式也参加统计；pair 同时保存公式身份
-和左右位置。最终 test 仍为 50 个因子、50 只股票、drop 5、`fast=False`。
+和左右位置。最终 test 最多选择 50 个因子，要求完整 portfolio。Qlib 仍为
+50 只股票、drop 5；Assay 使用其独立、完整冻结的 `assay_portfolio`。
+
+Assay source 必须使用 `assay_code_filter_v1`、`label=open_return`。原 FFO
+不传递 label，Assay 默认 `next_open`、所有市场 split 复权，只加载请求区间，
+按请求末日历史快照取固定成分股。lint 与原始运行诊断均保留，不能把 null IC
+映射为零后算作成功。原 FFO 的 fast/topk/n_drop 不影响 Assay 因子评价。
+task 通过 Python 引擎补充真实 VWAP、分组与 guide 算子，并调用独立 portfolio；
+这些能力扩展和显式 worker 时限逐项写入 source contract，详见 [ASSAY.md](ASSAY.md)。
+完整 portfolio 配置及支持的数据控制在初始化前核验，不接受空配置。
+当前 worker 通过固定 Assay 的 Python portfolio runner 计算；计划要求的
+`/v1/portfolio/backtest` REST 路由尚未接线，W06 资格仍未通过。
 
 执行使用统一入口的 `--protocol-file`、`--upstream-root`、`--data-manifest` 和
-`--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。Assay source
-的完整源合同及 example 的 validation/test 扩展仍未完成，入口明确拒绝它们。
+`--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。example 的
+validation/test 扩展仍未完成，完整 workflow 入口明确拒绝该 profile。
 
 ## 过滤与质量报告
 
@@ -238,5 +250,5 @@ forward horizon 的有效样本数。两种后端的完整 portfolio 使用各�
 且没有 matched 的标签 purge。example 的搜索日期是 2023–2024；访问不存在的
 validation/test 区间会明确报错，不能自动继承 matched 日期。
 
-该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。Qlib searcher
-已接入这些规则；Assay source 和 example workflow 仍保留独立的未完成 gate。
+该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。两种后端的
+searcher 均已接入这些规则；真实数据资格和 example 完整 workflow 仍未通过。

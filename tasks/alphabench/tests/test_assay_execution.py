@@ -181,15 +181,101 @@ def test_actual_portfolio_and_combination_keep_source_reports_and_benchmark(snap
 
 def test_source_assay_portfolio_retains_the_inclusive_end_even_with_undefined_tail_ic(snapshot):
     request, config, _, days = snapshot
-    request["protocol"].update(profile="upstream_searcher_v1", forward_n=3)
+    request["protocol"].update(profile="upstream_searcher_v1", forward_n=3, label="open_return")
     request.update(end=str(days[30]), fast=False)
     result = assay_evaluate(request, config)
     expected_dates = list(map(str, days[20:31]))
     assert [row["date"] for row in result["daily"]] == expected_dates
     assert [row["date"] for row in result["portfolio"]["daily"]] == expected_dates
     assert result["portfolio"]["actions"] and result["portfolio"]["holdings"]
-    assert all(np.isnan(row["ic"]) for row in result["daily"][-3:])
+    assert all(np.isnan(row["ic"]) for row in result["daily"][-4:])
     assert result["portfolio"]["execution"]["config"]["period_end"] == str(days[30])
+
+
+@pytest.mark.parametrize("market", ["nasdaq100", "csi300"])
+def test_source_panel_and_metrics_match_actual_assay_service(snapshot, tmp_path, monkeypatch, market):
+    from pathlib import Path
+    from assay.config import AssayConfig
+    from assay.data.schemas import price_partition_path, universe_snapshots_path, adj_events_path
+    from assay.service import AssayService
+
+    request, config, frames, days = snapshot
+    manifest_path = Path(config["data_manifest"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest.update(market=market, adjustment="split")
+    manifest_path.write_text(json.dumps(manifest))
+    request["protocol"].update(profile="upstream_searcher_v1", market=market,
+                               label="open_return", forward_n=2, data_digest=digest(manifest))
+    request.update(start=str(days[20]), end=str(days[30]), expression="cs_rank(ts_mean(close,3))")
+    # The requested end has a new snapshot but no trading row.
+    prices = frames["prices"].filter(pl.col("date") != days[30])
+    members = frames["membership"].filter((pl.col("symbol") != "S10") | (pl.col("date") >= days[30]))
+    groups = frames["groups"].with_columns(
+        pl.when(pl.col("effective_date") == days[23]).then(pl.lit(days[30])).otherwise(pl.col("effective_date")).alias("effective_date"))
+    groups = groups.with_columns(pl.col("effective_date").alias("as_of_date"))
+    for name, frame in [("prices", prices), ("membership", members), ("groups", groups)]:
+        replace_asset(snapshot, name, frame)
+    manifest = json.loads(manifest_path.read_text())
+    calendar = manifest_path.parent / manifest["assets"]["calendar"]["path"]
+    calendar.write_text("\n".join(day for day in calendar.read_text().splitlines() if day != str(days[30])))
+    manifest["assets"]["calendar"]["sha256"] = sha256(calendar)
+    manifest_path.write_text(json.dumps(manifest))
+    request["protocol"]["data_digest"] = digest(manifest)
+    events = pl.DataFrame({"event_id": ["split"], "symbol": ["S03"], "ex_date": [days[25]],
+        "as_of_date": [days[24]], "split_ratio": [2.], "dividend_cash": [0.]})
+    replace_asset(snapshot, "events", events)
+    native_root = tmp_path / "native-store"
+    native_market = "CN" if market.startswith("csi") else "US"
+    for (year, month), frame in prices.with_columns(
+        pl.col("date").dt.year().alias("year"), pl.col("date").dt.month().alias("month")).partition_by(
+            "year", "month", as_dict=True).items():
+        path = price_partition_path(native_root, native_market, year, month)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        frame.drop("year", "month").write_parquet(path)
+    snapshots = members.group_by("date", maintain_order=True).agg(pl.col("symbol").alias("symbols"))
+    snapshots = snapshots.rename({"date": "effective_date"}).with_columns(
+        pl.lit(market.upper()).alias("index_id"), pl.col("effective_date").alias("as_of_date"))
+    for path, frame in [(universe_snapshots_path(native_root, native_market), snapshots),
+                         (adj_events_path(native_root, native_market), events)]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        frame.write_parquet(path)
+    monkeypatch.setattr(AssayService, "apply_system_config", lambda _: {})
+    service = AssayService(AssayConfig.for_tests(native_root, market=native_market))
+    original = service.evaluate(request["expression"], universe=market.upper(),
+        period=(request["start"], request["end"]), horizons=[2], save=False)
+    result = assay_evaluate(request, config)
+    assert original.failure_mode is None and result["success"]
+    assert original.execution == "next_open" and result["label"]["execution"] == original.execution
+    assert result["adjustment"] == "split" and result["history_origin"] == request["start"]
+    assert result["panel_policy"] == "source_period_end_universe"
+    for name in ["ic", "rank_ic", "icir", "rank_icir"]:
+        assert result["metrics"][name] == pytest.approx(getattr(original, name))
+    np.testing.assert_allclose([row["ic"] for row in result["daily"]],
+                               [np.nan if value is None else value for value in original.ic_series], equal_nan=True)
+    # S11 enters during the interval; the source uses the end snapshot for every row.
+    assert any(row["instrument"] == "S11" and row["date"] == request["start"] for row in result["scores"])
+    assert any(row["instrument"] == "S10" and row["date"] == request["start"] for row in result["scores"])
+    assert result["actual_end"] == str(days[29])
+    assert all(np.isnan(row["score"]) for row in result["scores"] if row["date"] == request["start"])
+    if native_market == "US":
+        portfolio = assay_evaluate(dict(request, fast=False), config)["portfolio"]
+        assert portfolio["execution"]["config"]["period_end"] == request["end"]
+        assert portfolio["execution"]["config"]["as_of_date"] == request["end"]
+        assert portfolio["daily"][-1]["date"] == str(days[29])
+    expression = "cs_neutralize(ts_mean(close,3),'sector')"
+    original_groups = {"sector": {f"S{i:02d}": "a" if i % 2 else "b" for i in range(12)}}
+    grouped_native = service.evaluate(expression, universe=market.upper(), group_data=original_groups,
+        period=(request["start"], request["end"]), horizons=[2], save=False)
+    grouped_task = assay_evaluate(dict(request, expression=expression), config)
+    assert grouped_native.failure_mode is None and grouped_task["success"]
+    np.testing.assert_allclose([row["ic"] for row in grouped_task["daily"]],
+        [np.nan if value is None else value for value in grouped_native.ic_series], equal_nan=True)
+    for expression in ["close", "close-close", "ts_mean(close,100)"]:
+        failed = assay_evaluate(dict(request, expression=expression), config)
+        native = service.evaluate(expression, universe=market.upper(),
+            period=(request["start"], request["end"]), horizons=[2], save=False)
+        assert not failed["success"] and native.failure_mode
+        assert failed["diagnostics"][0]["failure_mode"] == native.failure_mode
 
 
 def test_hash_missing_data_and_unsupported_controls_fail_explicitly(snapshot):
@@ -254,29 +340,34 @@ def test_all_guide_operators_execute_through_pinned_assay_parser_and_engine(snap
             assert result["success"], expression
 
 
-def test_guide_extensions_and_split_adjusted_vwap_have_expected_values(snapshot):
+@pytest.mark.parametrize("profile", ["ldm_matched_v1", "upstream_searcher_v1"])
+def test_guide_extensions_and_split_adjusted_vwap_have_expected_values(snapshot, profile):
     request, config, frames, days = snapshot
+    request["protocol"]["profile"] = profile
+    request["end"] = str(days[-1])
     split = pl.DataFrame({"event_id": ["split-1"], "symbol": ["S03"], "ex_date": [days[25]],
                           "as_of_date": [days[24]], "split_ratio": [2.], "dividend_cash": [0.]})
     replace_asset(snapshot, "events", split)
-    engine, _, _, _, _, _ = prepare_panel(request, T3Protocol(**request["protocol"]), config)
+    engine, actual_days, _, _, _, _ = prepare_panel(request, T3Protocol(**request["protocol"]), config)
     original = frames["prices"].filter(pl.col("symbol") == "S03")["vwap"].to_numpy()
     expected = original.copy(); expected[:25] /= 2
-    np.testing.assert_allclose(engine.field_matrix("vwap")[:, 3], expected)
+    np.testing.assert_allclose(engine.field_matrix("vwap")[:, 3], expected[[days.index(day) for day in actual_days]])
     close = engine.field_matrix("close")
     np.testing.assert_allclose(engine.evaluate("Tanh($close / 20)").values, np.tanh(close / 20))
     mask = engine.evaluate("Mask(Gt($close,20),$close)").values
     np.testing.assert_allclose(mask, np.where(close > 20, close, np.nan), equal_nan=True)
 
 
-def test_cn_portfolio_uses_actual_price_bands_and_full_effective_costs(snapshot):
+@pytest.mark.parametrize("profile", ["ldm_matched_v1", "upstream_searcher_v1"])
+def test_cn_portfolio_uses_actual_price_bands_and_full_effective_costs(snapshot, profile):
     from pathlib import Path
     request, config, frames, days = snapshot
     path = Path(config["data_manifest"])
     manifest = json.loads(path.read_text())
-    manifest.update(market="csi300", adjustment="total")
+    manifest.update(market="csi300", adjustment="total" if profile == "ldm_matched_v1" else "split")
     path.write_text(json.dumps(manifest))
-    request["protocol"].update(market="csi300", data_digest=digest(manifest), assay_portfolio=PortfolioBacktestConfig.preset("A",
+    request["end"] = str(days[-1])
+    request["protocol"].update(market="csi300", profile=profile, label="open_return", data_digest=digest(manifest), assay_portfolio=PortfolioBacktestConfig.preset("A",
         universe="CSI300", period_start=str(days[20]), period_end=str(days[-1]), benchmark="custom", benchmark_symbol="TEST_INDEX",
         rebalance_type="daily", min_rebalance_interval=1, slippage_model="zero", st_filter=False,
         new_listing_lockout_days=0, ipo_lockout_days=0, rebalance_around_index=False, save_position_log=True).to_dict())

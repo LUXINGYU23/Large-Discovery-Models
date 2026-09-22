@@ -1,140 +1,643 @@
 {
   "execution_ready": false,
   "limitations": [
-    "These are source-resolution reports, not model or market evaluations.",
-    "Executing requires a matching frozen protocol and independently qualified data/environment.",
-    "The example entry contains neither private validation nor a held-out test stage."
+    "These reports resolve pinned sources; they are not model or market evaluations.",
+    "Real execution requires matching frozen protocol and independently qualified data/environment.",
+    "Assay capability extensions and operational limits are explicit protocol deltas.",
+    "The example entry has no private validation or held-out test stage; its complete workflow remains blocked."
   ],
   "qualification": "source_resolution_only",
-  "resolver_sha256": "718b0559df5014aedba6b6481b577266c73156b67584d1f3f270f8c2e49de9d6",
+  "resolver_sha256": "f3d7a382cab0a2e16a9b70c18c51ba2b543e2e0d397b2000aeefbef4819e8986",
   "rows": [
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_default_tot_csi300.json",
-      "artifact_sha256": "72a02c99be7a2f21e7e884d58f4475eec41bb077021d3c154c5519b4eb90a6ab",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_qlib_csi300.json",
+      "artifact_sha256": "317b6bcd03672d20e5a71ea1142f215e3b40cfc40d34819c37d7b3865475fb1e",
+      "backend": "qlib",
       "config": "searcher/config.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "762a8bd50db6db09748bf91a7c0b3de271ba40371525379da8fe394028ce353b"
+      "resolution_digest": "94190457fad87d3c4ee1de4b43388e8d6caa14563d74bdaf149dbccb3777651c"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_default_tot_sp500.json",
-      "artifact_sha256": "9a1ac59994e11ca63d9bfdc04f8b22dfdf0598deece0c7f1ba81dd4ebb98b39e",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_qlib_csi500.json",
+      "artifact_sha256": "4e6c0d3215fb830f578ce35124c137bd216ce248f650cabe26ecfafa09bda262",
+      "backend": "qlib",
+      "config": "searcher/config.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "84106f626dce3176d19ef70fd812e5a342fb44b0efde77e22583dc4f57c501d0"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_qlib_csi1000.json",
+      "artifact_sha256": "6d7f468655cf44cabed1495a4de172bf6306a527e2898a2e59c64d882eb009ab",
+      "backend": "qlib",
+      "config": "searcher/config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "7d3b78ab41c26b9e16bc0b8a0244e9432d28c7bd4fdb74b92b1519fee9719bf6"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_qlib_sp500.json",
+      "artifact_sha256": "7198b1def4d37089f97656bd4eb6e216c5050fd1e1e1858157681d8ee5c5b9a0",
+      "backend": "qlib",
       "config": "searcher/config.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "7b9ae04b93724c4e28af0d49be732e6a02b4e4d9976aaf54aa2d05a95a2cdefe"
+      "resolution_digest": "c3bc30b55acc9a0cf4230e6c8e9c7642e1f869fbbead7e317b76150fcba19e70"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_cot_csi300.json",
-      "artifact_sha256": "edae41f0c9390945e8049d2651297067a9d238c93addd0b97648d0558b7de982",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_qlib_csi300.json",
+      "artifact_sha256": "109c474a7c6e8ee8875fed24e6cf9811de7e94e1307223df63a3646d8f4f1e8b",
+      "backend": "qlib",
       "config": "searcher/configs/cot_config.yaml",
       "market": "csi300",
       "method": "alphabench_cot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "c89c89b7bd0ecf8c392e33fbc3e1f9339f7da7405e34db16d0c80169ee89c411"
+      "resolution_digest": "2c0c99d3c6cf47eb7d8beea9190107c47e3256957a1b4c575446c3e3b10b4b80"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_cot_sp500.json",
-      "artifact_sha256": "f6371c13f1febdd2bad6dcdfcdedbeacaea71043f5e112f8e0db9483222d5e68",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_qlib_csi500.json",
+      "artifact_sha256": "c7553b59d864b5df77a386683ab0e0cba88a87f5318518ad11571b26cad74fc0",
+      "backend": "qlib",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "3f5acf21ecdde7ce2f3be8b0fba3d3f17c8fdf261a477a45e318df2cea9829cb"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_qlib_csi1000.json",
+      "artifact_sha256": "5d96c3dd2a8a2195de3815d12ab4262571ab16c0d4d987b8852c9b9af2f6581a",
+      "backend": "qlib",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "ff920eefc045baa33bbacab3ea4b346a6609ad3e2803b3f683592f75898d7d7b"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_qlib_sp500.json",
+      "artifact_sha256": "1feeeed0572068783d989c4a1bed0ed80712a2ebcb7f1da3628c5c137421f9fd",
+      "backend": "qlib",
       "config": "searcher/configs/cot_config.yaml",
       "market": "sp500",
       "method": "alphabench_cot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "f24bf26dd08a91d7d8a8909738d248deceaca79427032ac43561cc167d3be35b"
+      "resolution_digest": "e67cfa1c9e961646fe3a238c622498a94dcb79ab1d78ce5b15db33a83c07c1df"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_tot_csi300.json",
-      "artifact_sha256": "dcd2ea1cf085ec3f25b0f68308072e1e93cbf910a296fe671cfc7a9b1f3f8b43",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_qlib_csi300.json",
+      "artifact_sha256": "fabee054cbea38626237e11a762202c5aca7d0e846f2ee27fe9dd57843305860",
+      "backend": "qlib",
       "config": "searcher/configs/tot_config.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "ebc1081fb2c7e4ab6baea38007d907747a969f2a26bc1114a1b81e7f7b71311f"
+      "resolution_digest": "075560cef2f67591d246051d05c958cf6ffcbcdc974c663466f35a2137c846e9"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_tot_sp500.json",
-      "artifact_sha256": "3edec6e5e89e61c313e928795aa5f50724daa1b7958554016da1134331331236",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_qlib_csi500.json",
+      "artifact_sha256": "0f1416d88fa23adae7fa4605e67c98e2b08f28a660938610865dd4ed7b70203a",
+      "backend": "qlib",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "498a4047ae55607704517e7476fe3baccb3a5cc972a89c6d8b361663b848dafe"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_qlib_csi1000.json",
+      "artifact_sha256": "25c0ca2a10c7765d0499a86a9bc5410dc494071429aa70a06298352c03f6b409",
+      "backend": "qlib",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "909af91863445ee02b1c1fb5317e3267e1cd2f7fedd6d41b53d0808c7d7f15fb"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_qlib_sp500.json",
+      "artifact_sha256": "1d894563d2e6047f88f1cd9bcc0d5e09422532e7cddd6eac0060d018356b293b",
+      "backend": "qlib",
       "config": "searcher/configs/tot_config.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "5b74c906b27b3f22f880ff0c6ab919e16a2523cbee8718ec5a4fb4c8a6f417cb"
+      "resolution_digest": "e518e3defc5e1745ba39c89bab91338935712f61fc91480338415b74b05230b9"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_ea_csi300.json",
-      "artifact_sha256": "55b360eeb4631c8a3302bce676ff91a79d16b3be5977caa5259e2d273a694c97",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_qlib_csi300.json",
+      "artifact_sha256": "2ba96cf2d64f2603e1caa2226f20591779b742962b3b62b5acbc880161df0cf8",
+      "backend": "qlib",
       "config": "searcher/configs/ea_config.yaml",
       "market": "csi300",
       "method": "alphabench_ea",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "cf13536e356430edb72eeefb121765e9d1788f79593e0fb830be9137eb5af876"
+      "resolution_digest": "b51d4686d6cfda80076f6db6d56a87ee61c6d8c97185b01a7ea8c908b5b321fa"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_ea_sp500.json",
-      "artifact_sha256": "459db7e899f917941ab9af205b553cec838134d8da11026999e09875743b5351",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_qlib_csi500.json",
+      "artifact_sha256": "5a0cadaebfaaa94ec3716229039790814b4c66a64085d1358eb7e5efc8069e96",
+      "backend": "qlib",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "257bf8e05329c8d51f7a78d1dd535572b398749793396c92abb1f6f8004425bf"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_qlib_csi1000.json",
+      "artifact_sha256": "60ceb3679492e479426ff66ac7fedd919e2ed6e36f9ab8bbf578691cb6ef59c1",
+      "backend": "qlib",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "9c50eabfc29dbf6e4d51b9ce782b9d78694ca6cff5f9d21f4b5d704ca9414734"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_qlib_sp500.json",
+      "artifact_sha256": "ab55b37728f84f227de433a3f50d5487dc9b4d8ce427a7c438e335a761945dea",
+      "backend": "qlib",
       "config": "searcher/configs/ea_config.yaml",
       "market": "sp500",
       "method": "alphabench_ea",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "76ccb3d9b693283a11768f8d9dc14bd362ef7289ce743dd7bfbe256c0aabcf87"
+      "resolution_digest": "4af10f6224cf53bac50dfad067b4944c19aee15ea9eb3c4b7a63d9d59dee8b16"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_cot_csi300.json",
-      "artifact_sha256": "8c4e105c4f8f83e62f2d67079f0f7dfb82a5811f4c1913bbaba3f3a2d1c53108",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_qlib_csi300.json",
+      "artifact_sha256": "2c48613d3eff9aa05f1f30f3d3d41196efb569232e2e24a3e8cbacd51326790d",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_cot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "3c0219a9b230c67f89a2ac151e1fe35314a677fd5e8d96bb5a6467668656d5e7"
+      "resolution_digest": "5167751e153e2bad5c7fab96e5a5198d24224ca82ee123d1af5f38a61769fa9e"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_cot_sp500.json",
-      "artifact_sha256": "a4cbd9d56dedc1957b0b1041b2f1a01e00441b181cd3ebbb249ef6185b05b3cf",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_qlib_csi500.json",
+      "artifact_sha256": "4739ae0d15f50ff8e08cea52ae4dd8d18f11b558d6438b389d1c86453435a190",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "f0bc0a9506e4a943fa24365767542b7dd41267a8ea9bb411d38b4b1ca8cb9d6e"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_qlib_csi1000.json",
+      "artifact_sha256": "41fe737bc657aa26e8a0bcfd49c5eaefb817eca3b2309c7beb612110f89b222c",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "cb31d0604152c7fe6ebd21dfcce7e453c3d4fd26c8438edae500dcb6a092f879"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_qlib_sp500.json",
+      "artifact_sha256": "8e96a629f75b6525f13a22a33f5c3f56c5ba0f976d33d8f27237407b56bc51ee",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_cot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "5bea1492350b982682b7592bb81e1ed3493101ed1ec9fcaee238397eac8b5b91"
+      "resolution_digest": "3eb9aba8362513e39315216528432d04a83b45b4eaef6c8b982cf09d858936ed"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_tot_csi300.json",
-      "artifact_sha256": "cb0404e9a7c5910a2fb24e4d4bd463bf374b491247996e16147a18b5d6663fa8",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_qlib_csi300.json",
+      "artifact_sha256": "68d8f3ba6cab915d52829dba0f346a5090baab5f4cdda861db95717a52352be1",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "ffb9ad6917ea3fb932bb6627b1e6d7998f56d1b2098396ddbb301ed4b7a590d6"
+      "resolution_digest": "327657eee6f54c621424d7ea137853aafa54d595992bb25de690cc42e89385c4"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_tot_sp500.json",
-      "artifact_sha256": "893c54a80a6cf327ff0f579fadc3c373429ed1338e6f5fb13857c2a6bf054bd7",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_qlib_csi500.json",
+      "artifact_sha256": "31a85bb838eaf64d964c5f33eb4b9071566d0cdaabf6b3488bcd60ba368e1157",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "4c6f2dc47b1b38775cecaffa80eaa1f9ac07caf34c0b28ce076c7c439c8a4417"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_qlib_csi1000.json",
+      "artifact_sha256": "b1a92f1df06c81e6f589efb5935b42c8fbef91771b04c2a7b0050d3c15f16383",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "4ebe654c208176e8346ee4d384ca06e4c2db62af26f43dcf79aa98a66af6712e"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_qlib_sp500.json",
+      "artifact_sha256": "e43912d7ffc1680b97b62a61f52ffc39321be81e0041487a9c11ac15308f3c33",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "01a09b858404787cfc9f82a05d0dbd8d5f7f084af214962bc9fc705a1d42fedb"
+      "resolution_digest": "6cdfd66bfcc8c0edfd78a1ec462f3729e930504c34c6aedac9d80b881f2dba8f"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_ea_csi300.json",
-      "artifact_sha256": "bffd10fd0634c4803a2dbf26f78186b56abef3ddb16b50cdf95a391c09371fed",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_qlib_csi300.json",
+      "artifact_sha256": "6de83a020027a8216ade6fbbf59ab71f93d0dac46ff13c5d971029442ab271ea",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_ea",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "b66da1187116f9838caae5ddcd8ce921c2914ae8f9d2b08256c9d798b2bebc7b"
+      "resolution_digest": "d6ebedc5fbaae3cbfbe25e7285fcc681ce3594b9e000cb7d03e2444d20a833b2"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_ea_sp500.json",
-      "artifact_sha256": "6d5be3c2a387b14d5ae1e139d6a53ea0632cba2c619b2f86643fc8a8ab6d7d96",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_qlib_csi500.json",
+      "artifact_sha256": "7191f4355c53e84cd9afa934494590ced368a4b3dbc40b0c289abed9f4d4d40b",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "06fd8f16325089248f6b6037fd31c8a709ce9e9cf3a8a45f7575bace7b69b346"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_qlib_csi1000.json",
+      "artifact_sha256": "b52978691dc878b040cea2fe18e5023b2d2cba62f6f33dab07e0d0f34510171d",
+      "backend": "qlib",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "03e251d52909e2c753f9a475a59853df81afc06b76f6f7182b73c5ed5997c5f1"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_qlib_sp500.json",
+      "artifact_sha256": "ab6c1c44beb3b9a00fae6007fd9a6ba2b4322fd509dea6d9ff99ed89184f8eea",
+      "backend": "qlib",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_ea",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "59f841cb19b9139905ddd1f9168cc85da31dd6984f84c37cbb5c78b8e14147fa"
+      "resolution_digest": "b0b80c87157c7eee5c935148ea397951b23f651c716f49d3d7f2f16fe532920d"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_assay_csi300.json",
+      "artifact_sha256": "b746b4b912a685ee2b08ea11804f0461875e5b4ee6f0b2a562c1465713f57d2b",
+      "backend": "assay",
+      "config": "searcher/config.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "481369bbeed096b0fd1e894bc1c4e95bc2e7ea658af672cca71e31e825fee27e"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_assay_csi500.json",
+      "artifact_sha256": "303cfacc5b94fee42aeab2237581cda9d21482dfd372fc8c5f24d2aa1c9b1a23",
+      "backend": "assay",
+      "config": "searcher/config.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "a2d613402ea7cf8ac7612fea3383f9b742005007b71a10ddbd2d2b3b02edc9cc"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_assay_csi1000.json",
+      "artifact_sha256": "e68e4360187a7b339aaffcb86116d5b2e3873985c26df491a8531f2ba215b148",
+      "backend": "assay",
+      "config": "searcher/config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "334a477f0f48420814d5060bb29e2614e308a0377700966888df8f6225ea9795"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_assay_sp500.json",
+      "artifact_sha256": "7ce0037d37377b69420eb439590e8aabb6a554317fdea9f0d29227f1f6cf90bf",
+      "backend": "assay",
+      "config": "searcher/config.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "b9dd9b996c590e9021f170fa068b455dd9bbcc5fe3a96504a219f68fcaed8d08"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_default_tot_assay_nasdaq100.json",
+      "artifact_sha256": "f2b9affb3b476a4cd2ac243d4f95d21edd0803a05573292bfc71929be108e06e",
+      "backend": "assay",
+      "config": "searcher/config.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "be45eaf51396a3489a35a3ceaa3028b15d06118b5673df32feeb363797addeeb"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_assay_csi300.json",
+      "artifact_sha256": "c1646ef051d05c65c5171314863bd1d3063924a0f4144237ed376884a53d99f1",
+      "backend": "assay",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "16e18f02b0441267ba7f60856baef4e1afd2eeab933b30f5253d7a8e449ecaa2"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_assay_csi500.json",
+      "artifact_sha256": "94ddafec5ab9f210934254a5b0d5c91a0e5909a853d3e0bfe35ab4a759f33576",
+      "backend": "assay",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "dc724a52d972ad163eb45aff8b6ee4e2154ff053e372107b8471b02a6985f2b8"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_assay_csi1000.json",
+      "artifact_sha256": "f0cdfdd7ec5092a6783cd93ffcfed2aebf7961abfb84465f8a3c985ac13a5735",
+      "backend": "assay",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "a71d4d8895e380964d8d18baadaa94c2e961f0756404b782252c12f041fe6c04"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_assay_sp500.json",
+      "artifact_sha256": "381ff636811e8cf557f949d0fe56cad280f4d284b58201f8f5c80209c33c4c4d",
+      "backend": "assay",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "ce207ca3dfe20e104c9b056b782d9c581e2674e004cacc089c84bac0a7ccb94d"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_cot_assay_nasdaq100.json",
+      "artifact_sha256": "66cffef79d9dd39d0d64fdb14ea72f46e292947f1ae0e65f2a1621ae13599aa0",
+      "backend": "assay",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "2ab6dbbdaec1d8cbcd9a252369f701679d9ab17db2a5eae552552b18d7e3481b"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_assay_csi300.json",
+      "artifact_sha256": "ff6091404567278d18658aa94abefb69966b7bca0df458cec1a69ac0a069c539",
+      "backend": "assay",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "db5b4afc65f2c6c8e8fa4033a20fa8cc4d2b58a66fd47b2ed2c635980a1a3616"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_assay_csi500.json",
+      "artifact_sha256": "de72fd9f73bf157e2fc14639eab27c7cb83faafe8a87808a9b7ba40d987ce5c5",
+      "backend": "assay",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "d2c565fcec7456fbdda10b04afaf1582a5a6c7dc1d1345e761469b16c00fc6a9"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_assay_csi1000.json",
+      "artifact_sha256": "fa4e9533ce4e27bf5e43d2d6165a5d4acb8f722f0e31978775637eee5e376da1",
+      "backend": "assay",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "0d5a1daf06637b5b82af5cc0eeb9847374617ce2e4f74f256d9d1589b6f0e132"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_assay_sp500.json",
+      "artifact_sha256": "f5440c06df4049d498f5f60316ea32c43952c84df5e0ef05dd83a4528e064b47",
+      "backend": "assay",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "c5a8ea704ed3a4c24771d1836192ff9c6bdfa925ddfe4b88b4b19b36f0686f0a"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_tot_assay_nasdaq100.json",
+      "artifact_sha256": "1261b3b8e5b4c61fd1cf78e70cfc096e703b64c5ce6115d55be05a2a25bc1a57",
+      "backend": "assay",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "8c8bf7586b1e3321bf22a1330221a1f82bf29e4caa0a4e01838192266ac52bd2"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_assay_csi300.json",
+      "artifact_sha256": "53c3f4141bcc995365d1aecc3889b4a62ac77e1b7bc6fb174e59951fbadb892e",
+      "backend": "assay",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "8e0fbc858045e56c71d5f9e591a01c270af62cdadde2dc398b2e65536a6e9272"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_assay_csi500.json",
+      "artifact_sha256": "4aa336210eb5666d4883da9eacb97d6c01f6e58da0cceca233afe82f1075d644",
+      "backend": "assay",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "6cc57f5e41c52b2aeb81bc04c4ba14df340329e58a330adc1d680b160f7070e3"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_assay_csi1000.json",
+      "artifact_sha256": "94786b04e8425c3c4f03adb9bcdbe6988e674a293a02d25765cf3fbace909c35",
+      "backend": "assay",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "3341d6524636485dee512828c4e0ebb705510647708bd16215d2048f7e30be3a"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_assay_sp500.json",
+      "artifact_sha256": "ed632b6882309f1d40df4943168896337abe2d436c7a1e377e0d35fb2d07c613",
+      "backend": "assay",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "dfedf5ef9cca3a90021a1a26d1ba814b84b280c39bdebc6fd8afd422fef1f93f"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/searcher_ea_assay_nasdaq100.json",
+      "artifact_sha256": "5afc8c1c2422eef89e3237ac4179ced8c2e1f180d159e3fc7485b57aefae0cb8",
+      "backend": "assay",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "45041cdd1f200ec8b7d6800f45cb617a09776392c0d7eb000c52649a3d4145a8"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_assay_csi300.json",
+      "artifact_sha256": "c44fc762fcd75975e1504b736c94fed706019e9f1c0f5243c63cbf81e29c4533",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "e1ad4e7ef37b5b63058ba62f16ea8877167e35e081a924d7f60851f04c9e9d0c"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_assay_csi500.json",
+      "artifact_sha256": "db6ec59ecf58437ab853f00fc988c52bdd5d49f0add06712980c2471e8ed9890",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "d6b5ce1fea04cca161985a8c82b99fa826deafc0218b5af0e9ef9dc3c114be1a"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_assay_csi1000.json",
+      "artifact_sha256": "dfa8b9841526e1827d1fd5124aa7b80d5ba15a81016cf93222c17963de078f95",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "5076be374fdfb9afa7e2bb5b1f6107e57da8e395b85826dee8e85d6f64bab18a"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_assay_sp500.json",
+      "artifact_sha256": "578fda15fa6c583f571b81912eee546cdd065aec2d786b0a2879f509a29498ac",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "dd6d95f64719f125889acb3df1da40fd06adba15c15446197eafcbc286366e67"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_cot_assay_nasdaq100.json",
+      "artifact_sha256": "0bb9a2a05260a74033ee8b22c7a20c1b74ba5dbc77d9aad189c4664a7200392a",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "8b245eb1262934c9e4d372d302f32dfbdb6d262d2b9a2baa36981f32b1fcc2f1"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_assay_csi300.json",
+      "artifact_sha256": "499f3eade5220cde645ea789d777bbbab29a381c6d99d9cb84011ea26ca91ae2",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "fa86660dfe1397b294d8d8b04c8a91cb90a210c7dee8afe80b89e75046d81631"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_assay_csi500.json",
+      "artifact_sha256": "0d09d490b75c6e6995c6e3fdf2afda901258a3fcdd2fdb65472255f288f30b8d",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "1d1760e12e999aa8bd0591bcada965a75310987c0b29ca620f952776e7a8b09b"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_assay_csi1000.json",
+      "artifact_sha256": "5965108945ef087b6ef8772ceb4b2f7b714b03d11d38096cc8c3716d07451402",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "5ec5b14d1fce651fe2cd57c21a87379e6984e662f3d6939f1838914826647a75"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_assay_sp500.json",
+      "artifact_sha256": "b7a6ab62ddf1074a329baa3e6c2517a8fc62517cbe6879660b4f12766d74587e",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "75ba144d6f4c62e7c5c5c38030e75ff36bd177201c713bacbb88a79f186d3342"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_tot_assay_nasdaq100.json",
+      "artifact_sha256": "48a5ecb2963b54f75d6c013b837c058f099f36b3498ca772a01c62a76b3cb2ba",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "7db75b5f9fc0983f0d2feb75935a6edc2d55b63ae015bf7b7356af9504b85af7"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_assay_csi300.json",
+      "artifact_sha256": "8b1c712ff274197d66601947bab97aebf4b7171f72d6098e720ba15184b661ed",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "4ea58c0db79ec8da5158b5f5a8f52a6a34d234b6fbde8e07d16d30c666313112"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_assay_csi500.json",
+      "artifact_sha256": "a403b04626b3601cca6cdd58ff5e46efdfb1e32f844432e05598fc2773ab503f",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "9bb5a4d3eec592de257fec13620156697e6f74ebe005faa4ce38cc8c6a34ca7d"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_assay_csi1000.json",
+      "artifact_sha256": "e6ba90d69cea1ca1d6e22906c142ccc195c97ed3606fd55f221401dced7b3f7b",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "ffcd0eecf7f17d12319cfc6a61ce978a9d33168b56b114f448d76b3e1c9c9bbb"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_assay_sp500.json",
+      "artifact_sha256": "a423535f9d5aab830a57e9015ed044b9d42e84ddf1e9a27a5ccc2f5a8ba01788",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "f8d887536bb2b5cbbdd3ba627f27dafeaad51c6a5a58916f07e1bc6c131778d2"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/f3d7a382cab0/benchmark_ea_assay_nasdaq100.json",
+      "artifact_sha256": "c5567201f5c17e9157f235cf89ea0893ea24164f238707d31863c0d4b467ae3f",
+      "backend": "assay",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "nasdaq100",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "0078621b86b7bedda228a6b14a498b35a3004b46ee159e0eff796873571f82cc"
     }
-  ],
-  "source_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
-  "workflow_evidence": "tasks/alphabench/resources/evidence/native_searcher_workflow.json"
+  ]
 }

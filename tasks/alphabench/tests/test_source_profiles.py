@@ -1,3 +1,4 @@
+import ast
 import copy
 import json
 import shutil
@@ -11,11 +12,32 @@ from tasks.alphabench.core.native_benchmark import ENTRY, load_benchmark
 from tasks.alphabench.core.native_runtime import NativeStop
 from tasks.alphabench.core.native_source import load_algorithms
 from tasks.alphabench.core.protocol import T3Protocol, digest
-from tasks.alphabench.core.source_profiles import main, resolve_source
+from tasks.alphabench.core.source_profiles import definition, main, resolve_source
 from tasks.alphabench.tests.test_native import callbacks, metrics, scheduler, source
 
 
 EXAMPLE = "example/search/configs/search_csi300.yaml"
+
+
+def test_assay_resolution_matches_original_bridge_payload_and_preserves_its_limits(source):
+    resolved = resolve_source(source, "searcher/configs/cot_config.yaml", "cot", backend="assay", market="nasdaq100")
+    effective = resolved["effective_source"]
+    assert effective["search"]["label"] == "open_return" and effective["search"]["worker_timeout"] is None
+    assert effective["test"]["factor_select_n"] == 50 and effective["test"]["stock_topk"] is None
+    assert effective["factor_backend"]["adjustment"] == "split" and not effective["factor_backend"]["portfolio"]
+    assert effective["factor_backend"]["ignored_ffo_arguments"] == ["label", "use_cache", "timeout", "topk", "n_drop", "fast", "n_jobs_backtest", "exchange_kwargs"]
+    calls = []
+    report = {"ic": .1, "failure_mode": None}
+    scope = {"_assay_execution": lambda: None, "_assay_adj": lambda: None,
+             "_request": lambda *args: (calls.append(args) or (200, report))}
+    original = definition((source / "ffo/utils/assay_engine.py").read_text(), "_evaluate_report")
+    module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), original], type_ignores=[])
+    exec(compile(ast.fix_missing_locations(module), "pinned_assay_bridge", "exec"), scope)
+    assert scope["_evaluate_report"]("ts_mean(close,5)", "NASDAQ100", "2016-01-01", "2021-01-01", 1, 180) == (True, report)
+    assert calls == [("/v1/factor/evaluate", {"expr": "ts_mean(close,5)", "universe": "NASDAQ100",
+        "period": ["2016-01-01", "2021-01-01"], "horizons": [1]}, 180)]
+    report.update(failure_mode="CONSTANT")
+    assert scope["_evaluate_report"]("close-close", "NASDAQ100", "2016-01-01", "2021-01-01", 1, 180)[0] is False
 
 
 @pytest.mark.parametrize("config,method,rounds,temperature,workers,N,seeds", [

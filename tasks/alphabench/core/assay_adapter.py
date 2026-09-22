@@ -1,6 +1,5 @@
 """Offline Assay execution with historical cross-sections and explicit assets."""
 
-from dataclasses import fields
 import datetime as dt
 import json
 from pathlib import Path
@@ -23,6 +22,7 @@ from assay.portfolio.config import PortfolioBacktestConfig
 from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from .data import sha256
+from .assay_contract import portfolio_config
 from .grammar import parse_expression
 from .protocol import T3Protocol, digest
 
@@ -103,19 +103,27 @@ def prepare_panel(request, protocol, config):
     start, end = dt.date.fromisoformat(request["start"]), dt.date.fromisoformat(request["end"])
     if calendar[0] > start or calendar[-1] < end:
         raise EvaluationPaused("calendar does not bracket the complete requested interval", status="paused_data_coverage")
-    days = [day for day in calendar if (day <= end if protocol.end_inclusive else day < end)]
+    source = protocol.profile != "ldm_matched_v1"
+    days = [day for day in calendar if (start <= day <= end if source else day < end)]
     if not days or not any(day >= start for day in days):
         raise ValueError("no trading sessions in the requested interval")
     members = assets["membership"]
     unique(members, ["date", "symbol"], "membership")
     known_by(members, "date", "membership")
-    members = members.filter(pl.col("date").is_in(days))
+    if source:
+        members = members.filter(pl.col("date") <= end)
+        members = members.filter(pl.col("date") == members["date"].max())
+    else:
+        members = members.filter(pl.col("date").is_in(days))
     symbols = sorted(members["symbol"].unique().to_list())
     if not symbols:
         raise ValueError("empty historical universe")
     grid = pl.DataFrame({"date": days}).join(pl.DataFrame({"symbol": symbols}), how="cross")
-    membership = grid.join(members.select("date", "symbol").with_columns(pl.lit(True).alias("member")),
-                           on=["date", "symbol"], how="left")["member"].fill_null(False).to_numpy().reshape(len(days), -1)
+    if source:
+        membership = np.ones((len(days), len(symbols)), dtype=bool)
+    else:
+        membership = grid.join(members.select("date", "symbol").with_columns(pl.lit(True).alias("member")),
+            on=["date", "symbol"], how="left")["member"].fill_null(False).to_numpy().reshape(len(days), -1)
     if not membership.sum(axis=1).all():
         raise ValueError("historical universe is empty on a calendar session")
     prices = assets["prices"]
@@ -129,7 +137,7 @@ def prepare_panel(request, protocol, config):
     unique(events, ["event_id"], "corporate actions")
     events = events.filter((pl.col("ex_date") <= days[-1]) & pl.col("symbol").is_in(symbols))
     known_by(events, "ex_date", "corporate action")
-    basis = "total" if protocol.market.startswith("csi") else "split"
+    basis = "total" if not source and protocol.market.startswith("csi") else "split"
     if manifest["adjustment"] != basis:
         raise ValueError("Assay adjustment differs from the fixed market basis")
     adjusted = forward_adjust(prices, events, mode=basis)
@@ -142,8 +150,12 @@ def prepare_panel(request, protocol, config):
     unique(groups, ["effective_date", "symbol"], "groups")
     group_keys = set(groups.columns) - {"effective_date", "as_of_date", "symbol"}
     known_by(groups, "effective_date", "group label")
-    labels = grid.sort("date").join_asof(groups.sort("effective_date"), left_on="date", right_on="effective_date",
-                                         by="symbol", strategy="backward", check_sortedness=False).sort("date", "symbol")
+    if source:
+        labels = grid.join(groups.filter(pl.col("effective_date") <= end).sort("effective_date").unique(
+            subset="symbol", keep="last").select("symbol", *sorted(group_keys)), on="symbol", how="left")
+    else:
+        labels = grid.sort("date").join_asof(groups.sort("effective_date"), left_on="date", right_on="effective_date",
+            by="symbol", strategy="backward", check_sortedness=False).sort("date", "symbol")
     daily_groups = {key: labels[key].to_numpy().reshape(len(days), -1) for key in group_keys}
     engine = HistoricalFactorEngine(panel, membership, daily_groups)
     execution = assets["execution"]
@@ -199,27 +211,11 @@ class PreparedPortfolioBacktester(PortfolioBacktester):
         return tuple(outputs)
 
 
-def portfolio_result(protocol, engine, factor, indices, execution, tradable, benchmark, expressions):
-    settings = protocol.assay_portfolio
-    if set(settings) != {item.name for item in fields(PortfolioBacktestConfig)}:
-        raise ValueError("freeze the full independent PortfolioBacktestConfig in assay_portfolio")
-    settings = dict(settings)
-    settings.update(period_start=str(engine.dates[indices[0]])[:10], period_end=str(engine.dates[indices[-1]])[:10],
-                    as_of_date=str(engine.dates[indices[-1]])[:10])
-    config = PortfolioBacktestConfig(**settings)
-    market = "A" if protocol.market.startswith("csi") else "US"
-    if config.market != market or config.universe != protocol.market.upper():
-        raise ValueError("Assay portfolio market/universe differs from factor evaluation")
-    if config.benchmark != "custom" or not config.benchmark_symbol:
-        raise ValueError("Assay portfolio requires an actual custom index benchmark")
-    if config.execution_price not in {"next_open", "next_close"}:
-        raise ValueError("only actual open/close execution is supported by the pinned portfolio engine")
-    if config.warmup_days or not config.save_trade_log or not config.save_position_log or config.output_frequency != "daily":
-        raise ValueError("portfolio must retain all daily NAV, trades and positions after factor warmup")
-    if config.sector_neutral or config.include_bid_ask or config.northbound_flow_filter or config.sz_sh_connect_only or config.inclusion_anticipation:
-        raise ValueError("portfolio requests controls without an implemented data input")
-    if config.slippage_model != "zero" or config.new_listing_lockout_days or config.ipo_lockout_days or config.rebalance_around_index or config.st_filter:
-        raise ValueError("portfolio requests impact or filters without an implemented data input")
+def portfolio_result(protocol, engine, factor, indices, execution, tradable, benchmark, expressions, requested_start, requested_end):
+    config = portfolio_config(protocol, PortfolioBacktestConfig)
+    config.period_start = requested_start if protocol.end_inclusive else str(engine.dates[indices[0]])[:10]
+    config.period_end = requested_end if protocol.end_inclusive else str(engine.dates[indices[-1]])[:10]
+    config.as_of_date = config.period_end
     backtester = PreparedPortfolioBacktester(engine, factor * protocol.direction, indices, execution)
     signal_contract = {"expressions": expressions, "direction": protocol.direction,
                        "combination": "single" if len(expressions) == 1 else "daily_zscore_equal_weight_mean_finite"}
@@ -252,9 +248,23 @@ def assay_evaluate(request, config):
     engine, days, tradable, execution, benchmark, manifest = prepare_panel(request, protocol, config)
     start = dt.date.fromisoformat(request["start"])
     indices = np.array([i for i, day in enumerate(days) if day >= start])
-    if indices[0] < max(lookback(parse(value)) for value in canonical):
+    source = protocol.profile != "ldm_matched_v1"
+    if not source and indices[0] < max(lookback(parse(value)) for value in canonical):
         raise ValueError("calendar lacks the required expression warmup")
-    arrays = [np.where(engine.membership, engine.evaluate(value).values, np.nan) for value in canonical]
+    diagnostics, arrays = [], []
+    for value in canonical:
+        if source and request["operation"] != "check":
+            checked = engine.diagnose(value)
+            diagnostics.append(checked.to_dict())
+            if not checked.ok or checked.failure_mode:
+                messages = [row["message"] for row in diagnostics[-1]["errors"] + diagnostics[-1]["warnings"]]
+                return {"success": False, "diagnostics": diagnostics,
+                    "error": "; ".join(messages) or checked.failure_mode,
+                    "metrics": {}, "daily": [], "scores": [], "portfolio": None}
+            result = checked.result
+        else:
+            result = engine.evaluate(value)
+        arrays.append(np.where(engine.membership, result.values, np.nan))
     if request["operation"] == "combine":
         arrays = [operators.get("cs_zscore").fn(value) for value in arrays]
         stacked = np.stack(arrays)
@@ -270,6 +280,8 @@ def assay_evaluate(request, config):
               "interval": {"start": request["start"], "end": request["end"], "end_inclusive": protocol.end_inclusive},
               "metrics": {}, "daily": [], "scores": [], "portfolio": None,
               "data_digest": digest(manifest), "history_origin": str(days[0]),
+              "panel_policy": "source_period_end_universe" if source else "historical_daily_universe",
+              "adjustment": manifest["adjustment"], "diagnostics": diagnostics,
               "n_dates": len(indices), "n_observations": int(active.sum()), "n_finite": int((active & finite).sum())}
     if request["operation"] == "check":
         result["check_kind"] = "dynamic"
@@ -306,5 +318,6 @@ def assay_evaluate(request, config):
     if not request["fast"]:
         if protocol.assay_portfolio.get("benchmark_symbol") != manifest["benchmark"]:
             raise ValueError("portfolio benchmark differs from the frozen data asset")
-        result["portfolio"] = portfolio_result(protocol, engine, factor, indices, execution, tradable, benchmark, canonical)
+        result["portfolio"] = portfolio_result(protocol, engine, factor, indices, execution, tradable, benchmark,
+                                                canonical, request["start"], request["end"])
     return result

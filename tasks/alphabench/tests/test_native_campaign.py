@@ -9,6 +9,7 @@ from tasks.alphabench.core import workflow
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.protocol import T3Protocol
 from tasks.alphabench.core.source_profiles import definition, resolve_source
+from tasks.alphabench.core.oracle_worker import load_source
 from tasks.alphabench.ldm_task.procedure import main
 from tasks.alphabench.tests.test_native import SOURCE, source
 
@@ -29,12 +30,19 @@ def arguments(root, contract):
     return ["--mock", "--protocol-file", str(path), "--upstream-root", str(SOURCE), "--out-dir", str(root / "run")]
 
 
-def source_protocol(method, **changes):
+def source_protocol(method, backend="qlib", **changes):
     path = "searcher/config.yaml" if method == "tot" else f"searcher/configs/{method}_config.yaml"
-    source = resolve_source(SOURCE, path, method)["effective_source"]
+    source = resolve_source(SOURCE, path, method, backend=backend)["effective_source"]
     algorithm, initial = source["algorithm"], source["initialization"]
-    base = T3Protocol(method="alphabench_" + method, profile="upstream_searcher_v1",
-        filter_profile="qlib_code_filter_v1", native_parameters={"source_config": path},
+    portfolio = {}
+    if backend == "assay":
+        config_type = load_source("test_assay_portfolio_config", SOURCE.parent / "Assay/src/assay/portfolio/config.py").PortfolioBacktestConfig
+        portfolio = config_type.preset("A", universe="CSI300", period_start="2016-01-01", period_end="2025-01-01",
+            benchmark="custom", benchmark_symbol="SH000300", slippage_model="zero", st_filter=False,
+            new_listing_lockout_days=0, ipo_lockout_days=0, rebalance_around_index=False, save_position_log=True).to_dict()
+    base = T3Protocol(method="alphabench_" + method, profile="upstream_searcher_v1", backend=backend,
+        filter_profile=backend + "_code_filter_v1", native_parameters={"source_config": path},
+        label=source["search"]["label"], assay_portfolio=portfolio,
         init_mode=initial["mode"], rounds=algorithm["rounds"], temperature=algorithm["temperature"], evaluations=1000)
     return replace(base, budgets={**base.budgets, "validation_evaluations": 1000,
         "dynamic_checks": 2000, "quality_checks": 2000, "oracle_job_slots": 12000,
@@ -42,10 +50,11 @@ def source_protocol(method, **changes):
 
 
 @pytest.mark.parametrize("method", ["cot", "tot", "ea"])
-def test_source_searcher_freezes_entry_and_tests_only_its_actual_final_pool(tmp_path, source, monkeypatch, method):
+@pytest.mark.parametrize("backend", ["qlib", "assay"])
+def test_source_searcher_freezes_entry_and_tests_only_its_actual_final_pool(tmp_path, source, monkeypatch, method, backend):
     monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
     monkeypatch.setattr(workflow, "run_campaign", lambda *_args, **_kwargs: pytest.fail("source started a search LDMEngine"))
-    args = arguments(tmp_path, source_protocol(method))
+    args = arguments(tmp_path, source_protocol(method, backend=backend))
     assert main(args) == 0
     run = tmp_path / "run"
     report = json.loads((run / "result.json").read_text())
@@ -61,6 +70,10 @@ def test_source_searcher_freezes_entry_and_tests_only_its_actual_final_pool(tmp_
     receipts += [json.loads(p.read_text()) for p in (run / "initialization/private/oracle").glob("*.json")]
     requests = [row["request"] for row in receipts]
     assert all(row["fast"] is (row["phase"] not in {"test", "analysis"}) for row in requests)
+    if backend == "assay":
+        assert all(row["protocol"]["label"] == "open_return" and row["protocol"]["assay_portfolio"] for row in requests)
+        assert all(row["response"]["check_kind"] == "lint" for row in receipts if row["request"]["operation"] == "check")
+        assert execution["config"]["source_resolution"]["effective_source"]["factor_backend"]["portfolio"] is False
     private = {row["identity"]["candidate"]: row["response"]["metrics"] for row in receipts
                if row["identity"]["phase"] == "validation"}
     from tasks.alphabench.core.candidate import FactorDomain
@@ -102,6 +115,20 @@ def test_source_settings_cannot_silently_become_a_matched_pilot(tmp_path, source
     with pytest.raises(ValueError, match="differs from the pinned source config"):
         main(args + ["--dry-run"])
     with pytest.raises(ValueError, match="differs from the pinned source config"):
+        main(args)
+    assert not (tmp_path / "run/initialization").exists()
+
+
+@pytest.mark.parametrize("change,error", [
+    ({"assay_portfolio": {}}, "full independent PortfolioBacktestConfig"),
+    ({"label": "close_return"}, "differs from the pinned source config"),
+    ({"filter_profile": "paper_filter_v1"}, "differs from the pinned source config"),
+])
+def test_assay_source_contract_is_checked_before_initialization(tmp_path, source, change, error):
+    args = arguments(tmp_path, source_protocol("cot", backend="assay", **change))
+    with pytest.raises(ValueError, match=error):
+        main(args + ["--dry-run"])
+    with pytest.raises(ValueError, match=error):
         main(args)
     assert not (tmp_path / "run/initialization").exists()
 

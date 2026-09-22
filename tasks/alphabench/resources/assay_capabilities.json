@@ -14,6 +14,9 @@
   },
   "adapter_changes": [
     "Historical union with pre-entry time-series history and per-session cross-sectional membership",
+    "Source profile uses the requested period's final historical snapshot and no pre-window feature history",
+    "Source profile uses next_open and split adjustment in both markets, including CN",
+    "Source factor evaluation honors native diagnostics and rejects any failure_mode, including CONSTANT",
     "Point-in-time daily group vectors passed to the original cross-sectional kernels",
     "Guide Tanh and Mask operators registered explicitly",
     "Actual VWAP adjusted on the same basis as OHLC",
@@ -24,12 +27,13 @@
   "verified_on": "remote server; Python 3.10; locked Assay environment; deterministic offline fixtures",
   "tests": {
     "file": "tasks/alphabench/tests/test_assay_execution.py",
-    "passed": 9,
+    "passed": 21,
     "guide_operators_executed": {"qlib": 48, "assay": 36},
-    "numerical_cases": ["pre-entry rolling mean", "daily group changes", "single-horizon open-return IC", "split-adjusted VWAP", "Tanh", "Mask", "actual benchmark NAV"],
-    "operational_cases": ["independent CN/US portfolio", "combination", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
+    "numerical_cases": ["pre-entry rolling mean", "daily group changes", "single-horizon open-return IC", "actual AssayService daily/aggregate IC for CN and US", "AssayService group-data IC", "source period-end universe on a non-trading date", "split-adjusted VWAP", "Tanh", "Mask", "actual benchmark NAV"],
+    "operational_cases": ["independent CN/US portfolio", "source CN/US portfolio", "combination", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
   },
   "remaining": [
+    "The frozen plan requires Host to invoke POST /v1/portfolio/backtest; the worker currently invokes the official Python PortfolioBacktester directly",
     "Qualified real data and complete offline preparation for each market",
     "Full operator numerical qualification beyond execution coverage",
     "Historical CN costs and trading-rule qualification",

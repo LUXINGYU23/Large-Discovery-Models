@@ -8,7 +8,7 @@
 
 `llm` 与 `ldm` 的共享 Campaign 生命周期已接线：独立初始化、完整表达式准入、最多五次修复、真实请求预算/receipt、search→private validation、固定选择→逐因子 full test、独立组合、质量审计及 accepted-action 训练数据导出。Qlib worker 复用固定 FFO 指标和 TopkDropout 回测。[Assay worker](ASSAY.md) 使用固定官方算子和独立回测器，补齐历史成分、逐日分类、实际基准及离线资产校验。
 
-原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib searcher source 配置使用实际原生最终池，matched 使用完整已测池；两者分别保留原生轮数和匹配预算的停止语义。当前 synthetic 检查不代表真实市场资格。Assay 真实数据和 source 合同、持久 Harness、compiled policy、example 完整流程与资格矩阵仍未关闭。数据缺口及未完成能力使 `complete_t3=false`。
+原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 配置使用实际原生最终池，matched 使用完整已测池；两者分别保留原生轮数和匹配预算的停止语义。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。当前 synthetic 检查不代表真实市场资格。真实数据、持久 Harness、compiled policy、example 完整流程与资格矩阵仍未关闭。数据缺口及未完成能力使 `complete_t3=false`。
 
 ## 服务器验证
 
