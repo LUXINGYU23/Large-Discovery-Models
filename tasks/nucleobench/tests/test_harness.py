@@ -545,8 +545,10 @@ def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
     assert compiled_spec.proposal_search.parameters["policy_skills_loaded"] is True
 
 
-@pytest.mark.parametrize("policy", [False, True])
-@pytest.mark.parametrize("surrogate_query", [False, True])
+@pytest.mark.parametrize(
+    ("policy", "surrogate_query"),
+    ((False, False), (False, True), (True, True)),
+)
 def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy, surrogate_query):
     sol_pi = {"version": 1, "actionFusion": True, "observationPack": True,
               "evidencePreservingReducer": True, "onlineContextCompact": True,

@@ -9,6 +9,7 @@
 - [Iron Mind](#iron-mind)
 - [SynthonBench](#synthonbench)
 - [NucleoBench](#nucleobench)
+- [Other Registered Tasks](#other-registered-tasks)
 
 ## Common Rules
 
@@ -59,6 +60,18 @@ Resolve the direct proposal wire API from the task config: Iron Mind and
 SynthonBench use Chat Completions; NucleoBench also supports Responses.
 The Pi sidecar uses Responses and must be checked through its documented
 capability smoke.
+
+## Other Registered Tasks
+
+The following adapters use the same registration and shared-runner contracts,
+but their task-local guides are the authoritative source for setup and runtime
+requirements:
+
+- [Adaptive KV-cache quantization](../../../tasks/llm_kv_adaptive_quantization/README.md)
+- [AI4Bio mutation-effect prediction](../../../tasks/ai4bio_mutation_effect_prediction/README.md)
+- [Discrete causal discovery](../../../tasks/causal_discovery_discrete/README.md)
+- [AtomWorld](../../../tasks/atomworld/README.md)
+- [ReaSyn](../../../tasks/reasyn/README.md)
 
 ## nanoGPT
 

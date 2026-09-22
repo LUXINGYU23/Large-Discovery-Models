@@ -54,6 +54,7 @@ in evidence rather than model confidence alone.
 - [Dependency Checks](#dependency-checks)
 - [Config-Driven Runs](#config-driven-runs)
 - [LDM Algorithm Abstraction](#ldm-algorithm-abstraction)
+- [Agentic Research Harness](#agentic-research-harness)
 - [Codebase Architecture](#codebase-architecture)
 - [Outputs And Logs](#outputs-and-logs)
 - [Data Collection And Augmentation](#data-collection-and-augmentation)
@@ -73,10 +74,12 @@ in evidence rather than model confidence alone.
 | `iron_mind` | Source-pinned reaction conditions for the official Iron Mind benchmark datasets. | [Clean-room quick start](tasks/iron_mind/QUICKSTART.md) | [Task guide](tasks/iron_mind/README.md) |
 | `synthonbench` | Official reaction and ordered-synthon tuples, with direct and persistent research-Harness proposal backends. | [Clean-room quick start](tasks/synthonbench/QUICKSTART.md) | [Task guide](tasks/synthonbench/README.md) |
 | `nucleobench` | Source-pinned regulatory nucleotide sequence design with direct, persistent-Harness, and compiled-policy LDM methods. | [Clean-room quick start](tasks/nucleobench/QUICKSTART.md) | [Task guide](tasks/nucleobench/README.md) |
+| `atomworld` | Source-pinned target-blind crystal manipulation with the official AtomWorld evaluator. | [Clean-room quick start](tasks/atomworld/QUICKSTART.md) | [Task guide](tasks/atomworld/README.md) |
+| `reasyn` | Source-pinned molecular reconstruction and TDC goal-directed optimization through ReaSyn. | [Clean-room quick start](tasks/reasyn/QUICKSTART.md) | [Task guide](tasks/reasyn/README.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The nine built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The eleven built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
@@ -84,7 +87,7 @@ scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
 predictor and five-network discrete causal-discovery evaluations. Run the
 documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all nine
+Task registration and conventional layout validation pass for all eleven
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
 not benchmark-qualified implementations. The AI4Bio mutation-effect and
@@ -96,7 +99,9 @@ official one-iteration campaign and separately labeled 3- and 20-iteration
 extended-budget runs. Discrete causal discovery includes a separately labeled
 20-iteration extended-budget run with 100 official network jobs. Qualification
 is task-specific; evidence from either qualified task does not qualify the
-other adapters.
+other adapters. AtomWorld and ReaSyn are registered draft adapters; their
+task guides identify the external assets and live-validation gates still needed
+before benchmark claims.
 
 Task authors can add a manifest-registered adapter without editing the shared
 runner. See [Registering LDM Tasks](tasks/README.md) or use the repository-local
@@ -104,6 +109,16 @@ agent workflows cataloged under [`skills/`](skills/README.md):
 
 - `register-ldm-task` scaffolds and implements a new task.
 - `run-ldm-task` validates and progressively executes an existing task.
+
+## Agentic Research Harness
+
+Tasks may replace direct proposal calls with persistent research sessions while
+keeping candidate validation, surrogate modeling, acquisition, and evaluation
+inside their task-local adapter. The optional Pi sidecar integrates isolated
+tools, web/MCP access, raw provider traces, and compiled-policy sessions.
+Optional Pi extensions, including SoL-Pi, are disabled unless a task explicitly
+passes their configuration. See the [Research Harness guide](docs/research-harness.md)
+and [Pi sidecar guide](harnesses/pi/README.md).
 
 ## The Research Loop
 

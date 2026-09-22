@@ -131,11 +131,11 @@ To enable SoL-Pi in both proposal and compiled-policy sessions, set
 `args.harness-sol-pi-config=/absolute/path/to/sol-pi.json`. Omit it to retain
 ordinary Pi behavior. The [sidecar guide](../../harnesses/pi/README.md#sol-pi)
 describes its four mechanisms, guest integration, and version recording.
-`args.llm-extra-body-json` also supplies provider options to all Harness model
-calls, including compaction and reduction. For DeepSeek Responses with thinking
-enabled at maximum effort, use `{"reasoning":{"effort":"max"},"tool_choice":"auto"}`
-together with `args.harness-thinking=max`. DeepSeek thinking mode requires automatic
-tool choice; complete structured submissions remain enforced by the task validator.
+`args.llm-extra-body-json` supplies provider-specific options to every Harness
+model call, including compaction and reduction. Configure reasoning and tool
+choice according to the selected provider; if it requires automatic tool
+selection, set `tool_choice` to `auto`. The task validator still enforces
+complete structured submissions independently.
 
 ## 5. Run the Qualified Tiny Campaign
 

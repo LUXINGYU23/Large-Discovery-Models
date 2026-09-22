@@ -10,9 +10,9 @@ submission. It is available through three search methods:
 | `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
-Iron Mind, SynthonBench, and NucleoBench are the reference integrations. The shared Harness
-does not know their candidate identity, legal search space, duplicate policy,
-surrogate, or evaluator.
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
+task-local integrations. The shared Harness does not know their candidate
+identity, legal search space, duplicate policy, surrogate, or evaluator.
 
 ## Architecture
 
@@ -81,6 +81,17 @@ The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
 session lifecycle, automatic context compaction, isolated file and shell tools,
 web and Context7 extensions, MCP clients, terminal submission, and redacted
 provider capture.
+
+### Optional Pi Extensions
+
+Pi extensions are opt-in runtime features: omitting their configuration keeps
+the ordinary sidecar and tool set unchanged. `PiHarnessConfig.sol_pi` carries
+the optional SoL-Pi configuration; a task may expose an explicit config path
+when it needs that extension. Extension integration remains in the sidecar,
+not in task resources or task validation. It may add session tools and context
+management, but it cannot alter candidate admission, measured history, the
+surrogate, acquisition, or evaluation. See the [Pi sidecar guide](../harnesses/pi/README.md#sol-pi)
+for the supported configuration and trace records.
 
 ## MCP Tools
 

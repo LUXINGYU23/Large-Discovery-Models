@@ -78,6 +78,8 @@ of each method's configuration. Scientific profiles remain in the task's
 | `synthonbench.yaml` | `synthonbench/pilot_evaluation_base.yaml` | 6 |
 | `synthonbench_extended.yaml` | `synthonbench/pilot_evaluation_extended.yaml` | 12 |
 | `nucleobench.yaml` | `nucleobench/malinois_k562_pilot_base.yaml` | 12 |
+| `atomworld.yaml` | `atomworld/ldm_harness_compiled.yaml` | 3 |
+| `reasyn.yaml` | `reasyn/pilot_evaluation_base.yaml` | 5 |
 
 Matrix paths are relative to `config/pilot_evaluation/`; task base paths are
 relative to `config/`. Round one is shared initialization. Mock, qualification,
@@ -164,11 +166,14 @@ produce scores and trajectories, but omit those verdicts.
 4. Add config and execution coverage, run `--dry-run`, and verify a task-local
    mock campaign for every registered method before real endpoint evaluation.
 
-Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
+reference matrices:
 
 - `config/pilot_evaluation/iron_mind.yaml`
 - `config/pilot_evaluation/synthonbench.yaml`
 - `config/pilot_evaluation/nucleobench.yaml`
+- `config/pilot_evaluation/atomworld.yaml`
+- `config/pilot_evaluation/reasyn.yaml`
 
 ## Final-submission and replenished-sampling protocols
 
