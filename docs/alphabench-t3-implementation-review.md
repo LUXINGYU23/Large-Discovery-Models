@@ -517,3 +517,51 @@ These runs use synthetic model/oracle responses. Native source-profile resolutio
 market/data qualification, persistent Harness, compiled policy and the remaining
 full-T3 gates are still pending. Neither W10 nor the requested two-round real
 DeepSeek acceptance is marked complete by these results.
+
+## Change 15: source entry resolution and repaired example execution
+
+Cross-check against W01/W10 found material differences beyond the documented
+constructor mismatch. The example evaluates all 42 Alpha158 factors before
+selecting 13 kbar/price seeds for CoT/ToT or 29 rolling seeds for EA. Its four
+workers limit concurrency; they do not select four top-IC seeds as the searcher
+adapters do. Its convenience client also defaults to inclusive 2023-2024 full
+backtests, while only baseline evaluation receives the requested market. The
+entry itself supplies no private validation or held-out test stage. These facts
+are now explicit; missing stages are not populated from another entry's defaults.
+
+The source resolver verifies fixed inputs and records declared/effective values,
+parameter origins and adapter deltas separately. Algorithm defaults, physical
+client defaults and final-test parser defaults come from the pinned source AST.
+The user-selected DeepSeek model and ignored temperature behavior remain explicit
+departures from source model settings. Seven source entry/method combinations
+have been resolved for both CSI300 and SP500, with complete server artifacts and
+a committed evidence index. Resolutions remain non-executable until their full
+oracle, filtering, final-pool and budget contracts are wired.
+
+The example loader executes the original benchmark_main/run_batch and original
+three algorithms. Repairs change obsolete callable names, remove unsupported
+verbose arguments and inject the required single/list/name-indexed oracle shapes.
+One explicit initialization seam accounts for the full baseline independently
+of search. Original grouping, seed order, worker cap and native search decisions
+remain in the original code. Control signals pass through the original worker
+exception handlers; a budget stop cannot become an ordinary failed seed result.
+Returned local summaries retain actual chains/trees/pools and worker errors.
+The entry freezes its complete input configuration before baseline dispatch;
+changed model parameters are rejected even during replay of completed callbacks.
+
+Complexity review: reused the existing source verifier and recorded scheduler;
+no replacement benchmark loop, provider, evaluator, persistence store or package
+was introduced. Alpha158 module loading now has one implementation used by the
+existing initializer and the example entry. Removed the unused process-executor
+path from the extracted entry, whose actual caller always requests threads.
+Source outputs stay separate from executable task protocols rather than adding
+an implicit compatibility conversion or inventing validation/test defaults.
+
+Remote validation: 229 task tests passed, with one backend-environment module
+skipped. Fourteen new checks cover all seven parameter/seed resolutions, immutable
+output and source tampering, the actual three example methods with all group
+seeds, exact replay without new callbacks, and budget control through workers.
+Initial replay assertions were corrected to exclude the shared runtime's explicit
+campaign-resume event; the native journal itself remains byte-identical on replay.
+All validation uses synthetic oracle responses. Source profiles, W10 as a whole
+and full T3 are not claimed complete by this component.

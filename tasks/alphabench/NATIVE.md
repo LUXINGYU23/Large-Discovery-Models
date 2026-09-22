@@ -134,3 +134,41 @@ CoT/ToT 的种子查询有明确的 seed 角色。在 matched 协议中，它们
 算法。此组检查选择没有未知在途请求的提交边界；恢复使用真实的共享 ledger
 和 receipt，所有物理调用计数保持一次。未知结果的暂停由独立 receipt/Host
 测试检查，不能把这组恢复结果解释为外部服务的物理 exactly-once 保证。
+
+## source 入口解析与 example 接线
+
+`core/source_profiles.py` 分别解析固定 `searcher/config.yaml`、三个
+`searcher/configs/*_config.yaml` 和 `example/search/configs/search_csi300.yaml`。
+它校验配置、入口、客户端、算法及种子资源哈希，输出原声明、实际生效值、
+参数来源、用户模型覆盖和必要修复差异。此文件是来源解析结果，尚不能作为
+`--protocol-file`；完整 source workflow 的区间、过滤、终局和预算接线仍被 gate 阻止。
+
+在服务器生成可重复的来源报告，不调用模型或 oracle：
+
+```bash
+tasks/alphabench/.venv/bin/python -m tasks.alphabench.core.source_profiles \
+  --upstream-root /mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench \
+  --config example/search/configs/search_csi300.yaml --method tot --market sp500 \
+  --output /mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_sp500.json
+```
+
+同一输出路径拒绝不同内容覆盖。已在服务器解析七个入口/方法组合在 CSI300、
+SP500 上的 14 份报告，索引见 `resources/evidence/source_profiles.json`。
+
+两套入口有不能合并的行为：
+
+- searcher CoT/ToT 按 IC 排序后只选择前 `workers` 个种子；专用配置为 4，
+  默认 `searcher/config.yaml` 为 1。其 search/validation/test 源请求为包含端点的
+  2016–2021、2021–2022、2022–2025，search 默认 `fast=True`。
+- example 先评价全部 42 条 Alpha158，再将 kbar+price 的 13 条分别交给
+  CoT/ToT、rolling 的 29 条交给 EA。4 是外层并发上限，全部组内种子都会运行。
+  源客户端的实际默认请求是 2023–2024、`fast=False`；原入口没有 validation/test
+  阶段。SP500 只传给了 baseline，其余便捷回调仍默认 CSI300。这些源事实不能
+  用 searcher 或 matched 的默认值覆盖后声称原样复现。
+
+`core/native_benchmark.py` 执行提取的原 `benchmark_main/run_batch`，修复过期构造
+参数及已删除的 `verbose` 参数，给 ToT 注入它实际需要的按名称索引结果。
+baseline 与搜索分别绑定现有回调；入口不导入 FFO/Qlib 或模型 SDK。返回原有
+局部结果用于报告，不复制搜索循环。参数、源文件和补丁摘要与调度日志共同保存。
+真实三算法已通过全组种子、并发、预算停止和完整重放测试；当前仍为 synthetic
+oracle 验证，尚未登记 source profile 或真实市场资格。

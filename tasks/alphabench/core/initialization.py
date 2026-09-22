@@ -35,12 +35,17 @@ def parse_seeds(text, suffix, *, pool=False):
     return result
 
 
-def alpha158_seeds(upstream_root, groups=("kbar", "rolling")):
+def alpha158_library(upstream_root):
     path = Path(upstream_root) / "factors/lib/alpha158/__init__.py"
     spec = importlib.util.spec_from_file_location("alphabench_alpha158", path)
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     module.FACTOR_DIR = str(path.parent)
     module.COMPILE_FILE = str(path.parent / "qlib_compile_product.json")
+    return module
+
+
+def alpha158_seeds(upstream_root, groups=("kbar", "rolling")):
+    module = alpha158_library(upstream_root)
     _, compiled = module.load_factors_alpha158(exclude_var="vwap", collection=list(groups))
     return [{"name": name, "expression": item["qlib_expression_default"]} for name, item in compiled.items()]
 

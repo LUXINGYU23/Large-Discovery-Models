@@ -1,0 +1,139 @@
+{
+  "execution_ready": false,
+  "limitations": [
+    "No model or market evaluation was performed.",
+    "Source oracle intervals, filters, native final pool, full budgets and data identities remain gated.",
+    "The example entry contains neither private validation nor a held-out test stage."
+  ],
+  "qualification": "source_resolution_only",
+  "resolver_sha256": "9ee350933fda8ec05c52b9d164abdd8d9c998dfab158200a7d082024e3ac9225",
+  "rows": [
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_default_tot_csi300.json",
+      "artifact_sha256": "3ff0dda9393d02a0c0b6eb67a10da2078a4f1229b1602c72fdb099beb3ffc567",
+      "config": "searcher/config.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "0372a1e13a06a02d7aa0a1f0e1ee71b124423bc040633763fd1136bf84ec7ac9"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_default_tot_sp500.json",
+      "artifact_sha256": "a6a7c52474f88bfb5be3c49b97e7caa29dae7c61f7add29e0ff1fd249519b934",
+      "config": "searcher/config.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "91a70ac5dfd8a6bad642f197bd01134c8f1ee4fe6c7cf4f0bdd32ada36cb9a6c"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_cot_csi300.json",
+      "artifact_sha256": "7e2d984b02804347f3981a62ccc0fbe1a30ce1da40beeb16d84dcd63607a87eb",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "57906a21320bf5fc5feb82a88c982c06ba55526f393b604c37ca227edc29d876"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_cot_sp500.json",
+      "artifact_sha256": "ef044fc9568245089597489719f7ba316a0942ecf7e793ee8e72d9ebeae32576",
+      "config": "searcher/configs/cot_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "45e47ea0794178ea79ae8d026607276c1ecaea570f13e72c45f9df09c71051ba"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_tot_csi300.json",
+      "artifact_sha256": "762ffe7ad0a0f9eff8988bcf5ff922c3f246b961c1e2a935555dacdbf8310f16",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "2821da53321f6f6d4d75cd4c9fb49daa7f99d88294a1aa9816d79f39bbb360b8"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_tot_sp500.json",
+      "artifact_sha256": "1ae7f92ac3d25b297b575de674d8a6af2d7585563cfcb95dc09e4a215e3876a7",
+      "config": "searcher/configs/tot_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "d7c53659a949e1c2f4596efc01b1716faea3bf452a979e34d8fd355174c80374"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_ea_csi300.json",
+      "artifact_sha256": "bd8bd4374a6eec034af36e6b828b23f17aaf03c3bf1d92a7efc0e59cd7f57879",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "8e94c72638f9ebe09d8780a247cdd91daca0a192561c821b3060be9e54295baf"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_ea_sp500.json",
+      "artifact_sha256": "97c6168406c49063a1e96346ec172c5c7b9da119ab29f74bb85ee8120625c9b5",
+      "config": "searcher/configs/ea_config.yaml",
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "profile": "upstream_searcher_v1",
+      "resolution_digest": "3c546efb50a4f935c549b1b708f5c161688e414fff272b22972c69ec983f5b62"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_cot_csi300.json",
+      "artifact_sha256": "f9d2fc4a83dd3f039ce330b55854cc9e2d6c540e5f41a498b2c439d115a2e0c8",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "84eea5894501aad3e6f2b6d73f3b7de1a9c1bd925abf488c589dcb471eacc8eb"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_cot_sp500.json",
+      "artifact_sha256": "c2a65fde41568dacc47b28e22a49069838b8e6ae7a229f62349dd3f0fa22fe26",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "a47872707cde8860d050cb095c17202ba4395d82a88709d110f3e1c1d95412fc"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_csi300.json",
+      "artifact_sha256": "2db34869bec4b91b00188cc3c45200eefbe1190c4501d85c2aec43e11ba2d23b",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "f13c700276a21db81666341bdc3ee4ac812f8d959c3296f938e2c97c14ea2ae7"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_sp500.json",
+      "artifact_sha256": "0695088e615163febf9b1c17c91229d06917d2290ee50299d68c710b688a2b37",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "f994bd928ed0afa9426c20c47c7233ec99da391aa6433e655feac7767dc521f4"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_ea_csi300.json",
+      "artifact_sha256": "1e5aacdd836c32b0d99a4355aa72c9d0333e8744ca10d0226546dcf963a0aea9",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "a9a41ecd793b595cc59ba9ab0ca04ae8c9b08cf7a77c58826a620a7408802d20"
+    },
+    {
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_ea_sp500.json",
+      "artifact_sha256": "3acd92347a84eb812a040bd59d069b6724e6ee524a37bed517bf69df2ceb7c96",
+      "config": "example/search/configs/search_csi300.yaml",
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "profile": "upstream_benchmark_v1",
+      "resolution_digest": "fcba2bbc9385932a0ff7d91260f7ad27b5793ba5e91e0736e5307fe9118b689a"
+    }
+  ],
+  "source_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e"
+}
