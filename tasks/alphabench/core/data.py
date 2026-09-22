@@ -151,7 +151,7 @@ def binary_series(path, length):
     return result
 
 
-def audit_qlib(root, market, *, source, archive_hash, suspended=None):
+def audit_qlib(root, market, *, source, archive_hash, suspended=None, suspension_sources=()):
     import numpy as np
     root = Path(root)
     calendar_path = root / "calendars/day.txt"
@@ -227,7 +227,7 @@ def audit_qlib(root, market, *, source, archive_hash, suspended=None):
              "symbols": len(symbols), "issues": issues, "gaps": gaps,
              "qualification": "blocked" if issues else "coverage_verified",
              "data_root": str(root.resolve()),
-             "suspension_source": SOURCES["cn_status"] if suspended is not None else None}
+             "suspension_sources": list(suspension_sources)}
     return audit, files
 
 
@@ -312,19 +312,29 @@ def plan_cn_status(root):
     return {"planned_pages": len(requests), "plan": str(root / "manifests/cn-status-plan.json")}
 
 
-def prepare_cn_status(root):
+def load_cn_status(root):
     source = SOURCES["cn_status"]
-    dataset = root / "qlib" / ("cn-" + SOURCES["cn"]["release"])
     plan = json.loads((root / "manifests/cn-status-plan.json").read_text(encoding="utf-8"))
+    if plan["source"] != source:
+        raise ValueError("CN status plan differs from its frozen source")
     rows, pages = [], {}
     for item in plan["requests"]:
         found, hashes = fetch_plan_page(root, plan, item, offline=True)
         rows.extend(found); pages.update(hashes)
+    return {"source": source, "pages": pages, "rows": rows}
+
+
+def prepare_cn_status(root):
+    source = SOURCES["cn_status"]
+    dataset = root / "qlib" / ("cn-" + SOURCES["cn"]["release"])
+    evidence = load_cn_status(root)
+    rows = evidence["rows"]
     suspended = {(row["symbol"], row["tradedate"]) for row in rows if str(row["tradestatus"]) == "0"}
-    atomic_json_write(root / "manifests/cn_suspensions.json", {"source": source, "pages": pages, "rows": rows})
+    atomic_json_write(root / "manifests/cn_suspensions.json", evidence)
     result = {}
     for market in BENCHMARKS:
-        audit, files = audit_qlib(dataset, market, source=SOURCES["cn"], archive_hash=SOURCES["cn"]["archive_sha256"], suspended=suspended)
+        audit, files = audit_qlib(dataset, market, source=SOURCES["cn"], archive_hash=SOURCES["cn"]["archive_sha256"],
+                                  suspended=suspended, suspension_sources=[{**source, "response_hashes_digest": digest(evidence["pages"])}])
         atomic_json_write(root / "manifests" / f"qlib_{market}.json", audit)
         atomic_json_write(root / "manifests" / f"qlib_{market}.files.json", files)
         result[market] = {"qualification": audit["qualification"], "issues": audit["issues"]}
@@ -524,7 +534,7 @@ def install_bundle(archive_path, root, expected):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("acquire-sources", "sources", "acquire-cn", "cn", "plan-cn-status", "cn-status",
-        "plan-us", "us", "acquire-plan", "membership", "pack", "install"))
+        "plan-cn-baostock", "acquire-cn-baostock", "cn-baostock", "plan-us", "us", "acquire-plan", "membership", "pack", "install"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--assay-root", type=Path)
     parser.add_argument("--market", choices=("sp500", "nasdaq100"), default="sp500")
@@ -552,6 +562,11 @@ def main(argv=None):
         result = acquire_sources(args.root)
     elif args.operation == "cn-status":
         result = prepare_cn_status(args.root)
+    elif args.operation in {"plan-cn-baostock", "acquire-cn-baostock", "cn-baostock"}:
+        from .cn_status import plan_baostock, acquire_baostock, prepare_baostock
+        operation = {"plan-cn-baostock": plan_baostock, "acquire-cn-baostock": acquire_baostock,
+                     "cn-baostock": prepare_baostock}[args.operation]
+        result = operation(args.root)
     elif args.operation == "us":
         from assay.data.calendar import trading_days
         from .us_data import audit_us

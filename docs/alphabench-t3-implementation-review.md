@@ -124,3 +124,31 @@ cost, threshold boundaries, receipt contract mismatch and incomplete audit
 coverage. The fresh mock reaches full audit coverage with zero additional
 quality calls; completed replay leaves 185 persisted files unchanged. Other
 metrics, native methods, backend and matrix qualifications remain open.
+
+## Change 5: local CN status capture and complete offline source audits
+
+Cross-check against W04 and the user's local-download constraint: the official
+AlphaBench download contains precomputed IC/RankIC tables, not the OHLCV assets
+needed to evaluate arbitrary new T3 expressions. The local US download completed
+all 3,100 pinned queries with zero failures. A verified 10,069-file bundle was
+transferred and installed without any server-side network acquisition.
+
+Added an explicit BaoStock acquisition step for the unresolved CN sessions.
+Queries are bound to a security and one calendar year, below the client's
+pagination boundary; errors never become valid cache entries. The live source
+has no snapshot API, so offline reproduction binds the saved timestamped
+responses and hashes. Only an exact tradestatus=0 corroboration removes a gap.
+Absent rows, reported trading, and membership extending past reported delisting
+stay unresolved. Audit provenance binds both source response inventories.
+
+Complexity review: this is one optional acquisition dependency group and one
+source-specific module using the existing bundle/import/audit path. No provider
+fallback, synthesized prices, automatic qualification, or generalized data
+service was added. Factored the existing Dolt response reader to share the same
+offline validation instead of trusting mutable earlier audit summaries.
+
+Remote validation: all 116 task tests pass. The actual offline US audit reads
+1,609,180 price rows and records remaining coverage and asset failures. CN gains
+774 corroborated suspension dates; remaining gaps are 107/1,028/259 security-days
+for CSI300/500/1000. Compact hashes and counts are committed, raw assets stay under
+/mnt/data1/. Data and full T3 qualification remain blocked.

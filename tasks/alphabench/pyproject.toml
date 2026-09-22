@@ -10,6 +10,7 @@ dependencies = [
 ]
 
 [dependency-groups]
+acquisition = ["baostock==0.9.4"]
 dev = [
     "pytest>=8,<9",
 ]
