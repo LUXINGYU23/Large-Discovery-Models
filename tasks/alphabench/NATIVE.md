@@ -172,3 +172,18 @@ baseline 与搜索分别绑定现有回调；入口不导入 FFO/Qlib 或模型 
 局部结果用于报告，不复制搜索循环。参数、源文件和补丁摘要与调度日志共同保存。
 真实三算法已通过全组种子、并发、预算停止和完整重放测试；当前仍为 synthetic
 oracle 验证，尚未登记 source profile 或真实市场资格。
+
+## 过滤与质量报告
+
+生成器和原生生成回调共享冻结的过滤合同。`qlib_code_filter_v1` 使用固定
+FFO 的 `_check_single_column`，保留原始 NaN 比例大于 1% 时拒绝的行为；
+Inf 与 NaN 分别记录。`assay_code_filter_v1` 调用固定 Assay 的无数据 lint，
+使用 `lint_checks` 计数，拒绝项标为 `lint_rejected`。
+`paper_filter_v1` 要求深度不超过 5、NaN/非有限值比例不超过 1%、动态检查
+耗时不超过 30 秒。code filter 接受深度 6 不代表通过 paper filter。
+
+最终质量审计覆盖所有原始 occurrence，复用相同合同的已有检查，缺失检查
+使用独立 `quality_checks` 预算。报告分别标明静态、后端检查和 paper 覆盖率；
+Assay lint 只产生 `assay_lint_success_rate`，不会伪造动态成功率或行情覆盖。
+检查响应若类型、耗时、比例或结果边界不符会暂停，已完成物理作业仍记账，
+恢复不重复派发。上述过滤实现不解除 source workflow 和真实数据资格的 gate。

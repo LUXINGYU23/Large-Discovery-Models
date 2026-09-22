@@ -13,6 +13,7 @@ from assay.engine import FactorEngine
 from assay.engine.ast import OpNode
 from assay.engine.engine import EvalContext
 from assay.engine import operators
+from assay.engine.diagnostics import lint
 from assay.engine.parsing import parse
 from assay.evaluator.forward_returns import forward_returns
 from assay.evaluator.metrics import evaluate_ic
@@ -241,6 +242,12 @@ def assay_evaluate(request, config):
     if not expressions or request["operation"] not in {"check", "evaluate", "combine"}:
         raise ValueError("a supported operation with at least one expression is required")
     canonical = [parse_expression(value, backend="assay").canonical for value in expressions]
+    if request["operation"] == "check" and protocol.check_kind == "lint":
+        diagnostics = lint(canonical[0]).to_dict()
+        return {"success": diagnostics["ok"], "check_kind": "lint", "diagnostics": diagnostics,
+                "error": "; ".join(row["message"] for row in diagnostics["errors"]) if not diagnostics["ok"] else None,
+                "nan_ratio": None, "non_finite_ratio": None,
+                "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     engine, days, tradable, execution, benchmark, manifest = prepare_panel(request, protocol, config)
     start = dt.date.fromisoformat(request["start"])
     indices = np.array([i for i, day in enumerate(days) if day >= start])
@@ -256,12 +263,14 @@ def assay_evaluate(request, config):
         factor = arrays[0]
     active = engine.membership[indices]
     finite = np.isfinite(factor[indices])
-    result = {"success": bool((active & finite).any()), "nan_ratio": float(1 - finite[active].mean()),
+    result = {"success": bool((active & finite).any()), "nan_ratio": float(np.isnan(factor[indices])[active].mean()),
+              "non_finite_ratio": float((~finite[active]).mean()),
               "actual_start": str(days[indices[0]]), "actual_end": str(days[indices[-1]]),
               "metrics": {}, "daily": [], "scores": [], "portfolio": None,
               "data_digest": digest(manifest), "history_origin": str(days[0]),
               "n_dates": len(indices), "n_observations": int(active.sum()), "n_finite": int((active & finite).sum())}
     if request["operation"] == "check":
+        result["check_kind"] = "dynamic"
         return result
     label_execution = "next_open" if protocol.label == "open_return" else "next_close"
     farthest = protocol.forward_n + (label_execution == "next_open")

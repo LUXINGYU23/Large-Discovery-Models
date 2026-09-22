@@ -63,6 +63,7 @@ class OracleService:
                     except subprocess.TimeoutExpired:
                         os.killpg(process.pid, signal.SIGKILL); process.wait()
                         return {"request_id": identity, "success": False, "error": "worker_timeout",
+                                "check_kind": protocol.check_kind if request["operation"] == "check" else None,
                                 "elapsed_seconds": protocol.worker_timeout, "metrics": {},
                                 "jobs": [{"job_id": identity + ":0", "operation": request["operation"]}]}
                 if code or not (directory / "response.json").exists():
@@ -73,7 +74,8 @@ class OracleService:
 
     def health(self):
         return {key: self.config[key] for key in ("backend", "market", "data_digest", "environment_digest")} | {
-            "capabilities": ["durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"]}
+            "capabilities": ["durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"]
+                + (["lint_check"] if self.config["backend"] == "assay" else [])}
 
 
 def main(argv=None):

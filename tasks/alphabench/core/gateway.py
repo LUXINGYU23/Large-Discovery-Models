@@ -28,7 +28,7 @@ class OracleGateway:
             raise ValueError("a controlled T3 oracle endpoint is required")
         with urllib.request.urlopen(self.endpoint + "/t3/health", timeout=10) as response:
             health = json.load(response)
-        required = {"durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"}
+        required = {"durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", self.protocol.check_kind + "_check"}
         if not required <= set(health.get("capabilities", [])):
             raise ValueError("oracle lacks full T3 capabilities")
         if any(health.get(key) != getattr(self.protocol, key) for key in ("backend", "market", "data_digest")):
@@ -54,7 +54,7 @@ class OracleGateway:
                    "expression": candidate.payload["expression"], "dialect": candidate.payload["dialect"],
                    "phase": phase, "start": start, "end": end, "fast": fast,
                    "job_permits": 8 if not fast else 2}
-        counter = {"check": "dynamic_checks", "quality": "quality_checks", "initialization": "initialization_evaluations",
+        counter = {"check": protocol.check_kind + "_checks", "quality": "quality_checks", "initialization": "initialization_evaluations",
                    "validation": "validation_evaluations", "test": "test_evaluations", "search": None}[phase]
 
         return logical, request, counter
@@ -95,6 +95,11 @@ class OracleGateway:
             raise EvaluationPaused("oracle job accounting is incomplete or exceeds permits")
         if charge_jobs:
             self.host.call(lambda: self.runtime.consume_many({"benchmark_jobs": len(jobs)}, usage_key="task:oracle-result:" + digest(logical)))
+        if request["operation"] == "check":
+            try:
+                self.protocol.check_passed(result)
+            except ValueError as exc:
+                raise EvaluationPaused(str(exc)) from exc
         return result
 
     def _reconcile(self, request):
@@ -149,11 +154,17 @@ def mock_oracle(request):
     ic = (seed % 1000 - 400) / 10000
     daily = [{"date": f"{request['start'][:4]}-01-{day:02d}", "ic": ic + (day - 8) / 1000,
               "rank_ic": ic * .9 + (day - 8) / 1100} for day in range(1, 15)]
-    return {"mock": True, "request_id": request["request_id"], "success": True,
+    result = {"mock": True, "request_id": request["request_id"], "success": True,
             "jobs": [{"job_id": request["request_id"] + ":0", "operation": request["operation"]}],
             "metrics": {"ic": ic, "rank_ic": ic * .9, "icir": ic / .01, "rank_icir": ic * 90},
-            "daily": daily, "nan_ratio": 0.0, "elapsed_seconds": 0.001,
+            "daily": daily, "nan_ratio": 0.0, "non_finite_ratio": 0.0, "elapsed_seconds": 0.001,
             "scores": [{"date": row["date"], "instrument": f"mock-{stock}", "score": (seed % 11 + stock) * (index+1)}
                        for index, row in enumerate(daily) for stock in range(3)],
             "portfolio": None if request["fast"] else {"mock": True, "daily": daily, "holdings": [], "actions": [],
                 "benchmark": {}, "pure": {}, "excess_with_cost": {}, "excess_without_cost": {}}}
+    if request["operation"] == "check":
+        kind = "lint" if request["protocol"]["filter_profile"] == "assay_code_filter_v1" else "dynamic"
+        result.update(check_kind=kind, metrics={}, daily=[], scores=[], portfolio=None)
+        if kind == "lint":
+            result.update(nan_ratio=None, non_finite_ratio=None, diagnostics={"ok": True, "status": "ok"})
+    return result

@@ -45,6 +45,7 @@
     "model_requests": 120,
     "proposal_attempts": 100,
     "dynamic_checks": 400,
+    "lint_checks": 400,
     "initialization_evaluations": 160,
     "validation_evaluations": 164,
     "test_evaluations": 50,

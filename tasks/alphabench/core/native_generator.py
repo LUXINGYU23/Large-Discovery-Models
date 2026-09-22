@@ -210,10 +210,9 @@ class NativeGenerator:
             except Exception as exc:
                 raise NativeStop(EvaluationPaused("native check response requires inspection")) from exc
             row["check_receipt"] = self.gateway.identity("check", position, candidate)
-            valid = result["success"] and (self.protocol.filter_profile != "paper_filter_v1" or
-                    result.get("nan_ratio", 1) <= .01 and result.get("elapsed_seconds", 31) <= 30)
+            valid = self.protocol.check_passed(result)
             if not valid:
-                row.update(status="dynamic_rejected", error=result.get("error", "dynamic quality threshold"))
+                row.update(status=self.protocol.check_kind + "_rejected", error=result.get("error", "factor check rejected"))
             return {**result, "success": valid}
 
         namespace = {"json": json, "time": time, "Any": typing.Any, "Dict": typing.Dict,

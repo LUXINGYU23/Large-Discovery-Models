@@ -1,11 +1,11 @@
 {
   "artifact_hashes": {
-    "budget.json": "2730b831286c66147c23aea80d1411ce242e5fb86b272d51be4a6c8d4a9ca768",
-    "checkpoint.json": "3fd3bb4c1518c83e692d2115aea78c6b810da413640976166d38fa89eb60a1b6",
-    "events.jsonl": "9116aeb8957ec7984bf9693a643344a7b471def84ba8fad10b75f9e49f00cb75",
-    "result.json": "2f8e2810da9ee86d9f4d19c526370bf51aba07a45ede0f02bfbfea9c0db84eeb",
-    "selection_frozen.json": "4ba5753243cdb6473fa74da62599a7762da53ab239b51d24592228985dabbbd5",
-    "summary.json": "2f8e2810da9ee86d9f4d19c526370bf51aba07a45ede0f02bfbfea9c0db84eeb",
+    "budget.json": "53f0403d0f4c43c7aa7adcfca328bc029fa7a2598acdce98be1587d9dc887c80",
+    "checkpoint.json": "b79009fb28a7906b324f891031af90aa411e8deeae452838a1cb3a4477334be1",
+    "events.jsonl": "27fb0dcc46f6f2ab16e4bb3b31193afe1d398ea9e676f803baf3364bd8b92d33",
+    "result.json": "4fad483b8c053ce1c7c50915a7ce827e646f8fa40d4312b909044df1a8bf2cf3",
+    "selection_frozen.json": "534365f504cf64803a52dd17121a6017825222f7f9ff0ca65569fe1e6b90695f",
+    "summary.json": "4fad483b8c053ce1c7c50915a7ce827e646f8fa40d4312b909044df1a8bf2cf3",
     "trajectory.csv": "a36b0fc43c7d2fad821a1bd0d20c3a86e49ddfe1558d24e3ca0f1f1f717a0796"
   },
   "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
@@ -18,6 +18,7 @@
       "external_evaluations": 2,
       "harness_turns": 0,
       "initialization_evaluations": 0,
+      "lint_checks": 0,
       "model_requests": 2,
       "model_tokens": 0,
       "oracle_job_slots": 288,
@@ -39,6 +40,7 @@
       "external_evaluations": 2,
       "harness_turns": 20,
       "initialization_evaluations": 160,
+      "lint_checks": 400,
       "model_requests": 120,
       "oracle_job_slots": 2000,
       "outer_iterations": 1,
@@ -54,29 +56,59 @@
   },
   "collections": [
     {
-      "generation": "1adb1ddba3c1deea8a9b41608f025854dd9e533105cdcebfb7206139e82ea9c9",
-      "ir_rows": 1,
-      "pointer": "initialization/ldm_data/alphabench/46e14fe783b16b3e3bd868a7f92a8ff214d79009a077acb4f1ee27e3c48f648b/current.json",
-      "sft_rows": 1
+      "count": 1,
+      "files": {
+        "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+        "ldm_ir.jsonl": "0d0fbc84ebbc258e1f1ae808e1497943f2fa203a5c317ed40d5bec3edb7a0fcd",
+        "ldm_sft.jsonl": "5167a27005846934795fbdde806d140f72a18edd55eef7dd394022b871650e0d"
+      },
+      "generation": "5fc81579d4b16c6c85aedcd60a215bbbbdd52518833487e75a95636c1bb07366",
+      "pointer": "initialization/ldm_data/alphabench/11f2055464eb2d4adb832a9314e5b2949715cccee4b48d55c4a0798313b42aea/current.json",
+      "rows": {
+        "ldm_ir.jsonl": 1,
+        "ldm_sft.jsonl": 1
+      }
     },
     {
-      "generation": "1bbbeb293fd71a9917905abd12ad13f538a3968a0f0246f4455c3a38be12bdac",
-      "ir_rows": 2,
-      "pointer": "ldm_data/alphabench/534e9233b4e7e323cbf76f7b6e957e872b10b98f6deed656b3db38bfa25d8b60/current.json",
-      "sft_rows": 2
+      "count": 2,
+      "files": {
+        "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+        "ldm_ir.jsonl": "d258af79748b27333fe4e5c9f6812af6f77c62baafbbd8f9195c934b6717e34e",
+        "ldm_sft.jsonl": "bd642d0d614a4ce57419b529999c3e43ae598cd6a0e7b03dd4e323a44bb8b9da"
+      },
+      "generation": "84f6612e60f79b2f84c8e80db385ebcb7217bc8ae0ef32bef944b35376d044df",
+      "pointer": "ldm_data/alphabench/47195bed5f897bff9a6ff40a8d39a2d39a7c370e1dceddc46c441bddb04e56d7/current.json",
+      "rows": {
+        "ldm_ir.jsonl": 2,
+        "ldm_sft.jsonl": 2
+      }
     }
   ],
   "complete_t3": false,
   "completed_replay": {
-    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_2\", \"status\": \"completed\", \"replayed\": true}",
-    "files": 185,
+    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_8\", \"status\": \"completed\", \"replayed\": true}",
+    "files": 187,
     "same_artifact_hashes": true
   },
-  "executed_at": "2026-09-23",
+  "executed_at": "2026-09-22T21:05:03.924950+00:00",
   "host": "designated remote server",
   "including_initialization": {
     "attempts": 32,
     "gain": 1.0,
+    "generation_cost": {
+      "attempts_per_step": [
+        1,
+        1,
+        1
+      ],
+      "failed_steps": 0,
+      "interrupted_steps": 0,
+      "mean": 1.0,
+      "step_count": 3,
+      "total_attempts": 3,
+      "unit": "model attempts per logical generation step"
+    },
+    "initialization_cost_basis": "current_run",
     "run_success": true,
     "strict_comparison": ">",
     "successful_measurements": 32,
@@ -93,6 +125,7 @@
         "external_evaluations": 30,
         "harness_turns": 0,
         "initialization_evaluations": 30,
+        "lint_checks": 0,
         "model_requests": 1,
         "model_tokens": 0,
         "oracle_job_slots": 180,
@@ -114,6 +147,7 @@
         "external_evaluations": 160,
         "harness_turns": 20,
         "initialization_evaluations": 160,
+        "lint_checks": 400,
         "model_requests": 120,
         "oracle_job_slots": 2000,
         "outer_iterations": 1,
@@ -132,6 +166,7 @@
         1
       ],
       "failed_steps": 0,
+      "interrupted_steps": 0,
       "mean": 1.0,
       "step_count": 1,
       "total_attempts": 1,
@@ -141,15 +176,19 @@
   },
   "kind": "synthetic_development_gate",
   "profile": "mock_ldm",
-  "protocol_digest": "d0a43ef060fa6e40cee227de6b054e4de408db86093ffa6adff0e5a118c5e8c1",
+  "protocol_digest": "28efbdd05a41505abed3d9158ea5b57de596c120f61b645d76cc62ce4d76a264",
   "qualification": "mock_verified",
   "quality_audit": {
     "accepted_occurrences": 8,
     "audited": 8,
+    "check_kind": "dynamic",
     "complete": true,
     "coverage": 1.0,
     "domain": "all raw occurrences from search model responses; excludes initialization",
+    "filter_profile": "paper_filter_v1",
+    "paper_coverage": 1.0,
     "paper_dynamic_success_rate": 1.0,
+    "paper_unavailable_reason": null,
     "qlib_dynamic_success_rate": 1.0,
     "raw_occurrences": 8,
     "static_success_rate": 1.0,
@@ -159,6 +198,7 @@
     "unique_valid": 8
   },
   "root": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_8",
   "search": {
     "attempts": 2,
     "gain": 0.36666666666666664,
@@ -168,6 +208,7 @@
         1
       ],
       "failed_steps": 0,
+      "interrupted_steps": 0,
       "mean": 1.0,
       "step_count": 2,
       "total_attempts": 2,

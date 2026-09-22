@@ -18,6 +18,21 @@ from tasks.alphabench.core.protocol import T3Protocol, digest
 from tasks.alphabench.core.grammar import REGISTRY
 
 
+def test_source_lint_runs_without_market_assets_and_retains_native_diagnostics():
+    from assay.engine.diagnostics import lint
+
+    protocol = T3Protocol(backend="assay", market="nasdaq100", filter_profile="assay_code_filter_v1")
+    request = {"protocol": protocol.to_dict(), "operation": "check"}
+    for expression, valid in [("ts_mean(close,5)", True), ("Mean($close,5)", True), ("close", False), ("1", False)]:
+        result = assay_evaluate(request | {"expression": expression}, {})
+        assert result["diagnostics"] == lint(expression).to_dict()
+        assert result["success"] is valid and result["check_kind"] == "lint"
+        assert result["nan_ratio"] is None and result["non_finite_ratio"] is None
+        assert result["metrics"] == {} and result["daily"] == [] and result["scores"] == [] and result["portfolio"] is None
+        assert protocol.check_passed(result | {"elapsed_seconds": .01}) is valid
+        assert protocol.check_passed(result | {"elapsed_seconds": .01}, paper=True) is None
+
+
 @pytest.fixture
 def snapshot(tmp_path):
     days = [dt.date(2020, 1, 1) + dt.timedelta(days=i) for i in range(40)]

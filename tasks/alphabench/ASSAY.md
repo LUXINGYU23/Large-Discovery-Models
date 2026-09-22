@@ -65,8 +65,14 @@ shortened to make a formula run.
 `label=open_return` means `next_open`: open[t+1+n]/open[t+1]-1. Both request
 `horizons=[forward_n]`. Purge removes the last n or n+1 signal sessions so no
 label crosses the split. The raw Assay IC report, daily IC/RankIC, finite sample
-counts and scores remain available in the private oracle response. The check
-operation evaluates only factors and exports no returns, IC or scores.
+counts and scores remain available in the private oracle response.
+
+With `paper_filter_v1`, the check operation evaluates only factors and exports
+no returns, IC or scores. With `assay_code_filter_v1`, it instead invokes the
+pinned Assay `lint` implementation without opening any market asset. Its full
+diagnostics are retained, including bare-field and constant rejection. A lint
+result has no measured NaN/non-finite ratio or paper dynamic success rate;
+it is metered as `lint_checks`, separately from `dynamic_checks`.
 
 ## Independent portfolio
 

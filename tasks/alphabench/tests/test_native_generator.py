@@ -206,6 +206,8 @@ def test_assay_native_prompt_and_separate_dialects_reach_the_same_check_gateway(
     receipts = [json.loads(path.read_text()) for path in native.gateway.receipts.root.glob("*.json")]
     assert {row["request"]["dialect"] for row in receipts} == {"qlib", "assay"}
     assert all(row["request"]["protocol"]["market"] == "nasdaq100" for row in receipts)
+    assert native.runtime.budget.counters["lint_checks"] == 2
+    assert native.runtime.budget.counters.get("dynamic_checks", 0) == 0
 
 
 @pytest.mark.parametrize("method", ["cot", "tot", "ea"])

@@ -105,6 +105,25 @@ def test_unknown_outcome_is_preserved_across_worker_handoffs(tmp_path, monkeypat
     assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "dispatch_intent"
 
 
+@pytest.mark.parametrize("changes", [
+    {"check_kind": "lint"}, {"nan_ratio": None}, {"non_finite_ratio": 1.1},
+    {"metrics": {"ic": .5}}, {"elapsed_seconds": -1},
+])
+def test_invalid_check_evidence_pauses_without_losing_or_repeating_paid_work(tmp_path, monkeypatch, changes):
+    gateway = metered_gateway(tmp_path, monkeypatch, dynamic_checks=1, oracle_job_slots=2)
+    candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
+    calls = []
+    def send(request):
+        calls.append(request)
+        return mock_oracle(request) | changes
+    monkeypatch.setattr(gateway, "_send", send)
+    for _ in range(2):
+        with pytest.raises(EvaluationPaused, match="check response"):
+            gateway.evaluate(candidate, phase="check", position=0)
+    assert len(calls) == 1 and gateway.runtime.budget.counters["benchmark_jobs"] == 1
+    assert gateway.runtime.budget.counters["dynamic_checks"] == 1
+
+
 def test_interrupted_host_releases_waiting_callback_before_stage_shutdown(monkeypatch):
     host = HostDispatcher()
     original_get = host.messages.get

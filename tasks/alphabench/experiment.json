@@ -56,10 +56,10 @@
       "data_preparation": "Local international acquisition, SHA256 bundle transfer, remote offline verification.",
       "qualification_note": "Data and remaining method/backend gates are incomplete; synthetic checks and development seed probes do not qualify full T3.",
       "protocol_digests": {
-        "mock_ldm": "9a543bb051bb5bd867f9c202a0ae6f4d7e43b6f37b2ed580d161827ee91e962b",
-        "mock_native_cot": "eec92b2ec6ad49bbb76f1d8aec8fdfca0ea377f11a85dc618728ab8f153aec81",
-        "mock_native_tot": "f073cdde6af2ac56648bc35337fa5548f4e4e46737d53504165d8c3745e311e0",
-        "mock_native_ea": "190376f44686e30515d9374633a00e47240117e038544fcf5c05aad5d45caec4"
+        "mock_ldm": "28efbdd05a41505abed3d9158ea5b57de596c120f61b645d76cc62ce4d76a264",
+        "mock_native_cot": "1ff4f6c28eb46e5fa951d9395f77937880bd9d99be3e9b2e71dbd05250b47273",
+        "mock_native_tot": "0b2b0c7624c8a92a9c13e491a3e9deface9f66857eefbf3eb0b4395e651feaff",
+        "mock_native_ea": "d93169bb5134db201eefb7b26a7b3d02a629141268a682667b63e0f158e2f03f"
       }
     },
     "per_candidate_limits": {

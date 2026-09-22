@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
+import math
 from pathlib import Path
 
 METHODS = ("alphabench_cot", "alphabench_tot", "alphabench_ea", "llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled")
@@ -55,7 +56,7 @@ class T3Protocol:
     max_model_tokens: int = 32768
     assay_portfolio: dict = field(default_factory=dict)
     budgets: dict = field(default_factory=lambda: {
-        "model_requests": 120, "proposal_attempts": 100, "dynamic_checks": 400,
+        "model_requests": 120, "proposal_attempts": 100, "dynamic_checks": 400, "lint_checks": 400,
         "initialization_evaluations": 160, "validation_evaluations": 164,
         "test_evaluations": 50, "analysis_jobs": 4, "quality_checks": 400,
         "oracle_job_slots": 2000, "benchmark_jobs": 2000, "policy_turns": 4,
@@ -73,6 +74,8 @@ class T3Protocol:
             raise ValueError("unknown filter profile")
         if self.backend == "qlib" and self.filter_profile == "assay_code_filter_v1":
             raise ValueError("Assay lint cannot validate a Qlib campaign")
+        if self.backend == "assay" and self.filter_profile == "qlib_code_filter_v1":
+            raise ValueError("Qlib code filtering requires the Qlib backend")
         if self.label not in ({"close_return"} if self.backend == "qlib" else {"close_return", "open_return"}):
             raise ValueError("label is not supported by the selected backend")
         if not isinstance(self.assay_portfolio, dict) or self.backend == "qlib" and self.assay_portfolio:
@@ -103,7 +106,7 @@ class T3Protocol:
             raise ValueError("drop count must be below portfolio size")
         if self.request_timeout <= self.worker_timeout:
             raise ValueError("request timeout must exceed worker timeout")
-        required = {"model_requests", "proposal_attempts", "dynamic_checks", "initialization_evaluations",
+        required = {"model_requests", "proposal_attempts", "dynamic_checks", "lint_checks", "initialization_evaluations",
                     "validation_evaluations", "test_evaluations", "analysis_jobs", "quality_checks",
                     "oracle_job_slots", "benchmark_jobs", "policy_turns", "harness_turns"}
         if set(self.budgets) != required or any(type(v) is not int or v < 0 for v in self.budgets.values()):
@@ -119,6 +122,28 @@ class T3Protocol:
     @property
     def grammar_depth(self):
         return {"paper_filter_v1": 5, "qlib_code_filter_v1": 6, "assay_code_filter_v1": None}[self.filter_profile]
+
+    @property
+    def check_kind(self):
+        return "lint" if self.filter_profile == "assay_code_filter_v1" else "dynamic"
+
+    def check_passed(self, raw, *, paper=False):
+        if (raw.get("check_kind") != self.check_kind or type(raw.get("success")) is not bool
+                or any(raw.get(key) for key in ("metrics", "daily", "scores", "portfolio"))):
+            raise ValueError("check response differs from the frozen kind or exposes evaluation results")
+        elapsed = raw.get("elapsed_seconds")
+        if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
+            raise ValueError("check response lacks valid execution time")
+        ratios = [raw.get(name) for name in ("nan_ratio", "non_finite_ratio")]
+        if self.check_kind == "lint":
+            if any(value is not None for value in ratios):
+                raise ValueError("lint cannot supply measured missing-value ratios")
+            return None if paper else raw["success"]
+        if raw["success"] and any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1 for value in ratios):
+            raise ValueError("dynamic check response lacks measured missing-value ratios")
+        if paper or self.filter_profile == "paper_filter_v1":
+            return raw["success"] and max(ratios) <= .01 and elapsed <= 30
+        return raw["success"] and ratios[0] <= .01
 
     def interval(self, phase):
         return {"search": ("2016-01-01", "2021-01-01"),

@@ -10,6 +10,10 @@
 [官方输入说明](https://github.com/CityU-MLO/AlphaBench/blob/31bb94bbb7744177c51c9d011e07c31e3092b93e/example/evaluation/01_build_datasets/README.md)
 列出 CSI300/SP500 的逐日 IC、RankIC 表，供 T2/T4 构造标签。预计算表不能评价 T3 新生成的任意因子。
 
+已核对该压缩包的 ZIP 目录：仅有上述四张 CSV，总压缩包大小为 202,921,647 字节。
+核对使用文件末尾的目录，不代表已完整下载或校验这个包；证据在
+[official_data_catalog.json](resources/evidence/official_data_catalog.json)。当前只接入 T3，故不将这个包列为行情准备依赖。
+
 [官方 Prerequisites](https://github.com/CityU-MLO/AlphaBench/tree/31bb94bbb7744177c51c9d011e07c31e3092b93e#prerequisites)
 要求另外下载 Qlib 行情。该版本未提供覆盖完整 T3 所有市场的固定行情包，也没有原实验行情的全量文件哈希。第三方公开行情可用于独立接入验证，不能冒充原论文数据或数值复现。
 

@@ -54,3 +54,26 @@ def test_quality_refuses_a_receipt_from_a_different_interval(tmp_path):
     atomic_json_write(path, record)
     with pytest.raises(ValueError, match="frozen evaluation contract"):
         audit_quality(protocol, runtime, gateway)
+
+
+@pytest.mark.parametrize("backend,profile,expression,rate,paper_rate,paper_coverage", [
+    ("assay", "assay_code_filter_v1", "ts_mean(close,5)", "assay_lint_success_rate", None, 0),
+    ("qlib", "qlib_code_filter_v1", "Abs(" * 6 + "$close" + ")" * 6, "qlib_dynamic_success_rate", 0, 1),
+])
+def test_source_checks_do_not_become_unmeasured_paper_success(tmp_path, backend, profile, expression, rate, paper_rate, paper_coverage):
+    protocol = T3Protocol(backend=backend, filter_profile=profile)
+    runtime = CampaignRuntime.open(tmp_path, task="alphabench")
+    gateway = OracleGateway(protocol, runtime, mock=True)
+    candidate = FactorDomain(backend, protocol.grammar_depth).admit(RawProposal({"expression": expression}, "model"))
+    gateway.evaluate(candidate, phase="check", position=0)
+    occurrences = [{"attempt": 0, "index": 0, "payload": candidate.payload, "status": "accepted",
+                    "check_receipt": gateway.identity("check", 0, candidate)}]
+    Receipts(tmp_path / "generation").accept("step", {"occurrences": occurrences})
+    before = (tmp_path / "budget.json").read_bytes()
+    report = audit_quality(protocol, runtime, gateway)
+    assert report[rate] == 1 and report["coverage"] == 1 and report["unique_valid"] == 1
+    assert report["paper_dynamic_success_rate"] == paper_rate and report["paper_coverage"] == paper_coverage
+    if backend == "assay":
+        assert "assay_dynamic_success_rate" not in report
+        assert report["paper_unavailable_reason"] == "lint_only"
+    assert (tmp_path / "budget.json").read_bytes() == before

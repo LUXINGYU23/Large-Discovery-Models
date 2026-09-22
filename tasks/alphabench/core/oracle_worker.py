@@ -63,10 +63,15 @@ def qlib_evaluate(request, config):
     else:
         factor = scores.iloc[:, 0]
     finite = np.isfinite(factor)
-    result = {"success": bool(finite.any()), "nan_ratio": float(1 - finite.mean()),
+    result = {"success": bool(finite.any()), "nan_ratio": float(factor.isna().mean()),
+              "non_finite_ratio": float((~finite).mean()),
               "actual_start": str(dates[0])[:10], "actual_end": str(dates[-1])[:10],
               "metrics": {}, "daily": [], "scores": [], "portfolio": None}
     if request["operation"] == "check":
+        result.update(utils._check_single_column(expressions[0], factor))
+        result["check_kind"] = "dynamic"
+        if not result["success"]:
+            result["error"] = result["error_message"]
         return result
     # Labels read future bars, but no label crossing a split may enter its statistics.
     kept_dates = dates[:-protocol.forward_n]
@@ -135,6 +140,8 @@ def main(argv=None):
             result = qlib_evaluate(request, config)
     except (ValueError, SyntaxError, FloatingPointError) as exc:
         result = {"success": False, "error": str(exc), "metrics": {}, "daily": [], "scores": [], "portfolio": None}
+    if request["operation"] == "check":
+        result["check_kind"] = T3Protocol(**request["protocol"]).check_kind
     result.update(request_id=request["request_id"], elapsed_seconds=time.monotonic() - started,
                   jobs=[{"job_id": request["request_id"] + ":0", "operation": request["operation"]}])
     atomic_json_write(args.output, clean(result))

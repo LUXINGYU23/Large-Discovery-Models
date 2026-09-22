@@ -79,12 +79,10 @@ class Generator:
                     continue
                 checked = self.gateway.evaluate(candidate, phase="check", position=[identity, attempt, index])
                 occurrence["check_receipt"] = self.gateway.identity("check", [identity, attempt, index], candidate)
-                valid = checked["success"]
-                if self.protocol.filter_profile == "paper_filter_v1":
-                    valid = valid and checked.get("nan_ratio", 1) <= .01 and checked.get("elapsed_seconds", 31) <= 30
+                valid = self.protocol.check_passed(checked)
                 if not valid:
-                    occurrence.update(status="dynamic_rejected", error=checked.get("error", "dynamic quality threshold"))
-                    errors.append({"index": index, "code": "dynamic_rejected", "message": occurrence["error"]})
+                    occurrence.update(status=self.protocol.check_kind + "_rejected", error=checked.get("error", "factor check rejected"))
+                    errors.append({"index": index, "code": occurrence["status"], "message": occurrence["error"]})
                     continue
                 occurrence["status"] = "accepted"
                 accepted[candidate.candidate_id] = candidate.payload

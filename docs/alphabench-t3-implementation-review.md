@@ -565,3 +565,48 @@ Initial replay assertions were corrected to exclude the shared runtime's explici
 campaign-resume event; the native journal itself remains byte-identical on replay.
 All validation uses synthetic oracle responses. Source profiles, W10 as a whole
 and full T3 are not claimed complete by this component.
+
+## Change 16: source filtering and honest quality evidence
+
+Cross-check against Spec 5.2 and W04/W06/W14 found two behavior mismatches:
+Qlib code checks had lost the pinned FFO 1% NaN rejection, and Assay code checks
+were evaluating market panels instead of calling the source's data-free lint.
+The Qlib worker now invokes the original `_check_single_column`; Assay invokes
+the original `lint` before accessing any asset. Source diagnostics remain in
+the receipts. NaN and non-finite ratios are separate, so the source code rule
+and the paper rule do not silently share different meanings of "NaN".
+
+One protocol method validates the result boundary and applies the selected
+filter. Both generators and final quality auditing use it. Lint has its own
+counter and rejection status; it cannot produce measured missing-value ratios
+or a paper dynamic success rate. Paper auditing also checks depth 5 when code
+filtering admits depth 6. Incomplete audit coverage stays explicit. Invalid
+check evidence pauses after physical-job accounting, and completed receipts
+prevent duplicate dispatch on recovery. All four named mock protocol digests
+were regenerated after adding the frozen lint budget.
+
+Complexity review: removed the duplicated generator threshold implementations;
+reused the existing gateway, receipts, Host ledger and upstream checkers.
+No second checking service, compatibility path or runtime package was added.
+The Qlib environment adds pytest only in its test dependency group. Numerical
+tests build an explicit fixture with Qlib's storage API and compare the actual
+worker against the original checker, including the exact 1% boundary, NaN vs
+Inf and the 30-second paper limit. Missing ratios are never fabricated as zero.
+
+Remote validation: 236 task tests passed; the two backend modules skipped in
+the generic environment passed separately (10 Assay tests and one Qlib test
+covering five numerical cases). The Qlib fixture initially needed Qlib's global
+configuration initialized before using FileFeatureStorage; that fixture setup
+was corrected. Registration validation and the procedure CLI passed. A fresh
+shared-runner mock campaign completed at `tasks/alphabench/runs/mock_8`; replay
+left all 187 files unchanged. Its refreshed evidence includes the current
+protocol digest, quality contract, budget and both paired collection exports.
+This campaign uses synthetic model/oracle responses, not the real-model gate.
+
+The official download was rechecked against the fixed repository: four
+precomputed IC/RankIC tables support T2/T4, while T3 requires separate market
+data. DATA.md now distinguishes ZIP-directory inspection from a full download.
+Local acquisition, hash-verified transfer and server-only numerical preparation
+remain the data workflow. Existing real-data gaps, source interval/final-pool
+integration, Harness/compiled methods and the complete T3 acceptance gates
+remain open; this filtering change does not qualify those capabilities.
