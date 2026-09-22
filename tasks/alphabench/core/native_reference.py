@@ -17,12 +17,17 @@ from .receipts import Receipts
 
 
 def prepare_native(protocol, source_root):
-    if protocol.profile != "ldm_matched_v1":
-        raise ValueError("native source profiles require their resolved parameter adapter")
     if protocol.objective != "rank_ic":
         raise ValueError("the pinned native algorithms optimize rank_ic; another search objective is unsupported")
     if source_root is None:
         raise ValueError("native execution requires --upstream-root with the pinned AlphaBench source")
+    verified_sources(source_root, SOURCES)
+    if protocol.profile == "upstream_searcher_v1":
+        from .source_profiles import prepare_searcher
+        return prepare_searcher(protocol, source_root)
+    if protocol.profile != "ldm_matched_v1":
+        raise ValueError("native benchmark requires its complete entry and explicit validation/test extension")
+    verified_sources(Path(source_root) / "searcher/algo", SOURCE_HASHES)
     parameters = protocol.native_parameters
     required = {"oracle_workers", "enable_reason", "accept_threshold"}
     required |= {"workers"} if protocol.method != "alphabench_ea" else {
@@ -42,8 +47,6 @@ def prepare_native(protocol, source_root):
                 raise ValueError(name + " must be between zero and one")
         elif type(value) is not int or value < 1:
             raise ValueError(name + " must be a positive integer")
-    verified_sources(Path(source_root) / "searcher/algo", SOURCE_HASHES)
-    verified_sources(source_root, SOURCES)
     return {"algorithm": {**{key: value for key, value in parameters.items() if key != "oracle_workers"},
         "rounds": protocol.rounds, "model": protocol.model, "temperature": protocol.temperature},
         "oracle_workers": parameters["oracle_workers"]}
@@ -96,8 +99,8 @@ def run_native(protocol, args, spec, client, run_dir, initial_observations, conf
         seeds = [{"name": item.candidate.payload["name"], "expression": item.candidate.payload["expression"],
                   "metrics": {key.removeprefix(prefix): value for key, value in item.metrics.items()}}
                  for item in initial_observations if item.evaluation.succeeded and item.metrics]
-        if not seeds and protocol.method != "alphabench_ea":
-            raise EvaluationPaused("native CoT/ToT requires at least one successful initial seed",
+        if not seeds and (protocol.profile == "upstream_searcher_v1" or protocol.method != "alphabench_ea"):
+            raise EvaluationPaused("native entry requires at least one successful initial seed",
                                    status="paused_no_valid_seeds")
         result = stages.load("native_algorithm_result")
         with load_algorithms(args.upstream_root, run_dir / "private", scheduler) as module:

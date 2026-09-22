@@ -187,11 +187,49 @@ def resolve_source(source_root, config_path, method, *, market=None):
         "declared": declared, "effective_source": effective, "parameter_sources": origins,
         "requested_market": requested_market, "protocol_delta": deltas,
         "execution_ready": False,
-        "pending": ["source-profile oracle intervals/filter semantics and native final-pool wiring",
-                    "frozen complete budgets and data/environment identities"] +
-                   ([] if searcher else ["explicit validation/test extension; neither exists in the example entry"])}
+        "pending": ["frozen matching protocol with complete budgets and qualified data/environment identities"] +
+                   ([] if searcher else ["complete benchmark workflow; explicit validation/test extension, absent from this entry"])}
     output["digest"] = digest(output)
     return output
+
+
+def prepare_searcher(protocol, source_root):
+    if protocol.backend != "qlib":
+        raise ValueError("source Assay execution still requires its backend-specific source contract")
+    if set(protocol.native_parameters) != {"source_config"}:
+        raise ValueError("source native_parameters must contain only the pinned source_config")
+    resolved = resolve_source(source_root, protocol.native_parameters["source_config"],
+                              protocol.method.removeprefix("alphabench_"), market=protocol.market)
+    if resolved["profile"] != protocol.profile:
+        raise ValueError("source config belongs to a different native entry")
+    effective = resolved["effective_source"]
+    algorithm, initialization = effective["algorithm"], effective["initialization"]
+    search, test = effective["search"], effective["test"]
+    expected = {"rounds": algorithm["rounds"], "temperature": algorithm["temperature"],
+        "init_mode": initialization["mode"], "filter_profile": "qlib_code_filter_v1",
+        "forward_n": search["forward_n"], "label": search["label"], "worker_timeout": search["worker_timeout"],
+        "factor_select_n": test["factor_select_n"], "stock_topk": test["stock_topk"],
+        "stock_n_drop": test["stock_n_drop"], "validation_metric": test["rank_by"], "direction": 1}
+    if initialization["mode"] == "cold":
+        expected["cold_seed_count"] = initialization["count"]
+    differing = [key for key, value in expected.items() if getattr(protocol, key) != value]
+    if differing:
+        raise ValueError("protocol differs from the pinned source config: " + ", ".join(differing))
+    if protocol.budgets["initialization_evaluations"] < initialization["count"]:
+        raise ValueError("source initialization budget must cover the complete seed pool")
+    if not search["fast"] or not effective["validation"]["enabled"]:
+        raise ValueError("source searcher requires its complete search and validation configuration")
+    return {"algorithm": {**algorithm, "model": protocol.model}, "oracle_workers": search["oracle_workers"],
+        "source_resolution": resolved, "initialization": initialization,
+        "protocol_delta": resolved["protocol_delta"] + [
+            {"field": "http_timeout", "source": search["http_timeout"], "adapter": protocol.request_timeout,
+             "reason": "Host transport must outlive the unchanged worker timeout for durable reconciliation"},
+            {"field": "seed_evaluation", "source": "FFO use_cache=True",
+             "adapter": "reuse the verified initialization receipt under the same frozen protocol",
+             "reason": "retain seed scores without repeating a paid job"},
+            {"field": "incomplete_validation", "source": "search-metric fallback during final ranking",
+             "adapter": "pause before test selection",
+             "reason": "complete T3 requires private validation for the complete native final pool"}]}
 
 
 def main(argv=None):

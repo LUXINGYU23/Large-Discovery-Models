@@ -75,9 +75,7 @@ def structure_diversity(expressions):
 
 def signal_diversity(factors):
     ids = [item["candidate_id"] for item in factors]
-    if len(ids) != len(set(ids)):
-        raise ValueError("signal diversity requires distinct candidate identities")
-    indexed, missing = {}, []
+    indexed, missing = [], []
     for factor in factors:
         values = {}
         for item in factor["scores"]:
@@ -85,11 +83,11 @@ def signal_diversity(factors):
             if key in values:
                 raise ValueError("duplicate factor score sample")
             values[key] = item["score"]
-        indexed[factor["candidate_id"]] = values
+        indexed.append(values)
         if not values:
             missing.append(factor["candidate_id"])
     pairs = []
-    for left, right in itertools.combinations(ids, 2):
+    for left, right in itertools.combinations(range(len(ids)), 2):
         a, b = indexed[left], indexed[right]
         shared = sorted(set(a) & set(b))
         keys = [key for key in shared if all(type(value) in (int, float) and math.isfinite(value) for value in (a[key], b[key]))]
@@ -102,11 +100,12 @@ def signal_diversity(factors):
                 reason = "constant_series"
             else:
                 rho = float(np.clip(np.corrcoef(values.T)[0, 1], -1., 1.))
-        pairs.append({"left": left, "right": right, "shared_samples": len(shared), "finite_samples": len(keys),
+        pairs.append({"left": ids[left], "right": ids[right], "left_index": left, "right_index": right,
+                      "shared_samples": len(shared), "finite_samples": len(keys),
                       "sample_index_digest": digest(keys), "correlation": rho, "reason": reason})
     correlations = [row["correlation"] for row in pairs if row["correlation"] is not None]
     available = bool(correlations) and not missing
-    return {"candidate_ids": ids, "candidate_set_digest": digest(sorted(ids)), "missing_candidates": missing,
+    return {"candidate_ids": ids, "candidate_set_digest": digest(sorted(set(ids))), "missing_candidates": missing,
             "pair_count": len(correlations), "total_pairs": len(pairs), "pairs": pairs,
             "diversity": 1-float(np.mean(np.abs(correlations))) if available else None,
             "signed_mean_correlation": float(np.mean(correlations)) if available else None,

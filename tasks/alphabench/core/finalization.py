@@ -6,6 +6,7 @@ import json
 import math
 
 from ldm_tts.contracts import Candidate, RawProposal
+from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import atomic_json_write
 from .candidate import FactorDomain
 from .protocol import digest
@@ -19,17 +20,28 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     stages = Receipts(private / "stages")
     runtime.status.update("running", phase="validation_complete", budget=runtime.budget)
     domain = FactorDomain(protocol.backend)
+    native_pool = protocol.profile == "upstream_searcher_v1"
+    if native_pool and not execution["algorithm_completed"]:
+        raise EvaluationPaused("source entry has not completed its configured algorithm", status="paused_native_search")
     pool = {}
     for row in initial_pool:
         if row["success"]:
             candidate = domain.admit(RawProposal(row, "initialization"))
             pool[candidate.candidate_id] = (candidate, row["validation_position"], "initialization", row["validation"])
     for observation in observations:
-        if observation.evaluation.succeeded and observation.candidate.source != "initialization":
+        if (observation.evaluation.succeeded or native_pool) and observation.candidate.source != "initialization":
             candidate = observation.candidate
             pool[candidate.candidate_id] = (candidate, candidate.metadata["attempt_position"], "search", None)
+    pool_rows = list(pool.values())
+    if native_pool:
+        pool_rows = []
+        for row in execution["native_final_pool"]:
+            candidate = domain.admit(RawProposal(row, "native_final_pool"))
+            if not isinstance(candidate, Candidate) or candidate.candidate_id not in pool:
+                raise ValueError("native final pool contains a factor without a measured receipt")
+            pool_rows.append((candidate, *pool[candidate.candidate_id][1:]))
     ranked, validation_scores = [], []
-    for candidate, position, source, raw in pool.values():
+    for candidate, position, source, raw in pool_rows:
         if raw is None:
             receipt = gateway.receipts.load(gateway.identity("validation", position, candidate))
             if receipt is None or receipt["state"] != "completed":
@@ -38,9 +50,13 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
         validation_scores.append({"candidate_id": candidate.candidate_id, "scores": raw.get("scores", [])})
         value = raw.get("metrics", {}).get(protocol.validation_metric)
         if not raw["success"] or type(value) not in (int, float) or not math.isfinite(value):
+            if native_pool:
+                raise EvaluationPaused("native final pool lacks complete finite private validation; search values cannot replace it",
+                                       status="paused_incomplete_validation")
             continue
         ranked.append({"candidate": candidate.to_dict(), "validation_score": value, "source": source})
-    ranked.sort(key=lambda row: (-row["validation_score"], row["candidate"]["candidate_id"]))
+    ranked.sort(key=(lambda row: -row["validation_score"]) if native_pool else
+                (lambda row: (-row["validation_score"], row["candidate"]["candidate_id"])))
     selection = {"protocol": protocol.identity, "direction": protocol.direction, "validation_metric": protocol.validation_metric,
                  "stock_topk": protocol.stock_topk, "stock_n_drop": protocol.stock_n_drop,
                  "selected": ranked[:protocol.factor_select_n]}
@@ -62,7 +78,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     quality = audit_quality(protocol, runtime, gateway)
     search_raw = [gateway.receipts.load(gateway.identity("search", item.candidate.metadata["attempt_position"], item.candidate))["response"]
                   for item in observations if item.candidate.source != "initialization"]
-    expressions = [item[0].payload["expression"] for item in pool.values()]
+    expressions = [item[0].payload["expression"] for item in pool_rows]
     generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "generation").glob("*.json"))]
     initial_generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "initialization/generation").glob("*.json"))]
     prefix = "mock_" if gateway.mock else ""
@@ -83,10 +99,10 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
                   "generation_cost": generation_costs(creation_steps + generation),
                   "initialization_cost_basis": "shared_source_creation" if shared_creation else "current_run"},
               "independent_combination": combination, "quality_audit": quality,
-              "final_pool": [item[0].payload for item in pool.values()],
+              "final_pool": [item[0].payload for item in pool_rows],
               "diversity": {
                   "final_pool": {"phase": "validation", "interval": protocol.interval("validation"),
-                      "scope": "all successful measured initialization and search candidates",
+                      "scope": "native algorithm final pool" if native_pool else "all successful measured initialization and search candidates",
                       "structure": structure_diversity(expressions), "signal": signal_diversity(validation_scores)},
                   "test_selection": {"phase": "test", "interval": protocol.interval("test"),
                       "selection_digest": digest(selection),

@@ -70,7 +70,13 @@ def main(argv=None):
     protocol = resolve_protocol(args)
     spec = describe_ldm_task(args)
     if args.dry_run:
-        print(json.dumps({"task": "alphabench", "protocol": protocol.to_dict(), "ldm_task_spec": spec.to_dict()}, indent=2))
+        report = {"task": "alphabench", "protocol": protocol.to_dict(), "ldm_task_spec": spec.to_dict()}
+        if protocol.profile != "ldm_matched_v1":
+            from tasks.alphabench.core.native_reference import prepare_native
+            if not protocol.method.startswith("alphabench_"):
+                raise ValueError("source profiles require the actual native algorithm entry")
+            report["source_entry"] = prepare_native(protocol, args.upstream_root)
+        print(json.dumps(report, indent=2))
         return 0
     return run(args, protocol, spec)
 

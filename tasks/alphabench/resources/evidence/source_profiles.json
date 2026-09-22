@@ -1,139 +1,140 @@
 {
   "execution_ready": false,
   "limitations": [
-    "No model or market evaluation was performed.",
-    "Source oracle intervals, filters, native final pool, full budgets and data identities remain gated.",
+    "These are source-resolution reports, not model or market evaluations.",
+    "Executing requires a matching frozen protocol and independently qualified data/environment.",
     "The example entry contains neither private validation nor a held-out test stage."
   ],
   "qualification": "source_resolution_only",
-  "resolver_sha256": "9ee350933fda8ec05c52b9d164abdd8d9c998dfab158200a7d082024e3ac9225",
+  "resolver_sha256": "718b0559df5014aedba6b6481b577266c73156b67584d1f3f270f8c2e49de9d6",
   "rows": [
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_default_tot_csi300.json",
-      "artifact_sha256": "3ff0dda9393d02a0c0b6eb67a10da2078a4f1229b1602c72fdb099beb3ffc567",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_default_tot_csi300.json",
+      "artifact_sha256": "72a02c99be7a2f21e7e884d58f4475eec41bb077021d3c154c5519b4eb90a6ab",
       "config": "searcher/config.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "0372a1e13a06a02d7aa0a1f0e1ee71b124423bc040633763fd1136bf84ec7ac9"
+      "resolution_digest": "762a8bd50db6db09748bf91a7c0b3de271ba40371525379da8fe394028ce353b"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_default_tot_sp500.json",
-      "artifact_sha256": "a6a7c52474f88bfb5be3c49b97e7caa29dae7c61f7add29e0ff1fd249519b934",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_default_tot_sp500.json",
+      "artifact_sha256": "9a1ac59994e11ca63d9bfdc04f8b22dfdf0598deece0c7f1ba81dd4ebb98b39e",
       "config": "searcher/config.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "91a70ac5dfd8a6bad642f197bd01134c8f1ee4fe6c7cf4f0bdd32ada36cb9a6c"
+      "resolution_digest": "7b9ae04b93724c4e28af0d49be732e6a02b4e4d9976aaf54aa2d05a95a2cdefe"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_cot_csi300.json",
-      "artifact_sha256": "7e2d984b02804347f3981a62ccc0fbe1a30ce1da40beeb16d84dcd63607a87eb",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_cot_csi300.json",
+      "artifact_sha256": "edae41f0c9390945e8049d2651297067a9d238c93addd0b97648d0558b7de982",
       "config": "searcher/configs/cot_config.yaml",
       "market": "csi300",
       "method": "alphabench_cot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "57906a21320bf5fc5feb82a88c982c06ba55526f393b604c37ca227edc29d876"
+      "resolution_digest": "c89c89b7bd0ecf8c392e33fbc3e1f9339f7da7405e34db16d0c80169ee89c411"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_cot_sp500.json",
-      "artifact_sha256": "ef044fc9568245089597489719f7ba316a0942ecf7e793ee8e72d9ebeae32576",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_cot_sp500.json",
+      "artifact_sha256": "f6371c13f1febdd2bad6dcdfcdedbeacaea71043f5e112f8e0db9483222d5e68",
       "config": "searcher/configs/cot_config.yaml",
       "market": "sp500",
       "method": "alphabench_cot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "45e47ea0794178ea79ae8d026607276c1ecaea570f13e72c45f9df09c71051ba"
+      "resolution_digest": "f24bf26dd08a91d7d8a8909738d248deceaca79427032ac43561cc167d3be35b"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_tot_csi300.json",
-      "artifact_sha256": "762ffe7ad0a0f9eff8988bcf5ff922c3f246b961c1e2a935555dacdbf8310f16",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_tot_csi300.json",
+      "artifact_sha256": "dcd2ea1cf085ec3f25b0f68308072e1e93cbf910a296fe671cfc7a9b1f3f8b43",
       "config": "searcher/configs/tot_config.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "2821da53321f6f6d4d75cd4c9fb49daa7f99d88294a1aa9816d79f39bbb360b8"
+      "resolution_digest": "ebc1081fb2c7e4ab6baea38007d907747a969f2a26bc1114a1b81e7f7b71311f"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_tot_sp500.json",
-      "artifact_sha256": "1ae7f92ac3d25b297b575de674d8a6af2d7585563cfcb95dc09e4a215e3876a7",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_tot_sp500.json",
+      "artifact_sha256": "3edec6e5e89e61c313e928795aa5f50724daa1b7958554016da1134331331236",
       "config": "searcher/configs/tot_config.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "d7c53659a949e1c2f4596efc01b1716faea3bf452a979e34d8fd355174c80374"
+      "resolution_digest": "5b74c906b27b3f22f880ff0c6ab919e16a2523cbee8718ec5a4fb4c8a6f417cb"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_ea_csi300.json",
-      "artifact_sha256": "bd8bd4374a6eec034af36e6b828b23f17aaf03c3bf1d92a7efc0e59cd7f57879",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_ea_csi300.json",
+      "artifact_sha256": "55b360eeb4631c8a3302bce676ff91a79d16b3be5977caa5259e2d273a694c97",
       "config": "searcher/configs/ea_config.yaml",
       "market": "csi300",
       "method": "alphabench_ea",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "8e94c72638f9ebe09d8780a247cdd91daca0a192561c821b3060be9e54295baf"
+      "resolution_digest": "cf13536e356430edb72eeefb121765e9d1788f79593e0fb830be9137eb5af876"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/searcher_ea_sp500.json",
-      "artifact_sha256": "97c6168406c49063a1e96346ec172c5c7b9da119ab29f74bb85ee8120625c9b5",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/searcher_ea_sp500.json",
+      "artifact_sha256": "459db7e899f917941ab9af205b553cec838134d8da11026999e09875743b5351",
       "config": "searcher/configs/ea_config.yaml",
       "market": "sp500",
       "method": "alphabench_ea",
       "profile": "upstream_searcher_v1",
-      "resolution_digest": "3c546efb50a4f935c549b1b708f5c161688e414fff272b22972c69ec983f5b62"
+      "resolution_digest": "76ccb3d9b693283a11768f8d9dc14bd362ef7289ce743dd7bfbe256c0aabcf87"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_cot_csi300.json",
-      "artifact_sha256": "f9d2fc4a83dd3f039ce330b55854cc9e2d6c540e5f41a498b2c439d115a2e0c8",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_cot_csi300.json",
+      "artifact_sha256": "8c4e105c4f8f83e62f2d67079f0f7dfb82a5811f4c1913bbaba3f3a2d1c53108",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_cot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "84eea5894501aad3e6f2b6d73f3b7de1a9c1bd925abf488c589dcb471eacc8eb"
+      "resolution_digest": "3c0219a9b230c67f89a2ac151e1fe35314a677fd5e8d96bb5a6467668656d5e7"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_cot_sp500.json",
-      "artifact_sha256": "c2a65fde41568dacc47b28e22a49069838b8e6ae7a229f62349dd3f0fa22fe26",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_cot_sp500.json",
+      "artifact_sha256": "a4cbd9d56dedc1957b0b1041b2f1a01e00441b181cd3ebbb249ef6185b05b3cf",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_cot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "a47872707cde8860d050cb095c17202ba4395d82a88709d110f3e1c1d95412fc"
+      "resolution_digest": "5bea1492350b982682b7592bb81e1ed3493101ed1ec9fcaee238397eac8b5b91"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_csi300.json",
-      "artifact_sha256": "2db34869bec4b91b00188cc3c45200eefbe1190c4501d85c2aec43e11ba2d23b",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_tot_csi300.json",
+      "artifact_sha256": "cb0404e9a7c5910a2fb24e4d4bd463bf374b491247996e16147a18b5d6663fa8",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_tot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "f13c700276a21db81666341bdc3ee4ac812f8d959c3296f938e2c97c14ea2ae7"
+      "resolution_digest": "ffb9ad6917ea3fb932bb6627b1e6d7998f56d1b2098396ddbb301ed4b7a590d6"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_tot_sp500.json",
-      "artifact_sha256": "0695088e615163febf9b1c17c91229d06917d2290ee50299d68c710b688a2b37",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_tot_sp500.json",
+      "artifact_sha256": "893c54a80a6cf327ff0f579fadc3c373429ed1338e6f5fb13857c2a6bf054bd7",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_tot",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "f994bd928ed0afa9426c20c47c7233ec99da391aa6433e655feac7767dc521f4"
+      "resolution_digest": "01a09b858404787cfc9f82a05d0dbd8d5f7f084af214962bc9fc705a1d42fedb"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_ea_csi300.json",
-      "artifact_sha256": "1e5aacdd836c32b0d99a4355aa72c9d0333e8744ca10d0226546dcf963a0aea9",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_ea_csi300.json",
+      "artifact_sha256": "bffd10fd0634c4803a2dbf26f78186b56abef3ddb16b50cdf95a391c09371fed",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "csi300",
       "method": "alphabench_ea",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "a9a41ecd793b595cc59ba9ab0ca04ae8c9b08cf7a77c58826a620a7408802d20"
+      "resolution_digest": "b66da1187116f9838caae5ddcd8ce921c2914ae8f9d2b08256c9d798b2bebc7b"
     },
     {
-      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/benchmark_ea_sp500.json",
-      "artifact_sha256": "3acd92347a84eb812a040bd59d069b6724e6ee524a37bed517bf69df2ceb7c96",
+      "artifact": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/source-profiles/718b0559df50/benchmark_ea_sp500.json",
+      "artifact_sha256": "6d5be3c2a387b14d5ae1e139d6a53ea0632cba2c619b2f86643fc8a8ab6d7d96",
       "config": "example/search/configs/search_csi300.yaml",
       "market": "sp500",
       "method": "alphabench_ea",
       "profile": "upstream_benchmark_v1",
-      "resolution_digest": "fcba2bbc9385932a0ff7d91260f7ad27b5793ba5e91e0736e5307fe9118b689a"
+      "resolution_digest": "59f841cb19b9139905ddd1f9168cc85da31dd6984f84c37cbb5c78b8e14147fa"
     }
   ],
-  "source_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e"
+  "source_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+  "workflow_evidence": "tasks/alphabench/resources/evidence/native_searcher_workflow.json"
 }

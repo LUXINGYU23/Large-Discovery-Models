@@ -663,3 +663,67 @@ added. These are synthetic numerical/portfolio fixtures, not real-market or
 model-endpoint acceptance. Source workflow initialization/final-pool/budget
 wiring, remaining agent methods, data qualification and the full T3 gate remain
 unfinished.
+
+## Change 18: complete Qlib searcher workflow binding
+
+Cross-check against Spec 3/6/7, W08-W10 and the pinned SearchPipeline found that
+source execution was still gated after its lower-level intervals and filters
+were implemented. The native entry now resolves the selected original YAML
+before initialization costs, verifies its source hashes and binds algorithm
+parameters without substituting matched defaults. CoT/ToT retain 30 cold seeds;
+EA automatically loads all 125 distinct fixed seeds. A different seed file,
+shared matched seed bundle, method, rounds, temperature, filter or final
+portfolio contract is rejected. Source dry-run performs the same configuration
+checks and displays the resolved entry. Data qualification is still required
+for real execution.
+
+SearchPipeline's ValEvalTracker also validates failed search evaluations; the
+source adapter now does the same without exposing validation to the algorithm.
+Finalization takes the algorithm's actual final_pool, preserving member order,
+names and duplicate occurrences. Finite validation ties retain source order;
+the tests execute the original rank_factors function to compare the selected
+sequence. Source runs pause before test when validation is incomplete instead
+of silently using search scores. This full-T3 requirement, provider override,
+longer Host transport timeout and reuse of verified seed receipts are explicit
+entry differences. Qlib source search/validation remain fast; test remains
+50 factors / 50 stocks / drop 5 with full portfolio output.
+
+The first full CoT test exposed an existing reporting assumption: a chain may
+retain the same formula in multiple rounds, but signal diversity rejected
+duplicate candidate IDs. Reporting now indexes pool occurrences directly and
+records both candidate identities and pair positions. A three-member numeric
+fixture proves duplicate weighting rather than collapsing a chain into a set.
+No extra identity layer or duplicate-removal workaround was added.
+
+Source E exhaustion pauses rather than publishing a truncated result under an
+original-round profile. The strengthened test lets EA complete 20 evaluations
+under a 25-evaluation cap before rejecting the next complete batch; replay
+leaves both the budget and model receipts unchanged and publishes no result.
+Matched E-stop finalization remains independently covered. All three source
+workflows also replay completed runs without changing any file.
+
+Complexity review: reused the existing resolver, native algorithms, evaluator,
+initialization Campaign, shared ledger and finalization function. Removed the
+obsolete matched-only entry/evaluator gates; no second search loop, budget
+store, compatibility path, package or speculative profile abstraction was
+introduced. Final-pool projection is a short branch over the same measured
+receipt index. Source-only settings stay in the existing native_parameters
+contract, leaving matched protocol identities unchanged.
+
+Remote validation: 246 task tests passed, with two backend-specific modules
+skipped in the generic environment; this change did not modify the workers.
+After review, all 24 native campaign tests passed, and three additional dry-run
+rejection checks passed. Shared regression: 491 passed, one skipped.
+Registration, dependency check and shared-runner dry-run passed. A fresh
+shared-runner mock completed at mock_9; replay preserved all 187 files and both
+paired collection exports. Source workflows completed 40 CoT, 60 ToT and 200 EA
+search evaluations, yielding 44/60/30 native final-pool members and 44/50/30 full
+mock test evaluations. Compact evidence and archive hashes are recorded in
+resources/evidence/native_searcher_workflow.json; the 14 source resolutions and
+standard mock evidence were refreshed.
+
+These runs use synthetic model and oracle responses. They do not establish
+real-market numerical qualification or the requested final two-round model
+acceptance. Assay's complete source contract, the example workflow's absent
+validation/test extension, remaining agent methods, data gaps and the full T3
+matrix remain open. The full goal and complete_t3=false are unchanged.

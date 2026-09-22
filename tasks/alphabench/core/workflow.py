@@ -32,9 +32,10 @@ def mock_response(request, native_count=None):
                                      for index in range(count)]})
 
 
-def make_client(protocol, mock):
+def make_client(protocol, mock, native_config=None):
     if mock:
-        count = max(1, protocol.cold_seed_count, protocol.native_parameters.get("N", 1)) if protocol.method.startswith("alphabench_") else None
+        parameters = native_config["algorithm"] if native_config else protocol.native_parameters
+        count = max(1, protocol.cold_seed_count, parameters.get("N", 1)) if protocol.method.startswith("alphabench_") else None
         return CallableProposalClient(lambda request: mock_response(request, count))
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
@@ -78,12 +79,12 @@ def bind_runner_contract(run_dir, protocol):
 
 def run(args, protocol, spec):
     if not args.mock:
-        if protocol.profile != "ldm_matched_v1":
-            raise ValueError("native source profiles require their resolved parameter adapter")
         if not args.protocol_file or not args.data_manifest:
             raise ValueError("real runs require a frozen --protocol-file and verified --data-manifest")
         verify_data_manifest(args.data_manifest, protocol)
     native = protocol.method.startswith("alphabench_")
+    if not native and protocol.profile != "ldm_matched_v1":
+        raise ValueError("source profiles require the actual native algorithm entry")
     if protocol.method not in {"llm", "ldm"} and not native:
         raise ValueError("the selected method requires its native/Harness adapter; direct execution is forbidden")
     run_dir = args.resume_run or args.out_dir or unique_run_dir(Path(__file__).resolve().parents[1] / "runs" / ("mock" if args.mock else "campaign"))
@@ -95,13 +96,28 @@ def run(args, protocol, spec):
         raise ValueError("existing run requires --resume-run")
     atomic_json_write(protocol_path, protocol.to_dict())
     contract_identity = bind_runner_contract(run_dir, protocol)
+    native_config = prepare_native(protocol, args.upstream_root) if native and protocol.profile != "ldm_matched_v1" else None
+    if protocol.profile == "upstream_searcher_v1":
+        if args.initialization_bundle or args.import_pool:
+            raise ValueError("source searcher initialization must come from its pinned entry")
+        seed_file = native_config["initialization"]["seed_file"]
+        if seed_file:
+            expected = args.upstream_root / seed_file
+            if args.seed_file and args.seed_file.read_bytes() != expected.read_bytes():
+                raise ValueError("seed file differs from the pinned source pool")
+            args.seed_file = expected
+        elif args.seed_file:
+            raise ValueError("source cold initialization cannot be replaced with a seed file")
+        from .receipts import Receipts
+        Receipts(run_dir / "private/stages").accept("source_entry_contract", native_config)
     if args.resume_run and (run_dir / "result.json").exists() and json.loads((run_dir / "status.json").read_text(encoding="utf-8"))["status"] == "completed":
         freeze_seed_source(protocol, args, run_dir / "initialization")
         AcceptedActions(run_dir).export()
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()), "status": "completed", "replayed": True}))
         return 0
-    native_config = prepare_native(protocol, args.upstream_root) if native else None
-    client = make_client(protocol, args.mock)
+    if native and native_config is None:
+        native_config = prepare_native(protocol, args.upstream_root)
+    client = make_client(protocol, args.mock, native_config)
     try:
         initial_observations, initial_pool, initial_budget = run_initialization(protocol, args, spec, client, run_dir)
     except EvaluationPaused as exc:

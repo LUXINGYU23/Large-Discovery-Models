@@ -81,6 +81,11 @@ def test_metric_boundaries_and_degeneracy():
     result = signal_diversity([{"candidate_id": "a", "scores": a}, {"candidate_id": "b", "scores": b}])
     assert result["diversity"] == 0 and result["signed_mean_correlation"] == -1
     assert result["pairs"][0]["finite_samples"] == 3
+    repeated = signal_diversity([{"candidate_id": "a", "scores": a}, {"candidate_id": "a", "scores": a},
+                                 {"candidate_id": "b", "scores": b}])
+    assert repeated["total_pairs"] == 3 and repeated["signed_mean_correlation"] == pytest.approx(-1 / 3)
+    assert [(pair["left_index"], pair["right_index"]) for pair in repeated["pairs"]] == [(0, 1), (0, 2), (1, 2)]
+    assert repeated["candidate_set_digest"] == result["candidate_set_digest"]
 
 
 def test_diversity_missing_samples_and_operator_structure_are_not_erased():

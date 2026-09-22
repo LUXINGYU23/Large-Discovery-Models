@@ -1,3 +1,4 @@
+import ast
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ import pytest
 from tasks.alphabench.core import workflow
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.source_profiles import definition, resolve_source
 from tasks.alphabench.ldm_task.procedure import main
 from tasks.alphabench.tests.test_native import SOURCE, source
 
@@ -25,6 +27,107 @@ def arguments(root, contract):
     path = root / "protocol.json"
     path.write_text(json.dumps(contract.to_dict()))
     return ["--mock", "--protocol-file", str(path), "--upstream-root", str(SOURCE), "--out-dir", str(root / "run")]
+
+
+def source_protocol(method, **changes):
+    path = "searcher/config.yaml" if method == "tot" else f"searcher/configs/{method}_config.yaml"
+    source = resolve_source(SOURCE, path, method)["effective_source"]
+    algorithm, initial = source["algorithm"], source["initialization"]
+    base = T3Protocol(method="alphabench_" + method, profile="upstream_searcher_v1",
+        filter_profile="qlib_code_filter_v1", native_parameters={"source_config": path},
+        init_mode=initial["mode"], rounds=algorithm["rounds"], temperature=algorithm["temperature"], evaluations=1000)
+    return replace(base, budgets={**base.budgets, "validation_evaluations": 1000,
+        "dynamic_checks": 2000, "quality_checks": 2000, "oracle_job_slots": 12000,
+        "benchmark_jobs": 12000}, **changes)
+
+
+@pytest.mark.parametrize("method", ["cot", "tot", "ea"])
+def test_source_searcher_freezes_entry_and_tests_only_its_actual_final_pool(tmp_path, source, monkeypatch, method):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    monkeypatch.setattr(workflow, "run_campaign", lambda *_args, **_kwargs: pytest.fail("source started a search LDMEngine"))
+    args = arguments(tmp_path, source_protocol(method))
+    assert main(args) == 0
+    run = tmp_path / "run"
+    report = json.loads((run / "result.json").read_text())
+    execution = report["execution"]
+    assert execution["algorithm_completed"] and execution["config"]["algorithm"]["rounds"] == 10
+    assert report["initialization"]["seed_count"] == (125 if method == "ea" else 30)
+    assert [(f["name"], f["expression"]) for f in report["final_pool"]] == [
+        (f["name"], f["expression"]) for f in execution["native_final_pool"]]
+    assert report["diversity"]["final_pool"]["scope"] == "native algorithm final pool"
+    assert len(report["final_pool"]) < report["initialization"]["seed_count"] + report["search"]["attempts"]
+    assert report["test"] and report["independent_combination"] and report["quality_audit"]["complete"]
+    receipts = [json.loads(p.read_text()) for p in (run / "private/oracle").glob("*.json")]
+    receipts += [json.loads(p.read_text()) for p in (run / "initialization/private/oracle").glob("*.json")]
+    requests = [row["request"] for row in receipts]
+    assert all(row["fast"] is (row["phase"] not in {"test", "analysis"}) for row in requests)
+    private = {row["identity"]["candidate"]: row["response"]["metrics"] for row in receipts
+               if row["identity"]["phase"] == "validation"}
+    from tasks.alphabench.core.candidate import FactorDomain
+    from ldm_tts.contracts import RawProposal
+    factors = [{**row, "val_metrics": private[FactorDomain().admit(RawProposal(row, "comparison")).candidate_id]}
+               for row in execution["native_final_pool"]]
+    node = definition((source / "searcher/run_test_backtest.py").read_text(), "rank_factors")
+    namespace = {}
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "source_rank_factors", "exec"), namespace)
+    expected = namespace["rank_factors"](factors)[:50]
+    assert [(row["candidate"]["name"], row["candidate"]["expression"]) for row in report["test"]] == [
+        (row["name"], row["expression"]) for row in expected]
+    if method == "cot":
+        signal = report["diversity"]["final_pool"]["signal"]
+        assert any(pair["left"] == pair["right"] and pair["left_index"] != pair["right_index"] for pair in signal["pairs"])
+    frozen = {p.relative_to(run): p.read_bytes() for p in run.rglob("*") if p.is_file()}
+    assert main(args + ["--resume-run", str(run)]) == 0
+    assert {p.relative_to(run): p.read_bytes() for p in run.rglob("*") if p.is_file()} == frozen
+
+
+def test_source_budget_stop_does_not_publish_a_truncated_native_result(tmp_path, source, monkeypatch):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    args = arguments(tmp_path, source_protocol("ea", evaluations=25))
+    assert main(args) == 2
+    run = tmp_path / "run"
+    assert json.loads((run / "status.json").read_text())["status"] == "paused_budget"
+    assert not (run / "result.json").exists() and not (run / "selection_frozen.json").exists()
+    assert json.loads((run / "budget.json").read_text())["counters"]["expensive_evaluation_attempts"] == 20
+    budget = (run / "budget.json").read_bytes()
+    receipts = {p.name: p.read_bytes() for p in (run / "private/model").glob("*.json")}
+    assert main(args + ["--resume-run", str(run)]) == 2
+    assert {p.name: p.read_bytes() for p in (run / "private/model").glob("*.json")} == receipts
+    assert (run / "budget.json").read_bytes() == budget
+
+
+@pytest.mark.parametrize("change", [{"rounds": 2}, {"cold_seed_count": 3}, {"filter_profile": "paper_filter_v1"}])
+def test_source_settings_cannot_silently_become_a_matched_pilot(tmp_path, source, change):
+    args = arguments(tmp_path, source_protocol("cot", **change))
+    with pytest.raises(ValueError, match="differs from the pinned source config"):
+        main(args + ["--dry-run"])
+    with pytest.raises(ValueError, match="differs from the pinned source config"):
+        main(args)
+    assert not (tmp_path / "run/initialization").exists()
+
+
+def test_source_validation_failure_cannot_select_test_factors_using_search_scores(tmp_path, source, monkeypatch):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    send = OracleGateway._send
+    search_failed, validated, phases = [], [], []
+    def respond(self, request):
+        result = send(self, request)
+        phases.append(request["phase"])
+        if request["phase"] == "search":
+            search_failed.append(request["expression"])
+            result.update(success=False, metrics={})
+        if request["phase"] == "validation":
+            validated.append(request["expression"])
+            result.update(success=False, metrics={})
+        return result
+    monkeypatch.setattr(OracleGateway, "_send", respond)
+    args = arguments(tmp_path, source_protocol("ea"))
+    assert main(args) == 2
+    run = tmp_path / "run"
+    assert search_failed and set(search_failed) <= set(validated)
+    assert "test" not in phases and "analysis" not in phases
+    assert json.loads((run / "status.json").read_text())["status"] == "paused_incomplete_validation"
+    assert not (run / "selection_frozen.json").exists()
 
 
 @pytest.mark.parametrize("method", ["cot", "tot", "ea"])

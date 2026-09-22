@@ -8,7 +8,7 @@
 
 当前组件已经执行真实的官方 CoT/ToT/EA Python 算法和原生生成器，并接入
 模型请求、动态检查、整批 search 预算及私有 validation。matched 正式 workflow
-已接入原生 cold 初始化和终局报告；source profiles 仍待完成。当前验证使用
+已接入原生 cold 初始化和终局报告；Qlib searcher source workflow 也已接线。当前验证使用
 synthetic oracle，不代表真实市场、W10 或完整 T3 已通过。
 
 ## 执行合同
@@ -111,8 +111,8 @@ validation 选取和独立多样性评价，两者不会互相替换。
 
 CoT/ToT 的种子查询有明确的 seed 角色。在 matched 协议中，它们只读已验证的
 共同初始化观测，不消耗新增 E；未知种子暂停。完整初始信息 digest、协议、
-并发数和评价适配器 hash 冻结后才能执行。source profile 的初始化规则仍须
-独立完成，不能套用 matched 的规则后声称保留了原入口。
+并发数和评价适配器 hash 冻结后才能执行。searcher 的 `use_cache=True` 种子查询
+复用同合同初始化 receipt；此操作差异写入 source entry 清单。
 
 成功 search 先完成 private validation，再持久化公开 observation；callback 只
 返回 search 指标。失败 search 仍计费，记录真实失败，不伪造分数。轨迹按逻辑
@@ -140,8 +140,8 @@ CoT/ToT 的种子查询有明确的 seed 角色。在 matched 协议中，它们
 `core/source_profiles.py` 分别解析固定 `searcher/config.yaml`、三个
 `searcher/configs/*_config.yaml` 和 `example/search/configs/search_csi300.yaml`。
 它校验配置、入口、客户端、算法及种子资源哈希，输出原声明、实际生效值、
-参数来源、用户模型覆盖和必要修复差异。此文件是来源解析结果，尚不能作为
-`--protocol-file`；完整 source workflow 的区间、过滤、终局和预算接线仍被 gate 阻止。
+参数来源、用户模型覆盖和必要修复差异。此文件是来源解析结果，不能直接作为
+`--protocol-file`；执行需另行冻结包含全部预算和数据/环境身份的 `T3Protocol`。
 
 在服务器生成可重复的来源报告，不调用模型或 oracle：
 
@@ -173,6 +173,35 @@ baseline 与搜索分别绑定现有回调；入口不导入 FFO/Qlib 或模型 
 真实三算法已通过全组种子、并发、预算停止和完整重放测试；当前仍为 synthetic
 oracle 验证，尚未登记 source profile 或真实市场资格。
 
+### Qlib searcher workflow
+
+选择 `profile=upstream_searcher_v1`、`method=alphabench_cot/tot/ea`，
+`native_parameters` 必须只有 `source_config`，值为上述对应 searcher YAML 的
+仓库相对路径。算法参数从已校验的原始配置与源码解析，不能再覆盖 N、worker、
+mutation/crossover 等值。协议中的 rounds、temperature、初始化、过滤、标签、
+最终因子数及持仓数须与来源一致；任何不一致在初始化付费前拒绝。
+`--dry-run` 同样核对来源并输出完整 `source_entry`，显示实际算法参数和协议差异。
+
+CoT/ToT 使用 30 条原生 cold 种子；EA 自动读取配置中的 125 条固定种子。
+不接受其他种子文件、import pool 或 matched 的共享 seed bundle。模型按用户
+要求覆盖为 `deepseek-flash`，原温度值保留但在 thinking 模式下无效。
+
+原生轮数及分支不因 E 上限改写。整批请求无法容纳时返回 `paused_budget`，
+不发布截短的 source 最终成绩；预算在开始前冻结，不能原地加额度后伪装同一
+实验。matched 才允许以新评价预算为停止条件生成明确标注的对照报告。
+
+searcher 对搜索评价失败的因子也执行 private validation，与原 ValEvalTracker
+一致。最终集合只取算法实际返回的 `final_pool`，保留名称、顺序和重复成员；
+validation 同分时保留源顺序。每个成员都必须有有限 validation 指标，否则
+在 test 前返回 `paused_incomplete_validation`。固定源码可回退到 search 排名，
+本 task 的完整 T3 合同禁止混排；该差异保存在 `source_entry_contract` 中。
+信号多样性按成员位置形成配对，重复公式也参加统计；pair 同时保存公式身份
+和左右位置。最终 test 仍为 50 个因子、50 只股票、drop 5、`fast=False`。
+
+执行使用统一入口的 `--protocol-file`、`--upstream-root`、`--data-manifest` 和
+`--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。Assay source
+的完整源合同及 example 的 validation/test 扩展仍未完成，入口明确拒绝它们。
+
 ## 过滤与质量报告
 
 生成器和原生生成回调共享冻结的过滤合同。`qlib_code_filter_v1` 使用固定
@@ -186,7 +215,7 @@ Inf 与 NaN 分别记录。`assay_code_filter_v1` 调用固定 Assay 的无数�
 使用独立 `quality_checks` 预算。报告分别标明静态、后端检查和 paper 覆盖率；
 Assay lint 只产生 `assay_lint_success_rate`，不会伪造动态成功率或行情覆盖。
 检查响应若类型、耗时、比例或结果边界不符会暂停，已完成物理作业仍记账，
-恢复不重复派发。上述过滤实现不解除 source workflow 和真实数据资格的 gate。
+恢复不重复派发。上述过滤实现不解除真实数据资格的 gate。
 
 ## 原生日期与标签边界
 
@@ -209,5 +238,5 @@ forward horizon 的有效样本数。两种后端的完整 portfolio 使用各�
 且没有 matched 的标签 purge。example 的搜索日期是 2023–2024；访问不存在的
 validation/test 区间会明确报错，不能自动继承 matched 日期。
 
-该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。source 入口到
-初始化、最终池和预算的完整接线仍未完成，因此尚未开放 source campaign。
+该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。Qlib searcher
+已接入这些规则；Assay source 和 example workflow 仍保留独立的未完成 gate。

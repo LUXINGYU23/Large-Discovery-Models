@@ -1,11 +1,11 @@
 {
   "artifact_hashes": {
-    "budget.json": "53f0403d0f4c43c7aa7adcfca328bc029fa7a2598acdce98be1587d9dc887c80",
-    "checkpoint.json": "b79009fb28a7906b324f891031af90aa411e8deeae452838a1cb3a4477334be1",
-    "events.jsonl": "27fb0dcc46f6f2ab16e4bb3b31193afe1d398ea9e676f803baf3364bd8b92d33",
-    "result.json": "4fad483b8c053ce1c7c50915a7ce827e646f8fa40d4312b909044df1a8bf2cf3",
-    "selection_frozen.json": "534365f504cf64803a52dd17121a6017825222f7f9ff0ca65569fe1e6b90695f",
-    "summary.json": "4fad483b8c053ce1c7c50915a7ce827e646f8fa40d4312b909044df1a8bf2cf3",
+    "budget.json": "7353d0a5f79f4c57d335ca611452b0829520223382e4ba765f99c7f65c644585",
+    "checkpoint.json": "8071748b1c740d7130670e65b9e4966ffa5dda06bcae67562d7c69ee47032b08",
+    "events.jsonl": "42900000cfcd34d93c0c8a5be3dff8780be354bad207bee94dd769da68719d04",
+    "result.json": "c532ba1b3f25d13d32d8358f2ac14e49726473835a3f1d750d4180893ec0278a",
+    "selection_frozen.json": "5ef060783b52b9294de9f1f96a8082b800f2e638a223b7517f10e0cf5fc8f29f",
+    "summary.json": "c532ba1b3f25d13d32d8358f2ac14e49726473835a3f1d750d4180893ec0278a",
     "trajectory.csv": "a36b0fc43c7d2fad821a1bd0d20c3a86e49ddfe1558d24e3ca0f1f1f717a0796"
   },
   "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
@@ -59,11 +59,11 @@
       "count": 1,
       "files": {
         "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
-        "ldm_ir.jsonl": "0d0fbc84ebbc258e1f1ae808e1497943f2fa203a5c317ed40d5bec3edb7a0fcd",
+        "ldm_ir.jsonl": "86c97d5e83fa60e446b7bb74ac81731874e2e431d1d6513b478bc130cc68b289",
         "ldm_sft.jsonl": "5167a27005846934795fbdde806d140f72a18edd55eef7dd394022b871650e0d"
       },
-      "generation": "5fc81579d4b16c6c85aedcd60a215bbbbdd52518833487e75a95636c1bb07366",
-      "pointer": "initialization/ldm_data/alphabench/11f2055464eb2d4adb832a9314e5b2949715cccee4b48d55c4a0798313b42aea/current.json",
+      "generation": "ba88ff5d1ee29cceae621dc3377a2b3b303e1be3887a9247aecbd8961a003c8d",
+      "pointer": "initialization/ldm_data/alphabench/ca170e4c71ff73b18328ab99ef00a1bc4bb5c48e688e156c4c165738d59b647b/current.json",
       "rows": {
         "ldm_ir.jsonl": 1,
         "ldm_sft.jsonl": 1
@@ -73,11 +73,11 @@
       "count": 2,
       "files": {
         "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
-        "ldm_ir.jsonl": "d258af79748b27333fe4e5c9f6812af6f77c62baafbbd8f9195c934b6717e34e",
+        "ldm_ir.jsonl": "d7fa0a228b6df119990f8aa8e2cbd0830703ca1f444868375df84b15eab48e92",
         "ldm_sft.jsonl": "bd642d0d614a4ce57419b529999c3e43ae598cd6a0e7b03dd4e323a44bb8b9da"
       },
-      "generation": "84f6612e60f79b2f84c8e80db385ebcb7217bc8ae0ef32bef944b35376d044df",
-      "pointer": "ldm_data/alphabench/47195bed5f897bff9a6ff40a8d39a2d39a7c370e1dceddc46c441bddb04e56d7/current.json",
+      "generation": "088c176d018d72125e1d5d1b8b36822bd087a00c27a6c460282f1d9fb41e0e7e",
+      "pointer": "ldm_data/alphabench/0cb075ee926a9b3b8e0382fa993fa8b2b7e61fae03988173e7eb3140640bec35/current.json",
       "rows": {
         "ldm_ir.jsonl": 2,
         "ldm_sft.jsonl": 2
@@ -86,11 +86,11 @@
   ],
   "complete_t3": false,
   "completed_replay": {
-    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_8\", \"status\": \"completed\", \"replayed\": true}",
+    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_9\", \"status\": \"completed\", \"replayed\": true}",
     "files": 187,
     "same_artifact_hashes": true
   },
-  "executed_at": "2026-09-22T21:05:03.924950+00:00",
+  "executed_at": "2026-09-22T21:52:59.286280+00:00",
   "host": "designated remote server",
   "including_initialization": {
     "attempts": 32,
@@ -172,7 +172,13 @@
       "total_attempts": 1,
       "unit": "model attempts per logical generation step"
     },
-    "seed_count": 30
+    "public_information_digest": "ddabd44a6e53530f43cca4acc655bbf9f66b3d47d4d6d9dfd8cdef386d83c6dd",
+    "seed_count": 30,
+    "source_digest": "6dcf8056cf373132f2f0742fd15f39f371c12d62561221f9b172a8c8793a529f",
+    "source_dispositions": {
+      "admitted": 30
+    },
+    "source_records": 30
   },
   "kind": "synthetic_development_gate",
   "profile": "mock_ldm",
@@ -191,6 +197,96 @@
     "paper_unavailable_reason": null,
     "qlib_dynamic_success_rate": 1.0,
     "raw_occurrences": 8,
+    "rows": [
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "4bb6de53c39ac93a4ee64cbc1af6a640df90cd23d941f88db937354f1b850fee",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 0,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "2367a98a647f7b3a16d54cdf951aec05fa377b743eee723da0ccaffa460462a5",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 1,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "b829365531df39b4478b6a2daf9e9446bc2b0fbc19423891fa8e88dd223c3bdd",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 2,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "93d7a7c82c9ef0965ff93bacdfca3fffa9b50d26b31ca53ffe627cb987428d7b",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 3,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "94fae9f0d3d8fee76c05213147b1b28b9b335664634f9743d51f680db102c5ea",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 0,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "0c39507e3d97019fff01e4202fc817c2fa4579d5ecff15b544cb889d33eef1a2",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 1,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "7517cb6c12ebff38eabca042a5fb95cab589057bd1f906ea1ae5de5f2c0a40d4",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 2,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "b700f61198a65f9815155d05a6dac4c49ee1330d1071fc264ef7793d54486613",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 3,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      }
+    ],
     "static_success_rate": 1.0,
     "unavailable_reason": null,
     "unique_admitted": 8,
@@ -198,7 +294,7 @@
     "unique_valid": 8
   },
   "root": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation",
-  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_8",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_9",
   "search": {
     "attempts": 2,
     "gain": 0.36666666666666664,
