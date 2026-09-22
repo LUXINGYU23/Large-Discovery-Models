@@ -31,7 +31,8 @@ class Generator:
 
         try:
             raw = self.receipts.execute(key, {"messages": messages, "protocol": self.protocol.identity}, reserve=reserve,
-                operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host)
+                operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host,
+                authorize=self.gateway.before_dispatch)
         except EndpointRequestError as exc:
             raise EvaluationPaused("model request failed; inspect the durable receipt before retrying",
                                    status="paused_provider") from exc

@@ -19,6 +19,7 @@ class OracleGateway:
         self.mock = mock
         self.receipts = Receipts(runtime.run_dir / "private" / "oracle")
         self.host = HostDispatcher()
+        self.before_dispatch = None
 
     def preflight(self):
         if self.mock:
@@ -41,6 +42,10 @@ class OracleGateway:
                 "position": position, "candidate": candidate.candidate_id}
 
     def evaluate(self, candidate, *, phase, position, fast=True):
+        logical, request, counter = self.evaluation_request(candidate, phase=phase, position=position, fast=fast)
+        return self._execute(logical, request, counter, charge_jobs=phase != "search")
+
+    def evaluation_request(self, candidate, *, phase, position, fast=True):
         protocol = self.protocol
         logical = self.identity(phase, position, candidate)
         start, end = protocol.interval("search" if phase == "initialization" else "check" if phase in {"check", "quality"} else phase)
@@ -52,7 +57,14 @@ class OracleGateway:
         counter = {"check": "dynamic_checks", "quality": "quality_checks", "initialization": "initialization_evaluations",
                    "validation": "validation_evaluations", "test": "test_evaluations", "search": None}[phase]
 
-        return self._execute(logical, request, counter, charge_jobs=phase != "search")
+        return logical, request, counter
+
+    @staticmethod
+    def reservation(logical, request, counter):
+        amounts = {"oracle_job_slots": request["job_permits"]}
+        if counter:
+            amounts[counter] = 1
+        return "task:oracle:" + digest(logical), amounts
 
     def combine(self, candidates, *, selection_digest):
         start, end = self.protocol.interval("test")
@@ -65,20 +77,21 @@ class OracleGateway:
 
     def _execute(self, logical, request, counter, *, charge_jobs=True):
         def reserve():
-            amounts = {"oracle_job_slots": request["job_permits"]}
-            if counter:
-                amounts[counter] = 1
-            self.runtime.consume_many(amounts, usage_key="task:oracle:" + digest(logical))
+            key, amounts = self.reservation(logical, request, counter)
+            self.runtime.consume_many(amounts, usage_key=key)
 
         try:
             result = self.receipts.execute(logical, request, reserve=reserve,
-                                           operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request), owner=self.host)
+                operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request), owner=self.host,
+                authorize=self.before_dispatch if logical["phase"] in {"search", "check"} else None)
         except (OSError, TimeoutError, urllib.error.URLError) as exc:
             raise EvaluationPaused("oracle dispatch requires reconciliation") from exc
-        if result.get("request_id") != request["request_id"]:
+        if not isinstance(result, dict) or result.get("request_id") != request["request_id"]:
             raise EvaluationPaused("oracle returned a different request identity")
         jobs = result.get("jobs")
-        if not isinstance(jobs, list) or len(jobs) > request["job_permits"] or len({job["job_id"] for job in jobs}) != len(jobs):
+        if (not isinstance(jobs, list) or len(jobs) > request["job_permits"] or
+                any(not isinstance(job, dict) or not isinstance(job.get("job_id"), str) or not job["job_id"] for job in jobs) or
+                len({job["job_id"] for job in jobs}) != len(jobs)):
             raise EvaluationPaused("oracle job accounting is incomplete or exceeds permits")
         if charge_jobs:
             self.host.call(lambda: self.runtime.consume_many({"benchmark_jobs": len(jobs)}, usage_key="task:oracle-result:" + digest(logical)))

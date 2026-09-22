@@ -55,28 +55,39 @@ class BudgetLedger:
     ) -> dict[str, int | float]:
         """Persist increments, or cumulative usage for an idempotent operation key."""
 
-        if usage_key is not None and not usage_key.strip():
-            raise ValueError("usage_key must not be empty")
-        previous = self.metadata.get("cumulative_usage", {}).get(usage_key, {})
-        totals = dict(previous)
+        return self.consume_groups({usage_key: amounts})
+
+    def consume_groups(
+        self, groups: Mapping[str | None, Mapping[str, int | float]]
+    ) -> dict[str, int | float]:
+        """Reserve a whole batch atomically, retaining each operation's replay key."""
+
+        usage = dict(self.metadata.get("cumulative_usage", {}))
         updates: dict[str, int | float] = {}
-        for name, raw_amount in amounts.items():
-            amount = _validated_number(raw_amount, f"amount for {name}")
+        for usage_key, amounts in groups.items():
+            if usage_key is not None and not usage_key.strip():
+                raise ValueError("usage_key must not be empty")
+            previous = usage.get(usage_key, {}) if usage_key is not None else {}
+            totals = dict(previous)
+            for name, raw_amount in amounts.items():
+                amount = _validated_number(raw_amount, f"amount for {name}")
+                if usage_key is not None:
+                    totals[name] = max(previous.get(name, 0), amount)
+                    amount = totals[name] - previous.get(name, 0)
+                current = updates.get(name, self.counters.get(name, 0))
+                updated = current + amount
+                limit = self.limits.get(name)
+                if limit is not None and updated > limit:
+                    raise BudgetExceededError(
+                        f"Budget {name!r} would be exceeded: "
+                        f"{current} + {amount} > {limit}"
+                    )
+                updates[name] = updated
             if usage_key is not None:
-                totals[name] = max(previous.get(name, 0), amount)
-                amount = totals[name] - previous.get(name, 0)
-            current = self.counters.get(name, 0)
-            updated = current + amount
-            limit = self.limits.get(name)
-            if limit is not None and updated > limit:
-                raise BudgetExceededError(
-                    f"Budget {name!r} would be exceeded: "
-                    f"{current} + {amount} > {limit}"
-                )
-            updates[name] = updated
+                usage[usage_key] = totals
         self.counters.update(updates)
-        if usage_key is not None:
-            self.metadata.setdefault("cumulative_usage", {})[usage_key] = totals
+        if any(key is not None for key in groups):
+            self.metadata["cumulative_usage"] = usage
         self.write()
         return updates
 
@@ -330,7 +341,12 @@ class CampaignRuntime:
     def consume_many(
         self, amounts: Mapping[str, int | float], *, usage_key: str | None = None
     ) -> dict[str, int | float]:
-        values = self.budget.consume_many(amounts, usage_key=usage_key)
+        return self.consume_groups({usage_key: amounts})
+
+    def consume_groups(
+        self, groups: Mapping[str | None, Mapping[str, int | float]]
+    ) -> dict[str, int | float]:
+        values = self.budget.consume_groups(groups)
         self.status.update("running", phase="budget_updated", budget=self.budget)
         return values
 

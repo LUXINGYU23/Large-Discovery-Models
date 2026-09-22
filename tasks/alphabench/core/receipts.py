@@ -20,7 +20,7 @@ class Receipts:
         path = self.path(identity)
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
-    def execute(self, identity, request, *, reserve, operation, reconcile=None, owner=None):
+    def execute(self, identity, request, *, reserve, operation, reconcile=None, owner=None, authorize=None):
         request_digest = digest(request)
         invoke = owner.call if owner else lambda callback: callback()
 
@@ -40,6 +40,8 @@ class Receipts:
                         atomic_json_write(self.path(identity), record)
                         return record
                     raise EvaluationPaused(f"physical request requires reconciliation: {digest(identity)}")
+            if authorize:
+                authorize()
             reserve()
             record = {"identity": identity, "request_digest": request_digest, "request": request,
                       "state": "reserved"}

@@ -7,8 +7,8 @@
 同一运行恢复时不允许这些实现发生变化。源 checkout 不被修改。
 
 当前组件已经执行真实的官方 CoT/ToT/EA Python 算法和原生生成器，并接入
-模型请求与动态检查计量；尚未接入正式 workflow。完整 batch 预算桥接、
-source profiles、私有 validation 和终局报告接线仍须完成。正式入口继续拒绝未完成的方法，
+模型请求、动态检查、整批 search 预算及私有 validation；尚未接入正式 workflow。
+source profiles、原生 cold 初始化和终局报告接线仍须完成。正式入口继续拒绝未完成的方法，
 本组件的通过不代表 W10 或完整 T3 已通过。
 
 ## 执行合同
@@ -73,6 +73,28 @@ IR/SFT 发布；原生不成功但含少量因子的返回值照常交回原算�
 `ignored_by_provider_in_thinking_mode`，不能宣称复现了旧模型的温度条件。
 
 ## 已验证及边界
+
+`core/native_evaluation.py` 的三个评价回调共享同一个实现。整个 batch 的 E 和
+各请求的 worker permits 由共享账本一次写入；任一额度不足不修改任何计数，也
+不派发部分 batch。各请求仍使用自己的稳定 usage key，随后网关确认许可和
+恢复时不会重扣。相同公式在不同回调或批次位置出现属于不同的新尝试。
+
+CoT/ToT 的种子查询有明确的 seed 角色。在 matched 协议中，它们只读已验证的
+共同初始化观测，不消耗新增 E；未知种子暂停。完整初始信息 digest、协议、
+并发数和评价适配器 hash 冻结后才能执行。source profile 的初始化规则仍须
+独立完成，不能套用 matched 的规则后声称保留了原入口。
+
+成功 search 先完成 private validation，再持久化公开 observation；callback 只
+返回 search 指标。失败 search 仍计费，记录真实失败，不伪造分数。轨迹按逻辑
+回调提交顺序及 batch 原顺序排列，物理完成顺序不改变该横轴。实际 search jobs
+在收到结果后即入账，即使之后的 validation 暂停也不会漏掉这些成本。
+
+停止标记阻止新的模型、修复、check 和 search 请求；已完成 receipt 仍可只读
+重放。所有 worker 退出后必须调用 `settle()` 核对已发起请求并完成必要的私有
+验证。未知在途结果继续暂停，不能用先发生的预算停止掩盖。已预留但未发起的
+候选单列 `reserved_but_unstarted`，不生成 observation，不计入实际评价轨迹；
+预留计数不会伪装成物理派发数。Host 设置停止标记时不等待原生调度锁，避免
+与正在等候 Host 回复的 worker 形成死锁。
 
 在指定服务器运行 `python -m pytest tasks/alphabench/tests/test_native.py -q`。
 固定源码对照覆盖三算法的部分生成、重复、阈值与多 worker；完整重放逐项比较

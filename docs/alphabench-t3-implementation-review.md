@@ -404,3 +404,58 @@ continuation and paired collection after interruption, unknown/malformed check
 responses, and actual HTTP Responses bodies with JSON/max thinking and one POST
 on a 503 failure. These are implementation checks, not qualified market runs or
 the user's final two-round real-endpoint acceptance.
+
+## Change 13: atomic native batches and private evaluation settlement
+
+Cross-check against W05/W10 and X05/X06 found that reserving E separately from
+worker permits could spend an entire batch's search allowance before the first
+request discovered a permit shortage. The shared ledger now commits several
+cumulative usage keys in one transaction. The native adapter reserves all search
+attempts and their job permits together, retaining the gateway's existing keys.
+A failed group changes neither counters nor persisted usage. Single-request
+confirmation and replay remain idempotent through the same implementation.
+
+All three evaluation callback shapes use one native evaluator. Callback identity
+and input position distinguish repeated expressions from replay. CoT/ToT seed
+queries have a source-instrumented role and reuse the verified matched initial
+observations; seed information, protocol, worker count and adapter implementation
+are frozen. The source algorithms still select their own seeds and preserve
+their chain, tree and population transitions. Empty ToT nodes now also emit the
+existing state event before the source's early return.
+
+Search receipts settle their actual jobs before private validation. Successful
+validation completion precedes publication of each public observation; neither
+validation scores nor validation failures become search scores. Observations
+retain logical submission/input order independently of concurrent completion.
+Failed search attempts retain their true status and cost. Malformed job records
+pause through the native control signal instead of triggering upstream fallback
+evaluation or appearing as invalid formulas.
+
+Pre-dispatch authorization checks the shared stop flag inside the Host writer,
+including each model repair and dynamic check. Completed receipts stay readable
+after a stop. Stop assignment has its own short mutex; Host authorization does
+not acquire a scheduler condition that a waiting worker may hold. After all
+workers drain, settlement reconciles begun requests, finishes private validation
+and lists reserved-but-unstarted candidates without fabricated observations.
+An unknown in-flight result still pauses even when another worker first stopped
+because E was exhausted. The durable stop record prevents new dispatch after
+resuming a terminal matched budget stop.
+
+Complexity review: the old single-key budget calculation was replaced by the
+multi-key implementation, not retained as a second path. Request construction
+and reservation identity each have one implementation shared by ordinary and
+native evaluation. No copied native loop, alternative evaluator, separate
+budget ledger, per-batch checkpoint database or expression-result cache was
+added. The three callable shapes exist only to match the official four seams.
+Formal workflow/finalization wiring, source profiles and native cold generation
+remain gated; this component does not claim W10 or full T3 qualification.
+
+Remote validation: 195 task tests pass with one backend-only module skipped;
+491 shared tests pass with one existing skip; all nine pinned Assay tests pass
+separately. Eighteen new task checks cover atomic E/permit rejection, competing
+complete batches, private validation, seed reuse versus fresh re-proposals,
+post-stop cancellation, unknown outcomes, provider repair authorization, failed
+search billing, validation reconciliation, malformed job receipts and all three
+actual algorithms with both metered generation and evaluation. Two checks kill
+real subprocesses after ledger reservation or committed observation and verify
+that resumed physical search/validation calls and charges occur only once.

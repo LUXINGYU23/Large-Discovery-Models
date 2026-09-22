@@ -1,8 +1,9 @@
 """Record native worker boundaries in the Campaign's existing event journal."""
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 import json
-from threading import Condition, local
+from threading import Condition, Lock, local
 import time
 from types import SimpleNamespace
 import uuid
@@ -32,6 +33,7 @@ class NativeRuntime:
             raise EvaluationPaused("native output integrity failure")
         self.cursor = 0
         self.condition = Condition()
+        self.stop_lock = Lock()
         self.thread = local()
         self.stopped = None
 
@@ -39,11 +41,27 @@ class NativeRuntime:
     def scope(self):
         return self.thread.scope
 
-    def stop(self, cause):
-        with self.condition:
+    @property
+    def role(self):
+        return getattr(self.thread, "role", "search")
+
+    @contextmanager
+    def seed(self):
+        previous = self.role
+        self.thread.role = "seed"
+        try:
+            yield
+        finally:
+            self.thread.role = previous
+
+    def stop(self, cause, *, notify=True):
+        with self.stop_lock:
             if self.stopped is None:
                 self.stopped = cause if isinstance(cause, NativeStop) else NativeStop(cause)
-            self.condition.notify_all()
+        # Host callbacks cannot acquire a lock held by a worker awaiting that Host.
+        if notify:
+            with self.condition:
+                self.condition.notify_all()
         return self.stopped
 
     def _check(self):
@@ -118,7 +136,7 @@ class NativeRuntime:
         """A leaf callback; its operation must use durable receipts for incomplete calls."""
         def invoke(*args, **kwargs):
             identity = self._identity()
-            inputs = {"args": args, "kwargs": kwargs}
+            inputs = {"args": args, "kwargs": kwargs, "role": self.role}
             self.boundary(kind + ".begin", inputs, identity=identity)
             completed_id = self._identity()
             if completed_id in self.by_id:
@@ -126,7 +144,7 @@ class NativeRuntime:
             try:
                 self._check()
                 answer = operation(identity, *args, **kwargs)
-            except (EvaluationPaused, BudgetExceededError, KeyboardInterrupt, SystemExit) as exc:
+            except (NativeStop, EvaluationPaused, BudgetExceededError, KeyboardInterrupt, SystemExit) as exc:
                 raise self.stop(exc)
             return self.boundary(kind + ".end", {"begin": identity}, lambda: answer, identity=completed_id)
         return invoke
@@ -210,6 +228,7 @@ class NativeRuntime:
         return {
             "ThreadPoolExecutor": self.executor,
             "as_completed": self.completed,
+            "native_seed": self.seed,
             "native_state": lambda kind, state: self.boundary(
                 "state", {"kind": kind, "state": state}, lambda: {"kind": kind, "state": state}),
             "threading": SimpleNamespace(Lock=self.lock),

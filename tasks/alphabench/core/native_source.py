@@ -31,13 +31,17 @@ def patched_source(name, text):
         text = text.replace(f"\nimport {module}\n", f"\nfrom .runtime import {module}\n")
     text = text.replace("from concurrent.futures import ", "from .runtime import ")
     if name in {"cot.py", "tot.py", "ea.py"}:
-        text = text.replace("from .base import BaseAlgo", "from .base import BaseAlgo\nfrom .runtime import native_state")
+        text = text.replace("from .base import BaseAlgo", "from .base import BaseAlgo\nfrom .runtime import native_state, native_seed")
     if name == "cot.py":
+        call = 'seed_metrics = self._safe_eval_batch(seed["name"], seed["expression"])["metrics"]'
+        replace("        " + call, "        with native_seed():\n            " + call)
         snapshot = 'native_state("cot.chain", {"chain": chain})\n'
         replace("        for r in range(1, rounds + 1):", "        " + snapshot + "\n        for r in range(1, rounds + 1):")
         replace("                continue\n\n            cand_name", "                " + snapshot + "                continue\n\n            cand_name")
         replace("\n        summary = {", "\n            " + snapshot + "\n        summary = {")
     if name == "tot.py":
+        call = 'seed_batch   = self._safe_eval_batch([{"name": seed["name"], "expression": seed["expression"]}])'
+        replace("        " + call, "        with native_seed():\n            " + call)
         before = ('            if self._is_better(best_global.get("metrics", {}), metrics):\n'
                   '                best_global = {"name": name, "expression": expr, "metrics": metrics}\n')
         replace(before, "            with self._seen_lock:\n" +
@@ -45,6 +49,9 @@ def patched_source(name, text):
         replace("            if depth >= rounds or not survivor_nodes:",
                 '            native_state("tot.node", branch_history[-1])\n\n'
                 "            if depth >= rounds or not survivor_nodes:")
+        replace('                return {"history": branch_history, "best": parent}',
+                '                native_state("tot.node", branch_history[-1])\n'
+                '                return {"history": branch_history, "best": parent}')
     if name == "ea.py":
         replace("        current_pool = _rank_by_rank_ic(pool)\n", "        current_pool = _rank_by_rank_ic(pool)\n"
                 '        native_state("ea.pool", {"round": 0, "pool": current_pool, "candidates": []})\n')
