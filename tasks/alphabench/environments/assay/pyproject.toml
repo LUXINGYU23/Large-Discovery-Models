@@ -1,0 +1,11 @@
+[project]
+name = "alphabench-assay-runtime"
+version = "0.1.0"
+requires-python = ">=3.10,<3.11"
+dependencies = ["assay[api,perf]"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+assay = { path = "/mnt/data1/Large-Discovery-Models/data/alphabench/Assay" }

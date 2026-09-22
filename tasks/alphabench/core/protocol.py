@@ -1,0 +1,128 @@
+"""Frozen scientific and execution identities; no inferred data defaults."""
+
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+import hashlib
+import json
+from pathlib import Path
+
+METHODS = ("alphabench_cot", "alphabench_tot", "alphabench_ea", "llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled")
+LDM_METHODS = ("ldm", "ldm_harness", "ldm_harness_compiled")
+BACKENDS = {"qlib": ("csi300", "csi500", "csi1000", "sp500"),
+            "assay": ("csi300", "csi500", "csi1000", "sp500", "nasdaq100")}
+PROFILES = ("upstream_searcher_v1", "upstream_benchmark_v1", "ldm_matched_v1")
+
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class T3Protocol:
+    backend: str = "qlib"
+    market: str = "csi300"
+    method: str = "llm"
+    profile: str = "ldm_matched_v1"
+    filter_profile: str = "paper_filter_v1"
+    init_mode: str = "cold"
+    data_digest: str = ""
+    environment_digest: str = ""
+    model: str = "deepseek-flash"
+    endpoint: str = "https://api.deepseek.com/responses"
+    wire_api: str = "responses"
+    reasoning_effort: str = "max"
+    forward_n: int = 1
+    label: str = "close_return"
+    objective: str = "rank_ic"
+    direction: int = 1
+    random_seed: int = 42
+    rounds: int = 2
+    evaluations: int = 4
+    batch_size: int = 2
+    sessions: int = 2
+    candidates_per_session: int = 4
+    cold_seed_count: int = 30
+    alpha158_groups: tuple[str, ...] = ("kbar", "rolling")
+    factor_select_n: int = 50
+    stock_topk: int = 50
+    stock_n_drop: int = 5
+    worker_timeout: int = 120
+    request_timeout: int = 180
+    max_model_tokens: int = 32768
+    budgets: dict = field(default_factory=lambda: {
+        "model_requests": 120, "proposal_attempts": 100, "dynamic_checks": 400,
+        "initialization_evaluations": 160, "validation_evaluations": 164,
+        "test_evaluations": 50, "analysis_jobs": 4, "quality_checks": 400,
+        "oracle_job_slots": 2000, "benchmark_jobs": 2000, "policy_turns": 4,
+        "harness_turns": 20,
+    })
+
+    def __post_init__(self):
+        if self.backend not in BACKENDS or self.market not in BACKENDS[self.backend]:
+            raise ValueError("unsupported backend/market pair")
+        if self.method not in METHODS or self.profile not in PROFILES:
+            raise ValueError("unknown method or protocol profile")
+        if self.init_mode not in {"cold", "alpha158", "file", "import_pool"}:
+            raise ValueError("unknown initialization mode")
+        if self.filter_profile not in {"paper_filter_v1", "qlib_code_filter_v1", "assay_code_filter_v1"}:
+            raise ValueError("unknown filter profile")
+        if self.backend == "qlib" and self.filter_profile == "assay_code_filter_v1":
+            raise ValueError("Assay lint cannot validate a Qlib campaign")
+        if self.objective not in {"ic", "rank_ic"} or self.direction not in {-1, 1}:
+            raise ValueError("invalid frozen objective/direction")
+        if (self.model, self.wire_api, self.reasoning_effort) != ("deepseek-flash", "responses", "max"):
+            raise ValueError("this campaign contract requires deepseek-flash / Responses / max")
+        if self.endpoint != "https://api.deepseek.com/responses":
+            raise ValueError("provider endpoint differs from the approved contract")
+        for name in ("forward_n", "rounds", "evaluations", "batch_size", "sessions", "candidates_per_session", "cold_seed_count",
+                     "factor_select_n", "stock_topk", "worker_timeout", "request_timeout", "max_model_tokens"):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 1:
+                raise ValueError(f"{name} must be a positive integer")
+        if self.method in LDM_METHODS and self.batch_size > self.candidates_per_session:
+            raise ValueError("LDM batch size must not exceed per-session K")
+        if not 0 <= self.stock_n_drop < self.stock_topk:
+            raise ValueError("drop count must be below portfolio size")
+        if self.request_timeout <= self.worker_timeout:
+            raise ValueError("request timeout must exceed worker timeout")
+        required = {"model_requests", "proposal_attempts", "dynamic_checks", "initialization_evaluations",
+                    "validation_evaluations", "test_evaluations", "analysis_jobs", "quality_checks",
+                    "oracle_job_slots", "benchmark_jobs", "policy_turns", "harness_turns"}
+        if set(self.budgets) != required or any(type(v) is not int or v < 0 for v in self.budgets.values()):
+            raise ValueError("all stage budgets must be explicit finite nonnegative integers")
+
+    def to_dict(self):
+        return json.loads(json.dumps(asdict(self)))
+
+    @property
+    def identity(self):
+        return digest(self.to_dict())
+
+    @property
+    def grammar_depth(self):
+        return {"paper_filter_v1": 5, "qlib_code_filter_v1": 6, "assay_code_filter_v1": None}[self.filter_profile]
+
+    def interval(self, phase):
+        return {"search": ("2016-01-01", "2021-01-01"),
+                "validation": ("2021-01-01", "2022-01-01"),
+                "test": ("2022-01-01", "2025-01-01"),
+                "check": ("2020-01-01", "2020-01-15")}[phase]
+
+
+def verify_data_manifest(path: Path, protocol: T3Protocol):
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest.get("qualification") != "qualified":
+        raise ValueError("data qualification is incomplete; inspect the recorded coverage issues")
+    for key in ("source", "archive_sha256", "files_sha256", "calendar_sha256", "universe_sha256",
+                "adjustment", "fields", "start", "end", "benchmark", "historical_universe"):
+        if not manifest.get(key):
+            raise ValueError(f"data manifest lacks {key}")
+    if manifest["historical_universe"] is not True:
+        raise ValueError("current constituents cannot replace a historical universe")
+    if manifest.get("market") != protocol.market or manifest.get("backend") != protocol.backend:
+        raise ValueError("data manifest backend/market mismatch")
+    if manifest["start"] > "2015-01-01" or manifest["end"] < "2025-01-01":
+        raise ValueError("data does not cover lookback, all splits, and forward labels")
+    if digest(manifest) != protocol.data_digest:
+        raise ValueError("data manifest does not match the frozen protocol")
+    return manifest

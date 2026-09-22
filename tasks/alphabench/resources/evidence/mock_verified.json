@@ -1,0 +1,139 @@
+{
+  "artifact_hashes": {
+    "budget.json": "c256a585808c0c36be69fb1c5b9a7b59d788e19e7f6a6cb591e515d9055fd3e5",
+    "checkpoint.json": "ebf63ab310f688814727df80f69a22678d5fd71a6b7bff273c74a439a474500b",
+    "events.jsonl": "fc6a5e291065c3213708ef595f16dfe0e852b94fe4dbd497688224aa75f6b2c9",
+    "result.json": "74737c6949b906537a7704f218166ae1cd1fb06ee251d29b34a9e411e4e8f3a7",
+    "selection_frozen.json": "4ba5753243cdb6473fa74da62599a7762da53ab239b51d24592228985dabbbd5",
+    "summary.json": "74737c6949b906537a7704f218166ae1cd1fb06ee251d29b34a9e411e4e8f3a7",
+    "trajectory.csv": "a36b0fc43c7d2fad821a1bd0d20c3a86e49ddfe1558d24e3ca0f1f1f717a0796"
+  },
+  "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+  "budget": {
+    "counters": {
+      "analysis_jobs": 1,
+      "benchmark_jobs": 53,
+      "dynamic_checks": 8,
+      "expensive_evaluation_attempts": 2,
+      "external_evaluations": 2,
+      "harness_turns": 0,
+      "initialization_evaluations": 0,
+      "model_requests": 2,
+      "model_tokens": 0,
+      "oracle_job_slots": 304,
+      "outer_iterations": 1,
+      "policy_turns": 0,
+      "proposal_attempts": 2,
+      "quality_checks": 8,
+      "selected_candidates": 2,
+      "successful_evaluations": 2,
+      "test_evaluations": 32,
+      "valid_search_candidates": 8,
+      "validation_evaluations": 2
+    },
+    "limits": {
+      "analysis_jobs": 4,
+      "benchmark_jobs": 2000,
+      "dynamic_checks": 400,
+      "expensive_evaluation_attempts": 2,
+      "external_evaluations": 2,
+      "harness_turns": 20,
+      "initialization_evaluations": 160,
+      "model_requests": 120,
+      "oracle_job_slots": 2000,
+      "outer_iterations": 1,
+      "policy_turns": 4,
+      "proposal_attempts": 100,
+      "quality_checks": 400,
+      "selected_candidates": 2,
+      "successful_evaluations": 2,
+      "test_evaluations": 50,
+      "valid_search_candidates": 8,
+      "validation_evaluations": 164
+    }
+  },
+  "collections": [
+    {
+      "generation": "1adb1ddba3c1deea8a9b41608f025854dd9e533105cdcebfb7206139e82ea9c9",
+      "ir_rows": 1,
+      "pointer": "initialization/ldm_data/alphabench/573c36fd0cee4403c96d2250ac2d48ac1da6ad8a6d2049fc080ae51b57d34be8/current.json",
+      "sft_rows": 1
+    },
+    {
+      "generation": "413eac28eb0f0f29302626530c03ece4e22a11a6995359b5971f8602696a1531",
+      "ir_rows": 2,
+      "pointer": "ldm_data/alphabench/f72d0d5be777cece7fd448829ff31289bc9cbbfcad45540bea42623b75b94f5f/current.json",
+      "sft_rows": 2
+    }
+  ],
+  "complete_t3": false,
+  "completed_replay": {
+    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock\", \"status\": \"completed\", \"replayed\": true}",
+    "files": 193,
+    "same_artifact_hashes": true
+  },
+  "executed_at": "2026-09-22",
+  "host": "designated remote server",
+  "initialization": {
+    "budget": {
+      "counters": {
+        "analysis_jobs": 0,
+        "benchmark_jobs": 90,
+        "dynamic_checks": 30,
+        "expensive_evaluation_attempts": 30,
+        "external_evaluations": 30,
+        "harness_turns": 0,
+        "initialization_evaluations": 30,
+        "model_requests": 1,
+        "model_tokens": 0,
+        "oracle_job_slots": 180,
+        "outer_iterations": 1,
+        "policy_turns": 0,
+        "proposal_attempts": 1,
+        "quality_checks": 0,
+        "selected_candidates": 30,
+        "successful_evaluations": 30,
+        "test_evaluations": 0,
+        "valid_search_candidates": 30,
+        "validation_evaluations": 30
+      },
+      "limits": {
+        "analysis_jobs": 4,
+        "benchmark_jobs": 2000,
+        "dynamic_checks": 400,
+        "expensive_evaluation_attempts": 160,
+        "external_evaluations": 160,
+        "harness_turns": 20,
+        "initialization_evaluations": 160,
+        "model_requests": 120,
+        "oracle_job_slots": 2000,
+        "outer_iterations": 1,
+        "policy_turns": 4,
+        "proposal_attempts": 100,
+        "quality_checks": 400,
+        "selected_candidates": 160,
+        "successful_evaluations": 160,
+        "test_evaluations": 50,
+        "valid_search_candidates": 160,
+        "validation_evaluations": 164
+      }
+    },
+    "seed_count": 30
+  },
+  "kind": "synthetic_development_gate",
+  "profile": "mock_ldm",
+  "protocol_digest": "d0a43ef060fa6e40cee227de6b054e4de408db86093ffa6adff0e5a118c5e8c1",
+  "qualification": "mock_verified",
+  "root": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation",
+  "search": {
+    "attempts": 2,
+    "gain": 0.36666666666666664,
+    "run_success": false,
+    "search_cost_attempts": null,
+    "strict_comparison": ">",
+    "successful_measurements": 2,
+    "threshold": 0.03
+  },
+  "status": "completed",
+  "test_factors": 32
+}

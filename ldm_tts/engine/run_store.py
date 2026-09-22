@@ -460,7 +460,7 @@ def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
         dir=str(path.parent),
     )
     try:
-        with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(temporary_fd, "w", encoding="utf-8", newline="\n") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
             handle.flush()

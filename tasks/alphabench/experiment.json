@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task_id": "alphabench",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/CityU-MLO/AlphaBench",
+    "source_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+    "task_path": "searcher"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "ic",
+        "direction": "maximize"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "rank_ic",
+        "direction": "maximize"
+      }
+    ],
+    "diagnostic": [{"name": "search_cost_attempts", "direction": "minimize"}]
+  },
+  "evaluation": {
+    "datasets": [
+      "synthetic_mock", "csi300", "csi500", "csi1000", "sp500", "nasdaq100"
+    ],
+    "settings": {
+      "scope": "Full T3; all methods and backend/market rows remain required",
+      "protocols": ["ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"],
+      "model": "deepseek-flash",
+      "endpoint": "https://api.deepseek.com/responses",
+      "wire_api": "responses",
+      "reasoning_effort": "max",
+      "feedback": "Only committed search observations. Validation and test remain private.",
+      "data_preparation": "Local international acquisition, SHA256 bundle transfer, remote offline verification.",
+      "qualification_note": "Data and remaining method/backend gates are incomplete; synthetic checks and development seed probes do not qualify full T3."
+    },
+    "per_candidate_limits": {"generation_attempts": 5, "worker_timeout_seconds": 120}
+  },
+  "budget": {},
+  "profiles": {
+    "mock_ldm": {
+      "description": "Synthetic LDM lifecycle with initialization, private validation, frozen full test, analysis and replay",
+      "budget": {"search_evaluations": 2},
+      "locked_args": {"mock": true, "method": "ldm", "iterations": 1, "evaluations": 2}
+    }
+  }
+}

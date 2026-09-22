@@ -1,0 +1,78 @@
+{
+  "checked_at_utc": "2026-09-22",
+  "cn": {
+    "csi1000": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "ca8a4cc481dd78407b839f0b1aab289de4c8bf64f6f43e521bca6cdb9e978caa",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "7fbcd803ec66f82b011a15d330e102eccb28568ea997242f5c96ab46a51f6145",
+      "gap_symbols": 64,
+      "issues": [
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 64
+        }
+      ],
+      "qualification": "blocked",
+      "symbols": 2803,
+      "universe_sha256": "49ee71e7606724feb8bf628c3f2c72459ea2c49c916e48599d866fca16f7eb26",
+      "unresolved_sessions": 707
+    },
+    "csi300": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "2085a65bef7fc7ba054b04ba12b9f1fa46d6846d1f5b43b05f3fc099a4d3ec4a",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "8a39bd4599bb6cfb14a3b38e684eb2313bff98eb29ec7b9c9594f30822fe2723",
+      "gap_symbols": 19,
+      "issues": [
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 19
+        }
+      ],
+      "qualification": "blocked",
+      "symbols": 949,
+      "universe_sha256": "a96252039fe59df24b49df0c4653daa56c71ab1e3ed99fe965d804c0a8ea8313",
+      "unresolved_sessions": 317
+    },
+    "csi500": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "419f319baeae5c3ef4cba81b0e1dedb0cba27429465f32b507fb7f0adf51eb3c",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "caa215ced4297bddac04edfd1ff8f5f3e29ca035c40b93aea20e1da209dc869a",
+      "gap_symbols": 25,
+      "issues": [
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 25
+        }
+      ],
+      "qualification": "blocked",
+      "symbols": 1802,
+      "universe_sha256": "1f764b1ef470794a4d708dd6f68ab58c61ce12246244c00dc34427b30a30600e",
+      "unresolved_sessions": 1144
+    }
+  },
+  "complete_t3_data": false,
+  "corroborated_suspension_rows": 127975,
+  "network": {
+    "acquisition": "local computer",
+    "server_install_and_audit": "offline"
+  },
+  "queried_status_rows": 128195,
+  "raw_query_responses": 3745,
+  "remaining_assets": [
+    "US full response acquisition and offline audit",
+    "unresolved CN gaps",
+    "historical industry groups",
+    "US VWAP and actual index benchmarks",
+    "corporate-action knowledge dates and lineage"
+  ],
+  "suspension_source": {
+    "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+    "last_date": "2023-06-09",
+    "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension",
+    "table": "bao_a_stock_eod_info",
+    "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master"
+  }
+}

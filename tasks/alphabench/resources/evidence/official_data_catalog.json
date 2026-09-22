@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-09-22",
+  "alphabench_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+  "link_file": "benchmark/data/evaluate/raw/download.txt",
+  "url": "https://drive.google.com/file/d/1DHvASw87V05jr4JQl7EW7PMroxiWgoKj/view",
+  "filename": "alphabench_performance_raw.zip",
+  "archive_bytes": 202921647,
+  "inspection": "HTTP HEAD plus final 65536 bytes; ZIP central directory parsed locally via the configured proxy. Full archive was not required or claimed to be verified.",
+  "files": [
+    {"name": "ic_table_csi300.csv", "uncompressed_bytes": 122263570},
+    {"name": "ic_table_sp500.csv", "uncompressed_bytes": 127917393},
+    {"name": "rankic_table_csi300.csv", "uncompressed_bytes": 123331936},
+    {"name": "rankic_table_sp500.csv", "uncompressed_bytes": 127966657}
+  ],
+  "conclusion": "The official linked archive contains four precomputed factor metric tables. It does not contain the per-security OHLCV needed to evaluate new T3 expressions.",
+  "data_instructions": "README.md Prerequisites requires downloading Qlib market data separately.",
+  "server_network_policy": "International acquisition on the local machine; hash-verified SSH transfer; offline preparation and all experiments under /mnt/data1."
+}
