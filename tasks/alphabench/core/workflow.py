@@ -36,8 +36,11 @@ def make_client(protocol, mock):
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         raise ValueError("DEEPSEEK_API_KEY is required in the Host environment")
+    body = {"reasoning": {"effort": protocol.reasoning_effort}, "store": False}
+    if protocol.method.startswith("alphabench_"):
+        body["text"] = {"format": {"type": "json_object"}}
     return OpenAICompatibleProposalClient(url=protocol.endpoint, model=protocol.model, api_key=key,
-        wire_api=protocol.wire_api, extra_body={"reasoning": {"effort": protocol.reasoning_effort}, "store": False},
+        wire_api=protocol.wire_api, extra_body=body, temperature=protocol.temperature,
         max_retries=0, max_tokens=protocol.max_model_tokens, timeout_seconds=protocol.request_timeout)
 
 

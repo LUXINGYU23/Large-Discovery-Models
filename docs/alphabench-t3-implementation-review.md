@@ -352,3 +352,55 @@ Scientific parity retains chain/generation/ranking order; only ToT's independent
 parallel-history ordering is normalized for separate-run comparisons, while
 same-run replay compares every field and list order exactly. W10 still needs the
 actual generator, budget/validation/finalization bridge and source profiles.
+
+## Change 12: official native generation, repair and auditable raw occurrences
+
+Cross-check against W07/W10 found that a native search callback must retain the
+official repair prompt, partial-success threshold and even the shuffle performed
+when exactly N factors have been collected. The adapter verifies the complete
+generator/prompt source hashes and executes the four required source functions.
+It fixes empty-array division by zero and malformed single-object fields, with
+the latter following the array normalizer's existing reason/type policy. It
+does not replace the native loop with the direct Campaign's exact-K generator.
+
+Model calls reuse Generator.request and its pre-reserved durable receipts;
+dynamic checks reuse the same gateway and grammar. All raw occurrences, including
+schema failures and the unvisited tail, are retained alongside normalized,
+visited, checked and accepted facts. Original native quality/return values are
+retained as JSON. Service failures, malformed receipts and configuration errors
+escape the native catchers, so they cannot consume five more model repairs as
+fake expression failures. Actual source algorithms now exercise this generator
+in the fixture integration path.
+
+UUIDs, set iteration, sample indices and RNG state use keyed events in the
+existing Campaign journal. Completed generation callbacks skip these internal
+events; an incomplete generation reconstructs them with its model/check receipts.
+The global RNG resumes at its last committed state and is not rewound when an
+old choice is reused. Accepted actions use the existing paired collection
+publication. Review exposed a tuple/list mismatch in persisted native error
+records; canonical JSON conversion now makes this partial-publication recovery
+idempotent, including a generation with a rejected expression.
+
+The frozen protocol now includes the requested temperature. The existing client
+factory passes it and maps native JSON mode to Responses text.format. The
+official DeepSeek Responses guide states that temperature is ignored in thinking
+mode; generation records explicitly report the requested value and unavailable
+effective value. User-selected deepseek-flash / Responses / max remains fixed.
+
+Complexity review: kept only the required upstream definitions, omitting unused
+helpers, heavy imports and demo entry points. No copied generator loop, SDK,
+oracle implementation, second collection exporter or per-request client clone.
+Removed an extra check wrapper and kept control conversion at the actual I/O
+boundaries. The direct generator remains a separate required submission contract,
+not a compatibility path. The main native workflow remains gated pending the
+atomic batch budget, private validation/finalization bridge and source profiles.
+
+Remote validation: 177 task tests pass, one backend-environment module is skipped,
+and the nine tests in the pinned Assay environment pass separately. The 13 new
+generator tests cover original-source parity, five repairs and both sides of the
+partial-success threshold, raw/visited/checked divergence and tail quality audit,
+Qlib/Assay prompt and dialect binding, all three actual native algorithms, RNG
+continuation and paired collection after interruption, unknown/malformed check
+responses, and actual HTTP Responses bodies with JSON/max thinking and one POST
+on a 503 failure. These are implementation checks, not qualified market runs or
+the user's final two-round real-endpoint acceptance.
