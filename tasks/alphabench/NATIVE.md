@@ -207,8 +207,12 @@ Assay source 必须使用 `assay_code_filter_v1`、`label=open_return`。原 FFO
 task 通过 Python 引擎补充真实 VWAP、分组与 guide 算子，并调用独立 portfolio；
 这些能力扩展和显式 worker 时限逐项写入 source contract，详见 [ASSAY.md](ASSAY.md)。
 完整 portfolio 配置及支持的数据控制在初始化前核验，不接受空配置。
+source A 股组合按官方 `PortfolioBacktester` 的 total-return 口径独立重算因子和
+价格，因子搜索 IC 仍为 Assay 默认 split；US 组合仍用 split。分红 fixture 的
+NAV、基准和交易日志已与原生回测器交叉核对。
 当前 worker 通过固定 Assay 的 Python portfolio runner 计算；计划要求的
-`/v1/portfolio/backtest` REST 路由尚未接线，W06 资格仍未通过。
+`/v1/portfolio/backtest` REST 路由尚未接线，且原路由没有真实指数序列和交易
+状态输入，W06 资格仍未通过。
 
 执行使用统一入口的 `--protocol-file`、`--upstream-root`、`--data-manifest` 和
 `--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。example 的

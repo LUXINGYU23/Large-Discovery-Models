@@ -769,3 +769,33 @@ with two backend-specific modules skipped in the generic environment; shared
 suite 491 passed, one skipped. The shared runner completed as `mock_10`; replay
 preserved all 187 artifacts. Task registration, dependency validation, and
 runner dry-run passed. No real data or model endpoint was exercised.
+
+## Change 20: reconcile source CN portfolio adjustment
+
+Cross-check against pinned `AssayService` and `PortfolioBacktester` found that
+source factor search evaluates CN and US on split-adjusted panels, while the
+independent A-share portfolio selects total-return adjustment. The worker had
+reused its split factor and price matrices for source CN portfolios despite a
+native lineage field saying `total`. It now rebuilds the CN portfolio panel
+and factor scores on the native total-return basis; source IC and score exports
+stay split. The combination signal applies the same daily finite z-score rule
+on the rebuilt panel. US and matched paths retain their established basis.
+
+A split-plus-cash-dividend fixture verifies that CN panel values differ and
+that the resulting NAV, actual-index benchmark series and trade log match the
+pinned `PortfolioBacktester` using its `DataStore.get_panel` adjustment and
+the same full trading inputs. All 21 Assay execution tests passed remotely.
+
+Complexity review: a single optional portfolio basis in the existing panel
+loader and one shared combination function removed duplicate z-score code.
+The existing portfolio runner, config, worker and data assets remain the only
+execution path; no adjustment-specific service or compatibility branch was
+added. The test keeps a minimal native store fixture to compare observable
+portfolio output, not the adapter's internal arithmetic.
+
+The pinned REST route forwards only `expr/config/as_of`; its Python runner
+accepts the custom benchmark and tradability mask that full T3 requires.
+Calling that route unchanged would silently drop the real benchmark and CN
+trading controls. W06 therefore remains open pending a qualified offline store
+and an endpoint contract that carries those inputs. Market-data qualification,
+remaining workflows and the final two-round real-model gate remain open.

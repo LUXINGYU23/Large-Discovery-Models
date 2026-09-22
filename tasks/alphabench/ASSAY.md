@@ -126,10 +126,22 @@ same task constraints with the installed native config class; there is no second
 schema or implicit portfolio default. The frozen implementation plan requires
 Host to call `/v1/portfolio/backtest`; the current worker still calls the
 official Python `PortfolioBacktester.run` entry directly, so W06 remains open
-until the REST route is exercised against the qualified offline data store. The
+until the REST route is exercised against the qualified offline data store.
+The pinned route accepts only `expr/config/as_of`, while its Python backtester
+accepts the actual custom index series and trading mask separately. An unchanged
+POST would omit inputs required by this task; it cannot close the gate. The
 configured worker timeout is a task limit, not an original Assay compute limit.
 Unknown requests use the shared durable reconciliation contract instead of the
 bridge's three HTTP attempts.
+
+Source factor IC and scores use the service's split adjustment in both markets.
+For an A-share source portfolio the official backtester independently rebuilds
+its factor and prices on a total-return basis; the task does the same before
+calling the pinned portfolio pipeline. US portfolios retain split adjustment.
+The raw report's `lineage.adj_version` and the signal contract record the
+portfolio basis separately from the factor report's adjustment. A deterministic
+source CN fixture with a split and cash dividend matches the native backtester's
+NAV, benchmark NAV and trade log when both receive the same actual controls.
 
 The actual index series is supplied as `benchmark=custom`, with an exact
 `benchmark_symbol` match to the data manifest. Trade and position logs and daily

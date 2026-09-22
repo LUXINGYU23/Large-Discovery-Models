@@ -371,10 +371,48 @@ def test_cn_portfolio_uses_actual_price_bands_and_full_effective_costs(snapshot,
         universe="CSI300", period_start=str(days[20]), period_end=str(days[-1]), benchmark="custom", benchmark_symbol="TEST_INDEX",
         rebalance_type="daily", min_rebalance_interval=1, slippage_model="zero", st_filter=False,
         new_listing_lockout_days=0, ipo_lockout_days=0, rebalance_around_index=False, save_position_log=True).to_dict())
+    if profile == "upstream_searcher_v1":
+        events = pl.DataFrame({"event_id": ["split-dividend"], "symbol": ["S03"], "ex_date": [days[25]],
+            "as_of_date": [days[24]], "split_ratio": [2.], "dividend_cash": [.5]})
+        replace_asset(snapshot, "events", events)
+        source_engine, _, _, _, _, _ = prepare_panel(request, T3Protocol(**request["protocol"]), config)
+        portfolio_engine, _, _, _, _, _ = prepare_panel(request, T3Protocol(**request["protocol"]), config, portfolio=True)
+        assert portfolio_engine.field_matrix("close")[0, 3] < source_engine.field_matrix("close")[0, 3]
     execution = frames["execution"].join(frames["prices"].select("date", "symbol", "close"), on=["date", "symbol"])
     execution = execution.with_columns((pl.col("close") * 1.1).alias("up_limit"), (pl.col("close") * .9).alias("down_limit"))
     replace_asset(snapshot, "execution", execution)
-    raw = assay_evaluate(dict(request, fast=False), config)["portfolio"]["raw"]
+    result = assay_evaluate(dict(request, fast=False), config)
+    raw = result["portfolio"]["raw"]
+    assert result["portfolio"]["signal_contract"]["factor_adjustment"] == "total"
+    assert raw["lineage"]["adj_version"] == "total"
+    if profile == "upstream_searcher_v1":
+        from assay.data.store.datastore import DataStore
+        from assay.portfolio.backtester import PortfolioBacktester
+
+        class SourceStore(DataStore):
+            def __init__(self):
+                pass
+
+            def get_universe(self, universe, date, as_of_date):
+                return sorted(frames["membership"]["symbol"].unique().to_list())
+
+            def _read_prices(self, symbols, start, end, as_of_date):
+                return frames["prices"].filter(pl.col("date").is_between(start, end) & pl.col("symbol").is_in(symbols))
+
+            def _read_adj_events(self, symbols, end, as_of_date):
+                return events.filter((pl.col("ex_date") <= end) & pl.col("symbol").is_in(symbols))
+
+            def get_trade_status(self, symbols, start, end, as_of_date):
+                return execution.filter(pl.col("date").is_between(start, end) & pl.col("symbol").is_in(symbols))
+
+        benchmark = frames["benchmark"].filter(pl.col("date").is_between(days[20], days[-1]))["close"].to_numpy()
+        native = PortfolioBacktester(SourceStore()).run(request["expression"],
+            PortfolioBacktestConfig.from_dict(raw["config"]), as_of=request["end"],
+            tradable_mask=np.ones((20, 12), dtype=bool), benchmark=benchmark).to_dict()
+        np.testing.assert_allclose(raw["nav_series"], native["nav_series"])
+        np.testing.assert_allclose(raw["benchmark_series"], native["benchmark_series"])
+        assert raw["trade_log"] == native["trade_log"]
+        assert result["adjustment"] == "split"
     assert raw["a_share_metrics"] is not None and raw["config"]["stamp_duty_rate"] == .0005
     assert raw["config"]["market"] == "A" and raw["trade_log"]
     replace_asset(snapshot, "execution", execution.with_columns(pl.lit(None, dtype=pl.Float64).alias("up_limit")))

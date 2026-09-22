@@ -98,7 +98,7 @@ class HistoricalFactorEngine(FactorEngine):
         return np.where(self.membership, result, np.nan)
 
 
-def prepare_panel(request, protocol, config):
+def prepare_panel(request, protocol, config, *, portfolio=False):
     manifest, calendar, assets = read_assets(config, protocol)
     start, end = dt.date.fromisoformat(request["start"]), dt.date.fromisoformat(request["end"])
     if calendar[0] > start or calendar[-1] < end:
@@ -135,11 +135,12 @@ def prepare_panel(request, protocol, config):
         raise ValueError("raw OHLCV and actual VWAP are required")
     events = assets["events"]
     unique(events, ["event_id"], "corporate actions")
-    events = events.filter((pl.col("ex_date") <= days[-1]) & pl.col("symbol").is_in(symbols))
+    events = events.filter((pl.col("ex_date") <= (end if source else days[-1])) & pl.col("symbol").is_in(symbols))
     known_by(events, "ex_date", "corporate action")
-    basis = "total" if not source and protocol.market.startswith("csi") else "split"
-    if manifest["adjustment"] != basis:
+    factor_basis = "total" if not source and protocol.market.startswith("csi") else "split"
+    if manifest["adjustment"] != factor_basis:
         raise ValueError("Assay adjustment differs from the fixed market basis")
+    basis = "total" if portfolio and protocol.market.startswith("csi") else factor_basis
     adjusted = forward_adjust(prices, events, mode=basis)
     # Assay adjusts OHLCV but passes extra fields through; VWAP needs the same price factor.
     adjusted = adjusted.join(prices.select("date", "symbol", pl.col("close").alias("raw_close")),
@@ -188,6 +189,13 @@ def lookback(node):
     return previous + window - (not lag)
 
 
+def combine_scores(arrays):
+    stacked = np.stack([operators.get("cs_zscore").fn(value) for value in arrays])
+    count = np.isfinite(stacked).sum(axis=0)
+    return np.divide(np.nansum(stacked, axis=0), count,
+                     out=np.full(arrays[0].shape, np.nan), where=count > 0)
+
+
 class PreparedPortfolioBacktester(PortfolioBacktester):
     def __init__(self, engine, factor, indices, execution):
         super().__init__()
@@ -218,6 +226,7 @@ def portfolio_result(protocol, engine, factor, indices, execution, tradable, ben
     config.as_of_date = config.period_end
     backtester = PreparedPortfolioBacktester(engine, factor * protocol.direction, indices, execution)
     signal_contract = {"expressions": expressions, "direction": protocol.direction,
+                       "factor_adjustment": "total" if protocol.market.startswith("csi") else "split",
                        "combination": "single" if len(expressions) == 1 else "daily_zscore_equal_weight_mean_finite"}
     identity = json.dumps(signal_contract, sort_keys=True)
     raw = backtester.run(identity, config, as_of=config.as_of_date,
@@ -266,10 +275,7 @@ def assay_evaluate(request, config):
             result = engine.evaluate(value)
         arrays.append(np.where(engine.membership, result.values, np.nan))
     if request["operation"] == "combine":
-        arrays = [operators.get("cs_zscore").fn(value) for value in arrays]
-        stacked = np.stack(arrays)
-        count = np.isfinite(stacked).sum(axis=0)
-        factor = np.divide(np.nansum(stacked, axis=0), count, out=np.full(engine._shape, np.nan), where=count > 0)
+        factor = combine_scores(arrays)
     else:
         factor = arrays[0]
     active = engine.membership[indices]
@@ -318,6 +324,10 @@ def assay_evaluate(request, config):
     if not request["fast"]:
         if protocol.assay_portfolio.get("benchmark_symbol") != manifest["benchmark"]:
             raise ValueError("portfolio benchmark differs from the frozen data asset")
+        if source and protocol.market.startswith("csi"):
+            engine, _, tradable, execution, benchmark, _ = prepare_panel(request, protocol, config, portfolio=True)
+            portfolio_arrays = [np.where(engine.membership, engine.evaluate(value).values, np.nan) for value in canonical]
+            factor = combine_scores(portfolio_arrays)[indices] if request["operation"] == "combine" else portfolio_arrays[0][indices]
         result["portfolio"] = portfolio_result(protocol, engine, factor, indices, execution, tradable, benchmark,
                                                 canonical, request["start"], request["end"])
     return result
