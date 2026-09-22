@@ -4,6 +4,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from ldm_tts.campaign import CampaignBudget, CampaignRecipe, CampaignRequest, run_campaign
 from ldm_tts.contracts.evaluation import EvaluationPaused
@@ -17,7 +18,7 @@ from .collection import AcceptedActions
 from .finalization import finalize
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
-from .initialization import run_initialization
+from .initialization import freeze_seed_source, run_initialization
 from .protocol import LDM_METHODS, digest, verify_data_manifest
 from .selection import FactorEncoder, FactorSelector
 
@@ -58,11 +59,16 @@ def run(args, protocol, spec):
         raise ValueError("existing run requires --resume-run")
     atomic_json_write(protocol_path, protocol.to_dict())
     if args.resume_run and (run_dir / "result.json").exists() and json.loads((run_dir / "status.json").read_text(encoding="utf-8"))["status"] == "completed":
+        freeze_seed_source(protocol, args, run_dir / "initialization")
         AcceptedActions(run_dir).export()
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()), "status": "completed", "replayed": True}))
         return 0
     client = make_client(protocol, args.mock)
-    initial_observations, initial_pool, initial_budget = run_initialization(protocol, args, spec, client, run_dir)
+    try:
+        initial_observations, initial_pool, initial_budget = run_initialization(protocol, args, spec, client, run_dir)
+    except EvaluationPaused as exc:
+        print(json.dumps({"task": "alphabench", "phase": "initialization", "status": exc.status, "reason": str(exc)}))
+        return 2
     initial_observations = [replace(item, round_idx=None) for item in initial_observations]
     collection = AcceptedActions(run_dir)
     objects = {}
@@ -89,7 +95,8 @@ def run(args, protocol, spec):
         max_evaluation_attempts=protocol.evaluations, extra_limits=protocol.budgets)
     try:
         result = run_campaign(CampaignRequest(run_dir, budget, config={"mock": args.mock, "protocol": protocol.to_dict()},
-            resume=bool(args.resume_run), runtime_hook=configure, contract_sha256=protocol.identity, finalize_runtime=False,
+            resume=(run_dir / "campaign.json").exists(), runtime_hook=configure, contract_sha256=protocol.identity, finalize_runtime=False,
+            run_id=None if (run_dir / "campaign.json").exists() else "alphabench-" + uuid4().hex,
             state_factory=lambda runtime: LDMEngineState.from_checkpoint(runtime.load_checkpoint()) if runtime.load_checkpoint() else LDMEngineState(observations=initial_observations)),
             CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["expander"].expand(request)),
                 FactorDomain(protocol.backend), Evaluator(),

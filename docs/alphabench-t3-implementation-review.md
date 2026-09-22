@@ -152,3 +152,32 @@ Remote validation: all 116 task tests pass. The actual offline US audit reads
 774 corroborated suspension dates; remaining gaps are 107/1,028/259 security-days
 for CSI300/500/1000. Compact hashes and counts are committed, raw assets stay under
 /mnt/data1/. Data and full T3 qualification remain blocked.
+
+## Change 6: complete source parsing and initialization recovery boundaries
+
+Cross-check against W08 found that the official JSONL final pool could not be
+imported, empty initialization was rejected, and an interrupted initialization
+could not resume before the main campaign existed. All source formats now reduce
+to names/expressions, with original content retained privately. External outcome
+fields never enter candidates or substitute for fresh measurements. Source
+digests and indexed admission/rejection/duplicate records survive recovery.
+
+The previous initialization run ID was the same directory basename for every
+run, allowing cross-run oracle request collisions. Fresh initialization and
+search campaigns now use independent UUID identities, retained on resume.
+Provider pauses before engine startup are durable; nonnumerical failure metrics
+are excluded. Empty initialization uses zero initialization/model budget while
+leaving the complete new search budget available.
+
+Complexity review: removed the previous duplicate file/pool loaders and reused
+the existing source receipt, Campaign, grammar and oracle implementations. There
+is no import of old scores, second evaluation loop or compatibility parser.
+Generator construction is limited to cold initialization that actually needs it.
+
+Remote validation: 126 task tests cover source formats, unknown/duplicate/invalid
+entries, empty initialization, partial evaluation failure, a pause before search
+exists, provider pause before engine startup, unchanged completed replay and
+distinct cross-run request identities. The fixed upstream loader yields the
+13/29/38/42 entry groups; all 125 records in its seed file pass static admission.
+These are source-contract checks, not data-backed seed qualification. Shared
+evaluated seed-bundle import and native source profiles remain open W08 work.

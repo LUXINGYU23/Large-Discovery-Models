@@ -75,7 +75,11 @@ class T3Protocol:
             raise ValueError("this campaign contract requires deepseek-flash / Responses / max")
         if self.endpoint != "https://api.deepseek.com/responses":
             raise ValueError("provider endpoint differs from the approved contract")
-        for name in ("forward_n", "rounds", "evaluations", "batch_size", "sessions", "candidates_per_session", "cold_seed_count",
+        if type(self.cold_seed_count) is not int or self.cold_seed_count < 0:
+            raise ValueError("cold_seed_count must be a nonnegative integer")
+        if not self.alpha158_groups or len(set(self.alpha158_groups)) != len(self.alpha158_groups) or set(self.alpha158_groups) - {"kbar", "price", "rolling"}:
+            raise ValueError("alpha158_groups must name distinct source collections")
+        for name in ("forward_n", "rounds", "evaluations", "batch_size", "sessions", "candidates_per_session",
                      "factor_select_n", "stock_topk", "worker_timeout", "request_timeout", "max_model_tokens"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise ValueError(f"{name} must be a positive integer")
@@ -90,6 +94,8 @@ class T3Protocol:
                     "oracle_job_slots", "benchmark_jobs", "policy_turns", "harness_turns"}
         if set(self.budgets) != required or any(type(v) is not int or v < 0 for v in self.budgets.values()):
             raise ValueError("all stage budgets must be explicit finite nonnegative integers")
+        if self.init_mode == "cold" and self.cold_seed_count > self.budgets["initialization_evaluations"]:
+            raise ValueError("cold seed count exceeds the initialization evaluation budget")
 
     def to_dict(self):
         return json.loads(json.dumps(asdict(self)))

@@ -1,6 +1,7 @@
 """Private validation ranking and immutable test selection precede every test call."""
 
 import csv
+from collections import Counter
 import json
 import math
 
@@ -67,8 +68,11 @@ def finalize(protocol, runtime, gateway, engine_result, initial_pool, initial_bu
     initial_raw = [{"success": item.evaluation.succeeded,
                     "metrics": {key.removeprefix(prefix): value for key, value in item.evaluation.metrics.items()}}
                    for item in engine_result.state.observations if item.candidate.source == "initialization"]
+    seed_manifest = json.loads((runtime.run_dir / "initialization/seed_manifest.json").read_text(encoding="utf-8"))
     report = {"task": "alphabench", "mock": gateway.mock, "protocol": protocol.to_dict(), "protocol_digest": protocol.identity,
               "method": protocol.method, "initialization": {"seed_count": len(initial_pool), "budget": initial_budget,
+                  "source_digest": seed_manifest["source_digest"], "source_records": len(seed_manifest["admissions"]),
+                  "source_dispositions": dict(Counter(row["status"] for row in seed_manifest["admissions"])),
                   "generation_cost": generation_costs(initial_generation)},
               "search": {**search_metrics(search_raw), "generation_cost": generation_costs(generation)}, "test": tested,
               "including_initialization": search_metrics(initial_raw + search_raw),

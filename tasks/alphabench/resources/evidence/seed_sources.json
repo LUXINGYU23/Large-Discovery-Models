@@ -1,0 +1,42 @@
+{
+  "groups": {
+    "kbar+price": {
+      "admissions": {
+        "admitted": 13
+      },
+      "records": 13
+    },
+    "kbar+price+rolling": {
+      "admissions": {
+        "admitted": 42
+      },
+      "records": 42
+    },
+    "kbar+rolling": {
+      "admissions": {
+        "admitted": 38
+      },
+      "records": 38
+    },
+    "rolling": {
+      "admissions": {
+        "admitted": 29
+      },
+      "records": 29
+    }
+  },
+  "seed_file": {
+    "admissions": {
+      "admitted": 125
+    },
+    "records": 125,
+    "rejected": [],
+    "source_sha256": "c9c15b05d315cb633807dedf1958e22564c775a98ad98beac9bd0b9892813451"
+  },
+  "source": {
+    "archive": "https://codeload.github.com/CityU-MLO/AlphaBench/tar.gz/31bb94bbb7744177c51c9d011e07c31e3092b93e",
+    "archive_sha256": "d0585e100f285fb61751d80ad035cb3c69758665b50dbbbd13c3082d9c49bdba",
+    "commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+    "source": "https://github.com/CityU-MLO/AlphaBench"
+  }
+}
