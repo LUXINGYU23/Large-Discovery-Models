@@ -98,7 +98,7 @@ def run(args, protocol, spec):
             resume=(run_dir / "campaign.json").exists(), runtime_hook=configure, contract_sha256=protocol.identity, finalize_runtime=False,
             run_id=None if (run_dir / "campaign.json").exists() else "alphabench-" + uuid4().hex,
             state_factory=lambda runtime: LDMEngineState.from_checkpoint(runtime.load_checkpoint()) if runtime.load_checkpoint() else LDMEngineState(observations=initial_observations)),
-            CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["expander"].expand(request)),
+            CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["gateway"].host.run(lambda: objects["expander"].expand(request))),
                 FactorDomain(protocol.backend), Evaluator(),
                 selector=FactorSelector(("mock_" if args.mock else "") + protocol.objective, seed=protocol.random_seed) if protocol.method in LDM_METHODS else None,
                 surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None))

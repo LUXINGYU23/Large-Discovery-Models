@@ -31,14 +31,14 @@ class Generator:
 
         try:
             raw = self.receipts.execute(key, {"messages": messages, "protocol": self.protocol.identity}, reserve=reserve,
-                operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict())
+                operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host)
         except EndpointRequestError as exc:
             raise EvaluationPaused("model request failed; inspect the durable receipt before retrying",
                                    status="paused_provider") from exc
         response = ProposalResponse(**raw)
         if not self.gateway.mock and response.metadata.get("model") != self.protocol.model:
             raise EvaluationPaused("provider returned a different model", status="paused_provider")
-        self.runtime.consume_many({"model_tokens": response.usage.get("total_tokens", 0)}, usage_key="task:model-usage:" + key)
+        self.gateway.host.call(lambda: self.runtime.consume_many({"model_tokens": response.usage.get("total_tokens", 0)}, usage_key="task:model-usage:" + key))
         return attach_proposal_attempt_receipt(response, key)
 
     def generate(self, *, identity, count, instruction, history=(), partial=False):
@@ -94,7 +94,7 @@ class Generator:
         minimum = max(1, count // 2) if partial else count
         result = {"candidates": list(accepted.values()), "occurrences": raw_occurrences,
                   "requested": count, "attempt_count": len(attempts), "complete": len(accepted) >= minimum}
-        Receipts(self.runtime.run_dir / "generation").accept(identity, result)
+        self.gateway.host.call(lambda: Receipts(self.runtime.run_dir / "generation").accept(identity, result))
         if not result["complete"]:
             raise EvaluationPaused("generation exhausted its five repair attempts", status="paused_generation")
         ir = make_complete_design_ir(task_id="alphabench", domain="financial factor expressions",
@@ -103,7 +103,7 @@ class Generator:
             design_space_description=json.dumps(REGISTRY), observations=visible,
             candidates=result["candidates"], request_description=json.dumps(original_messages),
             num_candidates=len(accepted), allows_new_parameters=False, reasoning_available=False)
-        self.collection.accept(identity, ir, {"run": self.runtime.run_id, "protocol": self.protocol.identity})
+        self.gateway.host.call(lambda: self.collection.accept(identity, ir, {"run": self.runtime.run_id, "protocol": self.protocol.identity}))
         return result, tuple(attempts)
 
 

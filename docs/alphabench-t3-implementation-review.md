@@ -281,3 +281,35 @@ tree distances, sign/operator distinctions, positive/negative correlation,
 pair sample alignment, missing members and duplicate sample rejection. Full
 W14 closure still requires native update events, preregistered run aggregation,
 and the remaining full-task quality/reporting/collection gates.
+
+## Change 10: bounded Host writer handoff with concurrent physical requests
+
+Cross-check against W05/W10 confirmed that native EA overlaps next-generation
+model calls with current-generation evaluation, while ToT uses concurrent
+branches. Serializing whole callbacks would change that execution contract.
+Receipts now perform preparation/reservation and completion on the Host writer,
+with physical I/O on the calling worker between those boundaries. Model usage,
+oracle job settlement and accepted generation/collection commits use the same
+handoff. The current direct Campaign expansion runs through the live message
+pump, so this is an exercised execution path rather than an unused native stub.
+
+The Host drains a bounded queue while its stage runs in a background future.
+Callbacks never mutate the ledger from worker threads. Stage cancellation
+releases pending callers before executor shutdown; callbacks arriving after
+closure are rejected. Queue backpressure releases the lifecycle condition while
+waiting, avoiding a producer/Host shutdown lock inversion.
+
+Complexity review: one task-local dispatcher and the existing receipt state
+machine cover model and oracle operations. There is no alternate ledger, copied
+runtime, per-worker budget cache or backend request retry. The synchronous
+service receipt path uses the same state transitions without a dispatcher;
+the Host's existing direct calls still execute on their owning thread.
+
+Remote validation: the task suite has 143 passing tests. Concurrency tests cover
+two requests contending for one remaining permit, overlapping physical calls,
+model pre-reservation, immutable receipt/budget replay, unknown outcomes,
+interruption without deadlock, late-callback rejection and 80 concurrent callers
+against the bounded queue. The nine separate Assay tests also pass after the
+receipt split. Native algorithm scheduling/recovery and the shared Harness
+provider preauthorization protocol remain required next steps; this change does
+not claim those adapters are complete.

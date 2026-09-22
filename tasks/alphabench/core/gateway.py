@@ -9,6 +9,7 @@ from ldm_tts.contracts import EvaluationResult
 from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY, EvaluationPaused
 from .protocol import digest
 from .receipts import Receipts
+from .host import HostDispatcher
 
 
 class OracleGateway:
@@ -17,6 +18,7 @@ class OracleGateway:
         self.endpoint = endpoint.rstrip("/") if endpoint else None
         self.mock = mock
         self.receipts = Receipts(runtime.run_dir / "private" / "oracle")
+        self.host = HostDispatcher()
 
     def preflight(self):
         if self.mock:
@@ -70,7 +72,7 @@ class OracleGateway:
 
         try:
             result = self.receipts.execute(logical, request, reserve=reserve,
-                                           operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request))
+                                           operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request), owner=self.host)
         except (OSError, TimeoutError, urllib.error.URLError) as exc:
             raise EvaluationPaused("oracle dispatch requires reconciliation") from exc
         if result.get("request_id") != request["request_id"]:
@@ -79,7 +81,7 @@ class OracleGateway:
         if not isinstance(jobs, list) or len(jobs) > request["job_permits"] or len({job["job_id"] for job in jobs}) != len(jobs):
             raise EvaluationPaused("oracle job accounting is incomplete or exceeds permits")
         if charge_jobs:
-            self.runtime.consume_many({"benchmark_jobs": len(jobs)}, usage_key="task:oracle-result:" + digest(logical))
+            self.host.call(lambda: self.runtime.consume_many({"benchmark_jobs": len(jobs)}, usage_key="task:oracle-result:" + digest(logical)))
         return result
 
     def _reconcile(self, request):
