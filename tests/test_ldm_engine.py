@@ -847,7 +847,7 @@ def test_preparation_failure_is_resumable_before_any_evaluation_charge(tmp_path,
     assert engine.runtime.budget.counters["expensive_evaluation_attempts"] == 2
 
 
-def test_preparation_failure_retried_fresh_proposal_counts_again(tmp_path):
+def test_preparation_failure_recovers_selection_without_new_proposal(tmp_path):
     from ldm_tts.contracts import CandidateEvaluationPreparer
     from ldm_tts.transport import ProposalResponse
 
@@ -899,10 +899,10 @@ def test_preparation_failure_retried_fresh_proposal_counts_again(tmp_path):
     engine.runtime = CampaignRuntime.open(run_dir, task="integer_search", resume=True)
     result = engine.run(config)
 
-    assert calls == 2
+    assert calls == 1
     assert len(result.state.observations) == 1
     assert engine.runtime.budget.counters["outer_iterations"] == 1
-    assert engine.runtime.budget.counters["proposal_attempts"] == 2
+    assert engine.runtime.budget.counters["proposal_attempts"] == 1
 
 
 @pytest.mark.parametrize("receipt_mode", ["stable", "none", "absent"])
@@ -934,39 +934,6 @@ def test_receipt_evaluator_obeys_config_and_ledger_limits(tmp_path, receipt_mode
     assert len(calls) == len(result.state.observations) == 1
     assert runtime.budget.counters["external_evaluations"] == 1
     assert result.stop_reason == ("external_evaluation_budget" if ledger_limit else "evaluation_attempt_budget")
-
-
-@pytest.mark.parametrize("batched", [False, True])
-def test_receipts_allow_only_paid_replay_at_config_limit(tmp_path, batched):
-    from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
-
-    calls = []
-    class Evaluator:
-        def evaluation_attempt_usage_key(self, candidate):
-            return candidate.canonical_key
-
-        def evaluate(self, candidate):
-            assert candidate.payload == 2  # Only the paid candidate may be recovered.
-            calls.append(candidate.payload)
-            return EvaluationResult(candidate.candidate_id, "succeeded", {"score": 1},
-                                    metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: "2"})
-
-    if batched:
-        Evaluator.evaluate_batch = lambda self, candidates: tuple(self.evaluate(c) for c in candidates)
-    runtime = CampaignRuntime.open(tmp_path, task="integer_search", budget_limits={"external_evaluations": 1})
-    engine = LDMEngine(
-        task_spec=integer_task_spec(), runtime=runtime, evaluator=Evaluator(), candidate_domain=IntegerDomain(),
-        expander=CallableReservoirExpander(lambda r: pytest.fail("recovery must not propose fresh candidates")),
-    )
-    config = LDMEngineConfig(iterations=1, reservoir_size=2, evaluations_per_round=2, max_evaluation_attempts=1)
-    # Simulate a stop just after reserving one selected candidate, before evaluation.
-    assert engine._consume_evaluation_attempt(Candidate("integer-2", 2, "2"), LDMEngineState(), config)
-    engine.runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
-    result = engine.run(config)
-    assert calls == [2]
-    assert len(result.state.observations) == 1
-    assert engine.runtime.budget.counters["external_evaluations"] == 1
-    assert result.stop_reason == "evaluation_attempt_budget"
 
 
 @pytest.mark.parametrize("receipt_mode", ["stable", "none", "absent"])
@@ -1074,7 +1041,7 @@ def test_paid_batch_recovers_only_reserved_candidates_without_new_research(tmp_p
 
 @pytest.mark.parametrize("receipt_mode", ["fresh", "none", "absent"])
 @pytest.mark.parametrize("limit", [1, 2])
-def test_fresh_evaluation_retry_is_charged_and_capped_without_a_checkpoint(tmp_path, receipt_mode, limit):
+def test_ambiguous_evaluation_is_paused_without_a_new_request(tmp_path, receipt_mode, limit):
     calls = []
     class Evaluator:
         def evaluate(self, candidate):
@@ -1094,8 +1061,94 @@ def test_fresh_evaluation_retry_is_charged_and_capped_without_a_checkpoint(tmp_p
     with pytest.raises(KeyboardInterrupt):
         engine.run(config)
     assert runtime.budget.counters["external_evaluations"] == 1
-    assert runtime.load_checkpoint() is None
+    assert runtime.load_checkpoint()["next_round"] == 0
+    engine.runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
+    from ldm_tts.contracts.evaluation import EvaluationPaused
+    with pytest.raises(EvaluationPaused):
+        engine.run(config)
+    assert len(calls) == engine.runtime.budget.counters["external_evaluations"] == 1
+    assert json.loads((tmp_path / "status.json").read_text())["status"] == "paused_outcome_unknown"
+
+
+@pytest.mark.parametrize("crash_at", ["result", "event"])
+def test_full_selection_recovers_unpaid_suffix_with_budget_remaining(tmp_path, monkeypatch, crash_at):
+    calls, expanded = [], []
+
+    class Evaluator:
+        def evaluation_attempt_usage_key(self, candidate):
+            return candidate.canonical_key
+
+        def evaluate(self, candidate):
+            calls.append(candidate.payload)
+            return EvaluationResult(candidate.candidate_id, "succeeded", {"score": float(candidate.payload)})
+
+    def expand(request):
+        expanded.append(request.context["evaluation_budget"])
+        return ExpansionResult(proposals=tuple(RawProposal(i, "test") for i in (2, 1, 3)))
+
+    runtime = CampaignRuntime.open(tmp_path, task="integer_search")
+    engine = LDMEngine(task_spec=integer_task_spec(), runtime=runtime, evaluator=Evaluator(),
+                       candidate_domain=IntegerDomain(), expander=CallableReservoirExpander(expand))
+    original = engine._record_evaluation
+    interrupted = False
+
+    def crash(state, candidate, result, round_idx):
+        nonlocal interrupted
+        if not interrupted:
+            interrupted = True
+            if crash_at == "event":
+                original(state, candidate, result, round_idx)
+            raise KeyboardInterrupt()
+        return original(state, candidate, result, round_idx)
+
+    monkeypatch.setattr(engine, "_record_evaluation", crash)
+    config = LDMEngineConfig(iterations=1, reservoir_size=3, evaluations_per_round=3, max_evaluation_attempts=5)
+    with pytest.raises(KeyboardInterrupt):
+        engine.run(config)
     engine.runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
     result = engine.run(config)
-    assert len(calls) == engine.runtime.budget.counters["external_evaluations"] == limit
-    assert len(result.state.observations) == limit - 1
+    assert calls == [2, 1, 3]
+    assert len(expanded) == 1
+    assert [o.candidate.payload for o in result.state.observations] == calls
+    assert len([e for e in engine.runtime.events() if e["event_type"] == "candidate_evaluated"]) == 3
+    assert engine.runtime.budget.counters["external_evaluations"] == 3
+
+
+def test_effective_batch_clamps_fresh_receipt_selection_and_context(tmp_path):
+    sizes = []
+
+    class Evaluator:
+        def evaluation_attempt_usage_key(self, candidate):
+            return candidate.canonical_key
+
+        def evaluate(self, candidate):
+            return EvaluationResult(candidate.candidate_id, "succeeded", {"score": float(candidate.payload)})
+
+    def expand(request):
+        sizes.append(request.context["evaluation_budget"]["effective"])
+        return ExpansionResult(proposals=tuple(RawProposal(i + request.round_idx * 3, "test") for i in range(3)))
+
+    runtime = CampaignRuntime.open(tmp_path, task="integer_search", budget_limits={"external_evaluations": 5})
+    engine = LDMEngine(task_spec=integer_task_spec(), runtime=runtime, evaluator=Evaluator(),
+                       candidate_domain=IntegerDomain(), expander=CallableReservoirExpander(expand))
+    result = engine.run(LDMEngineConfig(iterations=4, reservoir_size=3, evaluations_per_round=3),
+                        context={"evaluation_budget": {"effective": 999}})
+    assert sizes == [3, 2]
+    assert len(result.state.observations) == 5
+
+
+def test_campaign_can_defer_finalization_and_pause_is_not_a_measurement(tmp_path):
+    from ldm_tts.contracts.evaluation import EvaluationPaused
+
+    def evaluate(candidate):
+        raise EvaluationPaused("request outcome needs reconciliation")
+
+    request = CampaignRequest(run_dir=tmp_path, budget=CampaignBudget(1, 1), finalize_runtime=False)
+    recipe = CampaignRecipe(task_spec=integer_task_spec(), candidate_domain=IntegerDomain(),
+                            evaluator=CallableCandidateEvaluator(evaluate),
+                            expander=CallableReservoirExpander(lambda r: ExpansionResult((RawProposal(1, "test"),))))
+    with pytest.raises(EvaluationPaused):
+        run_campaign(request, recipe)
+    runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
+    assert runtime.load_checkpoint()["observations"] == []
+    assert not any(e["event_type"] == "campaign_finished" for e in runtime.events())

@@ -214,6 +214,7 @@ class CampaignRequest:
     contract_profile: str = ""
     artifact_projector: ArtifactProjector | None = None
     runtime_hook: Callable[[CampaignRuntime], None] | None = None
+    finalize_runtime: bool = True
 
     def __post_init__(self) -> None:
         if self.state is not None and self.state_factory is not None:
@@ -278,6 +279,7 @@ def run_campaign(request: CampaignRequest, recipe: CampaignRecipe) -> CampaignRe
         request.budget.engine_config(),
         state=state,
         context=request.context,
+        finalize_runtime=request.finalize_runtime,
     )
     projected = (
         request.artifact_projector(runtime, engine_result)

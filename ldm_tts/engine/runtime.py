@@ -19,7 +19,7 @@ from ldm_tts.contracts import (
     Observation,
     ReservoirBuilder,
 )
-from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
+from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY, EvaluationPaused
 from ldm_tts.engine.expansion import (
     PROPOSAL_ATTEMPT_RECEIPT_KEY,
     ExpansionRequest,
@@ -237,7 +237,8 @@ class LDMEngine:
         context: Mapping[str, Any] | None = None,
         finalize_runtime: bool = True,
     ) -> LDMEngineResult:
-        active = state or LDMEngineState()
+        checkpoint = self.runtime.load_checkpoint() if state is None else None
+        active = state or (LDMEngineState.from_checkpoint(checkpoint) if checkpoint else LDMEngineState())
         rounds_run = 0
         stop_reason = "iteration_budget"
         try:
@@ -245,34 +246,27 @@ class LDMEngine:
             if completed is not None:
                 stop_reason = completed
             for round_idx in range(active.next_round, config.iterations):
+                pending = self.runtime.budget.metadata.get("engine_active_selection")
+                if pending is not None and pending["round_idx"] == round_idx:
+                    active.expansion_schema.update(pending["expansion_schema"])
+                    exhausted = self._execute_selection(active, pending, config, recovering=True)
+                    active.next_round = round_idx + 1
+                    rounds_run += 1
+                    self._checkpoint(active)
+                    self.runtime.budget.metadata.pop("engine_active_selection", None)
+                    self.runtime.budget.write()
+                    if exhausted:
+                        stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or "evaluation_attempt_budget"
+                        break
+                    continue
                 completed = _completion_reason(active, config)
                 if completed is not None:
                     stop_reason = completed
                     break
-                remaining_attempts = _remaining_evaluation_attempts(self.runtime, active, config)
-                can_replay = self._uses_evaluation_attempt_receipts()
+                remaining_attempts = _remaining_fresh_attempts(self.runtime, active, config)
                 exhausted = _evaluation_budget_stop_reason(self.runtime, active, config)
                 if exhausted is not None:
                     stop_reason = exhausted
-                    pending = self._pending_evaluations(active)
-                    if pending:
-                        desired = _desired_round_results(active, config)
-                        before = len(active.observations)
-                        successes_before = _successful_evaluation_count(active)
-                        self._recover_evaluations(active, pending, config)
-                        recovered = (
-                            _successful_evaluation_count(active) - successes_before
-                            if config.target_successful_evaluations is not None
-                            else len(active.observations) - before
-                        )
-                        active.next_round = round_idx + 1
-                        rounds_run += 1
-                        self._checkpoint(active)
-                        stop_reason = _completion_reason(active, config) or (
-                            "iteration_budget"
-                            if recovered >= desired and active.next_round >= config.iterations
-                            else exhausted
-                        )
                     break
                 self.runtime.consume_many(
                     {"outer_iterations": 1}, usage_key=f"engine:round:{round_idx}"
@@ -284,6 +278,10 @@ class LDMEngine:
                     budget=self.runtime.budget,
                 )
                 parent = self.parent_selector(active.observations, self.objectives)
+                desired = _desired_round_results(active, config)
+                effective = min(desired, config.max_evaluation_attempts_per_round or desired)
+                if remaining_attempts is not None:
+                    effective = min(effective, remaining_attempts)
                 expansion = self.expander.expand(
                     ExpansionRequest(
                         round_idx=round_idx,
@@ -291,7 +289,11 @@ class LDMEngine:
                         observations=tuple(active.observations),
                         parent=parent,
                         expansion_schema=dict(active.expansion_schema),
-                        context=dict(context or {}),
+                        context={**dict(context or {}), "evaluation_budget": {
+                            "requested": config.evaluations_per_round,
+                            "effective": effective,
+                            "remaining_new_attempts": remaining_attempts,
+                        }},
                     )
                 )
                 if expansion.schema_update is not None:
@@ -351,15 +353,14 @@ class LDMEngine:
                     continue
 
                 active.empty_reservoir_rounds = 0
-                desired = _desired_round_results(active, config)
-                selection_count = desired
+                selection_count = effective
                 if config.replace_failed_evaluations:
                     selection_count = (
                         config.max_evaluation_attempts_per_round
                         or len(reservoir.candidates)
                     )
                 selection_count = min(selection_count, len(reservoir.candidates))
-                if remaining_attempts is not None and not can_replay:
+                if remaining_attempts is not None:
                     selection_count = min(selection_count, remaining_attempts)
                 selection = self._select(
                     active.observations,
@@ -369,11 +370,6 @@ class LDMEngine:
                     use_reservoir_order=expansion.selection_mode == "reservoir_order",
                 )
                 selected = self._resolve_selection(reservoir.candidates, selection)
-                self.runtime.record(
-                    "candidates_selected",
-                    selection.to_dict(),
-                    iteration=round_idx,
-                )
                 if not selected:
                     stop_reason = "empty_selection"
                     active.next_round = round_idx + 1
@@ -381,75 +377,35 @@ class LDMEngine:
                     self._checkpoint(active)
                     break
 
-                if isinstance(self.evaluator, CandidateEvaluationPreparer):
-                    self.runtime.status.update(
-                        "running",
-                        phase="evaluation_preparation",
-                        iteration=round_idx,
-                        budget=self.runtime.budget,
-                    )
-                    self.evaluator.prepare_evaluations(selected)
-
-                budget_exhausted = False
-                round_observations = 0
-                round_successes = 0
-                if (
-                    isinstance(self.evaluator, BatchCandidateEvaluator)
-                    and not config.replace_failed_evaluations
-                ):
-                    batch_candidates: list[Candidate] = []
-                    for candidate in selected:
-                        try:
-                            if not self._consume_evaluation_attempt(candidate, active, config):
-                                budget_exhausted = True
-                                stop_reason = "evaluation_attempt_budget"
-                                continue
-                        except BudgetExceededError:
-                            budget_exhausted = True
-                            stop_reason = "external_evaluation_budget"
-                            continue
-                        batch_candidates.append(candidate)
-                    if batch_candidates:
-                        evaluations = self._evaluate_batch(batch_candidates)
-                        for candidate, evaluation in zip(
-                            batch_candidates, evaluations, strict=True
-                        ):
-                            round_observations += 1
-                            round_successes += self._record_evaluation(
-                                active, candidate, evaluation, round_idx
-                            )
-                else:
-                    for candidate in selected:
-                        if config.target_successful_evaluations is not None:
-                            if round_successes >= desired:
-                                break
-                        elif round_observations >= desired:
-                            break
-                        try:
-                            if not self._consume_evaluation_attempt(candidate, active, config):
-                                budget_exhausted = True
-                                stop_reason = "evaluation_attempt_budget"
-                                continue
-                        except BudgetExceededError:
-                            budget_exhausted = True
-                            stop_reason = "external_evaluation_budget"
-                            continue
-                        evaluation = self._evaluate(candidate)
-                        round_observations += 1
-                        round_successes += self._record_evaluation(
-                            active, candidate, evaluation, round_idx
-                        )
-
+                pending = {
+                    "round_idx": round_idx, "desired": desired,
+                    "expansion_schema": _jsonable(active.expansion_schema),
+                    "selection": _jsonable(selection.to_dict()),
+                    "entries": [{"candidate": _jsonable(candidate.to_dict()),
+                                 "receipt": self._evaluation_attempt_usage_key(candidate),
+                                 "dispatched": False, "result": None}
+                                for candidate in selected],
+                }
+                self.runtime.budget.metadata["engine_active_selection"] = pending
+                self.runtime.budget.write()
+                self._checkpoint(active)
+                budget_exhausted = self._execute_selection(active, pending, config, recovering=False)
                 active.next_round = round_idx + 1
                 rounds_run += 1
                 self._checkpoint(active)
+                self.runtime.budget.metadata.pop("engine_active_selection", None)
+                self.runtime.budget.write()
                 if budget_exhausted:
+                    stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or "evaluation_attempt_budget"
                     break
                 completed = _completion_reason(active, config)
                 if completed is not None:
                     stop_reason = completed
                     break
 
+            stop_reason = _completion_reason(active, config) or stop_reason
+            if stop_reason == "iteration_budget" and active.next_round < config.iterations:
+                stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or stop_reason
             summary = self._summary(active, rounds_run, stop_reason)
             terminal = (
                 "completed"
@@ -472,6 +428,10 @@ class LDMEngine:
                     details=summary,
                 )
             return LDMEngineResult(active, rounds_run, stop_reason, summary)
+        except EvaluationPaused as exc:
+            self._checkpoint(active)
+            self.runtime.pause(exc.status, phase="evaluation_recovery", message=str(exc))
+            raise
         except Exception as exc:
             self.runtime.fail(exc)
             raise
@@ -524,88 +484,86 @@ class LDMEngine:
             candidates, representations, count=count, round_idx=round_idx
         )
 
-    def _consume_evaluation_attempt(
-        self, candidate: Candidate, state: LDMEngineState, config: LDMEngineConfig
+    def _execute_selection(
+        self, state: LDMEngineState, pending: dict[str, Any], config: LDMEngineConfig,
+        *, recovering: bool,
     ) -> bool:
-        receipt = self._evaluation_attempt_usage_key(candidate)
-        usage_key = f"engine:evaluation_attempt:{receipt}" if receipt is not None else None
-        paid = self.runtime.budget.metadata.get("cumulative_usage", {}).get(usage_key, {})
-        # Only this durable operation may replay at the limit, not every candidate
-        # handled by an evaluator that happens to expose a receipt hook.
-        if paid.get("external_evaluations", 0) < 1 and (
-            _remaining_evaluation_attempts(self.runtime, state, config) == 0
-        ):
-            return False
-        previous = self.runtime.budget.metadata.get("engine_pending_evaluations")
-        if receipt is not None:
-            entries = list(previous["entries"]) if previous and previous["round_idx"] == state.next_round else []
-            if not any(entry["receipt"] == receipt for entry in entries):
-                entries.append({"receipt": receipt, "candidate": _jsonable(candidate.to_dict())})
-            # Persist the recoverable candidate in the same ledger write as its
-            # charge, so recovery never needs another proposal or policy turn.
-            self.runtime.budget.metadata["engine_pending_evaluations"] = {
-                "round_idx": state.next_round, "entries": entries,
-                "expansion_schema": _jsonable(state.expansion_schema),
-            }
-        try:
-            self.runtime.consume_many(
-                {
-                    "selected_candidates": 1,
-                    "external_evaluations": 1,
-                    "expensive_evaluation_attempts": 1,
-                },
-                usage_key=usage_key,
-            )
-        except BudgetExceededError:
-            if previous is None:
-                self.runtime.budget.metadata.pop("engine_pending_evaluations", None)
-            else:
-                self.runtime.budget.metadata["engine_pending_evaluations"] = previous
-            raise
-        return True
+        round_idx = pending["round_idx"]
+        entries = pending["entries"]
+        self.runtime.record("candidates_selected", pending["selection"], iteration=round_idx,
+                            event_key=f"engine:selection:{round_idx}")
+        observed = {item.candidate_id for item in state.observations if item.round_idx == round_idx}
+        self.runtime.status.update("running", phase="evaluation_recovery" if recovering else "evaluation",
+                                   iteration=round_idx, budget=self.runtime.budget)
 
-    def _pending_evaluations(self, state: LDMEngineState) -> list[Candidate]:
-        pending = self.runtime.budget.metadata.get("engine_pending_evaluations")
-        if not pending or pending["round_idx"] != state.next_round:
-            return []
-        observed = {item.canonical_key for item in state.observations}
-        usage = self.runtime.budget.metadata.get("cumulative_usage", {})
-        candidates = []
-        for entry in pending["entries"]:
-            receipt, raw = entry["receipt"], entry["candidate"]
-            if usage.get(f"engine:evaluation_attempt:{receipt}", {}).get("external_evaluations", 0) < 1:
-                continue
-            candidate = Candidate(**raw)
-            if candidate.canonical_key in observed:
-                continue
-            # A fresh retry identity is not a cached evaluation, even when the
-            # evaluator exposes the same optional receipt interface.
-            if self._evaluation_attempt_usage_key(candidate) == receipt:
-                candidates.append(candidate)
-        return candidates
+        def reserve(index, entry):
+            candidate = Candidate(**entry["candidate"])
+            receipt = entry["receipt"]
+            if recovering and entry["dispatched"]:
+                if receipt is None or self._evaluation_attempt_usage_key(candidate) != receipt:
+                    raise EvaluationPaused("Dispatched evaluation has no matching durable replay receipt")
+            key = receipt if receipt is not None else f"round:{round_idx}:slot:{index}"
+            usage_key = f"engine:evaluation_attempt:{key}"
+            paid = self.runtime.budget.metadata.get("cumulative_usage", {}).get(usage_key, {})
+            if not paid.get("external_evaluations") and _remaining_fresh_attempts(self.runtime, state, config) == 0:
+                return None
+            self.runtime.consume_many({"selected_candidates": 1, "external_evaluations": 1,
+                                       "expensive_evaluation_attempts": 1}, usage_key=usage_key)
+            entry["dispatched"] = True
+            self.runtime.budget.write()
+            return candidate
 
-    def _recover_evaluations(
-        self, state: LDMEngineState, candidates: Sequence[Candidate], config: LDMEngineConfig
-    ) -> None:
-        pending = self.runtime.budget.metadata["engine_pending_evaluations"]
-        state.expansion_schema.update(pending["expansion_schema"])
-        self.runtime.status.update("running", phase="evaluation_recovery", iteration=state.next_round,
-                                   budget=self.runtime.budget)
-        if isinstance(self.evaluator, CandidateEvaluationPreparer):
-            self.evaluator.prepare_evaluations(candidates)
-        for candidate in candidates:
-            if not self._consume_evaluation_attempt(candidate, state, config):
-                raise ValueError("pending evaluation no longer matches its paid receipt")
-        if isinstance(self.evaluator, BatchCandidateEvaluator) and not config.replace_failed_evaluations:
-            evaluations = self._evaluate_batch(candidates)
-            for candidate, evaluation in zip(candidates, evaluations, strict=True):
-                self._record_evaluation(state, candidate, evaluation, state.next_round)
-        else:
-            for candidate in candidates:
-                self._record_evaluation(state, candidate, self._evaluate(candidate), state.next_round)
+        def commit(index, entry, result):
+            candidate = Candidate(**entry["candidate"])
+            expected = entry["receipt"]
+            actual = result.metadata.get(EVALUATION_ATTEMPT_RECEIPT_KEY)
+            if actual is not None and expected is not None and actual != expected:
+                raise ValueError("evaluation result receipt does not match reservation")
+            result = EvaluationResult(**{**result.to_dict(), "metadata": {
+                **result.metadata, EVALUATION_ATTEMPT_RECEIPT_KEY:
+                    expected if expected is not None else f"round:{round_idx}:slot:{index}",
+            }})
+            entry["result"] = _jsonable(result.to_dict())
+            self.runtime.budget.write()
+            self._record_evaluation(state, candidate, result, round_idx)
+            self._checkpoint(state)
 
-    def _uses_evaluation_attempt_receipts(self) -> bool:
-        return getattr(self.evaluator, "evaluation_attempt_usage_key", None) is not None
+        # Results persist before events/checkpoints; re-publishing cannot call the oracle.
+        for index, entry in enumerate(entries):
+            if entry["candidate"]["candidate_id"] not in observed and entry["result"] is not None:
+                commit(index, entry, EvaluationResult(**entry["result"]))
+                observed.add(entry["candidate"]["candidate_id"])
+        remaining = [(i, entry) for i, entry in enumerate(entries)
+                     if entry["candidate"]["candidate_id"] not in observed]
+        if isinstance(self.evaluator, CandidateEvaluationPreparer) and remaining:
+            self.evaluator.prepare_evaluations([Candidate(**entry["candidate"]) for _, entry in remaining])
+        batched = isinstance(self.evaluator, BatchCandidateEvaluator) and not config.replace_failed_evaluations
+        if batched:
+            dispatched = []
+            for index, entry in remaining:
+                candidate = reserve(index, entry)
+                if candidate is None:
+                    break
+                dispatched.append((index, entry, candidate))
+            if dispatched:
+                results = self._evaluate_batch([item[2] for item in dispatched])
+                # Save the entire returned batch before committing its first observation.
+                for (_, entry, _), result in zip(dispatched, results, strict=True):
+                    entry["result"] = _jsonable(result.to_dict())
+                self.runtime.budget.write()
+                for (index, entry, _), result in zip(dispatched, results, strict=True):
+                    commit(index, entry, result)
+            return len(dispatched) < len(remaining)
+        for index, entry in remaining:
+            completed = [item for item in state.observations if item.round_idx == round_idx]
+            count = sum(item.evaluation.succeeded for item in completed) if config.target_successful_evaluations is not None else len(completed)
+            if count >= pending["desired"]:
+                break
+            candidate = reserve(index, entry)
+            if candidate is None:
+                return True
+            commit(index, entry, self._evaluate(candidate))
+        return False
 
     def _evaluation_attempt_usage_key(self, candidate: Candidate) -> str | None:
         """Task hook promises durable replay, or refusal of an ambiguous retry.
@@ -652,6 +610,8 @@ class LDMEngine:
             if result.candidate_id != candidate.candidate_id:
                 raise ValueError("evaluator returned a mismatched candidate_id")
             return self.objectives.validate_result(result)
+        except EvaluationPaused:
+            raise
         except TimeoutError as exc:
             return EvaluationResult(candidate.candidate_id, "timed_out", error=str(exc))
         except Exception as exc:
@@ -665,6 +625,8 @@ class LDMEngine:
             raise TypeError("batch evaluation requires BatchCandidateEvaluator")
         try:
             results = tuple(evaluator.evaluate_batch(candidates))
+        except EvaluationPaused:
+            raise
         except TimeoutError as exc:
             return tuple(
                 EvaluationResult(candidate.candidate_id, "timed_out", error=str(exc))
@@ -735,6 +697,7 @@ class LDMEngine:
             observation.to_dict(),
             iteration=round_idx,
             candidate_id=candidate.candidate_id,
+            event_key=f"engine:evaluated:{round_idx}:{candidate.candidate_id}",
         )
         return int(evaluation.succeeded)
 
@@ -874,6 +837,14 @@ def _evaluation_budget_stop_reason(
         if remaining is not None and remaining < 1:
             return "external_evaluation_budget"
     return None
+
+
+def _remaining_fresh_attempts(runtime, state, config):
+    limits = [_remaining_evaluation_attempts(runtime, state, config)]
+    limits.extend(runtime.budget.remaining(name) for name in
+                  ("selected_candidates", "external_evaluations", "expensive_evaluation_attempts"))
+    finite = [max(0, int(value)) for value in limits if value is not None]
+    return min(finite) if finite else None
 
 
 def _jsonable(value: Any) -> Any:

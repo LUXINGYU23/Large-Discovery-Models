@@ -16,6 +16,16 @@ EVALUATION_STATUSES = frozenset({"succeeded", "failed", "timed_out", "invalid"})
 EVALUATION_ATTEMPT_RECEIPT_KEY = "ldm_evaluation_attempt_receipt"
 
 
+class EvaluationPaused(RuntimeError):
+    """A resumable control interruption, never a candidate measurement."""
+
+    def __init__(self, message: str, *, status: str = "paused_outcome_unknown") -> None:
+        if not status.startswith("paused_"):
+            raise ValueError("evaluation pause status must start with paused_")
+        super().__init__(message)
+        self.status = status
+
+
 @dataclass(frozen=True)
 class EvaluationResult:
     """Outcome of one candidate's external evaluation."""

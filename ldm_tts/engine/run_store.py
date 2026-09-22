@@ -168,6 +168,7 @@ class CampaignEvent:
     iteration: int | None = None
     candidate_id: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
+    event_key: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -180,6 +181,7 @@ class CampaignEvent:
             "iteration": self.iteration,
             "candidate_id": self.candidate_id,
             "payload": dict(self.payload),
+            "event_key": self.event_key,
         }
 
 
@@ -198,6 +200,7 @@ class CampaignRuntime:
     budget: BudgetLedger
     status: CampaignStatus
     _next_event_sequence: int = 0
+    _keyed_events: dict[str, CampaignEvent] = field(default_factory=dict)
 
     @classmethod
     def open(
@@ -285,6 +288,12 @@ class CampaignRuntime:
                 max((int(item.get("sequence", -1)) for item in events), default=-1) + 1
             ),
         )
+        for item in events:
+            if item.get("event_key"):
+                event = CampaignEvent(**{key: value for key, value in item.items() if key != "schema_version"})
+                if event.event_key in runtime._keyed_events:
+                    raise ValueError("duplicate durable event key")
+                runtime._keyed_events[event.event_key] = event
 
         if existing_manifest is None:
             manifest = {
@@ -331,12 +340,20 @@ class CampaignRuntime:
         *,
         iteration: int | None = None,
         candidate_id: str = "",
+        event_key: str = "",
     ) -> CampaignEvent:
         if not event_type.strip():
             raise ValueError("campaign event_type must not be empty")
         if iteration is not None and iteration < 0:
             raise ValueError("campaign event iteration must be non-negative")
         with _EVENT_LOCK:
+            if event_key in self._keyed_events:
+                event = self._keyed_events[event_key]
+                if (event.event_type, event.iteration, event.candidate_id, event.payload) != (
+                    event_type, iteration, str(candidate_id), dict(payload or {})
+                ):
+                    raise ValueError(f"event identity conflict: {event_key}")
+                return event
             event = CampaignEvent(
                 sequence=self._next_event_sequence,
                 event_type=event_type,
@@ -346,12 +363,16 @@ class CampaignRuntime:
                 iteration=iteration,
                 candidate_id=str(candidate_id),
                 payload=dict(payload or {}),
+                event_key=event_key,
             )
             self.run_dir.mkdir(parents=True, exist_ok=True)
             with self.event_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event.to_dict(), sort_keys=True) + "\n")
                 handle.flush()
+                os.fsync(handle.fileno())
             self._next_event_sequence += 1
+            if event_key:
+                self._keyed_events[event_key] = event
         return event
 
     def events(self) -> list[dict[str, Any]]:
@@ -390,7 +411,8 @@ class CampaignRuntime:
             raise ValueError("terminal campaign status must be 'completed' or 'stopped'")
         summary_path = self.run_dir / "summary.json"
         atomic_json_write(summary_path, dict(summary))
-        self.record("campaign_finished", {"status": status})
+        self.record("campaign_finished", {"status": status},
+                    event_key=f"campaign:finished:{status}:{summary.get('next_round')}:{summary.get('observation_count')}")
         self.status.update(status, phase="finished", budget=self.budget, details=summary)
         return summary_path
 
@@ -441,6 +463,8 @@ def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
         with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary_name, path)
     except BaseException:
         try:
