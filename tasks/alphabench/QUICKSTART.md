@@ -37,6 +37,10 @@ LDM_DATA_COLLECTION_ENABLED=1 "$T3_PY" -m tasks.alphabench.ldm_task.procedure \
 
 来源在首次读取时冻结，逐项记录准入、重复和拒绝原因。恢复可直接使用已冻结内容，不需要原文件继续存在；显式提供与冻结内容不同的源会报错。初始化尚未结束、主搜索尚未创建时也使用同一个 `--resume-run` 入口。每个新运行和初始化拥有独立请求身份，初始化成本不占用新搜索的 E。
 
-固定上游 Alpha158 loader 的分组记录数为 `kbar+price=13`、`rolling=29`、`kbar+rolling=38`、三组全部 `42`；默认是 38 条的 `kbar+rolling`。官方 seed 文件实际读取 125 条，均通过当前静态准入。此来源核验不等于真实行情评价，证据在 `resources/evidence/seed_sources.json`。matched 方法之间共用已评价 seed bundle 的导入与资格核对仍未实现，不能把不同运行的独立初始化当作共同初始信息。
+固定上游 Alpha158 loader 的分组记录数为 `kbar+price=13`、`rolling=29`、`kbar+rolling=38`、三组全部 `42`；默认是 38 条的 `kbar+rolling`。官方 seed 文件实际读取 125 条，均通过当前静态准入。此来源核验不等于真实行情评价，证据在 `resources/evidence/seed_sources.json`。
+
+matched 方法共用初始信息时，为新运行传入 `--initialization-bundle /absolute/source-run/initialization`。源必须是完整完成的原始初始化目录；导入核对数据、模型、过滤和标签协议，逐条验证 initialization/validation receipt、规范候选、观测和预算。mock bundle 不能用于真实运行。各方法的 `initialization.public_information_digest` 必须相同。
+
+导入只从 Host 读取公共 search 观测和私有 validation，并单独记录创建 bundle 的真实成本。本次初始化预算消耗为零，`including_initialization.generation_cost` 包含原始创建成本；可以把本次 `initialization_evaluations` 上限设为零。新搜索仍有完整 E。源目录的文件清单和哈希冻结后不能替换；导入中断时重新核对同一来源，完成后 `--resume-run` 使用本 run 的固定初始观测。
 
 真实运行必须同时具备冻结的 `protocol-file`、通过资格审核的数据 manifest、对应固定源码和受控 oracle。数据审计仍有缺口时保留 `blocked`，不要编辑 `qualification` 字段把开发探针伪装成正式结果。当前已有 DeepSeek Responses/max 接口预检和 Qlib 真实种子开发探针；它们不满足完整 T3 资格。

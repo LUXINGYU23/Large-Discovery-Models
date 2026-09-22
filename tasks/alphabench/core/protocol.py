@@ -94,8 +94,6 @@ class T3Protocol:
                     "oracle_job_slots", "benchmark_jobs", "policy_turns", "harness_turns"}
         if set(self.budgets) != required or any(type(v) is not int or v < 0 for v in self.budgets.values()):
             raise ValueError("all stage budgets must be explicit finite nonnegative integers")
-        if self.init_mode == "cold" and self.cold_seed_count > self.budgets["initialization_evaluations"]:
-            raise ValueError("cold seed count exceeds the initialization evaluation budget")
 
     def to_dict(self):
         return json.loads(json.dumps(asdict(self)))

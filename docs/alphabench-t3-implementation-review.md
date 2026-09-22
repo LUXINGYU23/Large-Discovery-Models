@@ -181,3 +181,33 @@ distinct cross-run request identities. The fixed upstream loader yields the
 13/29/38/42 entry groups; all 125 records in its seed file pass static admission.
 These are source-contract checks, not data-backed seed qualification. Shared
 evaluated seed-bundle import and native source profiles remain open W08 work.
+
+## Change 7: shared evaluated initialization for matched methods
+
+Cross-check against W08: matched methods can now import a completed initialization
+through --initialization-bundle. The verifier binds the source/model/scientific
+contract and requires complete initialization and validation receipts. It checks
+candidate identity, original admission order, authoritative observations, raw
+response hashes, phase/interval/expression, and creation accounting. Synthetic
+records cannot be imported into a real campaign. Method/search/portfolio knobs
+do not change the initialization contract; data, label, objective, filter, model,
+initialization source settings and runtime limits do.
+
+Each target uses the same public observations and keeps validation on the Host.
+Its own initialization counters are zero, while source creation cost and the
+public-information digest are preserved separately. Reports include source
+generation attempts in statistics including initialization. Import can recover
+before its finish record without generating or evaluating seeds again.
+
+Complexity review: the source is the existing completed initialization directory;
+no second bundle format, score migration, copying of model sessions, or generic
+cache service was introduced. Import uses one existing CampaignRuntime and an
+inventory of the exact verified artifacts. Fresh generation and shared reuse
+retain distinct costs. The fresh cold-start budget check moved to dispatch
+preparation so a verified import can legitimately have zero initialization budget.
+
+Remote validation: 132 task tests pass, including cross-method observation
+identity, zero import cost and full new E, changed scientific/mock identity,
+corrupt or unfinished receipts, substituted measurements, interrupted import,
+and byte-identical completed replay. Real data qualification, native execution
+and the remaining full T3 work packages are still open.

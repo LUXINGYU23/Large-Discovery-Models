@@ -51,6 +51,17 @@ def freeze_seed_source(protocol, args, directory):
     existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
     if existing and existing["protocol"] != protocol.identity:
         raise ValueError("initialization source protocol mismatch")
+    if existing and existing["mode"] == "shared_bundle":
+        if args.seed_file or args.import_pool:
+            raise ValueError("cannot replace a shared seed bundle with another source")
+        if args.initialization_bundle:
+            from .seed_bundle import verify_seed_bundle
+            if (str(args.initialization_bundle.resolve()) != existing["directory"]
+                or verify_seed_bundle(args.initialization_bundle, protocol, args.mock)["digest"] != existing["bundle_digest"]):
+                raise ValueError("shared seed bundle source changed")
+        return existing
+    if existing and args.initialization_bundle:
+        raise ValueError("cannot replace initialization with a shared seed bundle")
     supplied = args.seed_file if protocol.init_mode == "file" else args.import_pool if protocol.init_mode == "import_pool" else None
     if existing and supplied is None and not (protocol.init_mode == "alpha158" and args.upstream_root):
         return existing
@@ -107,6 +118,11 @@ def run_initialization(protocol, args, spec, client, run_dir):
     from .receipts import Receipts
 
     directory = run_dir / "initialization"
+    source_path = directory / "private/seed_source.json"
+    saved_source = json.loads(source_path.read_text(encoding="utf-8")) if source_path.exists() else None
+    if args.initialization_bundle or (saved_source and saved_source["mode"] == "shared_bundle"):
+        from .seed_bundle import import_seed_bundle
+        return import_seed_bundle(protocol, args, directory)
     source = freeze_seed_source(protocol, args, directory)
     manifest_path = directory / "seed_manifest.json"
     if manifest_path.exists() and json.loads((directory / "status.json").read_text(encoding="utf-8"))["status"] == "completed":
@@ -127,6 +143,8 @@ def run_initialization(protocol, args, spec, client, run_dir):
             seed_record = receipt_store.load("seeds")
             if seed_record is None:
                 if protocol.init_mode == "cold":
+                    if protocol.cold_seed_count > protocol.budgets["initialization_evaluations"]:
+                        raise ValueError("cold seed count exceeds the initialization evaluation budget")
                     seeds = Generator(protocol, runtime, client, gateway, collection).generate(
                         identity="initialization", count=protocol.cold_seed_count,
                         instruction="Generate the initial factor pool.")[0]["candidates"] if protocol.cold_seed_count else []
@@ -182,9 +200,11 @@ def run_initialization(protocol, args, spec, client, run_dir):
         receipt = objects["gateway"].receipts.load(objects["gateway"].identity("validation", position, candidate))
         pool.append({**candidate.payload, "candidate_id": candidate.candidate_id, "success": observation.evaluation.succeeded,
                      "validation_position": position, "validation": receipt["response"] if receipt else None})
+    observations = [item.to_dict() for item in result.engine.state.observations]
     atomic_json_write(directory / "seed_manifest.json", {"protocol": protocol.identity, "pool": pool,
+                       "protocol_contract": protocol.to_dict(), "mock": args.mock,
                        "source_digest": digest(source), "admissions": objects["seed_record"]["admissions"],
-                       "observations": [item.to_dict() for item in result.engine.state.observations]})
+                       "observations": observations, "public_information_digest": digest(observations)})
     collection.export()
     result.runtime.finish({**result.engine.summary, "phase": "initialization", "seed_count": len(pool)})
     return result.engine.state.observations, pool, result.runtime.budget.snapshot()

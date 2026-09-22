@@ -24,7 +24,7 @@ def parse_args(argv=None):
         parser.add_argument("--" + name, type=int)
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--resume-run", type=Path)
-    for name in ("seed-file", "import-pool", "upstream-root", "data-manifest", "protocol-file"):
+    for name in ("seed-file", "import-pool", "initialization-bundle", "upstream-root", "data-manifest", "protocol-file"):
         parser.add_argument("--" + name, type=Path)
     parser.add_argument("--oracle-url")
     return parser.parse_args(argv)
