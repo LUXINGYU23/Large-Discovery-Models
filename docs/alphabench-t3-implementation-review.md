@@ -1336,3 +1336,21 @@ dependency was added; the existing durable OracleService/Receipts path handles
 the result. The remote Assay suite passed 25 cases with temporary files on
 `/mnt/data1/`. Real market qualification and the broader W15-W17 matrix remain
 open.
+
+## Change 39: reject changed frozen identities before a resumed call
+
+Cross-check against W15 R17 and Spec section 12.2: a physical Host process exits
+after a paid search receipt, leaving an unfinished run. Four subsequent processes
+each attempt resume with one changed frozen input: declared data digest,
+environment/patch digest, model token limit or model-request budget. All four
+fail the run's protocol identity check before a new model client or Oracle request
+is created; restoring the original protocol resumes and completes with the same
+logical trace as an uninterrupted run. This covers declared identity changes;
+actual file tampering of a qualified market snapshot and all native patches still
+need separate source-integrity evidence.
+
+Complexity review: this extends the existing real-process lifecycle test and its
+request ledger with one client-creation marker. Production code, compatibility
+paths, dependencies and test fixtures are unchanged. The remote lifecycle suite
+passed five cases using `/mnt/data1/` for temporary files. R17 and W15 remain
+open for actual data/patch tamper and the rest of the fault matrix.

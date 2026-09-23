@@ -12,18 +12,27 @@ from tasks.alphabench.rebuild_report import rebuild
 @pytest.mark.parametrize("point", ["search", "validation", "test", "quality_set_frozen"])
 def test_process_death_after_durable_receipt_reuses_paid_work(tmp_path, point):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0, rounds=1,
-        evaluations=2, batch_size=2, factor_select_n=2).to_dict()))
+    frozen = replace(T3Protocol(), cold_seed_count=0, rounds=1,
+        evaluations=2, batch_size=2, factor_select_n=2).to_dict()
+    protocol.write_text(json.dumps(frozen))
     script = r'''
 import json, os, sys
 from pathlib import Path
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.receipts import Receipts
+from tasks.alphabench.core import workflow
 from tasks.alphabench.ldm_task.procedure import main
 
 run, protocol, point = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 marker = run / "crashed.marker"
 original_send, original_evaluate, original_accept = OracleGateway._send, OracleGateway.evaluate, Receipts.accept
+original_client = workflow.make_client
+
+
+def make_client(*args, **kwargs):
+    with (run / "clients.txt").open("a") as stream:
+        stream.write("created\n")
+    return original_client(*args, **kwargs)
 
 def send(self, request):
     with (run / "physical.jsonl").open("a") as stream:
@@ -45,6 +54,7 @@ def accept(self, identity, payload):
     return result
 
 OracleGateway._send, OracleGateway.evaluate, Receipts.accept = send, evaluate, accept
+workflow.make_client = make_client
 args = ["--mock", "--protocol-file", protocol, "--out-dir", str(run)]
 if (run / "campaign.json").exists():
     args.extend(["--resume-run", str(run)])
@@ -58,6 +68,20 @@ raise SystemExit(main(args))
     interrupted, baseline = tmp_path / "interrupted", tmp_path / "baseline"
     killed = child(interrupted, point)
     assert killed.returncode == 92, killed.stderr
+    if point == "search":
+        calls = (interrupted / "physical.jsonl").read_bytes()
+        clients = (interrupted / "clients.txt").read_bytes()
+        changes = (frozen | {"data_digest": "different-data"},
+                   frozen | {"environment_digest": "different-patch-or-environment"},
+                   frozen | {"max_model_tokens": frozen["max_model_tokens"] + 1},
+                   frozen | {"budgets": frozen["budgets"] | {"model_requests": frozen["budgets"]["model_requests"] + 1}})
+        for altered in changes:
+            protocol.write_text(json.dumps(altered))
+            rejected = child(interrupted, point)
+            assert rejected.returncode != 0 and "resume protocol identity mismatch" in rejected.stderr
+            assert (interrupted / "physical.jsonl").read_bytes() == calls
+            assert (interrupted / "clients.txt").read_bytes() == clients
+        protocol.write_text(json.dumps(frozen))
     resumed = child(interrupted, point)
     assert resumed.returncode == 0, resumed.stderr
     assert child(baseline, "none").returncode == 0
