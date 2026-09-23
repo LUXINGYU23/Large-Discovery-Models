@@ -28,10 +28,10 @@
   "verified_on": "remote server; Python 3.10; locked Assay environment; deterministic offline fixtures",
   "tests": {
     "file": "tasks/alphabench/tests/test_assay_execution.py",
-    "passed": 24,
+    "passed": 25,
     "guide_operators_executed": {"qlib": 48, "assay": 36},
     "numerical_cases": ["pre-entry rolling mean", "daily group changes", "single-horizon open-return IC", "actual AssayService daily/aggregate IC for CN and US", "AssayService group-data IC", "source period-end universe on a non-trading date", "split-adjusted VWAP", "Tanh", "Mask", "actual benchmark NAV", "source CN total-return portfolio NAV and trades against native PortfolioBacktester"],
-    "operational_cases": ["independent CN/US portfolio", "source CN/US portfolio", "combination", "actual Assay portfolio REST", "REST/native report parity", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
+    "operational_cases": ["independent CN/US portfolio", "source CN/US portfolio", "combination", "actual Assay portfolio REST", "REST/native report parity", "response lost after HTTP 200 pauses without a second POST", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
   },
   "remaining": [
     "Qualified real data and complete offline preparation for each market",

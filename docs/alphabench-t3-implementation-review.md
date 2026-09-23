@@ -1319,3 +1319,20 @@ contract on fixtures; qualified market assets, full numerical/operator audits,
 real backend matrix and remaining W15-W17 evidence are still required.
 The broader task suite was interrupted during an unrelated long-running native
 campaign case after 193 passes and four skips in 7m15s; it was not a full pass.
+
+## Change 38: preserve unknown outcome after an Assay REST response is lost
+
+Cross-check against W15 R16/X03 and Spec section 12.2: an actual Assay worker
+receives HTTP 200 from the pinned portfolio route, then loses the response before
+it can publish its worker output. The Host receipt remains `dispatch_intent`;
+a second execution of the same request pauses for reconciliation and the HTTP
+marker records exactly one POST. This is a physical child-process failure after
+the portfolio computation, not an in-memory exception before dispatch. It does
+not establish the other R16 service-outage, cancellation or kill cases.
+
+Complexity review: the fault is injected with a temporary `sitecustomize` module
+in the test process environment. No production hook, retry, wrapper or new
+dependency was added; the existing durable OracleService/Receipts path handles
+the result. The remote Assay suite passed 25 cases with temporary files on
+`/mnt/data1/`. Real market qualification and the broader W15-W17 matrix remain
+open.

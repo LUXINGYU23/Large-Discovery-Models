@@ -430,6 +430,42 @@ except EvaluationPaused as exc:
     assert receipt["state"] == "completed" and receipt["response_digest"] == digest(worker_response)
 
 
+def test_lost_assay_rest_response_pauses_without_reposting(snapshot, tmp_path, monkeypatch):
+    request, config, _, _ = snapshot
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config | {key: request["protocol"][key]
+        for key in ("backend", "market", "data_digest", "environment_digest")}))
+    marker = tmp_path / "rest-posts.txt"
+    (tmp_path / "sitecustomize.py").write_text('''
+import os
+import httpx
+
+original_post = httpx.Client.post
+
+def post(self, url, *args, **kwargs):
+    response = original_post(self, url, *args, **kwargs)
+    if str(url).endswith("/v1/portfolio/backtest"):
+        with open(os.environ["T3_REST_POST_MARKER"], "a") as output:
+            output.write(str(response.status_code) + "\\n")
+        raise httpx.ReadTimeout("response lost after portfolio completion")
+    return response
+
+httpx.Client.post = post
+''')
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path) + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    monkeypatch.setenv("T3_REST_POST_MARKER", str(marker))
+    service = OracleService(config_path, tmp_path / "oracle")
+    full_request = dict(request, fast=False)
+    with pytest.raises(EvaluationPaused, match="worker exit requires reconciliation"):
+        service.execute(full_request)
+    assert marker.read_text().splitlines() == ["200"]
+    assert service.receipts.load(request["request_id"])["state"] == "dispatch_intent"
+    assert not (tmp_path / "oracle" / "jobs" / request["request_id"] / "response.json").exists()
+    with pytest.raises(EvaluationPaused, match="physical request requires reconciliation"):
+        service.execute(full_request)
+    assert marker.read_text().splitlines() == ["200"]
+
+
 def test_all_guide_operators_execute_through_pinned_assay_parser_and_engine(snapshot):
     request, config, _, _ = snapshot
     for dialect in ("qlib", "assay"):
