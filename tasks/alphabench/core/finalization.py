@@ -33,7 +33,7 @@ def verify_report_artifacts(run_dir, protocol):
         raise ValueError("completed result differs from the persisted budget ledgers")
 
 
-def finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget, *, execution):
+def finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget, *, execution, data_manifest=None):
     private = runtime.run_dir / "private"
     stages = Receipts(private / "stages")
     stages.accept("search_execution", execution)
@@ -130,6 +130,10 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
              "tool_calls": sum(tool_calls.values()) if tool_usage_complete else None,
              "tool_calls_by_name": dict(sorted(tool_calls.items())) if tool_usage_complete else None,
              "tool_usage_reason": None if tool_usage_complete else "sidecar_usage_incomplete"}
+    data_status = "synthetic" if gateway.mock else (
+        "partial_comparison" if protocol.data_policy == "partial_comparison" else "unqualified")
+    data_reason = {"synthetic": "synthetic_oracle", "partial_comparison": "known_coverage_gaps",
+                   "unqualified": "market_data_qualification_pending"}[data_status]
     report = {"task": "alphabench", "mock": gateway.mock, "protocol": protocol.to_dict(), "protocol_digest": protocol.identity,
               "method": protocol.method, "initialization": {"seed_count": len(initial_pool), "budget": initial_budget,
                   "source_digest": seed_manifest["source_digest"], "source_records": len(seed_manifest["admissions"]),
@@ -154,7 +158,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
                       "structure": structure_diversity([row["candidate"]["expression"] for row in tested]),
                       "signal": signal_diversity([{"candidate_id": row["candidate_id"], "scores": row["raw"].get("scores", [])} for row in tested])}},
               "budget": budget, "costs": costs, "execution": execution,
-              "qualification": "mock_verified" if gateway.mock else "unqualified"}
+              "qualification": "mock_verified" if gateway.mock else data_status}
     selected_count = len(selection["selected"])
     test_success = sum(row["raw"]["success"] and isinstance(row["raw"].get("portfolio"), dict) for row in tested)
     combined = combination is not None and combination["success"] and isinstance(combination.get("portfolio"), dict)
@@ -180,9 +184,13 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
         "quality_audit": {"status": "complete" if quality["complete"] else "unavailable",
                           "raw_occurrences": quality["raw_occurrences"], "coverage": quality["coverage"],
                           "reason": quality["unavailable_reason"]},
-        "data": {"status": "synthetic" if gateway.mock else "unqualified",
+        "data": {"status": data_status,
                  "digest": protocol.data_digest or None,
-                 "reason": "synthetic_oracle" if gateway.mock else "market_data_qualification_pending"},
+                 "source_qualification": data_manifest["qualification"] if data_manifest else None,
+                 "issue_codes": sorted({item["code"] for item in data_manifest.get("issues", [])}) if data_manifest else [],
+                 "unresolved_sessions": sum(item["missing_sessions"] for item in data_manifest.get("gaps", [])) if data_manifest else 0,
+                 "instrument_interval_conflicts": len(data_manifest.get("instrument_interval_conflicts", [])) if data_manifest else 0,
+                 "reason": data_reason},
     }
     for population in ("final_pool", "test_selection"):
         result = report["diversity"][population]
@@ -194,9 +202,10 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     report["completeness"]["report"] = {"status": "complete", "artifact": "result.json / report.md / trajectory.csv"}
     # Mandatory analysis capability is checked before claiming a complete report.
     report["complete_t3"] = False
-    report["pending_capabilities"] = ["data_qualification", "native_algorithm_recovery", "assay_market_qualification",
-                                      "persistent_harness", "compiled_policy", "assay_portfolio_endpoint",
-                                      "full_metrics_and_quality_coverage", "crash_and_guest_isolation", "full_matrix_qualification"]
+    report["pending_capabilities"] = (["data_qualification"] if protocol.data_policy == "qualified_only" else []) + [
+        "native_algorithm_recovery", "assay_market_qualification", "persistent_harness",
+        "compiled_policy", "assay_portfolio_endpoint", "full_metrics_and_quality_coverage",
+        "crash_and_guest_isolation", "full_matrix_qualification"]
     atomic_json_write(runtime.run_dir / "result.json", report)
     (runtime.run_dir / "report.md").write_text(render_report(report), encoding="utf-8")
     with (runtime.run_dir / "trajectory.csv").open("w", newline="") as stream:

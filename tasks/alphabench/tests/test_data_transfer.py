@@ -75,17 +75,22 @@ def test_truncated_http_body_is_retried_before_publishing_download(tmp_path, mon
 
 
 @pytest.mark.parametrize("backend,market", [("qlib", "csi300"), ("assay", "nasdaq100")])
-def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backend, market):
+@pytest.mark.parametrize("qualification,data_policy", [("qualified", "qualified_only"),
+                                                      ("blocked", "partial_comparison")])
+def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backend, market,
+                                                                 qualification, data_policy):
     if sys.platform == "win32":
         pytest.skip("Oracle service process requires POSIX fcntl")
     from tasks.alphabench.core.oracle_service import OracleService
 
     root = tmp_path / "market"
     root.mkdir()
-    manifest = {"backend": backend, "market": market, "qualification": "qualified",
+    manifest = {"backend": backend, "market": market, "qualification": qualification,
                 "source": "frozen-fixture", "archive_sha256": "a" * 64,
                 "start": "2015-01-01", "end": "2025-02-01", "benchmark": "INDEX",
                 "adjustment": "split", "fields": ["close"], "historical_universe": True}
+    if qualification == "blocked":
+        manifest["issues"] = [{"code": "unresolved_price_gaps", "symbols": 1}]
     if backend == "qlib":
         files = {}
         for relative in ("calendars/day.txt", f"instruments/{market}.txt",
@@ -115,10 +120,18 @@ def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backen
         manifest_path = tmp_path / f"assay_{market}.json"
         altered = root / "prices.parquet"
     manifest_path.write_text(json.dumps(manifest))
-    protocol = T3Protocol(backend=backend, market=market, data_digest=data.digest(manifest))
+    protocol = T3Protocol(backend=backend, market=market, data_digest=data.digest(manifest),
+                          data_policy=data_policy)
+    if qualification == "blocked":
+        assert protocol.identity != T3Protocol(backend=backend, market=market,
+                                               data_digest=protocol.data_digest).identity
     protocol_path = tmp_path / "protocol.json"
     protocol_path.write_text(json.dumps(protocol.to_dict()))
     assert data.verify_data_manifest(manifest_path, protocol) == manifest
+    if qualification == "blocked":
+        with pytest.raises(ValueError, match="qualification is incomplete"):
+            data.verify_data_manifest(manifest_path, T3Protocol(
+                backend=backend, market=market, data_digest=protocol.data_digest))
     config = {"backend": backend, "market": market, "data_digest": protocol.data_digest,
               "environment_digest": protocol.environment_digest, "data_manifest": str(manifest_path)}
     if backend == "qlib":

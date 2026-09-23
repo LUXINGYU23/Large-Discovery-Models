@@ -44,8 +44,13 @@ def sha256(path):
 def verify_data_manifest(path: Path, protocol: T3Protocol):
     path = Path(path).resolve()
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    if manifest.get("qualification") != "qualified":
-        raise ValueError("data qualification is incomplete; inspect the recorded coverage issues")
+    qualification = manifest.get("qualification")
+    if protocol.data_policy == "qualified_only":
+        if qualification != "qualified":
+            raise ValueError("data qualification is incomplete; inspect the recorded coverage issues")
+    elif qualification not in {"qualified", "coverage_verified", "blocked"} or (
+            qualification == "blocked" and not manifest.get("issues")):
+        raise ValueError("partial comparison requires a documented data audit")
     for key in ("source", "archive_sha256", "files_sha256", "calendar_sha256", "universe_sha256",
                 "adjustment", "fields", "start", "end", "benchmark", "historical_universe"):
         if not manifest.get(key):

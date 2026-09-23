@@ -59,4 +59,4 @@ matched 方法共用初始信息时，为新运行传入 `--initialization-bundl
 
 导入只从 Host 读取公共 search 观测和私有 validation，并单独记录创建 bundle 的真实成本。本次初始化预算消耗为零，`including_initialization.generation_cost` 包含原始创建成本；可以把本次 `initialization_evaluations` 上限设为零。新搜索仍有完整 E。源目录的文件清单和哈希冻结后不能替换；导入中断时重新核对同一来源，完成后 `--resume-run` 使用本 run 的固定初始观测。
 
-真实运行必须同时具备冻结的 `protocol-file`、通过资格审核的数据 manifest、对应固定源码和受控 oracle。数据审计仍有缺口时保留 `blocked`，不要编辑 `qualification` 字段把开发探针伪装成正式结果。当前已有 DeepSeek Responses/max 接口预检和 Qlib 真实种子开发探针；它们不满足完整 T3 资格。
+真实运行必须同时具备冻结的 `protocol-file`、有来源及逐文件哈希的数据 manifest、对应固定源码和受控 oracle。用户允许以同一批不完整数据进行比较时，在协议中设置 `data_policy=partial_comparison` 并使用原审计 manifest 的规范 JSON digest；不编辑其 `qualification` 字段。所有方法仍要固定同一数据身份、市场、切分及缺失规则，报告标记部分数据比较。当前已有 DeepSeek Responses/max 接口预检和 Qlib 真实种子开发探针；它们不满足完整 T3 功能矩阵资格。

@@ -14,7 +14,10 @@ OUTPUT = "tasks/alphabench/qualification_records/completeness_matrix.json"
 
 
 def build_matrix(data, task):
-    cells = []
+    policy = data.get("comparison_data_policy", "qualified_only")
+    if policy not in {"qualified_only", "partial_comparison"}:
+        raise ValueError("unknown comparison data policy")
+    cells, market_limitations = [], {}
     for backend, markets in BACKENDS.items():
         for market in markets:
             section = "cn" if market.startswith("csi") else "us"
@@ -23,6 +26,7 @@ def build_matrix(data, task):
                 raise ValueError("market audit has no recognized qualification: " + market)
             blocked = audit["qualification"] != "qualified"
             issues = sorted({issue["code"] for issue in audit["issues"]}) if blocked else []
+            market_limitations[f"{backend}/{market}"] = issues
             for method in METHODS:
                 cells.append({
                     "id": f"{backend}/{market}/{method}",
@@ -34,8 +38,8 @@ def build_matrix(data, task):
                     "source_audit_qualification": audit["qualification"],
                     "capabilities": {"data": "unverified", "operators": "unverified",
                                      "method": "unverified", "portfolio": "unverified", "recovery": "unverified"},
-                    "blockers": (["unqualified_market_data", *issues] if blocked else []) +
-                                ["qualified_backend_manifest_missing", "formal_profile_unfrozen", "real_run_missing"],
+                    "blockers": (["unqualified_market_data"] if blocked and policy == "qualified_only" else []) +
+                                ["frozen_backend_manifest_missing", "formal_profile_unfrozen", "real_run_missing"],
                     "data_evidence": {"file": DATA_EVIDENCE, "section": f"{section}.{market}"},
                     "run_id": None, "compact_record": None, "raw_hashes": {},
                 })
@@ -44,6 +48,8 @@ def build_matrix(data, task):
     counts = {status: sum(cell["status"] == status for cell in cells)
               for status in ("passed", "failed", "blocked")}
     return {"schema_version": 1, "task_id": "alphabench", "kind": "functional_72",
+            "comparison_data_policy": policy,
+            "market_data_limitations": market_limitations,
             "data_evidence": {"file": DATA_EVIDENCE, "digest": digest(data)},
             "task_evidence": {"file": TASK_EVIDENCE, "digest": digest(task), "stage": task["stage"]},
             "required": len(cells), "counts": counts, "complete_t3": False, "cells": cells}

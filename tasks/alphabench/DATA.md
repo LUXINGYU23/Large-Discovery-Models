@@ -185,7 +185,7 @@ manifests/cn_suspensions.json   停牌来源、响应哈希及核对结果
 
 CN 审计检查成员区间、日历、表达式字段、复权 factor、基准和有限行情覆盖。
 2015 年是最低 warmup 期，保留到 2025 年 1 月检查前向标签边界；长窗口表达式仍须动态检查。
-`coverage_verified` 只表示结构化覆盖检查通过；正式运行要求独立复核后的 `qualified` 数据清单及相同的冻结 digest，不能手改资格绕过缺口。
+`coverage_verified` 只表示结构化覆盖检查通过。默认 `qualified_only` 仍要求独立复核后的 `qualified` 数据清单。按用户允许的部分数据比较，冻结协议显式选择 `partial_comparison` 时可使用有明确 `issues` 的原始 `blocked` 审计清单；各方法必须绑定同一规范 JSON digest 和物理文件清单，结果保留缺口、成员冲突与 `partial_comparison` 标记，不手改数据资格，也不声称原论文数值复现。
 
 Assay 需要 `price_raw`、`adj_events`、`universe_snapshots`；CN 另需交易限制，分组算子需要历史分类。Qlib 归一化 adjusted close 不能当作 raw close，累计 factor 不能可靠拆成分红和拆股。资产未齐前，Assay 转换与完整 T3 矩阵保持未通过。
 

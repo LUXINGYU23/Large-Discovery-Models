@@ -16,6 +16,9 @@ def test_full_matrix_retains_blocked_markets_and_all_methods():
     assert {cell["backend"] for cell in cells} == {"qlib", "assay"}
     assert all(cell["contract_profile"] is None and cell["run_id"] is None for cell in cells)
     assert all(cell["capabilities"]["data"] == "unverified" for cell in cells)
+    assert matrix["comparison_data_policy"] == "partial_comparison"
+    assert len(matrix["market_data_limitations"]) == 9
+    assert all("unqualified_market_data" not in cell["blockers"] for cell in cells)
     assert all(cell["data_evidence"]["file"] == DATA_EVIDENCE for cell in cells)
     assert json.loads((ROOT / OUTPUT).read_text(encoding="utf-8")) == matrix
 
@@ -27,6 +30,10 @@ def test_full_matrix_retains_blocked_markets_and_all_methods():
     without_data_blocker = build_matrix(qualified, task)
     assert without_data_blocker["counts"] == {"passed": 0, "failed": 0, "blocked": 72}
     assert all("unqualified_market_data" not in cell["blockers"] and
-               "qualified_backend_manifest_missing" in cell["blockers"] and
+               "frozen_backend_manifest_missing" in cell["blockers"] and
                cell["capabilities"]["data"] == "unverified" for cell in without_data_blocker["cells"])
     assert without_data_blocker["complete_t3"] is False
+    strict = deepcopy(data)
+    strict.pop("comparison_data_policy")
+    assert all("unqualified_market_data" in cell["blockers"]
+               for cell in build_matrix(strict, task)["cells"])

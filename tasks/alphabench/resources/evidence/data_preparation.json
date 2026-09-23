@@ -152,6 +152,7 @@
     }
   },
   "complete_t3_data": false,
+  "comparison_data_policy": "partial_comparison",
   "corroborated_suspension_rows": 127975,
   "network": {
     "acquisition": "local computer",

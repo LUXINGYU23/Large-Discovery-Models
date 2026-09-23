@@ -1470,3 +1470,29 @@ no new package, alternate data adapter, mutable archive patch, fallback or
 compatibility path. Validation covers full versus incomplete snapshots,
 duplicate and future-dated rows, and an altered input audit. The existing
 blocked market qualification and 72-cell matrix remain unchanged.
+
+## Change 45: freeze incomplete data as an explicit comparison scope
+
+The user relaxed only the full-market-data requirement: methods may be compared
+on the same incomplete snapshot. The frozen plan's W04 full-coverage gate is
+therefore superseded for these comparisons, while all T3 methods, markets,
+backends, search/validation/test stages and scientific cost accounting remain
+in scope. The protocol now has an explicit `partial_comparison` data policy.
+It accepts the existing audited `blocked` CN manifest with documented issues
+without changing its qualification field. The original default still requires
+`qualified`. Either path checks the manifest digest and rehashes every frozen
+asset before a real start or resume; each Oracle worker rechecks its bound
+files. `result.json` records the policy, original audit state, issue codes,
+missing sessions and membership conflicts. The 72-cell inventory keeps the
+source limitations but no longer treats full coverage as a prerequisite for
+the newly authorized functional comparison. Missing backend manifests, formal
+profiles and real runs remain blockers.
+
+Complexity review: one protocol field and the existing data-verifier branch
+express the new rule. The blocked source manifest is reused as-is; no second
+data copy, rewritten qualification, migration, fallback evaluator or new
+dependency was added. The report reads audit counts from that same manifest.
+The matrix stores issue codes once per market instead of repeating them in
+all eight method cells.
+The strict path and physical tamper checks remain covered by the existing
+real-process test, now parameterized for both data policies.

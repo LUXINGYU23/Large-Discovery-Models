@@ -89,10 +89,11 @@ def bind_runner_contract(run_dir, protocol):
 
 
 def run(args, protocol, spec):
+    data_manifest = None
     if not args.mock:
         if not args.protocol_file or not args.data_manifest:
             raise ValueError("real runs require a frozen --protocol-file and verified --data-manifest")
-        verify_data_manifest(args.data_manifest, protocol)
+        data_manifest = verify_data_manifest(args.data_manifest, protocol)
     native = protocol.method.startswith("alphabench_")
     if not native and protocol.profile != "ldm_matched_v1":
         raise ValueError("source profiles require the actual native algorithm entry")
@@ -217,7 +218,7 @@ def run(args, protocol, spec):
             execution = {"kind": "shared_engine", "summary": {
                 **result.engine.summary, "rounds_run": result.engine.state.next_round}}
         report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
-                          execution=execution)
+                          execution=execution, data_manifest=data_manifest)
         collection.export()
         objects["runtime"].finish(report)
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()),

@@ -4,7 +4,7 @@
 
 [数据准备](DATA.md) 包含官方数据资产核查、本机代理下载、固定来源/哈希、SSH 传输和服务器离线审计。所有数值测试和实验在指定服务器的 `/mnt/data1/` 下执行。
 
-[完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。当前数据审计使全部格保持 blocked；合同、预算和真实 run 尚未冻结或完成。数据变为 qualified 仍须补齐正式合同与真实证据，不会自动标记方法通过。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
+[完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。合同、预算和真实 run 尚未冻结或完成，全部格仍保持 blocked。用户已允许用同一批不完整数据做方法比较：真实协议须显式设置 `data_policy=partial_comparison`，绑定原始审计的 `data_digest`，各比较方法使用同一数据清单、后端、市场、切分和缺失规则。结果标为部分数据比较，不声称原论文数值复现。`qualified_only` 仍是默认门槛；两种模式都逐文件验证实际资产。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
 
 ## 已实现的路径
 

@@ -27,6 +27,7 @@ class T3Protocol:
     filter_profile: str = "paper_filter_v1"
     init_mode: str = "cold"
     data_digest: str = ""
+    data_policy: str = "qualified_only"
     environment_digest: str = ""
     model: str = "deepseek-flash"
     endpoint: str = "https://api.deepseek.com/responses"
@@ -69,6 +70,8 @@ class T3Protocol:
             raise ValueError("unsupported backend/market pair")
         if self.method not in METHODS or self.profile not in PROFILES:
             raise ValueError("unknown method or protocol profile")
+        if self.data_policy not in {"qualified_only", "partial_comparison"}:
+            raise ValueError("unknown data coverage policy")
         if type(self.harness_surrogate_query) is not bool or self.harness_surrogate_query and self.method not in {"ldm_harness", "ldm_harness_compiled"}:
             raise ValueError("GP research queries require an LDM Harness method")
         capabilities = self.policy_capabilities
@@ -125,6 +128,8 @@ class T3Protocol:
 
     def to_dict(self):
         value = asdict(self)
+        if self.data_policy == "qualified_only":
+            del value["data_policy"]
         if self.method not in {"harness", "ldm_harness", "ldm_harness_compiled"}:
             del value["harness_surrogate_query"]
         if self.method != "ldm_harness_compiled":
