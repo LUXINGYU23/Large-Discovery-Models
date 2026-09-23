@@ -23,6 +23,15 @@
 不是 AlphaBench 或 Qlib 官方发布的数据。不能把执行 Qlib 旧下载命令视为
 已经获得更完整的官方 T3 行情；任何新来源仍须独立冻结哈希并通过同一覆盖审计。
 
+旧版 Qlib 下载器使用的 Azure 地址在本机返回 HTTP 409（禁止公共访问）。
+[当前下载器源码](https://github.com/microsoft/qlib/blob/main/qlib/tests/data.py)
+转而指向 [SunsetWolf/qlib_dataset 的 GitHub release](https://github.com/SunsetWolf/qlib_dataset/releases/tag/v3)。
+`v3` 的 CN/US 日线归档可以从本机访问，但都发布于 2024-05-22，
+不可能包含完整的 2024 年下半年 T3 行情；这只是 Qlib 示例数据镜像，
+也不是 AlphaBench 原实验数据。没有把它传到服务器或作为缺口补证。
+对应的 URL、响应与资产大小记录在
+[official_data_catalog.json](resources/evidence/official_data_catalog.json)。
+
 ## 固定来源
 
 版本、地址和已知 SHA-256 在 `resources/data_sources.json`，不用 `latest`。

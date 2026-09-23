@@ -14,5 +14,19 @@
   ],
   "conclusion": "The official linked archive contains four precomputed factor metric tables. It does not contain the per-security OHLCV needed to evaluate new T3 expressions.",
   "data_instructions": "README.md Prerequisites requires downloading Qlib market data separately.",
+  "qlib_download_probe": {
+    "checked_at": "2026-09-23",
+    "legacy_url": "https://qlibpublic.blob.core.windows.net/data/default/stock_data/v2/qlib_data_cn_1d_latest.zip",
+    "legacy_head_status": 409,
+    "legacy_response": "Public access is not permitted on this storage account.",
+    "current_downloader": "https://github.com/microsoft/qlib/blob/main/qlib/tests/data.py",
+    "mirror_release": "https://github.com/SunsetWolf/qlib_dataset/releases/tag/v3",
+    "release_published_at_utc": "2024-05-22T09:12:09Z",
+    "mirror_assets": [
+      {"name": "qlib_data_cn_1d_latest.zip", "bytes": 240739135, "head_status": 200, "last_modified_utc": "2024-05-22T08:26:32Z"},
+      {"name": "qlib_data_us_1d_latest.zip", "bytes": 450094816, "head_status": 200, "last_modified_utc": "2024-05-22T08:52:42Z"}
+    ],
+    "conclusion": "The mirror predates the second half of 2024 and cannot supply complete T3 historical market data. Assets were not downloaded or imported."
+  },
   "server_network_policy": "International acquisition on the local machine; hash-verified SSH transfer; offline preparation and all experiments under /mnt/data1."
 }

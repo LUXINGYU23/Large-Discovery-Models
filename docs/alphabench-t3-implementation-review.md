@@ -1377,3 +1377,20 @@ schema compatibility layer, dependency or speculative method abstraction was
 added. Remote matrix test, `--check` and task registration passed. Pilot budgets,
 all named executable profiles, real runs and the 32-method matched comparison
 remain open.
+
+## Change 41: reject obsolete Qlib market-data mirrors with recorded evidence
+
+Cross-check against the frozen plan W04/W16 and the full-T3 data requirement:
+AlphaBench's own archive has only four precomputed T2/T4 IC tables and its
+prerequisites require separate Qlib market data. The former Qlib Azure download
+returns HTTP 409 from the local machine. The current Qlib downloader points to a
+GitHub release whose accessible CN and US daily assets were published on
+2024-05-22, before the required 2024 year-end coverage. This mirror cannot
+qualify the complete T3 period and was not transferred or promoted as data.
+The task's existing local-download, hash-transfer and remote offline-audit
+procedure remains the route for any genuinely qualifying replacement source.
+
+Complexity review: the finding is recorded in the existing data guide and
+catalog evidence; no acquisition backend, fallback, adapter, dependency, or
+low-value mirror test was added. The current CN/US source gaps and all 72
+functional qualification cells remain blocked.
