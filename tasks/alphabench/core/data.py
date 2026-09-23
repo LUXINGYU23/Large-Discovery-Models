@@ -58,8 +58,12 @@ def verify_data_manifest(path: Path, protocol: T3Protocol):
         raise ValueError("data does not cover lookback, all splits, and forward labels")
     if digest(manifest) != protocol.data_digest:
         raise ValueError("data manifest does not match the frozen protocol")
-    if protocol.backend == "qlib" and any(not manifest.get(key) for key in ("data_root", "all_instruments_sha256")):
-        raise ValueError("Qlib data manifest lacks its data root or all-instruments hash")
+    verify_data_files(path, manifest)
+    return manifest
+
+
+def verify_data_files(path: Path, manifest: dict):
+    path = Path(path).resolve()
 
     def check_file(root, relative, expected):
         declared = root / relative_path(relative)
@@ -67,17 +71,19 @@ def verify_data_manifest(path: Path, protocol: T3Protocol):
         if declared.is_symlink() or not target.is_relative_to(root) or not target.is_file() or sha256(target) != expected:
             raise ValueError("data asset content mismatch: " + relative)
 
-    if protocol.backend == "qlib":
+    if manifest["backend"] == "qlib":
+        if any(not manifest.get(key) for key in ("data_root", "all_instruments_sha256")):
+            raise ValueError("Qlib data manifest lacks its data root or all-instruments hash")
         root = Path(manifest["data_root"]).resolve()
         files = json.loads(path.with_suffix(".files.json").read_text(encoding="utf-8"))
         if not isinstance(files, dict) or not files or digest(files) != manifest["files_sha256"]:
             raise ValueError("Qlib file inventory differs from the frozen data manifest")
         required = {"calendars/day.txt": manifest["calendar_sha256"],
-                    f"instruments/{protocol.market}.txt": manifest["universe_sha256"],
+                    f"instruments/{manifest['market']}.txt": manifest["universe_sha256"],
                     "instruments/all.txt": manifest["all_instruments_sha256"]}
         for relative, expected in (files | required).items():
             check_file(root, relative, expected)
-    else:
+    elif manifest["backend"] == "assay":
         assets = manifest.get("assets")
         if not isinstance(assets, dict) or set(assets) != ASSAY_ASSETS:
             raise ValueError("Assay requires all seven frozen data assets")
@@ -88,7 +94,8 @@ def verify_data_manifest(path: Path, protocol: T3Protocol):
             raise ValueError("Assay file inventory differs from the frozen data manifest")
         for relative, expected in files.items():
             check_file(path.parent, relative, expected)
-    return manifest
+    else:
+        raise ValueError("unknown data backend")
 
 
 def fetch_file(request, destination, *, content_range=None):

@@ -10,8 +10,9 @@ import time
 
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.contracts.evaluation import EvaluationPaused
+from .data import verify_data_files
 from .grammar import parse_expression
-from .protocol import T3Protocol
+from .protocol import T3Protocol, digest
 
 
 def load_source(name, path):
@@ -144,11 +145,33 @@ def main(argv=None):
     parser.add_argument("request", type=Path)
     parser.add_argument("config", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--config-digest", required=True)
     args = parser.parse_args(argv)
-    request, config = json.loads(args.request.read_text(encoding="utf-8")), json.loads(args.config.read_text(encoding="utf-8"))
+    request = json.loads(args.request.read_text(encoding="utf-8"))
     started = time.monotonic()
     try:
-        if request["protocol"]["backend"] == "assay":
+        protocol = T3Protocol(**request["protocol"])
+        try:
+            config = json.loads(args.config.read_text(encoding="utf-8"))
+            if digest(config) != args.config_digest:
+                raise ValueError("oracle configuration changed after service startup")
+            if any(config[key] != getattr(protocol, key) for key in
+                   ("backend", "market", "data_digest", "environment_digest")):
+                raise ValueError("oracle worker config differs from the request")
+            manifest_path = Path(config["data_manifest"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if (digest(manifest) != protocol.data_digest
+                    or (manifest.get("backend"), manifest.get("market")) != (protocol.backend, protocol.market)):
+                raise ValueError("oracle worker data manifest identity mismatch")
+            if protocol.backend == "qlib":
+                if (Path(config["data_root"]).resolve() != Path(manifest["data_root"]).resolve()
+                        or config["benchmark"].lower() != manifest["benchmark"].lower()):
+                    raise ValueError("Qlib worker data root or benchmark differs from the manifest")
+                verify_data_files(manifest_path, manifest)
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            raise EvaluationPaused("oracle data/config integrity failure: " + str(exc),
+                                   status="paused_data_integrity") from exc
+        if protocol.backend == "assay":
             from .assay_adapter import assay_evaluate
             result = assay_evaluate(request, config)
         else:

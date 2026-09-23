@@ -23,6 +23,17 @@ class OracleService:
         self.config = json.loads(self.config_path.read_text(encoding="utf-8"))
         if self.config["backend"] not in {"qlib", "assay"}:
             raise ValueError("unknown oracle backend")
+        if not self.config.get("data_manifest"):
+            raise ValueError("oracle requires a frozen data manifest")
+        manifest = json.loads(Path(self.config["data_manifest"]).read_text(encoding="utf-8"))
+        if (digest(manifest) != self.config["data_digest"]
+                or (manifest.get("backend"), manifest.get("market")) != (self.config["backend"], self.config["market"])):
+            raise ValueError("oracle data manifest identity mismatch")
+        if self.config["backend"] == "qlib" and (
+                Path(self.config["data_root"]).resolve() != Path(manifest["data_root"]).resolve()
+                or self.config["benchmark"].lower() != manifest["benchmark"].lower()):
+            raise ValueError("Qlib oracle data root or benchmark differs from the manifest")
+        self.config_digest = digest(self.config)
         self.root = Path(root)
         self.receipts = Receipts(self.root / "requests")
 
@@ -55,7 +66,8 @@ class OracleService:
                 atomic_json_write(directory / "permit.json", {"request_digest": digest(request), "job_id": identity + ":0"})
                 with (directory / "worker.log").open("ab") as log:
                     process = subprocess.Popen([sys.executable, "-m", "tasks.alphabench.core.oracle_worker",
-                        str(directory / "request.json"), str(self.config_path), str(directory / "response.json")],
+                        str(directory / "request.json"), str(self.config_path), str(directory / "response.json"),
+                        "--config-digest", self.config_digest],
                         stdout=log, stderr=log, start_new_session=True,
                         env={key: value for key, value in os.environ.items() if key not in {"DEEPSEEK_API_KEY", "OPENAI_API_KEY"}})
                     try:
@@ -74,6 +86,7 @@ class OracleService:
 
     def health(self):
         return {key: self.config[key] for key in ("backend", "market", "data_digest", "environment_digest")} | {
+            "config_digest": self.config_digest,
             "capabilities": ["durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"]
                 + (["lint_check"] if self.config["backend"] == "assay" else [])}
 

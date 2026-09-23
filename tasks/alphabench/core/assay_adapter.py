@@ -48,7 +48,7 @@ def read_assets(config, protocol):
     path = Path(config["data_manifest"]).resolve()
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if digest(manifest) != protocol.data_digest or (manifest["backend"], manifest["market"]) != ("assay", protocol.market):
-        raise ValueError("Assay data manifest differs from the frozen protocol")
+        raise EvaluationPaused("Assay data manifest differs from the frozen protocol", status="paused_data_integrity")
     inventory = manifest["assets"]
     if set(inventory) != ASSAY_ASSETS:
         raise ValueError("Assay requires all seven offline data assets")
@@ -56,8 +56,9 @@ def read_assets(config, protocol):
     for name, record in inventory.items():
         declared = path.parent / record["path"]
         file = declared.resolve()
-        if not file.is_relative_to(path.parent) or declared.is_symlink() or sha256(file) != record["sha256"]:
-            raise ValueError("Assay asset path or content mismatch: " + name)
+        if (not file.is_relative_to(path.parent) or declared.is_symlink()
+                or not file.is_file() or sha256(file) != record["sha256"]):
+            raise EvaluationPaused("Assay asset path or content mismatch: " + name, status="paused_data_integrity")
         paths[name] = file
     calendar = [dt.date.fromisoformat(line) for line in paths.pop("calendar").read_text().splitlines()]
     if not calendar or calendar != sorted(set(calendar)):

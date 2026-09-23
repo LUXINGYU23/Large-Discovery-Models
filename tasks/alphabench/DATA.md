@@ -169,6 +169,13 @@ Qlib 的 `qlib_<market>.files.json` 须与 manifest 的 `files_sha256` 一致；
 交易日历、市场成分和 `all.txt` 都重新核对。Assay 的七个离线资产使用 manifest
 内的相对路径与哈希，并核对清单总摘要。缺失或改动在模型请求前拒绝运行；
 该入口检查不代替 Oracle worker 执行期间的数据不变性验收。
+Oracle 服务配置还必须提供同一 `data_manifest`；Qlib 的 `data_root` 和
+`benchmark` 必须与该清单一致。每个物理 Qlib worker 在读取行情前重复校验
+完整文件清单，Assay worker 读取资产时校验七个文件。配置或数据漂移使请求
+返回 `paused_data_integrity`，不能把失败回测当作有效的零收益样本。
+服务启动时还冻结整份 Oracle 配置摘要；之后即使只改上游源码路径，
+物理 worker 也拒绝执行。Host 在同一 run 内固定服务报告的配置摘要，
+配置确需变化时须创建新的服务和新的实验身份。
 
 ## 本次实际准备结果
 

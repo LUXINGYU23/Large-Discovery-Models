@@ -2,6 +2,7 @@
 
 import json
 import math
+import re
 import urllib.error
 import urllib.request
 
@@ -35,6 +36,13 @@ class OracleGateway:
             raise ValueError("oracle identity differs from the frozen backend/data")
         if health.get("environment_digest") != self.protocol.environment_digest:
             raise ValueError("oracle environment differs from the frozen contract")
+        config_digest = health.get("config_digest")
+        if not isinstance(config_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", config_digest):
+            raise ValueError("oracle lacks a frozen service config digest")
+        try:
+            self.receipts.accept("service_identity", {"config_digest": config_digest})
+        except ValueError as exc:
+            raise ValueError("oracle service config changed across this run") from exc
         return health
 
     def identity(self, phase, position, candidate):

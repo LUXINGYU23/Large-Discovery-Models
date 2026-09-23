@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import io
 import json
 from threading import Barrier, get_ident
 
@@ -34,6 +35,28 @@ def metered_gateway(tmp_path, monkeypatch, **limits):
         return consume_groups(*args, **kwargs)
     monkeypatch.setattr(runtime, "consume_groups", checked_groups)
     return OracleGateway(T3Protocol(), runtime, mock=True)
+
+
+def test_preflight_freezes_oracle_config_across_same_run(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch)
+    gateway.mock = False
+    gateway.endpoint = "http://oracle.invalid"
+    health = {key: getattr(gateway.protocol, key) for key in
+              ("backend", "market", "data_digest", "environment_digest")}
+    health["capabilities"] = ["durable_requests", "worker_permits", "daily_ic", "factor_scores",
+                              "portfolio", "dynamic_check"]
+    digest = "a" * 64
+
+    def response(url, timeout):
+        assert url == "http://oracle.invalid/t3/health"
+        return io.BytesIO(json.dumps(health | {"config_digest": digest}).encode())
+
+    monkeypatch.setattr("tasks.alphabench.core.gateway.urllib.request.urlopen", response)
+    assert gateway.preflight()["config_digest"] == digest
+    digest = "b" * 64
+    with pytest.raises(ValueError, match="config changed across this run"):
+        gateway.preflight()
+    assert gateway.receipts.load("service_identity")["config_digest"] == "a" * 64
 
 
 def test_competing_requests_reserve_before_dispatch_without_exceeding_one_slot(tmp_path, monkeypatch):

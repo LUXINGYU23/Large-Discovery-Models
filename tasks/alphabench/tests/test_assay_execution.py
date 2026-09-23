@@ -305,8 +305,9 @@ def test_hash_missing_data_and_unsupported_controls_fail_explicitly(snapshot):
     path = Path(config["data_manifest"]).parent / "benchmark.parquet"
     original = path.read_bytes()
     path.write_bytes(original + b"changed")
-    with pytest.raises(ValueError, match="content mismatch"):
+    with pytest.raises(EvaluationPaused, match="content mismatch") as exc:
         assay_evaluate(request, config)
+    assert exc.value.status == "paused_data_integrity"
     path.write_bytes(original)
     request["protocol"]["assay_portfolio"]["benchmark"] = "index"
     with pytest.raises(ValueError, match="actual custom index"):
@@ -348,6 +349,11 @@ def test_bounded_worker_serializes_real_assay_outputs_and_invalid_results(snapsh
     wrong_market = dict(request, protocol=request["protocol"] | {"market": "sp500"})
     with pytest.raises(ValueError, match="market"):
         service.execute(wrong_market)
+    changed_config = json.loads(config_path.read_text())
+    changed_config["data_digest"] = "0" * 64
+    config_path.write_text(json.dumps(changed_config))
+    with pytest.raises(ValueError, match="data manifest identity mismatch"):
+        OracleService(config_path, tmp_path / "different-oracle")
 
 
 @pytest.mark.parametrize("point,exit_code", [("after_spawn", 94), ("after_output", 95),

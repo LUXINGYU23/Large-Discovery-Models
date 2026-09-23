@@ -1417,3 +1417,32 @@ The old function/import were removed; no fallback, dependency, compatibility
 layer or production-side test hook remains. Focused data/procedure/campaign/
 Qlib tests passed 21 with one skipped on the server. Oracle-side data binding,
 mid-run file mutation and the rest of W15 remain open.
+
+## Change 43: bind Oracle execution to the frozen data snapshot
+
+Cross-check against W05/W15 R17, X03 and Spec sections 4.1/12.2: the Oracle
+service previously accepted a claimed data digest with an unrelated Qlib
+`data_root` or benchmark. It now requires the actual manifest and binds those
+paths and the benchmark before serving. Each physical worker rechecks the
+request/config/manifest identity; Qlib then rehashes the already defined
+per-market files before importing Qlib or starting evaluation. Assay already
+rehashes its seven files when loading; physical asset mismatch now yields
+`paused_data_integrity` instead of an ordinary failed factor observation.
+The entire service config digest is passed to the worker; changing only the
+upstream source path after startup also produces that pause.
+The Host freezes the digest reported by health in its existing receipt store;
+a different service config on the same run is rejected at preflight.
+The existing durable request receipt and budget path are unchanged.
+
+Complexity review: the physical-file verifier is one shared function used by
+Host and worker; the existing Host receipt records the service identity. No
+alternate evaluator, cache, retry, compatibility option or new dependency was
+added. Server Host/data tests passed 25, Assay 25, and pinned Qlib execution
+tests 6. A physical worker and service-startup test cover
+file tampering, altered Qlib roots, config changes after startup and a changed
+service on the same run.
+Rehashing the current blocked CN archive took 0.54 s
+for CSI300 and 1.55 s for CSI1000 in warm-cache probes. Mid-evaluation
+external modification, upstream source-content tampering at an unchanged path,
+qualified market data and remaining W15/W16 gates are still open; this is not
+full T3 qualification.

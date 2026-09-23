@@ -76,6 +76,10 @@ def test_truncated_http_body_is_retried_before_publishing_download(tmp_path, mon
 
 @pytest.mark.parametrize("backend,market", [("qlib", "csi300"), ("assay", "nasdaq100")])
 def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backend, market):
+    if sys.platform == "win32":
+        pytest.skip("Oracle service process requires POSIX fcntl")
+    from tasks.alphabench.core.oracle_service import OracleService
+
     root = tmp_path / "market"
     root.mkdir()
     manifest = {"backend": backend, "market": market, "qualification": "qualified",
@@ -115,8 +119,36 @@ def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backen
     protocol_path = tmp_path / "protocol.json"
     protocol_path.write_text(json.dumps(protocol.to_dict()))
     assert data.verify_data_manifest(manifest_path, protocol) == manifest
+    config = {"backend": backend, "market": market, "data_digest": protocol.data_digest,
+              "environment_digest": protocol.environment_digest, "data_manifest": str(manifest_path)}
+    if backend == "qlib":
+        config.update(data_root=str(root), benchmark="INDEX", upstream_root=str(tmp_path))
+    config_path = tmp_path / "oracle-config.json"
+    config_path.write_text(json.dumps(config))
+    service = OracleService(config_path, tmp_path / "oracle")
+    assert service.health()["data_digest"] == protocol.data_digest
+    if backend == "qlib":
+        config_path.write_text(json.dumps(config | {"data_root": str(tmp_path)}))
+        with pytest.raises(ValueError, match="data root or benchmark"):
+            OracleService(config_path, tmp_path / "oracle")
+        config_path.write_text(json.dumps(config | {"upstream_root": str(root)}))
+        drift = service.execute({"protocol": protocol.to_dict(), "request_id": "b" * 64,
+                                 "job_permits": 1, "operation": "check", "expression": "$close"})
+        assert drift["pause_status"] == "paused_data_integrity"
+        config_path.write_text(json.dumps(config))
 
     altered.write_bytes(b"EDIT")
+    if backend == "qlib":
+        request_path = tmp_path / "worker-request.json"
+        request_path.write_text(json.dumps({"protocol": protocol.to_dict(), "request_id": "a" * 64,
+                                            "operation": "check", "expression": "$close"}))
+        output = tmp_path / "worker-response.json"
+        worker = subprocess.run([sys.executable, "-m", "tasks.alphabench.core.oracle_worker",
+                                 str(request_path), str(config_path), str(output),
+                                 "--config-digest", service.config_digest],
+                                capture_output=True, text=True, timeout=30)
+        assert worker.returncode == 0, worker.stderr
+        assert json.loads(output.read_text())["pause_status"] == "paused_data_integrity"
     run_dir = tmp_path / "run"
     attempt = subprocess.run([sys.executable, "-m", "tasks.alphabench.ldm_task.procedure",
                               "--protocol-file", str(protocol_path), "--data-manifest", str(manifest_path),
