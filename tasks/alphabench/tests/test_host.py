@@ -1,17 +1,20 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from threading import Barrier, get_ident
+from types import SimpleNamespace
 
 import pytest
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime
+from ldm_tts.harness import HarnessProviderAuthorizationRequest
 from ldm_tts.transport import CallableProposalClient
 from tasks.alphabench.core.candidate import FactorDomain
 from tasks.alphabench.core.gateway import OracleGateway, mock_oracle
 from tasks.alphabench.core.generator import Generator
 from tasks.alphabench.core.host import HostDispatcher
+from tasks.alphabench.core.harness import HarnessMeter
 from tasks.alphabench.core.protocol import T3Protocol
 
 
@@ -22,11 +25,15 @@ def parallel(function, count=2):
 
 def metered_gateway(tmp_path, monkeypatch, **limits):
     runtime = CampaignRuntime.open(tmp_path, task="alphabench", budget_limits=limits)
-    owner, consume = get_ident(), runtime.consume_many
+    owner, consume, consume_groups = get_ident(), runtime.consume_many, runtime.consume_groups
     def checked(*args, **kwargs):
         assert get_ident() == owner, "only the Host thread may mutate the ledger"
         return consume(*args, **kwargs)
     monkeypatch.setattr(runtime, "consume_many", checked)
+    def checked_groups(*args, **kwargs):
+        assert get_ident() == owner, "only the Host thread may mutate the ledger"
+        return consume_groups(*args, **kwargs)
+    monkeypatch.setattr(runtime, "consume_groups", checked_groups)
     return OracleGateway(T3Protocol(), runtime, mock=True)
 
 
@@ -185,3 +192,56 @@ def test_bounded_queue_backpressure_keeps_all_reservations_on_host(tmp_path, mon
         return gateway.host.call(lambda: gateway.runtime.consume_many({"model_requests": 1}, usage_key=str(index)))
     result = gateway.host.run(lambda: parallel(callback, 80))
     assert len(result) == 80 and gateway.runtime.budget.counters["model_requests"] == 80
+
+
+def test_harness_provider_authorization_is_single_writer_and_finite(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, model_requests=1, proposal_attempts=2, harness_turns=2)
+    meter = HarnessMeter(gateway.runtime, gateway.host)
+    campaign = gateway.runtime.run_id
+    requests = [HarnessProviderAuthorizationRequest(campaign, profile, "round-0-" + profile,
+                "round-0-" + profile + "-provider-1", "a" * 64) for profile in ("one", "two")]
+
+    def stage():
+        meter.reserve_turns([request.turn_id for request in requests])
+        return parallel(lambda index: meter.authorize(requests[index]))
+
+    with pytest.raises(BudgetExceededError):
+        gateway.host.run(stage)
+    assert gateway.runtime.budget.counters == {"model_requests": 1, "proposal_attempts": 2, "harness_turns": 2}
+    records = list(meter.receipts.root.glob("*.json"))
+    assert len(records) == 1
+    authorized = json.loads(records[0].read_text(encoding="utf-8"))
+    assert authorized["request_digest"] == "a" * 64
+    summary = meter.reconcile(SimpleNamespace(turn_id=authorized["turn_id"], profile_id=authorized["profile_id"],
+                                              usage={"providerCalls": 1}))
+    assert summary == {"host_authorizations": 1, "sidecar_provider_calls": 1}
+    with pytest.raises(EvaluationPaused, match="exceeds Host authorizations"):
+        meter.reconcile(SimpleNamespace(turn_id=authorized["turn_id"], profile_id=authorized["profile_id"],
+                                        usage={"providerCalls": 2}))
+
+
+def test_harness_strict_barrier_reserves_all_turns_or_none(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, proposal_attempts=2, harness_turns=1)
+    meter = HarnessMeter(gateway.runtime, gateway.host)
+    with pytest.raises(BudgetExceededError):
+        gateway.host.run(lambda: meter.reserve_turns(["round-0-one", "round-0-two"]))
+    assert gateway.runtime.budget.counters == {}
+
+
+def test_harness_provider_id_cannot_be_reused_or_reauthorized_after_ledger_only_crash(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, model_requests=2)
+    meter = HarnessMeter(gateway.runtime, gateway.host)
+    request = HarnessProviderAuthorizationRequest(gateway.runtime.run_id, "one", "round-0-one",
+                                                   "round-0-one-provider-1", "a" * 64)
+    assert gateway.host.run(lambda: meter.authorize(request)) is True
+    with pytest.raises(EvaluationPaused, match="already authorized"):
+        gateway.host.run(lambda: meter.authorize(request))
+    changed = HarnessProviderAuthorizationRequest(request.campaign_id, request.profile_id, request.turn_id,
+                                                  request.provider_request_id, "b" * 64)
+    with pytest.raises(ValueError, match="different digest"):
+        gateway.host.run(lambda: meter.authorize(changed))
+    meter.receipts.path({"campaign_id": request.campaign_id, "profile_id": request.profile_id,
+                         "turn_id": request.turn_id, "provider_request_id": request.provider_request_id}).unlink()
+    with pytest.raises(EvaluationPaused, match="requires reconciliation"):
+        gateway.host.run(lambda: meter.authorize(request))
+    assert gateway.runtime.budget.counters["model_requests"] == 1

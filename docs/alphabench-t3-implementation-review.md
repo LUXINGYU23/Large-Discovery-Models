@@ -871,3 +871,43 @@ control frame, turn identity, old-sidecar rejection, denial,
 one remaining authorization across two concurrent proxy sessions, and ID
 advance after reconnect. These are fake-sidecar and fake-upstream tests;
 the actual guest and full AlphaBench session are still pending.
+
+## Change 23: bind AlphaBench Harness accounting and submission semantics
+
+Cross-check against W12 and the existing Campaign/Host contracts found that
+the shared provider-authorization frame alone could not enforce an AlphaBench
+budget. The task now reserves all session turns and their proposal attempts in
+one Host ledger operation before dispatch. Each provider request is authorized
+by that same Host before forwarding, with a durable request identity and digest.
+An already authorized ID cannot buy a second send; a ledger write without its
+receipt pauses for reconciliation. Committed sidecar usage is checked against
+Host authorizations rather than charged again.
+
+The internal expander enforces the two distinct method shapes: direct Harness
+submits the effective tail batch in reservoir order; LDM Harness submits K per
+fixed session, combines M occurrences into unique candidates, and computes
+q0 as count/M. Submission validation reports indexed grammar, historical
+duplicate, same-session duplicate and dynamic-check failures. All evaluated
+keys, including failed observations, are excluded. Accepted batches have a
+Host receipt before they can become proposals; replay verifies the receipt
+without paying another check. A repaired candidate keeps its check receipt
+even if its list index changes.
+
+Complexity review: this uses the existing CampaignRuntime ledger,
+HostDispatcher, OracleGateway, Receipts, FactorDomain and shared ReservoirBuilder.
+Turn and attempt reservations share one existing proposal-attempt usage key;
+cross-session aggregation makes one pass over occurrences. It adds no second
+model transport, selection engine, generic workflow layer or random-fill path.
+The task entry still rejects Harness methods until the full W12 tools, real Pi
+client, guest isolation and accepted-action path are connected; this internal
+module is not a claim of runnable or complete Harness.
+
+Remote verification: 20 focused Host/Harness tests passed, including competing
+requests under a one-request budget, atomic strict-barrier reservation, ID
+reuse/ledger-only crash, exact direct tail size, cross-session q0, historical
+failure rejection and replay without duplicate dynamic checks. The task's
+locked Python environment passed 266 tests with four long example cases
+deselected. A trial with the repository-root environment failed on its missing
+locked `zss` dependency; rerunning with the task environment resolved those
+failures. W12, real data qualification and the final real-model acceptance
+rounds remain open.
