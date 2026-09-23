@@ -52,11 +52,14 @@ def qlib_evaluate(request, config):
     if not dates:
         raise ValueError("no trading sessions in the requested interval")
     expressions = request.get("expressions", [request.get("expression")])
-    for expression in expressions:
-        parse_expression(expression, backend="qlib")
+    executable = [parse_expression(expression, backend="qlib", qlib_execution=True).canonical
+                  for expression in expressions]
     instruments = D.instruments(protocol.market)
-    features = D.features(instruments, expressions,
-                          start_time=dates[0], end_time=dates[-1])
+    try:
+        features = D.features(instruments, executable,
+                              start_time=dates[0], end_time=dates[-1])
+    except TypeError as exc:
+        raise ValueError("Qlib rejected the factor expression: " + str(exc)) from exc
     if features.empty:
         raise ValueError("no observations for the historical universe")
     scores = features.iloc[:, :len(expressions)]

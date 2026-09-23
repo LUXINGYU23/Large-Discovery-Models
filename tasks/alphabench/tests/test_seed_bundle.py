@@ -71,6 +71,20 @@ def test_bundle_rejects_different_science_and_mock_identity(tmp_path):
         verify_seed_bundle(source, protocol, False)
 
 
+@pytest.mark.parametrize("method,query,capabilities", [
+    ("harness", False, ("prior_mean@1", "ldm_weights@1")),
+    ("ldm_harness", True, ("prior_mean@1", "ldm_weights@1")),
+    ("ldm_harness_compiled", True, ("prior_mean@1",)),
+])
+def test_bundle_shares_across_agent_search_options(tmp_path, method, query, capabilities):
+    protocol, source = make_source(tmp_path)
+    target = replace(protocol, method=method, harness_surrogate_query=query,
+                     policy_capabilities=capabilities,
+                     budgets={**protocol.budgets, **({"surrogate_queries": 5} if query else {})})
+    assert verify_seed_bundle(source, target, True)["public_information_digest"] == json.loads(
+        (source / "seed_manifest.json").read_text())["public_information_digest"]
+
+
 def test_shared_import_recovers_interruption_before_finish(tmp_path, monkeypatch):
     protocol, source = make_source(tmp_path)
     target, path = tmp_path / "target", tmp_path / "protocol.json"

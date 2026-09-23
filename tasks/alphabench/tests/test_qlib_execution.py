@@ -12,6 +12,7 @@ from qlib.data.storage.file_storage import FileFeatureStorage
 from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from tasks.alphabench.core.oracle_worker import load_source, qlib_evaluate
+from tasks.alphabench.core.grammar import parse_expression
 from tasks.alphabench.core.protocol import T3Protocol
 
 
@@ -65,6 +66,26 @@ def test_actual_qlib_nan_filter_and_paper_finite_time_boundaries(tmp_path, sourc
         assert protocol.check_passed(raw | {"elapsed_seconds": 30}, paper=True) is paper_pass
         assert protocol.check_passed(raw | {"elapsed_seconds": 30.001}, paper=True) is False
         assert raw["metrics"] == {} and raw["daily"] == [] and raw["scores"] == [] and raw["portfolio"] is None
+
+
+def test_qlib_executes_unary_factor_negation_without_changing_candidate_identity(tmp_path, source):
+    days = pd.bdate_range("2020-01-01", periods=24)
+    stocks = {}
+    for i in range(3):
+        close = np.linspace(10 + i, 20 + i, 24).astype(np.float32)
+        stocks[f"S{i:02d}"] = {"close": close, "open": close * (.98 + .01 * np.sin(np.arange(24) + i)),
+                              "high": close * 1.05, "low": close * .9}
+    write_market(tmp_path, days, stocks)
+    expression = "(-((((2*$close)-$high)-$low)/$open))"
+    assert parse_expression(expression).canonical.startswith("(-")
+    assert parse_expression(expression, qlib_execution=True).canonical.startswith("Mul(-1,")
+    request = {"protocol": T3Protocol().to_dict(), "operation": "check", "expression": expression,
+               "start": str(days[0].date()), "end": str(days[-1].date()), "fast": True}
+    config = {"upstream_root": str(source), "data_root": str(tmp_path)}
+    actual = qlib_evaluate(request, config)
+    equivalent = qlib_evaluate(request | {"expression": "Mul(-1,Div(Sub(Sub(Mul(2,$close),$high),$low),$open))"}, config)
+    assert actual["success"] and actual["nan_ratio"] == equivalent["nan_ratio"]
+    assert actual["non_finite_ratio"] == equivalent["non_finite_ratio"]
 
 
 @pytest.mark.parametrize("profile", ["ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"])

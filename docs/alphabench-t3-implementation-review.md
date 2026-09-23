@@ -1611,3 +1611,57 @@ Only their concrete frozen protocols and compact real-run evidence were
 added; no method-specific shortcut, compatibility branch, new dependency or
 alternate scoring path was needed. Remaining direct/Harness matched runs,
 markets and failure gates are unchanged.
+
+## Change 51: execute all three real Harness methods with shared seeds
+
+Cross-check against Spec sections 6.2/10/11 and Plan W03/W08/W12/W13/W15:
+the first direct Harness start rejected the completed CoT seed bundle because
+the initialization contract included `harness_surrogate_query`, a search-only
+option. The contract now omits that and `policy_capabilities`; it still checks
+the model, data, market, label, filter and all other initialization inputs.
+The direct Harness then completed two persistent turns, two search evaluations,
+two private validations, two 725-session independent tests and a 725-session
+combination. Its completed resume returned `replayed=true`.
+
+The first GP-enabled LDM Harness attempt remains `paused_outcome_unknown`:
+the Oracle worker exited on Qlib's unsupported unary negation of an expression,
+without publishing a response. Neither that physical request nor the run was
+retried. The worker now lowers unary Qlib expression negation to the existing
+`Mul(-1, ...)` operator only at execution; candidate identity and recorded
+expression remain unchanged. A real Qlib fixture reproduces the original
+expression and proves the lowered execution matches an explicit `Mul` form.
+Qlib `TypeError` from factor loading is published as an invalid factor result
+instead of silently leaving an uncommitted worker response.
+
+The fresh LDM Harness run completed two rounds with four persistent proposal
+turns, 74 charged surrogate queries, two search/private validation pairs,
+two 725-session independent tests and a 725-session combination. The compiled
+variant completed the same two-round search and tests with four proposal turns,
+two separate policy turns, 73 charged surrogate queries, and an accepted
+non-degraded `replace` followed by `keep` of `epoch_000`. Both completed-run
+resumes returned `replayed=true`. All three methods imported the same nine
+Alpha158 `kbar` seed observations and retained the identical public information
+digest. Their actions, model/tool/Oracle costs, result hashes and protocol
+identities are in the compact evidence; the full results remain on `/mnt/data1/`.
+The source archive still has the documented coverage conflicts, so these are
+`partial_comparison` pilots, not formal 72-cell qualification or a performance
+ranking. The 2-round real DeepSeek Responses runs exercised the frozen
+`deepseek-flash` protocol with maximum reasoning effort.
+
+Complexity review: the seed contract uses the existing single exclusion set;
+there is no method-specific import wrapper. The Qlib execution change stays in
+the existing parser and worker and does not introduce a second grammar,
+candidate representation, retry path or dependency. The two new regressions
+cover actual shared-seed method options and the real Qlib failure, rather than
+mirroring implementation internals. Only concrete pilot protocols and compact
+evidence were added; no dead path, obsolete adapter or duplicate scorer was
+found in the touched scope. The unknown original worker request remains
+preserved for receipt integrity.
+
+Remote verification: the task suite passed 322 tests with nine optional skips;
+four previously verified 42-factor upstream example cases were deselected.
+The independent pinned Qlib environment passed all seven actual-execution
+tests, including the unary-negation regression (17 upstream empty-slice
+warnings). `qualify_matrix --check` reported 72 required combinations,
+`mock_verified` task stage and `complete_t3=false`. No secret appears in the
+new protocols or compact evidence.

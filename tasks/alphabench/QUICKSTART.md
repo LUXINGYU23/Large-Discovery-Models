@@ -1,6 +1,6 @@
 # AlphaBench T3 开发验证
 
-当前合同为 `draft`。以下流程验证注册、mock、恢复和数据获取；原生 source profiles、Assay 市场资格、Harness、compiled policy 及完整矩阵仍在实施中，不能把本流程称为完整 T3 验收。
+当前 task 合同为 `draft`。以下流程验证注册、mock、恢复和数据获取；真实部分数据 pilot 已覆盖原生及 Harness 方法，但 Assay 市场资格和 72 格完整矩阵尚未通过，不能把本流程称为完整 T3 验收。
 
 数值执行只在指定服务器进行，仓库位于 `/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation`。`uv.lock` 固定依赖，使用清华 PyPI 镜像；AlphaBench/Assay 源码和国际数据按 [DATA.md](DATA.md) 在本机取得并传输。
 
@@ -59,7 +59,7 @@ matched 方法共用初始信息时，为新运行传入 `--initialization-bundl
 
 导入只从 Host 读取公共 search 观测和私有 validation，并单独记录创建 bundle 的真实成本。本次初始化预算消耗为零，`including_initialization.generation_cost` 包含原始创建成本；可以把本次 `initialization_evaluations` 上限设为零。新搜索仍有完整 E。源目录的文件清单和哈希冻结后不能替换；导入中断时重新核对同一来源，完成后 `--resume-run` 使用本 run 的固定初始观测。
 
-真实运行必须同时具备冻结的 `protocol-file`、有来源及逐文件哈希的数据 manifest、对应固定源码和受控 oracle。用户允许以同一批不完整数据进行比较时，在协议中设置 `data_policy=partial_comparison` 并使用原审计 manifest 的规范 JSON digest；不编辑其 `qualification` 字段。所有方法仍要固定同一数据身份、市场、切分及缺失规则，报告标记部分数据比较。当前已有 DeepSeek Responses/max 接口预检和 Qlib 真实种子开发探针；它们不满足完整 T3 功能矩阵资格。
+真实运行必须同时具备冻结的 `protocol-file`、有来源及逐文件哈希的数据 manifest、对应固定源码和受控 oracle。用户允许以同一批不完整数据进行比较时，在协议中设置 `data_policy=partial_comparison` 并使用原审计 manifest 的规范 JSON digest；不编辑其 `qualification` 字段。所有方法仍要固定同一数据身份、市场、切分及缺失规则，报告标记部分数据比较。当前真实 DeepSeek Responses/max 与 Qlib 已跑过八种方法的 pilot；它们不满足完整 T3 功能矩阵资格。
 
 CSI300 direct 部分数据 pilot 的冻结协议与 Oracle 配置已保存在 `resources/protocols/partial_csi300_llm_pilot.json` 和 `resources/oracle_configs/partial_csi300_qlib_pilot.json`。在服务器仓库根的两个终端分别执行以下命令，使用新的 run 目录；配置只适用于 `/mnt/data1/` 已安装的指定归档：
 
@@ -105,3 +105,30 @@ manifest、源码和密钥路径，仅将 `--protocol-file` 指向 LDM 协议，
 及 `resources/evidence/partial_csi300_ea_pilot.json` 记录树状态、种群更新、实际
 费用和终局产物。三项原生 pilot 的 `public_information_digest` 相同，但 CoT
 使用 E=4，ToT/EA 使用 E=8，仍是功能验证，不是同预算成绩排名。
+
+三种持久 Agent 方法的冻结协议为 `partial_csi300_harness_pilot.json`、
+`partial_csi300_ldm_harness_pilot.json` 和
+`partial_csi300_ldm_harness_compiled_pilot.json`，都在 `resources/protocols/`。
+先按上文启动相同的受控 Oracle 服务；服务器已准备 Pi sidecar 和 KVM guest 后，
+从仓库根逐个用新目录运行：
+
+```bash
+T3_ROOT=/mnt/data1/Large-Discovery-Models
+T3_BUNDLE="$T3_ROOT/runs/alphabench-t3/partial-csi300-cot-pilot/initialization"
+for method in harness ldm_harness ldm_harness_compiled; do
+  LDM_DATA_COLLECTION_ENABLED=1 tasks/alphabench/.venv/bin/python \
+    -m tasks.alphabench.ldm_task.procedure \
+    --protocol-file "tasks/alphabench/resources/protocols/partial_csi300_${method}_pilot.json" \
+    --data-manifest "$T3_ROOT/data/alphabench/manifests/qlib_csi300.json" \
+    --upstream-root "$T3_ROOT/data/alphabench/AlphaBench" \
+    --oracle-url http://127.0.0.1:19779 \
+    --api-key-file "$T3_ROOT/secrets/alphabench-t3/deepseek.key" \
+    --initialization-bundle "$T3_BUNDLE" \
+    --out-dir "$T3_ROOT/runs/alphabench-t3/${method}-new"
+done
+```
+
+每个协议运行两轮；已完成实例的哈希、成本、policy 动作及远端 run 目录在
+`resources/evidence/` 中对应的三个 pilot JSON。已完成运行用相同冻结参数并将
+`--out-dir` 改为 `--resume-run`，可只读校验报告并返回 `replayed=true`。
+三者导入相同的九个已评价 `kbar` 种子；比较性能前还需冻结相同的搜索评价预算与重复计划。

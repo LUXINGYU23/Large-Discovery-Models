@@ -38,7 +38,8 @@ class Expression:
         return hashlib.sha256(f"{GRAMMAR_VERSION}:{self.dialect}:{self.canonical}".encode()).hexdigest()
 
 
-def parse_expression(expression: str, *, backend: str = "qlib", max_depth: int | None = None) -> Expression:
+def parse_expression(expression: str, *, backend: str = "qlib", max_depth: int | None = None,
+                     qlib_execution: bool = False) -> Expression:
     if backend not in {"qlib", "assay"}:
         raise ExpressionError("unknown backend")
     if not isinstance(expression, str) or not expression.strip() or len(expression) > 32768:
@@ -132,6 +133,8 @@ def parse_expression(expression: str, *, backend: str = "qlib", max_depth: int |
             return f"({left}{CMPOPS[type(node.ops[0])]}{right})", 1 + max(ld, rd)
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
             value, depth = visit(node.operand)
+            if qlib_execution and dialect == "qlib":
+                return (f"Mul(-1,{value})", depth + 1) if isinstance(node.op, ast.USub) else (value, depth)
             return f"({'-' if isinstance(node.op, ast.USub) else '+'}{value})", depth + 1
         raise ExpressionError(f"unsupported syntax: {type(node).__name__}")
 
