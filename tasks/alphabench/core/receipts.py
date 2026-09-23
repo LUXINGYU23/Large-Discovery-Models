@@ -27,7 +27,8 @@ class Receipts:
         def prepare():
             record = self.load(identity)
             if record is not None:
-                if record["request_digest"] != request_digest:
+                if (record["identity"] != identity or record["request_digest"] != request_digest or
+                        digest(record["request"]) != request_digest):
                     raise ValueError("receipt identity reused for a different request")
                 if record["state"] == "completed":
                     if digest(record["response"]) != record["response_digest"]:
@@ -40,12 +41,15 @@ class Receipts:
                         atomic_json_write(self.path(identity), record)
                         return record
                     raise EvaluationPaused(f"physical request requires reconciliation: {digest(identity)}")
-            if authorize:
-                authorize()
-            reserve()
-            record = {"identity": identity, "request_digest": request_digest, "request": request,
-                      "state": "reserved"}
-            atomic_json_write(self.path(identity), record)
+                if record["state"] != "reserved":
+                    raise ValueError("unknown receipt state")
+            else:
+                if authorize:
+                    authorize()
+                reserve()
+                record = {"identity": identity, "request_digest": request_digest, "request": request,
+                          "state": "reserved"}
+                atomic_json_write(self.path(identity), record)
             record["state"] = "dispatch_intent"
             atomic_json_write(self.path(identity), record)
             return record

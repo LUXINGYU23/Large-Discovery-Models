@@ -1152,3 +1152,33 @@ all four published files byte for byte with the selective input set. This
 closes the offline-report-rebuild item only; real market qualification, Assay
 portfolio service and the W15/W16 matrices remain open. `complete_t3=false`
 remains correct.
+
+## Change 31: recover durable T3 receipts across actual process death
+
+Cross-check against W15 R04, R06 and R09-R11: subprocess tests now exit after
+a durable reservation, after search/validation/test Oracle receipts, and after
+the quality occurrence set is frozen. Resumed runs match uninterrupted runs in
+Oracle dispatch order, budget counters, observation identity, search metrics,
+test metrics, quality coverage and stage completeness. Their reports also
+rebuild byte for byte from frozen inputs. The report-publication process-exit
+cases from Change 29 cover R12.
+
+Two defects were fixed. A shared-engine restart after search completion set
+`rounds_run` to the number of rounds in that invocation (zero), conflicting
+with the execution summary frozen before test; T3 now projects the cumulative
+`next_round` while leaving shared engine semantics intact. A `reserved` receipt
+was authorized and reserved again on replay; it now advances to dispatch
+intent using the existing reservation, while unknown states and a stored
+request whose body fails its digest are refused before physical work.
+
+Complexity review: these are local corrections at the task projection and
+receipt state transition, with no new lifecycle layer or compatibility route.
+One parameterized real-process test covers the four finalization boundaries;
+one process test covers reservation and corrupt-record refusal. The Oracle
+transport is deterministic mock data, but each interruption kills the OS
+process after a durable write. The task suite
+passed 312 tests, with two optional skips and four previously verified long
+example cases deselected; after the last receipt integrity check, 137 focused
+contract/Host/campaign/lifecycle tests passed. W15 remains open for real
+service outage/cancel, Harness/policy process recovery and remaining isolation
+evidence, and W16 remains blocked by market data and Assay service assets.

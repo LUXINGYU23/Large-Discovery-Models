@@ -211,7 +211,10 @@ def run(args, protocol, spec):
                     selector=(compiled_selector or FactorSelector(("mock_" if args.mock else "") + protocol.objective,
                         seed=protocol.random_seed)) if protocol.method in LDM_METHODS else None,
                     surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None))
-            observations, execution = result.engine.state.observations, {"kind": "shared_engine", "summary": result.engine.summary}
+            observations = result.engine.state.observations
+            # Engine rounds_run is per invocation; the report records cumulative rounds across resume.
+            execution = {"kind": "shared_engine", "summary": {
+                **result.engine.summary, "rounds_run": result.engine.state.next_round}}
         report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
                           execution=execution)
         collection.export()
