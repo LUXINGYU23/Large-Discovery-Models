@@ -10,14 +10,14 @@ from ldm_tts.campaign import CampaignBudget, CampaignRecipe, CampaignRequest, ru
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.expansion import CallableReservoirExpander
 from ldm_tts.engine import LDMEngineState
-from ldm_tts.engine.run_store import BudgetExceededError, atomic_json_write, unique_run_dir
+from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, atomic_json_write, unique_run_dir
 from ldm_tts.harness import HarnessError
 from ldm_tts.transport import CallableProposalClient
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from ldm_tts.registration.experiment import load_active_experiment_contract, snapshot_experiment_contract
 from .candidate import FactorDomain
 from .collection import AcceptedActions
-from .finalization import finalize
+from .finalization import finalize, verify_report_artifacts
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
 from .harness_runtime import build_harness, build_policy_harness
@@ -123,11 +123,22 @@ def run(args, protocol, spec):
             raise ValueError("example Alpha158 initialization cannot be replaced with a seed file")
         from .receipts import Receipts
         Receipts(run_dir / "private/stages").accept("source_entry_contract", native_config)
-    if args.resume_run and (run_dir / "result.json").exists() and json.loads((run_dir / "status.json").read_text(encoding="utf-8"))["status"] == "completed":
+    if args.resume_run and (run_dir / "report_manifest.json").exists():
+        verify_report_artifacts(run_dir, protocol)
+        status = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))["status"]
+        if status != "completed":
+            if status != "running":
+                raise ValueError("published report cannot finish from a non-running status")
         freeze_seed_source(protocol, args, run_dir / "initialization")
         AcceptedActions(run_dir).export()
+        if status != "completed":
+            report = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+            CampaignRuntime.open(run_dir, task="alphabench", resume=True).finish(report)
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()), "status": "completed", "replayed": True}))
         return 0
+    if args.resume_run and (run_dir / "result.json").exists() and json.loads(
+            (run_dir / "status.json").read_text(encoding="utf-8"))["status"] == "completed":
+        raise ValueError("completed run lacks its report artifact manifest")
     if native and native_config is None:
         native_config = prepare_native(protocol, args.upstream_root)
     harness_method = protocol.method in {"harness", "ldm_harness", "ldm_harness_compiled"}
@@ -204,6 +215,7 @@ def run(args, protocol, spec):
         report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
                           execution=execution)
         collection.export()
+        objects["runtime"].finish(report)
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()),
                           "qualification": report["qualification"], "complete_t3": report["complete_t3"]}, indent=2))
         return 0

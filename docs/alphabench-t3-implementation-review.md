@@ -1093,3 +1093,31 @@ campaign/native tests with four long example cases deselected. W14 remains open 
 of `result.json` from original artifacts and the rest of the scientific/source
 qualification matrix; real market data and Assay portfolio access remain
 unqualified. This change does not promote `complete_t3`.
+
+## Change 29: commit report publication before terminal status
+
+Cross-check against W15 R12/R17 and the accepted-action publication boundary:
+`result.json`, `report.md`, and `trajectory.csv` now receive a protocol-bound
+SHA-256 manifest before the run can finish. A completed resume verifies all
+three artifacts, the embedded protocol, and both initialization/search budget
+ledgers before reporting replay success. A run that has published this manifest
+but has not reached `completed` first replays the idempotent collection export,
+then uses the existing `CampaignRuntime.finish` to commit the terminal status.
+The ordinary path follows the same order, so collection failure cannot leave a
+premature completed status. A completed run without the manifest is rejected;
+there is no compatibility branch for earlier incomplete publication contracts.
+
+Complexity review: no new runtime state machine or persistence layer was added.
+The artifact manifest uses the existing atomic JSON writer; replay reuses the
+existing runtime and collection APIs. Moving `finish` from `finalization.py` to
+the workflow makes the actual publication order explicit. The fault tests use
+one parameterized subprocess case for the two adjacent process-exit windows,
+plus focused corruption and collection-failure cases; no duplicate synthetic
+recovery harness was retained.
+
+Remote verification: the task suite passed 303 tests with two optional backend
+skips and four previously verified long example cases deselected. After the
+budget consistency check, 21 focused campaign/collection/seed-bundle tests
+passed. W15's remaining service, native, Harness, cancellation, concurrency and
+isolation fault matrix is still open; the manifest is not an offline rebuild of
+`result.json` from raw receipts. `complete_t3=false` remains correct.

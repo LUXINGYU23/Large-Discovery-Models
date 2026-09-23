@@ -2,6 +2,7 @@
 
 import csv
 from collections import Counter
+import hashlib
 import json
 import math
 
@@ -13,6 +14,23 @@ from .protocol import digest
 from .receipts import Receipts
 from .reporting import daily_metrics, ea_update_metrics, generation_costs, render_report, search_metrics, signal_diversity, structure_diversity
 from .quality import audit_quality
+
+
+def verify_report_artifacts(run_dir, protocol):
+    manifest = json.loads((run_dir / "report_manifest.json").read_text(encoding="utf-8"))
+    if manifest["protocol_digest"] != protocol.identity or set(manifest["files"]) != {
+            "result.json", "report.md", "trajectory.csv"}:
+        raise ValueError("report artifact manifest differs from the frozen protocol")
+    for name, expected in manifest["files"].items():
+        if hashlib.sha256((run_dir / name).read_bytes()).hexdigest() != expected:
+            raise ValueError("completed report artifact differs from its manifest: " + name)
+    report = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    if report["protocol_digest"] != protocol.identity or digest(report["protocol"]) != protocol.identity:
+        raise ValueError("completed result differs from the frozen protocol")
+    if (json.loads((run_dir / "budget.json").read_text(encoding="utf-8")) != report["budget"] or
+            json.loads((run_dir / "initialization/budget.json").read_text(encoding="utf-8")) !=
+            report["initialization"]["budget"]):
+        raise ValueError("completed result differs from the persisted budget ledgers")
 
 
 def finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget, *, execution):
@@ -201,5 +219,8 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
                              "oracle_elapsed_seconds": duration, "cumulative_oracle_elapsed_seconds": elapsed,
                              "model_requests_run_total": costs["model_requests"],
                              "tool_calls_run_total": costs["tool_calls"]})
-    runtime.finish(report)
+    atomic_json_write(runtime.run_dir / "report_manifest.json", {
+        "protocol_digest": protocol.identity,
+        "files": {name: hashlib.sha256((runtime.run_dir / name).read_bytes()).hexdigest()
+                  for name in ("result.json", "report.md", "trajectory.csv")}})
     return report

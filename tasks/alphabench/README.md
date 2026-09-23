@@ -36,6 +36,7 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 - `private/`：Host 私有 model/oracle receipts、validation 和终局阶段记录。
 - `selection_frozen.json`：任何 test 前冻结的 validation 排名、因子集合、方向和持仓参数。
 - `result.json`、`report.md`、`trajectory.csv`：search、full test、组合、质量/多样性、预算与逐阶段完整性。
+- `report_manifest.json`：上述三份报告的 SHA-256 与协议 digest；完成状态的同 run 恢复先验证该清单，已发布未 finish 的运行只补提交终态。
 - `generation/`、`generation_attempts/`：直接/原生生成原始项与 Harness 每次提交的不可变账本；后者单独记录格式失败和修复项。
 - `accepted_actions/`：不可变 accepted action；IR/SFT 成对原子发布在数据收集目录，`current.json` 指向完整 generation。
 - `harness/`、`policy_harness/`：分离的 proposal 和 compiled-policy 会话、不可变输入、策略 epoch、预测、trace 与 usage。

@@ -1,11 +1,14 @@
 from dataclasses import replace
 import csv
 import json
+import subprocess
+import sys
 
 import pytest
 
 from tasks.alphabench.core.protocol import T3Protocol
 from tasks.alphabench.core.reporting import render_report
+from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.ldm_task.procedure import main
 
 
@@ -40,6 +43,7 @@ def test_initialized_campaign_resume_has_no_new_calls_or_cost(method, tmp_path, 
     assert all((run / name).read_bytes() == content for name, content in report_files.items())
     report = json.loads((run / "result.json").read_text(encoding="utf-8"))
     assert render_report(report).encode("utf-8") == report_files["report.md"]
+    assert (run / "report_manifest.json").exists()
     assert report["search"]["attempts"] == 4
     assert report["initialization"]["seed_count"] == 3
     assert report["completeness"]["search"]["status"] == "complete"
@@ -60,6 +64,98 @@ def test_initialized_campaign_resume_has_no_new_calls_or_cost(method, tmp_path, 
     assert trajectory[-1]["model_requests_run_total"] == str(report["costs"]["model_requests"])
     for filename in ("events.jsonl", "checkpoint.json", "summary.json"):
         assert (run / filename).exists()
+
+
+def test_completed_resume_rejects_corrupt_report_without_dispatch(tmp_path):
+    protocol = tmp_path / "protocol.json"
+    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    run = tmp_path / "run"
+    arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
+    assert main(arguments) == 0
+    budget = (run / "budget.json").read_bytes()
+    (run / "report.md").write_text("corrupted")
+    with pytest.raises(ValueError, match="report artifact differs"):
+        main(arguments + ["--resume-run", str(run)])
+    assert (run / "budget.json").read_bytes() == budget
+
+
+def test_completed_resume_rejects_changed_budget_ledger(tmp_path):
+    protocol = tmp_path / "protocol.json"
+    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    run = tmp_path / "run"
+    arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
+    assert main(arguments) == 0
+    ledger_path = run / "budget.json"
+    ledger = json.loads(ledger_path.read_text())
+    ledger["counters"]["model_requests"] += 1
+    ledger_path.write_text(json.dumps(ledger))
+    with pytest.raises(ValueError, match="budget ledgers"):
+        main(arguments + ["--resume-run", str(run)])
+
+
+@pytest.mark.parametrize("exit_point,exit_code", [("before_finish", 77), ("before_status", 78)])
+def test_report_publication_resumes_after_process_exit_without_new_model_calls(tmp_path, exit_point, exit_code):
+    protocol = tmp_path / "protocol.json"
+    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    run = tmp_path / "run"
+    arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
+    code = (
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        "from ldm_tts.engine.run_store import CampaignRuntime, CampaignStatus\n"
+        "from tasks.alphabench.ldm_task.procedure import main\n"
+        "original_finish = CampaignRuntime.finish\n"
+        "original_update = CampaignStatus.update\n"
+        "def exit_before_finish(runtime, summary, *, status='completed'):\n"
+        "    if sys.argv[3] == 'before_finish' and runtime.run_dir == Path(sys.argv[1]): os._exit(77)\n"
+        "    return original_finish(runtime, summary, status=status)\n"
+        "def exit_before_status(writer, status, **kwargs):\n"
+        "    if sys.argv[3] == 'before_status' and writer.path == Path(sys.argv[1]) / 'status.json' and status == 'completed': os._exit(78)\n"
+        "    return original_update(writer, status, **kwargs)\n"
+        "CampaignRuntime.finish = exit_before_finish\n"
+        "CampaignStatus.update = exit_before_status\n"
+        "main(['--mock', '--protocol-file', sys.argv[2], '--out-dir', sys.argv[1]])\n"
+    )
+    exited = subprocess.run([sys.executable, "-c", code, str(run), str(protocol), exit_point], check=False)
+    assert exited.returncode == exit_code and (run / "report_manifest.json").exists()
+    report_files = {name: (run / name).read_bytes() for name in
+                    ("result.json", "report.md", "trajectory.csv", "report_manifest.json")}
+    budget = (run / "budget.json").read_bytes()
+    model = {path.name: path.read_bytes() for path in (run / "private/model").glob("*.json")}
+    assert main(arguments + ["--resume-run", str(run)]) == 0
+    assert all((run / name).read_bytes() == content for name, content in report_files.items())
+    assert (run / "budget.json").read_bytes() == budget
+    assert {path.name: path.read_bytes() for path in (run / "private/model").glob("*.json")} == model
+    events = [json.loads(line) for line in (run / "events.jsonl").read_text().splitlines()]
+    assert sum(event["event_type"] == "campaign_finished" for event in events) == 1
+
+
+def test_collection_export_failure_does_not_publish_completed_status(tmp_path, monkeypatch):
+    protocol = tmp_path / "protocol.json"
+    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    run = tmp_path / "run"
+    arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
+    original_export = AcceptedActions.export
+    interrupted = False
+
+    def interrupt_final_export(actions):
+        nonlocal interrupted
+        if actions.run_dir == run and (run / "report_manifest.json").exists() and not interrupted:
+            interrupted = True
+            raise OSError("collection publication failed")
+        return original_export(actions)
+
+    monkeypatch.setattr(AcceptedActions, "export", interrupt_final_export)
+    with pytest.raises(OSError, match="collection publication failed"):
+        main(arguments)
+    assert json.loads((run / "status.json").read_text())["status"] == "running"
+    budget = (run / "budget.json").read_bytes()
+    model = {path.name: path.read_bytes() for path in (run / "private/model").glob("*.json")}
+    monkeypatch.setattr(AcceptedActions, "export", original_export)
+    assert main(arguments + ["--resume-run", str(run)]) == 0
+    assert json.loads((run / "status.json").read_text())["status"] == "completed"
+    assert (run / "budget.json").read_bytes() == budget
+    assert {path.name: path.read_bytes() for path in (run / "private/model").glob("*.json")} == model
 
 
 def test_real_run_requires_data_and_frozen_protocol(tmp_path):
