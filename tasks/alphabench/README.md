@@ -8,7 +8,9 @@
 
 `llm` 与 `ldm` 的共享 Campaign 生命周期已接线：独立初始化、完整表达式准入、最多五次修复、真实请求预算/receipt、search→private validation、固定选择→逐因子 full test、独立组合、质量审计及 accepted-action 训练数据导出。Qlib worker 复用固定 FFO 指标和 TopkDropout 回测。[Assay worker](ASSAY.md) 使用固定官方算子和独立回测器，补齐历史成分、逐日分类、实际基准及离线资产校验。
 
-原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 与 example source 使用实际原生最终池，matched 使用完整已测池；source 保留原生轮数，预算不足即暂停。example 原入口没有 validation/test，本 task 明确冻结独立的后续区间。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。当前 synthetic 检查不代表真实市场资格。真实数据、Assay portfolio REST 接口、持久 Harness、compiled policy 与完整资格矩阵仍未关闭，因此 `complete_t3=false`。
+原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 与 example source 使用实际原生最终池，matched 使用完整已测池；source 保留原生轮数，预算不足即暂停。example 原入口没有 validation/test，本 task 明确冻结独立的后续区间。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。
+
+`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。实际 DeepSeek Responses + synthetic Oracle 已完成两轮 direct Harness smoke；这不代表真实市场、完整 W12 方法矩阵或数据资格。真实数据、Assay portfolio REST 接口、compiled policy 与完整资格矩阵仍未关闭，因此 `complete_t3=false`。
 
 ## 服务器验证
 
@@ -22,7 +24,7 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 ```
 
 真实运行要求完整冻结的 `--protocol-file`、已复核的 `--data-manifest`、固定 `--upstream-root` 和受控 `--oracle-url`。
-模型固定为 DeepSeek Responses API 的 `deepseek-flash`、`reasoning.effort=max`；Host 从 `DEEPSEEK_API_KEY` 读取凭证。凭证不写入配置、报告或 guest。
+模型固定为 DeepSeek Responses API 的 `deepseek-flash`、`reasoning.effort=max`；Host 从 `--api-key-file` 或 `DEEPSEEK_API_KEY` 读取凭证。凭证不写入配置、报告或 guest。Harness 还需要本地构建的 Pi sidecar 和指定的 KVM guest 镜像；`--harness-sidecar-image` 默认 `ldm-pi-t3:local`。
 
 `--resume-run` 仅恢复同一不可变协议；`--init-mode import_pool` 导入表达式并重新评价，不能替代恢复。
 未知请求结果暂停并对账，不能伪造失败分数或隐式重发。

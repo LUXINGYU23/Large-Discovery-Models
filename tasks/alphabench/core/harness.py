@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ldm_tts.contracts import Candidate, RawProposal
 from ldm_tts.contracts.evaluation import EvaluationPaused
+from ldm_tts.data.ir import make_complete_design_ir
 from ldm_tts.engine.expansion import ExpansionResult
 from ldm_tts.harness import (HarnessArtifactRule, HarnessError, HarnessProviderAuthorizationRequest,
     HarnessSubmissionContract, HarnessSubmissionError, HarnessSubmissionValidation,
@@ -13,6 +14,8 @@ from ldm_tts.harness import (HarnessArtifactRule, HarnessError, HarnessProviderA
 from .candidate import FactorDomain
 from .protocol import digest
 from .receipts import Receipts
+from .harness_tools import check_position, public_observation
+from .grammar import REGISTRY
 
 
 class HarnessMeter:
@@ -105,24 +108,34 @@ def _candidate_file(submission, artifacts, artifact_root, count):
 
 
 class HarnessExpander:
-    def __init__(self, client, protocol, gateway, artifact_root):
+    def __init__(self, client, protocol, gateway, artifact_root, *, tools=None, collection=None):
         self.client, self.protocol, self.gateway = client, protocol, gateway
         self.artifact_root = Path(artifact_root).resolve()
         self.domain = FactorDomain(protocol.backend, protocol.grammar_depth)
         self.meter = HarnessMeter(gateway.runtime, gateway.host)
         self.accepted = Receipts(gateway.runtime.run_dir / "private" / "harness" / "accepted")
+        self.tools = tools
+        self.collection = collection
         self.profiles = client.config.profiles
         expected = 1 if protocol.method == "harness" else protocol.sessions
         if len(self.profiles) != expected:
             raise ValueError("Harness session count differs from the frozen protocol")
 
     def expand(self, request):
+        snapshot = self.tools.prepare(request) if self.tools else None
+        try:
+            return self._expand(request, snapshot)
+        finally:
+            if self.tools:
+                self.tools.clear()
+
+    def _expand(self, request, snapshot):
         direct = self.protocol.method == "harness"
         count = request.context["evaluation_budget"]["effective"] if direct else self.protocol.candidates_per_session
         expected = self.protocol.batch_size if direct else len(self.profiles) * count
         if request.reservoir_size != expected or count < 1:
             raise ValueError("Harness reservoir size differs from the frozen method")
-        history = [_public_observation(item) for item in request.observations]
+        history = [public_observation(item) for item in request.observations]
         delta = history if request.round_idx == 0 else [item for item in history if item["round_idx"] == request.round_idx - 1]
         from_seq = len(history) - len(delta)
         history_digest = canonical_sha256(delta)
@@ -138,22 +151,28 @@ class HarnessExpander:
             message=json.dumps({"backend": self.protocol.backend, "market": self.protocol.market,
                 "objective": self.protocol.objective, "candidate_count": count,
                 "history_delta": delta, "history_digest": history_digest,
-                "evaluated_count": len(history), "filter_profile": self.protocol.filter_profile}, sort_keys=True),
+                "evaluated_count": len(history), "filter_profile": self.protocol.filter_profile,
+                **({"research_snapshot": snapshot} if snapshot else {})}, sort_keys=True),
             forbidden_query_terms=tuple(sorted({item.candidate_id for item in request.observations})),
         ) for profile in self.profiles)
         self.meter.reserve_turns([turn.turn_id for turn in turns])
         try:
             results = self.client.run_turn(turns,
-                submission_validator=lambda submission: self._validate(submission, count, evaluated),
+                submission_validator=lambda submission: self._validate(submission, count, evaluated, request.round_idx),
                 provider_authorizer=self.meter.authorize,
                 recovery_timeout_seconds=2 * self.client.config.limits.wall_time_seconds)
         except HarnessError as exc:
+            if self.tools and self.tools.failure:
+                raise self.tools.failure from exc
             raise EvaluationPaused("Harness turn requires recovery: " + str(exc), status="paused_harness") from exc
+        if self.tools and self.tools.failure:
+            raise self.tools.failure
         by_profile = {result.profile_id: result for result in results}
         if len(by_profile) != len(self.profiles) or set(by_profile) != {profile.profile_id for profile in self.profiles}:
             raise EvaluationPaused("Harness strict session barrier is incomplete", status="paused_harness")
         occurrences = []
         summaries = []
+        accepted_actions = []
         for profile in self.profiles:
             result = by_profile[profile.profile_id]
             accounting = self.meter.reconcile(result)
@@ -168,8 +187,26 @@ class HarnessExpander:
             if receipt != {"canonical_keys": keys}:
                 raise EvaluationPaused("Harness accepted submission lacks its Host validation receipt", status="paused_harness")
             occurrences.extend((item, key, result, index) for index, (item, key) in enumerate(zip(candidates, keys)))
+            accepted_actions.append((result, candidates))
             summaries.append({"profile_id": result.profile_id, "turn_id": result.turn_id,
-                "submission_id": result.submission_id, "usage": result.usage, **accounting})
+                "submission_id": result.submission_id, "usage": result.usage,
+                "tool_budget": getattr(result, "tool_budget", {}),
+                "artifacts": getattr(result, "artifacts", {}), **accounting})
+        if self.collection:
+            for result, candidates in accepted_actions:
+                ir = make_complete_design_ir(task_id="alphabench", domain="financial factor expressions",
+                    task_description="Generate causal factors using only public contract and search observations.",
+                    objectives=[{"name": self.protocol.objective, "direction": "maximize"}],
+                    design_space_description=json.dumps(REGISTRY), observations=history,
+                    candidates=candidates, request_description=next(turn.message for turn in turns
+                        if turn.profile_id == result.profile_id), num_candidates=len(candidates),
+                    allows_new_parameters=False, reasoning_available=False)
+                action_id = digest([result.turn_id, result.submission_digest])
+                self.gateway.host.call(lambda action_id=action_id, ir=ir, result=result: self.collection.accept(
+                    action_id, ir, {"run": self.gateway.runtime.run_id, "protocol": self.protocol.identity,
+                        "profile_id": result.profile_id, "turn_id": result.turn_id,
+                        "submission_digest": result.submission_digest,
+                        "native_artifacts": getattr(result, "artifacts", {})}))
         groups = {}
         for item, key, result, index in occurrences:
             group = groups.setdefault(key, {"candidate": item, "lineage": []})
@@ -183,7 +220,7 @@ class HarnessExpander:
             metadata={"sampling_mode": "persistent_direct_session" if direct else "persistent_parallel_sessions",
                 "occurrences": len(occurrences), "unique": len(proposals), "turns": summaries})
 
-    def _validate(self, submission, count, evaluated):
+    def _validate(self, submission, count, evaluated, round_idx):
         try:
             candidates = _candidate_file(submission.submission, submission.artifacts, self.artifact_root, count)
         except (OSError, ValueError) as exc:
@@ -212,7 +249,7 @@ class HarnessExpander:
                 errors.append(HarnessSubmissionError(pointer, "same_session_duplicate", f"factor duplicates index {seen[key]}"))
                 continue
             seen[key] = index
-            checked = self.gateway.evaluate(candidate, phase="check", position=[submission.turn_id, key])
+            checked = self.gateway.evaluate(candidate, phase="check", position=check_position(round_idx, candidate))
             if not self.protocol.check_passed(checked):
                 errors.append(HarnessSubmissionError(pointer + "/expression", "dynamic_check_failed", "factor failed the frozen check"))
                 continue
@@ -221,8 +258,3 @@ class HarnessExpander:
             return HarnessSubmissionValidation("retry", tuple(errors))
         self.gateway.host.call(lambda: self.accepted.accept([submission.turn_id, submission.digest], {"canonical_keys": keys}))
         return HarnessSubmissionValidation()
-
-
-def _public_observation(observation):
-    return {"candidate_id": observation.candidate_id, "expression": observation.candidate.payload["expression"],
-            "status": observation.evaluation.status, "metrics": dict(observation.metrics), "round_idx": observation.round_idx}

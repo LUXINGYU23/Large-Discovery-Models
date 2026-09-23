@@ -11,6 +11,7 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.expansion import CallableReservoirExpander
 from ldm_tts.engine import LDMEngineState
 from ldm_tts.engine.run_store import BudgetExceededError, atomic_json_write, unique_run_dir
+from ldm_tts.harness import HarnessError
 from ldm_tts.transport import CallableProposalClient
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from ldm_tts.registration.experiment import load_active_experiment_contract, snapshot_experiment_contract
@@ -19,6 +20,7 @@ from .collection import AcceptedActions
 from .finalization import finalize
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
+from .harness_runtime import build_harness
 from .initialization import freeze_seed_source, run_initialization
 from .native_reference import prepare_native, run_native
 from .protocol import LDM_METHODS, digest, verify_data_manifest
@@ -32,12 +34,12 @@ def mock_response(request, native_count=None):
                                      for index in range(count)]})
 
 
-def make_client(protocol, mock, native_config=None):
+def make_client(protocol, mock, native_config=None, *, api_key=None):
     if mock:
         parameters = native_config["algorithm"] if native_config else protocol.native_parameters
         count = max(1, protocol.cold_seed_count, parameters.get("N", 1)) if protocol.method.startswith("alphabench_") else None
         return CallableProposalClient(lambda request: mock_response(request, count))
-    key = os.environ.get("DEEPSEEK_API_KEY")
+    key = api_key or os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         raise ValueError("DEEPSEEK_API_KEY is required in the Host environment")
     body = {"reasoning": {"effort": protocol.reasoning_effort}, "store": False}
@@ -46,6 +48,13 @@ def make_client(protocol, mock, native_config=None):
     return OpenAICompatibleProposalClient(url=protocol.endpoint, model=protocol.model, api_key=key,
         wire_api=protocol.wire_api, extra_body=body, temperature=protocol.temperature,
         max_retries=0, max_tokens=protocol.max_model_tokens, timeout_seconds=protocol.request_timeout)
+
+
+def provider_key(args):
+    key = args.api_key_file.read_text(encoding="utf-8").strip() if args.api_key_file else os.environ.get("DEEPSEEK_API_KEY", "")
+    if not key:
+        raise ValueError("DeepSeek key is required from --api-key-file or DEEPSEEK_API_KEY")
+    return key
 
 
 def bind_runner_contract(run_dir, protocol):
@@ -85,7 +94,7 @@ def run(args, protocol, spec):
     native = protocol.method.startswith("alphabench_")
     if not native and protocol.profile != "ldm_matched_v1":
         raise ValueError("source profiles require the actual native algorithm entry")
-    if protocol.method not in {"llm", "ldm"} and not native:
+    if protocol.method not in {"llm", "ldm", "harness", "ldm_harness"} and not native:
         raise ValueError("the selected method requires its native/Harness adapter; direct execution is forbidden")
     run_dir = args.resume_run or args.out_dir or unique_run_dir(Path(__file__).resolve().parents[1] / "runs" / ("mock" if args.mock else "campaign"))
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +129,9 @@ def run(args, protocol, spec):
         return 0
     if native and native_config is None:
         native_config = prepare_native(protocol, args.upstream_root)
-    client = make_client(protocol, args.mock, native_config)
+    harness_method = protocol.method in {"harness", "ldm_harness"}
+    key = provider_key(args) if harness_method or not args.mock else None
+    client = make_client(protocol, args.mock, native_config, api_key=key)
     try:
         initial_observations, initial_pool, initial_budget = run_initialization(protocol, args, spec, client, run_dir)
     except EvaluationPaused as exc:
@@ -137,8 +148,18 @@ def run(args, protocol, spec):
                               "selected_candidates": 0}, usage_key="task:search-counters")
         gateway = OracleGateway(protocol, runtime, endpoint=args.oracle_url, mock=args.mock)
         gateway.preflight()
-        generator = Generator(protocol, runtime, client, gateway, collection)
-        objects.update(gateway=gateway, expander=DirectExpander(generator), evaluator=FactorEvaluator(gateway))
+        if harness_method:
+            harness_client, tools, expander = build_harness(protocol, gateway, collection, api_key=key,
+                sidecar_image=args.harness_sidecar_image)
+            objects.update(harness_client=harness_client, tools=tools)
+            try:
+                harness_client.start()
+            except HarnessError as exc:
+                raise EvaluationPaused("Harness startup failed: " + str(exc), status="paused_harness") from exc
+        else:
+            generator = Generator(protocol, runtime, client, gateway, collection)
+            expander = DirectExpander(generator)
+        objects.update(gateway=gateway, expander=expander, evaluator=FactorEvaluator(gateway))
 
     class Evaluator:
         def evaluate(self, candidate):
@@ -177,3 +198,8 @@ def run(args, protocol, spec):
             objects["runtime"].pause(status, phase="reconciliation", message=str(exc))
         print(json.dumps({"task": "alphabench", "status": status, "reason": str(exc)}))
         return 2
+    finally:
+        if "harness_client" in objects:
+            objects["harness_client"].close()
+        if "tools" in objects:
+            objects["tools"].close()

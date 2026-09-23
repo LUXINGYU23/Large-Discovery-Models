@@ -911,3 +911,48 @@ deselected. A trial with the repository-root environment failed on its missing
 locked `zss` dependency; rerunning with the task environment resolved those
 failures. W12, real data qualification and the final real-model acceptance
 rounds remain open.
+
+## Change 24: run persistent T3 Harness tools and GP research in the guest
+
+Cross-check against W12: direct Harness now runs one persistent Pi session and
+submits the exact effective tail batch in order. LDM Harness runs the frozen
+number of independent sessions, collects all K occurrences, computes q0 from
+the fixed S x K denominator, and uses the existing FactorSelector for final B.
+Both variants share the same Host provider authorization and check receipts.
+The Host exposes operator contracts, static validation, paid checks, paged
+public search history and a single-observation lookup through one socket-backed
+MCP server. Explicit LDM query mode additionally exposes a frozen start-of-round
+GP posterior with snapshot identity, fit status, mean, latent std and UCB.
+The direct profile has no GP query capability. Submitted batches require a
+Host acceptance receipt; accepted actions publish through the existing paired
+IR/SFT journal after all sessions reach the strict barrier.
+
+The actual Pi sidecar and KVM guest were built and exercised. The guest test
+verified that Host private files and the MCP socket are absent, task resources
+cannot be written, and an external request is rejected by network policy.
+The actual MCP bridge reached the Host socket with bounded check and query
+budgets. DeepSeek Responses with max reasoning completed two synthetic Oracle
+rounds for each method: direct used 2 turns and 16 authorized requests; LDM
+query mode used 4 turns, 31 authorized requests and 17 GP queries. All six
+accepted actions were journaled. Result and manifest hashes are recorded in
+`tasks/alphabench/resources/evidence/harness_w12.json`. These runs remain
+`mock_verified` and `complete_t3=false`.
+
+Complexity review: the new runtime only binds the existing HarnessClient, Pi
+sidecar, Gondolin guest, CampaignRuntime ledger and FactorSelector. The same
+Host check position now serves research checks and submission validation,
+avoiding a second Oracle charge for one expression. Query budget and the
+query-mode protocol field are confined to Harness methods; the initial global
+field/budget change was removed after existing native runner identity tests
+identified the regression. The public observation projection lives in one
+place. No second GP, model transport, session transcript, compatibility path or
+speculative policy adapter was added. Stale README text that called Harness
+unimplemented was removed.
+
+Remote validation after that correction: AlphaBench task suite 274 passed,
+two backend imports skipped in the task environment, four previously verified
+long native examples deselected; shared Harness suite 33 passed; Pi TypeScript
+build and 37 tests passed under Node 24. The guest isolation and MCP tests ran
+against the built sidecar. Real data/backend qualification, no-query LDM
+full-flow evidence, compiled policy and the complete method-market matrix are
+still open, so W12 and full T3 are not declared complete.

@@ -46,6 +46,7 @@ class T3Protocol:
     batch_size: int = 2
     sessions: int = 2
     candidates_per_session: int = 4
+    harness_surrogate_query: bool = False
     cold_seed_count: int = 30
     alpha158_groups: tuple[str, ...] = ("kbar", "rolling")
     factor_select_n: int = 50
@@ -68,6 +69,8 @@ class T3Protocol:
             raise ValueError("unsupported backend/market pair")
         if self.method not in METHODS or self.profile not in PROFILES:
             raise ValueError("unknown method or protocol profile")
+        if type(self.harness_surrogate_query) is not bool or self.harness_surrogate_query and self.method not in {"ldm_harness", "ldm_harness_compiled"}:
+            raise ValueError("GP research queries require an LDM Harness method")
         if self.init_mode not in {"cold", "alpha158", "file", "import_pool"}:
             raise ValueError("unknown initialization mode")
         if self.filter_profile not in {"paper_filter_v1", "qlib_code_filter_v1", "assay_code_filter_v1"}:
@@ -109,11 +112,16 @@ class T3Protocol:
         required = {"model_requests", "proposal_attempts", "dynamic_checks", "lint_checks", "initialization_evaluations",
                     "validation_evaluations", "test_evaluations", "analysis_jobs", "quality_checks",
                     "oracle_job_slots", "benchmark_jobs", "policy_turns", "harness_turns"}
+        if self.harness_surrogate_query:
+            required.add("surrogate_queries")
         if set(self.budgets) != required or any(type(v) is not int or v < 0 for v in self.budgets.values()):
             raise ValueError("all stage budgets must be explicit finite nonnegative integers")
 
     def to_dict(self):
-        return json.loads(json.dumps(asdict(self)))
+        value = asdict(self)
+        if self.method not in {"harness", "ldm_harness", "ldm_harness_compiled"}:
+            del value["harness_surrogate_query"]
+        return json.loads(json.dumps(value))
 
     @property
     def identity(self):

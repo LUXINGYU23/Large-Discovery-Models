@@ -36,6 +36,10 @@ test("rejected artifacts can be edited and resubmitted across partial-turn recov
 		let providerHook!: (event: { payload: object }) => unknown;
 		first.createExtension()({ on: (_name: string, hook: typeof providerHook) => { providerHook = hook; } } as never);
 		assert.deepEqual(providerHook({ payload: {} }), { tool_choice: "required" });
+		const compatible = new SubmissionController({ ...config, forceFirstToolCall: false }, workspace);
+		await compatible.begin("policy", "turn-2", join(root, "turns", "turn-2"), async () => {}, validate);
+		compatible.createExtension()({ on: (_name: string, hook: typeof providerHook) => { providerHook = hook; } } as never);
+		assert.deepEqual(providerHook({ payload: {} }), {});
 		await assert.rejects(first.tool().execute("call-1", { artifact_path: "policy.py" }, undefined, undefined, {} as never), /wrong_shape.*Expected two objectives/);
 		assert.equal(first.submission, undefined);
 		assert.deepEqual(providerHook({ payload: { tool_choice: "auto" } }), { tool_choice: "auto" });

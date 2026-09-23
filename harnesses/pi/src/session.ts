@@ -278,7 +278,7 @@ export class SubmissionController {
 				}
 				this.providerRequests += 1;
 				if (this.value) return payload;
-				if (this.providerRequests > 1) return payload;
+			if (this.providerRequests > 1 || this.config.forceFirstToolCall === false) return payload;
 				return {
 					...payload,
 					tool_choice: "required",

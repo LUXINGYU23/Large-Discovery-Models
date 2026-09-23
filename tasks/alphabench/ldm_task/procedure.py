@@ -27,6 +27,9 @@ def parse_args(argv=None):
     for name in ("seed-file", "import-pool", "initialization-bundle", "upstream-root", "data-manifest", "protocol-file"):
         parser.add_argument("--" + name, type=Path)
     parser.add_argument("--oracle-url")
+    parser.add_argument("--api-key-file", type=Path)
+    parser.add_argument("--harness-sidecar-image", default="ldm-pi-t3:local")
+    parser.add_argument("--harness-surrogate-query", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -37,6 +40,10 @@ def resolve_protocol(args):
         overrides["rounds"] = args.iterations
     if args.protocol_profile is not None:
         overrides["profile"] = args.protocol_profile
+    if args.harness_surrogate_query:
+        overrides["harness_surrogate_query"] = True
+        if not args.protocol_file:
+            overrides["budgets"] = {**T3Protocol().budgets, "surrogate_queries": 400}
     if args.protocol_file:
         payload = json.loads(args.protocol_file.read_text(encoding="utf-8"))
         if any(payload.get(key) != value for key, value in overrides.items()):

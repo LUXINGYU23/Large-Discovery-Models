@@ -11,6 +11,7 @@ from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.harness import (HarnessError, HarnessLimits, HarnessPoolConfig, HarnessProfile,
     HarnessSubmissionRequest, HarnessSubmittedArtifact)
 from tasks.alphabench.core.candidate import FactorDomain
+from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness import HarnessExpander, submission_contract
 from tasks.alphabench.core.protocol import T3Protocol
@@ -75,6 +76,7 @@ def factor(name, window):
 
 def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_checks(tmp_path):
     protocol, gateway, client, expander = fixture(tmp_path, "harness", {"research": [factor("a", 5)]})
+    expander.collection = AcceptedActions(gateway.runtime.run_dir)
     request = ExpansionRequest(0, protocol.batch_size, context={"evaluation_budget": {"effective": 1}})
     first = gateway.host.run(lambda: expander.expand(request))
     assert first.selection_mode == "reservoir_order"
@@ -84,6 +86,7 @@ def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_check
     assert second == first
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     assert gateway.runtime.budget.counters["harness_turns"] == 1
+    assert len(list(expander.collection.journal.root.glob("*.json"))) == 1
 
 
 def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_path):
@@ -91,6 +94,7 @@ def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_p
         "research_a": [factor("first", 5), factor("second", 6)],
         "research_b": [factor("agreement", 5), factor("third", 7)],
     })
+    expander.collection = AcceptedActions(gateway.runtime.run_dir)
     request = ExpansionRequest(0, protocol.sessions * protocol.candidates_per_session,
                                context={"evaluation_budget": {"effective": 2}})
     result = gateway.host.run(lambda: expander.expand(request))
@@ -98,8 +102,9 @@ def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_p
     assert result.metadata["occurrences"] == 4 and result.metadata["unique"] == 3
     assert [item.metadata["q0"] for item in result.proposals] == [.5, .25, .25]
     assert len(result.proposals[0].metadata["harness_lineage"]) == 2
-    assert gateway.runtime.budget.counters["dynamic_checks"] == 4
+    assert gateway.runtime.budget.counters["dynamic_checks"] == 3
     assert gateway.runtime.budget.counters["harness_turns"] == 2
+    assert len(list(expander.collection.journal.root.glob("*.json"))) == 2
 
 
 def test_harness_rejects_evaluated_failures_and_same_session_duplicates(tmp_path):

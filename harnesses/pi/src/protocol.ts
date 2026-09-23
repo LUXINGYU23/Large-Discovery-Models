@@ -100,6 +100,7 @@ export interface InitializeFrame extends CommonFrame {
 	model: string;
 	thinking: ThinkingLevel;
 	providerRequestBody?: Record<string, unknown>;
+	forceFirstToolCall?: boolean;
 	solPi?: Record<string, unknown>;
 	taskId: string;
 	caseId: string;
@@ -659,6 +660,7 @@ export function parseFrame(line: string): InputFrame {
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
 		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
 		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
+		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
@@ -723,6 +725,9 @@ export function parseFrame(line: string): InputFrame {
 	if (typeof data.context7Enabled !== "boolean") {
 		throw new ProtocolError("invalid_frame", "context7Enabled must be boolean");
 	}
+	if (data.forceFirstToolCall !== undefined && typeof data.forceFirstToolCall !== "boolean") {
+		throw new ProtocolError("invalid_frame", "forceFirstToolCall must be boolean");
+	}
 
 	const profiles = parseProfiles(data.profiles);
 	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
@@ -757,6 +762,7 @@ export function parseFrame(line: string): InputFrame {
 		model: string(data.model, "model"),
 		thinking,
 		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
+		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
 		...(solPi === undefined ? {} : { solPi }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),

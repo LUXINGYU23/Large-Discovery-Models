@@ -75,6 +75,7 @@ class PiHarnessConfig(HarnessPoolConfig):
     web_search: PiWebSearch = field(default_factory=PiWebSearch)
     context7_enabled: bool = True
     provider_request_body: dict[str, Any] = field(default_factory=dict)
+    force_first_tool_call: bool = True
     sol_pi: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -119,6 +120,8 @@ class PiHarnessConfig(HarnessPoolConfig):
             )
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
+        if type(self.force_first_tool_call) is not bool:
+            raise ValueError("force_first_tool_call must be boolean")
 
     def initialize_payload(self) -> dict[str, Any]:
         return {
@@ -134,6 +137,7 @@ class PiHarnessConfig(HarnessPoolConfig):
             "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
+            **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),
             **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
         }
 
