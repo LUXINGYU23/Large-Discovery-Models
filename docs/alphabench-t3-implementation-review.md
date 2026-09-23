@@ -1182,3 +1182,23 @@ example cases deselected; after the last receipt integrity check, 137 focused
 contract/Host/campaign/lifecycle tests passed. W15 remains open for real
 service outage/cancel, Harness/policy process recovery and remaining isolation
 evidence, and W16 remains blocked by market data and Assay service assets.
+
+## Change 32: reconcile a real Oracle worker after service process death
+
+Cross-check against W15 R05/R16 and Spec section 12: the pinned Assay worker
+runs in a separate OS process. Killing the service immediately after worker
+launch, or after worker output but before receipt completion, leaves one
+durable dispatch intent. A new service process recovers that output into a
+completed receipt without launching another worker. If the worker is also
+terminated before writing output, the resumed request reports
+`paused_outcome_unknown`, retains the dispatch intent and does not launch a
+replacement. The test checks the physical launch count and response digest.
+
+Complexity review: one parameterized process test exercises the three distinct
+outcome boundaries using the existing service and receipt APIs. No runtime
+state, retry path, worker registry or new dependency was added. The Assay suite
+passed 24 tests. The task suite passed 305 tests with nine optional skips and
+four previously verified long upstream examples deselected; an earlier run
+with those examples included was stopped after 190 passes and four skips.
+This only qualifies service-process recovery on the fixture. Cancellation,
+other W15 boundaries, real market data and the full W16 matrix remain open.

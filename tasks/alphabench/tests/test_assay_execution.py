@@ -2,6 +2,11 @@
 
 import datetime as dt
 import json
+import os
+import signal
+import subprocess
+import sys
+import time
 
 import numpy as np
 import pytest
@@ -327,6 +332,86 @@ def test_bounded_worker_serializes_real_assay_outputs_and_invalid_results(snapsh
     wrong_market = dict(request, protocol=request["protocol"] | {"market": "sp500"})
     with pytest.raises(ValueError, match="market"):
         service.execute(wrong_market)
+
+
+@pytest.mark.parametrize("point,exit_code", [("after_spawn", 94), ("after_output", 95),
+                                           ("worker_lost", 94)])
+def test_oracle_service_process_death_reconciles_one_real_worker(snapshot, tmp_path, point, exit_code):
+    request, config, _, _ = snapshot
+    full_request = dict(request, fast=False)
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config | {key: request["protocol"][key]
+        for key in ("backend", "market", "data_digest", "environment_digest")}))
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(full_request))
+    root = tmp_path / "oracle"
+    script = r'''
+import json, os, signal, sys
+from pathlib import Path
+from ldm_tts.contracts.evaluation import EvaluationPaused
+from tasks.alphabench.core import oracle_service as module
+
+config, root, request_path, point = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4]
+marker = root / "crashed.marker"
+original_spawn = module.subprocess.Popen
+
+def spawn(*args, **kwargs):
+    worker = original_spawn(*args, **kwargs)
+    with (root / "launches.txt").open("a") as stream:
+        stream.write(str(worker.pid) + "\n")
+    if point == "worker_lost" and not marker.exists():
+        os.kill(worker.pid, signal.SIGSTOP)
+    if point in {"after_spawn", "worker_lost"} and not marker.exists():
+        marker.write_text(point)
+        os._exit(94)
+    return worker
+
+module.subprocess.Popen = spawn
+service = module.OracleService(config, root)
+original_execute = service.receipts.execute
+
+def execute(identity, request, *, reserve, operation):
+    if point == "after_output" and not marker.exists():
+        original_operation = operation
+        def interrupted():
+            answer = original_operation()
+            marker.write_text(point)
+            os._exit(95)
+        operation = interrupted
+    return original_execute(identity, request, reserve=reserve, operation=operation)
+
+service.receipts.execute = execute
+try:
+    print(json.dumps(service.execute(json.loads(request_path.read_text()))))
+except EvaluationPaused as exc:
+    print(json.dumps({"status": exc.status, "error": str(exc)}))
+'''
+    command = [sys.executable, "-c", script, str(config_path), str(root), str(request_path), point]
+    killed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    assert killed.returncode == exit_code, killed.stderr
+    if point == "worker_lost":
+        worker_pid = int((root / "launches.txt").read_text().splitlines()[0])
+        os.kill(worker_pid, signal.SIGKILL)
+        resumed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        assert resumed.returncode == 0, resumed.stderr
+        assert json.loads(resumed.stdout)["status"] == "paused_outcome_unknown"
+        assert len((root / "launches.txt").read_text().splitlines()) == 1
+        receipt = json.loads(next((root / "requests").glob("*.json")).read_text())
+        assert receipt["state"] == "dispatch_intent"
+        assert not (root / "jobs" / request["request_id"] / "response.json").exists()
+        return
+    output = root / "jobs" / request["request_id"] / "response.json"
+    deadline = time.monotonic() + 30
+    while not output.exists() and time.monotonic() < deadline:
+        time.sleep(.1)
+    assert output.exists()
+    worker_response = json.loads(output.read_text())
+    resumed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    assert resumed.returncode == 0, resumed.stderr
+    assert json.loads(resumed.stdout) == worker_response
+    assert len((root / "launches.txt").read_text().splitlines()) == 1
+    receipt = json.loads(next((root / "requests").glob("*.json")).read_text())
+    assert receipt["state"] == "completed" and receipt["response_digest"] == digest(worker_response)
 
 
 def test_all_guide_operators_execute_through_pinned_assay_parser_and_engine(snapshot):
