@@ -1446,3 +1446,27 @@ for CSI300 and 1.55 s for CSI1000 in warm-cache probes. Mid-evaluation
 external modification, upstream source-content tampering at an unchanged path,
 qualified market data and remaining W15/W16 gates are still open; this is not
 full T3 qualification.
+
+## Change 44: capture historical CN membership conflict snapshots
+
+Cross-check against frozen plan W04/W16 and Spec sections 4.1/12.2: the
+community CN Qlib archive has 5 CSI300 and 8 CSI500 membership intervals that
+extend beyond its `all.txt` security bounds. The pinned BaoStock 0.9.4 client
+accepts a historical date for these two indices. A deterministic plan now
+selects each conflict's first and last trading session, binds the existing
+archive-audit hashes, captures the raw response and retrieval time locally,
+and audits all responses offline. Its 22 snapshots have the expected 300/500
+rows. Across 13 conflict intervals, CSI300 has one symbol at both endpoints
+and four only at the first; CSI500 has four only at the first and four at
+neither. The source's `updateDate` can precede
+the requested session, so the result is `evidence_only`, with no automatic
+membership rewrite or qualification promotion. CSI1000 still lacks this
+client endpoint. The 23 raw files were hash-verified into the remote data root.
+
+Complexity review: the snapshot probe reuses the pinned BaoStock source,
+canonical request digest, atomic JSON writer, bundle installer and existing
+Qlib conflict audit. It adds one task-local module and three CLI operations;
+no new package, alternate data adapter, mutable archive patch, fallback or
+compatibility path. Validation covers full versus incomplete snapshots,
+duplicate and future-dated rows, and an altered input audit. The existing
+blocked market qualification and 72-cell matrix remain unchanged.

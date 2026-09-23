@@ -38,7 +38,7 @@
 
 - CN：investment_data 的 `2026-09-22` Qlib 归档，含 CSI300/500/1000 历史成员区间、行情、复权 factor 和指数基准。归档和 provenance 分别校验。
 - CN 停牌：Dolt 快照 `d9digdvvk5spruculluv4ujhen2350ut`。仅精确证券/日期的 `tradestatus=0` 可佐证停牌；缺行不是停牌证据。该公开表只到 `2023-06-09`。
-- CN 剩余缺口：BaoStock `0.9.4` 客户端获取日线交易状态及上市/退市日期。服务没有历史快照 API；查询计划、原始响应、获取时间和逐文件哈希组成冻结采集批次。重新在线获取不保证相同内容，离线复现使用保存的批次。
+- CN 剩余缺口：BaoStock `0.9.4` 客户端获取日线交易状态及上市/退市日期；沪深300和中证500成分股接口还接受历史查询日期。服务没有不可变版本的历史快照；查询计划、原始响应、获取时间和逐文件哈希组成冻结采集批次。重新在线获取不保证相同内容，离线复现使用保存的批次。该客户端没有中证1000的对应成分股接口。
 - US 成员：固定 Assay commit `06179ef75140ce5d9b94405e4af243faddc70b9e` 中的 SP500 基线/变更与 NASDAQ100 年度成员文件，保留生效日期、实现及资源哈希。
 - US 行情：Dolt `post-no-preference/stocks` 快照 `s156r5d03kp2mlt6a8pbai703vtrldc4` 的未复权 OHLCV、split、dividend、symbol。SQL 必须含 `AS OF`，保存完整原始响应和 SHA-256。
 
@@ -131,6 +131,30 @@ scp -P 5320 zsgpu@111.2.199.31:/mnt/data1/Large-Discovery-Models/data/alphabench
 
 再次 `pack → scp → install` 后，在服务器运行 `cn-baostock --root "$T3_DATA"`。该审计重新读取全部固定 Dolt 响应与 BaoStock 响应，只有明确的停牌状态可消除对应行情缺口；返回为空、报告仍交易但归档无价、历史成员区间跨退市日期都会保留为未解决问题。不会填充假行情或修改历史成员区间。结果及逐响应哈希在 `manifests/cn_baostock_status.json`。
 
+沪深300/中证500 的归档成员区间与 `all.txt` 冲突时，可再采集这些区间首末交易日的独立快照。`plan-cn-membership` 从服务器既有的 `qlib_csi300.json` 和 `qlib_csi500.json` 生成去重日期计划，并将两份审计哈希固定；本机按固定 BaoStock 客户端联网，服务器只做离线复核：
+
+```powershell
+$T3_MEM_STAGE = 'D:\Data\alphabench-membership-2026-09-23'
+$T3_PY = '.\tasks\alphabench\.venv\Scripts\python.exe'
+$T3_DATA = '/mnt/data1/Large-Discovery-Models/data/alphabench'
+$T3_REMOTE = '/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation'
+New-Item -ItemType Directory -Force "$T3_MEM_STAGE\manifests" | Out-Null
+scp -P 5320 `
+  zsgpu@111.2.199.31:/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/qlib_csi300.json `
+  zsgpu@111.2.199.31:/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/qlib_csi500.json `
+  "$T3_MEM_STAGE\manifests\"
+& $T3_PY -m tasks.alphabench.core.data plan-cn-membership --root $T3_MEM_STAGE
+& $T3_PY -m tasks.alphabench.core.data acquire-cn-membership --root $T3_MEM_STAGE
+& $T3_PY -m tasks.alphabench.core.data cn-membership --root $T3_MEM_STAGE
+& $T3_PY -m tasks.alphabench.core.data pack --root $T3_MEM_STAGE --bundle "$T3_MEM_STAGE\cn-membership.tar.gz"
+$T3_MEM_HASH = (Get-FileHash "$T3_MEM_STAGE\cn-membership.tar.gz" -Algorithm SHA256).Hash.ToLowerInvariant()
+scp -P 5320 "$T3_MEM_STAGE\cn-membership.tar.gz" zsgpu@111.2.199.31:/mnt/data1/Large-Discovery-Models/tmp/cn-membership.tar.gz
+ssh -p 5320 zsgpu@111.2.199.31 "cd $T3_REMOTE && tasks/alphabench/.venv/bin/python -m tasks.alphabench.core.data install --root $T3_DATA --bundle /mnt/data1/Large-Discovery-Models/tmp/cn-membership.tar.gz --sha256 $T3_MEM_HASH"
+ssh -p 5320 zsgpu@111.2.199.31 "cd $T3_REMOTE && tasks/alphabench/.venv/bin/python -m tasks.alphabench.core.data cn-membership --root $T3_DATA"
+```
+
+每个原始快照保存请求日期、服务返回日期、`updateDate`、全量行和获取时间。少于指数应有的 300/500 行仅记为不完整证据；即使满额也不自动改写 Qlib 成员或提升数据资格。报告在 `manifests/cn_membership_probe.json`，中证1000冲突仍需另一独立来源。
+
 US 全部响应传入后，用固定 Assay 环境中的交易所日历审计：
 
 ```bash
@@ -148,6 +172,7 @@ Assay 环境锁定的本地源码路径是 `/mnt/data1/Large-Discovery-Models/da
 ```text
 raw/cn-2026-09-22/             CN 归档及 provenance
 raw/cn-status-<commit>/        固定停牌快照的响应
+raw/cn-membership-<capture>/   BaoStock 历史成分股快照、查询计划与获取时间
 raw/us-dolt-<commit>/          US 价格、公司行动和证券元数据响应
 raw/<market>-membership.json   历史成员及来源哈希
 qlib/cn-2026-09-22/            服务器的 Qlib 数据
@@ -201,6 +226,8 @@ BaoStock 额外佐证 774 个停牌日期。CN 剩余缺口如下，单位为证
 不能据此把 `SZ302132` 旧日期直接补入 Qlib。`SH689009` 的原始 OHLCV
 已捕获，但仍须核对复权/成交额口径并在独立衍生数据版本中补齐；不能原地
 修改已冻结归档。退市后的成员关系也须以指数变更记录核对，不能简单截断。
+
+2026-09-23 另取得沪深300/中证500 冲突区间边界的 22 个历史成分股快照；13 条冲突区间的两端对应快照均达到 300/500 行。CSI300 中 4 条在区间末端缺席、1 条仍在；CSI500 中 4 条首末均缺席、4 条仅在起点出现。`updateDate` 可早于查询日期，满额快照也不能独自证明每日生效成员。原始 23 文件传输包 SHA-256 为 `be00b8939a3921125d6ed19299007222bbb2b3925e7d4f6fdfdbb272cd189ef5`；离线报告 SHA-256 为 `09faf44f57e3820996950cd80286c56a83f93f63fa6ac9ad990a6f23e2fe90fb`。这批证据仍标记 `evidence_only`，没有变更三个 CN 市场的 `blocked` 资格。
 
 US 审计发现 SP500 59,717 个缺口日期、NASDAQ100 13,605 个缺口日期；源数据还有 825 条异常 OHLCV、10 条非交易日记录和 34 只证券缺失元数据。VWAP、真实指数基准、历史行业分类及公司行动/代码沿革资格仍未解决。下载完整不能等同于数据完整，当前全部市场保持 `blocked`。
 

@@ -624,7 +624,9 @@ def install_bundle(archive_path, root, expected):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("acquire-sources", "sources", "acquire-cn", "cn", "plan-cn-status", "cn-status",
-        "plan-cn-baostock", "acquire-cn-baostock", "cn-baostock", "plan-us", "us", "acquire-plan", "membership", "pack", "install"))
+        "plan-cn-baostock", "acquire-cn-baostock", "cn-baostock",
+        "plan-cn-membership", "acquire-cn-membership", "cn-membership",
+        "plan-us", "us", "acquire-plan", "membership", "pack", "install"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--assay-root", type=Path)
     parser.add_argument("--market", choices=("sp500", "nasdaq100"), default="sp500")
@@ -656,6 +658,11 @@ def main(argv=None):
         from .cn_status import plan_baostock, acquire_baostock, prepare_baostock
         operation = {"plan-cn-baostock": plan_baostock, "acquire-cn-baostock": acquire_baostock,
                      "cn-baostock": prepare_baostock}[args.operation]
+        result = operation(args.root)
+    elif args.operation in {"plan-cn-membership", "acquire-cn-membership", "cn-membership"}:
+        from .cn_membership import plan_membership, acquire_membership, audit_membership
+        operation = {"plan-cn-membership": plan_membership, "acquire-cn-membership": acquire_membership,
+                     "cn-membership": audit_membership}[args.operation]
         result = operation(args.root)
     elif args.operation == "us":
         from assay.data.calendar import trading_days

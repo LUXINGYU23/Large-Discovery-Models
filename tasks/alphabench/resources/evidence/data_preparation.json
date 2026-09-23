@@ -18,7 +18,16 @@
       "no_status_evidence": 2
     }
   },
-  "checked_at_utc": "2026-09-23T10:31:14+00:00",
+  "cn_membership_probe": {
+    "audit_sha256": "09faf44f57e3820996950cd80286c56a83f93f63fa6ac9ad990a6f23e2fe90fb",
+    "bundle_sha256": "be00b8939a3921125d6ed19299007222bbb2b3925e7d4f6fdfdbb272cd189ef5",
+    "conflicts": {"csi300": 5, "csi500": 8},
+    "incomplete_snapshots": 0,
+    "qualification": "evidence_only",
+    "raw_files": 23,
+    "snapshots": 22
+  },
+  "checked_at_utc": "2026-09-23T12:47:10+00:00",
   "cn_all_instruments_sha256": "0520db301d5db6d5a0d39b8b33aa2b5579f5d11f7e782c546618074c6c9d7b5c",
   "cn": {
     "csi1000": {
