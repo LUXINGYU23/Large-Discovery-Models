@@ -32,13 +32,11 @@ from assay.portfolio.config import PortfolioBacktestConfig
 from assay.service import AssayService
 from ldm_tts.contracts.evaluation import EvaluationPaused
 
-from .data import sha256
+from .data import ASSAY_ASSETS, sha256
 from .assay_contract import portfolio_config
 from .grammar import parse_expression
 from .protocol import T3Protocol, digest
 
-
-ASSETS = {"calendar", "prices", "events", "membership", "groups", "execution", "benchmark"}
 
 # The pinned registry lacks these guide operators. They share the exact guide
 # semantics of the task's Qlib extensions, without rewriting either dialect.
@@ -52,7 +50,7 @@ def read_assets(config, protocol):
     if digest(manifest) != protocol.data_digest or (manifest["backend"], manifest["market"]) != ("assay", protocol.market):
         raise ValueError("Assay data manifest differs from the frozen protocol")
     inventory = manifest["assets"]
-    if set(inventory) != ASSETS:
+    if set(inventory) != ASSAY_ASSETS:
         raise ValueError("Assay requires all seven offline data assets")
     paths = {}
     for name, record in inventory.items():

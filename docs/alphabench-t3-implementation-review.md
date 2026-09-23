@@ -1394,3 +1394,26 @@ Complexity review: the finding is recorded in the existing data guide and
 catalog evidence; no acquisition backend, fallback, adapter, dependency, or
 low-value mirror test was added. The current CN/US source gaps and all 72
 functional qualification cells remain blocked.
+
+## Change 42: verify physical market assets before real starts and resumes
+
+Cross-check against W04/W15 R17 and Spec sections 4.1/12.2: the real Host
+previously checked the manifest JSON digest but not the files it described.
+The existing data verifier now rehashes the Qlib per-market feature inventory,
+calendar, historical market membership and all-instruments file, or all seven
+Assay assets. The Qlib inventory digest and Assay asset-map digest must match
+the frozen manifest, so swapping a sidecar cannot silently authorize another
+set of files. The check runs before creating or modifying a run and before any
+model client or Oracle request. Separate server processes reject same-length
+asset edits on both backends in new and resume routes; Qlib also rejects an
+altered inventory. This is fixture evidence for the entry boundary, not a
+qualified market dataset or a full completed-run recovery test.
+
+Complexity review: manifest validation moved from protocol metadata to the
+existing data module, reusing its streaming SHA-256 and relative-path guard.
+The seven Assay asset names now have one definition shared with its adapter.
+Missing files and symbolic links are rejected before hashing.
+The old function/import were removed; no fallback, dependency, compatibility
+layer or production-side test hook remains. Focused data/procedure/campaign/
+Qlib tests passed 21 with one skipped on the server. Oracle-side data binding,
+mid-run file mutation and the rest of W15 remain open.

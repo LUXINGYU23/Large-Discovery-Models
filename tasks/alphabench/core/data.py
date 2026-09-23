@@ -26,10 +26,11 @@ import urllib.parse
 import urllib.request
 
 from ldm_tts.engine.run_store import atomic_json_write
-from .protocol import digest
+from .protocol import T3Protocol, digest
 
 SOURCES = json.loads((Path(__file__).resolve().parents[1] / "resources/data_sources.json").read_text(encoding="utf-8"))
 BENCHMARKS = {"csi300": "sh000300", "csi500": "sh000905", "csi1000": "sh000852"}
+ASSAY_ASSETS = {"calendar", "prices", "events", "membership", "groups", "execution", "benchmark"}
 
 
 def sha256(path):
@@ -38,6 +39,56 @@ def sha256(path):
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             value.update(block)
     return value.hexdigest()
+
+
+def verify_data_manifest(path: Path, protocol: T3Protocol):
+    path = Path(path).resolve()
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest.get("qualification") != "qualified":
+        raise ValueError("data qualification is incomplete; inspect the recorded coverage issues")
+    for key in ("source", "archive_sha256", "files_sha256", "calendar_sha256", "universe_sha256",
+                "adjustment", "fields", "start", "end", "benchmark", "historical_universe"):
+        if not manifest.get(key):
+            raise ValueError(f"data manifest lacks {key}")
+    if manifest["historical_universe"] is not True:
+        raise ValueError("current constituents cannot replace a historical universe")
+    if manifest.get("market") != protocol.market or manifest.get("backend") != protocol.backend:
+        raise ValueError("data manifest backend/market mismatch")
+    if manifest["start"] > "2015-01-01" or manifest["end"] < "2025-01-01":
+        raise ValueError("data does not cover lookback, all splits, and forward labels")
+    if digest(manifest) != protocol.data_digest:
+        raise ValueError("data manifest does not match the frozen protocol")
+    if protocol.backend == "qlib" and any(not manifest.get(key) for key in ("data_root", "all_instruments_sha256")):
+        raise ValueError("Qlib data manifest lacks its data root or all-instruments hash")
+
+    def check_file(root, relative, expected):
+        declared = root / relative_path(relative)
+        target = declared.resolve()
+        if declared.is_symlink() or not target.is_relative_to(root) or not target.is_file() or sha256(target) != expected:
+            raise ValueError("data asset content mismatch: " + relative)
+
+    if protocol.backend == "qlib":
+        root = Path(manifest["data_root"]).resolve()
+        files = json.loads(path.with_suffix(".files.json").read_text(encoding="utf-8"))
+        if not isinstance(files, dict) or not files or digest(files) != manifest["files_sha256"]:
+            raise ValueError("Qlib file inventory differs from the frozen data manifest")
+        required = {"calendars/day.txt": manifest["calendar_sha256"],
+                    f"instruments/{protocol.market}.txt": manifest["universe_sha256"],
+                    "instruments/all.txt": manifest["all_instruments_sha256"]}
+        for relative, expected in (files | required).items():
+            check_file(root, relative, expected)
+    else:
+        assets = manifest.get("assets")
+        if not isinstance(assets, dict) or set(assets) != ASSAY_ASSETS:
+            raise ValueError("Assay requires all seven frozen data assets")
+        files = {record["path"]: record["sha256"] for record in assets.values()}
+        if (len(files) != len(assets) or digest(files) != manifest["files_sha256"]
+                or assets["calendar"]["sha256"] != manifest["calendar_sha256"]
+                or assets["membership"]["sha256"] != manifest["universe_sha256"]):
+            raise ValueError("Assay file inventory differs from the frozen data manifest")
+        for relative, expected in files.items():
+            check_file(path.parent, relative, expected)
+    return manifest
 
 
 def fetch_file(request, destination, *, content_range=None):

@@ -164,6 +164,12 @@ CN 审计检查成员区间、日历、表达式字段、复权 factor、基准�
 
 Assay 需要 `price_raw`、`adj_events`、`universe_snapshots`；CN 另需交易限制，分组算子需要历史分类。Qlib 归一化 adjusted close 不能当作 raw close，累计 factor 不能可靠拆成分红和拆股。资产未齐前，Assay 转换与完整 T3 矩阵保持未通过。
 
+真实 run 每次启动或恢复时，Host 按冻结 digest 检查 manifest，并重新计算物理资产哈希。
+Qlib 的 `qlib_<market>.files.json` 须与 manifest 的 `files_sha256` 一致；逐文件行情、
+交易日历、市场成分和 `all.txt` 都重新核对。Assay 的七个离线资产使用 manifest
+内的相对路径与哈希，并核对清单总摘要。缺失或改动在模型请求前拒绝运行；
+该入口检查不代替 Oracle worker 执行期间的数据不变性验收。
+
 ## 本次实际准备结果
 
 2026-09-23 的本机采集和服务器离线导入已完成：US 固定快照 3,100 页、1,609,180 条行情；CN 固定停牌快照 3,745 页及 BaoStock 补证 232 个响应。传输包共 10,069 个原始文件，SHA-256 为 `b20140d6954440fb2f9951d99ef78f14e0203781934b5b5b3397fdaddd766962`。

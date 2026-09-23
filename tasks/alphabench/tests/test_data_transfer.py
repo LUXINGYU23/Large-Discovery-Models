@@ -1,11 +1,14 @@
 import io
 import hashlib
 import json
+import subprocess
+import sys
 import tarfile
 
 import pytest
 
 from tasks.alphabench.core import data
+from tasks.alphabench.core.protocol import T3Protocol
 
 
 def test_verified_offline_transfer_is_idempotent_and_excludes_temporary_files(tmp_path, monkeypatch):
@@ -69,3 +72,76 @@ def test_truncated_http_body_is_retried_before_publishing_download(tmp_path, mon
     data.download("https://example.invalid/prices", target, hashlib.sha256(b"complete").hexdigest())
     assert target.read_bytes() == b"complete"
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize("backend,market", [("qlib", "csi300"), ("assay", "nasdaq100")])
+def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backend, market):
+    root = tmp_path / "market"
+    root.mkdir()
+    manifest = {"backend": backend, "market": market, "qualification": "qualified",
+                "source": "frozen-fixture", "archive_sha256": "a" * 64,
+                "start": "2015-01-01", "end": "2025-02-01", "benchmark": "INDEX",
+                "adjustment": "split", "fields": ["close"], "historical_universe": True}
+    if backend == "qlib":
+        files = {}
+        for relative in ("calendars/day.txt", f"instruments/{market}.txt",
+                         "instruments/all.txt", "features/stock/close.day.bin"):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"DATA")
+            files[relative] = data.sha256(target)
+        manifest.update(data_root=str(root), files_sha256=data.digest({"features/stock/close.day.bin": files["features/stock/close.day.bin"]}),
+                        calendar_sha256=files["calendars/day.txt"],
+                        universe_sha256=files[f"instruments/{market}.txt"],
+                        all_instruments_sha256=files["instruments/all.txt"])
+        manifest_path = tmp_path / f"qlib_{market}.json"
+        manifest_path.with_suffix(".files.json").write_text(json.dumps({
+            "features/stock/close.day.bin": files["features/stock/close.day.bin"]}))
+        altered = root / "features/stock/close.day.bin"
+    else:
+        assets = {}
+        for name in ("calendar", "prices", "events", "membership", "groups", "execution", "benchmark"):
+            target = root / (name + ".parquet")
+            target.write_bytes(b"DATA")
+            assets[name] = {"path": target.relative_to(tmp_path).as_posix(), "sha256": data.sha256(target)}
+        manifest.update(assets=assets,
+                        files_sha256=data.digest({record["path"]: record["sha256"] for record in assets.values()}),
+                        calendar_sha256=assets["calendar"]["sha256"],
+                        universe_sha256=assets["membership"]["sha256"])
+        manifest_path = tmp_path / f"assay_{market}.json"
+        altered = root / "prices.parquet"
+    manifest_path.write_text(json.dumps(manifest))
+    protocol = T3Protocol(backend=backend, market=market, data_digest=data.digest(manifest))
+    protocol_path = tmp_path / "protocol.json"
+    protocol_path.write_text(json.dumps(protocol.to_dict()))
+    assert data.verify_data_manifest(manifest_path, protocol) == manifest
+
+    altered.write_bytes(b"EDIT")
+    run_dir = tmp_path / "run"
+    attempt = subprocess.run([sys.executable, "-m", "tasks.alphabench.ldm_task.procedure",
+                              "--protocol-file", str(protocol_path), "--data-manifest", str(manifest_path),
+                              "--out-dir", str(run_dir)], capture_output=True, text=True, timeout=30)
+    assert attempt.returncode != 0 and "data asset content mismatch" in attempt.stderr
+    assert not run_dir.exists()
+    run_dir.mkdir()
+    sentinel = run_dir / "existing-receipt"
+    sentinel.write_text("paid")
+    resumed = subprocess.run([sys.executable, "-m", "tasks.alphabench.ldm_task.procedure",
+                              "--protocol-file", str(protocol_path), "--data-manifest", str(manifest_path),
+                              "--resume-run", str(run_dir)], capture_output=True, text=True, timeout=30)
+    assert resumed.returncode != 0 and "data asset content mismatch" in resumed.stderr
+    assert sentinel.read_text() == "paid" and list(run_dir.iterdir()) == [sentinel]
+    if backend == "qlib":
+        altered.write_bytes(b"DATA")
+        manifest_path.with_suffix(".files.json").write_text(json.dumps({
+            "features/stock/close.day.bin": "0" * 64}))
+        with pytest.raises(ValueError, match="file inventory differs"):
+            data.verify_data_manifest(manifest_path, protocol)
+        manifest_path.with_suffix(".files.json").write_text(json.dumps({
+            "features/stock/close.day.bin": data.sha256(altered)}))
+        alternate = root / "alternate.bin"
+        alternate.write_bytes(b"DATA")
+        altered.unlink()
+        altered.symlink_to(alternate)
+        with pytest.raises(ValueError, match="data asset content mismatch"):
+            data.verify_data_manifest(manifest_path, protocol)

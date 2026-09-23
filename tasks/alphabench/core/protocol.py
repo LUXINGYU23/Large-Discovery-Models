@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass, field
 import hashlib
 import json
 import math
-from pathlib import Path
 
 METHODS = ("alphabench_cot", "alphabench_tot", "alphabench_ea", "llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled")
 LDM_METHODS = ("ldm", "ldm_harness", "ldm_harness_compiled")
@@ -178,22 +177,3 @@ class T3Protocol:
     @property
     def end_inclusive(self):
         return self.profile != "ldm_matched_v1"
-
-
-def verify_data_manifest(path: Path, protocol: T3Protocol):
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    if manifest.get("qualification") != "qualified":
-        raise ValueError("data qualification is incomplete; inspect the recorded coverage issues")
-    for key in ("source", "archive_sha256", "files_sha256", "calendar_sha256", "universe_sha256",
-                "adjustment", "fields", "start", "end", "benchmark", "historical_universe"):
-        if not manifest.get(key):
-            raise ValueError(f"data manifest lacks {key}")
-    if manifest["historical_universe"] is not True:
-        raise ValueError("current constituents cannot replace a historical universe")
-    if manifest.get("market") != protocol.market or manifest.get("backend") != protocol.backend:
-        raise ValueError("data manifest backend/market mismatch")
-    if manifest["start"] > "2015-01-01" or manifest["end"] < "2025-01-01":
-        raise ValueError("data does not cover lookback, all splits, and forward labels")
-    if digest(manifest) != protocol.data_digest:
-        raise ValueError("data manifest does not match the frozen protocol")
-    return manifest

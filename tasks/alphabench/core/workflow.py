@@ -17,13 +17,14 @@ from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from ldm_tts.registration.experiment import load_active_experiment_contract, snapshot_experiment_contract
 from .candidate import FactorDomain
 from .collection import AcceptedActions
+from .data import verify_data_manifest
 from .finalization import finalize, verify_report_artifacts
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
 from .harness_runtime import build_harness, build_policy_harness
 from .initialization import freeze_seed_source, run_initialization
 from .native_reference import prepare_native, run_native
-from .protocol import LDM_METHODS, digest, verify_data_manifest
+from .protocol import LDM_METHODS, digest
 from .policy import CompiledFactorSelector
 from .selection import FactorEncoder, FactorSelector
 
