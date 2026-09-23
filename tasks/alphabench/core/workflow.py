@@ -211,7 +211,7 @@ def run(args, protocol, spec):
                 CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["gateway"].host.run(lambda: objects["expander"].expand(request))),
                     FactorDomain(protocol.backend), Evaluator(),
                     selector=(compiled_selector or FactorSelector(("mock_" if args.mock else "") + protocol.objective,
-                        seed=protocol.random_seed)) if protocol.method in LDM_METHODS else None,
+                        seed=protocol.random_seed, pool_size=protocol.bo_pool_size)) if protocol.method in LDM_METHODS else None,
                     surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None))
             observations = result.engine.state.observations
             # Engine rounds_run is per invocation; the report records cumulative rounds across resume.

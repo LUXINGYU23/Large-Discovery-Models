@@ -42,11 +42,12 @@ class T3PolicyAdapter:
         location = float(gp.y_mean) if gp.ready else float(y.mean()) if len(y) else 0.0
         scale = float(gp.y_std) if gp.ready else max(float(y.std()), .01) if len(y) else .25
         q0 = np.asarray([item.metadata["q0"] for item in candidates], dtype=float)
-        if not np.isfinite(q0).all() or np.any(q0 <= 0) or not np.isclose(q0.sum(), 1):
+        m = self.protocol.sessions * self.protocol.candidates_per_session
+        if not np.isfinite(q0).all() or np.any(q0 <= 0) or any(
+                not np.isclose(item.metadata["q0"], len(item.metadata.get("harness_lineage", ())) / m)
+                for item in candidates):
             raise ValueError("policy q0 must be finite positive empirical mass")
-        m = sum(len(item.metadata.get("harness_lineage", ())) for item in candidates)
-        if m != self.protocol.sessions * self.protocol.candidates_per_session:
-            raise ValueError("policy occurrence denominator differs from the frozen Harness protocol")
+        q0 /= q0.sum()
         measured = tuple({"candidate_id": item.candidate_id, "round_index": source_round,
                           "utility": item.scalar_score} for item, source_round in zip(history, rounds))
         diagnostics = {}
@@ -106,7 +107,8 @@ class T3PolicyAdapter:
 
 class CompiledFactorSelector(FactorSelector):
     def __init__(self, protocol, *, mock, initial_candidate_ids=(), collection=None):
-        super().__init__(("mock_" if mock else "") + protocol.objective, seed=protocol.random_seed)
+        super().__init__(("mock_" if mock else "") + protocol.objective, seed=protocol.random_seed,
+                         pool_size=protocol.bo_pool_size)
         self.protocol = protocol
         self.adapter = T3PolicyAdapter(protocol, initial_candidate_ids)
         self.controller = self.meter = self.gateway = None
@@ -125,6 +127,7 @@ class CompiledFactorSelector(FactorSelector):
     def select(self, candidates, representations, *, count=1, round_idx=0):
         if self.gateway is None:
             raise ValueError("compiled selector requires its policy Harness")
+        candidates, pool_metadata = self.maintain_pool(candidates, round_idx)
         baseline = tuple(self.gp.predict_record(item.candidate_id, representations[item.candidate_id].values,
                                                 beta=self.beta) for item in candidates)
         policy_input = self.adapter.build_selection_round(round_idx=round_idx, history=self.history,
@@ -169,15 +172,15 @@ class CompiledFactorSelector(FactorSelector):
                 for index, (item, prediction) in enumerate(zip(candidates, baseline)))
             fit = self.gp.summary()
         result = super().select(candidates, representations, count=count, round_idx=round_idx,
-                                predictions=active, alpha=policy.alpha, eta=policy.eta)
+                                predictions=active, alpha=policy.alpha, eta=policy.eta, pool_prepared=True)
         self.controller.record_predictions(round_idx, [{"candidate_id": item.candidate_id,
             "baseline_mean": baseline[index].scalar_mean, "active_mean": active[index].scalar_mean,
             "baseline_std": baseline[index].scalar_std, "active_std": active[index].scalar_std,
-            "q0": float(item.metadata["q0"]),
+            "q0": result.metadata["q0"][index],
             "selection_probability": result.metadata["probabilities"][index]}
             for index, item in enumerate(candidates)])
         return BOSelectionResult(result.selected_candidate_ids, result.predictions,
-            metadata={**result.metadata, "fit": fit, "policy": {"epoch_id": policy.epoch_id,
+            metadata={**result.metadata, **pool_metadata, "fit": fit, "policy": {"epoch_id": policy.epoch_id,
                 "source": policy.source, "degraded": policy.degraded,
                 "action": policy.metadata.get("action"), "status": policy.metadata.get("status"),
                 "accounting": accounting, "target_location": policy_input.execution_context["mean_context"]["target_location"],

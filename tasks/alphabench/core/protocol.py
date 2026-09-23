@@ -46,6 +46,7 @@ class T3Protocol:
     batch_size: int = 2
     sessions: int = 2
     candidates_per_session: int = 4
+    bo_pool_size: int | None = None
     harness_surrogate_query: bool = False
     policy_capabilities: tuple[str, ...] = ("prior_mean@1", "ldm_weights@1")
     cold_seed_count: int = 30
@@ -114,6 +115,9 @@ class T3Protocol:
                 raise ValueError(f"{name} must be a positive integer")
         if self.method in LDM_METHODS and self.batch_size > self.candidates_per_session:
             raise ValueError("LDM batch size must not exceed per-session K")
+        if self.bo_pool_size is not None and (self.method not in LDM_METHODS or type(self.bo_pool_size) is not int
+                or not self.batch_size <= self.bo_pool_size <= self.sessions * self.candidates_per_session):
+            raise ValueError("BO pool size must fit the LDM proposal and evaluation budgets")
         if not 0 <= self.stock_n_drop < self.stock_topk:
             raise ValueError("drop count must be below portfolio size")
         if self.request_timeout <= self.worker_timeout:
@@ -134,6 +138,8 @@ class T3Protocol:
             del value["harness_surrogate_query"]
         if self.method != "ldm_harness_compiled":
             del value["policy_capabilities"]
+        if self.bo_pool_size is None:
+            del value["bo_pool_size"]
         return json.loads(json.dumps(value))
 
     @property

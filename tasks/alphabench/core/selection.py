@@ -71,8 +71,9 @@ class FactorEncoder:
 
 
 class FactorSelector:
-    def __init__(self, objective, *, seed=42, alpha=2.0, eta=0.25, beta=1.0):
+    def __init__(self, objective, *, seed=42, alpha=2.0, eta=0.25, beta=1.0, pool_size=None):
         self.objective, self.seed, self.alpha, self.eta, self.beta = objective, seed, alpha, eta, beta
+        self.pool_size = pool_size
         self.gp = None
 
     def describe(self):
@@ -84,7 +85,29 @@ class FactorSelector:
         if len(history) >= 2 and self.gp.fit_status != "fitted":
             raise ValueError("GP numerical fit failed")
 
-    def select(self, candidates, representations, *, count=1, round_idx=0, predictions=None, alpha=None, eta=None):
+    def maintain_pool(self, candidates, round_idx):
+        candidates = tuple(candidates)
+        if self.pool_size is None:
+            return candidates, {}
+        ordered = tuple(sorted(candidates, key=lambda item: item.candidate_id))
+        mass = np.array([item.metadata["q0"] for item in ordered], dtype=float)
+        if not np.all(np.isfinite(mass)) or np.any(mass <= 0) or not np.isclose(mass.sum(), 1):
+            raise ValueError("empirical q0 must sum to one before BO pool maintenance")
+        if len(ordered) <= self.pool_size:
+            return candidates, {"configured_bo_pool_size": self.pool_size, "bo_pool_size": len(candidates),
+                                "bo_pool_candidate_ids": [item.candidate_id for item in candidates],
+                                "pool_maintenance": "all_unique_candidates"}
+        pool_seed = int(digest([self.seed, round_idx, [item.candidate_id for item in ordered]])[:16], 16)
+        scores = np.log(mass) + np.random.default_rng(pool_seed).gumbel(size=len(ordered))
+        retained = tuple(ordered[index] for index in np.argsort(-scores, kind="stable")[:self.pool_size])
+        retained = tuple(sorted(retained, key=lambda item: item.candidate_id))
+        return retained, {"configured_bo_pool_size": self.pool_size, "bo_pool_size": len(retained),
+                          "bo_pool_candidate_ids": [item.candidate_id for item in retained],
+                          "pool_seed": pool_seed, "pool_maintenance": "q0_gumbel_top_k_without_replacement"}
+
+    def select(self, candidates, representations, *, count=1, round_idx=0, predictions=None, alpha=None, eta=None,
+               pool_prepared=False):
+        candidates, pool_metadata = (tuple(candidates), {}) if pool_prepared else self.maintain_pool(candidates, round_idx)
         if predictions is None:
             predictions = tuple(self.gp.predict_record(candidate.candidate_id, representations[candidate.candidate_id].values,
                                                        beta=self.beta) for candidate in candidates)
@@ -97,13 +120,15 @@ class FactorSelector:
         if scale <= 1e-12: scale = float(np.std(ucb))
         z = np.clip((ucb - np.median(ucb)) / scale, -5, 5) if scale > 1e-12 else np.zeros(len(ucb))
         mass = np.array([candidate.metadata.get("q0", 1 / len(candidates)) for candidate in candidates])
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0) or not np.isclose(mass.sum(), 1):
+        if not np.all(np.isfinite(mass)) or np.any(mass <= 0) or (not pool_prepared and not pool_metadata
+                and not np.isclose(mass.sum(), 1)):
             raise ValueError("empirical q0 must sum to one over the unique reservoir")
+        mass /= mass.sum()
         logits = (self.alpha if alpha is None else alpha) * np.log(mass) + (self.eta if eta is None else eta) * z
         rng = np.random.default_rng(np.random.SeedSequence([self.seed, round_idx]))
         perturbed = logits + rng.gumbel(size=len(candidates))
         selected = np.argsort(-perturbed, kind="stable")[:count]
         probabilities = np.exp(logits-logits.max()); probabilities /= probabilities.sum()
         return BOSelectionResult(tuple(candidates[index].candidate_id for index in selected), predictions,
-            metadata={"q0": mass.tolist(), "logits": logits.tolist(), "probabilities": probabilities.tolist(),
+            metadata={**pool_metadata, "q0": mass.tolist(), "logits": logits.tolist(), "probabilities": probabilities.tolist(),
                       "gumbel_scores": perturbed.tolist(), "fit": self.gp.summary(), "round": round_idx})

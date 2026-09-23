@@ -94,6 +94,28 @@ def test_zero_prior_matches_original_gp_and_selection():
     assert len(controller.recorded) == 1
 
 
+def test_compiled_policy_receives_the_same_bounded_bo_pool_as_selection():
+    protocol, history, candidates, representations = _fixture()
+    protocol = replace(protocol, sessions=2, candidates_per_session=2, bo_pool_size=2)
+    domain, encoder = FactorDomain("qlib"), FactorEncoder()
+    extra = tuple(domain.admit(RawProposal({"name": name, "expression": expression}, "test"))
+                  for name, expression in (("f4", "Mean($high,5)"), ("f5", "Std($low,10)")))
+    candidates = tuple(replace(item, metadata={"q0": .25, "harness_lineage": [{}]})
+                       for item in (*candidates, *extra))
+    representations = {item.candidate_id: encoder.encode(item) for item in candidates}
+    selector, controller = _selector(protocol, history, [0, 0], [0, 0])
+    result = selector.select(candidates, representations, round_idx=0)
+    baseline = FactorSelector("mock_rank_ic", seed=protocol.random_seed, pool_size=2)
+    baseline.fit(history)
+    expected = baseline.select(candidates, representations, round_idx=0)
+    assert result.selected_candidate_ids == expected.selected_candidate_ids
+    assert result.metadata["bo_pool_candidate_ids"] == expected.metadata["bo_pool_candidate_ids"]
+    assert len(controller.round_input.query_features) == 2
+    assert controller.round_input.execution_context["weight_context"]["occurrences"] == 4
+    assert controller.round_input.execution_context["weight_context"]["candidate_predictions"][0]["q0"] == pytest.approx(.5)
+    assert result.metadata["q0"] == pytest.approx([.5, .5])
+
+
 def test_nonzero_prior_uses_shared_residual_gp_and_raw_target_scale():
     protocol, history, candidates, representations = _fixture()
     selector, controller = _selector(protocol, history, [.8, -.2], [.3, -.4])
