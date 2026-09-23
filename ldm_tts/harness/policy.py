@@ -24,6 +24,7 @@ from ldm_tts.harness.policy_execution import (
 )
 from ldm_tts.harness.protocol import (
     HarnessArtifactRule,
+    HarnessProviderAuthorizationRequest,
     HarnessSubmissionContract,
     HarnessSubmissionError,
     HarnessSubmissionRequest,
@@ -161,8 +162,8 @@ class PolicyRoundInput:
             raise ValueError("policy history identifiers, rounds and measurements must align with numeric history")
         if any(not isinstance(value, str) or not value.strip() for value in ids):
             raise ValueError("policy history candidate IDs must be non-empty strings")
-        if any(isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < self.round_index for value in rounds):
-            raise ValueError("policy history rounds must be integers preceding the current round")
+        if any(isinstance(value, bool) or not isinstance(value, int) or not -1 <= value < self.round_index for value in rounds):
+            raise ValueError("policy history rounds must be initialization or preceding search rounds")
         if any(left > right for left, right in zip(rounds, rounds[1:])):
             raise ValueError("policy history must be chronological")
         research = _json_mapping(self.research_snapshot, "research_snapshot")
@@ -303,6 +304,7 @@ class PolicyResearchController:
         profile_id: str = "policy_architect",
         account: Callable[[Mapping[str, int | float]], None] | None = None,
         recovery_budget: Callable[[], float] | None = None,
+        provider_authorizer: Callable[[HarnessProviderAuthorizationRequest], bool] | None = None,
     ) -> None:
         if not profile_id:
             raise ValueError("policy profile_id must not be empty")
@@ -313,6 +315,7 @@ class PolicyResearchController:
         self.profile_id = profile_id
         self.account = account
         self.recovery_budget = recovery_budget
+        self.provider_authorizer = provider_authorizer
         self.contract = adapter.capability_contract()
         self.root.mkdir(parents=True, exist_ok=True)
 
@@ -357,6 +360,7 @@ class PolicyResearchController:
         try:
             results = self.client.run_turn(
                 (turn,), submission_validator=validate,
+                **({"provider_authorizer": self.provider_authorizer} if self.provider_authorizer else {}),
                 recovery_timeout_seconds=(0 if self.recovery_budget is None else self.recovery_budget()),
             )
             elapsed = time.perf_counter() - started

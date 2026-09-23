@@ -46,7 +46,7 @@ function tool(name, description, inputSchema) {
 	server.registerTool(name, { description, inputSchema }, async (arguments_) => result(await host(name, arguments_)));
 }
 
-tool("get_contract", "Inspect the frozen T3 backend, market, fields, operators, filter and remaining dynamic-check allowance.", z.object({}));
+tool("get_contract", "Inspect the frozen T3 backend, market, fields, operators, filter and remaining Host check/query allowances.", z.object({}));
 tool("validate_expression", "Parse and canonicalize a T3 expression without an Oracle request.", z.object({ expression: z.string() }));
 tool("check_expression", "Run a paid dynamic or lint check. The Host reserves its Oracle budget before execution.", z.object({ expression: z.string() }));
 tool("get_history", "Read a bounded page of public, previously evaluated search observations.", z.object({ offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(100).default(20) }));

@@ -111,7 +111,9 @@ class HarnessToolService:
                     if dialect == "assay" else ["$open", "$high", "$low", "$close", "$volume"])
                     for dialect in dialects},
                 "snapshot_id": active["id"], "history_digest": digest(active["history"]),
-                "dynamic_checks_remaining": self.gateway.runtime.budget.remaining(self.protocol.check_kind + "_checks")}
+                "dynamic_checks_remaining": self.gateway.runtime.budget.remaining(self.protocol.check_kind + "_checks"),
+                "surrogate_queries_remaining": (self.gateway.runtime.budget.remaining("surrogate_queries")
+                    if self.encoder else None)}
         if tool == "get_history":
             offset, limit = arguments.get("offset", 0), arguments.get("limit", 20)
             if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 100:
@@ -158,7 +160,8 @@ class HarnessToolService:
             prediction = selector.gp.predict_record(candidate.candidate_id, vector.values, beta=selector.beta)
             return {**identity, "snapshot_id": active["id"], "history_digest": digest(active["history"]),
                 "fit_status": selector.gp.fit_status, "mean": prediction.scalar_mean,
-                "latent_std": prediction.scalar_std, "ucb": prediction.acquisition_score}
+                "latent_std": prediction.scalar_std, "ucb": prediction.acquisition_score,
+                "surrogate_queries_remaining": self.gateway.runtime.budget.remaining("surrogate_queries")}
         raise ValueError("unknown or unavailable Harness tool")
 
 

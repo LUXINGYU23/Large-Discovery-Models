@@ -60,10 +60,14 @@ def test_host_tools_expose_public_contract_and_frozen_gp_without_private_labels(
             return frozen, contract, first, second, found, query, again, stale, checked, replay, inactive
         frozen, contract, first, second, found, query, again, stale, checked, replay, inactive = gateway.host.run(research)
     assert contract["ok"] and set(contract["result"]["operator_signatures"]) == ({"qlib", "assay"} if backend == "assay" else {"qlib"})
+    assert contract["result"]["surrogate_queries_remaining"] == 2
     assert first["result"]["total"] == 3 and first["result"]["next_offset"] == 2
     assert len(second["result"]["observations"]) == 1
     assert found["result"]["observation"]["status"] == "invalid"
-    assert query["ok"] and query == again and query["result"]["fit_status"] == "fitted"
+    assert query["ok"] and again["ok"] and query["result"]["fit_status"] == "fitted"
+    assert query["result"]["surrogate_queries_remaining"] == 1
+    assert again["result"]["surrogate_queries_remaining"] == 0
+    assert all(query["result"][key] == again["result"][key] for key in ("mean", "latent_std", "ucb", "snapshot_id"))
     assert query["result"]["snapshot_id"] == frozen["snapshot_id"]
     assert set(query["result"]) >= {"mean", "latent_std", "ucb", "history_digest"}
     assert stale["ok"] is False

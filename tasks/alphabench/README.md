@@ -10,7 +10,7 @@
 
 原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 与 example source 使用实际原生最终池，matched 使用完整已测池；source 保留原生轮数，预算不足即暂停。example 原入口没有 validation/test，本 task 明确冻结独立的后续区间。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。
 
-`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。实际 DeepSeek Responses + synthetic Oracle 已完成两轮 direct Harness smoke；这不代表真实市场、完整 W12 方法矩阵或数据资格。真实数据、Assay portfolio REST 接口、compiled policy 与完整资格矩阵仍未关闭，因此 `complete_t3=false`。
+`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。`ldm_harness_compiled` 另启独立 policy session，在受限 Docker runner 中执行其提交的 prior/weight 策略；Host 仍固定 GP、选择、Oracle 和预算。实际 DeepSeek Responses + synthetic Oracle 已分别完成两轮 direct、LDM 和 compiled smoke，证据见 `resources/evidence/`。这些运行不代表真实市场或完整方法矩阵资格。真实数据、Assay portfolio REST 接口、故障矩阵和完整资格矩阵仍未关闭，因此 `complete_t3=false`。
 
 ## 服务器验证
 
@@ -37,6 +37,7 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 - `selection_frozen.json`：任何 test 前冻结的 validation 排名、因子集合、方向和持仓参数。
 - `result.json`、`trajectory.csv`：search、full test、组合、质量/多样性、预算与资格缺口。
 - `accepted_actions/`：不可变 accepted action；IR/SFT 成对原子发布在数据收集目录，`current.json` 指向完整 generation。
+- `harness/`、`policy_harness/`：分离的 proposal 和 compiled-policy 会话、不可变输入、策略 epoch、预测、trace 与 usage。
 
 原始行情、环境、运行目录和完整 trace 不提交 Git。紧凑的来源与开发验证证据保留在 `resources/evidence/`。
 

@@ -53,7 +53,7 @@ class HarnessMeter:
 
         return self.host.call(reserve)
 
-    def reconcile(self, result):
+    def reconcile(self, profile_id, turn_id, usage):
         def verify():
             count = 0
             for path in self.receipts.root.glob("*.json"):
@@ -63,10 +63,10 @@ class HarnessMeter:
                         or not isinstance(record.get("request_digest"), str) or len(record["request_digest"]) != 64
                         or record.get("campaign_id") != self.runtime.run_id):
                     raise EvaluationPaused("Harness provider receipt integrity failure", status="paused_provider")
-                if record["turn_id"] == result.turn_id and record["profile_id"] == result.profile_id:
+                if record["turn_id"] == turn_id and record["profile_id"] == profile_id:
                     count += 1
-            used = result.usage.get("providerCalls")
-            if type(used) is not int or used < 0 or used > count:
+            used = usage.get("providerCalls")
+            if used is not None and (type(used) is not int or used < 0 or used > count):
                 raise EvaluationPaused("Harness provider usage exceeds Host authorizations", status="paused_provider")
             return {"host_authorizations": count, "sidecar_provider_calls": used}
 
@@ -175,7 +175,7 @@ class HarnessExpander:
         accepted_actions = []
         for profile in self.profiles:
             result = by_profile[profile.profile_id]
-            accounting = self.meter.reconcile(result)
+            accounting = self.meter.reconcile(result.profile_id, result.turn_id, result.usage)
             if result.submission_status != "accepted":
                 raise EvaluationPaused("Harness session did not submit an accepted batch", status="paused_harness")
             candidates = _candidate_file(result.submission, result.submitted_artifacts, self.artifact_root, count)

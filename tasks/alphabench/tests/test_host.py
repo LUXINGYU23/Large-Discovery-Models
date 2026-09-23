@@ -1,7 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from threading import Barrier, get_ident
-from types import SimpleNamespace
 
 import pytest
 
@@ -212,12 +211,10 @@ def test_harness_provider_authorization_is_single_writer_and_finite(tmp_path, mo
     assert len(records) == 1
     authorized = json.loads(records[0].read_text(encoding="utf-8"))
     assert authorized["request_digest"] == "a" * 64
-    summary = meter.reconcile(SimpleNamespace(turn_id=authorized["turn_id"], profile_id=authorized["profile_id"],
-                                              usage={"providerCalls": 1}))
+    summary = meter.reconcile(authorized["profile_id"], authorized["turn_id"], {"providerCalls": 1})
     assert summary == {"host_authorizations": 1, "sidecar_provider_calls": 1}
     with pytest.raises(EvaluationPaused, match="exceeds Host authorizations"):
-        meter.reconcile(SimpleNamespace(turn_id=authorized["turn_id"], profile_id=authorized["profile_id"],
-                                        usage={"providerCalls": 2}))
+        meter.reconcile(authorized["profile_id"], authorized["turn_id"], {"providerCalls": 2})
 
 
 def test_harness_strict_barrier_reserves_all_turns_or_none(tmp_path, monkeypatch):

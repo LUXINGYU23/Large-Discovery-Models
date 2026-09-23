@@ -20,10 +20,11 @@ from .collection import AcceptedActions
 from .finalization import finalize
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
-from .harness_runtime import build_harness
+from .harness_runtime import build_harness, build_policy_harness
 from .initialization import freeze_seed_source, run_initialization
 from .native_reference import prepare_native, run_native
 from .protocol import LDM_METHODS, digest, verify_data_manifest
+from .policy import CompiledFactorSelector
 from .selection import FactorEncoder, FactorSelector
 
 
@@ -94,7 +95,7 @@ def run(args, protocol, spec):
     native = protocol.method.startswith("alphabench_")
     if not native and protocol.profile != "ldm_matched_v1":
         raise ValueError("source profiles require the actual native algorithm entry")
-    if protocol.method not in {"llm", "ldm", "harness", "ldm_harness"} and not native:
+    if protocol.method not in {"llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled"} and not native:
         raise ValueError("the selected method requires its native/Harness adapter; direct execution is forbidden")
     run_dir = args.resume_run or args.out_dir or unique_run_dir(Path(__file__).resolve().parents[1] / "runs" / ("mock" if args.mock else "campaign"))
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +130,7 @@ def run(args, protocol, spec):
         return 0
     if native and native_config is None:
         native_config = prepare_native(protocol, args.upstream_root)
-    harness_method = protocol.method in {"harness", "ldm_harness"}
+    harness_method = protocol.method in {"harness", "ldm_harness", "ldm_harness_compiled"}
     key = provider_key(args) if harness_method or not args.mock else None
     client = make_client(protocol, args.mock, native_config, api_key=key)
     try:
@@ -139,6 +140,9 @@ def run(args, protocol, spec):
         return 2
     initial_observations = [replace(item, round_idx=None) for item in initial_observations]
     collection = AcceptedActions(run_dir)
+    compiled_selector = (CompiledFactorSelector(protocol, mock=args.mock,
+        initial_candidate_ids=(item.candidate_id for item in initial_observations))
+        if protocol.method == "ldm_harness_compiled" else None)
     objects = {}
 
     def configure(runtime):
@@ -156,6 +160,16 @@ def run(args, protocol, spec):
                 harness_client.start()
             except HarnessError as exc:
                 raise EvaluationPaused("Harness startup failed: " + str(exc), status="paused_harness") from exc
+            if compiled_selector:
+                policy_client, policy_controller = build_policy_harness(protocol, gateway,
+                    compiled_selector.adapter, expander.meter, api_key=key,
+                    sidecar_image=args.harness_sidecar_image)
+                objects["policy_client"] = policy_client
+                try:
+                    policy_client.start()
+                except HarnessError as exc:
+                    raise EvaluationPaused("policy Harness startup failed: " + str(exc), status="paused_policy") from exc
+                compiled_selector.bind(policy_controller, expander.meter, gateway)
         else:
             generator = Generator(protocol, runtime, client, gateway, collection)
             expander = DirectExpander(generator)
@@ -183,7 +197,8 @@ def run(args, protocol, spec):
                 state_factory=lambda runtime: LDMEngineState.from_checkpoint(runtime.load_checkpoint()) if runtime.load_checkpoint() else LDMEngineState(observations=initial_observations)),
                 CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["gateway"].host.run(lambda: objects["expander"].expand(request))),
                     FactorDomain(protocol.backend), Evaluator(),
-                    selector=FactorSelector(("mock_" if args.mock else "") + protocol.objective, seed=protocol.random_seed) if protocol.method in LDM_METHODS else None,
+                    selector=(compiled_selector or FactorSelector(("mock_" if args.mock else "") + protocol.objective,
+                        seed=protocol.random_seed)) if protocol.method in LDM_METHODS else None,
                     surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None))
             observations, execution = result.engine.state.observations, {"kind": "shared_engine", "summary": result.engine.summary}
         report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
@@ -201,5 +216,7 @@ def run(args, protocol, spec):
     finally:
         if "harness_client" in objects:
             objects["harness_client"].close()
+        if "policy_client" in objects:
+            objects["policy_client"].close()
         if "tools" in objects:
             objects["tools"].close()

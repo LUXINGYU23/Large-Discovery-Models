@@ -956,3 +956,46 @@ build and 37 tests passed under Node 24. The guest isolation and MCP tests ran
 against the built sidecar. Real data/backend qualification, no-query LDM
 full-flow evidence, compiled policy and the complete method-market matrix are
 still open, so W12 and full T3 are not declared complete.
+
+## Change 25: execute independent compiled-policy research and residual GP
+
+Cross-check against W13: the compiled method now starts a second persistent Pi
+session with its own profile, read-only skill, artifact root, MCP list and Host
+provider authorization. The existing PolicyResearchController accepts the
+task's authorization callback; AlphaBench's wrapper reserves a policy turn and
+reconciles provider receipts for new, replayed and cached results. Initialization
+observations use explicit round `-1`; later feedback aligns the frozen
+pre-measurement predictions with measured candidate IDs and engine rounds.
+
+The policy may submit replace, keep or disable under the shared contract. A
+replacement is validated and executed by DockerPolicyExecutor with no network,
+read-only inputs and resource limits; the Pi profile exposes static draft
+validation but not the built-in sidecar draft execution tool. The Host retains
+the exact RBF GP, residual fit, UCB and Gumbel selection. Mean inputs contain
+public AST features and target scale; proposal counts, q0 and acquisition
+summaries are confined to weight_context. The three capability contracts and
+zero/nonzero prior behavior have focused tests.
+
+The actual DeepSeek Responses/max two-round synthetic-Oracle run committed a
+new policy epoch with `replace` in round 0 and accepted `keep` in round 1.
+Both actions were non-degraded; the proposal session committed four factor
+actions. Host preauthorized 73 model requests in total. Policy session/profile
+hashes, source, actions, and result hashes are in
+`tasks/alphabench/resources/evidence/policy_w13.json`. The second round read
+one measured prediction-feedback record from the first round. This verifies
+the method path, not real-market performance or data qualification.
+
+Complexity review: the compiled selector extends FactorSelector's existing
+sampling math and reuses RBFGPSurrogate's residual-prior parameters. There is
+one task adapter and no second GP, budget ledger, provider client or policy
+execution transport. The sidecar command is shared by proposal and policy
+sessions. The unsafe sidecar draft-execution capability is absent from the
+T3 policy tool inventory; the formal isolated executor remains the only
+execution path. An obsolete test call to the former meter signature was
+updated, and the README's stale compiled-policy status was corrected.
+
+Remote verification after updating the obsolete meter test call: the task
+suite passed 284 tests, with two optional backend skips and four previously
+verified long examples deselected. The shared policy/MCP/executor suite passed
+35 tests. Fault-matrix qualification remains separate from this two-round
+smoke. `complete_t3=false`.

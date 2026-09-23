@@ -148,6 +148,7 @@ def policy_mcp_server(
     *,
     diagnostics_path: str | None = None,
     diagnostics_sha256: str | None = None,
+    draft_execution_enabled: bool = True,
 ) -> HarnessMcpServer:
     root = PurePosixPath(artifact_root)
     if not root.is_absolute():
@@ -156,11 +157,8 @@ def policy_mcp_server(
     fields = {
         "server_id": "ldm_policy",
         "transport": "stdio",
-        "tools": [
-            "inspect_policy_contract",
-            "validate_policy_draft",
-            "evaluate_policy_draft",
-        ],
+        "tools": ["inspect_policy_contract", "validate_policy_draft",
+                  *(["evaluate_policy_draft"] if draft_execution_enabled else [])],
         "command": "node",
         "args": ["/app/dist/policy-mcp.js", "stdio"],
         "env": {

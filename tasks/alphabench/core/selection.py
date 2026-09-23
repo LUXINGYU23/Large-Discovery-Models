@@ -84,9 +84,14 @@ class FactorSelector:
         if len(history) >= 2 and self.gp.fit_status != "fitted":
             raise ValueError("GP numerical fit failed")
 
-    def select(self, candidates, representations, *, count=1, round_idx=0):
-        predictions = tuple(self.gp.predict_record(candidate.candidate_id, representations[candidate.candidate_id].values,
-                                                    beta=self.beta) for candidate in candidates)
+    def select(self, candidates, representations, *, count=1, round_idx=0, predictions=None, alpha=None, eta=None):
+        if predictions is None:
+            predictions = tuple(self.gp.predict_record(candidate.candidate_id, representations[candidate.candidate_id].values,
+                                                       beta=self.beta) for candidate in candidates)
+        else:
+            predictions = tuple(predictions)
+            if tuple(item.candidate_id for item in predictions) != tuple(item.candidate_id for item in candidates):
+                raise ValueError("predictions must align with the active candidate reservoir")
         ucb = np.array([item.acquisition_score for item in predictions])
         scale = float(np.median(np.abs(ucb - np.median(ucb)))) * 1.4826
         if scale <= 1e-12: scale = float(np.std(ucb))
@@ -94,7 +99,7 @@ class FactorSelector:
         mass = np.array([candidate.metadata.get("q0", 1 / len(candidates)) for candidate in candidates])
         if not np.all(np.isfinite(mass)) or np.any(mass <= 0) or not np.isclose(mass.sum(), 1):
             raise ValueError("empirical q0 must sum to one over the unique reservoir")
-        logits = self.alpha * np.log(mass) + self.eta * z
+        logits = (self.alpha if alpha is None else alpha) * np.log(mass) + (self.eta if eta is None else eta) * z
         rng = np.random.default_rng(np.random.SeedSequence([self.seed, round_idx]))
         perturbed = logits + rng.gumbel(size=len(candidates))
         selected = np.argsort(-perturbed, kind="stable")[:count]

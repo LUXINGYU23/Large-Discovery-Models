@@ -47,6 +47,7 @@ class T3Protocol:
     sessions: int = 2
     candidates_per_session: int = 4
     harness_surrogate_query: bool = False
+    policy_capabilities: tuple[str, ...] = ("prior_mean@1", "ldm_weights@1")
     cold_seed_count: int = 30
     alpha158_groups: tuple[str, ...] = ("kbar", "rolling")
     factor_select_n: int = 50
@@ -71,6 +72,12 @@ class T3Protocol:
             raise ValueError("unknown method or protocol profile")
         if type(self.harness_surrogate_query) is not bool or self.harness_surrogate_query and self.method not in {"ldm_harness", "ldm_harness_compiled"}:
             raise ValueError("GP research queries require an LDM Harness method")
+        capabilities = self.policy_capabilities
+        if (not isinstance(capabilities, (tuple, list))
+                or tuple(capabilities) not in (("prior_mean@1",), ("ldm_weights@1",),
+                    ("prior_mean@1", "ldm_weights@1"))
+                or self.method != "ldm_harness_compiled" and tuple(capabilities) != ("prior_mean@1", "ldm_weights@1")):
+            raise ValueError("invalid compiled-policy capability combination")
         if self.init_mode not in {"cold", "alpha158", "file", "import_pool"}:
             raise ValueError("unknown initialization mode")
         if self.filter_profile not in {"paper_filter_v1", "qlib_code_filter_v1", "assay_code_filter_v1"}:
@@ -121,6 +128,8 @@ class T3Protocol:
         value = asdict(self)
         if self.method not in {"harness", "ldm_harness", "ldm_harness_compiled"}:
             del value["harness_surrogate_query"]
+        if self.method != "ldm_harness_compiled":
+            del value["policy_capabilities"]
         return json.loads(json.dumps(value))
 
     @property
