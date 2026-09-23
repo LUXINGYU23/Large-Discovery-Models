@@ -10,6 +10,7 @@ from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.protocol import T3Protocol
 from tasks.alphabench.core.source_profiles import definition, resolve_source
 from tasks.alphabench.core.oracle_worker import load_source
+from tasks.alphabench.core.receipts import Receipts
 from tasks.alphabench.ldm_task.procedure import main
 from tasks.alphabench.tests.test_native import SOURCE, source
 
@@ -47,6 +48,103 @@ def source_protocol(method, backend="qlib", **changes):
     return replace(base, budgets={**base.budgets, "validation_evaluations": 1000,
         "dynamic_checks": 2000, "quality_checks": 2000, "oracle_job_slots": 12000,
         "benchmark_jobs": 12000}, **changes)
+
+
+def example_protocol(method="ea", backend="qlib", **changes):
+    path = "example/search/configs/search_csi300.yaml"
+    effective = resolve_source(SOURCE, path, method, backend=backend)["effective_source"]
+    portfolio = {}
+    if backend == "assay":
+        config_type = load_source("test_assay_example_config", SOURCE.parent / "Assay/src/assay/portfolio/config.py").PortfolioBacktestConfig
+        portfolio = config_type.preset("A", universe="CSI300", period_start="2024-07-15", period_end="2024-12-20",
+            benchmark="custom", benchmark_symbol="SH000300", slippage_model="zero", st_filter=False,
+            new_listing_lockout_days=0, ipo_lockout_days=0, rebalance_around_index=False, save_position_log=True).to_dict()
+    base = T3Protocol(method="alphabench_" + method, profile="upstream_benchmark_v1", backend=backend,
+        native_parameters={"source_config": path}, init_mode="alpha158",
+        alpha158_groups=("kbar", "rolling", "price"), filter_profile=backend + "_code_filter_v1",
+        label=effective["search"]["label"], assay_portfolio=portfolio,
+        rounds=effective["algorithm"]["rounds"], temperature=effective["algorithm"]["temperature"],
+        evaluations=3000)
+    return replace(base, budgets={**base.budgets, "model_requests": 500,
+        "proposal_attempts": 500, "dynamic_checks": 5000, "quality_checks": 5000,
+        "validation_evaluations": 3000, "oracle_job_slots": 50000,
+        "benchmark_jobs": 50000}, **changes)
+
+
+@pytest.mark.parametrize("method,backend", [("ea", "qlib"), ("cot", "qlib"), ("tot", "qlib"), ("ea", "assay")])
+def test_example_runs_full_baseline_search_extension_and_replay(tmp_path, source, monkeypatch, method, backend):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    args = arguments(tmp_path, example_protocol(method, backend))
+    assert main(args) == 0
+    run = tmp_path / "run"
+    report = json.loads((run / "result.json").read_text())
+    execution = report["execution"]
+    assert report["initialization"]["seed_count"] == 42
+    assert len(execution["algorithm_result"]["baseline"]) == 42
+    native_output = execution["algorithm_result"][method]
+    assert native_output["final_pool"] if method == "ea" else native_output["results"]
+    if method == "ea":
+        assert [(row["name"], row["expression"]) for row in execution["native_final_pool"]] == [
+            (row["name"], row["expression"]) for row in native_output["final_pool"]]
+    assert execution["algorithm_completed"] and report["search"]["attempts"] > 0
+    assert report["final_pool"] and report["test"] and report["independent_combination"]
+    assert report["diversity"]["final_pool"]["interval"] == ["2024-01-15", "2024-06-28"]
+    contract = Receipts(run / "private/stages").load("source_entry_contract")
+    assert any(row["field"] == "validation/test" for row in contract["protocol_delta"])
+    receipts = [json.loads(path.read_text()) for root in (run / "private/oracle", run / "initialization/private/oracle")
+                for path in root.glob("*.json")]
+    assert {row["request"]["phase"] for row in receipts} >= {"initialization", "search", "validation", "test"}
+    assert all(row["request"]["fast"] is (row["request"]["phase"] not in {"initialization", "search", "test", "analysis"})
+               for row in receipts)
+    if backend == "assay":
+        assert all(row["request"]["protocol"]["label"] == "open_return" for row in receipts)
+        assert all(row["response"]["check_kind"] == "lint" for row in receipts if row["request"]["operation"] == "check")
+    frozen = {path.relative_to(run): path.read_bytes() for path in run.rglob("*") if path.is_file()}
+    assert main(args + ["--resume-run", str(run)]) == 0
+    assert {path.relative_to(run): path.read_bytes() for path in run.rglob("*") if path.is_file()} == frozen
+
+
+@pytest.mark.parametrize("change,error", [
+    ({"alpha158_groups": ("kbar", "rolling")}, "all three pinned Alpha158 groups"),
+    ({"rounds": 2}, "differs from the pinned source config"),
+    ({"filter_profile": "paper_filter_v1"}, "differs from the pinned source config"),
+])
+def test_example_contract_rejects_unfrozen_settings_before_baseline(tmp_path, source, change, error):
+    args = arguments(tmp_path, example_protocol(**change))
+    with pytest.raises(ValueError, match=error):
+        main(args + ["--dry-run"])
+    assert not (tmp_path / "run/initialization").exists()
+
+
+def test_example_requires_budget_for_all_42_baseline_factors(tmp_path, source):
+    base = example_protocol()
+    args = arguments(tmp_path, replace(base, budgets={**base.budgets, "initialization_evaluations": 41}))
+    with pytest.raises(ValueError, match="complete seed pool"):
+        main(args + ["--dry-run"])
+    assert not (tmp_path / "run/initialization").exists()
+
+
+def test_example_batch_budget_stop_does_not_publish_truncated_result(tmp_path, source, monkeypatch):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    args = arguments(tmp_path, example_protocol(evaluations=25))
+    assert main(args) == 2
+    run = tmp_path / "run"
+    assert json.loads((run / "status.json").read_text())["status"] == "paused_budget"
+    assert not (run / "result.json").exists() and not (run / "selection_frozen.json").exists()
+    assert json.loads((run / "budget.json").read_text())["counters"]["expensive_evaluation_attempts"] == 0
+
+
+def test_example_sp500_binds_every_evaluation_to_the_selected_market(tmp_path, source, monkeypatch):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    args = arguments(tmp_path, example_protocol(market="sp500"))
+    assert main(args) == 0
+    run = tmp_path / "run"
+    report = json.loads((run / "result.json").read_text())
+    assert report["execution"]["algorithm_completed"] and report["test"]
+    receipts = [json.loads(path.read_text()) for root in (run / "private/oracle", run / "initialization/private/oracle")
+                for path in root.glob("*.json")]
+    assert {row["request"]["phase"] for row in receipts} >= {"initialization", "search", "validation", "test"}
+    assert all(row["request"]["protocol"]["market"] == "sp500" for row in receipts)
 
 
 @pytest.mark.parametrize("method", ["cot", "tot", "ea"])

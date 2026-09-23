@@ -47,6 +47,8 @@ class OracleGateway:
 
     def evaluation_request(self, candidate, *, phase, position, fast=True):
         protocol = self.protocol
+        if protocol.profile == "upstream_benchmark_v1" and phase in {"initialization", "search"}:
+            fast = False
         logical = self.identity(phase, position, candidate)
         start, end = protocol.interval("search" if phase == "initialization" else "check" if phase in {"check", "quality"} else phase)
         operation = "check" if phase in {"check", "quality"} else "evaluate"
@@ -106,6 +108,8 @@ class OracleGateway:
                 self.protocol.check_passed(result)
             except ValueError as exc:
                 raise EvaluationPaused(str(exc)) from exc
+        elif not request["fast"] and result.get("success") is True and not isinstance(result.get("portfolio"), dict):
+            raise EvaluationPaused("full evaluation response lacks the required portfolio")
         return result
 
     def _reconcile(self, request):

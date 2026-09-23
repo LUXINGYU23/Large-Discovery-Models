@@ -22,7 +22,7 @@ class NativeEvaluator:
     def __init__(self, scheduler, gateway, initial_observations, *, workers):
         self.scheduler, self.gateway = scheduler, gateway
         self.runtime, self.protocol = gateway.runtime, gateway.protocol
-        if self.protocol.profile not in {"ldm_matched_v1", "upstream_searcher_v1"}:
+        if self.protocol.profile not in {"ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"}:
             raise ValueError("native evaluator requires an implemented complete entry protocol")
         if self.runtime.budget.limits.get("expensive_evaluation_attempts") != self.protocol.evaluations:
             raise ValueError("native runtime must freeze the complete search attempt limit")
@@ -129,7 +129,7 @@ class NativeEvaluator:
             usage_key="task:oracle-result:" + digest(logical)))
         if type(raw.get("success")) is not bool or not isinstance(raw.get("metrics"), dict):
             raise EvaluationPaused("native search response is malformed")
-        if raw["success"] or self.protocol.profile == "upstream_searcher_v1":
+        if raw["success"] or self.protocol.profile != "ldm_matched_v1":
             # Validation completes before an observation is published, but never enters the callback result.
             validation = self.gateway.evaluate(candidate, phase="validation", position=position)
             if type(validation.get("success")) is not bool or not isinstance(validation.get("metrics"), dict):

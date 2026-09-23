@@ -246,14 +246,14 @@ def resolve_source(source_root, config_path, method, *, market=None, backend="ql
         "requested_market": requested_market, "protocol_delta": deltas,
         "execution_ready": False,
         "pending": ["frozen matching protocol with complete budgets and qualified data/environment identities"] +
-                   ([] if searcher else ["complete benchmark workflow; explicit validation/test extension, absent from this entry"])}
+                   ([] if searcher else ["explicit validation/test extension, absent from the source entry"])}
     if backend == "assay":
         output.update(assay_commit="06179ef75140ce5d9b94405e4af243faddc70b9e", assay_sources=ASSAY_SOURCES)
     output["digest"] = digest(output)
     return output
 
 
-def prepare_searcher(protocol, source_root):
+def prepare_source(protocol, source_root):
     if set(protocol.native_parameters) != {"source_config"}:
         raise ValueError("source native_parameters must contain only the pinned source_config")
     resolved = resolve_source(source_root, protocol.native_parameters["source_config"],
@@ -265,10 +265,17 @@ def prepare_searcher(protocol, source_root):
     search, test = effective["search"], effective["test"]
     expected = {"rounds": algorithm["rounds"], "temperature": algorithm["temperature"],
         "init_mode": initialization["mode"], "filter_profile": protocol.backend + "_code_filter_v1",
-        "forward_n": search["forward_n"], "label": search["label"],
-        "factor_select_n": test["factor_select_n"], "validation_metric": test["rank_by"], "direction": 1}
+        "forward_n": search["forward_n"], "label": search["label"], "direction": 1}
+    if test:
+        expected.update(factor_select_n=test["factor_select_n"], validation_metric=test["rank_by"])
+    else:
+        expected.update(factor_select_n=50, validation_metric="rank_ic")
+        if tuple(protocol.alpha158_groups) != ("kbar", "rolling", "price"):
+            raise ValueError("example initialization requires all three pinned Alpha158 groups")
     if protocol.backend == "qlib":
-        expected.update(worker_timeout=search["worker_timeout"], stock_topk=test["stock_topk"], stock_n_drop=test["stock_n_drop"])
+        expected.update(worker_timeout=search["worker_timeout"],
+                        stock_topk=test["stock_topk"] if test else search["stock_topk"],
+                        stock_n_drop=test["stock_n_drop"] if test else search["stock_n_drop"])
     else:
         config_type = load_source("t3_assay_portfolio_config",
             Path(source_root).parent / "Assay/src/assay/portfolio/config.py").PortfolioBacktestConfig
@@ -278,23 +285,37 @@ def prepare_searcher(protocol, source_root):
     differing = [key for key, value in expected.items() if getattr(protocol, key) != value]
     if differing:
         raise ValueError("protocol differs from the pinned source config: " + ", ".join(differing))
-    if protocol.budgets["initialization_evaluations"] < initialization["count"]:
+    initial_count = initialization["count"] if test else initialization["baseline_count"]
+    if protocol.budgets["initialization_evaluations"] < initial_count:
         raise ValueError("source initialization budget must cover the complete seed pool")
-    if not search["fast"] or not effective["validation"]["enabled"]:
-        raise ValueError("source searcher requires its complete search and validation configuration")
+    if test:
+        if not search["fast"] or not effective["validation"]["enabled"]:
+            raise ValueError("source searcher requires its complete search and validation configuration")
+    elif search["fast"] or effective["validation"] is not None:
+        raise ValueError("example entry must retain full search portfolios and its absent native validation")
     deltas = list(resolved["protocol_delta"])
     if protocol.backend == "assay":
         deltas.append({"field": "worker_timeout", "source": None, "adapter": protocol.worker_timeout,
             "reason": "explicit task worker bound; the source Assay service has no hard compute timeout"})
+    if not test:
+        deltas.append({"field": "validation/test", "source": None,
+            "adapter": {phase: list(protocol.interval(phase)) for phase in ("validation", "test")},
+            "reason": "explicit non-overlapping post-search extension with a calendar embargo; absent from the original example"})
+    if test:
+        source_timeout = search["http_timeout"]
+    elif protocol.backend == "assay":
+        source_timeout = effective["factor_backend"]["http_timeout"]
+    else:
+        source_timeout = search["worker_timeout"]
     return {"algorithm": {**algorithm, "model": protocol.model}, "oracle_workers": search["oracle_workers"],
         "source_resolution": resolved, "initialization": initialization,
         "protocol_delta": deltas + [
-            {"field": "http_timeout", "source": search["http_timeout"], "adapter": protocol.request_timeout,
+            {"field": "http_timeout", "source": source_timeout, "adapter": protocol.request_timeout,
              "reason": "Host transport must outlive the frozen worker timeout for durable reconciliation"},
             {"field": "seed_evaluation", "source": "FFO use_cache=True",
              "adapter": "reuse the verified initialization receipt under the same frozen protocol",
              "reason": "retain seed scores without repeating a paid job"},
-            {"field": "incomplete_validation", "source": "search-metric fallback during final ranking",
+            {"field": "incomplete_validation", "source": "search-metric fallback during final ranking" if test else "no validation or ranking stage",
              "adapter": "pause before test selection",
              "reason": "complete T3 requires private validation for the complete native final pool"}]}
 

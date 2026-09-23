@@ -20,7 +20,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     stages = Receipts(private / "stages")
     runtime.status.update("running", phase="validation_complete", budget=runtime.budget)
     domain = FactorDomain(protocol.backend)
-    native_pool = protocol.profile == "upstream_searcher_v1"
+    native_pool = protocol.profile in {"upstream_searcher_v1", "upstream_benchmark_v1"}
     if native_pool and not execution["algorithm_completed"]:
         raise EvaluationPaused("source entry has not completed its configured algorithm", status="paused_native_search")
     pool = {}
@@ -67,8 +67,6 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     for index, row in enumerate(selection["selected"]):
         candidate = Candidate(**row["candidate"])
         raw = gateway.evaluate(candidate, phase="test", position=[digest(selection), index], fast=False)
-        if raw["success"] and not isinstance(raw.get("portfolio"), dict):
-            raise ValueError("full T3 test requires portfolio outputs")
         tested.append({"candidate": candidate.payload, "candidate_id": candidate.candidate_id,
                        "raw": raw, "derived": daily_metrics(raw.get("daily", []), direction=protocol.direction)})
     stages.accept("test", {"selection_digest": digest(selection), "results": tested})
@@ -113,7 +111,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     # Mandatory analysis capability is checked before claiming a complete report.
     report["complete_t3"] = False
     report["pending_capabilities"] = ["data_qualification", "native_algorithm_recovery", "assay_market_qualification",
-                                      "persistent_harness", "compiled_policy", "native_profiles",
+                                      "persistent_harness", "compiled_policy", "assay_portfolio_endpoint",
                                       "full_metrics_and_quality_coverage", "crash_and_guest_isolation", "full_matrix_qualification"]
     atomic_json_write(runtime.run_dir / "result.json", report)
     with (runtime.run_dir / "trajectory.csv").open("w", newline="") as stream:

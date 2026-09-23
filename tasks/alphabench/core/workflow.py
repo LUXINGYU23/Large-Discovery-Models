@@ -97,17 +97,20 @@ def run(args, protocol, spec):
     atomic_json_write(protocol_path, protocol.to_dict())
     contract_identity = bind_runner_contract(run_dir, protocol)
     native_config = prepare_native(protocol, args.upstream_root) if native and protocol.profile != "ldm_matched_v1" else None
-    if protocol.profile == "upstream_searcher_v1":
+    if protocol.profile in {"upstream_searcher_v1", "upstream_benchmark_v1"}:
         if args.initialization_bundle or args.import_pool:
-            raise ValueError("source searcher initialization must come from its pinned entry")
-        seed_file = native_config["initialization"]["seed_file"]
-        if seed_file:
-            expected = args.upstream_root / seed_file
-            if args.seed_file and args.seed_file.read_bytes() != expected.read_bytes():
-                raise ValueError("seed file differs from the pinned source pool")
-            args.seed_file = expected
+            raise ValueError("source initialization must come from its pinned entry")
+        if protocol.profile == "upstream_searcher_v1":
+            seed_file = native_config["initialization"]["seed_file"]
+            if seed_file:
+                expected = args.upstream_root / seed_file
+                if args.seed_file and args.seed_file.read_bytes() != expected.read_bytes():
+                    raise ValueError("seed file differs from the pinned source pool")
+                args.seed_file = expected
+            elif args.seed_file:
+                raise ValueError("source cold initialization cannot be replaced with a seed file")
         elif args.seed_file:
-            raise ValueError("source cold initialization cannot be replaced with a seed file")
+            raise ValueError("example Alpha158 initialization cannot be replaced with a seed file")
         from .receipts import Receipts
         Receipts(run_dir / "private/stages").accept("source_entry_contract", native_config)
     if args.resume_run and (run_dir / "result.json").exists() and json.loads((run_dir / "status.json").read_text(encoding="utf-8"))["status"] == "completed":

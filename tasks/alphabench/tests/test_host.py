@@ -141,6 +141,22 @@ def test_missing_calendar_pauses_instead_of_becoming_a_bad_factor_and_preserves_
     assert len(calls) == 1 and gateway.runtime.budget.counters["benchmark_jobs"] == 1
 
 
+def test_full_evaluation_requires_portfolio_without_repeating_a_paid_job(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, oracle_job_slots=8, test_evaluations=1)
+    candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
+    calls = []
+    def send(request):
+        calls.append(request)
+        return mock_oracle(request) | {"portfolio": None}
+    monkeypatch.setattr(gateway, "_send", send)
+    for _ in range(2):
+        with pytest.raises(EvaluationPaused, match="required portfolio"):
+            gateway.evaluate(candidate, phase="test", position=0, fast=False)
+    assert len(calls) == 1
+    assert gateway.runtime.budget.counters["test_evaluations"] == 1
+    assert gateway.runtime.budget.counters["benchmark_jobs"] == 1
+
+
 def test_interrupted_host_releases_waiting_callback_before_stage_shutdown(monkeypatch):
     host = HostDispatcher()
     original_get = host.messages.get

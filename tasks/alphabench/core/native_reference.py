@@ -1,14 +1,19 @@
 """Official native search on one shared runtime, separate from the LDM engine."""
 
 from hashlib import sha256
+import json
 import math
 from pathlib import Path
 from uuid import uuid4
 
+from ldm_tts.contracts import Candidate, RawProposal
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime
+from .candidate import FactorDomain
 from .collection import AcceptedActions
 from .gateway import OracleGateway
+from .initialization import alpha158_seeds
+from .native_benchmark import load_benchmark
 from .native_evaluation import NativeEvaluator, NativeSearchBudgetExhausted
 from .native_generator import NativeGenerator, SOURCES
 from .native_runtime import NativeRuntime
@@ -22,11 +27,9 @@ def prepare_native(protocol, source_root):
     if source_root is None:
         raise ValueError("native execution requires --upstream-root with the pinned AlphaBench source")
     verified_sources(source_root, SOURCES)
-    if protocol.profile == "upstream_searcher_v1":
-        from .source_profiles import prepare_searcher
-        return prepare_searcher(protocol, source_root)
     if protocol.profile != "ldm_matched_v1":
-        raise ValueError("native benchmark requires its complete entry and explicit validation/test extension")
+        from .source_profiles import prepare_source
+        return prepare_source(protocol, source_root)
     verified_sources(Path(source_root) / "searcher/algo", SOURCE_HASHES)
     parameters = protocol.native_parameters
     required = {"oracle_workers", "enable_reason", "accept_threshold"}
@@ -99,16 +102,52 @@ def run_native(protocol, args, spec, client, run_dir, initial_observations, conf
         seeds = [{"name": item.candidate.payload["name"], "expression": item.candidate.payload["expression"],
                   "metrics": {key.removeprefix(prefix): value for key, value in item.metrics.items()}}
                  for item in initial_observations if item.evaluation.succeeded and item.metrics]
-        if not seeds and (protocol.profile == "upstream_searcher_v1" or protocol.method != "alphabench_ea"):
+        if not seeds and (protocol.profile != "ldm_matched_v1" or protocol.method != "alphabench_ea"):
             raise EvaluationPaused("native entry requires at least one successful initial seed",
                                    status="paused_no_valid_seeds")
+        if protocol.profile == "upstream_benchmark_v1" and len(seeds) != config["initialization"]["baseline_count"]:
+            raise EvaluationPaused("example entry requires all 42 measured Alpha158 baseline factors",
+                                   status="paused_incomplete_initialization")
         result = stages.load("native_algorithm_result")
         with load_algorithms(args.upstream_root, run_dir / "private", scheduler) as module:
             if result is None and evaluator.stopped is None:
-                algorithm = module.create_algo(protocol.method.removeprefix("alphabench_"), config["algorithm"],
-                    search_fn=scheduler.callback("search_fn", generator), **evaluator.callbacks())
+                if protocol.profile == "upstream_benchmark_v1":
+                    baseline = alpha158_seeds(args.upstream_root, ("kbar", "rolling", "price"))
+                    initial = {item.candidate_id: item for item in initial_observations if item.evaluation.succeeded}
+                    if len(initial) != len(baseline):
+                        raise EvaluationPaused("example baseline contains duplicate or failed factor identities",
+                                               status="paused_incomplete_initialization")
+
+                    def initialization_fn(identity, factors, *, market):
+                        if factors != baseline or market != protocol.market:
+                            raise ValueError("example baseline differs from the frozen source and market")
+                        rows = []
+                        for factor in factors:
+                            candidate = FactorDomain(protocol.backend).admit(RawProposal(factor, "initialization"))
+                            observation = initial.get(candidate.candidate_id) if isinstance(candidate, Candidate) else None
+                            if observation is None:
+                                raise EvaluationPaused("example baseline lacks a measured factor",
+                                                       status="paused_incomplete_initialization")
+                            metrics = {key.removeprefix(prefix): value for key, value in observation.evaluation.metrics.items()}
+                            rows.append({**factor, "metrics": metrics})
+                        return rows
+
+                    native_config = json.loads(json.dumps(config["source_resolution"]["declared"]))
+                    native_config["model"]["name"] = protocol.model
+                    native_config["market"] = protocol.market
+                    native_config["save_dir"] = str(run_dir / "private/native_output")
+                    for name in ("cot", "tot", "ea"):
+                        native_config[name]["enable"] = name == protocol.method.removeprefix("alphabench_")
+                    algorithm = load_benchmark(args.upstream_root, run_dir / "private", scheduler, module,
+                        initialization_fn=scheduler.callback("initialization_fn", initialization_fn),
+                        search_fn=scheduler.callback("search_fn", generator), **evaluator.callbacks())
+                    execute = lambda: algorithm(native_config)
+                else:
+                    algorithm = module.create_algo(protocol.method.removeprefix("alphabench_"), config["algorithm"],
+                        search_fn=scheduler.callback("search_fn", generator), **evaluator.callbacks())
+                    execute = lambda: algorithm.run(seeds, str(run_dir / "private/native_output"))
                 try:
-                    result = scheduler.run(lambda: algorithm.run(seeds, str(run_dir / "private/native_output")))
+                    result = scheduler.run(execute)
                 except NativeSearchBudgetExhausted:
                     pass
                 else:
@@ -116,7 +155,7 @@ def run_native(protocol, args, spec, client, run_dir, initial_observations, conf
         settlement = evaluator.settle()
         settlement.update(generator.settle())
         state = committed_native_state(runtime, protocol.method)
-        if result is not None:
+        if result is not None and protocol.profile != "upstream_benchmark_v1":
             state["native_final_pool"] = result["final_pool"]
         execution = {"kind": "native_reference", "engine_native": False, "config": config,
             "algorithm_result": result, "algorithm_completed": result is not None,

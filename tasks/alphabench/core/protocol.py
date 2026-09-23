@@ -149,8 +149,10 @@ class T3Protocol:
         if self.profile == "upstream_benchmark_v1":
             if phase == "search":
                 return "2023-01-01", "2024-01-01"
-            if phase != "check":
-                raise ValueError("the source benchmark entry has no validation/test interval; an explicit extension is required")
+            extension = {"validation": ("2024-01-15", "2024-06-28"),
+                         "test": ("2024-07-15", "2024-12-20")}
+            if phase in extension:
+                return extension[phase]
         return {"search": ("2016-01-01", "2021-01-01"),
                 "validation": ("2021-01-01", "2022-01-01"),
                 "test": ("2022-01-01", "2025-01-01"),

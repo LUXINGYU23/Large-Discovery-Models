@@ -62,8 +62,8 @@ def test_source_configs_keep_their_actual_defaults_and_seed_semantics(source, co
     assert protocol.end_inclusive
     for phase in ("search", "validation", "test"):
         if effective[phase] is None:
-            with pytest.raises(ValueError, match="no validation/test interval"):
-                protocol.interval(phase)
+            assert protocol.interval(phase) == {"validation": ("2024-01-15", "2024-06-28"),
+                                                "test": ("2024-07-15", "2024-12-20")}[phase]
         else:
             assert protocol.interval(phase) == (effective[phase]["start"], effective[phase]["end"])
     if config == EXAMPLE:

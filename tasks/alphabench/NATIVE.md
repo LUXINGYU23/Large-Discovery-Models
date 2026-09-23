@@ -8,7 +8,7 @@
 
 当前组件已经执行真实的官方 CoT/ToT/EA Python 算法和原生生成器，并接入
 模型请求、动态检查、整批 search 预算及私有 validation。matched 正式 workflow
-已接入原生 cold 初始化和终局报告；Qlib searcher source workflow 也已接线。当前验证使用
+已接入原生 cold 初始化和终局报告；Qlib/Assay 的 searcher 与 example source workflow 也已接线。当前验证使用
 synthetic oracle，不代表真实市场、W10 或完整 T3 已通过。
 
 ## 执行合同
@@ -171,8 +171,10 @@ tasks/alphabench/.venv/bin/python -m tasks.alphabench.core.source_profiles \
 参数及已删除的 `verbose` 参数，给 ToT 注入它实际需要的按名称索引结果。
 baseline 与搜索分别绑定现有回调；入口不导入 FFO/Qlib 或模型 SDK。返回原有
 局部结果用于报告，不复制搜索循环。参数、源文件和补丁摘要与调度日志共同保存。
-真实三算法已通过全组种子、并发、预算停止和完整重放测试；当前仍为 synthetic
-oracle 验证；example 完整 workflow 与真实市场资格仍未通过。
+真实三算法已通过全组种子、并发、预算停止和完整重放测试。example 的 task
+workflow 已在 Qlib 三算法及 Assay EA 的 synthetic oracle 下完成初始化、搜索、
+私有验证、测试、组合分析与逐字节重放；这不构成真实市场资格或完整 T3 验收。
+运行目录和逐文件摘要见 [example 证据索引](resources/evidence/native_example_workflow.json)。
 
 ### Searcher workflow
 
@@ -215,8 +217,25 @@ NAV、基准和交易日志已与原生回测器交叉核对。
 状态输入，W06 资格仍未通过。
 
 执行使用统一入口的 `--protocol-file`、`--upstream-root`、`--data-manifest` 和
-`--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。example 的
-validation/test 扩展仍未完成，完整 workflow 入口明确拒绝该 profile。
+`--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。
+
+### Example workflow
+
+选择 `profile=upstream_benchmark_v1`，`source_config` 固定为
+`example/search/configs/search_csi300.yaml`。入口先完整评价 42 条 Alpha158，
+再按原 `benchmark_main` 给 CoT/ToT 各 13 条 kbar+price、EA 29 条 rolling 种子。
+原 YAML 只启用 EA；选择 CoT/ToT 时显式打开对应方法并记录协议差异。三算法的
+原轮数、种群与 worker 数不缩小；不足以容纳原生整批请求时暂停，不生成截短成绩。
+Qlib 的初始化与搜索保留原 FFO 的 `fast=False` 完整组合请求；Assay 的 FFO
+本身不产组合，因此使用独立的完整 portfolio 扩展。成功的完整评价必须返回
+portfolio。原 example 的便捷回调默认 CSI300，task 将它们统一绑定到所选市场，
+这项差异也写入 source contract。
+
+原 example 只声明包含端点的 `2023-01-01` 至 `2024-01-01` 搜索区间，
+没有 validation/test。完整 T3 task 显式增加私有 validation
+`2024-01-15` 至 `2024-06-28` 和 held-out test `2024-07-15` 至 `2024-12-20`，
+两处均留两个日历周的间隔。最终池取原算法提交的链、树或种群；所有成员的私有
+RankIC 必须有限才冻结最多 50 个测试因子。该扩展不冒充原 example 的原生阶段。
 
 ## 过滤与质量报告
 
@@ -251,8 +270,8 @@ forward horizon 的有效样本数。两种后端的完整 portfolio 使用各�
 区间。Assay source 的尾部 IC 未定义不代表这些日期不参加 portfolio。
 
 端点规则按固定上游逐项核验。searcher 三段日期与 matched 相同，但包含终点，
-且没有 matched 的标签 purge。example 的搜索日期是 2023–2024；访问不存在的
-validation/test 区间会明确报错，不能自动继承 matched 日期。
+且没有 matched 的标签 purge。example 的搜索日期是 2023–2024；新增的
+validation/test 只属于明确冻结的 task 扩展，不能继承 matched 日期。
 
 该实现已用两个真实后端的数值 fixture 和完整 portfolio 检查。两种后端的
-searcher 均已接入这些规则；真实数据资格和 example 完整 workflow 仍未通过。
+searcher 与 example 均已接入这些规则；真实数据资格仍未通过。

@@ -799,3 +799,46 @@ Calling that route unchanged would silently drop the real benchmark and CN
 trading controls. W06 therefore remains open pending a qualified offline store
 and an endpoint contract that carries those inputs. Market-data qualification,
 remaining workflows and the final two-round real-model gate remain open.
+
+## Change 21: execute the pinned example search entry
+
+Cross-check against the pinned `benchmark_main`, example YAML and W10 confirms
+that this is a separate source entry. It evaluates all 42 Alpha158 factors,
+passes kbar+price (13) to each CoT/ToT worker and rolling (29) to EA, and uses
+the source's full (`fast=False`) 2023-01-01 through 2024-01-01 search requests.
+The YAML enables EA only; selecting CoT/ToT is an explicit method-enable delta.
+The original convenience callbacks default to CSI300, so every task callback
+is bound to the selected market. Original rounds, batch sizes, worker counts,
+generation order and native state are retained. No second search loop was made.
+
+The example source has no validation or held-out test. The task freezes
+2024-01-15 through 2024-06-28 for private validation and 2024-07-15 through
+2024-12-20 for held-out test, with calendar embargoes after search and
+validation. The actual committed chain/tree/population is ranked on complete
+finite private RankIC before the test set is frozen. Successful full oracle
+requests now require a portfolio response. The Assay factor bridge cannot
+produce one, so it uses the already explicit independent portfolio extension.
+Incomplete baseline, batch budget or validation pauses without a shortened
+source result.
+
+Complexity review: both source profiles share the existing resolver, runtime,
+callbacks, Host ledger, receipt store and finalizer. `prepare_searcher` became
+`prepare_source` without an alias or compatibility path. The example-specific
+entry uses the existing pinned `native_benchmark` adapter and source state;
+the portfolio condition is one shared gateway check instead of a test-only
+duplicate. No new task schema, search algorithm or fallback score was added.
+The prior example refusal and stale documentation were removed.
+
+Remote synthetic verification covers Qlib CoT/ToT/EA and Assay EA through
+baseline, search, validation, test, combination and byte-identical replay:
+four full example runs passed, with run paths and artifact hashes in
+`native_example_workflow.json`. A separate SP500 EA run checked market binding
+at every oracle phase. Targeted Host/source/campaign checks passed (58 tests),
+including missing portfolio and budget-stop boundaries; the remaining task
+suite passed 259 tests with two backend-specific modules skipped and four long
+example cases selected separately. Qlib and Assay fixture suites passed six
+and 21 tests respectively. The 63 source-resolution artifacts were regenerated
+into a new immutable resolver-hash directory, then each hash and resolution
+digest was independently checked. This does not
+qualify real data or the Assay REST portfolio route, and it does not close
+W12/W13, the full market-method matrix or the two real-model acceptance rounds.
