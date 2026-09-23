@@ -15,6 +15,11 @@ def audit_quality(protocol, runtime, gateway):
     for path in sorted((runtime.run_dir / "generation").glob("*.json")):
         generation = json.loads(path.read_text(encoding="utf-8"))
         occurrences.extend({**row, "generation": path.stem} for row in generation["occurrences"])
+    harness_attempts = [json.loads(path.read_text(encoding="utf-8"))
+                        for path in sorted((runtime.run_dir / "generation_attempts").glob("*.json"))]
+    for attempt in harness_attempts:
+        occurrences.extend({**row, "generation": attempt["turn_id"],
+                            "profile_id": attempt["profile_id"]} for row in attempt["occurrences"])
     Receipts(runtime.run_dir / "private/stages").accept("quality_set_frozen", occurrences)
     original, checked = {}, {}
     for occurrence in occurrences:
@@ -39,10 +44,11 @@ def audit_quality(protocol, runtime, gateway):
     results, admitted = [], set()
     for occurrence in occurrences:
         candidate = domain.admit(RawProposal(occurrence["payload"], "quality_audit"))
+        static_valid = isinstance(candidate, Candidate) and occurrence["status"] != "static_rejected"
         row = {"generation": occurrence["generation"], "attempt": occurrence["attempt"],
-               "index": occurrence["index"], "original_status": occurrence["status"], "static_valid": isinstance(candidate, Candidate)}
+               "index": occurrence["index"], "original_status": occurrence["status"], "static_valid": static_valid}
         row["paper_static_valid"] = isinstance(paper_domain.admit(RawProposal(occurrence["payload"], "quality_audit")), Candidate)
-        if isinstance(candidate, Candidate):
+        if static_valid:
             if occurrence["status"] == "accepted":
                 admitted.add(candidate.candidate_id)
             if candidate.candidate_id not in checked:
@@ -54,17 +60,19 @@ def audit_quality(protocol, runtime, gateway):
             row.update(candidate_id=candidate.candidate_id, backend_valid=raw["success"] if raw else None,
                        paper_valid=False if not row["paper_static_valid"] else protocol.check_passed(raw, paper=True) if raw else None)
         else:
-            row.update(backend_valid=False, paper_valid=False, reason=candidate.message)
+            row.update(backend_valid=False, paper_valid=False,
+                       reason=candidate.message if not isinstance(candidate, Candidate) else "source_static_rejected")
         results.append(row)
     total = len(occurrences)
     accepted = sum(row["status"] == "accepted" for row in occurrences)
     audited = sum(row["backend_valid"] is not None for row in results)
-    complete = audited == total
+    complete = bool(total) and audited == total
     paper_audited = sum(row["paper_valid"] is not None for row in results)
-    paper_complete = protocol.check_kind == "dynamic" and paper_audited == total
-    return {"domain": "all raw occurrences from search model responses; excludes initialization",
+    paper_complete = protocol.check_kind == "dynamic" and bool(total) and paper_audited == total
+    return {"domain": "all raw occurrences from search model responses and Harness submissions; excludes initialization",
             "check_kind": protocol.check_kind, "filter_profile": protocol.filter_profile,
-            "raw_occurrences": total, "audited": audited, "coverage": audited / total if total else None,
+            "raw_occurrences": total, "format_failures": sum(row["format_error"] for row in harness_attempts),
+            "audited": audited, "coverage": audited / total if total else None,
             "complete": complete, "unavailable_reason": "no_occurrences" if not total else None if complete else "quality_budget_exhausted",
             "static_success_rate": sum(row["static_valid"] for row in results) / total if total else None,
             protocol.backend + "_" + protocol.check_kind + "_success_rate": sum(row["backend_valid"] for row in results) / total if total and complete else None,

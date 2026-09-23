@@ -114,6 +114,7 @@ class HarnessExpander:
         self.domain = FactorDomain(protocol.backend, protocol.grammar_depth)
         self.meter = HarnessMeter(gateway.runtime, gateway.host)
         self.accepted = Receipts(gateway.runtime.run_dir / "private" / "harness" / "accepted")
+        self.attempts = Receipts(gateway.runtime.run_dir / "generation_attempts")
         self.tools = tools
         self.collection = collection
         self.profiles = client.config.profiles
@@ -221,14 +222,31 @@ class HarnessExpander:
                 "occurrences": len(occurrences), "unique": len(proposals), "turns": summaries})
 
     def _validate(self, submission, count, evaluated, round_idx):
+        identity = [submission.turn_id, submission.attempt_index, submission.digest]
+        saved = self.attempts.load(identity)
+        if saved is not None:
+            if saved["validation"]["decision"] == "accept":
+                self.gateway.host.call(lambda: self.accepted.accept([submission.turn_id, submission.digest],
+                    {"canonical_keys": saved["canonical_keys"]}))
+            return HarnessSubmissionValidation(saved["validation"]["decision"],
+                tuple(HarnessSubmissionError(**error) for error in saved["validation"]["errors"]))
         try:
             candidates = _candidate_file(submission.submission, submission.artifacts, self.artifact_root, count)
         except (OSError, ValueError) as exc:
-            return HarnessSubmissionValidation("retry", (HarnessSubmissionError(
+            validation = HarnessSubmissionValidation("retry", (HarnessSubmissionError(
                 "/artifact_path", "invalid_candidate_file", str(exc), "Repair candidates.json and submit it again."),))
+            self.gateway.host.call(lambda: self.attempts.accept(identity, {"submission_digest": submission.digest,
+                "turn_id": submission.turn_id, "profile_id": submission.profile_id,
+                "attempt": submission.attempt_index, "round_index": round_idx,
+                "occurrences": [], "format_error": True, "validation": validation.to_dict()}))
+            return validation
         errors, keys, seen = [], [], {}
+        occurrences = []
         for index, item in enumerate(candidates):
             pointer = f"/candidates/{index}"
+            occurrence = {"attempt": submission.attempt_index, "index": index,
+                          "payload": item, "status": "unprocessed"}
+            occurrences.append(occurrence)
             if (not isinstance(item, dict) or set(item) - {"name", "expression", "research_note"}
                     or not isinstance(item.get("name"), str) or not item["name"].strip()
                     or len(item["name"]) > 128 or not isinstance(item.get("expression"), str)
@@ -236,25 +254,42 @@ class HarnessExpander:
                         or len(item["research_note"]) > 2000))):
                 errors.append(HarnessSubmissionError(pointer, "invalid_candidate",
                     "candidate requires name and expression and permits only a short research_note"))
+                occurrence["status"] = "static_rejected"
                 continue
             candidate = self.domain.admit(RawProposal(item, "harness"))
             if not isinstance(candidate, Candidate):
                 errors.append(HarnessSubmissionError(pointer + "/expression", "invalid_expression", candidate.message))
+                occurrence["status"] = "static_rejected"
                 continue
             key = candidate.canonical_key
             if key in evaluated:
                 errors.append(HarnessSubmissionError(pointer, "historical_duplicate", "factor was already evaluated"))
+                occurrence["status"] = "duplicate"
                 continue
             if key in seen:
                 errors.append(HarnessSubmissionError(pointer, "same_session_duplicate", f"factor duplicates index {seen[key]}"))
+                occurrence["status"] = "duplicate"
                 continue
             seen[key] = index
-            checked = self.gateway.evaluate(candidate, phase="check", position=check_position(round_idx, candidate))
+            position = check_position(round_idx, candidate)
+            checked = self.gateway.evaluate(candidate, phase="check", position=position)
+            occurrence["check_receipt"] = self.gateway.identity("check", position, candidate)
             if not self.protocol.check_passed(checked):
                 errors.append(HarnessSubmissionError(pointer + "/expression", "dynamic_check_failed", "factor failed the frozen check"))
+                occurrence["status"] = "dynamic_rejected"
                 continue
+            occurrence["status"] = "check_passed"
             keys.append(key)
+        validation = HarnessSubmissionValidation("retry", tuple(errors)) if errors else HarnessSubmissionValidation()
+        if not errors:
+            for occurrence in occurrences:
+                occurrence["status"] = "accepted"
+        self.gateway.host.call(lambda: self.attempts.accept(identity, {"submission_digest": submission.digest,
+            "turn_id": submission.turn_id, "profile_id": submission.profile_id,
+            "attempt": submission.attempt_index, "round_index": round_idx,
+            "occurrences": occurrences, "format_error": False, "canonical_keys": keys if not errors else [],
+            "validation": validation.to_dict()}))
         if errors:
-            return HarnessSubmissionValidation("retry", tuple(errors))
+            return validation
         self.gateway.host.call(lambda: self.accepted.accept([submission.turn_id, submission.digest], {"canonical_keys": keys}))
-        return HarnessSubmissionValidation()
+        return validation

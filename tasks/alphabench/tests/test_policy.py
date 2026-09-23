@@ -8,11 +8,12 @@ import numpy as np
 import pytest
 
 from ldm_tts.contracts import RawProposal
-from ldm_tts.harness import CompiledOptimizationPolicy, DockerPolicyExecutor
+from ldm_tts.harness import CompiledOptimizationPolicy, DockerPolicyExecutor, file_sha256
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.optimization.gp import RBFGPSurrogate
 from ldm_tts.optimization.records import BOObservation
 from tasks.alphabench.core.candidate import FactorDomain
+from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness import HarnessMeter
 from tasks.alphabench.core.harness_runtime import build_policy_harness
@@ -105,6 +106,82 @@ def test_nonzero_prior_uses_shared_residual_gp_and_raw_target_scale():
         assert result.predictions[index].scalar_std == pytest.approx(expected.scalar_std)
     assert result.metadata["policy"]["target_scale"] == pytest.approx(selector.gp.y_std)
     assert controller.round_input.research_snapshot["history_mask"] == [True, True]
+
+
+@pytest.mark.parametrize("action", ["replace", "keep", "disable"])
+def test_accepted_policy_actions_export_public_snapshot_once(action, tmp_path, monkeypatch):
+    monkeypatch.setenv("LDM_DATA_COLLECTION_DIR", str(tmp_path / "collection"))
+    protocol, history, candidates, representations = _fixture()
+    collection = AcceptedActions(tmp_path / "run")
+    selector = CompiledFactorSelector(protocol, mock=True, collection=collection,
+        initial_candidate_ids=(item.candidate_id for item in history))
+    selector.fit(history)
+    baseline = tuple(selector.gp.predict_record(item.candidate_id,
+        representations[item.candidate_id].values, beta=selector.beta) for item in candidates)
+    round_input = selector.adapter.build_selection_round(round_idx=0, history=history,
+        candidates=candidates, representations=representations, baseline_predictions=baseline,
+        requested_batch=1, gp=selector.gp)
+    root = tmp_path / "policy_harness"
+    directory = root / "rounds/round_000"
+    directory.mkdir(parents=True)
+    research = {**round_input.research_snapshot, "history_rounds": list(round_input.history_rounds),
+                "history_candidate_ids": list(round_input.history_candidate_ids)}
+    (directory / "research_snapshot.json").write_text(json.dumps(research))
+    context = dict(round_input.execution_context)
+    context["weight_context"] = {**context["weight_context"], "prediction_feedback": {
+        "count": 1, "measurements": [{"candidate_id": history[0].candidate_id,
+            "round_index": -1, "measured_utility": history[0].scalar_score}]}}
+    (directory / "input.json").write_text(json.dumps({"execution_context": context}))
+    (directory / "contract.json").write_text(json.dumps(selector.adapter.contract.to_dict()))
+    np.savez(directory / "arrays.npz", history_features=round_input.history_features,
+        history_utilities=round_input.history_utilities, query_features=round_input.query_features)
+    names = ("contract.json", "research_snapshot.json", "input.json", "arrays.npz")
+    (directory / "manifest.json").write_text(json.dumps({"round_index": 0, "input_sha256": "frozen-input",
+        "files": {name: file_sha256(directory / name) for name in names}}))
+    prior = None
+    if action != "replace":
+        prior = {"epoch_id": "epoch_999", "artifact_sha256": ""}
+        prior_dir = root / "epochs/epoch_999"
+        prior_dir.mkdir(parents=True)
+        (prior_dir / "optimization_policy.py").write_text("# prior policy\n")
+        prior["artifact_sha256"] = file_sha256(prior_dir / "optimization_policy.py")
+    (root / "active_round.json").write_text(json.dumps({"round_index": 0,
+        "input_sha256": "frozen-input", "active_policy": prior}))
+    if action == "replace":
+        epoch_dir = root / "epochs/epoch_000"
+        epoch_dir.mkdir(parents=True)
+        (epoch_dir / "optimization_policy.py").write_text("# accepted policy\n")
+        epoch_id, artifact_hash = "epoch_000", file_sha256(epoch_dir / "optimization_policy.py")
+    elif action == "keep":
+        epoch_id, artifact_hash = prior["epoch_id"], prior["artifact_sha256"]
+    else:
+        epoch_id = artifact_hash = None
+    policy = CompiledOptimizationPolicy(epoch_id, artifact_hash, np.zeros(2), np.zeros(2),
+        "test", 2.0, .25, "artifact", False,
+        metadata={"action": action, "status": "accepted", "submission_sha256": "submitted",
+                  "harness_turn": {"profile_id": "policy_architect", "turn_id": "policy-turn"}})
+    selector.controller = SimpleNamespace(root=root)
+    selector.gateway = SimpleNamespace(runtime=SimpleNamespace(run_id="test-run"))
+    private = tmp_path / "run/private/validation.json"
+    private.parent.mkdir(parents=True)
+    private.write_text("HOLDOUT_CANARY")
+
+    selector._collect_policy_action(round_input, policy)
+    selector._collect_policy_action(round_input, policy)
+    published = next((tmp_path / "collection").rglob("ldm_ir.jsonl"))
+    ir_rows = [json.loads(line) for line in published.read_text().splitlines()]
+    sft_rows = [json.loads(line) for line in (published.parent / "ldm_sft.jsonl").read_text().splitlines()]
+    assert len(ir_rows) == len(sft_rows) == 1
+    assert ir_rows[0]["action"]["payload"]["candidates"][0]["action"] == action
+    for candidate in (*candidates, *history):
+        assert candidate.candidate_id not in json.dumps(ir_rows[0])
+        assert candidate.candidate_id not in json.dumps(sft_rows[0])
+    assert "history_index" in sft_rows[0]["instruction"]
+    assert "HOLDOUT_CANARY" not in json.dumps(ir_rows[0]) + json.dumps(sft_rows[0])
+    if action == "replace":
+        assert "# accepted policy" in sft_rows[0]["output"]
+    else:
+        assert "# prior policy" in sft_rows[0]["instruction"]
 
 
 @pytest.mark.parametrize("capabilities", [("prior_mean@1",), ("ldm_weights@1",),

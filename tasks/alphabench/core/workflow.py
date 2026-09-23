@@ -141,7 +141,7 @@ def run(args, protocol, spec):
     initial_observations = [replace(item, round_idx=None) for item in initial_observations]
     collection = AcceptedActions(run_dir)
     compiled_selector = (CompiledFactorSelector(protocol, mock=args.mock,
-        initial_candidate_ids=(item.candidate_id for item in initial_observations))
+        initial_candidate_ids=(item.candidate_id for item in initial_observations), collection=collection)
         if protocol.method == "ldm_harness_compiled" else None)
     objects = {}
 

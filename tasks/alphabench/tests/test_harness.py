@@ -15,6 +15,7 @@ from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness import HarnessExpander, submission_contract
 from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.quality import audit_quality
 
 
 class FakeHarnessClient:
@@ -87,6 +88,8 @@ def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_check
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     assert gateway.runtime.budget.counters["harness_turns"] == 1
     assert len(list(expander.collection.journal.root.glob("*.json"))) == 1
+    audit = audit_quality(protocol, gateway.runtime, gateway)
+    assert audit["raw_occurrences"] == 1 and audit["complete"]
 
 
 def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_path):
@@ -105,6 +108,8 @@ def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_p
     assert gateway.runtime.budget.counters["dynamic_checks"] == 3
     assert gateway.runtime.budget.counters["harness_turns"] == 2
     assert len(list(expander.collection.journal.root.glob("*.json"))) == 2
+    audit = audit_quality(protocol, gateway.runtime, gateway)
+    assert audit["raw_occurrences"] == 4 and audit["complete"]
 
 
 def test_harness_rejects_evaluated_failures_and_same_session_duplicates(tmp_path):
@@ -119,9 +124,51 @@ def test_harness_rejects_evaluated_failures_and_same_session_duplicates(tmp_path
         gateway.host.run(lambda: expander.expand(request))
     assert client.validations[0].errors[0].code == "historical_duplicate"
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
-
     client.batches["research"] = [factor("new", 6), factor("same", 6)]
     with pytest.raises(EvaluationPaused, match="requires recovery"):
         gateway.host.run(lambda: expander.expand(request))
     assert client.validations[1].errors[0].code == "same_session_duplicate"
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
+
+
+def test_harness_attempt_ledger_replays_after_accept_receipt_interruption(tmp_path, monkeypatch):
+    protocol, gateway, _, expander = fixture(tmp_path, "harness", {"research": [factor("a", 5)]})
+    body = json.dumps({"candidates": [factor("a", 5)]}).encode()
+    path = expander.artifact_root / "research.json"
+    path.write_bytes(body)
+    artifact = HarnessSubmittedArtifact("/artifact_path", "candidates.json", path.name,
+        hashlib.sha256(body).hexdigest(), len(body))
+    submission = HarnessSubmissionRequest("research", "turn-1", 1,
+        {"artifact_path": "candidates.json"}, (artifact,))
+    original = expander.accepted.accept
+
+    def interrupt(*_args):
+        raise RuntimeError("interrupted after attempt ledger")
+
+    monkeypatch.setattr(expander.accepted, "accept", interrupt)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        gateway.host.run(lambda: expander._validate(submission, 1, set(), 0))
+    assert expander.attempts.load(["turn-1", 1, submission.digest])["occurrences"][0]["status"] == "accepted"
+    monkeypatch.setattr(expander.accepted, "accept", original)
+    replay = gateway.host.run(lambda: expander._validate(submission, 1, set(), 0))
+    assert replay.decision == "accept"
+    assert gateway.runtime.budget.counters["dynamic_checks"] == 1
+    assert expander.accepted.load(["turn-1", submission.digest]) is not None
+
+
+def test_harness_schema_rejection_stays_rejected_in_quality_audit(tmp_path):
+    protocol, gateway, _, expander = fixture(tmp_path, "harness", {"research": [factor("a", 5)]})
+    body = json.dumps({"candidates": [{"name": 12, "expression": "Mean($close,5)"}]}).encode()
+    path = expander.artifact_root / "bad.json"
+    path.write_bytes(body)
+    artifact = HarnessSubmittedArtifact("/artifact_path", "candidates.json", path.name,
+        hashlib.sha256(body).hexdigest(), len(body))
+    submission = HarnessSubmissionRequest("research", "turn-invalid", 1,
+        {"artifact_path": "candidates.json"}, (artifact,))
+    result = gateway.host.run(lambda: expander._validate(submission, 1, set(), 0))
+    assert result.errors[0].code == "invalid_candidate"
+    audit = audit_quality(protocol, gateway.runtime, gateway)
+    assert audit["raw_occurrences"] == 1
+    assert audit["static_success_rate"] == 0
+    assert audit["qlib_dynamic_success_rate"] == 0
+    assert gateway.runtime.budget.counters.get("dynamic_checks", 0) == 0

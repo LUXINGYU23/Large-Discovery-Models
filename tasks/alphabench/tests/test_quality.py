@@ -45,6 +45,15 @@ def test_quality_reuses_checks_and_does_not_report_rates_for_missing_coverage(tm
     assert audit_quality(protocol, runtime, gateway) == result
 
 
+def test_empty_occurrence_set_is_not_complete_quality_evidence(tmp_path):
+    protocol = T3Protocol(method="harness")
+    runtime = CampaignRuntime.open(tmp_path, task="alphabench")
+    result = audit_quality(protocol, runtime, OracleGateway(protocol, runtime, mock=True))
+    assert result["raw_occurrences"] == 0
+    assert result["complete"] is False
+    assert result["unavailable_reason"] == "no_occurrences"
+
+
 def test_quality_refuses_a_receipt_from_a_different_interval(tmp_path):
     protocol, runtime, gateway, identity = quality_fixture(tmp_path)
     path = gateway.receipts.path(identity)

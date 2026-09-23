@@ -1011,3 +1011,40 @@ task data guide now states that provenance explicitly. The existing local
 acquire, hash-verified transfer and remote offline audit require no new path or
 fallback. Complexity review found no code to add or delete for this finding;
 the coverage and Assay gaps remain blocked rather than being inferred away.
+
+## Change 27: collect accepted policy actions and audit Harness submissions
+
+Cross-check against W14 and Spec sections 5.6 and 13: accepted compiled-policy
+`replace`, `keep`, and `disable` actions now enter the same immutable journal and
+paired ldm-2.0 IR/SFT export as factor proposals. The IR projects the frozen
+public numerical input, ordered candidate expressions, prior policy source and
+accepted action; runtime candidate IDs become positional indices in prediction
+feedback. The policy artifact and every frozen input file are checked against
+their committed SHA-256 before collection. The action is journaled before
+selection/evaluation, and a replay uses the same action ID. Private holdout
+files and later outcomes do not enter SFT instructions.
+
+The collection publisher now verifies file names, hashes, action IDs and IR/SFT
+row counts before writing `current.json`, including when a generation directory
+already exists. Recovery tests cover interruption between IR/SFT writes and
+between directory publication and pointer publication. Harness submission
+validation records each raw candidate occurrence and format failure with a
+stable turn/attempt/submission identity. A repeated submission reuses its
+validation receipt; a changed artifact on a restarted turn is a new attempt.
+Frozen quality audit includes these records, preserves schema-level static
+rejections and reports zero occurrences as unavailable rather than complete.
+
+Complexity review: the existing `Receipts`, `DataCollectionSink`, IR builder and
+PolicyResearchController artifacts remain the only persistence/rendering and
+policy-snapshot machinery. No second training schema, policy controller or
+quality evaluator was introduced. Duplicate check-position computation was
+removed, and generation verification uses one helper for staged and existing
+directories. The project-wide W14 gaps remain open: complete scientific report,
+per-method Search Cost, EA update rate, multi-run denominator, and qualified
+market data. This change does not promote `complete_t3`.
+
+Remote verification: the entire task suite passed 294 tests with two optional
+backend skips before the final input-set tightening. After the quality changes,
+the suite passed 292 tests with two skips and four previously verified full
+benchmark examples deselected; after the final input-set check, all 25 focused
+collection, Harness, policy and quality tests passed.

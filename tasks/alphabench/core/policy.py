@@ -5,10 +5,12 @@ import json
 
 import numpy as np
 
-from ldm_tts.harness import HarnessSubmissionError, PolicyCapabilityContract, PolicyRoundInput
+from ldm_tts.data.ir import make_complete_design_ir
+from ldm_tts.harness import HarnessSubmissionError, PolicyCapabilityContract, PolicyRoundInput, file_sha256
 from ldm_tts.optimization.gp import RBFGPSurrogate
 from ldm_tts.optimization.records import BOSelectionResult, BOPrediction
 
+from .protocol import digest
 from .selection import FEATURE_VERSION, LAYOUT, FactorSelector
 
 
@@ -103,12 +105,13 @@ class T3PolicyAdapter:
 
 
 class CompiledFactorSelector(FactorSelector):
-    def __init__(self, protocol, *, mock, initial_candidate_ids=()):
+    def __init__(self, protocol, *, mock, initial_candidate_ids=(), collection=None):
         super().__init__(("mock_" if mock else "") + protocol.objective, seed=protocol.random_seed)
         self.protocol = protocol
         self.adapter = T3PolicyAdapter(protocol, initial_candidate_ids)
         self.controller = self.meter = self.gateway = None
         self.history = ()
+        self.collection = collection
 
     def bind(self, controller, meter, gateway):
         if self.gateway is not None:
@@ -142,6 +145,8 @@ class CompiledFactorSelector(FactorSelector):
             raise ValueError("disabled prior capability returned a nonzero mean")
         if "ldm_weights@1" not in self.protocol.policy_capabilities and (policy.alpha != self.alpha or policy.eta != self.eta):
             raise ValueError("disabled weight capability changed LDM weights")
+        if self.collection and policy.metadata.get("status") == "accepted":
+            self._collect_policy_action(policy_input, policy)
         if self.gp.ready:
             active_gp = RBFGPSurrogate(self.history, lengthscale=1.5, noise=1e-4,
                 prior_mean=0, prior_std=.25, min_training_observations=2,
@@ -179,3 +184,86 @@ class CompiledFactorSelector(FactorSelector):
                 "target_scale": policy_input.execution_context["mean_context"]["target_scale"],
                 "history_mask": policy_input.research_snapshot["history_mask"],
                 "target_direction": policy_input.research_snapshot["target_direction"]}})
+
+    def _collect_policy_action(self, round_input, policy):
+        root = self.controller.root
+        round_dir = root / "rounds" / f"round_{round_input.round_index:03d}"
+        manifest = json.loads((round_dir / "manifest.json").read_text(encoding="utf-8"))
+        active_round = json.loads((root / "active_round.json").read_text(encoding="utf-8"))
+        if (manifest["round_index"] != round_input.round_index
+                or active_round["round_index"] != round_input.round_index
+                or active_round["input_sha256"] != manifest["input_sha256"]):
+            raise ValueError("policy action does not match its frozen research input")
+        if set(manifest["files"]) != {"contract.json", "input.json", "research_snapshot.json", "arrays.npz"}:
+            raise ValueError("policy research input file set changed")
+        for name, expected in manifest["files"].items():
+            if file_sha256(round_dir / name) != expected:
+                raise ValueError(f"policy research input changed: {name}")
+        research = json.loads((round_dir / "research_snapshot.json").read_text(encoding="utf-8"))
+        context = json.loads((round_dir / "input.json").read_text(encoding="utf-8"))["execution_context"]
+        with np.load(round_dir / "arrays.npz", allow_pickle=False) as saved:
+            arrays = {name: saved[name].tolist() for name in saved.files}
+        history = [{"round_index": source_round, "features": features, "utility": utility}
+                   for source_round, features, utility in zip(research["history_rounds"],
+                       arrays["history_features"], arrays["history_utilities"], strict=True)]
+        predictions = context["weight_context"]["candidate_predictions"]
+        queries = [{"expression": candidate["expression"], "features": features,
+                    **{key: value for key, value in prediction.items() if key != "candidate_id"}}
+                   for candidate, features, prediction in zip(research["candidate_catalog"],
+                       arrays["query_features"], predictions, strict=True)]
+        if any(candidate["candidate_id"] != prediction["candidate_id"] for candidate, prediction in
+               zip(research["candidate_catalog"], predictions, strict=True)):
+            raise ValueError("policy query snapshot candidate alignment changed")
+        prior = active_round["active_policy"]
+        prior_source = None
+        if prior:
+            epoch = prior["epoch_id"]
+            if not isinstance(epoch, str) or not epoch.startswith("epoch_") or not epoch[6:].isdigit():
+                raise ValueError("policy prior epoch identity is invalid")
+            artifact = root / "epochs" / epoch / "optimization_policy.py"
+            if file_sha256(artifact) != prior["artifact_sha256"]:
+                raise ValueError("policy prior artifact changed")
+            prior_source = artifact.read_text(encoding="utf-8")
+        action = policy.metadata["action"]
+        if action not in {"replace", "keep", "disable"}:
+            raise ValueError("accepted policy action is not supported")
+        candidate = {"action": action}
+        if action == "replace":
+            artifact = root / "epochs" / policy.epoch_id / "optimization_policy.py"
+            if file_sha256(artifact) != policy.artifact_digest:
+                raise ValueError("accepted policy artifact changed")
+            candidate["policy_source"] = artifact.read_text(encoding="utf-8")
+        feedback = context["weight_context"].get("prediction_feedback")
+        weight_context = {key: value for key, value in context["weight_context"].items()
+                          if key not in {"candidate_predictions", "prediction_feedback"}}
+        if feedback:
+            history_index = {(source_round, candidate_id): index for index, (source_round, candidate_id)
+                             in enumerate(zip(research["history_rounds"], research["history_candidate_ids"], strict=True))}
+            weight_context["prediction_feedback"] = {
+                "count": feedback["count"],
+                "measurements": [{"history_index": history_index[(row["round_index"], row["candidate_id"])],
+                                  **{key: value for key, value in row.items() if key != "candidate_id"}}
+                                 for row in feedback["measurements"]]}
+        request = {
+            "research": {key: research[key] for key in ("backend", "market", "objective", "capabilities",
+                "fixed_model", "sampling", "history_mask", "target_direction")},
+            "mean_context": context["mean_context"], "weight_context": weight_context,
+            "query_candidates": queries,
+            "diagnostic_arrays": {key: value for key, value in arrays.items()
+                                  if key not in {"history_features", "history_utilities", "query_features"}},
+            "active_policy_source": prior_source,
+            "available_actions": ["replace", "keep", "disable"],
+        }
+        ir = make_complete_design_ir(task_id="alphabench", domain="optimization policies for financial factor search",
+            task_description="Choose a compiled optimization policy from public research history and frozen numerical inputs.",
+            objectives=[{"name": self.protocol.objective, "direction": "maximize"}],
+            design_space_description=json.dumps(self.adapter.contract.to_dict(), sort_keys=True),
+            observations=history, candidates=[candidate], request_description=json.dumps(request, sort_keys=True),
+            num_candidates=1, round_idx=round_input.round_index, num_evaluated=len(history),
+            allows_new_parameters=False, reasoning_available=False)
+        turn = policy.metadata["harness_turn"]
+        self.collection.accept(digest(["policy", turn["turn_id"], policy.metadata["submission_sha256"]]), ir,
+            {"run": self.gateway.runtime.run_id, "protocol": self.protocol.identity,
+             "profile_id": turn["profile_id"], "turn_id": turn["turn_id"],
+             "submission_digest": policy.metadata["submission_sha256"],
+             "research_input_digest": manifest["input_sha256"], "artifact_digest": policy.artifact_digest})
