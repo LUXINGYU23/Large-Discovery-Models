@@ -11,9 +11,10 @@ from .receipts import Receipts
 def audit_quality(protocol, runtime, gateway):
     domain = FactorDomain(protocol.backend, protocol.grammar_depth)
     paper_domain = FactorDomain(protocol.backend, 5)
-    occurrences = []
+    occurrences, generations = [], []
     for path in sorted((runtime.run_dir / "generation").glob("*.json")):
         generation = json.loads(path.read_text(encoding="utf-8"))
+        generations.append(generation)
         occurrences.extend({**row, "generation": path.stem} for row in generation["occurrences"])
     harness_attempts = [json.loads(path.read_text(encoding="utf-8"))
                         for path in sorted((runtime.run_dir / "generation_attempts").glob("*.json"))]
@@ -44,7 +45,8 @@ def audit_quality(protocol, runtime, gateway):
     results, admitted = [], set()
     for occurrence in occurrences:
         candidate = domain.admit(RawProposal(occurrence["payload"], "quality_audit"))
-        static_valid = isinstance(candidate, Candidate) and occurrence["status"] != "static_rejected"
+        static_valid = isinstance(candidate, Candidate) and occurrence["status"] not in {
+            "static_rejected", "normalization_rejected"}
         row = {"generation": occurrence["generation"], "attempt": occurrence["attempt"],
                "index": occurrence["index"], "original_status": occurrence["status"], "static_valid": static_valid}
         row["paper_static_valid"] = isinstance(paper_domain.admit(RawProposal(occurrence["payload"], "quality_audit")), Candidate)
@@ -69,9 +71,15 @@ def audit_quality(protocol, runtime, gateway):
     complete = bool(total) and audited == total
     paper_audited = sum(row["paper_valid"] is not None for row in results)
     paper_complete = protocol.check_kind == "dynamic" and bool(total) and paper_audited == total
+    unique_generated = {row["candidate_id"] for row in results if row["static_valid"]}
+    native_quality = [(item.get("native_result") or {}).get("quality") for item in generations
+                      if item.get("native_result") is not None]
     return {"domain": "all raw occurrences from search model responses and Harness submissions; excludes initialization",
             "check_kind": protocol.check_kind, "filter_profile": protocol.filter_profile,
-            "raw_occurrences": total, "format_failures": sum(row["format_error"] for row in harness_attempts),
+            "raw_occurrences": total,
+            "format_failures": sum(item.get("format_failures", 0) +
+                ((item.get("native_result") or {}).get("quality") or {}).get("output_format_error", 0)
+                for item in generations) + sum(row["format_error"] for row in harness_attempts),
             "audited": audited, "coverage": audited / total if total else None,
             "complete": complete, "unavailable_reason": "no_occurrences" if not total else None if complete else "quality_budget_exhausted",
             "static_success_rate": sum(row["static_valid"] for row in results) / total if total else None,
@@ -82,4 +90,7 @@ def audit_quality(protocol, runtime, gateway):
                 "no_occurrences" if not total else None if paper_complete else "quality_budget_exhausted",
             "accepted_occurrences": accepted, "unique_checked": len(checked),
             "unique_valid": sum(protocol.check_passed(raw) for raw in checked.values()) if complete else None,
-            "unique_admitted": len(admitted), "rows": results}
+            "unique_generated": len(unique_generated), "unique_admitted": len(admitted),
+            "unique_admission_rate": len(admitted) / len(unique_generated) if unique_generated else None,
+            "unique_admission_denominator": "unique static-valid canonical candidates",
+            "native_quality": native_quality, "rows": results}

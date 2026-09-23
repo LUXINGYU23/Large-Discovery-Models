@@ -208,6 +208,17 @@ class HarnessExpander:
                         "profile_id": result.profile_id, "turn_id": result.turn_id,
                         "submission_digest": result.submission_digest,
                         "native_artifacts": getattr(result, "artifacts", {})}))
+        attempts = [json.loads(path.read_text(encoding="utf-8"))
+                    for path in self.attempts.root.glob("*.json")]
+        for result, candidates in accepted_actions:
+            self.gateway.host.call(lambda result=result, candidates=candidates, attempts=attempts:
+                Receipts(self.gateway.runtime.run_dir / "generation").accept(["harness", result.turn_id], {
+                    "attempt_kind": "harness_provider_calls", "attempt_count": result.usage.get("providerCalls"),
+                    "submission_attempts": sum(item["turn_id"] == result.turn_id for item in attempts),
+                    "complete": True, "occurrences": [], "candidates": candidates,
+                    "round_index": request.round_idx, "profile_id": result.profile_id,
+                    "turn_id": result.turn_id, "sidecar_usage": result.usage,
+                    "tool_budget": getattr(result, "tool_budget", {})}))
         groups = {}
         for item, key, result, index in occurrences:
             group = groups.setdefault(key, {"candidate": item, "lineage": []})

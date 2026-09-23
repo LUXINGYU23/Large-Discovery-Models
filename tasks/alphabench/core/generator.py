@@ -44,6 +44,7 @@ class Generator:
 
     def generate(self, *, identity, count, instruction, history=(), partial=False):
         accepted, attempts, raw_occurrences = {}, [], []
+        format_failures = 0
         excluded = {item.canonical_key for item in history}
         visible = [{"expression": item.candidate.payload["expression"], "status": item.evaluation.status,
                     "metrics": item.evaluation.metrics} for item in history]
@@ -62,6 +63,7 @@ class Generator:
                     raise ValueError("candidates must be a list")
             except (ValueError, KeyError, TypeError):
                 candidates = []
+                format_failures += 1
                 errors.append({"code": "invalid_json", "message": "Return {candidates: [...]} with name and expression."})
             for index, payload in enumerate(candidates):
                 occurrence = {"attempt": attempt, "index": index, "payload": payload, "status": "unprocessed"}
@@ -92,7 +94,8 @@ class Generator:
                             "accepted": list(accepted.values()), "errors": errors})})
         minimum = max(1, count // 2) if partial else count
         result = {"candidates": list(accepted.values()), "occurrences": raw_occurrences,
-                  "requested": count, "attempt_count": len(attempts), "complete": len(accepted) >= minimum}
+                  "requested": count, "attempt_count": len(attempts), "format_failures": format_failures,
+                  "complete": len(accepted) >= minimum}
         self.gateway.host.call(lambda: Receipts(self.runtime.run_dir / "generation").accept(identity, result))
         if not result["complete"]:
             raise EvaluationPaused("generation exhausted its five repair attempts", status="paused_generation")

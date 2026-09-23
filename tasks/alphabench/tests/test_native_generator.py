@@ -65,6 +65,8 @@ def test_full_raw_output_tail_sampling_and_idempotent_replay(tmp_path, source, m
     audit = audit_quality(native.protocol, native.runtime, native.gateway)
     assert audit["raw_occurrences"] == 4 and audit["accepted_occurrences"] == 2
     assert audit["qlib_dynamic_success_rate"] == .75 and audit["complete"]
+    assert audit["unique_admission_rate"] == pytest.approx(2 / 3)
+    assert audit["native_quality"] == [answer["quality"]]
     assert native.runtime.budget.counters["quality_checks"] == 1
     assert any(event["payload"]["kind"] == "sample" for event in native.runtime.events()
                if event["event_type"] == "native_generation_choice")
@@ -142,6 +144,7 @@ def test_five_attempt_repairs_preserve_native_partial_success_and_original_quali
     assert len(calls) == answer["trynum"] == 5
     assert answer["quality"]["output_format_error"] == 3
     assert answer["quality"]["generated_num"] == 4 and answer["quality"]["accepted_num"] == 2
+    assert audit_quality(native.protocol, native.runtime, native.gateway)["format_failures"] == 3
     saved = generation(tmp_path)
     assert saved["counts"]["raw_items"] == 5 and saved["counts"]["checked_items"] == 2
     assert "duplicate" in [row["status"] for row in saved["occurrences"]]

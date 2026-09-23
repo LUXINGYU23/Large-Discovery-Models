@@ -11,7 +11,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from .candidate import FactorDomain
 from .protocol import digest
 from .receipts import Receipts
-from .reporting import daily_metrics, generation_costs, search_metrics, signal_diversity, structure_diversity
+from .reporting import daily_metrics, ea_update_metrics, generation_costs, render_report, search_metrics, signal_diversity, structure_diversity
 from .quality import audit_quality
 
 
@@ -20,6 +20,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     stages = Receipts(private / "stages")
     runtime.status.update("running", phase="validation_complete", budget=runtime.budget)
     domain = FactorDomain(protocol.backend)
+    native = protocol.method.startswith("alphabench_")
     native_pool = protocol.profile in {"upstream_searcher_v1", "upstream_benchmark_v1"}
     if native_pool and not execution["algorithm_completed"]:
         raise EvaluationPaused("source entry has not completed its configured algorithm", status="paused_native_search")
@@ -78,6 +79,11 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
                   for item in observations if item.candidate.source != "initialization"]
     expressions = [item[0].payload["expression"] for item in pool_rows]
     generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "generation").glob("*.json"))]
+    sidecar_usage = [record["sidecar_usage"] for record in generation
+                     if record.get("attempt_kind") == "harness_provider_calls"]
+    if protocol.method == "ldm_harness_compiled":
+        sidecar_usage.extend(json.loads(path.read_text(encoding="utf-8")).get("harness_turn", {}).get("usage")
+            for path in sorted((runtime.run_dir / "policy_harness/rounds").glob("round_*/result.json")))
     initial_generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "initialization/generation").glob("*.json"))]
     prefix = "mock_" if gateway.mock else ""
     initial_raw = [{"success": item.evaluation.succeeded,
@@ -86,13 +92,35 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     seed_manifest = json.loads((runtime.run_dir / "initialization/seed_manifest.json").read_text(encoding="utf-8"))
     shared_creation = initial_budget.get("metadata", {}).get("shared_seed_creation")
     creation_steps = shared_creation["generation_steps"] if shared_creation else initial_generation
+    budget = runtime.budget.snapshot()
+    expected_sidecar_turns = (budget["counters"].get("harness_turns", 0) + budget["counters"].get("policy_turns", 0)
+                              if protocol.method in {"harness", "ldm_harness", "ldm_harness_compiled"} else 0)
+    tool_usage_complete = (len(sidecar_usage) == expected_sidecar_turns and
+                           all(isinstance(item, dict) and isinstance(item.get("toolCalls"), dict)
+                               and all(type(count) is int and count >= 0 for count in item["toolCalls"].values())
+                               for item in sidecar_usage))
+    tool_calls = Counter()
+    if tool_usage_complete:
+        for usage in sidecar_usage:
+            tool_calls.update(usage["toolCalls"])
+    costs = {"scope": "entire run including initialization, proposal and policy",
+             "model_requests": (initial_budget["counters"].get("model_requests", 0) +
+                                budget["counters"].get("model_requests", 0)),
+             "model_requests_by_stage": {"initialization": initial_budget["counters"].get("model_requests", 0),
+                                         "search_and_policy": budget["counters"].get("model_requests", 0)},
+             "tool_calls": sum(tool_calls.values()) if tool_usage_complete else None,
+             "tool_calls_by_name": dict(sorted(tool_calls.items())) if tool_usage_complete else None,
+             "tool_usage_reason": None if tool_usage_complete else "sidecar_usage_incomplete"}
     report = {"task": "alphabench", "mock": gateway.mock, "protocol": protocol.to_dict(), "protocol_digest": protocol.identity,
               "method": protocol.method, "initialization": {"seed_count": len(initial_pool), "budget": initial_budget,
                   "source_digest": seed_manifest["source_digest"], "source_records": len(seed_manifest["admissions"]),
                   "public_information_digest": seed_manifest["public_information_digest"],
                   "source_dispositions": dict(Counter(row["status"] for row in seed_manifest["admissions"])),
                   "generation_cost": generation_costs(initial_generation)},
-              "search": {**search_metrics(search_raw), "generation_cost": generation_costs(generation)}, "test": tested,
+              "search": {**search_metrics(search_raw), "generation_cost": generation_costs(generation),
+                         "ea_update": ea_update_metrics(execution["states"], planned_rounds=protocol.rounds)
+                         if protocol.method == "alphabench_ea" else {"applicable": False, "reason": "not_ea"}},
+              "test": tested,
               "including_initialization": {**search_metrics(initial_raw + search_raw),
                   "generation_cost": generation_costs(creation_steps + generation),
                   "initialization_cost_basis": "shared_source_creation" if shared_creation else "current_run"},
@@ -106,19 +134,72 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
                       "selection_digest": digest(selection),
                       "structure": structure_diversity([row["candidate"]["expression"] for row in tested]),
                       "signal": signal_diversity([{"candidate_id": row["candidate_id"], "scores": row["raw"].get("scores", [])} for row in tested])}},
-              "budget": runtime.budget.snapshot(), "execution": execution,
+              "budget": budget, "costs": costs, "execution": execution,
               "qualification": "mock_verified" if gateway.mock else "unqualified"}
+    selected_count = len(selection["selected"])
+    test_success = sum(row["raw"]["success"] and isinstance(row["raw"].get("portfolio"), dict) for row in tested)
+    combined = combination is not None and combination["success"] and isinstance(combination.get("portfolio"), dict)
+    search_complete = execution["algorithm_completed"] if native else execution["summary"]["stop_reason"] == "observation_target"
+    report["completeness"] = {
+        "initialization": {"status": "complete", "seed_count": len(initial_pool)},
+        "search": {"status": "complete" if search_complete else "partial",
+                   "attempts": len(search_raw), "planned_max_attempts": protocol.evaluations,
+                   "reason": None if search_complete else execution["stop_reason"] if native else execution["summary"]["stop_reason"]},
+        "validation": {"status": "complete" if pool_rows and len(ranked) == len(pool_rows) else "partial" if pool_rows else "unavailable",
+                       "attempts": len(pool_rows), "finite_successes": len(ranked),
+                       "reason": "invalid_validation_score" if pool_rows and len(ranked) < len(pool_rows) else
+                                 "no_final_pool" if not pool_rows else None},
+        "selection_frozen": {"status": "complete", "selection_digest": digest(selection),
+                             "selected": selected_count},
+        "test": {"status": "complete" if selected_count and test_success == selected_count else
+                 "partial" if selected_count else "unavailable",
+                 "selected": selected_count, "successful_portfolios": test_success,
+                 "reason": "failed_test_or_portfolio" if selected_count and test_success < selected_count else
+                           "no_selection" if not selected_count else None},
+        "independent_combination": {"status": "complete" if combined else "failed" if combination else "unavailable",
+                                    "reason": None if combined else "failed_combination_or_portfolio" if combination else "no_selection"},
+        "quality_audit": {"status": "complete" if quality["complete"] else "unavailable",
+                          "raw_occurrences": quality["raw_occurrences"], "coverage": quality["coverage"],
+                          "reason": quality["unavailable_reason"]},
+        "data": {"status": "synthetic" if gateway.mock else "unqualified",
+                 "digest": protocol.data_digest or None,
+                 "reason": "synthetic_oracle" if gateway.mock else "market_data_qualification_pending"},
+    }
+    for population in ("final_pool", "test_selection"):
+        result = report["diversity"][population]
+        reasons = {name: result[name]["reason"] for name in ("structure", "signal") if result[name]["reason"]}
+        report["completeness"][population + "_diversity"] = {
+            "status": "complete" if not reasons else "partial", "reason": ", ".join(
+                f"{name}: {reason}" for name, reason in reasons.items()) or None,
+            "structure_pairs": result["structure"]["pairs"], "signal_pairs": result["signal"]["pair_count"]}
+    report["completeness"]["report"] = {"status": "complete", "artifact": "result.json / report.md / trajectory.csv"}
     # Mandatory analysis capability is checked before claiming a complete report.
     report["complete_t3"] = False
     report["pending_capabilities"] = ["data_qualification", "native_algorithm_recovery", "assay_market_qualification",
                                       "persistent_harness", "compiled_policy", "assay_portfolio_endpoint",
                                       "full_metrics_and_quality_coverage", "crash_and_guest_isolation", "full_matrix_qualification"]
     atomic_json_write(runtime.run_dir / "result.json", report)
+    (runtime.run_dir / "report.md").write_text(render_report(report), encoding="utf-8")
     with (runtime.run_dir / "trajectory.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=("search_attempt", "candidate_id", "status", "objective")); writer.writeheader()
+        writer = csv.DictWriter(stream, fieldnames=("search_attempt", "candidate_id", "status", "objective",
+            "successful_search_observations", "physical_search_jobs", "cumulative_search_jobs",
+            "oracle_elapsed_seconds", "cumulative_oracle_elapsed_seconds",
+            "model_requests_run_total", "tool_calls_run_total")); writer.writeheader()
+        successful, jobs, elapsed = 0, 0, 0.0
         for index, item in enumerate(row for row in observations if row.candidate.source != "initialization"):
+            raw = search_raw[index]
+            successful += item.evaluation.succeeded
+            physical_jobs = len(raw["jobs"])
+            jobs += physical_jobs
+            duration = raw.get("elapsed_seconds")
+            elapsed = elapsed + duration if elapsed is not None and type(duration) in (int, float) and math.isfinite(duration) else None
             writer.writerow({"search_attempt": index+1, "candidate_id": item.candidate_id,
                              "status": item.evaluation.status,
-                             "objective": item.evaluation.metrics.get(("mock_" if gateway.mock else "")+protocol.objective)})
+                             "objective": item.evaluation.metrics.get(("mock_" if gateway.mock else "")+protocol.objective),
+                             "successful_search_observations": successful,
+                             "physical_search_jobs": physical_jobs, "cumulative_search_jobs": jobs,
+                             "oracle_elapsed_seconds": duration, "cumulative_oracle_elapsed_seconds": elapsed,
+                             "model_requests_run_total": costs["model_requests"],
+                             "tool_calls_run_total": costs["tool_calls"]})
     runtime.finish(report)
     return report

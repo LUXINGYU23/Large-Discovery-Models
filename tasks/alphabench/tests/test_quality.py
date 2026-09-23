@@ -37,6 +37,8 @@ def test_quality_reuses_checks_and_does_not_report_rates_for_missing_coverage(tm
     assert result["qlib_dynamic_success_rate"] is None
     assert result["paper_dynamic_success_rate"] is None
     assert result["unique_admitted"] == 1
+    assert result["unique_generated"] == 2
+    assert result["unique_admission_rate"] == .5
     assert result["rows"][0]["backend_valid"] is True
     assert result["rows"][1]["backend_valid"] is True
     assert result["rows"][2]["backend_valid"] is None

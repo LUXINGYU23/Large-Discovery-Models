@@ -1048,3 +1048,48 @@ backend skips before the final input-set tightening. After the quality changes,
 the suite passed 292 tests with two skips and four previously verified full
 benchmark examples deselected; after the final input-set check, all 25 focused
 collection, Harness, policy and quality tests passed.
+
+## Change 28: project T3 metrics with explicit populations and units
+
+Cross-check against W14 and Spec section 13, including the pinned EA pool
+updates: `U_t` counts new generation expressions entering the retained top pool
+at each completed round; the best-factor update event is separate. The report
+retains the actual round count, planned count and each entered expression.
+Search threshold discovery uses only new measured search attempts; the
+including-initialization view remains separate. CoE/ToT FracSuccess uses an
+explicit registered roster, counts missing/model-failed runs in its denominator,
+and excludes infrastructure-invalid runs only under the roster's fixed rule
+with a hashed evidence file. Completed cohort reports must agree on all
+protocol fields except random seed; draft or mock runs remain unqualified.
+
+Harness Search Cost is recorded as provider calls per committed turn with its
+submission-attempt ledger, while direct/native repair cost remains model
+attempts per logical step. Mixed initialization and Harness costs retain both
+components without an invalid combined count. Current-run model requests sum
+the independent initialization and search ledgers; imported seed-creation cost
+is labeled separately. Raw occurrence quality audits now retain direct/native
+format failures, the original native quality, and the denominator of unique
+admission. The result carries stage completeness, EA updates and run costs;
+the Markdown report and search-attempt CSV expose the same units and missing
+reasons. Report rendering uses a fixed stage order so offline rerender and
+completed-run replay are byte-identical.
+
+Complexity review: the new computation remains in the existing reporting and
+finalization modules. The small aggregation CLI delegates only the actual
+FracSuccess calculation and reads already committed run artifacts; it creates
+no second runtime, persistence framework, endpoint, or compatibility branch.
+Costs with different units are not forced through a shared total. Existing
+oracle receipts, generation records and stage results remain the sources for
+the projections. The review found and fixed three concrete defects before this
+commit: omitted initialization model requests, nondeterministic Markdown
+stage ordering, and a false `search=complete` when the shared engine stops
+before its attempt target.
+
+Remote verification: 298 task tests passed, two optional backend tests skipped,
+and four long upstream example cases previously verified were deselected.
+After the final aggregate identity and report-order changes, 13 focused
+campaign/aggregation tests passed. The early-stop correction then passed 44
+campaign/native tests with four long example cases deselected. W14 remains open for full offline rebuild
+of `result.json` from original artifacts and the rest of the scientific/source
+qualification matrix; real market data and Assay portfolio access remain
+unqualified. This change does not promote `complete_t3`.

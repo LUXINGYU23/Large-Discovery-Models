@@ -16,6 +16,7 @@ from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness import HarnessExpander, submission_contract
 from tasks.alphabench.core.protocol import T3Protocol
 from tasks.alphabench.core.quality import audit_quality
+from tasks.alphabench.core.reporting import generation_costs
 
 
 class FakeHarnessClient:
@@ -90,6 +91,10 @@ def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_check
     assert len(list(expander.collection.journal.root.glob("*.json"))) == 1
     audit = audit_quality(protocol, gateway.runtime, gateway)
     assert audit["raw_occurrences"] == 1 and audit["complete"]
+    generations = [json.loads(path.read_text()) for path in (gateway.runtime.run_dir / "generation").glob("*.json")]
+    cost = generation_costs(generations)
+    assert cost["unit"] == "sidecar provider calls per committed Harness turn"
+    assert cost["submission_attempts_per_step"] == [1]
 
 
 def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_path):
@@ -110,6 +115,8 @@ def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_p
     assert len(list(expander.collection.journal.root.glob("*.json"))) == 2
     audit = audit_quality(protocol, gateway.runtime, gateway)
     assert audit["raw_occurrences"] == 4 and audit["complete"]
+    generations = [json.loads(path.read_text()) for path in (gateway.runtime.run_dir / "generation").glob("*.json")]
+    assert generation_costs(generations)["submission_attempts_per_step"] == [1, 1]
 
 
 def test_harness_rejects_evaluated_failures_and_same_session_duplicates(tmp_path):

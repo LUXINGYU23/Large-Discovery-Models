@@ -35,10 +35,24 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 - `initialization/`：独立初始化预算、种子清单和观测。
 - `private/`：Host 私有 model/oracle receipts、validation 和终局阶段记录。
 - `selection_frozen.json`：任何 test 前冻结的 validation 排名、因子集合、方向和持仓参数。
-- `result.json`、`trajectory.csv`：search、full test、组合、质量/多样性、预算与资格缺口。
+- `result.json`、`report.md`、`trajectory.csv`：search、full test、组合、质量/多样性、预算与逐阶段完整性。
+- `generation/`、`generation_attempts/`：直接/原生生成原始项与 Harness 每次提交的不可变账本；后者单独记录格式失败和修复项。
 - `accepted_actions/`：不可变 accepted action；IR/SFT 成对原子发布在数据收集目录，`current.json` 指向完整 generation。
 - `harness/`、`policy_harness/`：分离的 proposal 和 compiled-policy 会话、不可变输入、策略 epoch、预测、trace 与 usage。
 
 原始行情、环境、运行目录和完整 trace 不提交 Git。紧凑的来源与开发验证证据保留在 `resources/evidence/`。
 
 `protocol.validation_metric` 独立于 search objective，可冻结为 `rank_ic/ic/icir/rank_icir`，默认 `rank_ic`。最终池与 test selection 分别报告结构和信号多样性：前者复用全部已测成员的私有 validation scores，后者使用冻结集合的 test scores。每个信号 pair 保留有效样本数、样本索引 digest 和未定义原因；成员缺 scores 时整个集合的信号多样性不可用。AST 距离去常数、保留实际运算符，归一化使用该集合的最大成对距离。
+
+`result.json` 的 `test[].raw` 与 `independent_combination` 原样保留后端 daily、scores、portfolio、holdings、actions 和未规范化的 turnover；`test[].derived` 另记无年化、ddof=1 的 ICIR、固定方向 WinRate 与中心矩 skewness。`search.ea_update` 从每轮冻结的 top pool 计算 `U_t` 和实际 `T`，与 best-factor 更新事件分开。`quality_audit` 的分母为 raw occurrence，格式失败单列；覆盖不足时通过率为 null。`completeness` 每阶段记录状态和原因，`complete_t3=false` 不因 mock 成功而改变。`report.md` 仅从 `result.json` 渲染。
+
+`trajectory.csv` 以新 search evaluation attempt 为主轴；`physical_search_jobs` 是该次 Oracle search 响应的实际 jobs，`oracle_elapsed_seconds` 是该响应耗时，累计耗时是响应耗时之和，不是墙钟时间。`model_requests_run_total` 和 `tool_calls_run_total` 是整次 run 的成本，每行重复展示而非逐候选归因；sidecar 缺 usage 时保留 null。Harness 的 Search Cost 用每个已提交 session 的实际 provider calls 表示，与直接/原生方法每步最多五次修复的单位分开。
+
+CoE/ToT 多 run 的 FracSuccess 只从预先保存的 roster 聚合。roster 的 `schema_version=1`，包含 `method`、`backend`、`market`、`profile`、`invalid_rule`（`count_as_failure` 或 `exclude_with_evidence`），以及 `runs` 数组；每项含唯一 `run_id`、整数 `seed`、冻结的 `protocol_digest` 和 `run_dir`。不同 run 除随机种子外须使用相同协议。缺失结果和模型生成失败留在分母；基础设施无效须在独立的 invalidations JSON 中以 run ID 指向非空证据文件。相对运行目录相对于 roster 所在目录，相对证据文件相对于 invalidations 所在目录。产物记录原始清单、结果与证据的 SHA-256、逐 run 纳入决定；`aggregation_qualified=false` 的比率仅用于诊断。
+
+```bash
+tasks/alphabench/.venv/bin/python -m tasks.alphabench.aggregate \
+  --roster /mnt/data1/alphabench-t3/roster.json \
+  --invalidations /mnt/data1/alphabench-t3/invalidations.json \
+  --output /mnt/data1/alphabench-t3/aggregate.json
+```

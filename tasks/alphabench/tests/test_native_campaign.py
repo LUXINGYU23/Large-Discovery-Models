@@ -273,6 +273,13 @@ def test_native_workflow_runs_full_stages_without_starting_search_engine(tmp_pat
     assert report["execution"]["native_final_pool"] == report["execution"]["algorithm_result"]["final_pool"]
     assert report["test"] and report["independent_combination"] and report["quality_audit"]["complete"]
     assert report["search"]["attempts"] > 0
+    if method == "ea":
+        update = report["search"]["ea_update"]
+        assert update["rounds"] == 2 and len(update["events"]) == 2
+        assert update["sum_U_t"] == sum(event["U_t"] for event in update["events"])
+        assert update["reason"] is None
+    else:
+        assert report["search"]["ea_update"] == {"applicable": False, "reason": "not_ea"}
     assert report["initialization"]["seed_count"] == 2
     assert report["complete_t3"] is False
     cold = json.loads(next((run / "initialization/generation").glob("*.json")).read_text())
@@ -298,6 +305,7 @@ def test_native_budget_stop_finalizes_committed_state_without_partial_batch_scor
     report = json.loads((tmp_path / "run/result.json").read_text())
     assert report["execution"]["algorithm_completed"] is False
     assert report["execution"]["stop_reason"] == "search_batch_budget_exhausted"
+    assert report["completeness"]["search"]["status"] == "partial"
     assert report["search"]["attempts"] <= 1
     assert report["execution"]["remaining_search_allowance"] == (0 if method == "cot" else 1)
     assert report["quality_audit"]["complete"]
