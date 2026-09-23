@@ -212,9 +212,10 @@ task 通过 Python 引擎补充真实 VWAP、分组与 guide 算子，并调用�
 source A 股组合按官方 `PortfolioBacktester` 的 total-return 口径独立重算因子和
 价格，因子搜索 IC 仍为 Assay 默认 split；US 组合仍用 split。分红 fixture 的
 NAV、基准和交易日志已与原生回测器交叉核对。
-当前 worker 通过固定 Assay 的 Python portfolio runner 计算；计划要求的
-`/v1/portfolio/backtest` REST 路由尚未接线，且原路由没有真实指数序列和交易
-状态输入，W06 资格仍未通过。
+当前 worker 通过固定 Assay 的 `/v1/portfolio/backtest` REST 路由调用原生
+portfolio runner。单次回测所需的真实指数序列、交易状态和 A 股涨跌停价由任务
+在进程内绑定到已校验的离线面板；路由仍按原生格式解析完整配置。该路径已在
+确定性 fixture 上核对，真实市场数据与完整矩阵未达资格，W06 尚未关闭。
 
 执行使用统一入口的 `--protocol-file`、`--upstream-root`、`--data-manifest` 和
 `--oracle-url`；mock 仅省略真实数据与服务。数据资格 gate 保留。

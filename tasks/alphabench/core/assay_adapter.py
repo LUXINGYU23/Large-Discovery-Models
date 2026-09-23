@@ -2,7 +2,17 @@
 
 import datetime as dt
 import json
+import os
 from pathlib import Path
+import secrets
+import socket
+import threading
+import time
+
+import httpx
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 import numpy as np
 import polars as pl
@@ -19,6 +29,7 @@ from assay.evaluator.metrics import evaluate_ic
 from assay.evaluator.turnover import rank_autocorr
 from assay.portfolio.backtester import PortfolioBacktester
 from assay.portfolio.config import PortfolioBacktestConfig
+from assay.service import AssayService
 from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from .data import sha256
@@ -229,8 +240,8 @@ def portfolio_result(protocol, engine, factor, indices, execution, tradable, ben
                        "factor_adjustment": "total" if protocol.market.startswith("csi") else "split",
                        "combination": "single" if len(expressions) == 1 else "daily_zscore_equal_weight_mean_finite"}
     identity = json.dumps(signal_contract, sort_keys=True)
-    raw = backtester.run(identity, config, as_of=config.as_of_date,
-                         tradable_mask=tradable[indices], benchmark=benchmark[indices]).to_dict()
+    raw = portfolio_over_http(backtester, identity, config, tradable[indices], benchmark[indices],
+                              protocol.worker_timeout)
     if not raw["nav_series"] or raw["n_trading_days"] != len(indices) or raw["warnings"]:
         raise ValueError("Assay portfolio did not produce a complete daily report: " + str(raw.get("attribution")))
     return {"raw": raw, "signal_contract": signal_contract,
@@ -238,8 +249,67 @@ def portfolio_result(protocol, engine, factor, indices, execution, tradable, ben
             for day, nav, bench in zip(raw["nav_dates"], raw["nav_series"], raw["benchmark_series"])],
             "holdings": raw["position_log"], "actions": raw["trade_log"],
             "units": "returns and drawdown in fractions; source annualization 252 sessions",
-            "execution": {"backend": "Assay PortfolioBacktester", "config": raw["config"],
+            "execution": {"backend": "Assay PortfolioBacktester", "route": "POST /v1/portfolio/backtest",
+                          "config": raw["config"],
                           "qlib_topk_drop_equivalence": False}}
+
+
+def portfolio_over_http(backtester, identity, config, tradable, benchmark, timeout):
+    from assay.api.routes import portfolio as route
+
+    class PreparedService:
+        used = False
+
+        def backtest_portfolio(self, expr, received, *, as_of):
+            if self.used or expr != identity or received.to_dict() != config.to_dict() or as_of != config.as_of_date:
+                raise ValueError("Assay portfolio REST request differs from the prepared signal and config")
+            self.used = True
+            return backtester.run(expr, received, as_of=as_of, tradable_mask=tradable, benchmark=benchmark)
+
+    # The pinned route resolves AssayService's process singleton. This bounded worker
+    # supplies the verified panel for exactly one authenticated loopback request.
+    app = FastAPI()
+    app.include_router(route.router, prefix="/v1/portfolio")
+
+    @app.exception_handler(ValueError)
+    async def invalid_portfolio(_, exc):
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    server = uvicorn.Server(uvicorn.Config(app, log_level="error", access_log=False, lifespan="off"))
+    token = secrets.token_hex(32)
+    previous_key = os.environ.get("ASSAY_API_KEYS")
+    previous_service = AssayService._instance
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        os.environ["ASSAY_API_KEYS"] = token
+        AssayService._instance = PreparedService()
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
+        try:
+            thread.start()
+            deadline = time.monotonic() + 10
+            while not server.started:
+                if not thread.is_alive() or time.monotonic() >= deadline:
+                    raise RuntimeError("Assay portfolio REST service did not start")
+                time.sleep(.01)
+            with httpx.Client(trust_env=False, timeout=timeout) as client:
+                response = client.post(f"http://127.0.0.1:{listener.getsockname()[1]}/v1/portfolio/backtest",
+                    json={"expr": identity, "config": config.to_dict(), "as_of": config.as_of_date},
+                    headers={"X-API-Key": token})
+            if response.status_code == 422:
+                raise ValueError(response.json()["detail"])
+            if response.status_code != 200:
+                raise RuntimeError(f"Assay portfolio REST returned {response.status_code}")
+            return response.json()
+        finally:
+            server.should_exit = True
+            if thread.ident is not None:
+                thread.join(timeout=5)
+            AssayService._instance = previous_service
+            if previous_key is None:
+                os.environ.pop("ASSAY_API_KEYS", None)
+            else:
+                os.environ["ASSAY_API_KEYS"] = previous_key
 
 
 def assay_evaluate(request, config):

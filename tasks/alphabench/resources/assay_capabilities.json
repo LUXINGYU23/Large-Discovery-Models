@@ -9,7 +9,7 @@
     "adjustment": "assay.data.store.adjust.forward_adjust",
     "label": "assay.evaluator.forward_returns.forward_returns",
     "metrics": "assay.evaluator.metrics.evaluate_ic",
-    "portfolio": "assay.portfolio.backtester.PortfolioBacktester.run",
+    "portfolio": "POST /v1/portfolio/backtest -> assay.portfolio.backtester.PortfolioBacktester.run",
     "portfolio_export": "assay.portfolio.report.PortfolioReport.to_dict"
   },
   "adapter_changes": [
@@ -21,19 +21,19 @@
     "Guide Tanh and Mask operators registered explicitly",
     "Actual VWAP adjusted on the same basis as OHLC",
     "Portfolio factor and price matrices prepared on the native market adjustment basis and supplied to the independent portfolio pipeline",
+    "Pinned Assay portfolio REST route invoked through authenticated worker-local HTTP with the complete native config and prepared market controls",
     "Actual index benchmark and actual CN price-limit bands required",
     "Signal identity includes expressions, direction and missing-value combination semantics"
   ],
   "verified_on": "remote server; Python 3.10; locked Assay environment; deterministic offline fixtures",
   "tests": {
     "file": "tasks/alphabench/tests/test_assay_execution.py",
-    "passed": 21,
+    "passed": 24,
     "guide_operators_executed": {"qlib": 48, "assay": 36},
     "numerical_cases": ["pre-entry rolling mean", "daily group changes", "single-horizon open-return IC", "actual AssayService daily/aggregate IC for CN and US", "AssayService group-data IC", "source period-end universe on a non-trading date", "split-adjusted VWAP", "Tanh", "Mask", "actual benchmark NAV", "source CN total-return portfolio NAV and trades against native PortfolioBacktester"],
-    "operational_cases": ["independent CN/US portfolio", "source CN/US portfolio", "combination", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
+    "operational_cases": ["independent CN/US portfolio", "source CN/US portfolio", "combination", "actual Assay portfolio REST", "REST/native report parity", "real child worker", "completed receipt replay", "market isolation", "missing/corrupt assets", "label purge", "interval and warmup coverage"]
   },
   "remaining": [
-    "The frozen plan requires Host to invoke POST /v1/portfolio/backtest; the worker currently invokes the official Python PortfolioBacktester directly and the pinned route lacks custom benchmark and tradability inputs",
     "Qualified real data and complete offline preparation for each market",
     "Full operator numerical qualification beyond execution coverage",
     "Historical CN costs and trading-rule qualification",

@@ -124,15 +124,15 @@ preflight loads only the verified, dependency-free native config module and
 validates the complete configuration before initialization. The worker uses the
 same task constraints with the installed native config class; there is no second
 schema or implicit portfolio default. The frozen implementation plan requires
-Host to call `/v1/portfolio/backtest`; the current worker still calls the
-official Python `PortfolioBacktester.run` entry directly, so W06 remains open
-until the REST route is exercised against the qualified offline data store.
-The pinned route accepts only `expr/config/as_of`, while its Python backtester
-accepts the actual custom index series and trading mask separately. An unchanged
-POST would omit inputs required by this task; it cannot close the gate. The
-configured worker timeout is a task limit, not an original Assay compute limit.
-Unknown requests use the shared durable reconciliation contract instead of the
-bridge's three HTTP attempts.
+Host to call `/v1/portfolio/backtest`. The bounded worker mounts the pinned
+Assay portfolio router on a one-request loopback HTTP server. Its process-local
+service binds the already verified offline panel, actual custom index series and
+trading mask to that request; the POST sends the frozen signal identity, complete
+native config and `as_of` through the original route before the pinned
+`PortfolioBacktester.run` pipeline executes. A random per-worker API key protects
+the route. There is no HTTP retry; the shared receipt contract handles unknown
+outcomes. The configured worker timeout is a task limit, not an original Assay
+compute limit. W06 still requires qualified market assets and the real matrix.
 
 Source factor IC and scores use the service's split adjustment in both markets.
 For an A-share source portfolio the official backtester independently rebuilds

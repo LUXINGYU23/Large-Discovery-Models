@@ -171,12 +171,28 @@ def test_assay_source_keeps_inclusive_panel_tail_without_future_reads(snapshot, 
 
 def test_actual_portfolio_and_combination_keep_source_reports_and_benchmark(snapshot):
     request, config, _, _ = snapshot
+    from assay.service import AssayService
+    from tasks.alphabench.core.assay_adapter import PreparedPortfolioBacktester
+
+    previous_key, previous_service = os.environ.get("ASSAY_API_KEYS"), AssayService._instance
     result = assay_evaluate(dict(request, fast=False), config)
     portfolio = result["portfolio"]
+    assert os.environ.get("ASSAY_API_KEYS") == previous_key and AssayService._instance is previous_service
+    assert portfolio["execution"]["route"] == "POST /v1/portfolio/backtest"
     assert portfolio["actions"] and portfolio["holdings"] and len(portfolio["daily"]) == len(result["daily"])
     assert any(row["cost"] > 0 for row in portfolio["actions"])
     np.testing.assert_allclose(portfolio["raw"]["benchmark_series"], np.arange(120, 139) / 120)
     assert portfolio["execution"]["qlib_topk_drop_equivalence"] is False
+    protocol = T3Protocol(**request["protocol"])
+    engine, days, tradable, execution, benchmark, _ = prepare_panel(request, protocol, config)
+    indices = np.array([i for i, day in enumerate(days) if day >= dt.date.fromisoformat(request["start"])][:-1])
+    factor = np.where(engine.membership, engine.evaluate(request["expression"]).values, np.nan)[indices]
+    identity = json.dumps(portfolio["signal_contract"], sort_keys=True)
+    native = PreparedPortfolioBacktester(engine, factor, indices, execution).run(identity,
+        PortfolioBacktestConfig.from_dict(portfolio["raw"]["config"]),
+        as_of=portfolio["raw"]["config"]["as_of_date"],
+        tradable_mask=tradable[indices], benchmark=benchmark[indices]).to_dict()
+    assert clean(portfolio["raw"]) == clean(native)
     combined = assay_evaluate(dict(request, operation="combine", expressions=["close", "adv5"], fast=False), config)
     assert combined["portfolio"]["actions"]
     assert combined["portfolio"]["raw"]["factor_id"] != portfolio["raw"]["factor_id"]

@@ -1293,3 +1293,29 @@ post-delisting membership and two without status. CSI300/500/1000 remain `blocke
 with 5/8/11 membership interval conflicts. A qualified replacement universe and
 adjusted price source are still required, as are the Assay service and W15-W17
 gates; this does not establish complete T3.
+
+## Change 37: invoke the pinned Assay portfolio REST route
+
+Cross-check against plan W06 and Spec section 9.3: the Host now POSTs the frozen
+signal identity, full `PortfolioBacktestConfig` and `as_of` to the pinned Assay
+`/v1/portfolio/backtest` route. The bounded worker mounts that original router
+on a single-use, authenticated loopback server. Its process-local Assay service
+binds the already verified factor/price panel, actual index benchmark and trading
+mask to the native `PortfolioBacktester`; A-share limit bands still come from the
+verified execution asset. The service rejects an altered identity, config, as-of
+or second invocation. Known data validation failures retain their prior failure
+semantics; transport/server failures remain uncertain and enter durable receipt
+reconciliation. A deterministic fixture's complete raw REST report equals the
+direct pinned backtester report, and the source CN fixture retains native NAV,
+benchmark and trade-log parity. The temporary key and singleton are restored.
+
+Complexity review: the previous direct portfolio call was removed. The existing
+prepared backtester and upstream router are reused without changing Assay source
+or adding a dependency, alternate data path, compatibility wrapper or retry.
+Only the request-local service binding is new because the pinned HTTP schema
+does not carry custom benchmark or tradability arrays. Remote Assay tests passed
+24 cases and task registration remains `mock_verified`. This verifies the REST
+contract on fixtures; qualified market assets, full numerical/operator audits,
+real backend matrix and remaining W15-W17 evidence are still required.
+The broader task suite was interrupted during an unrelated long-running native
+campaign case after 193 passes and four skips in 7m15s; it was not a full pass.
