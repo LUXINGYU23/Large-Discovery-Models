@@ -17,6 +17,12 @@
 [官方 Prerequisites](https://github.com/CityU-MLO/AlphaBench/tree/31bb94bbb7744177c51c9d011e07c31e3092b93e#prerequisites)
 要求另外下载 Qlib 行情。该版本未提供覆盖完整 T3 所有市场的固定行情包，也没有原实验行情的全量文件哈希。第三方公开行情可用于独立接入验证，不能冒充原论文数据或数值复现。
 
+截至 2026-09-23，[Qlib 的数据准备说明](https://github.com/microsoft/qlib#data-preparation)
+明确表示其官方数据集暂时停用，转而推荐社区维护的
+`chenditc/investment_data`。下文固定的 CN 归档就是该推荐来源的指定版本，
+不是 AlphaBench 或 Qlib 官方发布的数据。不能把执行 Qlib 旧下载命令视为
+已经获得更完整的官方 T3 行情；任何新来源仍须独立冻结哈希并通过同一覆盖审计。
+
 ## 固定来源
 
 版本、地址和已知 SHA-256 在 `resources/data_sources.json`，不用 `latest`。

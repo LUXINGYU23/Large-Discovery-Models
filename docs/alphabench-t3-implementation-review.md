@@ -999,3 +999,15 @@ suite passed 284 tests, with two optional backend skips and four previously
 verified long examples deselected. The shared policy/MCP/executor suite passed
 35 tests. Fault-matrix qualification remains separate from this two-round
 smoke. `complete_t3=false`.
+
+## Change 26: clarify the provenance of the T3 market-data mirror
+
+Cross-check of the pinned AlphaBench and Qlib instructions confirms that the
+AlphaBench download contains precomputed T2/T4 labels, while its T3 evaluator
+requires a separately installed market-data backend. Qlib currently says its
+official dataset is temporarily disabled and recommends the same community CN
+archive already pinned in `tasks/alphabench/resources/data_sources.json`. The
+task data guide now states that provenance explicitly. The existing local
+acquire, hash-verified transfer and remote offline audit require no new path or
+fallback. Complexity review found no code to add or delete for this finding;
+the coverage and Assay gaps remain blocked rather than being inferred away.
