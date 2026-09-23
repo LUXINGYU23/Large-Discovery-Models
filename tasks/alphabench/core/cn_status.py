@@ -7,7 +7,7 @@ import re
 import socket
 
 from ldm_tts.engine.run_store import atomic_json_write
-from .data import SOURCES, BENCHMARKS, audit_qlib, load_cn_status, sha256
+from .data import SOURCES, BENCHMARKS, audit_qlib, instrument_bounds, load_cn_status, sha256
 from .protocol import digest
 
 SOURCE = SOURCES["cn_baostock"]
@@ -132,6 +132,7 @@ def acquire_baostock(root):
 def prepare_baostock(root):
     plan = read_plan(root)
     dolt = load_cn_status(root)
+    bounds = instrument_bounds(root / "qlib" / ("cn-" + SOURCES["cn"]["release"]) / "instruments/all.txt")
     suspended = {(row["symbol"], row["tradedate"]) for row in dolt["rows"] if str(row["tradestatus"]) == "0"}
     initial = len(suspended)
     pages, metadata, history = {}, {}, {}
@@ -161,12 +162,17 @@ def prepare_baostock(root):
         for gap in audit["gaps"]:
             symbol = gap["symbol"].upper()
             out_date = metadata.get(symbol, {}).get("outDate", "")
+            archived = bounds.get(symbol)
             for day in gap["dates"]:
                 row = history.get((symbol, day))
                 unresolved.append({"market": market, "symbol": symbol, "date": day,
                     "source_status": row["tradestatus"] if row else None,
                     "reported_out_date": out_date or None,
-                    "reason": "membership_at_or_after_reported_delisting" if out_date and day >= out_date
+                    "archive_instrument_start": archived[0] if archived else None,
+                    "archive_instrument_end": archived[1] if archived else None,
+                    "reason": "membership_before_archive_instrument_interval" if archived and day < archived[0]
+                              else "membership_at_or_after_reported_delisting" if out_date and day >= out_date
+                              else "membership_after_archive_instrument_interval" if archived and day > archived[1]
                               else "missing_archive_price_on_reported_trading_day" if row else "no_status_evidence"})
         atomic_json_write(root / "manifests" / f"qlib_{market}.json", audit)
         atomic_json_write(root / "manifests" / f"qlib_{market}.files.json", files)

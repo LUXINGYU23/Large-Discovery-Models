@@ -1,7 +1,7 @@
 {
   "baostock": {
     "additional_suspensions": 774,
-    "audit_sha256": "496572eb48c537914fe149846705b939d0e18e7b94ce23ec5b12116c169fed70",
+    "audit_sha256": "eac6b519a5d2f356e408088b9aff615183dba917077d85d8b87098ae3931bda7",
     "plan_sha256": "48c20c825a2560081d7fbbbc8459bd624a179f79afa65d4960d08db6fe20db33",
     "raw_responses": 232,
     "source": {
@@ -13,19 +13,25 @@
     },
     "unresolved_reason_counts": {
       "membership_at_or_after_reported_delisting": 329,
-      "missing_archive_price_on_reported_trading_day": 1063,
+      "membership_before_archive_instrument_interval": 493,
+      "missing_archive_price_on_reported_trading_day": 570,
       "no_status_evidence": 2
     }
   },
-  "checked_at_utc": "2026-09-22T16:51:49.320143+00:00",
+  "checked_at_utc": "2026-09-23T10:31:14+00:00",
+  "cn_all_instruments_sha256": "0520db301d5db6d5a0d39b8b33aa2b5579f5d11f7e782c546618074c6c9d7b5c",
   "cn": {
     "csi1000": {
       "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
-      "audit_sha256": "1fc2d5cbd79d9bba2243d4ffa58cbad9633a8a6b72df50cda0a16c2e19ae2476",
+      "audit_sha256": "d824fb05e498bf4170796284ace83f10ed6f054f3f1e97df0ab0cf5ee49dce5d",
       "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
       "files_sha256": "7fbcd803ec66f82b011a15d330e102eccb28568ea997242f5c96ab46a51f6145",
       "gap_symbols": 6,
       "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 11
+        },
         {
           "code": "unresolved_price_gaps",
           "symbols": 6
@@ -57,11 +63,15 @@
     },
     "csi300": {
       "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
-      "audit_sha256": "42f2574d98aa7a5bb69e1380a8b8c959dce6e42b50dc009608692800edc3654a",
+      "audit_sha256": "d0627b1a55ce3c8ad73fb8ec2eaa5a0f593df16588a21b1deb92afbe46ebe81a",
       "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
       "files_sha256": "8a39bd4599bb6cfb14a3b38e684eb2313bff98eb29ec7b9c9594f30822fe2723",
       "gap_symbols": 4,
       "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 5
+        },
         {
           "code": "unresolved_price_gaps",
           "symbols": 4
@@ -93,11 +103,15 @@
     },
     "csi500": {
       "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
-      "audit_sha256": "dd01b1475cfdfba1cc5b2a264a9044cf028bb4f1c2425c4dc890fa2c0629aaf9",
+      "audit_sha256": "9f5ca31d3cfab13dd4e1c921b4bd5eb9f95f0245d08721dd8db66fde868df0e9",
       "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
       "files_sha256": "caa215ced4297bddac04edfd1ff8f5f3e29ca035c40b93aea20e1da209dc869a",
       "gap_symbols": 6,
       "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 8
+        },
         {
           "code": "unresolved_price_gaps",
           "symbols": 6

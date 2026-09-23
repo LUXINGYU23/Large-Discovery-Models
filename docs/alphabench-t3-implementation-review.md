@@ -1266,3 +1266,30 @@ because a process crash cannot exercise it. Production collection code and
 shared IR/sink interfaces are unchanged, with no new recovery layer or
 dependency. The task collection suite passed all three cases. Other W15
 faults, qualified market data, Assay service parity and W16/W17 remain open.
+
+## Change 36: reject CN membership outside archive instrument intervals
+
+Cross-check against W04 and Spec section 4.1 found that the community Qlib
+archive lists `SZ302132` as a CSI500/CSI1000 member before the code began trading.
+The exchange's 2025-02-15 implementation announcement fixes its transition from
+`SZ300114` at 2025-02-17; the archive's own `all.txt` agrees, while its market
+membership files contain both codes before then. The audit now hashes and checks
+that archive `all.txt` interval against the actual trading sessions in each
+required historical membership interval. This internal conflict does not by
+itself prove legal delisting. Non-trading interval endpoints are ignored, and
+BaoStock gap classification distinguishes membership before an archived symbol
+begins from genuine reported trading without an archived price. It does not
+rewrite the original universe or mix current-code historical prices into the
+frozen Qlib archive.
+
+Complexity review: one small `instrument_bounds` parser serves the two existing
+offline audit paths; no source adapter, compatibility branch or dependency was
+added. The focused CN/transfer/US-data suite passed 10 cases; task registration
+validation passed, and all four compact evidence hashes match the remote
+manifests. Remote re-audit of the 10,069-file installed bundle retained the
+same gaps but classified 493 as
+pre-archive-interval `SZ302132`, 570 as missing `SH689009` prices, 329 as
+post-delisting membership and two without status. CSI300/500/1000 remain `blocked`
+with 5/8/11 membership interval conflicts. A qualified replacement universe and
+adjusted price source are still required, as are the Assay service and W15-W17
+gates; this does not establish complete T3.

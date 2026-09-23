@@ -7,6 +7,7 @@ Raw downloads and audit reports are retained even when qualification fails.
 from __future__ import annotations
 
 import argparse
+from bisect import bisect_left, bisect_right
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 import hashlib
@@ -151,6 +152,17 @@ def binary_series(path, length):
     return result
 
 
+def instrument_bounds(path):
+    bounds = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        symbol, start, end = line.split()
+        symbol = symbol.upper()
+        if symbol in bounds or start > end:
+            raise ValueError("duplicate or reversed archive instrument interval")
+        bounds[symbol] = (start, end)
+    return bounds
+
+
 def audit_qlib(root, market, *, source, archive_hash, suspended=None, suspension_sources=()):
     import numpy as np
     root = Path(root)
@@ -158,8 +170,14 @@ def audit_qlib(root, market, *, source, archive_hash, suspended=None, suspension
     dates = calendar_path.read_text(encoding="utf-8").splitlines()
     if dates != sorted(set(dates)):
         raise ValueError("calendar must be sorted and unique")
+    period = np.array(["2015-01-01" <= day < "2025-02-01" for day in dates])
+    sessions = [day for day, included in zip(dates, period) if included]
     universe_path = root / "instruments" / (market + ".txt")
+    all_path = root / "instruments/all.txt"
     issues, membership = [], []
+    bounds = instrument_bounds(all_path) if all_path.exists() else {}
+    if not bounds:
+        issues.append({"code": "missing_all_instruments", "path": str(all_path)})
     if universe_path.exists():
         for line in universe_path.read_text(encoding="utf-8").splitlines():
             symbol, start, end = line.split()
@@ -168,7 +186,19 @@ def audit_qlib(root, market, *, source, archive_hash, suspended=None, suspension
             membership.append((symbol.lower(), start, end))
     else:
         issues.append({"code": "missing_historical_universe", "path": str(universe_path)})
-    period = np.array(["2015-01-01" <= day < "2025-02-01" for day in dates])
+    interval_conflicts = []
+    for symbol, start, end in membership:
+        first, after_last = bisect_left(sessions, start), bisect_right(sessions, end)
+        if first == after_last or not bounds:
+            continue
+        archived = bounds.get(symbol.upper())
+        if archived is None or sessions[first] < archived[0] or sessions[after_last - 1] > archived[1]:
+            interval_conflicts.append({"symbol": symbol, "member_start": start, "member_end": end,
+                                       "first_session": sessions[first], "last_session": sessions[after_last - 1],
+                                       "archive_start": archived[0] if archived else None,
+                                       "archive_end": archived[1] if archived else None})
+    if interval_conflicts:
+        issues.append({"code": "membership_outside_archive_instrument_interval", "intervals": len(interval_conflicts)})
     if not any(period) or dates[0] > "2015-01-05" or dates[-1] < "2025-01-27":
         issues.append({"code": "insufficient_calendar", "first": dates[0], "last": dates[-1]})
     expected_members = np.zeros(len(dates), dtype=int)
@@ -221,6 +251,8 @@ def audit_qlib(root, market, *, source, archive_hash, suspended=None, suspension
              "source": source, "archive_sha256": archive_hash, "files_sha256": digest(files),
              "calendar_sha256": sha256(calendar_path),
              "universe_sha256": sha256(universe_path) if universe_path.exists() else None,
+             "all_instruments_sha256": sha256(all_path) if all_path.exists() else None,
+             "instrument_interval_conflicts": interval_conflicts,
              "fields": required, "start": dates[0], "end": dates[-1],
              "benchmark": benchmark, "historical_universe": bool(membership),
              "adjustment": "investment_data normalized adjusted prices and inverse-adjusted volume; factor retained",
