@@ -34,7 +34,7 @@ class Generator:
                 operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host,
                 authorize=self.gateway.before_dispatch)
         except EndpointRequestError as exc:
-            raise EvaluationPaused("model request failed; inspect the durable receipt before retrying",
+            raise EvaluationPaused("model request failed: " + str(exc) + "; inspect the durable receipt before retrying",
                                    status="paused_provider") from exc
         response = ProposalResponse(**raw)
         if not self.gateway.mock and response.metadata.get("model") != self.protocol.model:

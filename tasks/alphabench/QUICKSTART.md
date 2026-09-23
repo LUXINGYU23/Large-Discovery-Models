@@ -60,3 +60,23 @@ matched 方法共用初始信息时，为新运行传入 `--initialization-bundl
 导入只从 Host 读取公共 search 观测和私有 validation，并单独记录创建 bundle 的真实成本。本次初始化预算消耗为零，`including_initialization.generation_cost` 包含原始创建成本；可以把本次 `initialization_evaluations` 上限设为零。新搜索仍有完整 E。源目录的文件清单和哈希冻结后不能替换；导入中断时重新核对同一来源，完成后 `--resume-run` 使用本 run 的固定初始观测。
 
 真实运行必须同时具备冻结的 `protocol-file`、有来源及逐文件哈希的数据 manifest、对应固定源码和受控 oracle。用户允许以同一批不完整数据进行比较时，在协议中设置 `data_policy=partial_comparison` 并使用原审计 manifest 的规范 JSON digest；不编辑其 `qualification` 字段。所有方法仍要固定同一数据身份、市场、切分及缺失规则，报告标记部分数据比较。当前已有 DeepSeek Responses/max 接口预检和 Qlib 真实种子开发探针；它们不满足完整 T3 功能矩阵资格。
+
+CSI300 direct 部分数据 pilot 的冻结协议与 Oracle 配置已保存在 `resources/protocols/partial_csi300_llm_pilot.json` 和 `resources/oracle_configs/partial_csi300_qlib_pilot.json`。在服务器仓库根的两个终端分别执行以下命令，使用新的 run 目录；配置只适用于 `/mnt/data1/` 已安装的指定归档：
+
+```bash
+tasks/alphabench/environments/qlib/.venv/bin/python -m tasks.alphabench.core.oracle_service \
+  --config tasks/alphabench/resources/oracle_configs/partial_csi300_qlib_pilot.json \
+  --root /mnt/data1/Large-Discovery-Models/runs/alphabench-t3/oracle-new --port 19779
+```
+
+```bash
+LDM_DATA_COLLECTION_ENABLED=1 tasks/alphabench/.venv/bin/python -m tasks.alphabench.ldm_task.procedure \
+  --protocol-file tasks/alphabench/resources/protocols/partial_csi300_llm_pilot.json \
+  --data-manifest /mnt/data1/Large-Discovery-Models/data/alphabench/manifests/qlib_csi300.json \
+  --upstream-root /mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench \
+  --oracle-url http://127.0.0.1:19779 \
+  --api-key-file /mnt/data1/Large-Discovery-Models/secrets/alphabench-t3/deepseek.key \
+  --out-dir /mnt/data1/Large-Discovery-Models/runs/alphabench-t3/llm-new
+```
+
+既有 pilot 的结果哈希、成本与数据缺口见 `resources/evidence/partial_csi300_llm_pilot.json`。这是完整路径的先行测试，不是八方法的正式匹配比较。

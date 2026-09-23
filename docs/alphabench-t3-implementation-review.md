@@ -1496,3 +1496,40 @@ The matrix stores issue codes once per market instead of repeating them in
 all eight method cells.
 The strict path and physical tamper checks remain covered by the existing
 real-process test, now parameterized for both data policies.
+
+## Change 46: complete one real partial-data direct pilot
+
+Cross-check against W09/W14 and the user's revised W04 data criterion: one
+frozen `qlib/csi300/llm` pilot used the original blocked CN audit manifest,
+the same physical archive/feature hashes, DeepSeek Responses `deepseek-flash`
+with `reasoning.effort=max`, and a finite two-round budget. Both search and
+private validation attempts completed. The final factor's independent full
+test and the separately requested combination each produced 725 trading days
+of portfolio output. Search, validation, selection, test, combination, quality
+audit and report stages are complete; selected-set diversity is undefined for
+one factor and remains explicitly partial. The run reports 107 unresolved CN
+security sessions and five membership interval conflicts, so its
+qualification is `partial_comparison`, `complete_t3=false`. Reopening the
+completed run returned `replayed=true`. Full source/matched method comparison,
+other markets and fault gates remain open.
+
+Complexity review: the pilot reuses the existing protocol, Oracle service,
+raw blocked audit and Host result path. One concrete protocol and service
+config were frozen for the server; no derived price archive, special evaluator,
+new provider adapter or acceptance fallback was introduced. The compact
+evidence records hashes and counts; model payloads and raw market files stay
+outside Git on `/mnt/data1/`.
+
+## Change 47: retain the provider's bounded failure reason
+
+The first real LDM pilot paused at a model `dispatch_intent` without a saved
+response. That physical request has an unknown outcome and is preserved; no
+same-ID retry or free replay is permitted. The task-level pause previously
+discarded the transport's bounded exception message, hiding whether the
+cause was an HTTP response, network failure or incomplete model output.
+It now appends that message to the existing `paused_provider` reason for a
+new run while keeping the durable receipt and budget behavior unchanged.
+
+Complexity review: one error string changed, with no new logging pipeline,
+retry, exception type, configuration or dependency. The provider transport
+already bounds HTTP error detail. The original paused run remains intact.

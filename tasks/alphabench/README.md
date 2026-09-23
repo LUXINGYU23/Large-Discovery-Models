@@ -4,7 +4,7 @@
 
 [数据准备](DATA.md) 包含官方数据资产核查、本机代理下载、固定来源/哈希、SSH 传输和服务器离线审计。所有数值测试和实验在指定服务器的 `/mnt/data1/` 下执行。
 
-[完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。合同、预算和真实 run 尚未冻结或完成，全部格仍保持 blocked。用户已允许用同一批不完整数据做方法比较：真实协议须显式设置 `data_policy=partial_comparison`，绑定原始审计的 `data_digest`，各比较方法使用同一数据清单、后端、市场、切分和缺失规则。结果标为部分数据比较，不声称原论文数值复现。`qualified_only` 仍是默认门槛；两种模式都逐文件验证实际资产。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
+[完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。正式比较合同、预算和矩阵真实 run 尚未完成，全部格仍保持 blocked。用户已允许用同一批不完整数据做方法比较：真实协议须显式设置 `data_policy=partial_comparison`，绑定原始审计的 `data_digest`，各比较方法使用同一数据清单、后端、市场、切分和缺失规则。结果标为部分数据比较，不声称原论文数值复现。`qualified_only` 仍是默认门槛；两种模式都逐文件验证实际资产。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
 
 ## 已实现的路径
 
@@ -12,7 +12,7 @@
 
 原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 与 example source 使用实际原生最终池，matched 使用完整已测池；source 保留原生轮数，预算不足即暂停。example 原入口没有 validation/test，本 task 明确冻结独立的后续区间。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。
 
-`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。`ldm_harness_compiled` 另启独立 policy session，在受限 Docker runner 中执行其提交的 prior/weight 策略；Host 仍固定 GP、选择、Oracle 和预算。实际 DeepSeek Responses + synthetic Oracle 已分别完成两轮 direct、LDM 和 compiled smoke，证据见 `resources/evidence/`。这些运行不代表真实市场或完整方法矩阵资格。Assay portfolio REST 已在离线 fixture 验证；真实数据、故障矩阵和完整资格矩阵仍未关闭，因此 `complete_t3=false`。
+`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。`ldm_harness_compiled` 另启独立 policy session，在受限 Docker runner 中执行其提交的 prior/weight 策略；Host 仍固定 GP、选择、Oracle 和预算。实际 DeepSeek Responses + synthetic Oracle 已分别完成两轮 direct、LDM 和 compiled smoke。另有 [CSI300 部分数据 direct pilot](resources/evidence/partial_csi300_llm_pilot.json)：真实 DeepSeek/Qlib 的两轮 search、私有 validation、full test 与独立组合均完成，但不是完整方法矩阵资格。Assay portfolio REST 已在离线 fixture 验证；故障矩阵和完整资格矩阵仍未关闭，因此 `complete_t3=false`。
 
 ## 服务器验证
 
