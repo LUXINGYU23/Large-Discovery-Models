@@ -1354,3 +1354,26 @@ request ledger with one client-creation marker. Production code, compatibility
 paths, dependencies and test fixtures are unchanged. The remote lifecycle suite
 passed five cases using `/mnt/data1/` for temporary files. R17 and W15 remain
 open for actual data/patch tamper and the rest of the fault matrix.
+
+## Change 40: record every required functional matrix cell
+
+Cross-check against W16 and plan section 9.1/9.3: the task now tracks all nine
+backend/market rows times eight methods as 72 distinct functional cells. Each
+cell names its dialect requirement and matched scientific profile, records the
+current source audit and outstanding backend data manifest, and keeps the formal
+contract, initialization, filter, budget, run and raw hashes empty until real
+evidence exists. The source audit's `qualified` state alone cannot qualify a
+Qlib or Assay backend; every cell remains blocked until an independently
+verified backend manifest and complete method run are recorded. A canonical
+digest binds the inventory to the tracked data and task evidence. The runner's
+shared qualification remains `mock_verified`; this inventory is not a formal
+profile or a performance result.
+
+Complexity review: one standard-library generator reuses the existing BACKENDS
+and METHODS registry, and one focused test verifies full cardinality and the
+no-auto-promotion boundary. The 72-row JSON is generated from those inputs,
+not hand-maintained duplicate configuration. No production evaluator path,
+schema compatibility layer, dependency or speculative method abstraction was
+added. Remote matrix test, `--check` and task registration passed. Pilot budgets,
+all named executable profiles, real runs and the 32-method matched comparison
+remain open.

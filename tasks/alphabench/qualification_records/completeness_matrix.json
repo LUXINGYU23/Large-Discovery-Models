@@ -1,0 +1,3039 @@
+{
+  "cells": [
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/alphabench_cot",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/alphabench_tot",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/alphabench_ea",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/llm",
+      "initialization": null,
+      "market": "csi300",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/ldm",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/harness",
+      "initialization": null,
+      "market": "csi300",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/ldm_harness",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi300/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/alphabench_cot",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/alphabench_tot",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/alphabench_ea",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/llm",
+      "initialization": null,
+      "market": "csi500",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/ldm",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/harness",
+      "initialization": null,
+      "market": "csi500",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/ldm_harness",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi500/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/alphabench_cot",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/alphabench_tot",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/alphabench_ea",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/llm",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/ldm",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/harness",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/ldm_harness",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/csi1000/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/alphabench_cot",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/alphabench_tot",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/alphabench_ea",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/llm",
+      "initialization": null,
+      "market": "sp500",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/ldm",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/harness",
+      "initialization": null,
+      "market": "sp500",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/ldm_harness",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "qlib",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib"
+      ],
+      "filter_profile": null,
+      "id": "qlib/sp500/ldm_harness_compiled",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/alphabench_cot",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/alphabench_tot",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/alphabench_ea",
+      "initialization": null,
+      "market": "csi300",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/llm",
+      "initialization": null,
+      "market": "csi300",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/ldm",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/harness",
+      "initialization": null,
+      "market": "csi300",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/ldm_harness",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi300"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi300/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi300",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/alphabench_cot",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/alphabench_tot",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/alphabench_ea",
+      "initialization": null,
+      "market": "csi500",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/llm",
+      "initialization": null,
+      "market": "csi500",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/ldm",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/harness",
+      "initialization": null,
+      "market": "csi500",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/ldm_harness",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi500/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi500",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/alphabench_cot",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/alphabench_tot",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/alphabench_ea",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/llm",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/ldm",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/harness",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/ldm_harness",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "membership_outside_archive_instrument_interval",
+        "unresolved_price_gaps",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "cn.csi1000"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/csi1000/ldm_harness_compiled",
+      "initialization": null,
+      "market": "csi1000",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/alphabench_cot",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/alphabench_tot",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/alphabench_ea",
+      "initialization": null,
+      "market": "sp500",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/llm",
+      "initialization": null,
+      "market": "sp500",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/ldm",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/harness",
+      "initialization": null,
+      "market": "sp500",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/ldm_harness",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.sp500"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/sp500/ldm_harness_compiled",
+      "initialization": null,
+      "market": "sp500",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/alphabench_cot",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "alphabench_cot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/alphabench_tot",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "alphabench_tot",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/alphabench_ea",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "alphabench_ea",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/llm",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "llm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/ldm",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "ldm",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/harness",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/ldm_harness",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "ldm_harness",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    },
+    {
+      "backend": "assay",
+      "blockers": [
+        "unqualified_market_data",
+        "invalid_ohlcv",
+        "missing_actual_index_benchmarks",
+        "missing_historical_industry_classification",
+        "missing_security_metadata",
+        "missing_vwap",
+        "prices_outside_exchange_sessions",
+        "unresolved_price_gaps",
+        "unverified_corporate_action_completeness_and_knowledge_dates",
+        "unverified_security_lineage",
+        "qualified_backend_manifest_missing",
+        "formal_profile_unfrozen",
+        "real_run_missing"
+      ],
+      "budget": null,
+      "capabilities": {
+        "data": "unverified",
+        "method": "unverified",
+        "operators": "unverified",
+        "portfolio": "unverified",
+        "recovery": "unverified"
+      },
+      "compact_record": null,
+      "contract_profile": null,
+      "data_evidence": {
+        "file": "tasks/alphabench/resources/evidence/data_preparation.json",
+        "section": "us.nasdaq100"
+      },
+      "dialects": [
+        "qlib",
+        "assay"
+      ],
+      "filter_profile": null,
+      "id": "assay/nasdaq100/ldm_harness_compiled",
+      "initialization": null,
+      "market": "nasdaq100",
+      "method": "ldm_harness_compiled",
+      "raw_hashes": {},
+      "run_id": null,
+      "scientific_profile": "ldm_matched_v1",
+      "source_audit_qualification": "blocked",
+      "stage": "not_started",
+      "status": "blocked"
+    }
+  ],
+  "complete_t3": false,
+  "counts": {
+    "blocked": 72,
+    "failed": 0,
+    "passed": 0
+  },
+  "data_evidence": {
+    "digest": "ec706888a31ea83f0b26d04d24185fe53f6f45cea5fb8bb5100fe7f1a5a608af",
+    "file": "tasks/alphabench/resources/evidence/data_preparation.json"
+  },
+  "kind": "functional_72",
+  "required": 72,
+  "schema_version": 1,
+  "task_evidence": {
+    "digest": "c966ade1a1cab0211435d1c08bb40b7e87502b8920965ff49bcece3a321b22d3",
+    "file": "tasks/alphabench/resources/qualification_evidence.json",
+    "stage": "mock_verified"
+  },
+  "task_id": "alphabench"
+}

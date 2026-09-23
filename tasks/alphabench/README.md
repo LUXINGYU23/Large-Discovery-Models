@@ -4,6 +4,8 @@
 
 [数据准备](DATA.md) 包含官方数据资产核查、本机代理下载、固定来源/哈希、SSH 传输和服务器离线审计。所有数值测试和实验在指定服务器的 `/mnt/data1/` 下执行。
 
+[完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。当前数据审计使全部格保持 blocked；合同、预算和真实 run 尚未冻结或完成。数据变为 qualified 仍须补齐正式合同与真实证据，不会自动标记方法通过。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
+
 ## 已实现的路径
 
 `llm` 与 `ldm` 的共享 Campaign 生命周期已接线：独立初始化、完整表达式准入、最多五次修复、真实请求预算/receipt、search→private validation、固定选择→逐因子 full test、独立组合、质量审计及 accepted-action 训练数据导出。Qlib worker 复用固定 FFO 指标和 TopkDropout 回测。[Assay worker](ASSAY.md) 使用固定官方算子和独立回测器，补齐历史成分、逐日分类、实际基准及离线资产校验。
