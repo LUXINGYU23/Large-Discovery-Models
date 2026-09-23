@@ -80,3 +80,11 @@ LDM_DATA_COLLECTION_ENABLED=1 tasks/alphabench/.venv/bin/python -m tasks.alphabe
 ```
 
 既有 pilot 的结果哈希、成本与数据缺口见 `resources/evidence/partial_csi300_llm_pilot.json`。这是完整路径的先行测试，不是八方法的正式匹配比较。
+
+同一 CSI300 数据上还完成了三轮 LDM pilot，冻结协议为
+`resources/protocols/partial_csi300_ldm_pilot.json`，紧凑证据为
+`resources/evidence/partial_csi300_ldm_pilot.json`。它沿用上面的 Oracle、
+manifest、源码和密钥路径，仅将 `--protocol-file` 指向 LDM 协议，并使用新的
+`--out-dir`。前两轮暂停记录保留在远端；成功的运行把输出 token 上限设为
+32768，第三轮记录了已拟合 GP 的实际选择，随后完成私有 validation、冻结选择、
+独立 test 和组合。它与 direct pilot 的 E 不同，不能据此作正式方法优劣比较。

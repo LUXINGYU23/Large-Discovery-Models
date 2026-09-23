@@ -1533,3 +1533,26 @@ new run while keeping the durable receipt and budget behavior unchanged.
 Complexity review: one error string changed, with no new logging pipeline,
 retry, exception type, configuration or dependency. The provider transport
 already bounds HTTP error detail. The original paused run remains intact.
+
+## Change 48: run a real LDM GP pilot on the frozen partial dataset
+
+Cross-check against W09/W14 and Spec sections 5.4/7/12: the first LDM pilot
+stopped with an unknown model dispatch outcome. A second run received
+`status=incomplete` from DeepSeek Responses at an 8192 output-token limit;
+the raw incomplete response was not published, so its exact reason is unknown.
+Both runs remain paused without a same-ID retry. A new frozen protocol changed
+only `max_model_tokens` to 32768 and completed three search rounds on the same
+CSI300 archive and Oracle configuration as the direct pilot. The selection
+events record GP `prior`, `fallback` and `fitted` states in order, with two
+measured observations before the fitted selection. All three private
+validations completed. Two selected factors and their independent combination
+each produced 725 test sessions. The completed run replayed without new work.
+The source audit still has 107 unresolved security sessions and five interval
+conflicts, so the result remains `partial_comparison` and `complete_t3=false`.
+The direct and LDM pilots have different E and are not a matched comparison.
+
+Complexity review: the existing GP selector, Host receipts, Oracle service and
+report path were used unchanged. The repository adds only one concrete LDM
+protocol and its compact run evidence; no provider retry, data workaround,
+comparison wrapper or new dependency was introduced. Full native/Harness
+method runs, formal matched budgets and remaining market cells are still open.
