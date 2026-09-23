@@ -1202,3 +1202,23 @@ four previously verified long upstream examples deselected; an earlier run
 with those examples included was stopped after 190 passes and four skips.
 This only qualifies service-process recovery on the fixture. Cancellation,
 other W15 boundaries, real market data and the full W16 matrix remain open.
+
+## Change 33: resume a committed Harness turn after Host process death
+
+Cross-check against W15 R14 and Spec section 12.2: a separate fake sidecar
+process requests one provider authorization, commits a turn and exits. After
+the client recovers that committed turn, the Host OS process exits before it
+can consume the result. Two subsequent Host processes replay the same sidecar
+commit and reconcile the stored provider receipt. The accepted submission,
+single authorization and frozen `model_requests`/turn/attempt counters remain
+unchanged across both resumes.
+
+Complexity review: the test reuses the shared Harness client, task Host meter
+and existing persistent fixture. The fixture's explicit protocol release now
+avoids evaluating an unused package-version default, allowing the task venv
+to run it without installing another package. No production retry path,
+session store or accounting layer was added. Focused task Harness/Host tests
+passed 23 cases, shared Harness client tests passed 23, actual Docker guest
+and MCP tests passed two, and isolated policy runner/profile tests passed five.
+This does not close policy-epoch R19, real Pi crash recovery, cancellation or
+the remaining W15 matrix. Full market qualification remains blocked.

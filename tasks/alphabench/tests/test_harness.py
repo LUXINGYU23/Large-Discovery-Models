@@ -1,5 +1,8 @@
 import hashlib
 import json
+from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -161,6 +164,73 @@ def test_harness_attempt_ledger_replays_after_accept_receipt_interruption(tmp_pa
     assert replay.decision == "accept"
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     assert expander.accepted.load(["turn-1", submission.digest]) is not None
+
+
+def test_host_process_death_after_sidecar_commit_replays_without_provider_charge(tmp_path):
+    fixture = Path(__file__).parents[3] / "tests/fixtures/fake_harness_sidecar.py"
+    script = r'''
+import json, os, sys
+from pathlib import Path
+from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.harness import (HarnessClient, HarnessPoolConfig, HarnessProfile, HarnessSubmissionValidation, HarnessTurn)
+from tasks.alphabench.core.harness import HarnessMeter, submission_contract
+from tasks.alphabench.core.host import HostDispatcher
+
+run, fixture = Path(sys.argv[1]), Path(sys.argv[2])
+limits = {"model_requests": 1, "harness_turns": 1, "proposal_attempts": 1}
+runtime = CampaignRuntime.open(run, task="alphabench", budget_limits=limits,
+    resume=(run / "campaign.json").exists())
+artifact_root = run / "harness"
+artifact_root.mkdir(exist_ok=True)
+config = HarnessPoolConfig(artifact_root=artifact_root,
+    profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+    campaign_id=runtime.run_id, task_id="alphabench", case_id="recovery", seed=0,
+    submission_contract=submission_contract(1))
+turn = HarnessTurn("research", "round-0-research", 0, 0, 0, "c" * 64, "research")
+host = HostDispatcher()
+meter = HarnessMeter(runtime, host)
+os.environ.update(HARNESS_TEST_RELEASE="0.2.0", HARNESS_TEST_PROVIDER_AUTH="1",
+    HARNESS_TEST_PROCESS_FAILURE="exit")
+client = HarnessClient((sys.executable, "-u", str(fixture)), api_key="fixture",
+    config=config, response_timeout_seconds=5)
+original_request = client._request
+marker = run / "host-crashed.marker"
+
+def request(*args, **kwargs):
+    result = original_request(*args, **kwargs)
+    if args[0] == "run_turn" and not marker.exists():
+        marker.write_text("after-sidecar-commit")
+        os._exit(96)
+    return result
+
+client._request = request
+
+def stage():
+    meter.reserve_turns([turn.turn_id])
+    with client:
+        result, = client.run_turn((turn,),
+            submission_validator=lambda _: HarnessSubmissionValidation(),
+            provider_authorizer=meter.authorize, recovery_timeout_seconds=10)
+        return {"replayed": result.replayed, "submission": result.submission,
+            "usage": meter.reconcile(result.profile_id, result.turn_id, result.usage)}
+
+print(json.dumps(host.run(stage)))
+'''
+    command = [sys.executable, "-c", script, str(tmp_path / "run"), str(fixture)]
+    killed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    assert killed.returncode == 96, killed.stderr
+    resumed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    assert resumed.returncode == 0, resumed.stderr
+    result = json.loads(resumed.stdout)
+    replayed = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    assert replayed.returncode == 0, replayed.stderr
+    assert json.loads(replayed.stdout) == result
+    assert result["replayed"] is True
+    assert result["submission"] == {"candidates": [{"value": "research"}]}
+    assert result["usage"] == {"host_authorizations": 1, "sidecar_provider_calls": 1}
+    budget = json.loads((tmp_path / "run/budget.json").read_text())["counters"]
+    assert budget == {"model_requests": 1, "harness_turns": 1, "proposal_attempts": 1}
+    assert len(list((tmp_path / "run/private/harness/provider").glob("*.json"))) == 1
 
 
 def test_harness_schema_rejection_stays_rejected_in_quality_audit(tmp_path):

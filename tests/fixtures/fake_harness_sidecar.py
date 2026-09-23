@@ -14,7 +14,7 @@ from importlib.metadata import version
 profiles: list[str] = []
 committed = {}
 turn_requests = 0
-print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE", version("large-discovery-models"))}), flush=True)
+print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE") or version("large-discovery-models")}), flush=True)
 
 
 def submission_record(submission, artifacts) -> tuple[str, str]:
