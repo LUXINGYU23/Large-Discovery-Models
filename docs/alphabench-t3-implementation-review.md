@@ -1121,3 +1121,34 @@ budget consistency check, 21 focused campaign/collection/seed-bundle tests
 passed. W15's remaining service, native, Harness, cancellation, concurrency and
 isolation fault matrix is still open; the manifest is not an offline rebuild of
 `result.json` from raw receipts. `complete_t3=false` remains correct.
+
+## Change 30: rebuild final reports from frozen inputs
+
+Cross-check against W14 and Spec section 13: the search execution summary is
+accepted before finalization, so a later process can reconstruct the same
+selection, test, quality audit, metrics and publication manifest from the
+checkpoint, budget ledgers, generation records and completed Oracle receipts.
+The offline command uses the original request construction and verifies receipt
+identity, request and response digests. A missing required receipt fails closed;
+only a missing quality check with exhausted frozen budget reproduces the
+original incomplete-coverage result. Existing published files must match the
+rebuild byte for byte, while a missing `result.json` can be regenerated from
+the original inputs. The source run is never modified and the output must be a
+fresh directory outside it.
+
+Complexity review: this remains a task-local CLI around the existing finalizer,
+not a second reporting implementation. The only read-only adapter supplies
+frozen Oracle responses; no model client, Oracle endpoint, new persistence
+layer or compatibility path was added. The review reduced copied inputs to the
+JSON files actually read by the finalizer, excluding session traces and other
+private files. Quality budget reasons now use a stable code rather than a
+runtime exception message, which also makes the offline projection exact.
+
+Remote verification: 307 task tests passed, two optional backend tests skipped,
+and four long upstream examples deselected before the final input-copy change.
+After that change, eight focused rebuild/quality tests and all six native
+CoT/ToT/EA Qlib/Assay full-workflow cases passed. A persistent mock run rebuilt
+all four published files byte for byte with the selective input set. This
+closes the offline-report-rebuild item only; real market qualification, Assay
+portfolio service and the W15/W16 matrices remain open. `complete_t3=false`
+remains correct.

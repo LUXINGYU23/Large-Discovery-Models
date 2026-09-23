@@ -56,8 +56,8 @@ def audit_quality(protocol, runtime, gateway):
             if candidate.candidate_id not in checked:
                 try:
                     checked[candidate.candidate_id] = gateway.evaluate(candidate, phase="quality", position=candidate.candidate_id)
-                except BudgetExceededError as exc:
-                    row["reason"] = str(exc)
+                except BudgetExceededError:
+                    row["reason"] = "budget_exhausted"
             raw = original[digest(occurrence["check_receipt"])] if "check_receipt" in occurrence else checked.get(candidate.candidate_id)
             row.update(candidate_id=candidate.candidate_id, backend_valid=raw["success"] if raw else None,
                        paper_valid=False if not row["paper_static_valid"] else protocol.check_passed(raw, paper=True) if raw else None)

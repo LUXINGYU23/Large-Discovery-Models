@@ -36,6 +36,7 @@ def verify_report_artifacts(run_dir, protocol):
 def finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget, *, execution):
     private = runtime.run_dir / "private"
     stages = Receipts(private / "stages")
+    stages.accept("search_execution", execution)
     runtime.status.update("running", phase="validation_complete", budget=runtime.budget)
     domain = FactorDomain(protocol.backend)
     native = protocol.method.startswith("alphabench_")

@@ -8,6 +8,7 @@ import pytest
 from tasks.alphabench.core import workflow
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.rebuild_report import rebuild
 from tasks.alphabench.core.source_profiles import definition, resolve_source
 from tasks.alphabench.core.oracle_worker import load_source
 from tasks.alphabench.core.receipts import Receipts
@@ -278,6 +279,7 @@ def test_native_workflow_runs_full_stages_without_starting_search_engine(tmp_pat
         assert update["rounds"] == 2 and len(update["events"]) == 2
         assert update["sum_U_t"] == sum(event["U_t"] for event in update["events"])
         assert update["reason"] is None
+        assert len(rebuild(run, tmp_path / "rebuilt")["matched"]) == 4
     else:
         assert report["search"]["ea_update"] == {"applicable": False, "reason": "not_ea"}
     assert report["initialization"]["seed_count"] == 2

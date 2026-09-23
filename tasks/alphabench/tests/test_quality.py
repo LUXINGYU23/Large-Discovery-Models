@@ -42,6 +42,7 @@ def test_quality_reuses_checks_and_does_not_report_rates_for_missing_coverage(tm
     assert result["rows"][0]["backend_valid"] is True
     assert result["rows"][1]["backend_valid"] is True
     assert result["rows"][2]["backend_valid"] is None
+    assert result["rows"][2]["reason"] == "budget_exhausted"
     assert result["rows"][3]["backend_valid"] is False
     assert (tmp_path / "budget.json").read_bytes() == budget
     assert audit_quality(protocol, runtime, gateway) == result

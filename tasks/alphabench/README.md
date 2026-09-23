@@ -34,6 +34,7 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 - `protocol.json`、`campaign.json`、`budget.json`、`events.jsonl`、`checkpoint.json`：冻结身份、预算、共享事件和恢复视图。
 - `initialization/`：独立初始化预算、种子清单和观测。
 - `private/`：Host 私有 model/oracle receipts、validation 和终局阶段记录。
+- `private/stages/`：冻结的 search execution、selection、test 与 quality 输入；离线重建以这些记录和完成的 Oracle receipts 重新投影。
 - `selection_frozen.json`：任何 test 前冻结的 validation 排名、因子集合、方向和持仓参数。
 - `result.json`、`report.md`、`trajectory.csv`：search、full test、组合、质量/多样性、预算与逐阶段完整性。
 - `report_manifest.json`：上述三份报告的 SHA-256 与协议 digest；完成状态的同 run 恢复先验证该清单，已发布未 finish 的运行只补提交终态。
@@ -48,6 +49,14 @@ uv run --locked --project tasks/alphabench python scripts/run_ldm_tts.py config/
 `result.json` 的 `test[].raw` 与 `independent_combination` 原样保留后端 daily、scores、portfolio、holdings、actions 和未规范化的 turnover；`test[].derived` 另记无年化、ddof=1 的 ICIR、固定方向 WinRate 与中心矩 skewness。`search.ea_update` 从每轮冻结的 top pool 计算 `U_t` 和实际 `T`，与 best-factor 更新事件分开。`quality_audit` 的分母为 raw occurrence，格式失败单列；覆盖不足时通过率为 null。`completeness` 每阶段记录状态和原因，`complete_t3=false` 不因 mock 成功而改变。`report.md` 仅从 `result.json` 渲染。
 
 `trajectory.csv` 以新 search evaluation attempt 为主轴；`physical_search_jobs` 是该次 Oracle search 响应的实际 jobs，`oracle_elapsed_seconds` 是该响应耗时，累计耗时是响应耗时之和，不是墙钟时间。`model_requests_run_total` 和 `tool_calls_run_total` 是整次 run 的成本，每行重复展示而非逐候选归因；sidecar 缺 usage 时保留 null。Harness 的 Search Cost 用每个已提交 session 的实际 provider calls 表示，与直接/原生方法每步最多五次修复的单位分开。
+
+离线重建只读取已冻结的 checkpoint、预算、生成记录与 Oracle receipts，不创建模型或 Oracle 客户端，也不修改源 run。输出目录必须尚不存在；原报告文件若仍在源目录，会逐字节核对，删除了 `result.json` 也能从原始记录重算。缺失必需 receipt、请求身份或响应哈希不一致时停止。
+
+```bash
+tasks/alphabench/.venv/bin/python -m tasks.alphabench.rebuild_report \
+  --run-dir /mnt/data1/Large-Discovery-Models/runs/t3-run \
+  --out-dir /mnt/data1/Large-Discovery-Models/rebuilds/t3-run
+```
 
 CoE/ToT 多 run 的 FracSuccess 只从预先保存的 roster 聚合。roster 的 `schema_version=1`，包含 `method`、`backend`、`market`、`profile`、`invalid_rule`（`count_as_failure` 或 `exclude_with_evidence`），以及 `runs` 数组；每项含唯一 `run_id`、整数 `seed`、冻结的 `protocol_digest` 和 `run_dir`。不同 run 除随机种子外须使用相同协议。缺失结果和模型生成失败留在分母；基础设施无效须在独立的 invalidations JSON 中以 run ID 指向非空证据文件。相对运行目录相对于 roster 所在目录，相对证据文件相对于 invalidations 所在目录。产物记录原始清单、结果与证据的 SHA-256、逐 run 纳入决定；`aggregation_qualified=false` 的比率仅用于诊断。
 
