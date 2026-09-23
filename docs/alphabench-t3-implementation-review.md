@@ -1586,3 +1586,28 @@ settlement tests passed 19. A wider example-baseline run was interrupted after
 19 passing tests because its 42-factor case consumed five minutes; no failure
 was observed in those 19 tests. The new protocol and compact evidence only
 describe the actual CoT run. Other methods and markets remain open.
+
+## Change 50: execute native ToT and EA on the same seed information
+
+Cross-check against W08/W10/W14 and Spec sections 6.2/7/12: the completed
+CoT initialization bundle was imported without regenerating or reevaluating
+its nine Alpha158 `kbar` factors. The ToT protocol ran two parallel trees for
+two rounds with `N=2`, `top_k=1`, and eight measured search candidates. The
+native algorithm finished with four tree states and eight final-pool factors.
+Its twelve model requests include actual generation repairs. EA ran two full
+generations with two mutation and two crossover candidates each; the retained
+pool gained three then four new expressions (`U_t`), and the native algorithm
+finished with ten final-pool factors. Both runs completed eight private search
+validations, selected two factors by frozen validation, evaluated each across
+725 test sessions and independently combined them across 725 sessions.
+Their completed-run replays incurred no new work. ToT and EA have identical
+data, environment and public initialization digest to CoT, but CoT used E=4
+versus E=8 for these two pilots. These records verify real method behavior,
+not a matched performance ranking or full T3 qualification.
+
+Complexity review: ToT and EA used the existing native adapter, Oracle,
+seed-bundle import, finalization and report path without code changes.
+Only their concrete frozen protocols and compact real-run evidence were
+added; no method-specific shortcut, compatibility branch, new dependency or
+alternate scoring path was needed. Remaining direct/Harness matched runs,
+markets and failure gates are unchanged.

@@ -97,3 +97,11 @@ manifest、源码和密钥路径，仅将 `--protocol-file` 指向 LDM 协议，
 成功运行的摘要、源 bundle 身份和结果哈希见
 `resources/evidence/partial_csi300_cot_pilot.json`。其他 matched 方法可导入
 同一 bundle，但协议的模型、数据、过滤、标签及初始化合同必须一致。
+
+同一 bundle 上的原生 ToT 与 EA pilot 分别冻结为
+`resources/protocols/partial_csi300_tot_pilot.json` 和
+`resources/protocols/partial_csi300_ea_pilot.json`。启动方式与 CoT 成功运行相同，
+替换协议和新的输出目录即可。对应的 `resources/evidence/partial_csi300_tot_pilot.json`
+及 `resources/evidence/partial_csi300_ea_pilot.json` 记录树状态、种群更新、实际
+费用和终局产物。三项原生 pilot 的 `public_information_digest` 相同，但 CoT
+使用 E=4，ToT/EA 使用 E=8，仍是功能验证，不是同预算成绩排名。
