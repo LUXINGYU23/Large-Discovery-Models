@@ -842,3 +842,32 @@ into a new immutable resolver-hash directory, then each hash and resolution
 digest was independently checked. This does not
 qualify real data or the Assay REST portfolio route, and it does not close
 W12/W13, the full market-method matrix or the two real-model acceptance rounds.
+
+## Change 22: introduce sending-time Harness provider authorization
+
+Cross-check against W12 and the existing Python/Pi Harness confirmed that
+turn-end `providerCalls` cannot enforce a finite request budget. The shared
+wire protocol is now release 0.2.0: each proxied request identifies its
+campaign, profile, turn, unique provider request ID and digest before any
+upstream connection. The Python client validates the active turn and answers
+through a task-neutral callback. The sidecar binds each answer to the pending
+run-turn and exact ID/digest; malformed authorization results end the turn.
+Denial returns 403 without forwarding. Request intent and authorized markers
+survive turn recovery, so a rejected or interrupted request ID is not reused.
+The authorized count is separate from rejected attempts in the turn summary.
+
+Complexity review: this extends the one existing proxy, client and JSONL
+protocol. It adds no second model gateway, budget ledger, retry path or
+AlphaBench-specific code to the shared Harness. Other current tasks retain
+their existing accounting and may use their currently built sidecar when they
+do not supply the new callback. The next
+W12 increment must bind AlphaBench's callback to its single Host writer and
+durable `model_requests` budget, then reconcile committed and replayed turns.
+Without that task wiring, this protocol change does not close W12.
+
+Remote validation: Python shared suite 495 passed, one skipped; Pi build and
+37 tests passed; AlphaBench Host/Campaign tests 21 passed. The tests cover the
+control frame, turn identity, old-sidecar rejection, denial,
+one remaining authorization across two concurrent proxy sessions, and ID
+advance after reconnect. These are fake-sidecar and fake-upstream tests;
+the actual guest and full AlphaBench session are still pending.

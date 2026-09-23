@@ -85,8 +85,9 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	sessions.set("b", { runTurn: async () => { await pending; return committed; } });
 	const inputs = [{ profileId: "a", turnId: "a-1" }, { profileId: "b", turnId: "b-1" }] as never;
 	const validate = async () => ({} as never);
+	const authorize = async () => true;
 	let settled = false;
-	const failed = pool.runTurns(inputs, validate).finally(() => { settled = true; });
+	const failed = pool.runTurns(inputs, validate, authorize).finally(() => { settled = true; });
 	const assertion = assert.rejects(failed, (error: unknown) => {
 		assert.ok(error instanceof TurnExecutionError);
 		assert.match(error.message, /provider 502/);
@@ -100,7 +101,7 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	assert.equal(settled, false);
 	release();
 	await assertion;
-	assert.deepEqual(await pool.runTurns(inputs, validate), [{ sessionId: "a" }, committed]);
+	assert.deepEqual(await pool.runTurns(inputs, validate, authorize), [{ sessionId: "a" }, committed]);
 });
 
 test("partial-turn continuation keeps history and classifies execution failures", async () => {
@@ -132,7 +133,7 @@ test("partial-turn continuation keeps history and classifies execution failures"
 		});
 		await assert.rejects(profile.runTurn({
 			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
-		}, async () => ({})), (error: unknown) => {
+		}, async () => ({}), async () => true), (error: unknown) => {
 			assert.ok(error instanceof TurnExecutionError);
 			assert.equal(error.retryable, true);
 			assert.deepEqual(error.turnUsage, [{ profileId: "research", turnId: "turn-1",
@@ -142,7 +143,7 @@ test("partial-turn continuation keeps history and classifies execution failures"
 		for (let index = 1; index < failures.length; index += 1) {
 			await assert.rejects(profile.runTurn({
 				profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
-			}, async () => ({})), (error: unknown) => {
+			}, async () => ({}), async () => true), (error: unknown) => {
 				assert.ok(error instanceof TurnExecutionError);
 				assert.equal(error.retryable, index < failures.length - 2, failures[index]);
 				return true;
@@ -163,7 +164,7 @@ test("a fatal failure is not masked by another session's recoverable failure", a
 	const sessions = (pool as unknown as { sessions: Map<string, { runTurn: () => Promise<unknown> }> }).sessions;
 	sessions.set("a", { runTurn: async () => { throw new TurnExecutionError("timeout", [], true); } });
 	sessions.set("b", { runTurn: async () => { throw new Error("digest mismatch"); } });
-	await assert.rejects(pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never, async () => ({} as never)),
+	await assert.rejects(pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never, async () => ({} as never), async () => true),
 		(error: unknown) => error instanceof TurnExecutionError && !error.retryable && error.message.includes("digest mismatch"));
 });
 

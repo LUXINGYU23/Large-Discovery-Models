@@ -13,6 +13,7 @@ from ldm_tts.harness import (
     HarnessPoolConfig,
     HarnessError,
     HarnessProfile,
+    HarnessProviderAuthorizationRequest,
     HarnessSubmissionContract,
     HarnessSubmissionError,
     HarnessSubmissionValidation,
@@ -232,6 +233,67 @@ def test_persistent_harness_client_runs_one_profile_batch(
     assert result[0].usage["toolCalls"] == {}
     assert result[0].usage["validationSubmissions"] == 1
     assert result[0].tool_budget == {}
+
+
+@pytest.mark.parametrize("decision,bad_identity", [(True, False), (False, False), (True, True)])
+def test_provider_authorization_checks_turn_identity_before_reply(tmp_path, monkeypatch, decision, bad_identity):
+    monkeypatch.setenv("HARNESS_TEST_PROVIDER_AUTH", "1")
+    monkeypatch.setenv("HARNESS_TEST_RELEASE", "0.2.0")
+    if bad_identity:
+        monkeypatch.setenv("HARNESS_TEST_PROVIDER_AUTH_BAD_IDENTITY", "1")
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn("research", "turn-1", 0, 0, 0, "c" * 64, "research")
+    requests: list[HarnessProviderAuthorizationRequest] = []
+
+    def authorize(request):
+        requests.append(request)
+        return decision
+
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        if decision and not bad_identity:
+            result = client.run_turn(
+                (turn,), submission_validator=lambda _: HarnessSubmissionValidation(),
+                provider_authorizer=authorize,
+            )
+            assert result[0].submission_status == "accepted"
+        else:
+            with pytest.raises(HarnessError, match=(
+                "does not match the turn batch" if bad_identity else "provider authorization denied"
+            )):
+                client.run_turn(
+                    (turn,), submission_validator=lambda _: HarnessSubmissionValidation(),
+                    provider_authorizer=authorize,
+                )
+    assert len(requests) == (0 if bad_identity else 1)
+    if requests:
+        assert requests[0].provider_request_id == "turn-1-provider-1"
+
+
+def test_provider_authorization_rejects_old_sidecar_before_turn(tmp_path):
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn("research", "turn-1", 0, 0, 0, "c" * 64, "research")
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        with pytest.raises(HarnessError, match="requires Pi sidecar protocol 0.2.0"):
+            client.run_turn(
+                (turn,), submission_validator=lambda _: HarnessSubmissionValidation(),
+                provider_authorizer=lambda _: True,
+            )
 
 
 @pytest.mark.parametrize("failure", ["measured", "unknown", "wrong-turn"])

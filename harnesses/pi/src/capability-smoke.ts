@@ -275,7 +275,7 @@ async function main(): Promise<void> {
 			inputDigest,
 			message: "Verify the sandbox with bash and read, then submit exactly two candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
-		}], validate);
+		}], validate, async () => true);
 		assert(turn);
 		assert.equal((turn.submission.candidates as unknown[]).length, 2);
 		assert.equal(turn.usage.providerCalls, 7);
@@ -311,20 +311,20 @@ async function main(): Promise<void> {
 			message: "Submit exactly two more candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
 		};
-		await assert.rejects(pool.runTurns([recoveryInput], validate), (error: unknown) => {
+		await assert.rejects(pool.runTurns([recoveryInput], validate, async () => true), (error: unknown) => {
 			assert.ok(error instanceof TurnExecutionError);
 			assert.equal(error.retryable, true);
 			assert.match(error.message, /server_error/);
 			assert.equal(error.turnUsage[0]?.usage.providerCalls, 2);
 			return true;
 		});
-		const [recovered] = await pool.runTurns([recoveryInput], validate);
+		const [recovered] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert(recovered);
 		assert.equal((recovered.submission.candidates as unknown[]).length, 2);
 		assert.equal(recovered.usage.providerCalls, 4);
 		assert.equal((JSON.parse(requestBodies[7] as string) as { tool_choice?: unknown }).tool_choice, "required");
 		assert.equal((JSON.parse(requestBodies[8] as string) as { tool_choice?: unknown }).tool_choice, undefined);
-		const [replayed] = await pool.runTurns([recoveryInput], validate);
+		const [replayed] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert(replayed);
 		assert.equal(replayed.submissionDigest, recovered.submissionDigest);
 		assert.equal(replayed.replayed, true);
@@ -333,6 +333,7 @@ async function main(): Promise<void> {
 			pool.runTurns(
 				[{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }],
 				validate,
+				async () => true,
 			),
 			/history cursor mismatch/,
 		);
@@ -402,7 +403,7 @@ async function main(): Promise<void> {
 		await pool.close();
 		pool = new PiSessionPool(config, secret);
 		await pool.initialize();
-		const [resumed] = await pool.runTurns([recoveryInput], validate);
+		const [resumed] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert.equal(resumed?.sessionId, recovered.sessionId);
 		assert.equal(resumed?.replayed, true);
 		assert.equal(await readFile(dataPath, "utf8"), '{"observations":[]}');

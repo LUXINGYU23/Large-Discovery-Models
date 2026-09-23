@@ -157,6 +157,23 @@ export interface SubmissionValidationResultFrame extends CommonFrame {
 	errors: SubmissionError[];
 }
 
+export interface ProviderAuthorizationRequest {
+	profileId: string;
+	turnId: string;
+	providerRequestId: string;
+	requestDigest: string;
+}
+
+export type ProviderAuthorizer = (request: ProviderAuthorizationRequest) => Promise<boolean>;
+
+export interface ProviderAuthorizationResultFrame extends CommonFrame {
+	type: "provider_authorization_result";
+	authorizationId: string;
+	providerRequestId: string;
+	requestDigest: string;
+	authorized: boolean;
+}
+
 export interface SubmissionValidationRequest {
 	profileId: string;
 	turnId: string;
@@ -185,6 +202,7 @@ export type InputFrame =
 	| InitializeFrame
 	| RunTurnFrame
 	| SubmissionValidationResultFrame
+	| ProviderAuthorizationResultFrame
 	| CloseFrame;
 
 export class TurnExecutionError extends Error {
@@ -575,6 +593,23 @@ export function parseFrame(line: string): InputFrame {
 			submissionDigest: digest(data.submissionDigest, "submissionDigest"),
 			decision: decision as "accept" | "retry" | "reject_turn",
 			errors,
+		};
+	}
+	if (identity.type === "provider_authorization_result") {
+		exactKeys(data, [
+			"type", "requestId", "protocolVersion", "campaignId", "authorizationId",
+			"providerRequestId", "requestDigest", "authorized",
+		], "frame");
+		if (typeof data.authorized !== "boolean") {
+			throw new ProtocolError("invalid_frame", "authorized must be a boolean");
+		}
+		return {
+			...identity,
+			type: "provider_authorization_result",
+			authorizationId: string(data.authorizationId, "authorizationId"),
+			providerRequestId: string(data.providerRequestId, "providerRequestId"),
+			requestDigest: digest(data.requestDigest, "requestDigest"),
+			authorized: data.authorized,
 		};
 	}
 	if (identity.type === "run_turn") {

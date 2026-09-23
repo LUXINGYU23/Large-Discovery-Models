@@ -5,6 +5,8 @@ import {
 	TurnExecutionError,
 	parseFrame,
 	type InputFrame,
+	type ProviderAuthorizationRequest,
+	type ProviderAuthorizationResultFrame,
 	type SubmissionValidationDecision,
 	type SubmissionValidationRequest,
 	type SubmissionValidationResultFrame,
@@ -19,7 +21,7 @@ let pool: PiSessionPool | undefined;
 let redactor = new Redactor([]);
 let closing = false;
 
-type CommandFrame = Exclude<InputFrame, SubmissionValidationResultFrame>;
+type CommandFrame = Exclude<InputFrame, SubmissionValidationResultFrame | ProviderAuthorizationResultFrame>;
 
 class SubmissionValidationBroker {
 	private readonly pending = new Map<string, {
@@ -69,6 +71,57 @@ class SubmissionValidationBroker {
 
 const validations = new SubmissionValidationBroker();
 
+class ProviderAuthorizationBroker {
+	private readonly pending = new Map<string, {
+		requestId: string;
+		campaignId: string;
+		providerRequestId: string;
+		requestDigest: string;
+		resolve: (authorized: boolean) => void;
+		reject: (error: Error) => void;
+	}>();
+	private nextId = 0;
+
+	request(frame: { requestId: string; campaignId: string }, request: ProviderAuthorizationRequest): Promise<boolean> {
+		this.nextId += 1;
+		const authorizationId = `${frame.requestId}-authorization-${this.nextId.toString().padStart(6, "0")}`;
+		const result = new Promise<boolean>((resolve, reject) => {
+			this.pending.set(authorizationId, {
+				requestId: frame.requestId,
+				campaignId: frame.campaignId,
+				providerRequestId: request.providerRequestId,
+				requestDigest: request.requestDigest,
+				resolve,
+				reject,
+			});
+		});
+		respondTo(frame, "provider_authorization_requested", { authorizationId, ...request });
+		return result;
+	}
+
+	resolve(frame: ProviderAuthorizationResultFrame): void {
+		const pending = this.pending.get(frame.authorizationId);
+		if (
+			!pending
+			|| pending.requestId !== frame.requestId
+			|| pending.campaignId !== frame.campaignId
+			|| pending.providerRequestId !== frame.providerRequestId
+			|| pending.requestDigest !== frame.requestDigest
+		) {
+			throw new ProtocolError("invalid_state", `unknown provider authorization: ${frame.authorizationId}`);
+		}
+		this.pending.delete(frame.authorizationId);
+		pending.resolve(frame.authorized);
+	}
+
+	rejectAll(error: Error): void {
+		for (const pending of this.pending.values()) pending.reject(error);
+		this.pending.clear();
+	}
+}
+
+const authorizations = new ProviderAuthorizationBroker();
+
 function respond(value: unknown): void {
 	process.stdout.write(`${JSON.stringify(redactor.value(value))}\n`);
 }
@@ -96,6 +149,7 @@ async function close(): Promise<void> {
 	if (closing) return;
 	closing = true;
 	validations.rejectAll(new Error("harness sidecar is closing"));
+	authorizations.rejectAll(new Error("harness sidecar is closing"));
 	const activePool = pool;
 	pool = undefined;
 	try {
@@ -152,6 +206,7 @@ async function handle(frame: CommandFrame): Promise<boolean> {
 		const turns = await pool.runTurns(
 			frame.turns,
 			(request) => validations.request(frame, request),
+			(request) => authorizations.request(frame, request),
 		);
 		respondTo(frame, "turn_committed", { turns });
 		return true;
@@ -170,10 +225,12 @@ for await (const line of lines) {
 	if (!line.trim()) continue;
 	let requestId: string | undefined;
 	let requestCampaignId: string | undefined;
+	let requestType: string | undefined;
 	let frame: InputFrame | undefined;
 	try {
-		const parsed = JSON.parse(line) as { requestId?: unknown; campaignId?: unknown };
+		const parsed = JSON.parse(line) as { requestId?: unknown; campaignId?: unknown; type?: unknown };
 		if (typeof parsed.requestId === "string") requestId = parsed.requestId;
+		if (typeof parsed.type === "string") requestType = parsed.type;
 		if (typeof parsed.campaignId === "string") {
 			requestCampaignId = parsed.campaignId;
 		}
@@ -183,6 +240,10 @@ for await (const line of lines) {
 	try {
 		frame = parseFrame(line);
 	} catch (error) {
+		if (requestType === "provider_authorization_result" && activeCommand) {
+			authorizations.rejectAll(error as Error);
+			continue;
+		}
 		respond({
 			type: "error",
 			requestId,
@@ -202,6 +263,14 @@ for await (const line of lines) {
 		}
 		continue;
 	}
+	if (frame.type === "provider_authorization_result") {
+		try {
+			authorizations.resolve(frame);
+		} catch (error) {
+			authorizations.rejectAll(error as Error);
+		}
+		continue;
+	}
 	if (activeCommand) {
 		respondTo(frame, "error", {
 			error: { code: "invalid_state", message: "sidecar is processing another command" },
@@ -218,6 +287,7 @@ for await (const line of lines) {
 				...(error instanceof TurnExecutionError ? { turnUsage: error.turnUsage } : {}),
 			};
 			validations.rejectAll(error as Error);
+			authorizations.rejectAll(error as Error);
 			respondTo(frame, "error", {
 				error: failure,
 			});
