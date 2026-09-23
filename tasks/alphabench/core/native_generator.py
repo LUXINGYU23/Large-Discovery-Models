@@ -283,8 +283,13 @@ class NativeGenerator:
             response = self.generator.request(logical, request["messages"])
             requests.setdefault(logical[1], []).append((logical[2], receipt["identity"], response.text))
         for path in sorted(self.gateway.receipts.root.glob("*.json")):
+            if path == self.gateway.receipts.path("service_identity"):
+                continue
             receipt = json.loads(path.read_text(encoding="utf-8"))
-            if receipt["identity"]["phase"] != "check" or receipt["state"] == "reserved":
+            identity = receipt.get("identity")
+            if not isinstance(identity, dict) or "phase" not in identity:
+                raise EvaluationPaused("native oracle receipt lacks its request identity")
+            if identity["phase"] != "check" or receipt["state"] == "reserved":
                 continue
             candidate = self.generator.domain.admit(RawProposal(
                 {"expression": receipt["request"]["expression"]}, "native_generation"))

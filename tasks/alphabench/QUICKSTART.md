@@ -88,3 +88,12 @@ manifest、源码和密钥路径，仅将 `--protocol-file` 指向 LDM 协议，
 `--out-dir`。前两轮暂停记录保留在远端；成功的运行把输出 token 上限设为
 32768，第三轮记录了已拟合 GP 的实际选择，随后完成私有 validation、冻结选择、
 独立 test 和组合。它与 direct pilot 的 E 不同，不能据此作正式方法优劣比较。
+
+原生 CoT 的真实 pilot 使用 `resources/protocols/partial_csi300_cot_pilot.json`
+和同一数据 manifest、Oracle 服务。首次运行完成了 9 个 Alpha158 `kbar`
+种子的初始化，但主运行在终局对账处失败；该初始化目录保持原样。修复后以新
+`--out-dir` 启动，并传入
+`--initialization-bundle /mnt/data1/Large-Discovery-Models/runs/alphabench-t3/partial-csi300-cot-pilot/initialization`。
+成功运行的摘要、源 bundle 身份和结果哈希见
+`resources/evidence/partial_csi300_cot_pilot.json`。其他 matched 方法可导入
+同一 bundle，但协议的模型、数据、过滤、标签及初始化合同必须一致。

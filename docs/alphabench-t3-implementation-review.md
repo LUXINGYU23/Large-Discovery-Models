@@ -1556,3 +1556,33 @@ report path were used unchanged. The repository adds only one concrete LDM
 protocol and its compact run evidence; no provider retry, data workaround,
 comparison wrapper or new dependency was introduced. Full native/Harness
 method runs, formal matched budgets and remaining market cells are still open.
+
+## Change 49: reconcile real native CoT and reuse its measured seed bundle
+
+Cross-check against W08/W10/W15 and Spec sections 6.2/7/11: the first real
+CoT run completed all nine official Alpha158 `kbar` seed evaluations and its
+four native search evaluations, then failed in `NativeGenerator.settle()`.
+Oracle preflight had stored a verified `service_identity` document beside
+ordinary request receipts. The native scanner assumed every JSON file in that
+directory had a request `identity`, causing a `KeyError` after the paid work.
+The scanner now skips exactly the preflight document and raises a controlled
+pause for any other record without request identity. The failed run remains
+intact. A new run imported its independently completed initialization bundle,
+verified all source files and receipts, and completed CoT's two parallel chains
+for two rounds each. The native result reports `algorithm_completed=true` with
+six history states; four search observations, all thirteen private validations
+including seeds, two independent 725-session test portfolios and the 725-session
+combination completed. Completed-run replay performed no new work. The shared
+seed bundle digest and public information digest are recorded for reuse by the
+remaining matched methods. Known market gaps still require
+`partial_comparison`; this pilot does not establish a formal matched ranking.
+
+Complexity review: one existing scanner recognizes the single metadata file
+created by the existing Oracle preflight. No extra receipt directory, adapter,
+retry path or compatibility layer was added. The focused regression verifies
+both the valid service record and an unexpected identity-free document.
+Remote native generator tests passed 18 and the native evaluation plus focused
+settlement tests passed 19. A wider example-baseline run was interrupted after
+19 passing tests because its 42-factor case consumed five minutes; no failure
+was observed in those 19 tests. The new protocol and compact evidence only
+describe the actual CoT run. Other methods and markets remain open.

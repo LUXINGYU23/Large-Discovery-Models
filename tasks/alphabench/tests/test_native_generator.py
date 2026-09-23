@@ -76,6 +76,16 @@ def test_full_raw_output_tail_sampling_and_idempotent_replay(tmp_path, source, m
     assert not new_calls and len(calls) == 1 and (tmp_path / "budget.json").read_bytes() == before
 
 
+def test_native_settlement_skips_service_binding_but_rejects_unknown_receipts(tmp_path, source, monkeypatch):
+    native, scheduler, _ = build(tmp_path, [{"generated": [{"name": "A", "expression": "$close"}]}], monkeypatch)
+    invoke(native, scheduler, count=1)
+    native.gateway.receipts.accept("service_identity", {"config_digest": "a" * 64})
+    assert native.settle() == {"interrupted_generations": 0}
+    native.gateway.receipts.accept("unexpected", {"config_digest": "b" * 64})
+    with pytest.raises(EvaluationPaused, match="oracle receipt lacks its request identity"):
+        native.settle()
+
+
 def test_native_cold_start_retains_partial_factors_even_when_source_success_is_false(tmp_path, source, monkeypatch):
     output = {"generated": [{"name": "a", "expression": "$close"}, {"name": "b", "expression": "$open"}]}
     native, scheduler, calls = build(tmp_path, [output] + [{"generated": []}] * 4, monkeypatch,
