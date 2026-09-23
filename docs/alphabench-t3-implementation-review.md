@@ -1222,3 +1222,31 @@ passed 23 cases, shared Harness client tests passed 23, actual Docker guest
 and MCP tests passed two, and isolated policy runner/profile tests passed five.
 This does not close policy-epoch R19, real Pi crash recovery, cancellation or
 the remaining W15 matrix. Full market qualification remains blocked.
+
+## Change 34: reconcile a committed policy turn across Host death
+
+Cross-check against plan W15 R19/Y03 and Spec sections 11.3/12.2: the task selector
+precharges the policy turn, and the provider authorization charges each model
+request before the sidecar may send it. A separate sidecar process commits the
+policy `disable` submission. The Host OS process then exits either before the
+controller persists the result or after that result exists but before the
+selector reconciles it. Two later Host processes use the replayed or cached
+result, each seeing the same policy action and one provider receipt; model and
+policy counters stay at one. The test does not cover a compiled `replace` epoch
+or a real Pi process fault, so those W15 claims remain open.
+
+The data-source cross-check also confirmed that the official AlphaBench
+download is precomputed IC/RankIC tables, not new T3 factor OHLCV. A candidate
+US archive's public `LLL` listing omits L3 Technologies despite the SEC's
+historical ticker evidence, so it was not promoted as a qualified source.
+The local-acquisition, hash-transfer and remote offline-audit procedure remains
+in `DATA.md`; the existing CSI500 count was preserved while its Markdown row
+was repaired.
+
+Complexity review: the process test uses the existing selector, controller,
+Harness client and Host meter; only the shared fake sidecar's terminal
+submission is configurable. No new production state, wrapper, fallback,
+dependency or data-source abstraction was introduced. Shared Harness/Policy
+tests passed 48; task Policy/Harness tests passed 16 with five optional
+container cases skipped. Market-data qualification, real Assay portfolio
+service parity and the remaining W15/W16/W17 gates remain blocked or open.

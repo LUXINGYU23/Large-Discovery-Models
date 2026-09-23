@@ -3,6 +3,8 @@ from pathlib import Path
 from types import SimpleNamespace
 import json
 import os
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -190,6 +192,105 @@ def test_policy_capability_variants_are_frozen(capabilities):
     protocol = T3Protocol(method="ldm_harness_compiled", policy_capabilities=capabilities)
     assert T3PolicyAdapter(protocol).capability_contract().enabled_capabilities == tuple(sorted(capabilities))
     assert protocol.to_dict()["policy_capabilities"] == list(capabilities)
+
+
+@pytest.mark.parametrize("stage,exit_code,result_written", [
+    ("after_sidecar", 97, False),
+    ("after_result", 98, True),
+])
+def test_policy_reconciles_committed_turn_after_host_process_death(tmp_path, stage, exit_code, result_written):
+    fixture = Path(__file__).parents[3] / "tests/fixtures/fake_harness_sidecar.py"
+    script = r'''
+import json, os, sys
+from dataclasses import replace
+from pathlib import Path
+from ldm_tts.contracts import RawProposal
+from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.harness import (HarnessClient, HarnessPoolConfig, HarnessProfile,
+    PolicyResearchController, policy_submission_contract)
+from ldm_tts.optimization.records import BOObservation
+from tasks.alphabench.core.candidate import FactorDomain
+from tasks.alphabench.core.harness import HarnessMeter
+from tasks.alphabench.core.host import HostDispatcher
+from tasks.alphabench.core.policy import CompiledFactorSelector
+from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.selection import FEATURE_VERSION, FactorEncoder
+
+run, fixture, stage = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+runtime = CampaignRuntime.open(run, task="alphabench",
+    budget_limits={"model_requests": 1, "policy_turns": 1},
+    resume=(run / "campaign.json").exists())
+host = HostDispatcher()
+gateway = type("Gateway", (), {"runtime": runtime, "host": host})()
+meter = HarnessMeter(runtime, host)
+protocol = T3Protocol(method="ldm_harness_compiled", sessions=1,
+    candidates_per_session=1, batch_size=1)
+selector = CompiledFactorSelector(protocol, mock=True)
+domain, encoder = FactorDomain(), FactorEncoder()
+previous = domain.admit(RawProposal({"name": "previous", "expression": "Mean($close,5)"}, "test"))
+candidate = domain.admit(RawProposal({"name": "next", "expression": "Std($close,10)"}, "test"))
+candidate = replace(candidate, metadata={"q0": 1.0, "harness_lineage": [{}]})
+selector.fit((BOObservation.scalar(previous.candidate_id, .02, encoder.encode(previous).values,
+    feature_version=FEATURE_VERSION, metadata={"round_idx": 0}),))
+root = run / "policy_harness"
+root.mkdir(exist_ok=True)
+config = HarnessPoolConfig(artifact_root=root,
+    profiles=(HarnessProfile("policy_architect", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+    campaign_id=runtime.run_id, task_id="alphabench", case_id="policy-recovery", seed=0,
+    submission_contract=policy_submission_contract())
+os.environ.update(HARNESS_TEST_RELEASE="0.2.0", HARNESS_TEST_PROVIDER_AUTH="1",
+    HARNESS_TEST_PROCESS_FAILURE="exit", HARNESS_TEST_SUBMISSION="policy_disable")
+client = HarnessClient((sys.executable, "-u", str(fixture)), api_key="fixture",
+    config=config, response_timeout_seconds=5)
+marker = run / "host-crashed.marker"
+if stage == "after_sidecar":
+    original_request = client._request
+    def request(*args, **kwargs):
+        result = original_request(*args, **kwargs)
+        if args[0] == "run_turn" and not marker.exists():
+            marker.write_text(stage)
+            os._exit(97)
+        return result
+    client._request = request
+controller = PolicyResearchController(client=client, adapter=selector.adapter,
+    executor=None, root=root, account=None, recovery_budget=lambda: 10,
+    provider_authorizer=meter.authorize)
+if stage == "after_result":
+    original_resolve = controller.resolve
+    def resolve(round_input):
+        result = original_resolve(round_input)
+        if not marker.exists():
+            marker.write_text(stage)
+            os._exit(98)
+        return result
+    controller.resolve = resolve
+selector.bind(controller, meter, gateway)
+with client:
+    result = selector.select((candidate,),
+        {candidate.candidate_id: encoder.encode(candidate)}, count=1, round_idx=1)
+print(json.dumps({"selected": result.selected_candidate_ids,
+    "status": result.metadata["policy"]["status"],
+    "action": result.metadata["policy"]["action"],
+    "accounting": result.metadata["policy"]["accounting"]}))
+'''
+    command = [sys.executable, "-c", script, str(tmp_path / "run"), str(fixture), stage]
+    killed = subprocess.run(command, capture_output=True, text=True, timeout=40)
+    assert killed.returncode == exit_code, killed.stderr
+    run = tmp_path / "run"
+    assert (run / "host-crashed.marker").read_text() == stage
+    assert (run / "policy_harness/rounds/round_001/result.json").exists() is result_written
+    resumed = subprocess.run(command, capture_output=True, text=True, timeout=40)
+    assert resumed.returncode == 0, resumed.stderr
+    replayed = subprocess.run(command, capture_output=True, text=True, timeout=40)
+    assert replayed.returncode == 0, replayed.stderr
+    result = json.loads(resumed.stdout)
+    assert json.loads(replayed.stdout) == result
+    assert result["status"] == "accepted" and result["action"] == "disable"
+    assert result["accounting"] == {"host_authorizations": 1, "sidecar_provider_calls": 1}
+    assert json.loads((run / "budget.json").read_text())["counters"] == {
+        "model_requests": 1, "policy_turns": 1}
+    assert len(list((run / "private/harness/provider").glob("*.json"))) == 1
+    assert len(json.loads((run / "policy_harness/fake_committed.json").read_text())) == 1
 
 
 @pytest.mark.parametrize("capabilities", [("prior_mean@1",), ("ldm_weights@1",),

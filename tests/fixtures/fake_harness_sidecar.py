@@ -14,6 +14,7 @@ from importlib.metadata import version
 profiles: list[str] = []
 committed = {}
 turn_requests = 0
+policy_disable = os.environ.get("HARNESS_TEST_SUBMISSION") == "policy_disable"
 print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE") or version("large-discovery-models")}), flush=True)
 
 
@@ -98,7 +99,8 @@ for line in sys.stdin:
                     }}), flush=True)
                     sys.exit(0)
             attempt_index = 0
-            submission = {"candidates": [{"value": item["profileId"]}]}
+            submission = ({"action": "disable"} if policy_disable
+                          else {"candidates": [{"value": item["profileId"]}]})
             artifacts = []
             decision = {"decision": "accept", "errors": []}
             while not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
@@ -122,7 +124,8 @@ for line in sys.stdin:
                 decision = validation
                 if decision["decision"] != "retry":
                     break
-                submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
+                if not policy_disable:
+                    submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
             submission_json, digest = submission_record(submission, artifacts)
             if os.environ.get("HARNESS_TEST_CHANGE_AFTER_VALIDATION"):
                 submission = {"candidates": [{"value": "changed"}]}

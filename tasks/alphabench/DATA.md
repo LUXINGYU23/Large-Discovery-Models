@@ -35,6 +35,12 @@
 
 两个 US 市场按全部历史成员并集下载。代码更名/重用、退市结算、公司行动完整性、实际指数基准仍须审计；不把 ETF 或等权组合当作官方指数。曾核查的 Yahoo 访问失败仅是来源调查，不是行情缺失证据。
 
+候选补充来源也要核对证券身份，不能只按 ticker 拼接。2026-09-23 查询
+[HistoricalData.net 的 LLL 公开目录](https://historicaldata.net/api/symbol/LLL)，其日线文件只列
+`JX Luxventure Limited`；但 [L3 Technologies 的 SEC 文件](https://www.sec.gov/Archives/edgar/data/1039101/000114036118040588/form425.htm)
+明确记录该公司 2018 年的交易代码同为 `LLL`。目录自身也声明首末日期不保证逐日完整。
+因此该来源尚不能填补 L3 的历史行情缺口或证明 US 证券身份完整；未购买、导入或提升为合格来源。
+
 ## 本机下载
 
 从实际实现仓库根运行 PowerShell。缓存放到仓库外，不提交数据或凭证。
