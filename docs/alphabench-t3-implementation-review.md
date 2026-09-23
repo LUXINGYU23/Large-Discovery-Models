@@ -1250,3 +1250,19 @@ dependency or data-source abstraction was introduced. Shared Harness/Policy
 tests passed 48; task Policy/Harness tests passed 16 with five optional
 container cases skipped. Market-data qualification, real Assay portfolio
 service parity and the remaining W15/W16/W17 gates remain blocked or open.
+
+## Change 35: recover paired training export after process death
+
+Cross-check against plan W15 R20/Y04 and Spec section 14: a Host process exits
+after writing an unpublished IR row but before SFT, or after publishing the
+complete generation but before updating `current.json`. A new process reuses
+the immutable action journal and publishes one complete IR/SFT pair. Repeated
+resume leaves one action and one generation; its pointer, manifest and both
+training files match an uninterrupted baseline byte for byte.
+
+Complexity review: the process test replaces overlapping in-memory exception
+tests for those two boundaries. The separate corruption/hash check remains
+because a process crash cannot exercise it. Production collection code and
+shared IR/sink interfaces are unchanged, with no new recovery layer or
+dependency. The task collection suite passed all three cases. Other W15
+faults, qualified market data, Assay service parity and W16/W17 remain open.
