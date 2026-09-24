@@ -9,8 +9,9 @@ import typing
 import pytest
 
 from ldm_tts.contracts.evaluation import EvaluationPaused
-from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime
+from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, atomic_json_write
 from ldm_tts.transport import CallableProposalClient
+from ldm_tts.transport.openai import EndpointRequestError
 from tasks.alphabench.core.collection import AcceptedActions
 from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.native_generator import NativeGenerator
@@ -326,3 +327,34 @@ def test_native_responses_wire_uses_json_max_thinking_and_no_implicit_retry(tmp_
     assert body["reasoning"] == {"effort": "max"} and body["text"] == {"format": {"type": "json_object"}}
     assert body["temperature"] == .5 and body["max_output_tokens"] == protocol.max_model_tokens
     assert native.runtime.budget.counters["model_requests"] == 1
+
+
+def test_unknown_model_response_requires_explicit_counted_recovery(tmp_path, source, monkeypatch):
+    calls = []
+    def propose(_):
+        calls.append(1)
+        if len(calls) == 1:
+            raise EndpointRequestError("Request timed out")
+        return json.dumps({"generated": [{"name": "A", "expression": "$close"}]})
+
+    native, _, _ = build(tmp_path, propose, monkeypatch)
+    identity, messages = ["native", "example", 0], [{"role": "user", "content": "factor"}]
+    run = lambda: native.gateway.host.run(lambda: native.generator.request(identity, messages))
+    with pytest.raises(EvaluationPaused, match="model request failed"):
+        run()
+    with pytest.raises(EvaluationPaused, match="physical request requires reconciliation"):
+        run()
+    assert len(calls) == 1 and native.runtime.budget.counters["model_requests"] == 1
+
+    key = digest({"run": native.runtime.run_id, "identity": identity, "protocol": native.protocol.identity})
+    original = native.generator.receipts.load(key)
+    marker = tmp_path / "private/model_recovery" / (key + ".json")
+    atomic_json_write(marker, {"action": "discard_unknown_response_and_retry_once",
+                               "original_receipt_digest": digest(original)})
+    assert json.loads(run().text)["generated"][0]["expression"] == "$close"
+    assert len(calls) == 2 and native.runtime.budget.counters["model_requests"] == 2
+    assert native.runtime.budget.counters["proposal_attempts"] == 2
+    assert native.generator.receipts.load(key)["state"] == "completed"
+    assert len(list((tmp_path / "private/model_retries").glob("*.json"))) == 1
+    run()
+    assert len(calls) == 2 and native.runtime.budget.counters["model_requests"] == 2

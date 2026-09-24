@@ -58,7 +58,7 @@ def qlib_evaluate(request, config):
     try:
         features = D.features(instruments, executable,
                               start_time=dates[0], end_time=dates[-1])
-    except TypeError as exc:
+    except (TypeError, AttributeError, ZeroDivisionError, OverflowError) as exc:
         raise ValueError("Qlib rejected the factor expression: " + str(exc)) from exc
     if features.empty:
         raise ValueError("no observations for the historical universe")

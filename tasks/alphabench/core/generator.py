@@ -7,6 +7,7 @@ from ldm_tts.contracts import Candidate, RawProposal
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.data.ir import make_complete_design_ir
 from ldm_tts.engine.expansion import ExpansionResult, attach_proposal_attempt_receipt
+from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.transport import ProposalRequest, ProposalResponse
 from ldm_tts.transport.openai import EndpointRequestError
 from .candidate import FactorDomain
@@ -24,15 +25,21 @@ class Generator:
 
     def request(self, identity, messages, *, proposal=True):
         key = digest({"run": self.runtime.run_id, "identity": identity, "protocol": self.protocol.identity})
+        request = {"messages": messages, "protocol": self.protocol.identity, "logical": identity}
 
         def reserve():
             amounts = {"model_requests": 1, **({"proposal_attempts": 1} if proposal else {})}
             self.runtime.consume_many(amounts, usage_key=("engine:proposal_attempt:" if proposal else "task:model:") + key)
 
         try:
-            raw = self.receipts.execute(key, {"messages": messages, "protocol": self.protocol.identity, "logical": identity}, reserve=reserve,
-                operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(), owner=self.gateway.host,
-                authorize=self.gateway.before_dispatch)
+            previous = self.receipts.load(key)
+            marker = self.runtime.run_dir / "private/model_recovery" / (key + ".json")
+            if previous and previous["state"] == "dispatch_intent" and marker.exists():
+                raw = self._retry_unknown(key, request, previous, marker, proposal)
+            else:
+                raw = self.receipts.execute(key, request, reserve=reserve,
+                    operation=lambda: self.client.propose(ProposalRequest(tuple(messages))).to_dict(),
+                    owner=self.gateway.host, authorize=self.gateway.before_dispatch)
         except EndpointRequestError as exc:
             raise EvaluationPaused("model request failed: " + str(exc) + "; inspect the durable receipt before retrying",
                                    status="paused_provider") from exc
@@ -41,6 +48,30 @@ class Generator:
             raise EvaluationPaused("provider returned a different model", status="paused_provider")
         self.gateway.host.call(lambda: self.runtime.consume_many({"model_tokens": response.usage.get("total_tokens", 0)}, usage_key="task:model-usage:" + key))
         return attach_proposal_attempt_receipt(response, key)
+
+    def _retry_unknown(self, key, request, previous, marker, proposal):
+        if (previous["identity"] != key or previous["request"] != request or
+                previous["request_digest"] != digest(request)):
+            raise ValueError("unknown model receipt differs from the resumed request")
+        resolution = json.loads(marker.read_text(encoding="utf-8"))
+        if resolution != {"action": "discard_unknown_response_and_retry_once",
+                          "original_receipt_digest": digest(previous)}:
+            raise ValueError("model recovery authorization differs from the unknown receipt")
+        retries = Receipts(self.runtime.run_dir / "private/model_retries")
+        retry_key = digest({"retry_of": key, "attempt": 1})
+
+        def reserve():
+            amounts = {"model_requests": 1, **({"proposal_attempts": 1} if proposal else {})}
+            self.runtime.consume_many(amounts, usage_key=("engine:proposal_attempt:" if proposal else "task:model:") + retry_key)
+
+        raw = retries.execute(retry_key, {**request, "retry_of": key}, reserve=reserve,
+            operation=lambda: self.client.propose(ProposalRequest(tuple(request["messages"]))).to_dict(),
+            owner=self.gateway.host, authorize=self.gateway.before_dispatch)
+        previous.update(state="completed", response=raw, response_digest=digest(raw),
+                        recovery={"discarded_unknown_receipt_digest": resolution["original_receipt_digest"],
+                                  "retry_receipt": retry_key})
+        self.gateway.host.call(lambda: atomic_json_write(self.receipts.path(key), previous))
+        return raw
 
     def generate(self, *, identity, count, instruction, history=(), partial=False):
         accepted, attempts, raw_occurrences = {}, [], []

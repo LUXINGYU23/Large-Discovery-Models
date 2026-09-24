@@ -2,9 +2,11 @@
 
 import argparse
 from dataclasses import replace
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -111,19 +113,34 @@ def processes():
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
-def spawn(name, command, log_path, *, python=PYTHON):
+def spawn(name, command, log_path, *, python=PYTHON, resume=False):
     registry = processes()
-    if name in registry:
+    previous = registry.get(name)
+    if previous and not resume:
         raise ValueError(f"process already launched: {name}; inspect and resume its existing run")
+    if resume:
+        if previous is None:
+            raise ValueError(f"process was not launched: {name}")
+        try:
+            os.kill(previous["pid"], 0)
+        except ProcessLookupError:
+            pass
+        else:
+            raise ValueError(f"existing process is still alive: {name}")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
     environment.update(LDM_DATA_COLLECTION_ENABLED="1", TMPDIR=str(DATA_ROOT / "tmp"),
                        UV_CACHE_DIR=str(DATA_ROOT / "cache/uv"))
+    code_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
     with log_path.open("ab") as log:
         child = subprocess.Popen([str(python), *command], cwd=REPO, env=environment,
                                  stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                                  start_new_session=True)
-    registry[name] = {"pid": child.pid, "log": str(log_path), "started_unix": time.time()}
+    attempts = previous.get("prior_attempts", []) if previous else []
+    if previous:
+        attempts = [*attempts, {"pid": previous["pid"], "started_unix": previous["started_unix"]}]
+    registry[name] = {"pid": child.pid, "log": str(log_path), "started_unix": time.time(),
+                      "prior_attempts": attempts, "code_commit": code_commit}
     atomic_json_write(STUDY / "processes.json", registry)
     return child.pid
 
@@ -180,13 +197,102 @@ def launch():
     for seed in SEEDS:
         for method in METHODS:
             name = f"{method}:seed_{seed}"
-            spawn(name, ["-m", "tasks.alphabench.ldm_task.procedure",
-                         "--protocol-file", str(proto_path(method, seed)),
-                         "--data-manifest", str(DATA), "--upstream-root", str(SOURCE),
-                         "--oracle-url", ORACLE_URL, "--api-key-file", str(KEY),
-                         "--initialization-bundle", str(bundle_dir(seed)),
-                         "--out-dir", str(run_dir(method, seed))], STUDY / f"logs/{method}-seed_{seed}.log")
+            spawn(name, campaign_command(method, seed), STUDY / f"logs/{method}-seed_{seed}.log")
     print(json.dumps({"campaigns_started": len(SEEDS) * len(METHODS), "study": str(STUDY)}))
+
+
+def campaign_command(method, seed, *, resume=False):
+    return ["-m", "tasks.alphabench.ldm_task.procedure",
+            "--protocol-file", str(proto_path(method, seed)),
+            "--data-manifest", str(DATA), "--upstream-root", str(SOURCE),
+            "--oracle-url", ORACLE_URL, "--api-key-file", str(KEY),
+            "--initialization-bundle", str(bundle_dir(seed)),
+            "--resume-run" if resume else "--out-dir", str(run_dir(method, seed))]
+
+
+def paused_run(method, seed):
+    if method not in METHODS or seed not in SEEDS:
+        raise ValueError("unknown study method or seed")
+    name = f"{method}:seed_{seed}"
+    entry = processes().get(name)
+    if entry is None:
+        raise ValueError("campaign was not launched")
+    try:
+        os.kill(entry["pid"], 0)
+    except ProcessLookupError:
+        pass
+    else:
+        raise ValueError("campaign process is still alive")
+    directory = run_dir(method, seed)
+    if not json.loads((directory / "status.json").read_text())["status"].startswith("paused_"):
+        raise ValueError("campaign is not paused")
+    if json.loads((directory / "protocol.json").read_text()) != json.loads(proto_path(method, seed).read_text()):
+        raise ValueError("campaign protocol differs from the frozen study")
+    return directory
+
+
+def resume(method, seed):
+    paused_run(method, seed)
+    health()
+    name = f"{method}:seed_{seed}"
+    pid = spawn(name, campaign_command(method, seed, resume=True),
+                STUDY / f"logs/{method}-seed_{seed}.log", resume=True)
+    print(json.dumps({"resumed": name, "pid": pid, "run_dir": str(run_dir(method, seed))}))
+
+
+def resolve_model(method, seed):
+    directory = paused_run(method, seed)
+    receipts = []
+    for path in (directory / "private/model").glob("*.json"):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record["state"] == "dispatch_intent":
+            receipts.append((path, record))
+    if len(receipts) != 1:
+        raise ValueError("expected exactly one unknown model response")
+    path, receipt = receipts[0]
+    if (receipt["identity"] != path.stem or digest(receipt["request"]) != receipt["request_digest"]
+            or receipt["request"]["protocol"] != protocol(method, seed).identity):
+        raise ValueError("unknown model receipt failed identity verification")
+    marker = directory / "private/model_recovery" / path.name
+    frozen(marker, {"action": "discard_unknown_response_and_retry_once",
+                    "original_receipt_digest": digest(receipt)})
+    print(json.dumps({"authorized_one_counted_model_retry": f"{method}:seed_{seed}",
+                      "unknown_receipt": path.stem}))
+
+
+def resolve_worker(request_id):
+    from tasks.alphabench.core.oracle_service import OracleService
+
+    if not re.fullmatch(r"[a-f0-9]{64}", request_id):
+        raise ValueError("invalid worker request identity")
+    service = OracleService(ORACLE_CONFIG, STUDY / "oracle")
+    receipt = service.reconciled(request_id)
+    directory = STUDY / "oracle/jobs" / request_id
+    request = json.loads((directory / "request.json").read_text(encoding="utf-8"))
+    permit = json.loads((directory / "permit.json").read_text(encoding="utf-8"))
+    if (receipt is None or receipt["state"] != "dispatch_intent" or receipt["request"] != request
+            or request["request_id"] != request_id or request["phase"] != "search"
+            or permit != {"request_digest": digest(request), "job_id": request_id + ":0"}
+            or (directory / "response.json").exists()):
+        raise ValueError("worker request is not an unresolved search crash")
+    log = (directory / "worker.log").read_bytes()
+    error = "'numpy.float64' object has no attribute 'name'"
+    if b"AttributeError: " + error.encode() not in log:
+        raise ValueError("worker log does not prove the known Qlib expression failure")
+    active = subprocess.check_output(["ps", "-eo", "args"], text=True)
+    if any("tasks.alphabench.core.oracle_worker" in line and request_id in line for line in active.splitlines()):
+        raise ValueError("worker is still running")
+    response = {"request_id": request_id, "success": False,
+                "error": "Qlib rejected the factor expression: " + error,
+                "metrics": {}, "daily": [], "scores": [], "portfolio": None,
+                "elapsed_seconds": None,
+                "jobs": [{"job_id": request_id + ":0", "operation": request["operation"]}]}
+    frozen(directory / "recovery.json", {"request_digest": digest(request),
+        "worker_log_sha256": sha256(log).hexdigest(), "response_digest": digest(response)})
+    atomic_json_write(directory / "response.json", response)
+    if service.reconciled(request_id)["state"] != "completed":
+        raise RuntimeError("worker failure did not reconcile")
+    print(json.dumps({"reconciled_failed_worker": request_id}))
 
 
 def status():
@@ -213,8 +319,11 @@ def status():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("prepare", "start-oracle", "initialize", "init-one", "launch", "status"))
+    parser.add_argument("action", choices=("prepare", "start-oracle", "initialize", "init-one", "launch",
+                                           "resume", "resolve-model", "resolve-worker", "status"))
     parser.add_argument("--seed", type=int, choices=SEEDS)
+    parser.add_argument("--method", choices=METHODS)
+    parser.add_argument("--request-id")
     args = parser.parse_args()
     if args.action == "prepare":
         prepare()
@@ -228,6 +337,14 @@ def main():
         initialize_one(args.seed)
     elif args.action == "launch":
         launch()
+    elif args.action in {"resume", "resolve-model"}:
+        if args.method is None or args.seed is None:
+            parser.error(args.action + " requires --method and --seed")
+        (resume if args.action == "resume" else resolve_model)(args.method, args.seed)
+    elif args.action == "resolve-worker":
+        if args.request_id is None:
+            parser.error("resolve-worker requires --request-id")
+        resolve_worker(args.request_id)
     else:
         status()
 

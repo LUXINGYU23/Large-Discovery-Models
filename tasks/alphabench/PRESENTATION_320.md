@@ -47,6 +47,33 @@ process twice. A paused campaign must be reconciled and resumed from its
 existing run directory with the same protocol and service; it must not be
 started again under a new run ID to conceal already dispatched work.
 
+For a paused run, inspect its log and private receipts first. Oracle requests
+with completed server receipts reconcile during `resume`. The two search
+workers that exited on Qlib's scalar-expression `AttributeError` can be
+settled as invalid evaluations from their recorded request, permit and worker
+traceback, without dispatching a second evaluation:
+
+```bash
+$T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id c8fe9bb6f6b4c28a937b1c0cd1d974be5d4cb20309b162230598bd2262b3e71e
+$T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id 473c28f8d56e02a46737e87a2498f8a434dd4ace6bd4a8669ea9fb58aacb1f0f
+```
+
+The EA seed 42 model timeout has no retrievable provider response. After
+confirming its process is dead and its single model receipt remains unknown,
+authorize one new physical request. The original unknown request stays in the
+audit trail and both requests count toward the model budget. The accepted
+response is committed to the original logical generation only after the
+retry receipt is durable:
+
+```bash
+$T3_PY -m tasks.alphabench.presentation_320 resolve-model --method alphabench_ea --seed 42
+$T3_PY -m tasks.alphabench.presentation_320 resume --method alphabench_ea --seed 42
+```
+
+Use `resume --method METHOD --seed SEED` for any other paused campaign after
+its outstanding receipts are reconcilable. The launcher checks that the old
+process is dead and that the run protocol matches the frozen study.
+
 The primary figure uses actual newly measured search attempts on the x-axis
 and best-so-far search RankIC relative to the shared seed pool on the y-axis.
 Private validation and held-out test never feed the search controller. Report

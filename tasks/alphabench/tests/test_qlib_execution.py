@@ -88,6 +88,17 @@ def test_qlib_executes_unary_factor_negation_without_changing_candidate_identity
     assert actual["non_finite_ratio"] == equivalent["non_finite_ratio"]
 
 
+def test_qlib_scalar_operator_failure_is_an_invalid_expression(tmp_path, source):
+    days = pd.bdate_range("2020-01-01", periods=24)
+    values = np.linspace(10, 20, 24).astype(np.float32)
+    write_market(tmp_path, days, {"S00": {"high": values, "low": values * .9}})
+    request = {"protocol": T3Protocol().to_dict(), "operation": "check",
+               "expression": "Div(IdxMax($high,5),Add(5,1e-12))",
+               "start": str(days[0].date()), "end": str(days[-1].date()), "fast": True}
+    with pytest.raises(ValueError, match="Qlib rejected the factor expression"):
+        qlib_evaluate(request, {"upstream_root": str(source), "data_root": str(tmp_path)})
+
+
 @pytest.mark.parametrize("profile", ["ldm_matched_v1", "upstream_searcher_v1", "upstream_benchmark_v1"])
 def test_qlib_endpoint_and_forward_labels_follow_the_selected_profile(tmp_path, source, profile):
     days = pd.bdate_range("2020-01-01", periods=45)
