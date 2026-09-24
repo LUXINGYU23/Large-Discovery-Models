@@ -59,7 +59,8 @@ $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id 473c28f8
 ```
 
 After an Oracle POST times out, the client polls that request's durable
-receipt for up to twice the frozen worker timeout. On resume, an existing
+receipt every 20 seconds for up to twice the frozen worker timeout. A large
+receipt has a 60-second read timeout. On resume, an existing
 server receipt is reconciled without another POST. If the server confirms the
 request ID is absent (404), the client posts the same ID and payload again;
 the service serializes that ID and permits at most one physical worker.

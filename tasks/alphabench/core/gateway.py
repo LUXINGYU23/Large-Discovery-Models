@@ -28,7 +28,7 @@ class OracleGateway:
             return {"mock": True}
         if not self.endpoint:
             raise ValueError("a controlled T3 oracle endpoint is required")
-        with urllib.request.urlopen(self.endpoint + "/t3/health", timeout=10) as response:
+        with urllib.request.urlopen(self.endpoint + "/t3/health", timeout=60) as response:
             health = json.load(response)
         required = {"durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", self.protocol.check_kind + "_check"}
         if not required <= set(health.get("capabilities", [])):
@@ -147,7 +147,7 @@ class OracleGateway:
 
     def _service_receipt(self, request):
         try:
-            with urllib.request.urlopen(self.endpoint + "/t3/requests/" + request["request_id"], timeout=10) as response:
+            with urllib.request.urlopen(self.endpoint + "/t3/requests/" + request["request_id"], timeout=60) as response:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
             if exc.code == 404: return None
@@ -165,7 +165,7 @@ class OracleGateway:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return None
-            time.sleep(min(5, remaining))
+            time.sleep(min(20, remaining))
 
     def _send(self, request):
         if self.mock:

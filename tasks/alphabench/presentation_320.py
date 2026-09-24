@@ -146,7 +146,7 @@ def spawn(name, command, log_path, *, python=PYTHON, resume=False):
 
 
 def health():
-    with urlopen(ORACLE_URL + "/t3/health", timeout=3) as response:
+    with urlopen(ORACLE_URL + "/t3/health", timeout=60) as response:
         return json.load(response)
 
 
