@@ -46,6 +46,8 @@ The launcher refuses to replace a frozen protocol or start a registered
 process twice. A paused campaign must be reconciled and resumed from its
 existing run directory with the same protocol and service; it must not be
 started again under a new run ID to conceal already dispatched work.
+`start-oracle` can restart a stopped service against the same durable receipt
+directory, recording the prior PID in the process registry.
 
 For a paused run, inspect its log and private receipts first. Oracle requests
 with completed server receipts reconcile during `resume`. The two dynamic-check

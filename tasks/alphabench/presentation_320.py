@@ -156,7 +156,7 @@ def start_oracle():
     except OSError:
         spawn("oracle", ["-m", "tasks.alphabench.core.oracle_service", "--config", str(ORACLE_CONFIG),
                          "--root", str(STUDY / "oracle"), "--port", "19780"],
-              STUDY / "logs/oracle.log", python=ORACLE_PYTHON)
+              STUDY / "logs/oracle.log", python=ORACLE_PYTHON, resume="oracle" in processes())
         for _ in range(30):
             time.sleep(1)
             try:

@@ -1,4 +1,5 @@
 import json
+from urllib.error import URLError
 
 import pytest
 
@@ -6,6 +7,30 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.alphabench import presentation_320
 from tasks.alphabench.core.protocol import T3Protocol, digest
 from tasks.alphabench.core.receipts import Receipts
+
+
+def test_oracle_restart_reuses_existing_process_registry_entry(tmp_path, monkeypatch):
+    monkeypatch.setattr(presentation_320, "STUDY", tmp_path)
+    monkeypatch.setattr(presentation_320, "ORACLE_CONFIG", tmp_path / "config.json")
+    (tmp_path / "config.json").write_text(json.dumps({"backend": "qlib", "market": "csi300",
+        "data_digest": "a" * 64, "environment_digest": "b" * 64}))
+    atomic_json_write(tmp_path / "processes.json", {"oracle": {"pid": 999999}})
+    calls = []
+
+    def health():
+        if not calls:
+            raise URLError("oracle unavailable")
+        return {"backend": "qlib", "market": "csi300", "data_digest": "a" * 64,
+                "environment_digest": "b" * 64, "config_digest": "c" * 64}
+
+    def spawn(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(presentation_320, "health", health)
+    monkeypatch.setattr(presentation_320, "spawn", spawn)
+    monkeypatch.setattr(presentation_320.time, "sleep", lambda _: None)
+    presentation_320.start_oracle()
+    assert len(calls) == 1 and calls[0][0][0] == "oracle" and calls[0][1]["resume"] is True
 
 
 @pytest.mark.parametrize("phase,operation", [("check", "check"), ("search", "evaluate")])
