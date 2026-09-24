@@ -348,7 +348,7 @@ def test_unknown_model_response_requires_explicit_counted_recovery(tmp_path, sou
 
     key = digest({"run": native.runtime.run_id, "identity": identity, "protocol": native.protocol.identity})
     original = native.generator.receipts.load(key)
-    marker = tmp_path / "private/model_recovery" / (key + ".json")
+    marker = tmp_path / "private/model_recovery" / native.generator.receipts.path(key).name
     atomic_json_write(marker, {"action": "discard_unknown_response_and_retry_once",
                                "original_receipt_digest": digest(original)})
     assert json.loads(run().text)["generated"][0]["expression"] == "$close"

@@ -250,7 +250,7 @@ def resolve_model(method, seed):
     if len(receipts) != 1:
         raise ValueError("expected exactly one unknown model response")
     path, receipt = receipts[0]
-    if (receipt["identity"] != path.stem or digest(receipt["request"]) != receipt["request_digest"]
+    if (digest(receipt["identity"]) != path.stem or digest(receipt["request"]) != receipt["request_digest"]
             or receipt["request"]["protocol"] != protocol(method, seed).identity):
         raise ValueError("unknown model receipt failed identity verification")
     marker = directory / "private/model_recovery" / path.name

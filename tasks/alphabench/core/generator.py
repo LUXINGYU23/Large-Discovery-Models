@@ -33,7 +33,7 @@ class Generator:
 
         try:
             previous = self.receipts.load(key)
-            marker = self.runtime.run_dir / "private/model_recovery" / (key + ".json")
+            marker = self.runtime.run_dir / "private/model_recovery" / self.receipts.path(key).name
             if previous and previous["state"] == "dispatch_intent" and marker.exists():
                 raw = self._retry_unknown(key, request, previous, marker, proposal)
             else:
