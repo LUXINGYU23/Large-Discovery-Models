@@ -102,11 +102,14 @@ class OracleGateway:
                             previous["request_digest"] != digest(request)):
                         raise ValueError("oracle receipt differs from the resumed request")
                     server = self._service_receipt(request)
-                    if server is None:
-                        # The service deduplicates request_id under a durable worker permit.
-                        self._send(request)
-                    elif server["state"] != "completed":
-                        self._await_reconciliation(request)
+                    if server is None or server["state"] != "completed":
+                        # The service permits a new worker only when no permit was ever recorded.
+                        try:
+                            self._send(request)
+                        except urllib.error.HTTPError as exc:
+                            if exc.code != 409:
+                                raise
+                            self._await_reconciliation(request)
             result = self.receipts.execute(logical, request, reserve=reserve,
                 operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request), owner=self.host,
                 authorize=self.before_dispatch if logical["phase"] in {"search", "check"} else None)

@@ -62,14 +62,11 @@ $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id 473c28f8
 
 After an Oracle POST times out, the client polls that request's durable
 receipt every 20 seconds for up to twice the frozen worker timeout. A large
-receipt has a 60-second read timeout. On resume, an existing
-server receipt is reconciled without another POST. If the server confirms the
-request ID is absent (404), the client posts the same ID and payload again;
-the service serializes that ID and permits at most one physical worker.
-An unresolved request still pauses for inspection.
-If a service crash left `dispatch_intent` before the durable worker permit,
-the same-ID POST can complete the unstarted dispatch. A recorded permit still
-blocks automatic worker retry.
+receipt has a 60-second read timeout. On resume, a completed server receipt
+is reconciled directly. A missing or unfinished request prompts a POST with
+the same ID and payload. The service serializes that ID and launches a worker
+only if no durable permit was recorded. A permitted request with unknown
+outcome still pauses for inspection.
 Search HTTP responses omit the large per-instrument score array, which the
 search controllers do not consume. New search receipts store that smaller
 response and its link to the complete worker output in the same request's job

@@ -165,11 +165,15 @@ def test_timed_out_oracle_post_waits_for_same_durable_request(tmp_path, monkeypa
     assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "completed"
 
 
-def test_resume_reposts_missing_oracle_request_with_same_identity_and_budget(tmp_path, monkeypatch):
+@pytest.mark.parametrize("server_pending", [False, True])
+def test_resume_reposts_unfinished_oracle_request_with_same_identity_and_budget(tmp_path, monkeypatch, server_pending):
     gateway = metered_gateway(tmp_path, monkeypatch, dynamic_checks=1, oracle_job_slots=2)
     gateway.mock, gateway.endpoint = False, "http://oracle.invalid"
     candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
     posts, server = [], {}
+    if server_pending:
+        _, request, _ = gateway.evaluation_request(candidate, phase="check", position=0)
+        server[request["request_id"]] = {"state": "dispatch_intent", "request_digest": digest(request)}
 
     def send(request):
         posts.append(request)
