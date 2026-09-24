@@ -6,7 +6,7 @@ import pytest
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.alphabench import presentation_320
 from tasks.alphabench.core.protocol import T3Protocol, digest
-from tasks.alphabench.core.oracle_service import wire_response
+from tasks.alphabench.core.oracle_service import OracleService, wire_response
 from tasks.alphabench.core.receipts import Receipts
 
 
@@ -37,10 +37,45 @@ def test_oracle_restart_reuses_existing_process_registry_entry(tmp_path, monkeyp
 def test_search_transport_omits_scores_without_changing_full_receipt():
     full = {"success": True, "scores": [{"instrument": "A", "score": 1.0}], "metrics": {"rank_ic": 0.1}}
     transport = wire_response({"phase": "search"}, full)
-    assert transport == {"success": True, "metrics": {"rank_ic": 0.1}}
+    assert transport == {"success": True, "metrics": {"rank_ic": 0.1},
+                         "full_response_digest": digest(full)}
     assert full["scores"] == [{"instrument": "A", "score": 1.0}]
     assert wire_response({"phase": "validation"}, full) is full
     assert wire_response({"phase": "test"}, full) is full
+
+
+def test_search_service_keeps_full_worker_output_and_small_durable_receipt(tmp_path, monkeypatch):
+    manifest = {"backend": "qlib", "market": "csi300", "data_root": str(tmp_path / "data"),
+                "benchmark": "SH000300"}
+    atomic_json_write(tmp_path / "manifest.json", manifest)
+    protocol = T3Protocol(data_digest=digest(manifest), environment_digest="a" * 64)
+    config = {"backend": protocol.backend, "market": protocol.market,
+              "data_digest": protocol.data_digest, "environment_digest": protocol.environment_digest,
+              "data_manifest": str(tmp_path / "manifest.json"), "data_root": manifest["data_root"],
+              "benchmark": manifest["benchmark"]}
+    atomic_json_write(tmp_path / "config.json", config)
+    request = {"request_id": "b" * 64, "protocol": protocol.to_dict(), "phase": "search",
+               "operation": "evaluate", "job_permits": 2}
+    full = {"request_id": request["request_id"], "success": True,
+            "scores": [{"instrument": "A", "score": 1.0}], "metrics": {"rank_ic": 0.1},
+            "jobs": [{"job_id": request["request_id"] + ":0", "operation": "evaluate"}]}
+    launches = []
+
+    class Worker:
+        def __init__(self, command, **_):
+            launches.append(command)
+            atomic_json_write(command[5], full)
+
+        def wait(self, **_):
+            return 0
+
+    monkeypatch.setattr("tasks.alphabench.core.oracle_service.subprocess.Popen", Worker)
+    service = OracleService(tmp_path / "config.json", tmp_path / "oracle")
+    result = service.execute(request)
+    assert result["full_response_digest"] == digest(full) and "scores" not in result
+    assert service.execute(request) == result and len(launches) == 1
+    assert service.receipts.load(request["request_id"])["response"] == result
+    assert json.loads((tmp_path / "oracle/jobs" / request["request_id"] / "response.json").read_text()) == full
 
 
 @pytest.mark.parametrize("phase,operation", [("check", "check"), ("search", "evaluate")])

@@ -44,6 +44,7 @@ class OracleService:
             response = json.loads(output.read_text(encoding="utf-8"))
             if response.get("request_id") != identity:
                 raise ValueError("worker output identity mismatch")
+            response = wire_response(record["request"], response)
             record.update(state="completed", response=response, response_digest=digest(response))
             atomic_json_write(self.receipts.path(identity), record)
         return record
@@ -80,7 +81,7 @@ class OracleService:
                                 "jobs": [{"job_id": identity + ":0", "operation": request["operation"]}]}
                 if code or not (directory / "response.json").exists():
                     raise EvaluationPaused("worker exit requires reconciliation")
-                return json.loads((directory / "response.json").read_text(encoding="utf-8"))
+                return wire_response(request, json.loads((directory / "response.json").read_text(encoding="utf-8")))
 
             return self.receipts.execute(identity, request, reserve=lambda: None, operation=operation)
 
@@ -91,10 +92,11 @@ class OracleService:
                 + (["lint_check"] if self.config["backend"] == "assay" else [])}
 
 
-def wire_response(request, response):
+def wire_response(request, response, *, full_digest=None):
     if request["phase"] != "search" or "scores" not in response:
         return response
-    return {key: value for key, value in response.items() if key != "scores"}
+    return {key: value for key, value in response.items() if key != "scores"} | {
+        "full_response_digest": full_digest or digest(response)}
 
 
 def main(argv=None):
@@ -123,10 +125,10 @@ def main(argv=None):
                     return self.reply(400, {"error": "invalid identity"})
                 record = service.reconciled(identity)
                 if record and record["state"] == "completed":
-                    response = wire_response(record["request"], record["response"])
+                    response = wire_response(record["request"], record["response"],
+                                             full_digest=record["response_digest"])
                     if response is not record["response"]:
-                        record = record | {"response": response, "response_digest": digest(response),
-                                           "source_response_digest": record["response_digest"]}
+                        record = record | {"response": response, "response_digest": digest(response)}
                 return self.reply(200 if record else 404, record or {"state": "missing"})
             return self.reply(404, {"error": "unknown route"})
 
