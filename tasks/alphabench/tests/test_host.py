@@ -15,7 +15,7 @@ from tasks.alphabench.core.gateway import OracleGateway, mock_oracle
 from tasks.alphabench.core.generator import Generator
 from tasks.alphabench.core.host import HostDispatcher
 from tasks.alphabench.core.harness import HarnessMeter
-from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.protocol import T3Protocol, digest
 
 
 def parallel(function, count=2):
@@ -153,6 +153,32 @@ def test_timed_out_oracle_post_waits_for_same_durable_request(tmp_path, monkeypa
     assert result["success"] and len(posts) == 1 and len(polls) == 2
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "completed"
+
+
+def test_resume_reposts_missing_oracle_request_with_same_identity_and_budget(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, dynamic_checks=1, oracle_job_slots=2)
+    gateway.mock, gateway.endpoint = False, "http://oracle.invalid"
+    candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
+    posts, server = [], {}
+
+    def send(request):
+        posts.append(request)
+        if len(posts) == 1:
+            raise TimeoutError("request never reached the oracle")
+        response = mock_oracle(request)
+        server[request["request_id"]] = {"state": "completed", "request_digest": digest(request),
+                                         "response": response, "response_digest": digest(response)}
+        return response
+
+    monkeypatch.setattr(gateway, "_send", send)
+    monkeypatch.setattr(gateway, "_service_receipt", lambda request: server.get(request["request_id"]))
+    with pytest.raises(EvaluationPaused, match="reconciliation"):
+        gateway.evaluate(candidate, phase="check", position=0)
+    assert gateway.evaluate(candidate, phase="check", position=0)["success"]
+    assert posts[0] == posts[1]
+    assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "completed"
+    assert gateway.runtime.budget.counters == {
+        "dynamic_checks": 1, "oracle_job_slots": 2, "benchmark_jobs": 1}
 
 
 @pytest.mark.parametrize("changes", [

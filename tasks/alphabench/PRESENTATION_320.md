@@ -59,8 +59,11 @@ $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id 473c28f8
 ```
 
 After an Oracle POST times out, the client polls that request's durable
-receipt for up to twice the frozen worker timeout. It never repeats the POST;
-an unresolved request still pauses for inspection.
+receipt for up to twice the frozen worker timeout. On resume, an existing
+server receipt is reconciled without another POST. If the server confirms the
+request ID is absent (404), the client posts the same ID and payload again;
+the service serializes that ID and permits at most one physical worker.
+An unresolved request still pauses for inspection.
 
 The EA seed 42 model timeout has no retrievable provider response. After
 confirming its process is dead and its single model receipt remains unknown,

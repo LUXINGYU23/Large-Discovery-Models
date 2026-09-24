@@ -92,6 +92,18 @@ class OracleGateway:
             self.runtime.consume_many(amounts, usage_key=key)
 
         try:
+            if not self.mock:
+                previous = self.receipts.load(logical)
+                if previous and previous["state"] == "dispatch_intent":
+                    if (previous["identity"] != logical or previous["request"] != request or
+                            previous["request_digest"] != digest(request)):
+                        raise ValueError("oracle receipt differs from the resumed request")
+                    server = self._service_receipt(request)
+                    if server is None:
+                        # The service deduplicates request_id under a durable worker permit.
+                        self._send(request)
+                    elif server["state"] != "completed":
+                        self._await_reconciliation(request)
             result = self.receipts.execute(logical, request, reserve=reserve,
                 operation=lambda: self._send(request), reconcile=lambda: self._reconcile(request), owner=self.host,
                 authorize=self.before_dispatch if logical["phase"] in {"search", "check"} else None)
@@ -124,17 +136,36 @@ class OracleGateway:
     def _reconcile(self, request):
         if self.mock:
             return None
-        try:
-            with urllib.request.urlopen(self.endpoint + "/t3/requests/" + request["request_id"], timeout=10) as response:
-                receipt = json.load(response)
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404: return None
-            raise
+        receipt = self._service_receipt(request)
+        if receipt is None:
+            return None
         if receipt["request_digest"] != digest(request):
             raise ValueError("server receipt belongs to another request")
         if receipt["state"] == "completed" and digest(receipt["response"]) == receipt["response_digest"]:
             return receipt["response"]
         return None
+
+    def _service_receipt(self, request):
+        try:
+            with urllib.request.urlopen(self.endpoint + "/t3/requests/" + request["request_id"], timeout=10) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404: return None
+            raise
+
+    def _await_reconciliation(self, request):
+        deadline = time.monotonic() + 2 * self.protocol.worker_timeout
+        while True:
+            try:
+                recovered = self._reconcile(request)
+            except OSError:
+                recovered = None
+            if recovered is not None:
+                return recovered
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            time.sleep(min(5, remaining))
 
     def _send(self, request):
         if self.mock:
@@ -148,18 +179,10 @@ class OracleGateway:
         except urllib.error.HTTPError:
             raise
         except OSError:
-            deadline = time.monotonic() + 2 * self.protocol.worker_timeout
-            while True:
-                try:
-                    recovered = self._reconcile(request)
-                except OSError:
-                    recovered = None
-                if recovered is not None:
-                    return recovered
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise
-                time.sleep(min(5, remaining))
+            recovered = self._await_reconciliation(request)
+            if recovered is not None:
+                return recovered
+            raise
 
 
 class FactorEvaluator:
