@@ -55,6 +55,7 @@ def test_search_transport_omits_scores_without_changing_full_receipt():
     assert full["scores"] == [{"instrument": "A", "score": 1.0}]
     assert wire_response({"phase": "validation"}, full) is full
     assert wire_response({"phase": "test"}, full) is full
+    assert wire_response({"operation": "check"}, full) is full
 
 
 def test_search_service_keeps_full_worker_output_and_small_durable_receipt(tmp_path, monkeypatch):

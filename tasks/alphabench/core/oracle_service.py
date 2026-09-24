@@ -93,7 +93,7 @@ class OracleService:
 
 
 def wire_response(request, response, *, full_digest=None):
-    if request["phase"] != "search" or "scores" not in response:
+    if request.get("phase") != "search" or "scores" not in response:
         return response
     return {key: value for key, value in response.items() if key != "scores"} | {
         "full_response_digest": full_digest or digest(response)}
