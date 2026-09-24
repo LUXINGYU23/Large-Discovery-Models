@@ -91,6 +91,12 @@ class OracleService:
                 + (["lint_check"] if self.config["backend"] == "assay" else [])}
 
 
+def wire_response(request, response):
+    if request["phase"] != "search" or "scores" not in response:
+        return response
+    return {key: value for key, value in response.items() if key != "scores"}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -116,6 +122,11 @@ def main(argv=None):
                 if not re.fullmatch(r"[a-f0-9]{64}", identity):
                     return self.reply(400, {"error": "invalid identity"})
                 record = service.reconciled(identity)
+                if record and record["state"] == "completed":
+                    response = wire_response(record["request"], record["response"])
+                    if response is not record["response"]:
+                        record = record | {"response": response, "response_digest": digest(response),
+                                           "source_response_digest": record["response_digest"]}
                 return self.reply(200 if record else 404, record or {"state": "missing"})
             return self.reply(404, {"error": "unknown route"})
 
@@ -126,12 +137,13 @@ def main(argv=None):
                 size = int(self.headers.get("Content-Length", "0"))
                 if not 0 < size <= 1024 * 1024:
                     raise ValueError("request size outside contract")
-                result = service.execute(json.loads(self.rfile.read(size)))
+                request = json.loads(self.rfile.read(size))
+                result = service.execute(request)
             except EvaluationPaused as exc:
                 return self.reply(409, {"status": exc.status, "error": str(exc)})
             except (ValueError, KeyError, TypeError) as exc:
                 return self.reply(400, {"error": str(exc)})
-            return self.reply(200, result)
+            return self.reply(200, wire_response(request, result))
 
     ThreadingHTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
 

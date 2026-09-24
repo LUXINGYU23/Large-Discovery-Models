@@ -6,6 +6,7 @@ import pytest
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.alphabench import presentation_320
 from tasks.alphabench.core.protocol import T3Protocol, digest
+from tasks.alphabench.core.oracle_service import wire_response
 from tasks.alphabench.core.receipts import Receipts
 
 
@@ -31,6 +32,15 @@ def test_oracle_restart_reuses_existing_process_registry_entry(tmp_path, monkeyp
     monkeypatch.setattr(presentation_320.time, "sleep", lambda _: None)
     presentation_320.start_oracle()
     assert len(calls) == 1 and calls[0][0][0] == "oracle" and calls[0][1]["resume"] is True
+
+
+def test_search_transport_omits_scores_without_changing_full_receipt():
+    full = {"success": True, "scores": [{"instrument": "A", "score": 1.0}], "metrics": {"rank_ic": 0.1}}
+    transport = wire_response({"phase": "search"}, full)
+    assert transport == {"success": True, "metrics": {"rank_ic": 0.1}}
+    assert full["scores"] == [{"instrument": "A", "score": 1.0}]
+    assert wire_response({"phase": "validation"}, full) is full
+    assert wire_response({"phase": "test"}, full) is full
 
 
 @pytest.mark.parametrize("phase,operation", [("check", "check"), ("search", "evaluate")])

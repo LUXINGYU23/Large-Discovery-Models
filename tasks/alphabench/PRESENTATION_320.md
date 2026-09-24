@@ -67,6 +67,10 @@ server receipt is reconciled without another POST. If the server confirms the
 request ID is absent (404), the client posts the same ID and payload again;
 the service serializes that ID and permits at most one physical worker.
 An unresolved request still pauses for inspection.
+Search HTTP responses omit the large per-instrument score array, which the
+search controllers do not consume. The full score array and response digest
+remain in the Oracle's durable receipt; private validation and test responses
+still return their scores for finalization.
 
 The EA seed 42 model timeout has no retrievable provider response. After
 confirming its process is dead and its single model receipt remains unknown,
