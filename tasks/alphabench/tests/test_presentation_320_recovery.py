@@ -34,6 +34,19 @@ def test_oracle_restart_reuses_existing_process_registry_entry(tmp_path, monkeyp
     assert len(calls) == 1 and calls[0][0][0] == "oracle" and calls[0][1]["resume"] is True
 
 
+def test_dead_running_campaign_can_resume_its_original_directory(tmp_path, monkeypatch):
+    method, seed = "ldm_harness_compiled", 43
+    monkeypatch.setattr(presentation_320, "STUDY", tmp_path)
+    monkeypatch.setattr(presentation_320.os, "kill", lambda *_: (_ for _ in ()).throw(ProcessLookupError()))
+    atomic_json_write(tmp_path / "processes.json", {f"{method}:seed_{seed}": {"pid": 999999}})
+    protocol = presentation_320.protocol(method, seed)
+    atomic_json_write(presentation_320.proto_path(method, seed), protocol.to_dict())
+    directory = presentation_320.run_dir(method, seed)
+    atomic_json_write(directory / "protocol.json", protocol.to_dict())
+    atomic_json_write(directory / "status.json", {"status": "running"})
+    assert presentation_320.stopped_run(method, seed) == directory
+
+
 def test_search_transport_omits_scores_without_changing_full_receipt():
     full = {"success": True, "scores": [{"instrument": "A", "score": 1.0}], "metrics": {"rank_ic": 0.1}}
     transport = wire_response({"phase": "search"}, full)

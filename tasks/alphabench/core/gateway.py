@@ -28,8 +28,11 @@ class OracleGateway:
             return {"mock": True}
         if not self.endpoint:
             raise ValueError("a controlled T3 oracle endpoint is required")
-        with urllib.request.urlopen(self.endpoint + "/t3/health", timeout=60) as response:
-            health = json.load(response)
+        try:
+            with urllib.request.urlopen(self.endpoint + "/t3/health", timeout=60) as response:
+                health = json.load(response)
+        except OSError as exc:
+            raise EvaluationPaused("oracle preflight requires recovery", status="paused_oracle") from exc
         required = {"durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", self.protocol.check_kind + "_check"}
         if not required <= set(health.get("capabilities", [])):
             raise ValueError("oracle lacks full T3 capabilities")

@@ -210,7 +210,7 @@ def campaign_command(method, seed, *, resume=False):
             "--resume-run" if resume else "--out-dir", str(run_dir(method, seed))]
 
 
-def paused_run(method, seed):
+def stopped_run(method, seed):
     if method not in METHODS or seed not in SEEDS:
         raise ValueError("unknown study method or seed")
     name = f"{method}:seed_{seed}"
@@ -224,15 +224,16 @@ def paused_run(method, seed):
     else:
         raise ValueError("campaign process is still alive")
     directory = run_dir(method, seed)
-    if not json.loads((directory / "status.json").read_text())["status"].startswith("paused_"):
-        raise ValueError("campaign is not paused")
+    state = json.loads((directory / "status.json").read_text())["status"]
+    if state != "running" and not state.startswith("paused_"):
+        raise ValueError("campaign is not recoverable")
     if json.loads((directory / "protocol.json").read_text()) != json.loads(proto_path(method, seed).read_text()):
         raise ValueError("campaign protocol differs from the frozen study")
     return directory
 
 
 def resume(method, seed):
-    paused_run(method, seed)
+    stopped_run(method, seed)
     health()
     name = f"{method}:seed_{seed}"
     pid = spawn(name, campaign_command(method, seed, resume=True),
@@ -241,7 +242,7 @@ def resume(method, seed):
 
 
 def resolve_model(method, seed):
-    directory = paused_run(method, seed)
+    directory = stopped_run(method, seed)
     receipts = []
     for path in (directory / "private/model").glob("*.json"):
         record = json.loads(path.read_text(encoding="utf-8"))

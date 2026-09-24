@@ -59,6 +59,16 @@ def test_preflight_freezes_oracle_config_across_same_run(tmp_path, monkeypatch):
     assert gateway.receipts.load("service_identity")["config_digest"] == "a" * 64
 
 
+def test_preflight_timeout_pauses_the_existing_run(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch)
+    gateway.mock, gateway.endpoint = False, "http://oracle.invalid"
+    monkeypatch.setattr("tasks.alphabench.core.gateway.urllib.request.urlopen",
+                        lambda *_, **__: (_ for _ in ()).throw(TimeoutError("slow oracle")))
+    with pytest.raises(EvaluationPaused, match="preflight requires recovery") as failure:
+        gateway.preflight()
+    assert failure.value.status == "paused_oracle"
+
+
 def test_competing_requests_reserve_before_dispatch_without_exceeding_one_slot(tmp_path, monkeypatch):
     gateway = metered_gateway(tmp_path, monkeypatch, dynamic_checks=1, oracle_job_slots=2)
     candidate = FactorDomain().admit(RawProposal({"expression": "Mean($close,5)"}, "test"))

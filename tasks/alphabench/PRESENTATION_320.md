@@ -88,6 +88,8 @@ $T3_PY -m tasks.alphabench.presentation_320 resume --method alphabench_ea --seed
 Use `resume --method METHOD --seed SEED` for any other paused campaign after
 its outstanding receipts are reconcilable. The launcher checks that the old
 process is dead and that the run protocol matches the frozen study.
+A dead process whose status still says `running` can also resume from the same
+directory; Oracle preflight timeouts now record a recoverable pause.
 
 The primary figure uses actual newly measured search attempts on the x-axis
 and best-so-far search RankIC relative to the shared seed pool on the y-axis.
