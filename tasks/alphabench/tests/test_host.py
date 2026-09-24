@@ -134,6 +134,27 @@ def test_unknown_outcome_is_preserved_across_worker_handoffs(tmp_path, monkeypat
     assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "dispatch_intent"
 
 
+def test_timed_out_oracle_post_waits_for_same_durable_request(tmp_path, monkeypatch):
+    gateway = metered_gateway(tmp_path, monkeypatch, dynamic_checks=1, oracle_job_slots=2)
+    gateway.mock, gateway.endpoint = False, "http://oracle.invalid"
+    candidate = FactorDomain().admit(RawProposal({"expression": "$close"}, "test"))
+    posts, polls = [], []
+    def disconnected(request, *, timeout):
+        posts.append(request)
+        raise TimeoutError("response lost")
+    def reconcile(request):
+        polls.append(request["request_id"])
+        return mock_oracle(request) if len(polls) == 2 else None
+    monkeypatch.setattr("tasks.alphabench.core.gateway.urllib.request.urlopen", disconnected)
+    monkeypatch.setattr("tasks.alphabench.core.gateway.time.sleep", lambda _: None)
+    monkeypatch.setattr(gateway, "_reconcile", reconcile)
+
+    result = gateway.evaluate(candidate, phase="check", position=0)
+    assert result["success"] and len(posts) == 1 and len(polls) == 2
+    assert gateway.runtime.budget.counters["dynamic_checks"] == 1
+    assert gateway.receipts.load(gateway.identity("check", 0, candidate))["state"] == "completed"
+
+
 @pytest.mark.parametrize("changes", [
     {"check_kind": "lint"}, {"nan_ratio": None}, {"non_finite_ratio": 1.1},
     {"metrics": {"ic": .5}}, {"elapsed_seconds": -1},

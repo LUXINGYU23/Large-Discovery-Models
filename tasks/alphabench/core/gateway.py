@@ -3,6 +3,7 @@
 import json
 import math
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -141,8 +142,24 @@ class OracleGateway:
         encoded = json.dumps(request, allow_nan=False).encode()
         http_request = urllib.request.Request(self.endpoint + "/t3/execute", data=encoded,
                                              headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(http_request, timeout=self.protocol.request_timeout) as response:
-            return json.load(response)
+        try:
+            with urllib.request.urlopen(http_request, timeout=self.protocol.request_timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError:
+            raise
+        except OSError:
+            deadline = time.monotonic() + 2 * self.protocol.worker_timeout
+            while True:
+                try:
+                    recovered = self._reconcile(request)
+                except OSError:
+                    recovered = None
+                if recovered is not None:
+                    return recovered
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(5, remaining))
 
 
 class FactorEvaluator:

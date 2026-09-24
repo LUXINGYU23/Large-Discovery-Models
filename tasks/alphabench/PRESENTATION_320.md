@@ -58,6 +58,10 @@ $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id c8fe9bb6
 $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id 473c28f8d56e02a46737e87a2498f8a434dd4ace6bd4a8669ea9fb58aacb1f0f
 ```
 
+After an Oracle POST times out, the client polls that request's durable
+receipt for up to twice the frozen worker timeout. It never repeats the POST;
+an unresolved request still pauses for inspection.
+
 The EA seed 42 model timeout has no retrievable provider response. After
 confirming its process is dead and its single model receipt remains unknown,
 authorize one new physical request. The original unknown request stays in the
