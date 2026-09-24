@@ -268,14 +268,17 @@ def resolve_worker(request_id):
     service = OracleService(ORACLE_CONFIG, STUDY / "oracle")
     receipt = service.reconciled(request_id)
     directory = STUDY / "oracle/jobs" / request_id
-    request = json.loads((directory / "request.json").read_text(encoding="utf-8"))
+    request_path = directory / "request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
     permit = json.loads((directory / "permit.json").read_text(encoding="utf-8"))
     if (receipt is None or receipt["state"] != "dispatch_intent" or receipt["request"] != request
-            or request["request_id"] != request_id or request["phase"] != "search"
+            or request["request_id"] != request_id or request["phase"] not in {"check", "search"}
+            or request["operation"] != ("check" if request["phase"] == "check" else "evaluate")
             or permit != {"request_digest": digest(request), "job_id": request_id + ":0"}
             or (directory / "response.json").exists()):
-        raise ValueError("worker request is not an unresolved search crash")
-    log = (directory / "worker.log").read_bytes()
+        raise ValueError("worker request is not an unresolved expression crash")
+    log_path = directory / "worker.log"
+    log = log_path.read_bytes()
     error = "'numpy.float64' object has no attribute 'name'"
     if b"AttributeError: " + error.encode() not in log:
         raise ValueError("worker log does not prove the known Qlib expression failure")
@@ -285,8 +288,11 @@ def resolve_worker(request_id):
     response = {"request_id": request_id, "success": False,
                 "error": "Qlib rejected the factor expression: " + error,
                 "metrics": {}, "daily": [], "scores": [], "portfolio": None,
-                "elapsed_seconds": None,
+                "elapsed_seconds": max(0.0, log_path.stat().st_mtime - request_path.stat().st_mtime),
+                "elapsed_estimated_from_files": True,
                 "jobs": [{"job_id": request_id + ":0", "operation": request["operation"]}]}
+    if request["phase"] == "check":
+        response["check_kind"] = T3Protocol(**request["protocol"]).check_kind
     frozen(directory / "recovery.json", {"request_digest": digest(request),
         "worker_log_sha256": sha256(log).hexdigest(), "response_digest": digest(response)})
     atomic_json_write(directory / "response.json", response)

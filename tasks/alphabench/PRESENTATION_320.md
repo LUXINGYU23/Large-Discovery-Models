@@ -48,10 +48,10 @@ existing run directory with the same protocol and service; it must not be
 started again under a new run ID to conceal already dispatched work.
 
 For a paused run, inspect its log and private receipts first. Oracle requests
-with completed server receipts reconcile during `resume`. The two search
+with completed server receipts reconcile during `resume`. The two dynamic-check
 workers that exited on Qlib's scalar-expression `AttributeError` can be
-settled as invalid evaluations from their recorded request, permit and worker
-traceback, without dispatching a second evaluation:
+settled as invalid checks from their recorded request, permit and worker
+traceback, without dispatching another Qlib worker:
 
 ```bash
 $T3_PY -m tasks.alphabench.presentation_320 resolve-worker --request-id c8fe9bb6f6b4c28a937b1c0cd1d974be5d4cb20309b162230598bd2262b3e71e
