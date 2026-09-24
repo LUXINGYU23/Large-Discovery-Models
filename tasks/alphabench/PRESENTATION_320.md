@@ -67,6 +67,9 @@ server receipt is reconciled without another POST. If the server confirms the
 request ID is absent (404), the client posts the same ID and payload again;
 the service serializes that ID and permits at most one physical worker.
 An unresolved request still pauses for inspection.
+If a service crash left `dispatch_intent` before the durable worker permit,
+the same-ID POST can complete the unstarted dispatch. A recorded permit still
+blocks automatic worker retry.
 Search HTTP responses omit the large per-instrument score array, which the
 search controllers do not consume. New search receipts store that smaller
 response and its link to the complete worker output in the same request's job

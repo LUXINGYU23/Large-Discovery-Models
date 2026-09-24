@@ -1,8 +1,10 @@
 import json
+from pathlib import Path
 from urllib.error import URLError
 
 import pytest
 
+from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.alphabench import presentation_320
 from tasks.alphabench.core.protocol import T3Protocol, digest
@@ -58,7 +60,7 @@ def test_search_transport_omits_scores_without_changing_full_receipt():
     assert wire_response({"operation": "check"}, full) is full
 
 
-def test_search_service_keeps_full_worker_output_and_small_durable_receipt(tmp_path, monkeypatch):
+def test_search_service_keeps_full_output_and_retries_only_without_a_permit(tmp_path, monkeypatch):
     manifest = {"backend": "qlib", "market": "csi300", "data_root": str(tmp_path / "data"),
                 "benchmark": "SH000300"}
     atomic_json_write(tmp_path / "manifest.json", manifest)
@@ -78,7 +80,10 @@ def test_search_service_keeps_full_worker_output_and_small_durable_receipt(tmp_p
     class Worker:
         def __init__(self, command, **_):
             launches.append(command)
-            atomic_json_write(command[5], full)
+            worker_request = json.loads(Path(command[3]).read_text(encoding="utf-8"))
+            identity = worker_request["request_id"]
+            atomic_json_write(command[5], full | {"request_id": identity,
+                "jobs": [{"job_id": identity + ":0", "operation": "evaluate"}]})
 
         def wait(self, **_):
             return 0
@@ -90,6 +95,24 @@ def test_search_service_keeps_full_worker_output_and_small_durable_receipt(tmp_p
     assert service.execute(request) == result and len(launches) == 1
     assert service.receipts.load(request["request_id"])["response"] == result
     assert json.loads((tmp_path / "oracle/jobs" / request["request_id"] / "response.json").read_text()) == full
+
+    unpermitted = request | {"request_id": "c" * 64}
+    atomic_json_write(service.receipts.path(unpermitted["request_id"]), {
+        "identity": unpermitted["request_id"], "request": unpermitted,
+        "request_digest": digest(unpermitted), "state": "dispatch_intent"})
+    atomic_json_write(tmp_path / "oracle/jobs" / unpermitted["request_id"] / "request.json", unpermitted)
+    assert service.execute(unpermitted)["request_id"] == unpermitted["request_id"]
+    assert len(launches) == 2
+
+    permitted = request | {"request_id": "d" * 64}
+    atomic_json_write(service.receipts.path(permitted["request_id"]), {
+        "identity": permitted["request_id"], "request": permitted,
+        "request_digest": digest(permitted), "state": "dispatch_intent"})
+    atomic_json_write(tmp_path / "oracle/jobs" / permitted["request_id"] / "permit.json", {
+        "request_digest": digest(permitted), "job_id": permitted["request_id"] + ":0"})
+    with pytest.raises(EvaluationPaused, match="requires reconciliation"):
+        service.execute(permitted)
+    assert len(launches) == 2
 
 
 @pytest.mark.parametrize("phase,operation", [("check", "check"), ("search", "evaluate")])

@@ -41,6 +41,8 @@ class OracleService:
         record = self.receipts.load(identity)
         output = self.root / "jobs" / identity / "response.json"
         if record and record["state"] == "dispatch_intent" and output.exists():
+            if not (output.parent / "permit.json").exists():
+                raise ValueError("worker output lacks its durable permit")
             response = json.loads(output.read_text(encoding="utf-8"))
             if response.get("request_id") != identity:
                 raise ValueError("worker output identity mismatch")
@@ -61,7 +63,18 @@ class OracleService:
         directory.mkdir(parents=True, exist_ok=True)
         with (directory / "lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            self.reconciled(identity)
+            record = self.reconciled(identity)
+            if record and record["state"] == "dispatch_intent" and not (directory / "permit.json").exists():
+                if ((directory / "worker.log").exists() or (directory / "response.json").exists()
+                        or (directory / "request.json").exists() and
+                        json.loads((directory / "request.json").read_text(encoding="utf-8")) != request):
+                    raise ValueError("unpermitted request has worker artifacts or a different payload")
+                if (record["identity"] != identity or record["request"] != request or
+                        record["request_digest"] != digest(request)):
+                    raise ValueError("unpermitted receipt differs from the request")
+                # The permit precedes Popen, so this dispatch could not have launched a worker.
+                record["state"] = "reserved"
+                atomic_json_write(self.receipts.path(identity), record)
             def operation():
                 atomic_json_write(directory / "request.json", request)
                 atomic_json_write(directory / "permit.json", {"request_digest": digest(request), "job_id": identity + ":0"})
