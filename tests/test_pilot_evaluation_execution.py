@@ -150,7 +150,7 @@ def test_dry_run_redacts_api_key_file_path(tmp_path: Path, capsys) -> None:
 def test_registered_matrices_build_all_method_plans(
     config_path: Path, monkeypatch, tmp_path: Path,
 ) -> None:
-    for task in ("IRON_MIND", "SYNTHONBENCH", "NUCLEOBENCH", "REASYN", "ATOMWORLD"):
+    for task in ("IRON_MIND", "SYNTHONBENCH", "NUCLEOBENCH", "REASYN", "ATOMWORLD", "RESEARCHGYM"):
         for suffix in ("DATA_ROOT", "RUNS_ROOT", "WORK_ROOT", "SOURCE_ROOT", "API_KEY_FILE"):
             monkeypatch.setenv(f"{task}_{suffix}", str(tmp_path / task / suffix))
     monkeypatch.setenv("NUCLEOBENCH_START_SET_SHA256", "a" * 64)

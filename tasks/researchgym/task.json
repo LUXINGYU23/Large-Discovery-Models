@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "researchgym",
+  "description": "LDM search over method programs for source-pinned ResearchGym cases, scored by the official graders.",
+  "dependency_checker": "tasks.researchgym.ldm_task.dependencies:check_dependencies"
+}

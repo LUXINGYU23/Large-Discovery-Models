@@ -1,0 +1,556 @@
+{
+  "schema_version": 1,
+  "task_id": "researchgym",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/Anikethh/ResearchGym",
+    "source_commit": "0adc08e93754b606d8a76055ed2f1c9574504312",
+    "task_path": "tasks/test/time-series-explanation; tasks/test/continual-learning; tasks/test/cross-modal-retrieval; tasks/test/improving-replay-buffers"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "tse_real_mean_cpd",
+        "direction": "maximize",
+        "description": "time_series_explanation: mean of the 10 real-data CPD cells (5 datasets x Average/Zeros, top-k 0.1)",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "cl_cifar100_acc",
+        "direction": "maximize",
+        "description": "continual_learning: official grader acc_mean over CIFAR100 N=10 for seeds 1992-1994",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "cmr_coco_c_i2t_r1",
+        "direction": "maximize",
+        "description": "cross_modal_retrieval: official grader row average of image-to-text Recall@1 over 16 COCO-C corruptions (severity 5, BLIP ViT-B/16)",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "rl_cheetah_run_return",
+        "direction": "maximize",
+        "description": "improving_replay_buffers: official grader mean average_return on DMC cheetah-run over seeds 0 and 1",
+        "modes": [
+          "real"
+        ]
+      }
+    ],
+    "optimized": [
+      {
+        "name": "tse_real_mean_cpd",
+        "direction": "maximize",
+        "description": "time_series_explanation: mean of the 10 real-data CPD cells (5 datasets x Average/Zeros, top-k 0.1)",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "cl_cifar100_acc",
+        "direction": "maximize",
+        "description": "continual_learning: official grader acc_mean over CIFAR100 N=10 for seeds 1992-1994",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "cmr_coco_c_i2t_r1",
+        "direction": "maximize",
+        "description": "cross_modal_retrieval: official grader row average of image-to-text Recall@1 over 16 COCO-C corruptions (severity 5, BLIP ViT-B/16)",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "rl_cheetah_run_return",
+        "direction": "maximize",
+        "description": "improving_replay_buffers: official grader mean average_return on DMC cheetah-run over seeds 0 and 1",
+        "modes": [
+          "real"
+        ]
+      },
+      {
+        "name": "mock_score",
+        "direction": "maximize",
+        "description": "Deterministic analytic score over public program features; synthetic fixture only.",
+        "modes": [
+          "mock"
+        ]
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "cell.*",
+        "direction": "maximize",
+        "description": "Per-cell official grader values (dataset/substitution, corruption, or seed) that make up the objective."
+      },
+      {
+        "name": "diagnostic.aaa_mean",
+        "direction": "maximize",
+        "description": "Continual learning average anytime accuracy.",
+        "modes": [
+          "real"
+        ]
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "time_series_explanation",
+      "continual_learning",
+      "cross_modal_retrieval",
+      "improving_replay_buffers"
+    ],
+    "settings": {
+      "proposal_backends": {
+        "llm": "direct OpenAI-compatible API proposes the evaluation batch (preflight)",
+        "ldm": "direct API occurrences -> empirical q0 -> RBF GP-UCB LDM sampling (preflight)",
+        "harness": "one persistent Pi session proposes the evaluation batch (Responses preflight)",
+        "ldm_harness": "independent persistent Pi sessions -> empirical q0 -> fixed LDM sampling",
+        "ldm_harness_compiled": "ldm_harness plus an independent policy session compiling prior_mean@1 and ldm_weights@1",
+        "bo": "unsupported: no score-blind LLM-free program generator is defined"
+      },
+      "protocols": {
+        "time_series_explanation": {
+          "protocol_id": "rg_tse_real_state_cpd_topk0.1_5ds_2sub_5fold_v1",
+          "official_grader": true,
+          "official_protocol": false,
+          "deviations": [
+            "Only the real-data table is run; the synthetic Switch-Feature and State tables are omitted.",
+            "State classifier, top-k 0.1, test batch 50, folds 0-4."
+          ]
+        },
+        "continual_learning": {
+          "protocol_id": "rg_cl_cifar100_n10_vitb16_3seeds_epoch5_v1",
+          "official_grader": true,
+          "official_protocol": false,
+          "deviations": [
+            "Only the CIFAR100 (N=10) table is run; ImageNet-R, ImageNet-A and CUB200 are omitted.",
+            "Rehearsal-free config with tuned_epoch 5, init_lr 0.01, batch 48, seeds 1992-1994."
+          ]
+        },
+        "cross_modal_retrieval": {
+          "protocol_id": "rg_cmr_cococ_sub1000_sev5_i2t_blipb_16corr_v1",
+          "official_grader": true,
+          "official_protocol": false,
+          "deviations": [
+            "Queries use a seed-0 1000-image subset of the COCO Karpathy test split (scripts/prepare_case_data.py cmr).",
+            "Only the Table 1 BLIP ViT-B/16 image-shift row is run."
+          ]
+        },
+        "improving_replay_buffers": {
+          "protocol_id": "rg_rl_dmc_cheetah_run_100k_2seeds_tasklocal_sac_v1",
+          "official_grader": true,
+          "official_protocol": false,
+          "deviations": [
+            "The pinned upstream task provides no training loop; the SAC stack in resources/cases/support/improving_replay_buffers/rl_runner.py is task-local and fixed.",
+            "Only DMC cheetah-run, 100000 environment steps, seeds 0 and 1; results are not comparable to published tables."
+          ]
+        }
+      },
+      "coverage": {
+        "time_series_explanation": {
+          "kind": "tse_real",
+          "datasets": [
+            "PAM",
+            "Boiler",
+            "Epilepsy",
+            "Wafer",
+            "Freezer"
+          ],
+          "baselines": [
+            "Average",
+            "Zeros"
+          ],
+          "count": 5
+        },
+        "continual_learning": {
+          "kind": "cl_table",
+          "table": "cifar100",
+          "dataset": "CIFAR100",
+          "num_tasks": 10,
+          "seeds": [
+            1992,
+            1993,
+            1994
+          ]
+        },
+        "cross_modal_retrieval": {
+          "kind": "cmr_row",
+          "row": "qs_image_blip_base",
+          "columns": [
+            "gaussian_noise",
+            "shot_noise",
+            "impulse_noise",
+            "speckle_noise",
+            "defocus_blur",
+            "glass_blur",
+            "motion_blur",
+            "zoom_blur",
+            "snow",
+            "frost",
+            "fog",
+            "brightness",
+            "contrast",
+            "elastic_transform",
+            "pixelate",
+            "jpeg_compression"
+          ],
+          "sources_per_column": 1
+        },
+        "improving_replay_buffers": {
+          "kind": "rl_environment",
+          "environment": "Cheetah-Run",
+          "seeds": [
+            0,
+            1
+          ]
+        }
+      },
+      "candidate": "Complete Python module for the case slot; static rules in resources/cases/catalog.json",
+      "evaluation_isolation": "fresh workspace from SHA-256 verified pinned files per candidate; one process group per job, terminated as a tree on timeout",
+      "comparison_axis": "official-grader evaluations (one evaluation = the full declared job matrix of one candidate)",
+      "api_cost": "measured tokens x configured prices; cap checked before each request/turn"
+    },
+    "per_candidate_limits": {
+      "evaluation_timeout_seconds": 3600,
+      "grader_timeout_seconds": 600
+    }
+  },
+  "budget": {
+    "default_evaluation_timeout_seconds": 3600
+  },
+  "profiles": {
+    "time_series_explanation_tiny_ldm": {
+      "description": "time_series_explanation: two-round direct-API LDM pilot on the declared sub-protocol; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "time_series_explanation",
+        "search-method": "ldm",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "proposal-batch-size": 2
+      }
+    },
+    "time_series_explanation_tiny_ldm_harness": {
+      "description": "time_series_explanation: two-round persistent-session LDM pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "time_series_explanation",
+        "search-method": "ldm_harness",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "time_series_explanation_tiny_harness": {
+      "description": "time_series_explanation: two-round single-session Harness pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "time_series_explanation",
+        "search-method": "harness",
+        "iterations": 2,
+        "proposal-samples": 1,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 1,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 1
+      }
+    },
+    "time_series_explanation_tiny_ldm_harness_compiled": {
+      "description": "time_series_explanation: two-round compiled-policy pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "time_series_explanation",
+        "search-method": "ldm_harness_compiled",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "time_series_explanation_pilot_ldm_harness": {
+      "description": "time_series_explanation: 1 seed round + 15 optimization rounds, 8 occurrences from 4 sessions, BO pool 6; draft.",
+      "budget": {
+        "expensive_evaluations": 16
+      },
+      "locked_args": {
+        "case": "time_series_explanation",
+        "search-method": "ldm_harness",
+        "iterations": 16,
+        "proposal-samples": 8,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 6,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 4
+      }
+    },
+    "continual_learning_tiny_ldm": {
+      "description": "continual_learning: two-round direct-API LDM pilot on the declared sub-protocol; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "continual_learning",
+        "search-method": "ldm",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "proposal-batch-size": 2
+      }
+    },
+    "continual_learning_tiny_ldm_harness": {
+      "description": "continual_learning: two-round persistent-session LDM pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "continual_learning",
+        "search-method": "ldm_harness",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "continual_learning_tiny_harness": {
+      "description": "continual_learning: two-round single-session Harness pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "continual_learning",
+        "search-method": "harness",
+        "iterations": 2,
+        "proposal-samples": 1,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 1,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 1
+      }
+    },
+    "continual_learning_tiny_ldm_harness_compiled": {
+      "description": "continual_learning: two-round compiled-policy pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "continual_learning",
+        "search-method": "ldm_harness_compiled",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "continual_learning_pilot_ldm_harness": {
+      "description": "continual_learning: 1 seed round + 15 optimization rounds, 8 occurrences from 4 sessions, BO pool 6; draft.",
+      "budget": {
+        "expensive_evaluations": 16
+      },
+      "locked_args": {
+        "case": "continual_learning",
+        "search-method": "ldm_harness",
+        "iterations": 16,
+        "proposal-samples": 8,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 6,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 4
+      }
+    },
+    "cross_modal_retrieval_tiny_ldm": {
+      "description": "cross_modal_retrieval: two-round direct-API LDM pilot on the declared sub-protocol; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "cross_modal_retrieval",
+        "search-method": "ldm",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "proposal-batch-size": 2
+      }
+    },
+    "cross_modal_retrieval_tiny_ldm_harness": {
+      "description": "cross_modal_retrieval: two-round persistent-session LDM pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "cross_modal_retrieval",
+        "search-method": "ldm_harness",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "cross_modal_retrieval_tiny_harness": {
+      "description": "cross_modal_retrieval: two-round single-session Harness pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "cross_modal_retrieval",
+        "search-method": "harness",
+        "iterations": 2,
+        "proposal-samples": 1,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 1,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 1
+      }
+    },
+    "cross_modal_retrieval_tiny_ldm_harness_compiled": {
+      "description": "cross_modal_retrieval: two-round compiled-policy pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "cross_modal_retrieval",
+        "search-method": "ldm_harness_compiled",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "cross_modal_retrieval_pilot_ldm_harness": {
+      "description": "cross_modal_retrieval: 1 seed round + 15 optimization rounds, 8 occurrences from 4 sessions, BO pool 6; draft.",
+      "budget": {
+        "expensive_evaluations": 16
+      },
+      "locked_args": {
+        "case": "cross_modal_retrieval",
+        "search-method": "ldm_harness",
+        "iterations": 16,
+        "proposal-samples": 8,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 6,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 4
+      }
+    },
+    "improving_replay_buffers_tiny_ldm": {
+      "description": "improving_replay_buffers: two-round direct-API LDM pilot on the declared sub-protocol; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "improving_replay_buffers",
+        "search-method": "ldm",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "proposal-batch-size": 2
+      }
+    },
+    "improving_replay_buffers_tiny_ldm_harness": {
+      "description": "improving_replay_buffers: two-round persistent-session LDM pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "improving_replay_buffers",
+        "search-method": "ldm_harness",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "improving_replay_buffers_tiny_harness": {
+      "description": "improving_replay_buffers: two-round single-session Harness pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "improving_replay_buffers",
+        "search-method": "harness",
+        "iterations": 2,
+        "proposal-samples": 1,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 1,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 1
+      }
+    },
+    "improving_replay_buffers_tiny_ldm_harness_compiled": {
+      "description": "improving_replay_buffers: two-round compiled-policy pilot; draft.",
+      "budget": {
+        "expensive_evaluations": 2
+      },
+      "locked_args": {
+        "case": "improving_replay_buffers",
+        "search-method": "ldm_harness_compiled",
+        "iterations": 2,
+        "proposal-samples": 4,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 4,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 2
+      }
+    },
+    "improving_replay_buffers_pilot_ldm_harness": {
+      "description": "improving_replay_buffers: 1 seed round + 15 optimization rounds, 8 occurrences from 4 sessions, BO pool 6; draft.",
+      "budget": {
+        "expensive_evaluations": 16
+      },
+      "locked_args": {
+        "case": "improving_replay_buffers",
+        "search-method": "ldm_harness",
+        "iterations": 16,
+        "proposal-samples": 8,
+        "evaluations-per-round": 1,
+        "bo-pool-size": 6,
+        "initialization-mode": "shared_start",
+        "harness-sessions": 4
+      }
+    }
+  }
+}
