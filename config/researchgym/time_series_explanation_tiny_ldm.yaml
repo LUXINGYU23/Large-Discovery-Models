@@ -1,0 +1,29 @@
+name: researchgym_time_series_explanation_tiny_ldm
+task: researchgym
+algorithm: ldm
+mode: real
+contract_profile: time_series_explanation_tiny_ldm
+description: 'time_series_explanation: two-round direct-API LDM pilot on the declared sub-protocol; draft.'
+args:
+  case: time_series_explanation
+  search-method: ldm
+  iterations: 2
+  proposal-samples: 4
+  evaluations-per-round: 1
+  bo-pool-size: 4
+  initialization-mode: shared_start
+  proposal-batch-size: 2
+  upstream-root: ${RESEARCHGYM_ROOT}
+  case-data-root: ${RESEARCHGYM_CASE_DATA_ROOT}
+  case-python: ${RESEARCHGYM_CASE_PYTHON}
+  devices: ${RESEARCHGYM_DEVICES}
+  min-free-mib: 20000
+  campaign-hours: 0
+  llm-wire-api: responses
+  llm-reasoning: high
+  llm-max-tokens: 16384
+  recovery-attempts: 3
+  out-dir: ${RESEARCHGYM_RUNS_ROOT}
+  proposal-mode: openai
+env:
+  LDM_DATA_COLLECTION_ENABLED: '1'

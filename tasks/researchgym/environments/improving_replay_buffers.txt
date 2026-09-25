@@ -1,0 +1,10 @@
+# Case environment for improving_replay_buffers. The pinned upstream task ships
+# only an environment stub; its requirements.txt pins git builds (d4rl, old gym)
+# that the task-local SAC stack does not use. These wheels are sufficient for
+# resources/cases/support/improving_replay_buffers/rl_runner.py and the official
+# grading/grade.py. Install into a dedicated venv with a CUDA torch build.
+torch==2.5.1
+numpy>=1.24,<2
+# dm_control 1.0.8 (the version used by the earlier deployment) requires mujoco>=2.3.0.
+mujoco==2.3.7
+dm_control==1.0.8

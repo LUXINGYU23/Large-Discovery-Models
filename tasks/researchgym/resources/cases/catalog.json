@@ -1,0 +1,618 @@
+{
+ "schema_version": 1,
+ "global_rules": {
+  "max_program_chars": 40000,
+  "max_program_lines": 400,
+  "max_repeated_line": 20,
+  "forbidden_import_roots": [
+   "socket",
+   "subprocess",
+   "requests",
+   "urllib",
+   "urllib3",
+   "http",
+   "httpx",
+   "aiohttp",
+   "ftplib",
+   "telnetlib",
+   "smtplib",
+   "shutil",
+   "ctypes",
+   "importlib",
+   "multiprocessing",
+   "pty",
+   "signal",
+   "grading"
+  ],
+  "forbidden_calls": [
+   "eval",
+   "exec",
+   "compile",
+   "__import__",
+   "breakpoint"
+  ],
+  "within_submission_duplicates": "forbidden",
+  "historical_repeat_scope": "authoritative_measured_candidates_only"
+ },
+ "cases": [
+  {
+   "case_id": "time_series_explanation",
+   "display_name": "Time-series explanation (ResearchGym)",
+   "upstream_task": "tasks/test/time-series-explanation",
+   "entry": {
+    "symbol": "attribute",
+    "kind": "function",
+    "arguments": [
+     "classifier",
+     "test_loader",
+     "timesteps",
+     "device"
+    ],
+    "methods": []
+   },
+   "candidate_path": "ldm_explainer.py",
+   "forbidden_import_prefixes": [
+    "real",
+    "synthetic",
+    "winit"
+   ],
+   "injections": [
+    {
+     "path": "real/main.py",
+     "anchor": "    if \"timex++\" in explainers:",
+     "where": "before",
+     "block": "    if \"{slot}\" in explainers:\n        from {module} import attribute as _ldm_attribute\n        attr[\"{slot}\"] = _ldm_attribute(classifier, test_loader, timesteps, device)\n"
+    }
+   ],
+   "support_files": [],
+   "links": [
+    {
+     "workspace": "data",
+     "source": "{data_root}/data"
+    },
+    {
+     "workspace": "model",
+     "source": "{data_root}/model"
+    }
+   ],
+   "prepare_dirs": [
+    "logs"
+   ],
+   "jobs": {
+    "matrix": {
+     "dataset": [
+      "PAM",
+      "boiler",
+      "freezer",
+      "wafer",
+      "epilepsy"
+     ],
+     "fold": [
+      0,
+      1,
+      2,
+      3,
+      4
+     ]
+    },
+    "argv": [
+     "{python}",
+     "real/main.py",
+     "--model_type",
+     "state",
+     "--explainers",
+     "{slot}",
+     "--data",
+     "{dataset}",
+     "--fold",
+     "{fold}",
+     "--testbs",
+     "50",
+     "--areas",
+     "0.1",
+     "--top",
+     "0",
+     "--device",
+     "cuda:0",
+     "--output-file",
+     "logs/state_{dataset}_{fold}_0_{slot}.csv"
+    ],
+    "expected_outputs": [
+     "logs/state_{dataset}_{fold}_0_{slot}.csv"
+    ],
+    "generated_files": []
+   },
+   "grader": {
+    "argv": [
+     "{python}",
+     "grading/grade.py",
+     "--logs",
+     "logs",
+     "--json-out",
+     "{summary}",
+     "--no-markdown",
+     "--table",
+     "real",
+     "--real-explainer",
+     "{slot}"
+    ]
+   },
+   "coverage": {
+    "kind": "tse_real",
+    "datasets": [
+     "PAM",
+     "Boiler",
+     "Epilepsy",
+     "Wafer",
+     "Freezer"
+    ],
+    "baselines": [
+     "Average",
+     "Zeros"
+    ],
+    "count": 5
+   },
+   "metric": {
+    "name": "tse_real_mean_cpd",
+    "direction": "maximize",
+    "aggregate": "mean of the 10 real-data CPD cells (5 datasets x Average/Zeros, top-k 0.1)",
+    "gp_target_scale_floor": 0.01
+   },
+   "protocol": {
+    "protocol_id": "rg_tse_real_state_cpd_topk0.1_5ds_2sub_5fold_v1",
+    "official_grader": true,
+    "official_protocol": false,
+    "deviations": [
+     "Only the real-data table is run; the synthetic Switch-Feature and State tables are omitted.",
+     "State classifier, top-k 0.1, test batch 50, folds 0-4."
+    ]
+   },
+   "public_context": {
+    "interface": "Define top-level attribute(classifier, test_loader, timesteps, device). test_loader yields (x_batch, data_mask) batches in fixed order; timesteps is an (N, T) tensor for the full test split; classifier.predict and classifier(x, mask, timesteps, False) return class logits. Return one attribution tensor for the whole test split with the same (N, T, F) shape as the stacked inputs, on CPU or device.",
+    "scoring": "The task's own real/main.py masks the top 10% attributed entries and records cumulative prediction difference (CPD). The official grader averages CPD per dataset and substitution baseline over folds 0-4. The campaign objective is the mean of all 10 (dataset, Average/Zeros) cells; a missing cell or fold invalidates the candidate.",
+    "rules": [
+     "Any dataset or fold that crashes invalidates the whole candidate.",
+     "Do not train the classifier or read labels; attribution must depend only on the supplied classifier and inputs.",
+     "Stay within the per-candidate wall time; five datasets x five folds run in parallel on the configured devices."
+    ],
+    "references": [
+     "real/main.py",
+     "attribution/__init__.py"
+    ]
+   },
+   "seed_program": "seeds/time_series_explanation.py",
+   "evaluation_timeout_seconds": 3600,
+   "grader_timeout_seconds": 600
+  },
+  {
+   "case_id": "continual_learning",
+   "display_name": "Rehearsal-free continual learning (ResearchGym)",
+   "upstream_task": "tasks/test/continual-learning",
+   "entry": {
+    "symbol": "Learner",
+    "kind": "class",
+    "arguments": [],
+    "methods": [
+     "incremental_train",
+     "after_task"
+    ]
+   },
+   "candidate_path": "models/ldm_method.py",
+   "forbidden_import_prefixes": [
+    "models.simplecil",
+    "models.adam_",
+    "models.l2p",
+    "models.dualprompt",
+    "models.coda_prompt",
+    "models.finetune",
+    "models.ease",
+    "models.aper",
+    "models.ranpac",
+    "models.slca",
+    "models.fecam",
+    "models.memo",
+    "models.der",
+    "models.icarl",
+    "models.foster",
+    "models.wa",
+    "models.lwf"
+   ],
+   "injections": [
+    {
+     "path": "utils/factory.py",
+     "anchor": "def get_model(model_name, args):\n",
+     "where": "after",
+     "block": "    if model_name.lower() == \"{slot}\":\n        from models.{module} import Learner as _LDMLearner\n        return _LDMLearner(args)\n"
+    }
+   ],
+   "support_files": [],
+   "links": [
+    {
+     "workspace": "data",
+     "source": "{data_root}/data"
+    }
+   ],
+   "prepare_dirs": [
+    "logs/{slot}/cifar224/0/10"
+   ],
+   "jobs": {
+    "matrix": {
+     "seed": [
+      1992,
+      1993,
+      1994
+     ]
+    },
+    "argv": [
+     "{python}",
+     "main.py",
+     "--config",
+     "exps/_ldm_{seed}.json"
+    ],
+    "expected_outputs": [
+     "logs/{slot}/cifar224/0/10/reproduce_{seed}_pretrained_vit_b16_224.log"
+    ],
+    "generated_files": [
+     {
+      "path": "exps/_ldm_{seed}.json",
+      "json": {
+       "prefix": "reproduce",
+       "dataset": "cifar224",
+       "memory_size": 0,
+       "memory_per_class": 0,
+       "fixed_memory": false,
+       "shuffle": true,
+       "init_cls": 10,
+       "increment": 10,
+       "model_name": "{slot}",
+       "backbone_type": "pretrained_vit_b16_224",
+       "device": [
+        "0"
+       ],
+       "seed": [
+        "{seed:int}"
+       ],
+       "tuned_epoch": 5,
+       "init_lr": 0.01,
+       "batch_size": 48,
+       "weight_decay": 0.0005,
+       "min_lr": 0,
+       "ffn_num": 64,
+       "optimizer": "sgd",
+       "vpt_type": "shallow",
+       "prompt_token_num": 5
+      }
+     }
+    ]
+   },
+   "grader": {
+    "argv": [
+     "{python}",
+     "grading/grade.py",
+     "--logs",
+     "logs",
+     "--json-out",
+     "{summary}",
+     "--md",
+     "{scratch_markdown}",
+     "--table",
+     "cifar100"
+    ],
+    "scratch_markdown_source": "task_description.md"
+   },
+   "coverage": {
+    "kind": "cl_table",
+    "table": "cifar100",
+    "dataset": "CIFAR100",
+    "num_tasks": 10,
+    "seeds": [
+     1992,
+     1993,
+     1994
+    ]
+   },
+   "metric": {
+    "name": "cl_cifar100_acc",
+    "direction": "maximize",
+    "aggregate": "official grader acc_mean over CIFAR100 N=10 for seeds 1992-1994",
+    "gp_target_scale_floor": 0.5
+   },
+   "protocol": {
+    "protocol_id": "rg_cl_cifar100_n10_vitb16_3seeds_epoch5_v1",
+    "official_grader": true,
+    "official_protocol": false,
+    "deviations": [
+     "Only the CIFAR100 (N=10) table is run; ImageNet-R, ImageNet-A and CUB200 are omitted.",
+     "Rehearsal-free config with tuned_epoch 5, init_lr 0.01, batch 48, seeds 1992-1994."
+    ]
+   },
+   "public_context": {
+    "interface": "Define top-level class Learner(BaseLearner) (from models.base import BaseLearner), constructed as Learner(args). The trainer calls incremental_train(data_manager), eval_task(), after_task() once per task. incremental_train must increment self._cur_task, set self._total_classes, call self._network.update_fc(self._total_classes) and assign self.test_loader; after_task sets self._known_classes = self._total_classes. self._network(x) returns a dict with 'logits' and 'features'; extract_vector(x) returns features. DataLoader batches are (index, inputs, targets). SimpleCosineIncrementalNet's CosineLinear head has weight and sigma but no bias.",
+    "scoring": "Top-1 accuracy over every class seen so far after the final task (Acc), averaged over seeds 1992-1994 by the official grader; AAA is reported as a diagnostic. A seed that crashes or does not finish all 10 tasks invalidates the candidate.",
+    "rules": [
+     "Rehearsal-free: memory_size is 0 and no replay buffer may be kept.",
+     "Inference cost must not grow with the task count (no growing prompt/LoRA pools).",
+     "Do not hardcode class, task or dataset counts.",
+     "Move added modules to self._device; the backbone already lives there."
+    ],
+    "references": [
+     "models/simplecil.py",
+     "models/base.py",
+     "utils/inc_net.py",
+     "trainer.py"
+    ]
+   },
+   "seed_program": "seeds/continual_learning.py",
+   "evaluation_timeout_seconds": 3600,
+   "grader_timeout_seconds": 600
+  },
+  {
+   "case_id": "cross_modal_retrieval",
+   "display_name": "Test-time adaptation for cross-modal retrieval (ResearchGym)",
+   "upstream_task": "tasks/test/cross-modal-retrieval",
+   "entry": {
+    "symbol": "LDMTTA",
+    "kind": "class",
+    "arguments": [],
+    "methods": [
+     "forward"
+    ]
+   },
+   "candidate_path": "models/tta_baselines/ldm_method.py",
+   "forbidden_import_prefixes": [
+    "models.tta_baselines"
+   ],
+   "injections": [
+    {
+     "path": "models/tta_baselines/set_model.py",
+     "anchor": "def set_model(model, optimizer, args, margin_e0=0):\n",
+     "where": "after",
+     "block": "    if args.method == \"{slot}\":\n        from models.tta_baselines.{module} import LDMTTA as _LDMTTA\n        return _LDMTTA(model, optimizer, steps=args.tta_steps)\n"
+    }
+   ],
+   "support_files": [],
+   "links": [
+    {
+     "workspace": "dataset",
+     "source": "{data_root}/dataset"
+    },
+    {
+     "workspace": "weights",
+     "source": "{data_root}/weights"
+    },
+    {
+     "workspace": "ldm_configs",
+     "source": "{data_root}/ldm_configs/coco_image_c_sub1000"
+    }
+   ],
+   "prepare_dirs": [
+    "output/{slot}"
+   ],
+   "jobs": {
+    "matrix": {
+     "corruption": [
+      "gaussian_noise",
+      "shot_noise",
+      "impulse_noise",
+      "speckle_noise",
+      "defocus_blur",
+      "glass_blur",
+      "motion_blur",
+      "zoom_blur",
+      "snow",
+      "frost",
+      "fog",
+      "brightness",
+      "contrast",
+      "elastic_transform",
+      "pixelate",
+      "jpeg_compression"
+     ]
+    },
+    "argv": [
+     "{python}",
+     "-m",
+     "torch.distributed.run",
+     "--nproc_per_node=1",
+     "--master_port={port}",
+     "main.py",
+     "--config",
+     "ldm_configs/COCO_IP_{corruption}_5.yaml",
+     "--output_dir",
+     "output/{slot}/{corruption}",
+     "--retrieval",
+     "i2t",
+     "--method",
+     "{slot}",
+     "--tta_steps",
+     "3"
+    ],
+    "expected_outputs": [
+     "output/{slot}/{corruption}/evaluate.txt"
+    ],
+    "generated_files": []
+   },
+   "grader": {
+    "argv": [
+     "{python}",
+     "grading/grade.py",
+     "--root",
+     "output/{slot}",
+     "--table",
+     "qs_image",
+     "--json-out",
+     "{summary}",
+     "--no-markdown"
+    ]
+   },
+   "coverage": {
+    "kind": "cmr_row",
+    "row": "qs_image_blip_base",
+    "columns": [
+     "gaussian_noise",
+     "shot_noise",
+     "impulse_noise",
+     "speckle_noise",
+     "defocus_blur",
+     "glass_blur",
+     "motion_blur",
+     "zoom_blur",
+     "snow",
+     "frost",
+     "fog",
+     "brightness",
+     "contrast",
+     "elastic_transform",
+     "pixelate",
+     "jpeg_compression"
+    ],
+    "sources_per_column": 1
+   },
+   "metric": {
+    "name": "cmr_coco_c_i2t_r1",
+    "direction": "maximize",
+    "aggregate": "official grader row average of image-to-text Recall@1 over 16 COCO-C corruptions (severity 5, BLIP ViT-B/16)",
+    "gp_target_scale_floor": 0.5
+   },
+   "protocol": {
+    "protocol_id": "rg_cmr_cococ_sub1000_sev5_i2t_blipb_16corr_v1",
+    "official_grader": true,
+    "official_protocol": false,
+    "deviations": [
+     "Queries use a seed-0 1000-image subset of the COCO Karpathy test split (scripts/prepare_case_data.py cmr).",
+     "Only the Table 1 BLIP ViT-B/16 image-shift row is run."
+    ]
+   },
+   "public_context": {
+    "interface": "Define top-level class LDMTTA(nn.Module), constructed as LDMTTA(model, optimizer, steps=args.tta_steps). forward(self, x, device, args, metric_logger, if_adapt=True, counter=None, if_vis=False) receives one query-image batch and returns its B x N_gallery similarity matrix after adaptation. Reach the network as self.model.module: forward_output(x, device, args), encode_image(x), text_features. Only visual LayerNorm parameters are in self.optimizer. Call metric_logger.update(loss_total=..., lr=...) once per batch; decorate adapting helpers with @torch.enable_grad().",
+    "scoring": "Image-to-text Recall@1 for each of 16 severity-5 COCO-C corruptions; the official grader averages the BLIP ViT-B/16 row. Adaptation is online and continual without labels or resets. A missing corruption invalidates the candidate.",
+    "rules": [
+     "Do not import other models.tta_baselines modules; write the method directly.",
+     "Stay close to Tent's wall time (3 steps per batch, no per-gallery-entry Python loops).",
+     "Guard against empty selections, division by zero and NaN."
+    ],
+    "references": [
+     "models/tta_baselines/tent.py",
+     "models/tta_baselines/set_model.py",
+     "main.py"
+    ]
+   },
+   "seed_program": "seeds/cross_modal_retrieval.py",
+   "evaluation_timeout_seconds": 3600,
+   "grader_timeout_seconds": 600
+  },
+  {
+   "case_id": "improving_replay_buffers",
+   "display_name": "Improving replay buffers for online RL (ResearchGym)",
+   "upstream_task": "tasks/test/improving-replay-buffers",
+   "entry": {
+    "symbol": "ReplayBuffer",
+    "kind": "class",
+    "arguments": [],
+    "methods": [
+     "__init__",
+     "add",
+     "sample",
+     "__len__"
+    ]
+   },
+   "candidate_path": "ldm_buffer.py",
+   "forbidden_import_prefixes": [
+    "rl_runner",
+    "synther"
+   ],
+   "injections": [],
+   "support_files": [
+    {
+     "source": "support/improving_replay_buffers/rl_runner.py",
+     "dest": "rl_runner.py"
+    }
+   ],
+   "links": [],
+   "prepare_dirs": [
+    "results/{slot}"
+   ],
+   "jobs": {
+    "matrix": {
+     "seed": [
+      0,
+      1
+     ]
+    },
+    "argv": [
+     "{python}",
+     "rl_runner.py",
+     "--domain",
+     "cheetah",
+     "--task",
+     "run",
+     "--seed",
+     "{seed}",
+     "--steps",
+     "100000",
+     "--buffer",
+     "ldm_buffer",
+     "--out",
+     "results/{slot}"
+    ],
+    "expected_outputs": [
+     "results/{slot}/cheetah-run_seed{seed}.json"
+    ],
+    "generated_files": [],
+    "env": {
+     "MUJOCO_GL": "egl",
+     "OMP_NUM_THREADS": "4"
+    }
+   },
+   "grader": {
+    "argv": [
+     "{python}",
+     "grading/grade.py",
+     "--logs",
+     "results/{slot}",
+     "--json-out",
+     "{summary}",
+     "--no-markdown"
+    ]
+   },
+   "coverage": {
+    "kind": "rl_environment",
+    "environment": "Cheetah-Run",
+    "seeds": [
+     0,
+     1
+    ]
+   },
+   "metric": {
+    "name": "rl_cheetah_run_return",
+    "direction": "maximize",
+    "aggregate": "official grader mean average_return on DMC cheetah-run over seeds 0 and 1",
+    "gp_target_scale_floor": 10.0
+   },
+   "protocol": {
+    "protocol_id": "rg_rl_dmc_cheetah_run_100k_2seeds_tasklocal_sac_v1",
+    "official_grader": true,
+    "official_protocol": false,
+    "deviations": [
+     "The pinned upstream task provides no training loop; the SAC stack in resources/cases/support/improving_replay_buffers/rl_runner.py is task-local and fixed.",
+     "Only DMC cheetah-run, 100000 environment steps, seeds 0 and 1; results are not comparable to published tables."
+    ]
+   },
+   "public_context": {
+    "interface": "Define top-level class ReplayBuffer(obs_dim, act_dim, capacity, device). add(obs, act, rew, next_obs, done) is called once per environment step (100000 per run) and returns None; sample(batch_size) is called once per gradient step and returns float32 tensors on device in the order (obs, act, rew, next_obs, done) with shapes (B, obs_dim) (B, act_dim) (B,) (B, obs_dim) (B,); __len__() returns the number of stored transitions. Sampled transitions may be synthesized as long as rewards and next states remain consistent enough to train on.",
+    "scoring": "Average return of the deterministic policy on DMC cheetah-run after 100000 environment steps (10 evaluation episodes), averaged over seeds 0 and 1 by the official grader. A seed without a result JSON invalidates the candidate.",
+    "rules": [
+     "Vectorize per-sample work on the device; amortize any auxiliary model training.",
+     "Guard against an empty buffer, NaN and out-of-range indices.",
+     "Only torch and numpy are needed; no files or network."
+    ],
+    "references": [
+     "task_description.md"
+    ]
+   },
+   "seed_program": "seeds/improving_replay_buffers.py",
+   "evaluation_timeout_seconds": 3600,
+   "grader_timeout_seconds": 600
+  }
+ ]
+}
