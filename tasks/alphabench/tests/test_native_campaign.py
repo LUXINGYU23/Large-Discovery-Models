@@ -300,18 +300,31 @@ def test_native_workflow_runs_full_stages_without_starting_search_engine(tmp_pat
 
 
 @pytest.mark.parametrize("method", ["cot", "tot", "ea"])
-def test_native_budget_stop_finalizes_committed_state_without_partial_batch_scores(tmp_path, source, monkeypatch, method):
+def test_native_budget_stop_finalizes_every_paid_search_attempt(tmp_path, source, monkeypatch, method):
     monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
     args = arguments(tmp_path, protocol(method, evaluations=1))
     assert main(args) == 0
     report = json.loads((tmp_path / "run/result.json").read_text())
     assert report["execution"]["algorithm_completed"] is False
     assert report["execution"]["stop_reason"] == "search_batch_budget_exhausted"
-    assert report["completeness"]["search"]["status"] == "partial"
-    assert report["search"]["attempts"] <= 1
-    assert report["execution"]["remaining_search_allowance"] == (0 if method == "cot" else 1)
+    assert report["completeness"]["search"]["status"] == "complete"
+    assert report["search"]["attempts"] == 1
+    assert report["execution"]["remaining_search_allowance"] == 0
     assert report["quality_audit"]["complete"]
     assert main(args + ["--resume-run", str(tmp_path / "run")]) == 0
+
+
+@pytest.mark.parametrize("method", ["cot", "tot", "ea"])
+def test_matched_native_trajectory_contains_every_planned_search_step(tmp_path, source, monkeypatch, method):
+    monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
+    args = arguments(tmp_path, protocol(method, evaluations=5, rounds=3))
+    assert main(args) == 0
+    run = tmp_path / "run"
+    report = json.loads((run / "result.json").read_text())
+    assert report["search"]["attempts"] == 5
+    assert report["budget"]["counters"]["expensive_evaluation_attempts"] == 5
+    assert report["completeness"]["search"]["status"] == "complete"
+    assert len((run / "trajectory.csv").read_text().splitlines()) == 6
 
 
 def test_native_finalization_pause_resumes_without_restarting_search_or_generation(tmp_path, source, monkeypatch):

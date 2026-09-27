@@ -30,7 +30,7 @@ def verified_sources(root, hashes):
     return files
 
 
-def patched_source(name, text):
+def patched_source(name, text, *, matched=False):
     def replace(before, after):
         nonlocal text
         if text.count(before) != 1:
@@ -47,7 +47,34 @@ def patched_source(name, text):
         replace("        " + call, "        with native_seed():\n            " + call)
         snapshot = 'native_state("cot.chain", {"chain": chain})\n'
         replace("        for r in range(1, rounds + 1):", "        " + snapshot + "\n        for r in range(1, rounds + 1):")
-        replace("                continue\n\n            cand_name", "                " + snapshot + "                continue\n\n            cand_name")
+        if matched:
+            before = ('            if cand is None:\n'
+                  '                self._log("  No candidate returned; skipping round.")\n'
+                  '                chain.append({\n'
+                  '                    "round":        r,\n'
+                  '                    "name":         best_name,\n'
+                  '                    "expression":   best_expr,\n'
+                  '                    "metrics":      best_metrics,\n'
+                  '                    "instruction":  instruction,\n'
+                  '                    "elapsed_time": llm_elapsed,\n'
+                  '                    "generated":    {},\n'
+                  '                })\n'
+                  '                continue\n')
+            after = ('            while cand is None:\n'
+                 '                self._log("  No candidate returned; retrying this round.")\n'
+                 '                retry_started = time.time()\n'
+                 '                payload = self.search_fn(\n'
+                 '                    instruction=instruction, model=self.model, N=1, max_try=5,\n'
+                 '                    avoid_repeat=False, verbose=False, debug_mode=False,\n'
+                 '                    temperature=self.temperature, enable_reason=self.enable_reason,\n'
+                 '                    local=self.local, local_port=self.local_port,\n'
+                 '                )\n'
+                 '                llm_elapsed += time.time() - retry_started\n'
+                 '                cand = self._extract_single_candidate(payload)\n')
+            replace(before, after)
+        else:
+            replace("                continue\n\n            cand_name",
+                    "                " + snapshot + "                continue\n\n            cand_name")
         replace("\n        summary = {", "\n            " + snapshot + "\n        summary = {")
     if name == "tot.py":
         call = 'seed_batch   = self._safe_eval_batch([{"name": seed["name"], "expression": seed["expression"]}])'
@@ -68,16 +95,27 @@ def patched_source(name, text):
         replace("                current_pool = _rank_by_rank_ic(combined)[:pool_size]\n",
                 "                current_pool = _rank_by_rank_ic(combined)[:pool_size]\n"
                 '                native_state("ea.pool", {"round": r, "pool": current_pool, "candidates": unique_candidates})\n')
+        if matched:
+            replace("                unique_candidates = _get_unique_set(candidates)\n",
+                "                unique_candidates = _get_unique_set(candidates)\n"
+                "                while len(unique_candidates) < N:\n"
+                "                    extra, _, elapsed = self._run_llm_round(\n"
+                "                        _seed_block_json(_select_seed_pool(current_pool, top_k=self.seeds_top_k)),\n"
+                "                        N - len(unique_candidates), 0, r)\n"
+                "                    llm_elapsed += elapsed\n"
+                "                    mut_candidates.extend(extra)\n"
+                "                    candidates.extend(extra)\n"
+                "                    unique_candidates = _get_unique_set(candidates)\n")
     return text
 
 
 @contextmanager
-def load_algorithms(source_root, private_root, scheduler):
+def load_algorithms(source_root, private_root, scheduler, *, matched=False):
     source_root, private_root = Path(source_root), Path(private_root)
     destination = private_root / "native_source"
     files, manifest = {}, {}
     for name, source in verified_sources(source_root / "searcher/algo", SOURCE_HASHES).items():
-        body = patched_source(name, source).encode("utf-8")
+        body = patched_source(name, source, matched=matched).encode("utf-8")
         files[name] = body
         manifest[name] = {"source_sha256": SOURCE_HASHES[name], "patched_sha256": sha256(body).hexdigest()}
     manifest = {"files": manifest, "runtime_sha256": sha256(

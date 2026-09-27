@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 from threading import Barrier
+from threading import Lock
 import time
 
 import pytest
@@ -123,6 +124,35 @@ def test_fixed_native_algorithms_match_upstream_and_replay_without_callbacks(tmp
         replayed = replay.run(lambda: algo.run(SEEDS, str(run / "native")))
     assert actual == replayed  # Names, completion order, timing and every tree/chain/pool entry.
     assert (run / "events.jsonl").read_bytes() == journal_before
+
+
+@pytest.mark.parametrize("method", ["cot", "ea"])
+def test_matched_native_generation_fills_each_round_after_empty_or_duplicate_output(tmp_path, source, method):
+    sched = scheduler(tmp_path / "campaign")
+    lock, calls, evaluated = Lock(), 0, []
+
+    def search(instruction, model, N, **kwargs):
+        nonlocal calls
+        with lock:
+            calls += 1
+            index = calls
+        expression = ("$close" if index <= (1 if method == "cot" else 2) else "$open")
+        return {"success": True, "factors": [] if method == "cot" and index == 1 else
+                [{"name": f"candidate{index}", "expression": expression}]}
+
+    def evaluate(factors):
+        evaluated.extend(factor["expression"] for factor in factors)
+        return [metrics(factor["expression"]) for factor in factors]
+
+    config = {**CONFIG, "rounds": 1, "workers": 1, "N": 2, "mutation_rate": .5, "crossover_rate": .5}
+    operations = {"search_fn": sched.callback("search_fn", lambda identity, *args, **kwargs: search(*args, **kwargs)),
+                  "batch_evaluate_fn": sched.callback("batch_evaluate_fn", lambda identity, factors: evaluate(factors)),
+                  "evaluate_fn": sched.callback("evaluate_fn", lambda identity, expression: metrics(expression))}
+    with load_algorithms(source, tmp_path / "campaign/private", sched, matched=True) as module:
+        algo = module.create_algo(method, config, **operations)
+        sched.run(lambda: algo.run(SEEDS[:1], str(tmp_path / "native")))
+    assert calls == (2 if method == "cot" else 3)
+    assert evaluated == (["$open", "$open"] if method == "cot" else ["$close", "$open"])
 
 
 def test_scheduler_keeps_parallel_io_but_replays_recorded_delivery_order(tmp_path):

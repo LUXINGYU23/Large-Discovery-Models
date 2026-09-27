@@ -15,7 +15,7 @@ from .receipts import Receipts
 
 
 class NativeSearchBudgetExhausted(BudgetExceededError):
-    """The complete requested search batch cannot fit the remaining matched E."""
+    """The matched search evaluation allowance is exhausted."""
 
 
 class NativeEvaluator:
@@ -36,9 +36,12 @@ class NativeEvaluator:
              "workers": workers, "adapter_sha256": sha256(Path(__file__).read_bytes()).hexdigest()})
         self.stopped = next((event["payload"] for event in self.runtime.events()
                              if event["event_type"] == "native_search_stopped"), None)
+        self.settling = False
         gateway.before_dispatch = self.authorize
 
     def authorize(self):
+        if self.settling:
+            return
         self.scheduler._check()
         if self.stopped:
             raise self.scheduler.stop(NativeSearchBudgetExhausted(self.stopped["reason"]), notify=False)
@@ -81,34 +84,40 @@ class NativeEvaluator:
         def reserve():
             self.authorize()
             groups = {}
+            selected = []
+            usage = self.runtime.budget.metadata.get("cumulative_usage", {})
+            remaining = self.runtime.budget.remaining("expensive_evaluation_attempts")
             for candidate in candidates:
                 logical, request, counter = self.gateway.evaluation_request(candidate, phase="search",
                     position=candidate.metadata["attempt_position"])
                 key, amounts = self.gateway.reservation(logical, request, counter)
+                charged = usage.get(key, {}).get("expensive_evaluation_attempts", 0)
+                if not charged and remaining == 0 and self.protocol.profile == "ldm_matched_v1":
+                    break
+                if not charged:
+                    remaining -= 1
                 groups[key] = {**amounts, "expensive_evaluation_attempts": 1,
                                "external_evaluations": 1, "selected_candidates": 1}
+                selected.append(candidate)
+            if not selected and candidates:
+                self.stopped = {"batch": identity, "requested": len(candidates), "remaining": 0,
+                                "reason": "matched search evaluation allowance exhausted"}
+                self.runtime.record("native_search_stopped", self.stopped, event_key="native_search_stopped")
+                raise self.scheduler.stop(NativeSearchBudgetExhausted(self.stopped["reason"]), notify=False)
             try:
                 self.runtime.consume_groups(groups)
             except BudgetExceededError as exc:
-                usage = self.runtime.budget.metadata.get("cumulative_usage", {})
-                needed = sum(1 - usage.get(key, {}).get("expensive_evaluation_attempts", 0) for key in groups)
-                remaining = self.runtime.budget.remaining("expensive_evaluation_attempts")
-                if needed > remaining and self.protocol.profile == "ldm_matched_v1":
-                    self.stopped = {"batch": identity, "requested": len(candidates), "remaining": remaining,
-                                    "reason": str(exc), "candidates": [item.to_dict() for item in candidates]}
-                    self.runtime.record("native_search_stopped", self.stopped, event_key="native_search_stopped")
-                    cause = NativeSearchBudgetExhausted(str(exc))
-                else:
-                    cause = EvaluationPaused("native batch exceeds the frozen execution budget: " + str(exc),
-                                             status="paused_budget")
+                cause = EvaluationPaused("native batch exceeds the frozen execution budget: " + str(exc),
+                                         status="paused_budget")
                 raise self.scheduler.stop(cause, notify=False)
             submitted = next(event["sequence"] for event in self.runtime.events()
                 if event["event_type"] == "native_boundary" and event["payload"]["id"] == identity)
             self.runtime.record("native_batch_reserved", {"batch": identity, "submitted": submitted,
-                "candidates": [item.to_dict() for item in candidates]}, event_key="native_batch:" + identity)
-            return submitted
+                "requested": len(candidates), "candidates": [item.to_dict() for item in selected]},
+                event_key="native_batch:" + identity)
+            return submitted, selected
 
-        submitted = self.gateway.host.call(reserve)
+        submitted, selected = self.gateway.host.call(reserve)
 
         def measure(index, candidate):
             try:
@@ -118,8 +127,17 @@ class NativeEvaluator:
 
         with ThreadPoolExecutor(max_workers=self.workers) as pool:
             futures = [pool.submit(measure, index, candidate)
-                       for index, candidate in enumerate(candidates)]
-            return [future.result() for future in futures]
+                       for index, candidate in enumerate(selected)]
+            results = [future.result() for future in futures]
+        if len(selected) < len(candidates):
+            def stop():
+                self.stopped = {"batch": identity, "requested": len(candidates),
+                                "accepted": len(selected), "remaining": 0,
+                                "reason": "matched search evaluation allowance exhausted"}
+                self.runtime.record("native_search_stopped", self.stopped, event_key="native_search_stopped")
+            self.gateway.host.call(stop)
+            raise self.scheduler.stop(NativeSearchBudgetExhausted(self.stopped["reason"]), notify=False)
+        return results
 
     def _measure(self, identity, submitted, index, candidate):
         position = candidate.metadata["attempt_position"]
@@ -149,21 +167,20 @@ class NativeEvaluator:
                 "cached": raw.get("cached", False)}
 
     def settle(self):
-        """After workers drain, reconcile begun search requests and leave unstarted work explicit."""
-        unstarted = []
-        for event in self.runtime.events():
-            if event["event_type"] != "native_batch_reserved":
-                continue
-            batch = event["payload"]
-            for index, payload in enumerate(batch["candidates"]):
-                candidate = Candidate(**payload)
-                receipt = self.gateway.receipts.load(self.gateway.identity(
-                    "search", candidate.metadata["attempt_position"], candidate))
-                if receipt is None or receipt["state"] == "reserved":
-                    unstarted.append({"batch": batch["batch"], "index": index, "candidate": payload})
+        """Finish every paid search attempt; unknown dispatched requests still pause."""
+        self.settling = True
+        try:
+            for event in self.runtime.events():
+                if event["event_type"] != "native_batch_reserved":
                     continue
-                self._measure(batch["batch"], batch["submitted"], index, candidate)
-        return {"stopped": self.stopped, "reserved_but_unstarted": unstarted}
+                batch = event["payload"]
+                for index, payload in enumerate(batch["candidates"]):
+                    self._measure(batch["batch"], batch["submitted"], index, Candidate(**payload))
+        finally:
+            self.settling = False
+        if len(self.observations()) != self.runtime.budget.counters.get("expensive_evaluation_attempts", 0):
+            raise EvaluationPaused("native search receipts do not account for every paid attempt")
+        return {"stopped": self.stopped, "reserved_but_unstarted": []}
 
     def observations(self):
         rows = [event["payload"] for event in self.runtime.events() if event["event_type"] == "native_observation"]

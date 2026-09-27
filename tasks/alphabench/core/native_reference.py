@@ -109,7 +109,8 @@ def run_native(protocol, args, spec, client, run_dir, initial_observations, conf
             raise EvaluationPaused("example entry requires all 42 measured Alpha158 baseline factors",
                                    status="paused_incomplete_initialization")
         result = stages.load("native_algorithm_result")
-        with load_algorithms(args.upstream_root, run_dir / "private", scheduler) as module:
+        with load_algorithms(args.upstream_root, run_dir / "private", scheduler,
+                             matched=protocol.profile == "ldm_matched_v1") as module:
             if result is None and evaluator.stopped is None:
                 if protocol.profile == "upstream_benchmark_v1":
                     baseline = alpha158_seeds(args.upstream_root, ("kbar", "rolling", "price"))

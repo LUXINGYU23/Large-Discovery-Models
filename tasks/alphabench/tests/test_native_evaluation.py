@@ -43,17 +43,30 @@ def batch(evaluator, scheduler, factors=FACTORS):
     return scheduler.run(lambda: evaluator.callbacks()["batch_evaluate_fn"](factors))
 
 
-@pytest.mark.parametrize("limits,status", [({"expensive_evaluation_attempts": 1}, "search"),
-                                           ({"oracle_job_slots": 3}, "permits")])
-def test_full_batch_rejection_never_spends_or_dispatches_partial_work(tmp_path, monkeypatch, limits, status):
-    evaluator, scheduler = build(tmp_path, evaluations=limits.get("expensive_evaluation_attempts", 4), limits=limits)
+def test_non_search_budget_rejects_batch_without_partial_dispatch(tmp_path, monkeypatch):
+    evaluator, scheduler = build(tmp_path, limits={"oracle_job_slots": 3})
     monkeypatch.setattr(evaluator.gateway, "_send", lambda _: pytest.fail("rejected batch was dispatched"))
     before = (tmp_path / "budget.json").read_bytes()
-    with pytest.raises(NativeSearchBudgetExhausted if status == "search" else EvaluationPaused):
+    with pytest.raises(EvaluationPaused):
         batch(evaluator, scheduler)
     assert (tmp_path / "budget.json").read_bytes() == before
     assert evaluator.observations() == []
     assert evaluator.settle()["reserved_but_unstarted"] == []
+
+
+def test_final_batch_measures_only_remaining_search_allowance(tmp_path, monkeypatch):
+    evaluator, scheduler = build(tmp_path, evaluations=1)
+    calls = []
+    def send(request):
+        calls.append(request["phase"])
+        return mock_oracle(request)
+    monkeypatch.setattr(evaluator.gateway, "_send", send)
+    with pytest.raises(NativeSearchBudgetExhausted):
+        batch(evaluator, scheduler)
+    assert evaluator.settle()["reserved_but_unstarted"] == []
+    assert [item.candidate.payload["name"] for item in evaluator.observations()] == ["open"]
+    assert evaluator.runtime.budget.counters["expensive_evaluation_attempts"] == 1
+    assert calls == ["search", "validation"]
 
 
 def test_parallel_search_keeps_input_order_and_commits_private_validation_before_return(tmp_path, monkeypatch):
@@ -109,7 +122,7 @@ def test_seed_role_reuses_initial_information_but_reproposals_pay_new_attempts(t
     assert len({tuple(item.candidate.metadata["attempt_position"]) for item in evaluator.observations()}) == 2
 
 
-def test_concurrent_batches_cannot_partially_claim_the_same_remaining_E(tmp_path):
+def test_concurrent_batches_cannot_exceed_remaining_E(tmp_path):
     evaluator, scheduler = build(tmp_path, evaluations=3)
     overlap = Barrier(2)
     def stage():
@@ -122,9 +135,10 @@ def test_concurrent_batches_cannot_partially_claim_the_same_remaining_E(tmp_path
     with pytest.raises(NativeSearchBudgetExhausted):
         scheduler.run(stage)
     evaluator.settle()
-    assert evaluator.runtime.budget.counters["expensive_evaluation_attempts"] == 2
-    assert evaluator.runtime.budget.remaining("expensive_evaluation_attempts") == 1
-    assert sum(event["event_type"] == "native_batch_reserved" for event in evaluator.runtime.events()) == 1
+    charged = evaluator.runtime.budget.counters["expensive_evaluation_attempts"]
+    assert 2 <= charged <= 3
+    assert len(evaluator.observations()) == charged
+    assert evaluator.runtime.budget.remaining("expensive_evaluation_attempts") == 3 - charged
 
 
 @pytest.mark.parametrize("unknown", [False, True])
@@ -147,8 +161,8 @@ def test_stop_cancels_unstarted_requests_but_drains_and_reconciles_begun_work(tm
         assert calls == ["search"] and not evaluator.observations()
     else:
         settled = evaluator.settle()
-        assert len(settled["reserved_but_unstarted"]) == 1
-        assert len(evaluator.observations()) == 1 and calls == ["search", "validation"]
+        assert settled["reserved_but_unstarted"] == []
+        assert len(evaluator.observations()) == 2 and calls == ["search", "validation", "search", "validation"]
     assert evaluator.runtime.budget.counters["expensive_evaluation_attempts"] == 2
 
 
@@ -220,14 +234,19 @@ def test_all_actual_native_algorithms_use_metered_generator_and_private_evaluato
     monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
     evaluator, scheduler = build(tmp_path, evaluations=50, method=method)
     gateway, protocol = evaluator.gateway, evaluator.protocol
-    client = CallableProposalClient(lambda request: json.dumps({"generated": FACTORS}))
+    generated = iter(range(100))
+    def model(request):
+        index = next(generated)
+        return json.dumps({"generated": [{"name": f"factor_{index}_{offset}",
+            "expression": f"Ref($close, {index * 2 + offset + 1})"} for offset in range(2)]})
+    client = CallableProposalClient(model)
     generator = NativeGenerator(protocol, evaluator.runtime, client, gateway, AcceptedActions(tmp_path), source)
     def stage(module):
         algo = module.create_algo(method, {"rounds": 2, "workers": 2, "N": 2, "top_k": 2,
             "model": protocol.model, "temperature": protocol.temperature},
             search_fn=scheduler.callback("search_fn", generator), **evaluator.callbacks())
         return algo.run(SEEDS, str(tmp_path / "native"))
-    with load_algorithms(source, tmp_path / "private", scheduler) as module:
+    with load_algorithms(source, tmp_path / "private", scheduler, matched=True) as module:
         result = scheduler.run(lambda: stage(module))
     assert result["history"] and evaluator.observations()
     assert evaluator.runtime.budget.counters["validation_evaluations"] == len(evaluator.observations())

@@ -162,7 +162,9 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     selected_count = len(selection["selected"])
     test_success = sum(row["raw"]["success"] and isinstance(row["raw"].get("portfolio"), dict) for row in tested)
     combined = combination is not None and combination["success"] and isinstance(combination.get("portfolio"), dict)
-    search_complete = execution["algorithm_completed"] if native else execution["summary"]["stop_reason"] == "observation_target"
+    search_complete = (len(search_raw) == protocol.evaluations if native and protocol.profile == "ldm_matched_v1"
+                       else execution["algorithm_completed"] if native else
+                       execution["summary"]["stop_reason"] == "observation_target")
     report["completeness"] = {
         "initialization": {"status": "complete", "seed_count": len(initial_pool)},
         "search": {"status": "complete" if search_complete else "partial",
