@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -54,28 +55,39 @@ class BudgetLedger:
     ) -> dict[str, int | float]:
         """Persist increments, or cumulative usage for an idempotent operation key."""
 
-        if usage_key is not None and not usage_key.strip():
-            raise ValueError("usage_key must not be empty")
-        previous = self.metadata.get("cumulative_usage", {}).get(usage_key, {})
-        totals = dict(previous)
+        return self.consume_groups({usage_key: amounts})
+
+    def consume_groups(
+        self, groups: Mapping[str | None, Mapping[str, int | float]]
+    ) -> dict[str, int | float]:
+        """Reserve a whole batch atomically, retaining each operation's replay key."""
+
+        usage = dict(self.metadata.get("cumulative_usage", {}))
         updates: dict[str, int | float] = {}
-        for name, raw_amount in amounts.items():
-            amount = _validated_number(raw_amount, f"amount for {name}")
+        for usage_key, amounts in groups.items():
+            if usage_key is not None and not usage_key.strip():
+                raise ValueError("usage_key must not be empty")
+            previous = usage.get(usage_key, {}) if usage_key is not None else {}
+            totals = dict(previous)
+            for name, raw_amount in amounts.items():
+                amount = _validated_number(raw_amount, f"amount for {name}")
+                if usage_key is not None:
+                    totals[name] = max(previous.get(name, 0), amount)
+                    amount = totals[name] - previous.get(name, 0)
+                current = updates.get(name, self.counters.get(name, 0))
+                updated = current + amount
+                limit = self.limits.get(name)
+                if limit is not None and updated > limit:
+                    raise BudgetExceededError(
+                        f"Budget {name!r} would be exceeded: "
+                        f"{current} + {amount} > {limit}"
+                    )
+                updates[name] = updated
             if usage_key is not None:
-                totals[name] = max(previous.get(name, 0), amount)
-                amount = totals[name] - previous.get(name, 0)
-            current = self.counters.get(name, 0)
-            updated = current + amount
-            limit = self.limits.get(name)
-            if limit is not None and updated > limit:
-                raise BudgetExceededError(
-                    f"Budget {name!r} would be exceeded: "
-                    f"{current} + {amount} > {limit}"
-                )
-            updates[name] = updated
+                usage[usage_key] = totals
         self.counters.update(updates)
-        if usage_key is not None:
-            self.metadata.setdefault("cumulative_usage", {})[usage_key] = totals
+        if any(key is not None for key in groups):
+            self.metadata["cumulative_usage"] = usage
         self.write()
         return updates
 
@@ -168,6 +180,7 @@ class CampaignEvent:
     iteration: int | None = None
     candidate_id: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
+    event_key: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -180,6 +193,7 @@ class CampaignEvent:
             "iteration": self.iteration,
             "candidate_id": self.candidate_id,
             "payload": dict(self.payload),
+            "event_key": self.event_key,
         }
 
 
@@ -198,6 +212,7 @@ class CampaignRuntime:
     budget: BudgetLedger
     status: CampaignStatus
     _next_event_sequence: int = 0
+    _keyed_events: dict[str, CampaignEvent] = field(default_factory=dict)
 
     @classmethod
     def open(
@@ -274,7 +289,7 @@ class CampaignRuntime:
         )
 
         event_path = path / "events.jsonl"
-        events = _read_jsonl(event_path) if resume else []
+        events = _read_jsonl(event_path, repair_incomplete_tail=True) if resume else []
         runtime = cls(
             run_dir=path,
             task=task,
@@ -285,6 +300,12 @@ class CampaignRuntime:
                 max((int(item.get("sequence", -1)) for item in events), default=-1) + 1
             ),
         )
+        for item in events:
+            if item.get("event_key"):
+                event = CampaignEvent(**{key: value for key, value in item.items() if key != "schema_version"})
+                if event.event_key in runtime._keyed_events:
+                    raise ValueError("duplicate durable event key")
+                runtime._keyed_events[event.event_key] = event
 
         if existing_manifest is None:
             manifest = {
@@ -320,7 +341,12 @@ class CampaignRuntime:
     def consume_many(
         self, amounts: Mapping[str, int | float], *, usage_key: str | None = None
     ) -> dict[str, int | float]:
-        values = self.budget.consume_many(amounts, usage_key=usage_key)
+        return self.consume_groups({usage_key: amounts})
+
+    def consume_groups(
+        self, groups: Mapping[str | None, Mapping[str, int | float]]
+    ) -> dict[str, int | float]:
+        values = self.budget.consume_groups(groups)
         self.status.update("running", phase="budget_updated", budget=self.budget)
         return values
 
@@ -331,12 +357,20 @@ class CampaignRuntime:
         *,
         iteration: int | None = None,
         candidate_id: str = "",
+        event_key: str = "",
     ) -> CampaignEvent:
         if not event_type.strip():
             raise ValueError("campaign event_type must not be empty")
         if iteration is not None and iteration < 0:
             raise ValueError("campaign event iteration must be non-negative")
         with _EVENT_LOCK:
+            if event_key in self._keyed_events:
+                event = self._keyed_events[event_key]
+                if (event.event_type, event.iteration, event.candidate_id, event.payload) != (
+                    event_type, iteration, str(candidate_id), dict(payload or {})
+                ):
+                    raise ValueError(f"event identity conflict: {event_key}")
+                return event
             event = CampaignEvent(
                 sequence=self._next_event_sequence,
                 event_type=event_type,
@@ -346,12 +380,16 @@ class CampaignRuntime:
                 iteration=iteration,
                 candidate_id=str(candidate_id),
                 payload=dict(payload or {}),
+                event_key=event_key,
             )
             self.run_dir.mkdir(parents=True, exist_ok=True)
             with self.event_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event.to_dict(), sort_keys=True) + "\n")
                 handle.flush()
+                os.fsync(handle.fileno())
             self._next_event_sequence += 1
+            if event_key:
+                self._keyed_events[event_key] = event
         return event
 
     def events(self) -> list[dict[str, Any]]:
@@ -390,7 +428,8 @@ class CampaignRuntime:
             raise ValueError("terminal campaign status must be 'completed' or 'stopped'")
         summary_path = self.run_dir / "summary.json"
         atomic_json_write(summary_path, dict(summary))
-        self.record("campaign_finished", {"status": status})
+        self.record("campaign_finished", {"status": status},
+                    event_key=f"campaign:finished:{status}:{summary.get('next_round')}:{summary.get('observation_count')}")
         self.status.update(status, phase="finished", budget=self.budget, details=summary)
         return summary_path
 
@@ -438,9 +477,11 @@ def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
         dir=str(path.parent),
     )
     try:
-        with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(temporary_fd, "w", encoding="utf-8", newline="\n") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary_name, path)
     except BaseException:
         try:
@@ -463,14 +504,34 @@ def unique_run_dir(path: Path) -> Path:
     raise RuntimeError(f"could not allocate a unique campaign directory beside {requested}")
 
 
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+def _read_jsonl(path: Path, *, repair_incomplete_tail: bool = False) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    data = path.read_bytes()
+    lines = data.splitlines(keepends=True)
+    records, offset = [], 0
+    for index, line in enumerate(lines):
+        try:
+            if line.strip():
+                records.append(json.loads(line.decode("utf-8")))
+        except ValueError:
+            if not repair_incomplete_tail or index != len(lines) - 1 or line.endswith(b"\n"):
+                raise
+            # Preserve the interrupted append before repairing the writable log.
+            backup = path.with_name(path.name + ".incomplete-" + hashlib.sha256(line).hexdigest() + ".json")
+            atomic_json_write(backup, {"offset": offset, "tail_hex": line.hex()})
+            with path.open("r+b") as handle:
+                handle.truncate(offset)
+                handle.flush()
+                os.fsync(handle.fileno())
+            return records
+        offset += len(line)
+    if repair_incomplete_tail and data and not data.endswith(b"\n"):
+        with path.open("ab") as handle:
+            handle.write(b"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    return records
 
 
 def _validated_numbers(

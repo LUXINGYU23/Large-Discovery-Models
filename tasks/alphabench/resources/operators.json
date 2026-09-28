@@ -1,0 +1,38 @@
+{
+  "version": "alphabench-t3-grammar-v1",
+  "qlib": {
+    "Abs": ["value"], "Add": ["value", "value"], "And": ["value", "value"],
+    "Clip": ["value", "number", "number"], "Corr": ["value", "value", "window"],
+    "Count": ["value", "window"], "Cov": ["value", "value", "window"],
+    "Delta": ["value", "window"], "Div": ["value", "value"], "EMA": ["value", "window"],
+    "Eq": ["value", "value"], "Ge": ["value", "value"], "Greater": ["value", "value"],
+    "Gt": ["value", "value"], "IdxMax": ["value", "window"], "IdxMin": ["value", "window"],
+    "If": ["value", "value", "value"], "Kurt": ["value", "window"], "Le": ["value", "value"],
+    "Less": ["value", "value"], "Log": ["value"], "Lt": ["value", "value"],
+    "Mad": ["value", "window"], "Mask": ["value", "value"], "Max": ["value", "window"],
+    "Mean": ["value", "window"], "Med": ["value", "window"], "Min": ["value", "window"],
+    "Mul": ["value", "value"], "Ne": ["value", "value"], "Not": ["value"],
+    "Or": ["value", "value"], "Power": ["value", "value"], "Quantile": ["value", "window", "quantile"],
+    "Rank": ["value", "window"], "Ref": ["value", "lag"], "Resi": ["value", "window"],
+    "Rsquare": ["value", "window"], "Sign": ["value"], "Skew": ["value", "window"],
+    "Slope": ["value", "window"], "Sqrt": ["value"], "Std": ["value", "window"],
+    "Sub": ["value", "value"], "Sum": ["value", "window"], "Tanh": ["value"],
+    "Var": ["value", "window"], "WMA": ["value", "window"]
+  },
+  "assay": {
+    "abs": ["value"], "clip": ["value", "number", "number"], "cs_demean": ["value"],
+    "cs_group_mean": ["value", "group"], "cs_group_rank": ["value", "group"],
+    "cs_neutralize": ["value", "group"], "cs_rank": ["value"], "cs_scale": ["value", "number?"],
+    "cs_winsorize": ["value", "quantile"], "cs_zscore": ["value"],
+    "elem_max": ["value", "value"], "elem_min": ["value", "value"], "log": ["value"],
+    "pow": ["value", "number"], "safe_div": ["value", "value", "fill:number?"],
+    "sigmoid": ["value"], "sign": ["value"], "signed_power": ["value", "number"], "sqrt": ["value"],
+    "ts_argmax": ["value", "window"], "ts_argmin": ["value", "window"],
+    "ts_corr": ["value", "value", "window"], "ts_cov": ["value", "value", "window"],
+    "ts_decay_linear": ["value", "window"], "ts_delay": ["value", "lag"],
+    "ts_delta": ["value", "window"], "ts_dema": ["value", "window"],
+    "ts_ema": ["value", "window"], "ts_max": ["value", "window"], "ts_mean": ["value", "window"],
+    "ts_min": ["value", "window"], "ts_rank": ["value", "window"], "ts_returns": ["value", "window"],
+    "ts_std": ["value", "window"], "ts_sum": ["value", "window"], "where": ["value", "value", "value"]
+  }
+}

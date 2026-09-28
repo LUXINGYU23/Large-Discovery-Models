@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "cn": {
+    "release": "2026-09-22",
+    "source_commit": "b8c129b4d9b838f050eac8b1135111b3b79fc894",
+    "archive": "https://github.com/chenditc/investment_data/releases/download/2026-09-22/qlib_bin.tar.gz",
+    "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+    "archive_bytes": 566183981,
+    "manifest": "https://github.com/chenditc/investment_data/releases/download/2026-09-22/qlib_bin.manifest.json",
+    "manifest_sha256": "2e85160a860b2150dd16c67b27bd138862d2bec6e13df73e349f42a398bb6dba"
+  },
+  "assay": {
+    "source": "https://github.com/chester1uo/Assay",
+    "commit": "06179ef75140ce5d9b94405e4af243faddc70b9e",
+    "archive": "https://codeload.github.com/chester1uo/Assay/tar.gz/06179ef75140ce5d9b94405e4af243faddc70b9e",
+    "archive_sha256": "5db610635745c4173b1d6094f083dedbe686aef1d5e7138c2cda1460e3c55924"
+  },
+  "alphabench": {
+    "source": "https://github.com/CityU-MLO/AlphaBench",
+    "commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+    "archive": "https://codeload.github.com/CityU-MLO/AlphaBench/tar.gz/31bb94bbb7744177c51c9d011e07c31e3092b93e",
+    "archive_sha256": "d0585e100f285fb61751d80ad035cb3c69758665b50dbbbd13c3082d9c49bdba"
+  },
+  "cn_status": {
+    "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master",
+    "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+    "table": "bao_a_stock_eod_info",
+    "last_date": "2023-06-09",
+    "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension"
+  },
+  "cn_baostock": {
+    "documentation": "https://pypi.org/project/baostock/0.9.4/",
+    "client_version": "0.9.4",
+    "endpoint": "public-api.baostock.com:10030",
+    "capture": "2026-09-23",
+    "versioning": "Live service has no immutable historical snapshot API; retain timestamped, hashed responses for offline reproduction."
+  },
+  "period": {"start": "2015-01-01", "end_exclusive": "2025-02-01"},
+  "us": {
+    "url": "https://www.dolthub.com/api/v1alpha1/post-no-preference/stocks/master",
+    "commit": "s156r5d03kp2mlt6a8pbai703vtrldc4",
+    "tables": ["ohlcv", "dividend", "split", "symbol"],
+    "price_basis": "unadjusted OHLCV; independent dividend and split events",
+    "benchmarks": {"sp500": "SP500", "nasdaq100": "NASDAQ100"},
+    "membership_resources": ["sp500-historical.json", "n100-ticker-changes-{year}.yaml"],
+    "qualification": "Each SQL response is pinned with AS OF and hashed. Missing historic symbols, index benchmarks, security lineage or corporate actions block qualification."
+  }
+}

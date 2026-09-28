@@ -66,6 +66,7 @@ in evidence rather than model confidence alone.
 | Task | Optimizes | Start Here | Reference |
 | --- | --- | --- | --- |
 | `nanogpt` | Training-code and hyperparameter operations for nanoGPT-style pretraining. | [Clean-room quick start](tasks/nanogpt/QUICKSTART.md) | [Task guide](tasks/nanogpt/README.md) |
+| `alphabench` | AlphaBench T3 factor search and evaluation; partial-data studies remain explicitly labeled. | [Quick start](tasks/alphabench/QUICKSTART.md) | [Task guide](tasks/alphabench/README.md) |
 | `small_molecule` | SMILES candidates for docking and activity objectives. | [Clean-room quick start](tasks/small_molecule/QUICKSTART.md) | [Task guide](tasks/small_molecule/README.md) |
 | `antibody` | CDRH3 amino-acid sequences for antigen binding. | [Clean-room quick start](tasks/antibody/QUICKSTART.md) | [Task guide](tasks/antibody/README.md) |
 | `llm_kv_adaptive_quantization` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) |

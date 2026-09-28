@@ -1,0 +1,49 @@
+{
+  "qualification": "development_smoke_only",
+  "complete_t3": false,
+  "provider": {
+    "model": "deepseek-flash",
+    "wire_api": "responses",
+    "reasoning_effort": "max"
+  },
+  "method": "ldm_harness_compiled",
+  "capabilities": ["prior_mean@1", "ldm_weights@1"],
+  "rounds": 2,
+  "search_observations": 2,
+  "proposal_turns": 4,
+  "policy_turns": 2,
+  "host_authorized_model_requests": 73,
+  "proposal_accepted_actions": 4,
+  "policy_actions": [
+    {"round": 0, "action": "replace", "source": "artifact", "epoch_id": "epoch_000", "degraded": false, "provider_calls": 19},
+    {"round": 1, "action": "keep", "source": "previous", "epoch_id": "epoch_000", "degraded": false, "provider_calls": 7}
+  ],
+  "policy_guest": {
+    "profile_id": "policy_architect",
+    "profile_guest_path": "/resources/profiles/policy_architect/AGENTS.md",
+    "skill_guest_path": "/resources/skills/compile-ldm-policy",
+    "profile_sha256": "df521f4c4947677a847b47326f632c41e279ebd7d7a99a8af9bd5730c856b9ce",
+    "skill_sha256": "c196fed12252df83d9173d70e5c17e766ae9c141a3c8616f3e52f01d777143b3",
+    "exposed_mcp_tools": ["inspect_policy_contract", "validate_policy_draft"],
+    "separate_session": true,
+    "network_disabled_in_policy_executor": true
+  },
+  "result_sha256": "99235c765678414eb0d3228a12cbe511a3d7663021b299f7135b541d34d04c3d",
+  "policy_manifest_sha256": "e8d61cfe1a6e0746fdb445e07c02dd7f8d05dc3cd682da298ca101301cd34444",
+  "policy_round_result_sha256": [
+    "8daa38c49dfe3749ec108e0caf910680f87fa45db684b3850a458feb917d3dfb",
+    "068ce7b480074a7431742e03d139b554d7193d8b983d589a765a5a42be25d432"
+  ],
+  "remote_run": "/mnt/data1/Large-Discovery-Models/tmp/alphabench-compiled-noquery-20260923",
+  "checks": {
+    "task_tests": "284 passed, 2 optional backend skips, 4 previously verified long cases deselected",
+    "shared_policy_tests": "35 passed",
+    "actual_policy_guest": "separate profile and skill resource digests verified on startup",
+    "actual_policy_executor": "three capability variants and host-file canary tested in Docker"
+  },
+  "remaining": [
+    "qualified historical market data and real backend runs",
+    "policy fault and crash matrix",
+    "full T3 metrics, collection, and method-market qualification"
+  ]
+}

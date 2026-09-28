@@ -18,6 +18,7 @@ from typing import Any
 
 from ldm_tts.harness.protocol import (
     HarnessPoolConfig,
+    HarnessProviderAuthorizationRequest,
     HarnessSubmissionError,
     HarnessSubmissionRequest,
     HarnessSubmissionValidation,
@@ -27,6 +28,7 @@ from ldm_tts.harness.protocol import (
 )
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
+ProviderAuthorizer = Callable[[HarnessProviderAuthorizationRequest], bool]
 _SEMVER_PATTERN = re.compile(
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
@@ -118,6 +120,7 @@ class HarnessClient:
         turns: Sequence[HarnessTurn],
         *,
         submission_validator: SubmissionValidator,
+        provider_authorizer: ProviderAuthorizer | None = None,
         recovery_timeout_seconds: float = 0,
     ) -> tuple[HarnessTurnResult, ...]:
         if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
@@ -128,6 +131,8 @@ class HarnessClient:
         expected = {turn.profile_id: turn for turn in turns}
         if len(expected) != len(turns):
             raise ValueError("harness turn profile IDs must be unique")
+        if provider_authorizer is not None and self._protocol_version != "0.2.0":
+            raise HarnessError("provider authorization requires Pi sidecar protocol 0.2.0")
         terminal_validations: dict[str, tuple[str, str]] = {}
         validation_submissions: dict[str, int] = {}
 
@@ -151,6 +156,16 @@ class HarnessClient:
                 terminal_validations[request.profile_id] = (status, request.digest)
             return validation
 
+        def authorize(request: HarnessProviderAuthorizationRequest) -> bool:
+            if (request.campaign_id != self.config.campaign_id
+                    or request.profile_id not in expected
+                    or request.turn_id != expected[request.profile_id].turn_id):
+                raise HarnessError("harness provider authorization request does not match the turn batch")
+            decision = True if provider_authorizer is None else provider_authorizer(request)
+            if type(decision) is not bool:
+                raise HarnessError("harness provider authorizer must return a boolean")
+            return decision
+
         known_usage: dict[str, dict[str, Any]] = {}
         retry_delay = 1.0
         restart_required = False
@@ -165,6 +180,7 @@ class HarnessClient:
                     {"turns": [turn.to_dict() for turn in turns]},
                     "turn_committed",
                     submission_validator=validate,
+                    provider_authorizer=authorize,
                 )
                 break
             except HarnessError as exc:
@@ -268,6 +284,7 @@ class HarnessClient:
         *,
         timeout_seconds: float | None = None,
         submission_validator: SubmissionValidator | None = None,
+        provider_authorizer: ProviderAuthorizer | None = None,
     ) -> dict[str, Any]:
         frame = self._frame(self._next_request_id(), frame_type, fields)
         process = self._process
@@ -302,6 +319,16 @@ class HarnessClient:
                 or response.get("campaignId") != self.config.campaign_id
             ):
                 raise HarnessError("harness sidecar response protocol identity mismatch")
+            if response.get("type") == "provider_authorization_requested":
+                if provider_authorizer is None:
+                    _terminate(process)
+                    raise HarnessError("harness requested provider authorization outside run_turn")
+                try:
+                    self._answer_provider_authorization(response, provider_authorizer)
+                except BaseException:
+                    _terminate(process)
+                    raise
+                continue
             if response.get("type") != "submission_validation_requested":
                 break
             if submission_validator is None:
@@ -345,6 +372,30 @@ class HarnessClient:
         }
         _assert_response_keys(response, expected_keys[expected_type])
         return response
+
+    def _answer_provider_authorization(
+        self,
+        response: dict[str, Any],
+        authorizer: ProviderAuthorizer,
+    ) -> None:
+        _assert_response_keys(response, {
+            "type", "requestId", "protocolVersion", "campaignId", "authorizationId",
+            "profileId", "turnId", "providerRequestId", "requestDigest",
+        })
+        request = HarnessProviderAuthorizationRequest(
+            campaign_id=_required_string(response["campaignId"], "campaignId"),
+            profile_id=_required_string(response["profileId"], "profileId"),
+            turn_id=_required_string(response["turnId"], "turnId"),
+            provider_request_id=_required_string(response["providerRequestId"], "providerRequestId"),
+            request_digest=_required_digest(response["requestDigest"], "requestDigest"),
+        )
+        self._send_frame({
+            **self._frame(response["requestId"], "provider_authorization_result"),
+            "authorizationId": _required_string(response["authorizationId"], "authorizationId"),
+            "providerRequestId": request.provider_request_id,
+            "requestDigest": request.request_digest,
+            "authorized": authorizer(request),
+        })
 
     def _answer_submission_validation(
         self,

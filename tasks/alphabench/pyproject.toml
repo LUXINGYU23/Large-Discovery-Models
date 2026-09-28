@@ -1,0 +1,19 @@
+[project]
+name = "ldm-tts-alphabench"
+version = "0.1.0"
+description = "Complete AlphaBench T3 factor search and evaluation"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "zss==1.2.0",
+]
+
+[dependency-groups]
+acquisition = ["baostock==0.9.4"]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.uv]
+package = false

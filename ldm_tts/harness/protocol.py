@@ -496,6 +496,23 @@ class HarnessTurnResult:
 
 
 @dataclass(frozen=True)
+class HarnessProviderAuthorizationRequest:
+    campaign_id: str
+    profile_id: str
+    turn_id: str
+    provider_request_id: str
+    request_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.campaign_id or not self.profile_id or not self.turn_id:
+            raise ValueError("harness provider authorization identity is incomplete")
+        if re.fullmatch(re.escape(self.turn_id) + r"-provider-[1-9][0-9]*", self.provider_request_id) is None:
+            raise ValueError("harness provider request ID does not match its turn")
+        if _SHA256_PATTERN.fullmatch(self.request_digest) is None:
+            raise ValueError("harness provider request digest must be a lowercase SHA-256 digest")
+
+
+@dataclass(frozen=True)
 class HarnessSubmissionRequest:
     profile_id: str
     turn_id: str
