@@ -522,20 +522,20 @@ def materialize_trajectory(
     }
     summary_payload = dict(result.summary)
     summary_payload.update(task_summary)
-    from ldm_tts.engine.run_store import atomic_json_write
+    from ldm_tts.engine.run_store import atomic_json_write, load_jsonl
 
     atomic_json_write(run_dir / "summary.json", summary_payload)
 
     if sink is not None and getattr(sink, "enabled", False):
-        from ldm_tts.data import append_jsonl, read_jsonl, render_record, smallmol_irs_from_round_record
+        from ldm_tts.data import append_jsonl, render_record, smallmol_irs_from_round_record
 
         paths = sink.paths
-        ir_rows = read_jsonl(paths.ir_path) if paths.ir_path.exists() else []
+        ir_rows = load_jsonl(paths.ir_path, repair_incomplete_tail=True)
         def belongs_to_run(row):
             return row.get("collection", {}).get("provenance", {}).get("trajectory_dir") == str(run_dir)
 
         if paths.sft_path is not None:
-            sft_rows = read_jsonl(paths.sft_path) if paths.sft_path.exists() else []
+            sft_rows = load_jsonl(paths.sft_path, repair_incomplete_tail=True)
             if len(sft_rows) > len(ir_rows):
                 raise ValueError("collected SFT rows exceed IR rows")
             for ir, sft in zip(ir_rows, sft_rows):

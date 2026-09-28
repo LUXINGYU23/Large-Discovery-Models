@@ -289,7 +289,7 @@ class CampaignRuntime:
         )
 
         event_path = path / "events.jsonl"
-        events = _read_jsonl(event_path, repair_incomplete_tail=True) if resume else []
+        events = load_jsonl(event_path, repair_incomplete_tail=True) if resume else []
         runtime = cls(
             run_dir=path,
             task=task,
@@ -394,7 +394,7 @@ class CampaignRuntime:
         return event
 
     def events(self) -> list[dict[str, Any]]:
-        return _read_jsonl(self.event_path)
+        return load_jsonl(self.event_path)
 
     def checkpoint(self, state: Mapping[str, Any]) -> Path:
         path = self.run_dir / "checkpoint.json"
@@ -505,7 +505,8 @@ def unique_run_dir(path: Path) -> Path:
     raise RuntimeError(f"could not allocate a unique campaign directory beside {requested}")
 
 
-def _read_jsonl(path: Path, *, repair_incomplete_tail: bool = False) -> list[dict[str, Any]]:
+def load_jsonl(path: str | Path, *, repair_incomplete_tail: bool = False) -> list[dict[str, Any]]:
+    path = Path(path)
     if not path.exists():
         return []
     data = path.read_bytes()
@@ -560,12 +561,6 @@ def utc_timestamp() -> str:
     """Return a stable UTC timestamp for persisted records."""
 
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
-
-
-def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
-    """Load non-empty JSONL records from ``path``."""
-
-    return _read_jsonl(Path(path))
 
 
 class JsonlTrajectoryRecorder:

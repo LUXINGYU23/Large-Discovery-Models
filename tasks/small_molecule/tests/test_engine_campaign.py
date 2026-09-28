@@ -692,3 +692,64 @@ def test_resume_repairs_interrupted_training_export(tmp_path, monkeypatch, inter
     saved = ir_path.read_bytes(), sft_path.read_bytes()
     assert workflow.main([*args, "--resume-from", str(run_dir)]) == 0
     assert (ir_path.read_bytes(), sft_path.read_bytes()) == saved
+
+
+@pytest.mark.parametrize("target", ["ldm_ir.jsonl", "ldm_sft.jsonl"])
+@pytest.mark.parametrize("break_at", [1, 2])
+def test_resume_repairs_partial_training_jsonl_tail(tmp_path, monkeypatch, target, break_at):
+    import os
+    from ldm_tts.data import collection, render_record, smallmol_irs_from_round_record
+    from ldm_tts.data.ir import jdump
+    from tasks.small_molecule.core import workflow
+
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
+    run_dir = tmp_path / f"{target}-{break_at}"
+    args = [
+        "--mock", "--method", "m1_llm_one_step", "--batch-size", "1",
+        "--init-size", "1", "--init-strategy", "llm_cold_start",
+        "--m1-k-direct-llm", "1", "--budget", "2",
+    ]
+    original = collection.append_jsonl
+    calls = 0
+
+    def interrupted(path, row):
+        nonlocal calls
+        if Path(path).name == target:
+            calls += 1
+            if calls == break_at:
+                payload = (jdump(dict(row)) + "\n").encode("utf-8")
+                with Path(path).open("ab") as handle:
+                    handle.write(payload[:len(payload) // 2])
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                raise KeyboardInterrupt("interrupted within a JSONL record")
+        original(path, row)
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(collection, "append_jsonl", interrupted)
+        with pytest.raises(KeyboardInterrupt):
+            workflow.main([*args, "--output-dir", str(run_dir)])
+
+    broken_path = run_dir / "ldm_data" / target
+    broken = broken_path.read_bytes()
+    prefix_end = broken.rfind(b"\n") + 1
+    assert broken[prefix_end:] and not broken.endswith(b"\n")
+    assert workflow.main([*args, "--resume-from", str(run_dir)]) == 0
+    backup, = broken_path.parent.glob(target + ".incomplete-*.json")
+    audit = json.loads(backup.read_text())
+    assert audit == {"offset": prefix_end, "tail_hex": broken[prefix_end:].hex()}
+    assert broken_path.read_bytes().startswith(broken[:prefix_end])
+
+    rounds = [json.loads(line) for line in (run_dir / "rounds.jsonl").read_text().splitlines()]
+    expected = [ir for record in rounds for ir in smallmol_irs_from_round_record(record)]
+    ir_path = run_dir / "ldm_data/ldm_ir.jsonl"
+    sft_path = run_dir / "ldm_data/ldm_sft.jsonl"
+    ir_rows = [json.loads(line) for line in ir_path.read_text().splitlines()]
+    sft_rows = [json.loads(line) for line in sft_path.read_text().splitlines()]
+    assert len(ir_rows) == len(sft_rows) == len(expected)
+    assert [{key: value for key, value in row.items() if key != "collection"}
+            for row in ir_rows] == expected
+    assert sft_rows == [render_record(row) for row in ir_rows]
+    saved = ir_path.read_bytes(), sft_path.read_bytes()
+    assert workflow.main([*args, "--resume-from", str(run_dir)]) == 0
+    assert (ir_path.read_bytes(), sft_path.read_bytes()) == saved
