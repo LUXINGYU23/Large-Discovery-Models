@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "imageId": "alphabench-t3-research",
+  "rootfsSize": "2G",
+  "installPolicy": "session_overlay",
+  "recipeFiles": ["Dockerfile", "smoke.sh"],
+  "smokeScript": "smoke.sh"
+}

@@ -1346,14 +1346,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--operation-surrogate",
-        "--operation-features",
         dest="operation_features",
         action="store_true",
         help="Represent candidates for the surrogate through the active expansion schema.",
     )
     parser.add_argument(
         "--initial-expansion-parameters",
-        "--initial-operation-features",
         dest="initial_operation_features",
         default="5",
         help=(
@@ -1363,7 +1361,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-expansion-parameters",
-        "--max-active-operation-features",
         dest="max_active_operation_features",
         type=int,
         default=0,
@@ -1371,7 +1368,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--disable-expansion-schema-updates",
-        "--disable-feature-expansion",
         dest="allow_feature_expansion",
         action="store_false",
         help="Keep the initial reservoir expansion schema fixed.",
@@ -1379,7 +1375,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.set_defaults(allow_feature_expansion=True)
     parser.add_argument(
         "--allow-new-expansion-parameters",
-        "--allow-new-feature-specs",
         dest="allow_new_feature_specs",
         action="store_true",
         help=(
@@ -4849,15 +4844,10 @@ def explicit_options_from_argv(argv: list[str]) -> set[str]:
         "--operation-schema": "operation_schema",
         "--operation-retries": "operation_retries",
         "--max-operations-per-step": "max_operations_per_step",
-        "--operation-features": "operation_features",
         "--operation-surrogate": "operation_features",
-        "--initial-operation-features": "initial_operation_features",
         "--initial-expansion-parameters": "initial_operation_features",
-        "--max-active-operation-features": "max_active_operation_features",
         "--max-expansion-parameters": "max_active_operation_features",
-        "--disable-feature-expansion": "allow_feature_expansion",
         "--disable-expansion-schema-updates": "allow_feature_expansion",
-        "--allow-new-feature-specs": "allow_new_feature_specs",
         "--allow-new-expansion-parameters": "allow_new_feature_specs",
         "--mock-expand-every": "mock_expand_every",
         "--surrogate-mode": "surrogate_mode",

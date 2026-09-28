@@ -38,20 +38,26 @@ checkpoints, the converted `comp_2048` fingerprint/reaction indices, the Enamine
 target file, and a working GPU projector environment. These are external assets,
 not bundled with this small example; see the full task guide above for setup.
 
-On the server used for the recorded run:
+Set `LDM_SSH_PORT` and `LDM_SSH_TARGET` on your local machine and connect:
 
 ```bash
-ssh -p 5320 zsgpu@111.2.199.31
-cd /mnt/data1/Large-Discovery-Models/work/atomworld-reasyn-star-20260913/harness
+ssh -p "${LDM_SSH_PORT:?}" "${LDM_SSH_TARGET:?}"
+```
 
-export REASYN_ROOT=/mnt/data0/science_tools/meta_tools/dock-project/ReaSyn
+On the server, set `LDM_PROJECT_ROOT`, `REASYN_ROOT`, `LLM_BASE_URL`,
+`LLM_API_KEY`, and `CUDA_VISIBLE_DEVICES` for that environment, then run:
+
+```bash
+cd "${LDM_PROJECT_ROOT:?}"
+: "${REASYN_ROOT:?}"
+: "${LLM_BASE_URL:?}"
+: "${LLM_API_KEY:?}"
+: "${CUDA_VISIBLE_DEVICES:?}"
+
 export REASYN_PYTHON="$REASYN_ROOT/.venv/bin/python"
-export LLM_BASE_URL=http://127.0.0.1:52306/v1
 export LLM_MODEL_NAME=DeepSeek-V4-Flash
-export LLM_API_KEY=EMPTY
-export CUDA_VISIBLE_DEVICES=2
 
-/home/zsgpu/.local/bin/uv sync --locked --project tasks/reasyn --group dev --extra chemistry
+uv sync --locked --project tasks/reasyn --group dev --extra chemistry
 
 example_args=(config/reasyn/reconstruction_tiny.yaml
   --set name=reasyn_ready2run_tiny
@@ -65,11 +71,10 @@ tasks/reasyn/.venv/bin/python scripts/run_ldm_tts.py "${example_args[@]}" --dry-
 tasks/reasyn/.venv/bin/python scripts/run_ldm_tts.py "${example_args[@]}"
 ```
 
-Paths and GPU 2 are specific to this host; adapt them for another environment.
-`EMPTY` is only appropriate for this local service without authentication. Keep
-real credentials in environment variables. Choose a fresh output directory for
-each new experiment. Runtime result files are deliberately not checked in with
-this runbook.
+`LLM_API_KEY=EMPTY` is only appropriate for a local service without
+authentication. Keep real credentials in environment variables. Choose a fresh
+output directory for each new experiment. Runtime result files are deliberately
+not checked in with this runbook.
 
 The dependency report can warn that Torch is absent from the lightweight runner:
 the real projector uses the separate `REASYN_PYTHON` environment. A `draft`

@@ -5,8 +5,6 @@ from ldm_tts.optimization.records import (
     BOObservation,
     BOPrediction,
     BOSelectionResult,
-    FeatureEncoder,
-    FeatureVector,
     SurrogateEncoder,
     SurrogateVector,
 )
@@ -17,8 +15,6 @@ __all__ = [
     "BOObservation",
     "BOPrediction",
     "BOSelectionResult",
-    "FeatureEncoder",
-    "FeatureVector",
     "SurrogateEncoder",
     "SurrogateVector",
     "WarmStartAcquisitionSelector",

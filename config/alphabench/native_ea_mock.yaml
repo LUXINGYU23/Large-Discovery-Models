@@ -1,0 +1,13 @@
+name: alphabench_native_ea_mock
+task: alphabench
+algorithm: alphabench_ea
+mode: mock
+contract_profile: mock_native_ea
+description: Synthetic native lifecycle qualification.
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"
+args:
+  mock: true
+  method: "alphabench_ea"
+  protocol_file: "tasks/alphabench/resources/protocols/native_ea_qualification.json"
+  upstream_root: "$ALPHABENCH_SOURCE_ROOT"

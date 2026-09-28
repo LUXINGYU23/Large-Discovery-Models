@@ -63,3 +63,4 @@ results.tsv
 .DS_Store
 logs/
 TTS/
+/tasks/alphabench/environments/assay/source

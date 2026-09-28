@@ -1,0 +1,13 @@
+name: alphabench_native_cot_mock
+task: alphabench
+algorithm: alphabench_cot
+mode: mock
+contract_profile: mock_native_cot
+description: Synthetic native lifecycle qualification.
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"
+args:
+  mock: true
+  method: "alphabench_cot"
+  protocol_file: "tasks/alphabench/resources/protocols/native_cot_qualification.json"
+  upstream_root: "$ALPHABENCH_SOURCE_ROOT"

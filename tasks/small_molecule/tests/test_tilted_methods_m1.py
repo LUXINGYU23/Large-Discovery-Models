@@ -194,7 +194,7 @@ def test_m1_stratified_llm_only_selects_llm_order_without_ehvi(monkeypatch, tmp_
     from tasks.small_molecule.core import engine_adapters
     from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
     from ldm_tts.engine.run_store import CampaignRuntime
-    from tasks.small_molecule.tests.test_tilted_loop import run_campaign
+    from tasks.small_molecule.tests.test_engine_campaign import run_campaign
 
     result, summary, _runtime = run_campaign(
         cfg,

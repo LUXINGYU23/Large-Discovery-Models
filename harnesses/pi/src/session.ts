@@ -30,6 +30,7 @@ import type {
 	SubmissionValidator,
 } from "./protocol.js";
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
+import type { ProviderAuthorizer } from "./protocol.js";
 import {
 	snapshotSubmissionArtifacts,
 	verifySubmissionRecord,
@@ -277,7 +278,7 @@ export class SubmissionController {
 				}
 				this.providerRequests += 1;
 				if (this.value) return payload;
-				if (this.providerRequests > 1) return payload;
+			if (this.providerRequests > 1 || this.config.forceFirstToolCall === false) return payload;
 				return {
 					...payload,
 					tool_choice: "required",
@@ -591,7 +592,7 @@ export class PersistentProfileSession {
 		return skillDirectories;
 	}
 
-	async runTurn(input: SessionTurnInput, validate: SubmissionValidator): Promise<CommittedTurn> {
+	async runTurn(input: SessionTurnInput, validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const turnRoot = join(this.profileRoot, "turns", input.turnId);
 		const commitPath = join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json");
@@ -643,6 +644,7 @@ export class PersistentProfileSession {
 			this.session.sessionManager.getSessionId(),
 			input.turnId,
 			turnRoot,
+			authorize,
 		);
 		let submission: TerminalSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
@@ -972,7 +974,7 @@ export class PiSessionPool {
 		});
 	}
 
-	async runTurns(inputs: SessionTurnInput[], validate: SubmissionValidator): Promise<CommittedTurn[]> {
+	async runTurns(inputs: SessionTurnInput[], validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn[]> {
 		const expected = new Set(this.sessions.keys());
 		if (inputs.length !== expected.size || new Set(inputs.map((input) => input.profileId)).size !== inputs.length) {
 			throw new Error("run_turn must contain exactly one input for every profile");
@@ -981,7 +983,7 @@ export class PiSessionPool {
 			if (!expected.delete(input.profileId)) throw new Error(`unknown or duplicate profile: ${input.profileId}`);
 		}
 		const results = await Promise.allSettled(inputs.map(
-			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate) as Promise<CommittedTurn>,
+			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate, authorize) as Promise<CommittedTurn>,
 		));
 		const failed = results.find((result) => result.status === "rejected"
 			&& !(result.reason instanceof TurnExecutionError && result.reason.retryable))
