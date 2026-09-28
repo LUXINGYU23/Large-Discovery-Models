@@ -1192,3 +1192,12 @@ def test_campaign_can_defer_finalization_and_pause_is_not_a_measurement(tmp_path
     runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
     assert runtime.load_checkpoint()["observations"] == []
     assert not any(e["event_type"] == "campaign_finished" for e in runtime.events())
+
+def test_keyed_event_replay_uses_persisted_json_payload_identity(tmp_path):
+    runtime = CampaignRuntime.open(tmp_path, task="test")
+    event = runtime.record("measured", {"values": (1, float("nan"))}, event_key="same")
+    resumed = CampaignRuntime.open(tmp_path, task="test", resume=True)
+    assert resumed.record("measured", {"values": [1, float("nan")]}, event_key="same").sequence == event.sequence
+    assert sum(row["event_key"] == "same" for row in resumed.events()) == 1
+    with pytest.raises(ValueError, match="event identity conflict"):
+        resumed.record("measured", {"values": [2, float("nan")]}, event_key="same")

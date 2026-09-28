@@ -363,12 +363,13 @@ class CampaignRuntime:
             raise ValueError("campaign event_type must not be empty")
         if iteration is not None and iteration < 0:
             raise ValueError("campaign event iteration must be non-negative")
+        payload_json = json.dumps(dict(payload or {}), sort_keys=True)
         with _EVENT_LOCK:
             if event_key in self._keyed_events:
                 event = self._keyed_events[event_key]
-                if (event.event_type, event.iteration, event.candidate_id, event.payload) != (
-                    event_type, iteration, str(candidate_id), dict(payload or {})
-                ):
+                if ((event.event_type, event.iteration, event.candidate_id) !=
+                        (event_type, iteration, str(candidate_id)) or
+                        json.dumps(event.payload, sort_keys=True) != payload_json):
                     raise ValueError(f"event identity conflict: {event_key}")
                 return event
             event = CampaignEvent(
@@ -379,7 +380,7 @@ class CampaignRuntime:
                 timestamp_unix=time.time(),
                 iteration=iteration,
                 candidate_id=str(candidate_id),
-                payload=dict(payload or {}),
+                payload=json.loads(payload_json),
                 event_key=event_key,
             )
             self.run_dir.mkdir(parents=True, exist_ok=True)

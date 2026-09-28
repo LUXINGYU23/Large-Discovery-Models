@@ -464,6 +464,7 @@ def materialize_trajectory(
     cfg: TiltedLDMCase2Config,
     *,
     sink=None,
+    export_from_round: int = 0,
 ) -> dict[str, Any]:
     """Project engine events into task trajectory and summary files."""
     from ldm_tts.optimization.acquisition import hypervolume
@@ -529,7 +530,7 @@ def materialize_trajectory(
     if sink is not None and getattr(sink, "enabled", False):
         from ldm_tts.data import smallmol_irs_from_round_record
 
-        for record in rounds:
+        for record in rounds[export_from_round:]:
             provenance = {
                 "task": "small_molecule",
                 "method": cfg.method,

@@ -453,8 +453,11 @@ def test_engine_artifacts_exist_for_mock_campaign(tmp_path):
         assert (tmp_path / name).exists(), name
 
 
-def test_workflow_entrypoint_uses_shared_campaign_and_checkpoint_resume(tmp_path):
+def test_workflow_entrypoint_uses_shared_campaign_and_checkpoint_resume(tmp_path, monkeypatch):
     from tasks.small_molecule.core import workflow
+    from ldm_tts.data import smallmol_irs_from_round_record
+
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
     run_dir = tmp_path / "workflow-campaign"
     base_args = [
@@ -474,12 +477,24 @@ def test_workflow_entrypoint_uses_shared_campaign_and_checkpoint_resume(tmp_path
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["successful_evaluation_count"] == 2
     assert summary["stop_reason"] == "successful_evaluation_target"
+    collected = run_dir / "ldm_data"
+    before = {name: (collected / name).read_text(encoding="utf-8").splitlines()
+              for name in ("ldm_ir.jsonl", "ldm_sft.jsonl")}
 
     assert workflow.main([*base_args, "--budget", "3", "--resume-from", str(run_dir)]) == 0
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["successful_evaluation_count"] == 3
     events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
     assert sum(event["event_type"] == "campaign_resumed" for event in events) == 1
+    rounds = [json.loads(line) for line in (run_dir / "rounds.jsonl").read_text().splitlines()]
+    expected = sum(len(smallmol_irs_from_round_record(row)) for row in rounds)
+    after = {name: (collected / name).read_text(encoding="utf-8").splitlines()
+             for name in before}
+    assert all(len(lines) == expected and lines[:len(before[name])] == before[name]
+               for name, lines in after.items())
+    assert workflow.main([*base_args, "--budget", "3", "--resume-from", str(run_dir)]) == 0
+    assert all((collected / name).read_text(encoding="utf-8").splitlines() == lines
+               for name, lines in after.items())
 
 
 def test_workflow_seed_initialization_is_engine_owned(tmp_path):

@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.protocol import T3Protocol, digest
+from tasks.alphabench.core.data import sha256, verify_data_manifest
 from tasks.alphabench.core import workflow
 from tasks.alphabench.ldm_task.procedure import main
 from tasks.alphabench.rebuild_report import rebuild
@@ -57,3 +58,51 @@ def test_offline_rebuild_preserves_incomplete_quality_coverage(tmp_path, monkeyp
     assert report["quality_audit"]["complete"] is False
     assert report["quality_audit"]["rows"][1]["reason"] == "budget_exhausted"
     assert len(rebuild(run, tmp_path / "rebuilt")["matched"]) == 4
+
+
+def test_offline_rebuild_preserves_verified_partial_data_audit(tmp_path):
+    data_root = tmp_path / "market"
+    for relative in ("calendars/day.txt", "instruments/csi300.txt", "instruments/all.txt",
+                     "features/stock/close.day.bin"):
+        target = data_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"DATA")
+    files = {"features/stock/close.day.bin": sha256(data_root / "features/stock/close.day.bin")}
+    manifest = {"backend": "qlib", "market": "csi300", "qualification": "blocked",
+                "issues": [{"code": "unresolved_price_gaps"}],
+                "gaps": [{"missing_sessions": 7}],
+                "instrument_interval_conflicts": [{"instrument": "S00"}],
+                "data_root": str(data_root), "source": "fixture", "archive_sha256": "a" * 64,
+                "files_sha256": digest(files), "calendar_sha256": sha256(data_root / "calendars/day.txt"),
+                "universe_sha256": sha256(data_root / "instruments/csi300.txt"),
+                "all_instruments_sha256": sha256(data_root / "instruments/all.txt"),
+                "adjustment": "split", "fields": ["close"], "start": "2015-01-01",
+                "end": "2025-02-01", "benchmark": "SH000300", "historical_universe": True}
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest))
+    manifest_path.with_suffix(".files.json").write_text(json.dumps(files))
+    protocol = replace(T3Protocol(), cold_seed_count=0, data_digest=digest(manifest),
+                       data_policy="partial_comparison")
+    assert verify_data_manifest(manifest_path, protocol) == manifest
+    protocol_path = tmp_path / "protocol.json"
+    protocol_path.write_text(json.dumps(protocol.to_dict()))
+    run = tmp_path / "run"
+    assert main(["--mock", "--protocol-file", str(protocol_path), "--out-dir", str(run)]) == 0
+    config_path = run / "config.json"
+    config = json.loads(config_path.read_text())
+    config_path.write_text(json.dumps(config | {"mock": False}))
+    (run / "data_manifest.json").write_text(json.dumps(manifest))
+    for name in ("result.json", "report.md", "trajectory.csv", "report_manifest.json"):
+        (run / name).unlink()
+    rebuilt = tmp_path / "rebuilt"
+    rebuild(run, rebuilt)
+    data = json.loads((rebuilt / "result.json").read_text())["completeness"]["data"]
+    assert data["source_qualification"] == "blocked"
+    assert data["issue_codes"] == ["unresolved_price_gaps"]
+    assert data["unresolved_sessions"] == 7
+    assert data["instrument_interval_conflicts"] == 1
+    (run / "data_manifest.json").unlink()
+    reconstructed = tmp_path / "reconstructed-from-manifest"
+    rebuild(run, reconstructed, data_manifest_path=manifest_path)
+    for name in ("result.json", "report.md", "trajectory.csv", "report_manifest.json"):
+        assert (rebuilt / name).read_bytes() == (reconstructed / name).read_bytes()

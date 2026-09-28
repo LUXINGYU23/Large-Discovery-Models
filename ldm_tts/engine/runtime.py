@@ -382,7 +382,7 @@ class LDMEngine:
                     "expansion_schema": _jsonable(active.expansion_schema),
                     "selection": _jsonable(selection.to_dict()),
                     "entries": [{"candidate": _jsonable(candidate.to_dict()),
-                                 "receipt": self._evaluation_attempt_usage_key(candidate),
+                                 "receipt": None,
                                  "dispatched": False, "result": None}
                                 for candidate in selected],
                 }
@@ -432,6 +432,10 @@ class LDMEngine:
             self._checkpoint(active)
             self.runtime.pause(exc.status, phase="evaluation_recovery", message=str(exc))
             raise
+        except BudgetExceededError as exc:
+            self._checkpoint(active)
+            self.runtime.pause("paused_budget", phase="budget_recovery", message=str(exc))
+            raise EvaluationPaused(str(exc), status="paused_budget") from exc
         except Exception as exc:
             self.runtime.fail(exc)
             raise
@@ -498,10 +502,16 @@ class LDMEngine:
 
         def reserve(index, entry):
             candidate = Candidate(**entry["candidate"])
+            actual_receipt = self._evaluation_attempt_usage_key(candidate)
             receipt = entry["receipt"]
-            if recovering and entry["dispatched"]:
-                if receipt is None or self._evaluation_attempt_usage_key(candidate) != receipt:
-                    raise EvaluationPaused("Dispatched evaluation has no matching durable replay receipt")
+            if receipt is None and entry["dispatched"]:
+                raise EvaluationPaused("Dispatched evaluation has no durable replay receipt")
+            if receipt is not None and receipt != actual_receipt:
+                raise EvaluationPaused("Evaluation receipt changed after selection preparation")
+            if receipt is None:
+                receipt = actual_receipt
+                entry["receipt"] = receipt
+                self.runtime.budget.write()
             key = receipt if receipt is not None else f"round:{round_idx}:slot:{index}"
             usage_key = f"engine:evaluation_attempt:{key}"
             paid = self.runtime.budget.metadata.get("cumulative_usage", {}).get(usage_key, {})
@@ -610,7 +620,7 @@ class LDMEngine:
             if result.candidate_id != candidate.candidate_id:
                 raise ValueError("evaluator returned a mismatched candidate_id")
             return self.objectives.validate_result(result)
-        except EvaluationPaused:
+        except (EvaluationPaused, BudgetExceededError):
             raise
         except TimeoutError as exc:
             return EvaluationResult(candidate.candidate_id, "timed_out", error=str(exc))
@@ -625,7 +635,7 @@ class LDMEngine:
             raise TypeError("batch evaluation requires BatchCandidateEvaluator")
         try:
             results = tuple(evaluator.evaluate_batch(candidates))
-        except EvaluationPaused:
+        except (EvaluationPaused, BudgetExceededError):
             raise
         except TimeoutError as exc:
             return tuple(

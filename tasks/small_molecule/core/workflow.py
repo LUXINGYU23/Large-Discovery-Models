@@ -183,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
     minimum_rounds = -(-int(cfg.budget) // int(cfg.batch_size))
     max_rounds = minimum_rounds + max(1, int(cfg.max_empty_reservoir_rounds))
     max_attempts = max(int(cfg.budget), int(cfg.budget) * 8)
+    exported_rounds = (
+        len((run_dir / "rounds.jsonl").read_text(encoding="utf-8").splitlines())
+        if resume_requested and (run_dir / "rounds.jsonl").exists()
+        else 0
+    )
     campaign = run_campaign(
         CampaignRequest(
             run_dir=run_dir,
@@ -219,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
                 },
             ),
             artifact_projector=lambda runtime, result: engine_adapters.materialize_trajectory(
-                runtime, result, cfg, sink=sink
+                runtime, result, cfg, sink=sink, export_from_round=exported_rounds
             ),
         ),
         recipe,

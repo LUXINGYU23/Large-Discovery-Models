@@ -77,11 +77,13 @@ def test_truncated_http_body_is_retried_before_publishing_download(tmp_path, mon
 @pytest.mark.parametrize("backend,market", [("qlib", "csi300"), ("assay", "nasdaq100")])
 @pytest.mark.parametrize("qualification,data_policy", [("qualified", "qualified_only"),
                                                       ("blocked", "partial_comparison")])
-def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, backend, market,
+def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, monkeypatch, backend, market,
                                                                  qualification, data_policy):
     if sys.platform == "win32":
         pytest.skip("Oracle service process requires POSIX fcntl")
     from tasks.alphabench.core.oracle_service import OracleService
+    monkeypatch.setattr("tasks.alphabench.core.oracle_service.oracle_environment_digest",
+                        lambda config: T3Protocol().environment_digest)
 
     root = tmp_path / "market"
     root.mkdir()

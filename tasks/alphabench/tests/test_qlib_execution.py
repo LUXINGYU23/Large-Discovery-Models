@@ -1,7 +1,11 @@
 """Run in the pinned Qlib environment; these are synthetic market fixtures."""
 
+import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -12,8 +16,11 @@ from qlib.data.storage.file_storage import FileFeatureStorage
 from ldm_tts.contracts.evaluation import EvaluationPaused
 
 from tasks.alphabench.core.oracle_worker import load_source, qlib_evaluate
+from tasks.alphabench.core.oracle_identity import oracle_environment_digest
+from tasks.alphabench.core.data import sha256
+from tasks.alphabench.core.oracle_service import OracleService
 from tasks.alphabench.core.grammar import parse_expression
-from tasks.alphabench.core.protocol import T3Protocol
+from tasks.alphabench.core.protocol import T3Protocol, digest
 
 
 @pytest.fixture
@@ -155,3 +162,66 @@ def test_full_qlib_portfolio_uses_the_same_retained_interval(tmp_path, source, p
     assert any(row["cost"] > 0 for row in portfolio["daily"])
     assert set(portfolio["analysis"]) == {"benchmark", "pure_return_without_cost", "pure_return_with_cost",
         "excess_return_without_cost", "excess_return_with_cost"}
+
+
+def test_oracle_refuses_mutated_upstream_scoring_source_before_a_worker_permit(tmp_path, source):
+    upstream = tmp_path / "upstream"
+    for relative in ("ffo/utils/utils.py", "ffo/backtest/qlib/single_alpha_backtest.py"):
+        target = upstream / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / relative, target)
+    data_root = tmp_path / "market"
+    for relative in ("calendars/day.txt", "instruments/csi300.txt", "instruments/all.txt",
+                     "features/stock/close.day.bin"):
+        target = data_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"DATA")
+    manifest = {"backend": "qlib", "market": "csi300", "data_root": str(data_root),
+                "benchmark": "SH000300",
+                "calendar_sha256": sha256(data_root / "calendars/day.txt"),
+                "universe_sha256": sha256(data_root / "instruments/csi300.txt"),
+                "all_instruments_sha256": sha256(data_root / "instruments/all.txt")}
+    files = {"features/stock/close.day.bin": sha256(data_root / "features/stock/close.day.bin")}
+    manifest["files_sha256"] = digest(files)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest))
+    manifest_path.with_suffix(".files.json").write_text(json.dumps(files))
+    config = {"backend": "qlib", "market": "csi300", "data_root": str(data_root),
+              "benchmark": "SH000300", "upstream_root": str(upstream)}
+    environment_digest = oracle_environment_digest(config)
+    protocol = T3Protocol(data_digest=digest(manifest), environment_digest=environment_digest)
+    config.update(data_digest=protocol.data_digest, environment_digest=environment_digest,
+                  data_manifest=str(manifest_path))
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config))
+    service = OracleService(config_path, tmp_path / "oracle")
+    assert service.health()["environment_digest"] == environment_digest
+    mismatched = tmp_path / "mismatched-config.json"
+    mismatched.write_text(json.dumps(config | {"environment_digest": "0" * 64}))
+    with pytest.raises(ValueError, match="scoring environment identity mismatch"):
+        OracleService(mismatched, tmp_path / "mismatched-oracle")
+
+    with (upstream / "ffo/utils/utils.py").open("a") as stream:
+        stream.write("\n# changed after service startup\n")
+    request = {"request_id": "a" * 64, "protocol": protocol.to_dict(), "job_permits": 1,
+               "operation": "check", "expression": "$close"}
+    with pytest.raises(ValueError, match="pinned AlphaBench Oracle source changed"):
+        service.health()
+    with pytest.raises(EvaluationPaused, match="pinned AlphaBench Oracle source changed") as exc:
+        service.execute(request)
+    assert exc.value.status == "paused_data_integrity"
+    assert not (tmp_path / "oracle/jobs").exists()
+    with pytest.raises(ValueError, match="pinned AlphaBench Oracle source changed"):
+        OracleService(config_path, tmp_path / "other-oracle")
+
+    request_path = tmp_path / "worker-request.json"
+    request_path.write_text(json.dumps(request))
+    response_path = tmp_path / "worker-response.json"
+    worker = subprocess.run([sys.executable, "-m", "tasks.alphabench.core.oracle_worker",
+                             str(request_path), str(config_path), str(response_path),
+                             "--config-digest", service.config_digest],
+                            capture_output=True, text=True, timeout=30)
+    assert worker.returncode == 0, worker.stderr
+    response = json.loads(response_path.read_text())
+    assert response["pause_status"] == "paused_data_integrity"
+    assert "pinned AlphaBench Oracle source changed" in response["error"]

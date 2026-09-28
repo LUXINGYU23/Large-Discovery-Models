@@ -13,6 +13,7 @@ import sys
 
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import atomic_json_write
+from .oracle_identity import oracle_environment_digest
 from .protocol import T3Protocol, digest
 from .receipts import Receipts
 
@@ -33,6 +34,8 @@ class OracleService:
                 Path(self.config["data_root"]).resolve() != Path(manifest["data_root"]).resolve()
                 or self.config["benchmark"].lower() != manifest["benchmark"].lower()):
             raise ValueError("Qlib oracle data root or benchmark differs from the manifest")
+        if oracle_environment_digest(self.config) != self.config["environment_digest"]:
+            raise ValueError("oracle scoring environment identity mismatch")
         self.config_digest = digest(self.config)
         self.root = Path(root)
         self.receipts = Receipts(self.root / "requests")
@@ -56,6 +59,12 @@ class OracleService:
         for key in ("backend", "market", "data_digest", "environment_digest"):
             if getattr(protocol, key) != self.config[key]:
                 raise ValueError("oracle configuration identity mismatch: " + key)
+        try:
+            if oracle_environment_digest(self.config) != protocol.environment_digest:
+                raise ValueError("oracle scoring environment changed after startup")
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            raise EvaluationPaused("oracle scoring environment integrity failure: " + str(exc),
+                                   status="paused_data_integrity") from exc
         identity = request["request_id"]
         if not re.fullmatch(r"[a-f0-9]{64}", identity) or type(request["job_permits"]) is not int or request["job_permits"] < 1:
             raise ValueError("valid request identity and worker permit required")
@@ -99,6 +108,8 @@ class OracleService:
             return self.receipts.execute(identity, request, reserve=lambda: None, operation=operation)
 
     def health(self):
+        if oracle_environment_digest(self.config) != self.config["environment_digest"]:
+            raise ValueError("oracle scoring environment changed after startup")
         return {key: self.config[key] for key in ("backend", "market", "data_digest", "environment_digest")} | {
             "config_digest": self.config_digest,
             "capabilities": ["durable_requests", "worker_permits", "daily_ic", "factor_scores", "portfolio", "dynamic_check"]
@@ -131,7 +142,10 @@ def main(argv=None):
 
         def do_GET(self):
             if self.path == "/t3/health":
-                return self.reply(200, service.health())
+                try:
+                    return self.reply(200, service.health())
+                except (KeyError, TypeError, ValueError, OSError) as exc:
+                    return self.reply(409, {"status": "paused_data_integrity", "error": str(exc)})
             if self.path.startswith("/t3/requests/"):
                 identity = self.path.removeprefix("/t3/requests/")
                 if not re.fullmatch(r"[a-f0-9]{64}", identity):

@@ -17,9 +17,12 @@ tasks/alphabench/environments/assay/.venv/bin/python -m pytest \
 ```
 
 The service config must contain `backend=assay`, `market`, `data_digest`,
-`environment_digest` and the absolute `data_manifest` path. Start it with the
-Assay environment's Python. Health and dispatch both bind the market; each
-worker verifies the data manifest and the actual SHA-256 of every input asset.
+`environment_digest` and the absolute `data_manifest` path. Compute
+`environment_digest` with `oracle_environment_digest(config)` using the exact
+Assay Python environment that starts the service, then freeze that value in
+both config and protocol. The service and every worker verify the installed
+Assay scoring source and environment against it. Health and dispatch bind the
+market; each worker also verifies the manifest and every input asset's SHA-256.
 The qualification in current acquisition audits remains **blocked**. Fixture
 execution is not a market-data qualification or a completed W06 gate.
 

@@ -12,6 +12,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from .data import verify_data_files
 from .grammar import parse_expression
+from .oracle_identity import oracle_environment_digest
 from .protocol import T3Protocol, digest
 
 
@@ -171,6 +172,8 @@ def main(argv=None):
                         or config["benchmark"].lower() != manifest["benchmark"].lower()):
                     raise ValueError("Qlib worker data root or benchmark differs from the manifest")
                 verify_data_files(manifest_path, manifest)
+            if oracle_environment_digest(config) != protocol.environment_digest:
+                raise ValueError("oracle scoring environment identity mismatch")
         except (KeyError, TypeError, ValueError, OSError) as exc:
             raise EvaluationPaused("oracle data/config integrity failure: " + str(exc),
                                    status="paused_data_integrity") from exc

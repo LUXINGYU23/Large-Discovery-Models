@@ -107,6 +107,13 @@ def run(args, protocol, spec):
     if protocol_path.exists() and not args.resume_run:
         raise ValueError("existing run requires --resume-run")
     atomic_json_write(protocol_path, protocol.to_dict())
+    if data_manifest is not None:
+        snapshot = run_dir / "data_manifest.json"
+        if snapshot.exists():
+            if json.loads(snapshot.read_text(encoding="utf-8")) != data_manifest:
+                raise ValueError("run data audit differs from the verified manifest")
+        else:
+            atomic_json_write(snapshot, data_manifest)
     contract_identity = bind_runner_contract(run_dir, protocol)
     native_config = prepare_native(protocol, args.upstream_root) if native and protocol.profile != "ldm_matched_v1" else None
     if protocol.profile in {"upstream_searcher_v1", "upstream_benchmark_v1"}:

@@ -19,6 +19,7 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from tasks.alphabench.core.assay_adapter import assay_evaluate, prepare_panel
 from tasks.alphabench.core.data import sha256
 from tasks.alphabench.core.oracle_service import OracleService
+from tasks.alphabench.core.oracle_identity import oracle_environment_digest
 from tasks.alphabench.core.oracle_worker import clean
 from tasks.alphabench.core.protocol import T3Protocol, digest
 from tasks.alphabench.core.grammar import REGISTRY
@@ -75,7 +76,7 @@ def snapshot(tmp_path):
         universe="NASDAQ100", benchmark="custom", benchmark_symbol="TEST_INDEX", rebalance_type="daily", min_rebalance_interval=1,
         execution_price="next_open", signal_transform="rank", weight_method="signal_prop", max_single_weight=.3,
         slippage_model="zero", save_position_log=True).to_dict()
-    protocol = T3Protocol(backend="assay", market="nasdaq100", data_digest=digest(manifest), environment_digest="fixture",
+    protocol = T3Protocol(backend="assay", market="nasdaq100", data_digest=digest(manifest), environment_digest=oracle_environment_digest({"backend": "assay"}),
                           assay_portfolio=portfolio)
     request = {"request_id": "a"*64, "protocol": protocol.to_dict(), "operation": "evaluate", "expression": "ts_mean(close,5)",
                "start": str(days[20]), "end": str(days[-1] + dt.timedelta(days=1)), "fast": True, "job_permits": 2}

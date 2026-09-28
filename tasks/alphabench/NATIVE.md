@@ -1,5 +1,11 @@
 # 原生算法执行与恢复
 
+正式 Oracle 协议的 `environment_digest` 必须在实际运行它的 Python 环境中通过
+`tasks.alphabench.core.oracle_identity.oracle_environment_digest(config)` 计算，
+并同时写入冻结的协议和服务配置。Qlib 的两份上游评分/回测源码必须与固定
+AlphaBench checkout 的字节哈希一致；服务启动、派发和 worker 执行均验证实际
+源码与环境，变化时暂停，不能只比较配置中自报的字符串。
+
 固定源码为 AlphaBench `31bb94bbb7744177c51c9d011e07c31e3092b93e`。
 `core/native_source.py` 校验五个 `searcher/algo` 文件的原始字节哈希，
 把带插桩的副本写入运行的私有目录，再加载官方 `create_algo`。

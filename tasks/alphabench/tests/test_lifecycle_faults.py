@@ -148,3 +148,29 @@ assert receipts.execute("one", {"value": 1}, authorize=lambda: count("authorize"
     corrupted = subprocess.run(command, capture_output=True, text=True, timeout=30)
     assert corrupted.returncode != 0 and "different request" in corrupted.stderr
     assert (tmp_path / "effects.txt").read_text().splitlines() == ["authorize", "reserve", "physical"]
+
+
+@pytest.mark.parametrize("phase", ["initialization", "search"])
+def test_validation_budget_exhaustion_pauses_without_losing_paid_receipts(tmp_path, phase):
+    from tasks.alphabench.ldm_task.procedure import main
+
+    base = T3Protocol()
+    protocol = replace(base, cold_seed_count=2 if phase == "initialization" else 0,
+        rounds=1, evaluations=2, batch_size=2,
+        budgets={**base.budgets, "validation_evaluations": 1})
+    protocol_path = tmp_path / "protocol.json"
+    protocol_path.write_text(json.dumps(protocol.to_dict()))
+    run = tmp_path / "run"
+    assert main(["--mock", "--protocol-file", str(protocol_path), "--out-dir", str(run)]) == 2
+    stage = run / "initialization" if phase == "initialization" else run
+    assert json.loads((stage / "status.json").read_text())["status"] == "paused_budget"
+    assert not (run / "result.json").exists()
+    observations = json.loads((stage / "checkpoint.json").read_text())["state"]["observations"]
+    assert len(observations) == 1 and observations[0]["evaluation"]["status"] == "succeeded"
+    receipts = [json.loads(path.read_text()) for path in (stage / "private/oracle").glob("*.json")]
+    completed = [row for row in receipts if row.get("state") == "completed"]
+    assert sum(row["identity"].get("phase") == phase for row in completed) == 2
+    assert sum(row["identity"].get("phase") == "validation" for row in completed) == 1
+    budget = json.loads((stage / "budget.json").read_text())["counters"]
+    assert budget["validation_evaluations"] == 1
+    assert budget["external_evaluations"] == 2
