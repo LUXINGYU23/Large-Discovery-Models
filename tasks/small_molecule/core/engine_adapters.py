@@ -1,25 +1,4 @@
-"""LDMEngine behavioral adapters for the small-molecule task.
-
-This module turns the tilted case2 scientific components into the task-owned
-adapter seams required by :class:`ldm_tts.engine.LDMEngine`:
-
-* :class:`SmilesCandidateDomain` -- SMILES canonicalization and hard filters
-  (``CandidateDomainAdapter``).
-* :class:`SmilesReservoirExpander` -- LLM reservoir expansion wrapping the
-  existing ``DirectLLMReservoirBuilder`` / ``LLMSeedAnalogReservoirBuilder``,
-  with the refill loop and q0-gumbel pool maintenance folded inside
-  (``ReservoirExpander``).
-* :class:`SmilesCandidateEvaluator` -- Vina + activity scoring per candidate
-  (``CandidateEvaluator``).
-* :class:`TiltedAcquisitionSelector` -- EHVI/mean posterior scores tilted by the
-  q0 base measure and sampled with gumbel top-k (``AcquisitionSelector``).
-* :class:`SmilesSurrogateEncoder` -- molecular fingerprint / SMILES string
-  kernel representations (``SurrogateEncoder``).
-
-:func:`materialize_legacy_trajectory` exports the engine events back into the
-legacy trajectory files (``rounds.jsonl`` / ``history.json`` / legacy summary
-fields) so downstream tooling keeps working.
-"""
+"""Small-molecule adapters for the shared LDM campaign engine."""
 
 from __future__ import annotations
 
@@ -34,7 +13,6 @@ from ldm_tts.contracts import (
     Candidate,
     CandidateRejection,
     EvaluationResult,
-    Observation,
     RawProposal,
     SurrogateSpaceSpec,
 )
@@ -55,7 +33,7 @@ from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import Candidat
 from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import canonicalize_smiles
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
 from tasks.small_molecule.core.ldm_tilted_case2.ehvi_all import compute_ehvi_for_candidates
-from tasks.small_molecule.core.ldm_tilted_case2.loop import _score_smiles_with_diagnostics
+from tasks.small_molecule.core.ldm_tilted_case2.scoring import _score_smiles_with_diagnostics
 from tasks.small_molecule.core.ldm_tilted_case2.methods.direct_llm import (
     DirectLLMReservoirBuilder,
 )
@@ -459,7 +437,7 @@ class SmilesSurrogateEncoder:
 
 
 # ---------------------------------------------------------------------------
-# History conversion helpers
+# History projection
 # ---------------------------------------------------------------------------
 
 
@@ -475,41 +453,20 @@ def _history_rows_from_observations(observations) -> list[tuple[str, tuple]]:
     return rows
 
 
-def observations_from_history_rows(history: Sequence[tuple[str, Sequence]]) -> list[Observation]:
-    """Rebuild engine observations from a legacy history.json payload."""
-    observations: list[Observation] = []
-    for smiles, scores in history:
-        if len(scores) != 2 or scores[0] is None or scores[1] is None:
-            continue
-        candidate = Candidate(
-            candidate_id="mol-" + hashlib.sha256(str(smiles).encode()).hexdigest()[:12],
-            payload={"smiles": str(smiles), "rationale": ""},
-            canonical_key=str(smiles),
-            source="legacy_resume",
-        )
-        evaluation = EvaluationResult(
-            candidate.candidate_id,
-            "succeeded",
-            metrics={"vina": float(scores[0]), "activity": float(scores[1])},
-        )
-        observations.append(Observation(candidate=candidate, evaluation=evaluation))
-    return observations
-
-
 # ---------------------------------------------------------------------------
-# Legacy trajectory export
+# Trajectory and summary projection
 # ---------------------------------------------------------------------------
 
 
-def materialize_legacy_trajectory(
+def materialize_trajectory(
     runtime,
     result,
     cfg: TiltedLDMCase2Config,
     *,
     sink=None,
 ) -> dict[str, Any]:
-    """Export engine events back into the legacy tilted-case2 files."""
-    from tasks.small_molecule.core.acquisition import hypervolume
+    """Project engine events into task trajectory and summary files."""
+    from ldm_tts.optimization.acquisition import hypervolume
 
     events = runtime.events()
     rounds = _rounds_from_events(events, cfg)
@@ -545,7 +502,7 @@ def materialize_legacy_trajectory(
         llm_call_count += len(record.get("llm_attempts", []))
         for key, value in record.get("drop_counts", {}).items():
             drop_totals[key] = drop_totals.get(key, 0) + int(value)
-    legacy_summary = {
+    task_summary = {
         "method": cfg.method,
         "llm_call_count": llm_call_count,
         "round_count": len(rounds),
@@ -564,7 +521,7 @@ def materialize_legacy_trajectory(
         "engine": result.summary,
     }
     summary_payload = dict(result.summary)
-    summary_payload.update(legacy_summary)
+    summary_payload.update(task_summary)
     from ldm_tts.engine.run_store import atomic_json_write
 
     atomic_json_write(run_dir / "summary.json", summary_payload)
@@ -585,7 +542,7 @@ def materialize_legacy_trajectory(
             }
             for ir in smallmol_irs_from_round_record(record):
                 sink.append(ir, provenance=provenance, outcome=outcome)
-    return legacy_summary
+    return task_summary
 
 
 def _rounds_from_events(

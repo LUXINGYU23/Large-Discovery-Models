@@ -13,10 +13,8 @@ from ldm_tts.optimization.records import (
     BOObservation,
     BOPrediction,
     BOSelectionResult,
-    FeatureVector,
     SurrogateVector,
 )
-from ldm_tts.engine.runtime import LDMSearchRoundResult, run_budgeted_search
 from tasks.nanogpt.core.expansion_schema import (
     initial_active_operation_schema,
     load_operation_schema,
@@ -31,7 +29,6 @@ from ldm_tts.contracts.evaluation import (
     is_finite_number,
     ranked_items,
 )
-from ldm_tts.engine.run_store import CandidateTraceRecord, LDMRoundTrace
 from ldm_tts.engine.run_store import JsonlTrajectoryRecorder, load_jsonl
 from ldm_tts.registration.dependencies import (
     check_plan,
@@ -62,87 +59,6 @@ class LDMScoringTests(unittest.TestCase):
         ranked = ranked_items(rows, lambda row: row["score"], minimize=True)
         self.assertEqual([row["name"] for row in ranked], ["best", "middle"])
         self.assertEqual(best_item(rows, lambda row: row["score"])["name"], "best")
-
-
-class LDMSearchLoopTests(unittest.TestCase):
-    def test_budgeted_loop_appends_history_and_records_rounds(self) -> None:
-        history: list[int] = [0]
-        records: list[dict] = []
-
-        def build_round(round_idx: int, round_history: list[int]) -> LDMSearchRoundResult[int]:
-            return LDMSearchRoundResult(
-                history_delta=[round_history[-1] + 1],
-                record={"round_idx": round_idx, "history_size": len(round_history)},
-            )
-
-        result = run_budgeted_search(
-            history,
-            budget=4,
-            build_round=build_round,
-            record_round=records.append,
-            start_round=2,
-        )
-
-        self.assertEqual(history, [0, 1, 2, 3])
-        self.assertEqual(result.rounds_run, 3)
-        self.assertIsNone(result.early_stop_reason)
-        self.assertEqual([record["round_idx"] for record in records], [2, 3, 4])
-
-    def test_budgeted_loop_stops_after_empty_reservoir_limit(self) -> None:
-        history: list[int] = []
-        empty_counts: list[tuple[int, int]] = []
-
-        result = run_budgeted_search(
-            history,
-            budget=1,
-            build_round=lambda round_idx, _history: LDMSearchRoundResult(
-                record={"round_idx": round_idx},
-                empty_reservoir=True,
-            ),
-            on_empty_reservoir=lambda round_idx, count: empty_counts.append((round_idx, count)),
-            max_empty_reservoir_rounds=2,
-        )
-
-        self.assertEqual(result.early_stop_reason, "empty_reservoir_limit")
-        self.assertEqual(result.rounds_run, 2)
-        self.assertEqual(empty_counts, [(0, 1), (1, 2)])
-
-    def test_budgeted_loop_stops_on_empty_selection_by_default(self) -> None:
-        history: list[int] = []
-
-        result = run_budgeted_search(
-            history,
-            budget=1,
-            build_round=lambda round_idx, _history: LDMSearchRoundResult(
-                record={"round_idx": round_idx},
-            ),
-        )
-
-        self.assertEqual(history, [])
-        self.assertEqual(result.early_stop_reason, "empty_selection")
-        self.assertEqual(result.rounds_run, 1)
-
-    def test_budgeted_loop_retries_empty_selection_when_early_stop_disabled(self) -> None:
-        history: list[int] = []
-
-        def build_round(round_idx: int, _history: list[int]) -> LDMSearchRoundResult[int]:
-            if round_idx < 2:
-                return LDMSearchRoundResult(record={"round_idx": round_idx})
-            return LDMSearchRoundResult(
-                history_delta=[round_idx],
-                record={"round_idx": round_idx},
-            )
-
-        result = run_budgeted_search(
-            history,
-            budget=1,
-            build_round=build_round,
-            allow_early_stop=False,
-        )
-
-        self.assertEqual(history, [2])
-        self.assertIsNone(result.early_stop_reason)
-        self.assertEqual(result.rounds_run, 3)
 
 
 class LDMTrajectoryTests(unittest.TestCase):
@@ -519,7 +435,7 @@ class LDMOperationSpaceTests(unittest.TestCase):
 
 class LDMBOTraceContractTests(unittest.TestCase):
     def test_bo_records_serialize_nested_feature_vectors(self) -> None:
-        feature = FeatureVector(
+        feature = SurrogateVector(
             values=(0.1, 0.9),
             version="mock:v1",
             source_id="candidate-1",
@@ -542,37 +458,9 @@ class LDMBOTraceContractTests(unittest.TestCase):
         )
 
         self.assertEqual(feature.to_dict()["values"], (0.1, 0.9))
-        self.assertIsInstance(feature, SurrogateVector)
         self.assertEqual(observation.to_dict()["feature"]["source_id"], "candidate-1")
         self.assertEqual(selection.to_dict()["predictions"][0]["candidate_id"], "candidate-1")
         json.dumps(selection.to_dict())
-
-    def test_round_trace_serializes_candidate_rows(self) -> None:
-        trace = LDMRoundTrace(
-            round_idx=2,
-            task="mock_task",
-            history_size_before=3,
-            history_size_after=4,
-            response_space="direct_candidates",
-            acquisition="gp_ucb",
-            candidates=(
-                CandidateTraceRecord(
-                    candidate_id="candidate-1",
-                    payload={"x": 1},
-                    prediction={"acquisition_score": 0.5},
-                    true_scores=(-1.0,),
-                    selected=True,
-                ),
-            ),
-            selected_candidate_ids=("candidate-1",),
-        )
-
-        payload = trace.to_dict()
-
-        self.assertEqual(payload["candidates"][0]["payload"], {"x": 1})
-        self.assertTrue(payload["candidates"][0]["selected"])
-        json.dumps(payload)
-
 
 class LDMTaskSpecTests(unittest.TestCase):
     def test_nanogpt_operation_spec_reports_active_and_full_dimensions(self) -> None:
@@ -627,22 +515,6 @@ class LDMTaskSpecTests(unittest.TestCase):
         )
         self.assertEqual(spec.proposal_search.name, "best_of_n")
         self.assertEqual(spec.proposal_search.breadth, 2)
-
-    def test_nanogpt_accepts_canonical_and_legacy_expansion_flags(self) -> None:
-        from tasks.nanogpt.ldm_task import procedure as nanogpt_procedure
-
-        canonical = nanogpt_procedure.parse_args(
-            ["--initial-expansion-parameters", "3", "--max-expansion-parameters", "7"]
-        )
-        legacy = nanogpt_procedure.parse_args(
-            ["--initial-operation-features", "3", "--max-active-operation-features", "7"]
-        )
-
-        self.assertEqual(canonical.initial_operation_features, legacy.initial_operation_features)
-        self.assertEqual(
-            canonical.max_active_operation_features,
-            legacy.max_active_operation_features,
-        )
 
     def test_small_molecule_spec_reports_two_objective_space(self) -> None:
         from tasks.small_molecule.ldm_task import procedure as molecule_procedure

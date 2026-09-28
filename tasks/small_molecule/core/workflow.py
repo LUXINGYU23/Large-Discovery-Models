@@ -1,50 +1,5 @@
 #!/usr/bin/env python3
-"""Small-molecule task workflow for the shared LDM-TTS config runner.
-
-This module wires the small-molecule scientific components into the shared
-``ldm_tts.engine.LDMEngine`` campaign runtime:
-
-    LLM proposal reservoir -> shared acquisition-tilted selection -> environment scoring
-
-The task-owned adapters (candidate domain, reservoir expander, evaluator,
-acquisition selector, and surrogate encoder) live in
-``tasks.small_molecule.core.engine_adapters``. The previous task-local
-``ldm_tilted_case2.loop.run_tilted_case2_search`` loop is retired; its pure
-helpers remain importable and its trajectory files are re-exported from the
-engine events.
-
-Example smoke run without external services:
-
-    python -m tasks.small_molecule.ldm_task.procedure \
-        --mock \
-        --method m1_stratified_direct_llm_oversample_sir \
-        --budget 8 \
-        --m1-k-direct-llm 16 \
-        --trajectory-dir runs/case2_mock
-
-Example real run:
-
-    python -m tasks.small_molecule.ldm_task.procedure \
-        --method m1_stratified_direct_llm_oversample_sir \
-        --init-strategy llm_cold_start \
-        --budget 80 \
-        --m1-k-direct-llm 512 \
-        --max-candidates-per-round 256 \
-        --kernel sk \
-        --gp-device cpu \
-        --llm-url http://127.0.0.1:52307/v1 \
-        --llm-model-name Qwen3-Coder-30B-A3B-Instruct \
-        --llm-max-retries 20 \
-        --llm-retry-wait-seconds 10 \
-        --vina-bin /path/to/vina \
-        --trajectory-dir runs/case2_real
-
-Resume an interrupted run:
-
-    python -m tasks.small_molecule.ldm_task.procedure \
-        --resume-from runs/case2_real \
-        --budget 160
-"""
+"""Small-molecule campaign entry point for the shared LDM-TTS runner."""
 
 from __future__ import annotations
 
@@ -72,8 +27,7 @@ from ldm_tts.campaign import (
     InitializationOrderSelector,
     run_campaign,
 )
-from ldm_tts.engine import LDMEngineState
-from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
+from ldm_tts.engine.run_store import unique_run_dir
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.contracts import (
     AcquisitionSpec,
@@ -185,7 +139,6 @@ def main(argv: list[str] | None = None) -> int:
             f"Original import error: {exc}"
         ) from exc
 
-    legacy_resume = resume_requested and not (output_dir / "campaign.json").exists()
     spec = describe_ldm_task(args)
 
     evaluator = engine_adapters.SmilesCandidateEvaluator(vina_fn, activity_fn)
@@ -234,13 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         CampaignRequest(
             run_dir=run_dir,
             config=_jsonable_args(args),
-            resume=resume_requested and not legacy_resume,
-            state_factory=lambda runtime: _resolve_engine_state(
-                runtime,
-                engine_adapters,
-                resume=resume_requested,
-                legacy_resume=legacy_resume,
-            ),
+            resume=resume_requested,
             budget=CampaignBudget(
                 rounds=max_rounds,
                 reservoir_size=cfg.max_candidates_per_round,
@@ -271,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
                     * max(1, int(cfg.max_candidates_per_round) // 8),
                 },
             ),
-            artifact_projector=lambda runtime, result: engine_adapters.materialize_legacy_trajectory(
+            artifact_projector=lambda runtime, result: engine_adapters.materialize_trajectory(
                 runtime, result, cfg, sink=sink
             ),
         ),
@@ -286,13 +233,13 @@ def main(argv: list[str] | None = None) -> int:
         ))
         for observation in engine_result.state.observations
     ]
-    legacy_summary = campaign.projected
+    task_summary = campaign.projected
 
     result = {
         "output_dir": str(run_dir.resolve()),
         "history_size": len(history),
         "best": best_observed(history, cfg.minimize),
-        "summary": legacy_summary,
+        "summary": task_summary,
         "history_path": str((run_dir / "history.json").resolve()),
         "summary_path": str((run_dir / "summary.json").resolve()),
         "rounds_path": str((run_dir / "rounds.jsonl").resolve()),
@@ -308,25 +255,6 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
         for key, value in vars(args).items()
         if key != "api_key"
     }
-
-
-def _resolve_engine_state(
-    runtime: CampaignRuntime,
-    engine_adapters,
-    *,
-    resume: bool,
-    legacy_resume: bool,
-) -> LDMEngineState:
-    if resume:
-        if not legacy_resume:
-            checkpoint = runtime.load_checkpoint()
-            if checkpoint is not None:
-                return LDMEngineState.from_checkpoint(checkpoint)
-        history_rows = _load_legacy_history(Path(runtime.run_dir))
-        return LDMEngineState(
-            observations=engine_adapters.observations_from_history_rows(history_rows)
-        )
-    return LDMEngineState()
 
 
 def _initial_seed_proposals(args, cfg) -> tuple[RawProposal, ...]:
@@ -348,27 +276,6 @@ def _initial_seed_proposals(args, cfg) -> tuple[RawProposal, ...]:
         )
         for smiles in canonical
     )
-
-
-def _load_legacy_history(run_dir: Path) -> list[tuple[str, Sequence[object]]]:
-    history_path = run_dir / "history.json"
-    if history_path.exists():
-        rows = json.loads(history_path.read_text(encoding="utf-8"))
-        return [
-            (str(row["smiles"]), tuple(row["scores"]))
-            for row in rows
-        ]
-    from ldm_tts.engine.run_store import load_jsonl
-
-    history: list[tuple[str, Sequence[object]]] = []
-    for record in load_jsonl(run_dir / "rounds.jsonl"):
-        selection = record.get("selection_results", {})
-        for smiles, scores in zip(
-            selection.get("selected_smiles", []),
-            selection.get("selected_scores", []),
-        ):
-            history.append((str(smiles), tuple(scores)))
-    return history
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -481,18 +388,12 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help=(
-            "Resume from the selected trajectory directory. Existing history.json is used "
-            "when present; otherwise rounds.jsonl is replayed."
-        ),
+        help="Resume the selected campaign from its checkpoint.",
     )
     parser.add_argument(
         "--resume-from",
         default="",
-        help=(
-            "Resume from an existing trajectory directory, or from a file inside it "
-            "(summary.json, history.json, rounds.jsonl, or config.json). Implies --resume."
-        ),
+        help="Resume from an existing campaign directory. Implies --resume.",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -825,10 +726,8 @@ def resolve_resume_dir(args: argparse.Namespace) -> Path | None:
         return None
     path = Path(args.resume_from)
     path = path if path.is_absolute() else REPO_ROOT / path
-    if not path.exists():
-        raise SystemExit(f"--resume-from path does not exist: {path}")
-    if path.is_file():
-        path = path.parent
+    if not path.is_dir():
+        raise SystemExit(f"--resume-from must be an existing campaign directory: {path}")
     explicit = args.trajectory_dir or args.output_dir
     if explicit:
         explicit_path = Path(explicit)

@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -578,42 +578,6 @@ class AtomicJsonLog:
             return payload
 
 
-@dataclass(frozen=True)
-class CandidateTraceRecord:
-    """Serializable candidate row retained for legacy task traces."""
-
-    candidate_id: str
-    payload: Any
-    source: str = ""
-    prediction: dict[str, Any] | None = None
-    true_scores: tuple[float | None, ...] = ()
-    selected: bool = False
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class LDMRoundTrace:
-    """Task-neutral legacy round record."""
-
-    round_idx: int
-    task: str
-    history_size_before: int
-    history_size_after: int
-    response_space: str
-    acquisition: str
-    candidates: tuple[CandidateTraceRecord, ...] = ()
-    selected_candidate_ids: tuple[str, ...] = ()
-    llm_attempts: tuple[dict[str, Any], ...] = ()
-    fallback_reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
 __all__ = [
     "BudgetExceededError",
     "BudgetLedger",
@@ -621,9 +585,7 @@ __all__ = [
     "CampaignEvent",
     "CampaignRuntime",
     "CampaignStatus",
-    "CandidateTraceRecord",
     "JsonlTrajectoryRecorder",
-    "LDMRoundTrace",
     "atomic_json_write",
     "load_jsonl",
     "unique_run_dir",

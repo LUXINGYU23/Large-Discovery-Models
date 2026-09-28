@@ -3,7 +3,7 @@
 The task's main loop now runs through ``ldm_tts.engine.LDMEngine`` with the
 adapters in ``tasks.small_molecule.core.engine_adapters``. These tests drive
 the same assembly as ``core.workflow.main`` and assert both the shared engine
-artifacts and the legacy trajectory exports.
+artifacts and the task trajectory exports.
 """
 
 from __future__ import annotations
@@ -21,12 +21,11 @@ from ldm_tts.engine.run_store import CampaignRuntime
 
 from tasks.small_molecule.core import engine_adapters
 from tasks.small_molecule.core.gp import GPConfig
-import tasks.small_molecule.core.ldm_tilted_case2.loop as loop_mod
 from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import (
     CandidateRecord,
 )
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
-from tasks.small_molecule.core.ldm_tilted_case2.loop import _score_smiles
+from tasks.small_molecule.core.ldm_tilted_case2.scoring import _score_smiles_with_diagnostics
 from tasks.small_molecule.core.llm_advisor.client import MockLLMClient
 from tasks.small_molecule.core.rng import RNG
 
@@ -170,8 +169,8 @@ def run_campaign(
         ),
         state=state,
     )
-    legacy_summary = engine_adapters.materialize_legacy_trajectory(runtime, result, cfg)
-    return result, legacy_summary, runtime
+    task_summary = engine_adapters.materialize_trajectory(runtime, result, cfg)
+    return result, task_summary, runtime
 
 
 def _seed_observations(cfg, evaluator, runtime, seeds):
@@ -454,16 +453,14 @@ def test_engine_artifacts_exist_for_mock_campaign(tmp_path):
         assert (tmp_path / name).exists(), name
 
 
-def test_workflow_entrypoint_uses_shared_campaign_algorithm(tmp_path):
+def test_workflow_entrypoint_uses_shared_campaign_and_checkpoint_resume(tmp_path):
     from tasks.small_molecule.core import workflow
 
     run_dir = tmp_path / "workflow-campaign"
-    rc = workflow.main([
+    base_args = [
         "--mock",
         "--method",
         "m1_llm_one_step",
-        "--budget",
-        "2",
         "--batch-size",
         "1",
         "--init-size",
@@ -472,14 +469,17 @@ def test_workflow_entrypoint_uses_shared_campaign_algorithm(tmp_path):
         "llm_cold_start",
         "--m1-k-direct-llm",
         "1",
-        "--output-dir",
-        str(run_dir),
-    ])
-
-    assert rc == 0
+    ]
+    assert workflow.main([*base_args, "--budget", "2", "--output-dir", str(run_dir)]) == 0
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["successful_evaluation_count"] == 2
     assert summary["stop_reason"] == "successful_evaluation_target"
+
+    assert workflow.main([*base_args, "--budget", "3", "--resume-from", str(run_dir)]) == 0
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["successful_evaluation_count"] == 3
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    assert sum(event["event_type"] == "campaign_resumed" for event in events) == 1
 
 
 def test_workflow_seed_initialization_is_engine_owned(tmp_path):
@@ -537,7 +537,7 @@ def test_score_smiles_retries_transient_nonfinite_values():
 
     vina = TransientVinaFailure()
 
-    scores = _score_smiles(
+    scores, _diagnostics = _score_smiles_with_diagnostics(
         ["CCO", "CCN"],
         (vina, lambda smiles_list: [5.1, 5.2]),
     )
@@ -551,7 +551,7 @@ def test_score_smiles_raises_scorer_exceptions():
         raise RuntimeError("receptor prep failed")
 
     with pytest.raises(RuntimeError, match="broken_scorer failed.*receptor prep failed"):
-        _score_smiles(["CCO"], (broken_scorer, lambda smiles_list: [5.1]))
+        _score_smiles_with_diagnostics(["CCO"], (broken_scorer, lambda smiles_list: [5.1]))
 
 
 def test_engine_one_step_records_failed_observation_for_unscorable_candidate(tmp_path):

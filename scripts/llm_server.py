@@ -28,7 +28,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-MODEL_PATH = os.environ.get("SERVE_MODEL", "/mnt/data0/hf_models/models/Qwen3.5-9B")
+MODEL_PATH = os.environ["SERVE_MODEL"]
 SERVED_NAME = os.environ.get(
     "SERVE_MODEL_NAME",
     os.path.basename(MODEL_PATH.rstrip("/")),

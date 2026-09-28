@@ -2,7 +2,7 @@
 
 Task packages provide scientific adapters in :class:`CampaignRecipe`; this
 module owns runtime creation, absolute budgets, checkpoint restore, the shared
-engine lifecycle, and optional legacy artifact projection.
+engine lifecycle, and optional task artifact projection.
 """
 
 from __future__ import annotations
