@@ -635,3 +635,60 @@ def test_tilted_selector_samples_by_tilted_probability(monkeypatch):
     assert selection.metadata["selection_mode"] == "ehvi_sir"
     assert selection.metadata["selected_probabilities"] == [pytest.approx(0.75)]
     assert selection.fallback_reason is None
+
+
+@pytest.mark.parametrize("interruption", ["before_first", "after_first", "between_ir_and_sft"])
+def test_resume_repairs_interrupted_training_export(tmp_path, monkeypatch, interruption):
+    from ldm_tts.data import DataCollectionSink, smallmol_irs_from_round_record
+    from ldm_tts.data import collection
+    from tasks.small_molecule.core import workflow
+
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
+    run_dir = tmp_path / interruption
+    args = [
+        "--mock", "--method", "m1_llm_one_step", "--batch-size", "1",
+        "--init-size", "1", "--init-strategy", "llm_cold_start",
+        "--m1-k-direct-llm", "1", "--budget", "2",
+    ]
+    with monkeypatch.context() as patcher:
+        if interruption == "between_ir_and_sft":
+            original = collection.append_jsonl
+            interrupted = False
+
+            def append(path, row):
+                nonlocal interrupted
+                if Path(path).name == "ldm_sft.jsonl" and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt("interrupted after IR append")
+                original(path, row)
+
+            patcher.setattr(collection, "append_jsonl", append)
+        else:
+            original = DataCollectionSink.append
+            calls = 0
+            stop_at = 1 if interruption == "before_first" else 2
+
+            def append(self, ir, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == stop_at:
+                    raise KeyboardInterrupt("interrupted before IR append")
+                original(self, ir, **kwargs)
+
+            patcher.setattr(DataCollectionSink, "append", append)
+        with pytest.raises(KeyboardInterrupt):
+            workflow.main([*args, "--output-dir", str(run_dir)])
+
+    assert workflow.main([*args, "--resume-from", str(run_dir)]) == 0
+    rounds = [json.loads(line) for line in (run_dir / "rounds.jsonl").read_text().splitlines()]
+    expected = [ir for record in rounds for ir in smallmol_irs_from_round_record(record)]
+    ir_path = run_dir / "ldm_data/ldm_ir.jsonl"
+    sft_path = run_dir / "ldm_data/ldm_sft.jsonl"
+    ir_rows = [json.loads(line) for line in ir_path.read_text().splitlines()]
+    sft_rows = [json.loads(line) for line in sft_path.read_text().splitlines()]
+    assert len(ir_rows) == len(sft_rows) == len(expected)
+    assert [{key: value for key, value in row.items() if key != "collection"}
+            for row in ir_rows] == expected
+    saved = ir_path.read_bytes(), sft_path.read_bytes()
+    assert workflow.main([*args, "--resume-from", str(run_dir)]) == 0
+    assert (ir_path.read_bytes(), sft_path.read_bytes()) == saved

@@ -562,3 +562,62 @@ def test_cn_portfolio_uses_actual_price_bands_and_full_effective_costs(snapshot,
     replace_asset(snapshot, "execution", execution.with_columns(pl.lit(None, dtype=pl.Float64).alias("up_limit")))
     with pytest.raises(ValueError, match="actual daily price-limit bands"):
         assay_evaluate(dict(request, fast=False), config)
+
+
+def test_oracle_rejects_task_scoring_source_change_before_dispatch_and_in_worker(tmp_path, monkeypatch):
+    from pathlib import Path
+    import shutil
+    from tasks.alphabench.core import oracle_identity
+
+    source_package = Path(oracle_identity.__file__).resolve().parents[1]
+    copied_package = tmp_path / "copy/tasks/alphabench"
+    copied_package.mkdir(parents=True)
+    shutil.copy2(source_package.parent / "__init__.py", copied_package.parent / "__init__.py")
+    shutil.copy2(source_package / "__init__.py", copied_package / "__init__.py")
+    shutil.copytree(source_package / "core", copied_package / "core",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(source_package / "resources", copied_package / "resources")
+
+    monkeypatch.setattr(oracle_identity, "__file__", str(copied_package / "core/oracle_identity.py"))
+    manifest = {"backend": "assay", "market": "nasdaq100"}
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest))
+    environment_digest = oracle_environment_digest({"backend": "assay"})
+    protocol = T3Protocol(backend="assay", market="nasdaq100",
+                          data_digest=digest(manifest), environment_digest=environment_digest)
+    config = {"backend": "assay", "market": "nasdaq100", "data_digest": digest(manifest),
+              "environment_digest": environment_digest, "data_manifest": str(manifest_path)}
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config))
+    service = OracleService(config_path, tmp_path / "oracle")
+    request = {"request_id": "a" * 64, "protocol": protocol.to_dict(), "job_permits": 1,
+               "operation": "check", "expression": "ts_mean(close,5)"}
+    assert service.health()["environment_digest"] == environment_digest
+
+    source = copied_package / "core/protocol.py"
+    original = source.read_text()
+    assert 'return self.profile != "ldm_matched_v1"' in original
+    source.write_text(original.replace('return self.profile != "ldm_matched_v1"', "return True"))
+    with pytest.raises(ValueError, match="scoring environment changed"):
+        service.health()
+    with pytest.raises(EvaluationPaused) as exc:
+        service.execute(request)
+    assert exc.value.status == "paused_data_integrity"
+    assert not (tmp_path / "oracle/jobs").exists()
+
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request))
+    response_path = tmp_path / "response.json"
+    workspace = Path(__file__).resolve().parents[3]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join((str(tmp_path / "copy"), str(workspace)))
+    worker = subprocess.run(
+        [sys.executable, "-m", "tasks.alphabench.core.oracle_worker",
+         str(request_path), str(config_path), str(response_path),
+         "--config-digest", service.config_digest],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert worker.returncode == 0, worker.stderr
+    response = json.loads(response_path.read_text())
+    assert response["pause_status"] == "paused_data_integrity"
+    assert "scoring environment identity mismatch" in response["error"]

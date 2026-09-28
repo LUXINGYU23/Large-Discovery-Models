@@ -464,7 +464,6 @@ def materialize_trajectory(
     cfg: TiltedLDMCase2Config,
     *,
     sink=None,
-    export_from_round: int = 0,
 ) -> dict[str, Any]:
     """Project engine events into task trajectory and summary files."""
     from ldm_tts.optimization.acquisition import hypervolume
@@ -528,9 +527,32 @@ def materialize_trajectory(
     atomic_json_write(run_dir / "summary.json", summary_payload)
 
     if sink is not None and getattr(sink, "enabled", False):
-        from ldm_tts.data import smallmol_irs_from_round_record
+        from ldm_tts.data import append_jsonl, read_jsonl, render_record, smallmol_irs_from_round_record
 
-        for record in rounds[export_from_round:]:
+        paths = sink.paths
+        ir_rows = read_jsonl(paths.ir_path) if paths.ir_path.exists() else []
+        def belongs_to_run(row):
+            return row.get("collection", {}).get("provenance", {}).get("trajectory_dir") == str(run_dir)
+
+        if paths.sft_path is not None:
+            sft_rows = read_jsonl(paths.sft_path) if paths.sft_path.exists() else []
+            if len(sft_rows) > len(ir_rows):
+                raise ValueError("collected SFT rows exceed IR rows")
+            for ir, sft in zip(ir_rows, sft_rows):
+                if belongs_to_run(ir) and sft != render_record(
+                    ir, mode=sink.render_mode,
+                    include_parent_artifact=sink.include_parent_artifact
+                ):
+                    raise ValueError("collected SFT row differs from its IR row")
+            for ir in ir_rows[len(sft_rows):]:
+                if not belongs_to_run(ir):
+                    raise ValueError("another trajectory has an unfinished training export")
+                append_jsonl(paths.sft_path, render_record(
+                    ir, mode=sink.render_mode,
+                    include_parent_artifact=sink.include_parent_artifact))
+
+        expected = []
+        for record in rounds:
             provenance = {
                 "task": "small_molecule",
                 "method": cfg.method,
@@ -542,7 +564,18 @@ def materialize_trajectory(
                 "drop_counts": record.get("drop_counts", {}),
             }
             for ir in smallmol_irs_from_round_record(record):
-                sink.append(ir, provenance=provenance, outcome=outcome)
+                expected.append((ir, provenance, outcome))
+        existing = [row for row in ir_rows if belongs_to_run(row)]
+        if len(existing) > len(expected):
+            raise ValueError("collected IR rows exceed trajectory records")
+        for row, (ir, provenance, outcome) in zip(existing, expected):
+            stored = json.loads(json.dumps({
+                **ir, "collection": {"provenance": provenance, "outcome": outcome}
+            }))
+            if row != stored:
+                raise ValueError("collected IR row differs from its trajectory record")
+        for ir, provenance, outcome in expected[len(existing):]:
+            sink.append(ir, provenance=provenance, outcome=outcome)
     return task_summary
 
 
