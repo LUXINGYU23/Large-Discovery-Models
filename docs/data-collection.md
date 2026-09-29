@@ -66,7 +66,8 @@ Collection, expert augmentation, and rendering are exposed together through
 the [`ldm_tts.data`](../ldm_tts/data/__init__.py) package. Implementations live in
 focused modules including `ldm_tts/data/collection.py`, `ldm_tts/data/ir.py`,
 `ldm_tts/data/rendering.py`, and `ldm_tts/data/augmentation.py`; task code
-should import the public data interface.
+should import the public data interface for shared helpers. The small-molecule
+round converter lives in its task module.
 
 Use these helpers from task code:
 
@@ -76,8 +77,8 @@ from ldm_tts.data import (
     ExpertJustificationPipeline,
     make_complete_design_ir,
     make_parameter_edit_ir,
-    smallmol_irs_from_round_record,
 )
+from tasks.small_molecule.core.data_ir import smallmol_irs_from_round_record
 ```
 
 Main utilities:
