@@ -18,7 +18,7 @@ from ldm_tts.optimization.records import (
 from tasks.nanogpt.core.expansion_schema import (
     initial_active_operation_schema,
     load_operation_schema,
-    operation_feature_dim,
+    operation_representation_dimension,
     operation_representation_dimension,
     validate_operation_payload,
 )
@@ -399,8 +399,8 @@ class LDMOperationSpaceTests(unittest.TestCase):
             Namespace(initial_operation_features="5"),
         )
 
-        self.assertEqual(operation_feature_dim(schema), 27)
-        self.assertEqual(operation_feature_dim(active_schema), 16)
+        self.assertEqual(operation_representation_dimension(schema), 27)
+        self.assertEqual(operation_representation_dimension(active_schema), 16)
         self.assertEqual(list(active_schema.parameters), [
             "DEPTH",
             "WIDTH",
@@ -484,7 +484,7 @@ class LDMTaskSpecTests(unittest.TestCase):
         )
         active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)
         self.assertEqual(
-            operation_feature_dim(active_schema),
+            operation_representation_dimension(active_schema),
             operation_representation_dimension(active_schema),
         )
 

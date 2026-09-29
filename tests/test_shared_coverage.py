@@ -37,11 +37,11 @@ from tasks.nanogpt.core.expansion_schema import (
     OperationParameter,
     OperationSchema,
     choice_values_equal,
-    initial_operation_feature_names,
+    initial_operation_parameter_names,
     load_operation_schema,
     normalize_operation_numeric,
     normalize_operation_parameter,
-    operation_feature_version,
+    operation_representation_version,
     operation_parameter_from_payload,
     operation_parameter_to_json,
     operation_schema_signature,
@@ -438,7 +438,7 @@ class TestOperationSpaceCoverage:
         payload = operation_schema_to_json(schema)
         assert payload["source_path"] is None
         assert payload["parameters"]["MODE"]["choices"] == ["fast", 2, True, 1.5]
-        assert operation_feature_version(schema) == "operation_schema:v1"
+        assert operation_representation_version(schema) == "operation_schema:v1"
         assert len(operation_schema_signature(schema)) == 12
         replaced = replace_operation_schema(
             schema,
@@ -499,14 +499,14 @@ class TestOperationSpaceCoverage:
 
     def test_initial_feature_selection(self) -> None:
         schema = _schema()
-        assert initial_operation_feature_names(schema, "all") == ["COUNT", "RATE", "MODE"]
-        assert initial_operation_feature_names(schema, "0") == ["COUNT"]
-        assert initial_operation_feature_names(schema, "99") == ["COUNT", "RATE", "MODE"]
-        assert initial_operation_feature_names(schema, "rate, rate, mode") == ["RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "all") == ["COUNT", "RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "0") == ["COUNT"]
+        assert initial_operation_parameter_names(schema, "99") == ["COUNT", "RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "rate, rate, mode") == ["RATE", "MODE"]
         with pytest.raises(ValueError, match="Unknown expansion-schema parameter"):
-            initial_operation_feature_names(schema, "missing")
+            initial_operation_parameter_names(schema, "missing")
         with pytest.raises(ValueError, match="did not select"):
-            initial_operation_feature_names(schema, ",")
+            initial_operation_parameter_names(schema, ",")
 
     def test_numeric_normalization_and_choice_comparison(self) -> None:
         assert normalize_operation_numeric(2, OperationParameter("x", "float", 2, 2)) == 0
