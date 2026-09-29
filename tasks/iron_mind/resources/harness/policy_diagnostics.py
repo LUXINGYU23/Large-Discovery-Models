@@ -3,19 +3,32 @@
 import numpy as np
 
 
+def robust_z_values(values: np.ndarray, z_clip: float, epsilon: float = 1e-12) -> np.ndarray:
+    median = float(np.median(values))
+    scale = 1.4826 * float(np.median(np.abs(values - median)))
+    if scale <= epsilon:
+        scale = float(np.std(values))
+    if scale <= epsilon:
+        return np.zeros_like(values)
+    return np.clip((values - median) / (scale + epsilon), -z_clip, z_clip)
+
+
+def tilt_log_weights(mass, normalized_acquisition, alpha, eta, epsilon=1e-12):
+    return alpha * np.log(mass + epsilon) + eta * normalized_acquisition
+
+
+def softmax_logits(logits):
+    exponentials = np.exp(logits - float(np.max(logits)))
+    return exponentials / float(exponentials.sum())
+
+
 def robust_z_acquisition(values: np.ndarray, z_clip: float) -> np.ndarray:
     values = np.asarray(values, dtype=float)
     if values.ndim != 1 or not len(values) or not np.isfinite(values).all():
         raise ValueError("policy acquisition must be a finite non-empty vector")
     if isinstance(z_clip, bool) or not np.isfinite(z_clip) or z_clip <= 0:
         raise ValueError("policy z_clip must be finite and positive")
-    median = float(np.median(values))
-    scale = 1.4826 * float(np.median(np.abs(values - median)))
-    if scale <= 1e-12:
-        scale = float(np.std(values))
-    if scale <= 1e-12:
-        return np.zeros_like(values)
-    return np.clip((values - median) / (scale + 1e-12), -z_clip, z_clip)
+    return robust_z_values(values, z_clip)
 
 
 def evaluate_policy_draft(prior, inputs, outputs):
@@ -107,6 +120,4 @@ def selection_probability(mass, acquisition, alpha, eta, normalization):
         raise ValueError("unsupported robust_z constants")
     z = robust_z_acquisition(acquisition, normalization["z_clip"])
     epsilon = normalization["epsilon"]
-    logits = alpha * np.log(mass + epsilon) + eta * z
-    probability = np.exp(logits - logits.max())
-    return probability / probability.sum()
+    return softmax_logits(tilt_log_weights(mass, z, alpha, eta, epsilon))
