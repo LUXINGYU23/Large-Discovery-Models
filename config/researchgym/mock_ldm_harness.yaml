@@ -1,0 +1,14 @@
+name: researchgym_mock_ldm_harness
+task: researchgym
+algorithm: ldm_harness
+mode: mock
+args:
+  mock: true
+  case: cross_modal_retrieval
+  search-method: ldm_harness
+  iterations: 3
+  proposal-samples: 6
+  bo-pool-size: 4
+  evaluations-per-round: 2
+  harness-sessions: 3
+  harness-command-json: '["python3", "-u", "tests/fixtures/harness_sidecar.py", "repair"]'

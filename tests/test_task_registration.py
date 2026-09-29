@@ -29,6 +29,7 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         "nanogpt",
         "nucleobench",
         "reasyn",
+        "researchgym",
         "small_molecule",
         "synthonbench",
     }
