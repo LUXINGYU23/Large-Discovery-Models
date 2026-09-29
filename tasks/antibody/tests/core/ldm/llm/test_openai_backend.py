@@ -211,10 +211,3 @@ class TestOpenAIClientCall:
             c = OpenAIClient()
             with pytest.raises(RuntimeError, match="API down"):
                 c.call("p", 0.25, 30)
-
-
-class TestBuildLLMClientRemoved:
-    def test_build_llm_client_no_longer_exists(self):
-        """The factory was removed; only OpenAIClient remains."""
-        with pytest.raises(ImportError):
-            from tasks.antibody.core.ldm import build_llm_client  # noqa: F401

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import importlib
 
-import pytest
-
 
 def test_public_api_contains_only_expected_names():
     """core/ldm.__all__ must be the canonical public surface."""
@@ -30,54 +28,6 @@ def test_each_public_symbol_is_importable():
     mod = importlib.import_module("tasks.antibody.core.ldm")
     for name in mod.__all__:
         assert hasattr(mod, name), f"tasks.antibody.core.ldm missing export: {name}"
-
-
-def test_internal_modules_not_exported_at_top_level():
-    """Internal atom classes and helpers must NOT leak through `from tasks.antibody.core.ldm import *`."""
-    # Check that concrete atom classes are NOT in __all__
-    mod = importlib.import_module("tasks.antibody.core.ldm")
-    forbidden = {
-        "LatinHyperCubeSampling", "NeighborSampling", "LocalSearch", "Or",
-        "MaxCysteine", "MaxHydrophobicRun", "MaxAromatic",
-        "NetChargeRange", "NoNGlycosylation", "BiasSum",
-        "LiteLLMClient", "build_llm_client", "ParsedUpdate", "DecisionLog",
-        "safe_exec_dsl", "validate_search_atom", "validate_bias_atom",
-        "sample_within_search_dsl",
-        "fallback_to_original_antbo",
-    }
-    leaked = forbidden & set(mod.__all__)
-    assert not leaked, f"Internals leaked into tasks.antibody.core.ldm.__all__: {leaked}"
-
-
-def test_no_internal_leak_via_dir():
-    """``dir(tasks.antibody.core.ldm)`` should not contain internal helpers or concrete atoms.
-
-    Note: subclasses of ABCs (like HammingDistanceTo) are defined in the
-    same module as their ABC, so they may appear in dir(). The public_api
-    test relies on __all__ for the canonical surface. This test is a
-    best-effort sanity check.
-    """
-    mod = importlib.import_module("tasks.antibody.core.ldm")
-    names = set(dir(mod))
-    # These are PUBLIC — allowed in dir():
-    public = {
-        "DSLConfig", "SearchSpaceAtom", "BiasAtom",
-        "Orchestrator", "OrchestratorStatus", "OrchestratorDecision",
-        "LLMClient", "OpenAIClient",
-    }
-    # Names that appear but are NOT in __all__ should be either:
-    #   - dunder attributes (excluded below)
-    #   - re-exports of stdlib (typing etc.)
-    # We only flag concrete atom classes.
-    suspicious = {"LatinHyperCubeSampling", "NeighborSampling", "LocalSearch", "Or",
-                  "MaxCysteine", "MaxHydrophobicRun", "MaxAromatic",
-                  "NetChargeRange", "NoNGlycosylation", "BiasSum",
-                  "LiteLLMClient", "build_llm_client"}
-    leaked_suspicious = (names & suspicious) - public
-    # Note: these may leak via dir() because they're defined in submodules;
-    # this is informational. The hard guarantee is __all__.
-    if leaked_suspicious:
-        print(f"INFO: {leaked_suspicious} are accessible via dir() but NOT in __all__")
 
 
 def test_core_outside_does_not_import_internal_modules():

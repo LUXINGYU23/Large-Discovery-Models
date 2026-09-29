@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import warnings
-from typing import Optional, Tuple, Any
+from typing import Optional, Any, Literal
 
 import numpy as np
-import torch.nn.functional
+import torch
 from botorch.fit import fit_gpytorch_model
-from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
 from gpytorch.constraints import Interval
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import ScaleKernel, RBFKernel, CosineKernel, MaternKernel
@@ -17,7 +15,7 @@ from gpytorch.models import ExactGP
 
 from tasks.antibody.core import CategoricalOverlap, TransformedCategorical, OrdinalKernel, FastStringKernel
 from tasks.antibody.core.kernels import BERTWarpRBF, BERTWarpCosine
-from tasks.antibody.core.localbo_utils import SEARCH_STRATS
+SEARCH_STRATS = Literal['glocal', 'local', 'local-no-hamming', 'batch_local', 'global']
 
 
 def identity(x: Any) -> Any:
@@ -47,84 +45,6 @@ class GP(ExactGP):
 
     def __call__(self, *args, **kwargs) -> MultivariateNormal:
         return super().__call__(*[self.transform_inputs(input_point) for input_point in args], **kwargs)
-
-    def dmu_dphi(self, num_cats: int, xs: Optional[torch.Tensor] = None) -> torch.Tensor:
-        if self.prediction_strategy is None:
-            warnings.warn("Warning: model was not in eval mode. It is now.")
-            self.eval()
-            self(self.train_inputs[0])
-        if xs is None:
-            xs = self.train_inputs[0]
-
-        # convert to features --> one-hot encoding
-        one_hot_xs: torch.Tensor = torch.nn.functional.one_hot(xs.to(torch.int64), num_classes=num_cats).float()
-        one_hot_xs.requires_grad_()
-
-        one_hot_xtrain: torch.Tensor = torch.nn.functional.one_hot(self.train_inputs[0].to(torch.int64),
-                                                                   num_classes=num_cats).float()
-
-        # K^-1 y_train
-        alpha = self.prediction_strategy.lik_train_train_covar.inv_matmul(self.train_targets.unsqueeze(-1))
-        dmu_dphi = []
-
-        for one_hot_x in one_hot_xs:
-            # compute jacobian of K(xs, x_train)
-            outputscales: torch.Tensor = self.covar_module.outputscale
-            outputscales = outputscales.flatten()
-            dk_dphi = torch.autograd.functional.jacobian(
-                func=lambda x: self.covar_module.base_kernel.forward_one_hot(x.unsqueeze(0), one_hot_xtrain).mul(
-                    outputscales).squeeze(0),
-                inputs=one_hot_x)
-
-            dk_dphi = torch.permute(dk_dphi, dims=(*np.arange(1, dk_dphi.ndim), 0))
-
-            assert dk_dphi.shape == (*xs.shape[1:], num_cats, len(one_hot_xtrain)), (
-                dk_dphi.shape, (*xs.shape[1:], num_cats, len(one_hot_xtrain)))
-            dmu_dphi.append((dk_dphi @ alpha).detach().squeeze(-1))
-        dmu_dphi = torch.stack(dmu_dphi)
-        assert dmu_dphi.shape == (*xs.shape, num_cats), (dmu_dphi.shape, (*xs.shape, num_cats))
-        return dmu_dphi
-
-    def ag_ev_phi(self, num_cats: int, dmu_dphi: torch.Tensor = None, xs: torch.Tensor = None,
-                  n_samples_threshold: int = 10) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-
-        Parameters
-        ----------
-        num_cats: number of categories
-        dmu_dphi: matrix of partial derivatives d mu / d phi of shape (n_pts, n_dim, n_cats) --> compute it if None
-        xs: points for which derivatives have been computed --> assume it is the training points of the GP if None
-        n_samples_threshold: if number of samples having feature phi_ij is less than this threshold, AG_ij will be nan
-
-        Returns
-        -------
-        ag_phi: matrix of averaged gradient, shape (n_dim, n_categories). Can contain nan (see `n_samples_threshold`)
-        ev_phi: matrix of empirical variances, shape (n_dim, n_categories). Can contain nan (see `n_samples_threshold`)
-        """
-
-        if xs is None:
-            xs = self.train_inputs[0]
-        if dmu_dphi is None:
-            dmu_dphi = self.dmu_dphi(num_cats=num_cats, xs=xs)
-
-        # Here the one-hot encodings correspond to the phi
-        one_hot_xs: torch.Tensor = torch.nn.functional.one_hot(xs.to(torch.int64), num_classes=num_cats)
-
-        # average across samples (filtering samples containing the feature)
-        ag_phi: torch.Tensor = (dmu_dphi * one_hot_xs).sum(0) / one_hot_xs.sum(0)
-
-        # empirical variance
-        ev_phi = (dmu_dphi ** 2 * one_hot_xs).sum(0) / one_hot_xs.sum(0) - ag_phi ** 2
-
-        # set ag to nan for features observed only few times
-        ag_phi[one_hot_xs.sum(0) < n_samples_threshold] = np.nan
-        ev_phi[one_hot_xs.sum(0) < n_samples_threshold] = np.nan
-
-        assert ag_phi.shape == ev_phi.shape == (*xs.shape[1:], num_cats), (
-            ag_phi.shape, ev_phi.shape, (*xs.shape[1:], num_cats))
-
-        return ag_phi, ev_phi
-
 
 def train_gp(train_x: torch.tensor, train_y: torch.tensor, use_ard: bool, num_steps: int,
              kern: str = 'transformed_overlap', hypers: Optional[dict] = None, noise_variance: float = None,
@@ -257,48 +177,3 @@ def train_gp(train_x: torch.tensor, train_y: torch.tensor, use_ard: bool, num_st
     # Switch to eval mode
     model.eval()
     return model
-
-
-def load_mcmc_samples_to_model(_model, mcmc_samples) -> None:
-    """Load MCMC samples into GPyTorchModel."""
-    if "noise" in mcmc_samples:
-        _model.likelihood.noise_covar.noise = (
-            mcmc_samples["likelihood.noise_prior"]
-            .detach()
-            .clone()
-            .view(_model.likelihood.noise_covar.noise.shape)  # pyre-ignore
-            .clamp_min(MIN_INFERRED_NOISE_LEVEL)
-        )
-    _model.covar_module.base_kernel.lengthscale = (
-        mcmc_samples["covar_module.base_kernel.lengthscale_prior"]
-        .detach()
-        .clone()
-        .view(_model.covar_module.base_kernel.lengthscale.shape)  # pyre-ignore
-    )
-    _model.covar_module.outputscale = (  # pyre-ignore
-        mcmc_samples["covar_module.outputscale_prior"]
-        .detach()
-        .clone()
-        .view(_model.covar_module.outputscale.shape)
-    )
-    _model.mean_module.constant.data = (
-        mcmc_samples["mean_module.mean_prior"]
-        .detach()
-        .clone()
-        .view(_model.mean_module.constant.shape)  # pyre-ignore
-    )
-    if "c0" in mcmc_samples:
-        _model.input_transform._set_concentration(  # pyre-ignore
-            i=0,
-            value=mcmc_samples["c0"]
-            .detach()
-            .clone()
-            .view(_model.input_transform.concentration0.shape),  # pyre-ignore
-        )
-        _model.input_transform._set_concentration(
-            i=1,
-            value=mcmc_samples["c1"]
-            .detach()
-            .clone()
-            .view(_model.input_transform.concentration1.shape),  # pyre-ignore
-        )

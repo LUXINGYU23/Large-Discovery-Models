@@ -6,11 +6,13 @@ import numpy as np
 import pytest
 import torch
 
+from tasks.antibody.core.cdr_constraints import check_cdr_constraints, check_cdr_constraints_all
 from tasks.antibody.core.ldm.acquisition.parallel_search import (
     execute_atoms,
     execute_sampling_atoms,
     parallel_local_search,
 )
+from tasks.antibody.core.ldm.dsl.alphabet import AA_TO_IDX
 from tasks.antibody.core.ldm.dsl.search_space import (
     LatinHyperCubeSampling,
     LocalSearch,
@@ -22,6 +24,21 @@ from tasks.antibody.core.ldm.dsl.search_space import (
 CENTER = "ARDYGNYWYFD"
 DEVICE = torch.device("cpu")
 CONFIG = np.full(11, 20)
+
+
+@pytest.mark.parametrize(
+    ("sequence", "violations"),
+    [
+        ("ARDYGNYWYFD", (0, 0, 0)),
+        ("AAAAAAAAAAA", (1, 0, 0)),
+        ("RRRACFGHIKL", (0, 1, 0)),
+        ("ACDNSTFGHIK", (0, 0, 1)),
+    ],
+)
+def test_cdr_constraints_reject_repeat_charge_and_glycosylation(sequence, violations):
+    encoded = np.asarray([AA_TO_IDX[aa] for aa in sequence])
+    assert check_cdr_constraints_all(encoded) == violations
+    assert check_cdr_constraints(encoded) is (violations == (0, 0, 0))
 
 
 class FakeGP:
