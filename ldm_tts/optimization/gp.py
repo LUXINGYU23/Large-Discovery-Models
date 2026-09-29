@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from collections.abc import Mapping
 from typing import Any, Sequence
 
@@ -19,51 +18,17 @@ from ldm_tts.optimization.records import (
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 
 
-@dataclass(frozen=True)
-class SearchObservation:
-    """Compatibility scalar observation; new callers should use BOObservation."""
-
-    candidate_id: str
-    feature_vector: tuple[float, ...]
-    score: float
-
-    def to_bo(self, *, feature_version: str = "") -> BOObservation:
-        return BOObservation.scalar(
-            self.candidate_id,
-            self.score,
-            self.feature_vector,
-            feature_version=feature_version,
-        )
-
-
-@dataclass(frozen=True)
-class GPPrediction:
-    """Compatibility scalar prediction; new callers should use BOPrediction."""
-
-    mean: float
-    std: float
-    acquisition_score: float
-
-    def to_bo(self, candidate_id: str) -> BOPrediction:
-        return BOPrediction.scalar(
-            candidate_id,
-            mean=self.mean,
-            std=self.std,
-            acquisition_score=self.acquisition_score,
-        )
-
-
 class RBFGPSurrogate:
     """Standardized exact GP with a stable prior/fallback for sparse history.
 
     Scaling floors and the minimum fit size are fixed configuration, independent
-    of the residual mean. None floors preserve legacy std-plus-epsilon scaling;
+    of the residual mean. None floors use std-plus-epsilon scaling;
     explicit floors use max(measured std, floor).
     """
 
     def __init__(
         self,
-        observations: Sequence[BOObservation | SearchObservation],
+        observations: Sequence[BOObservation],
         *,
         lengthscale: float = 1.5,
         noise: float = 1.0e-4,
@@ -75,12 +40,7 @@ class RBFGPSurrogate:
         feature_scale_floor: float | None = None,
         target_scale_floor: float | None = None,
     ) -> None:
-        self.observations = [
-            item.to_bo(feature_version=feature_version)
-            if isinstance(item, SearchObservation)
-            else item
-            for item in observations
-        ]
+        self.observations = list(observations)
         for item in self.observations:
             if len(item.objectives) != 1:
                 raise ValueError("RBFGPSurrogate requires scalar BO observations")
@@ -142,16 +102,6 @@ class RBFGPSurrogate:
             return
         self.ready = True
         self.fit_status = "fitted"
-
-    def predict(self, vector: Sequence[float], *, beta: float = 1.0) -> GPPrediction:
-        """Return the legacy scalar prediction shape."""
-
-        prediction = self.predict_record("candidate", vector, beta=beta)
-        return GPPrediction(
-            prediction.scalar_mean,
-            prediction.scalar_std,
-            float(prediction.acquisition_score),
-        )
 
     def predict_record(
         self,
@@ -307,26 +257,6 @@ class RBFGPUCBSelector:
         )
 
 
-def select_max_ucb(
-    candidates: Sequence[tuple[str, Sequence[float]]],
-    surrogate: RBFGPSurrogate,
-    *,
-    beta: float = 1.0,
-) -> tuple[str, GPPrediction]:
-    """Return a deterministic highest-UCB candidate from a finite pool."""
-
-    if not candidates:
-        raise ValueError("cannot select from an empty candidate reservoir")
-    predictions = [
-        (candidate_id, surrogate.predict(vector, beta=beta))
-        for candidate_id, vector in candidates
-    ]
-    return max(
-        predictions,
-        key=lambda item: (item[1].acquisition_score, item[0]),
-    )
-
-
 def select_max_ucb_record(
     candidates: Sequence[tuple[str, Sequence[float]]],
     surrogate: RBFGPSurrogate,
@@ -355,10 +285,7 @@ def _rbf_kernel(left: np.ndarray, right: np.ndarray, lengthscale: float) -> np.n
 
 
 __all__ = [
-    "GPPrediction",
     "RBFGPUCBSelector",
     "RBFGPSurrogate",
-    "SearchObservation",
-    "select_max_ucb",
     "select_max_ucb_record",
 ]
