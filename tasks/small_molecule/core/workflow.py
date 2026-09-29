@@ -969,12 +969,6 @@ def best_observed(history, minimize: Sequence[bool]) -> dict[str, object] | None
     }
 
 
-def config_to_json(cfg: TiltedLDMCase2Config) -> dict[str, object]:
-    payload = dict(cfg.__dict__)
-    payload["gp_config"] = dict(cfg.gp_config.__dict__)
-    return payload
-
-
 def resolve_acquisition_weights(raw: str) -> tuple[float, float]:
     values = tuple(float(value.strip()) for value in str(raw).split(",") if value.strip())
     if len(values) != 2:

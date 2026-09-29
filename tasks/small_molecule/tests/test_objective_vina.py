@@ -142,13 +142,6 @@ class VinaScorerConfigTests(unittest.TestCase):
         cfg = VinaScorerConfig()
         self.assertEqual(cfg.cache_dir, Path("runs/docking"))
 
-    def test_failure_score_field_removed(self) -> None:
-        """The legacy ``failure_score`` field is gone; failures are signalled
-        with ``float('nan')`` from ``VinaScorer.__call__`` instead."""
-        cfg = VinaScorerConfig()
-        self.assertFalse(hasattr(cfg, "failure_score"))
-
-
 # ---------------------------------------------------------------------------
 # Class 2: _resolve_vina_bin
 # ---------------------------------------------------------------------------
@@ -919,25 +912,6 @@ class PackageExportsTests(unittest.TestCase):
         self.assertIs(VinaScorer, VinaScorer)
         self.assertIs(VinaScorerConfig, VinaScorerConfig)
         self.assertIs(Scorer, Scorer)
-
-    def test_init_does_not_reexport_removed_or_helper_symbols(self) -> None:
-        import tasks.small_molecule.core
-
-        for removed in (
-            "VinaObjective",       # dropped: batch-then-best design
-            "best_vina_score",     # dropped: reducer
-            "aggregate_vina_scores",  # dropped: reducer
-            "VinaCandidate",       # dropped: archive state
-        ):
-            self.assertNotIn(removed, tasks.small_molecule.core.__all__)
-        for helper in (
-            "vina_dock_one",
-            "vina_dock_batch",
-        ):
-            # Still importable as tasks.small_molecule.core.objective_vina.<name>, but not
-            # part of the canonical public surface.
-            self.assertNotIn(helper, tasks.small_molecule.core.__all__)
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

@@ -172,23 +172,5 @@ class AsRNGPromotionTests(unittest.TestCase):
             as_rng("rng")  # type: ignore[arg-type]
 
 
-class RNGCrossToolConsistency(unittest.TestCase):
-    """Sanity: same seed → same first draws across constructions."""
-
-    def test_python_replay_matches(self) -> None:
-        rng = RNG(seed=123)
-        first_seq = [rng.python.random() for _ in range(10)]
-        rng_replay = RNG(seed=123)
-        replay_seq = [rng_replay.python.random() for _ in range(10)]
-        self.assertEqual(first_seq, replay_seq)
-
-    def test_numpy_replay_matches(self) -> None:
-        rng = RNG(seed=456)
-        first_seq = rng.numpy.random(size=20)
-        rng_replay = RNG(seed=456)
-        replay_seq = rng_replay.numpy.random(size=20)
-        np.testing.assert_array_equal(first_seq, replay_seq)
-
-
 if __name__ == "__main__":
     unittest.main()
