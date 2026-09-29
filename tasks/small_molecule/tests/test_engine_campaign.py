@@ -455,7 +455,7 @@ def test_engine_artifacts_exist_for_mock_campaign(tmp_path):
 
 def test_workflow_entrypoint_uses_shared_campaign_and_checkpoint_resume(tmp_path, monkeypatch):
     from tasks.small_molecule.core import workflow
-    from ldm_tts.data import smallmol_irs_from_round_record
+    from tasks.small_molecule.core.data_ir import smallmol_irs_from_round_record
 
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
@@ -639,7 +639,8 @@ def test_tilted_selector_samples_by_tilted_probability(monkeypatch):
 
 @pytest.mark.parametrize("interruption", ["before_first", "after_first", "between_ir_and_sft"])
 def test_resume_repairs_interrupted_training_export(tmp_path, monkeypatch, interruption):
-    from ldm_tts.data import DataCollectionSink, smallmol_irs_from_round_record
+    from ldm_tts.data import DataCollectionSink
+    from tasks.small_molecule.core.data_ir import smallmol_irs_from_round_record
     from ldm_tts.data import collection
     from tasks.small_molecule.core import workflow
 
@@ -698,7 +699,8 @@ def test_resume_repairs_interrupted_training_export(tmp_path, monkeypatch, inter
 @pytest.mark.parametrize("break_at", [1, 2])
 def test_resume_repairs_partial_training_jsonl_tail(tmp_path, monkeypatch, target, break_at):
     import os
-    from ldm_tts.data import collection, render_record, smallmol_irs_from_round_record
+    from ldm_tts.data import collection, render_record
+    from tasks.small_molecule.core.data_ir import smallmol_irs_from_round_record
     from ldm_tts.data.ir import jdump
     from tasks.small_molecule.core import workflow
 

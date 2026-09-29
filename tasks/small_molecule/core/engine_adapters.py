@@ -527,7 +527,8 @@ def materialize_trajectory(
     atomic_json_write(run_dir / "summary.json", summary_payload)
 
     if sink is not None and getattr(sink, "enabled", False):
-        from ldm_tts.data import append_jsonl, render_record, smallmol_irs_from_round_record
+        from ldm_tts.data import append_jsonl, render_record
+        from tasks.small_molecule.core.data_ir import smallmol_irs_from_round_record
 
         paths = sink.paths
         ir_rows = load_jsonl(paths.ir_path, repair_incomplete_tail=True)
