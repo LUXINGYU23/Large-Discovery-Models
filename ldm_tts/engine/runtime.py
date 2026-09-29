@@ -31,6 +31,7 @@ from ldm_tts.optimization.records import (
     BOObservation,
     BOSelectionResult,
     SurrogateEncoder,
+    SurrogateVector,
 )
 
 
@@ -142,12 +143,23 @@ class LDMEngineState:
                 error=str(evaluation_payload.get("error", "")),
                 metadata=dict(evaluation_payload.get("metadata", {})),
             )
+            surrogate_payload = raw.get("surrogate")
+            surrogate = None
+            if surrogate_payload is not None:
+                if not isinstance(surrogate_payload, Mapping):
+                    raise ValueError("engine checkpoint surrogate must be an object")
+                surrogate = SurrogateVector(
+                    values=tuple(surrogate_payload["values"]),
+                    version=surrogate_payload["version"],
+                    source_id=surrogate_payload.get("source_id", ""),
+                    metadata=dict(surrogate_payload.get("metadata", {})),
+                )
             round_idx = raw.get("round_idx")
             observations.append(
                 Observation(
                     candidate=candidate,
                     evaluation=evaluation,
-                    surrogate=None,
+                    surrogate=surrogate,
                     round_idx=None if round_idx is None else int(round_idx),
                     metadata=dict(raw.get("metadata", {})),
                 )

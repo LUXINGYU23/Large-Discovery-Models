@@ -9,10 +9,11 @@ from tasks.alphabench.core.protocol import T3Protocol
 from tasks.alphabench.rebuild_report import rebuild
 
 
+@pytest.mark.parametrize("method", ["llm", "ldm"])
 @pytest.mark.parametrize("point", ["search", "validation", "test", "quality_set_frozen"])
-def test_process_death_after_durable_receipt_reuses_paid_work(tmp_path, point):
+def test_process_death_after_durable_receipt_reuses_paid_work(tmp_path, point, method):
     protocol = tmp_path / "protocol.json"
-    frozen = replace(T3Protocol(), cold_seed_count=0, rounds=1,
+    frozen = replace(T3Protocol(), method=method, cold_seed_count=0, rounds=1,
         evaluations=2, batch_size=2, factor_select_n=2).to_dict()
     protocol.write_text(json.dumps(frozen))
     script = r'''
