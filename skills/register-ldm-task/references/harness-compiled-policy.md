@@ -42,6 +42,10 @@ optimization policy in addition to the existing proposal Harness.
    Expose requested and effective evaluation batch sizes in `weight_context`
    when interpreting without-replacement selection. Those signals must not
    leak into the deployable mean features.
+   Derive session counts, minibatch sizes and occurrence rules from the actual
+   proposal configuration, not a second set of defaults. Keep these facts in
+   the task's weight context. Evaluate selection headroom under the task's
+   actual batch contract before expensive policy research.
 3. Wire the prior mean into the existing task surrogate as a residual GP:
    subtract the prior on the task-declared target scale, fit the unchanged GP,
    and add the prior back to query predictions. Kernel, variance, noise,
@@ -86,6 +90,12 @@ Declare scientific report paths in the task matrix's `policy_fields` and scalar
 aggregates in `policy_mean_fields`; do not add task metric names or scalarization
 to the shared reporter.
 Proposal profile count belongs to the task, not the shared policy lifecycle.
+
+Use established numerical routines for ties and undefined statistics. Pair
+frozen predictions with measurements by candidate identity and evaluation event;
+do not pool raw proposal frequencies across unrelated rounds. Distinguish
+historical development checks, prospective selected-point accuracy, and actual
+optimization benefit. Repeated draft selection can overfit the same holdouts.
 
 ## Artifact and fallback contract
 

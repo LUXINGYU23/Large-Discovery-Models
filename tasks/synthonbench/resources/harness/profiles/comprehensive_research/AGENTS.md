@@ -76,6 +76,20 @@ candidates are measured; the current turn states which mode applies.
 
 ## Construction and submission
 
+Load exact data from tool-returned `guest_file.path` with JSON in your scripts;
+the file is read-only and identified by SHA-256. An unfiltered
+`get_measured_history` exports the complete evaluated set; filters restrict the
+file's records but pagination restricts only the displayed response. Refresh
+this input after new measurements. Private notes, previous proposal files and
+compaction summaries cannot override current eligibility. Keep measured inputs
+separate from writable drafts; never use the output candidates.json as history.
+
+When a design compares against measured candidates, put their exact IDs in the
+optional `comparison_candidate_ids` array. Copy IDs programmatically from the
+history file; unknown references are rejected with their item index. Omit this
+field for a hypothesis without measured comparisons. Valid references establish
+identity, not the correctness of a claimed mechanism; verify actual differences.
+
 Use `list_synthon_reactions` and `search_synthon_space` to retrieve exact legal values.
 Every candidate has an official `reaction_id` and ordered `synthon_ids`, with
 one valid ID per reaction slot. Do not substitute free-form SMILES or invent IDs.
@@ -85,7 +99,7 @@ are useful for uncertainty, not mandatory for every final candidate.
 
 Write `/workspace/candidates.json` with code. Its only top-level field is
 `candidates`, an array of exactly the requested count. Each object contains
-exactly `reaction_id`, `synthon_ids`, `change_summary`, and `rationale`.
+`reaction_id`, `synthon_ids`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`.
 Each English note is one short sentence: what changed, and the testable
 hypothesis, expected effect, or control purpose. Identify a measured comparison
 by candidate ID when applicable. Detailed calculations and citations stay in

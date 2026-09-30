@@ -69,6 +69,7 @@ class IronMindOptimizationPolicyAdapter:
         acquisition_beta: float,
         default_alpha: float,
         default_eta: float,
+        proposal_sampling: Mapping[str, Any],
         enabled_capabilities: Sequence[str] = ("prior_mean@1", "ldm_weights@1"),
     ) -> None:
         if seed < 0:
@@ -77,6 +78,7 @@ class IronMindOptimizationPolicyAdapter:
             raise ValueError("Iron Mind policy acquisition beta must be non-negative")
         self.schema = schema
         self.seed = seed
+        self.proposal_sampling = dict(proposal_sampling)
         self.acquisition_beta = float(acquisition_beta)
         self._contract = PolicyCapabilityContract(
             task_id=TASK_ID,
@@ -180,6 +182,7 @@ class IronMindOptimizationPolicyAdapter:
                 "target_scale": target_scale,
             },
             "weight_context": {
+                "proposal_sampling": self.proposal_sampling,
                 "seed": self.seed,
                 "history_size": len(history),
                 "unique_candidate_count": len(candidates),

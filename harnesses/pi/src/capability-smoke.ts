@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PiSessionPool } from "./session.js";
-import { type InitializeFrame } from "./protocol.js";
+import { type InitializeFrame, TurnExecutionError } from "./protocol.js";
 import { SIDECAR_RELEASE_VERSION } from "./release.js";
 import { canonicalSha256, sha256 } from "./trace.js";
 import { configureGuestCache } from "./guest-image.js";
@@ -55,12 +55,12 @@ function textEvents(index: number, text: string): unknown[] {
 	];
 }
 
-function failureEvents(index: number, message: string): unknown[] {
+function failureEvents(index: number, message: string, code = "upstream_error"): unknown[] {
 	const response = {
 		id: `resp_${index}`,
 		status: "failed",
 		output: [],
-		error: { code: "upstream_error", message },
+		error: { code, message },
 	};
 	return [
 		{ type: "response.created", response: { ...response, status: "in_progress", error: null } },
@@ -75,7 +75,8 @@ function writeEvents(response: import("node:http").ServerResponse, events: unkno
 }
 
 async function main(): Promise<void> {
-	const command = parseTaskGuestCommand(process.argv.slice(2));
+	const solPi = process.argv.includes("--sol-pi");
+	const command = parseTaskGuestCommand(process.argv.slice(2).filter((arg) => arg !== "--sol-pi"));
 	const cacheRoot = configureGuestCache(command.cacheDir);
 	process.env.TMPDIR = join(cacheRoot, "runtime-overlays");
 	await Promise.all([
@@ -93,6 +94,12 @@ async function main(): Promise<void> {
 		let body = "";
 		for await (const chunk of request) body += chunk.toString();
 		requestBodies.push(body);
+		if (solPi) {
+			const tools = JSON.parse(body).tools as Array<{ name: string; parameters: { properties: Record<string, unknown> } }>;
+			assert(tools.some((tool) => tool.name === "obs_recall"));
+			assert(tools.some((tool) => tool.name === "update_plan"));
+			assert(tools.find((tool) => tool.name === "write")?.parameters.properties.then_run);
+		}
 		call += 1;
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
@@ -101,9 +108,12 @@ async function main(): Promise<void> {
 				provider: "auto",
 			})));
 		} else if (call === 2) {
-			writeEvents(response, toolEvents(call, "bash", JSON.stringify({
+			const check = {
 				command: "if printf 'tamper' >> .ldm-resources/skills/0/capability-smoke/SKILL.md 2>/dev/null; then exit 9; fi; if command -v wget >/dev/null; then wget -qO- -T 15 https://example.com >/dev/null; elif command -v curl >/dev/null; then curl -fsS --max-time 15 https://example.com >/dev/null; else exit 8; fi; printf 'sandbox-network-ok' > proof.txt; cat proof.txt",
-			})));
+			};
+			writeEvents(response, toolEvents(call, solPi ? "write" : "bash", JSON.stringify(solPi
+				? { path: "/workspace/proof.txt", content: "pending", then_run: check }
+				: check)));
 		} else if (call === 3) {
 			writeEvents(response, toolEvents(call, "read", JSON.stringify({
 				path: "/workspace/.ldm-resources/skills/0/capability-smoke/SKILL.md",
@@ -123,6 +133,8 @@ async function main(): Promise<void> {
 		} else if (call === 8) {
 			writeEvents(response, failureEvents(call, "stream_read_error"));
 		} else if (call === 9) {
+			writeEvents(response, failureEvents(call, "An error occurred while processing your request.", "server_error"));
+		} else if (call === 10) {
 			writeEvents(response, toolEvents(call, "submit_research", JSON.stringify({
 				candidates: [{ reaction_id: "r3", synthon_ids: ["e", "f"] }, { reaction_id: "r4", synthon_ids: ["g", "h"] }],
 			})));
@@ -192,6 +204,10 @@ async function main(): Promise<void> {
 		wireApi: "responses",
 		model: "fake-responses-model",
 		thinking: "max",
+		...(solPi ? { solPi: {
+			version: 1, actionFusion: true, observationPack: true,
+			evidencePreservingReducer: true, onlineContextCompact: true, cacheWriteReadRatio: 50,
+		} } : {}),
 		taskId: recipe.taskId,
 		caseId: "local-smoke",
 		seed: 1,
@@ -221,7 +237,7 @@ async function main(): Promise<void> {
 		},
 		context7Enabled: true,
 	};
-	const pool = new PiSessionPool(config, secret);
+	let pool = new PiSessionPool(config, secret);
 	const validate = async (request: { turnId: string; attemptIndex: number }) => {
 		if (request.turnId === "capability_turn" && request.attemptIndex === 1) {
 			return {
@@ -259,7 +275,7 @@ async function main(): Promise<void> {
 			inputDigest,
 			message: "Verify the sandbox with bash and read, then submit exactly two candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
-		}], validate);
+		}], validate, async () => true);
 		assert(turn);
 		assert.equal((turn.submission.candidates as unknown[]).length, 2);
 		assert.equal(turn.usage.providerCalls, 7);
@@ -273,15 +289,16 @@ async function main(): Promise<void> {
 		assert(requestBodies[0]?.includes("Invoke task and MCP tools directly"));
 		assert.equal(requestBodies[0]?.includes("task-local-skill-ok"), false);
 		assert(requestBodies[0]?.includes('"effort":"max"'));
+		const wireTools = JSON.parse(requestBodies[0]!).tools as Array<{
+			name: string; strict?: boolean; parameters: { required?: string[] };
+		}>;
+		const readTool = wireTools.find((tool) => tool.name === "read");
+		assert.equal(readTool?.strict, false);
+		assert.equal(readTool?.parameters.required?.includes("offset"), false);
+		assert(wireTools.every((tool) => typeof tool.strict === "boolean"));
 		const payloads = requestBodies.map((body) => JSON.parse(body) as { tool_choice?: unknown });
 		assert.equal(payloads[0]?.tool_choice, "required");
-		const submissionChoice = { type: "function", name: "submit_research" };
-		assert.equal(payloads[1]?.tool_choice, undefined);
-		assert.equal(payloads[2]?.tool_choice, undefined);
-		assert.equal(payloads[3]?.tool_choice, undefined);
-		assert.equal(payloads[4]?.tool_choice, undefined);
-		assert.deepEqual(payloads[5]?.tool_choice, submissionChoice);
-		assert.equal(payloads[6]?.tool_choice, undefined);
+		assert(payloads.slice(1).every((payload) => payload.tool_choice === undefined));
 
 		const recoveryInput = {
 			profileId: "target_sar",
@@ -294,27 +311,37 @@ async function main(): Promise<void> {
 			message: "Submit exactly two more candidates.",
 			forbiddenQueryTerms: ["candidate-secret-id"],
 		};
-		const [recovered] = await pool.runTurns([recoveryInput], validate);
+		await assert.rejects(pool.runTurns([recoveryInput], validate, async () => true), (error: unknown) => {
+			assert.ok(error instanceof TurnExecutionError);
+			assert.equal(error.retryable, true);
+			assert.match(error.message, /server_error/);
+			assert.equal(error.turnUsage[0]?.usage.providerCalls, 2);
+			return true;
+		});
+		const [recovered] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert(recovered);
 		assert.equal((recovered.submission.candidates as unknown[]).length, 2);
-		assert.equal(recovered.usage.providerCalls, 3);
-		assert.deepEqual((JSON.parse(requestBodies[8] as string) as { tool_choice?: unknown }).tool_choice, submissionChoice);
-		const [replayed] = await pool.runTurns([recoveryInput], validate);
+		assert.equal(recovered.usage.providerCalls, 4);
+		assert.equal((JSON.parse(requestBodies[7] as string) as { tool_choice?: unknown }).tool_choice, "required");
+		assert.equal((JSON.parse(requestBodies[8] as string) as { tool_choice?: unknown }).tool_choice, undefined);
+		const [replayed] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert(replayed);
 		assert.equal(replayed.submissionDigest, recovered.submissionDigest);
 		assert.equal(replayed.replayed, true);
-		assert.equal(call, 10);
+		assert.equal(call, 11);
 		await assert.rejects(
 			pool.runTurns(
 				[{ ...recoveryInput, turnId: "cursor_mismatch", inputDigest: sha256("cursor-mismatch") }],
 				validate,
+				async () => true,
 			),
 			/history cursor mismatch/,
 		);
 
 
-		const sessionFiles = await readdir(join(root, "harness", "sessions", "target_sar", "pi-session"));
-		assert.equal(sessionFiles.filter((name) => name.endsWith(".jsonl")).length, 1);
+		const sessionFiles = (await readdir(join(root, "harness", "sessions", "target_sar", "pi-session")))
+			.filter((name) => name.endsWith(".jsonl"));
+		assert.equal(sessionFiles.length, 1);
 		const session = await readFile(join(root, "harness", "sessions", "target_sar", "pi-session", sessionFiles[0] as string), "utf8");
 		const readResults = session
 			.trim()
@@ -363,12 +390,24 @@ async function main(): Promise<void> {
 
 		const recoveryRoot = join(root, "harness", "sessions", "target_sar", "turns", "capability_recovery_turn");
 		const recoveryIndex = await readFile(join(recoveryRoot, "provider_index.jsonl"), "utf8");
-		assert.equal(recoveryIndex.trim().split("\n").length, 3);
+		assert.equal(recoveryIndex.trim().split("\n").length, 4);
 		const recoveryArtifacts = await readdir(join(recoveryRoot, "provider"));
-		assert.equal(recoveryArtifacts.filter((name) => name.endsWith(".request.bin")).length, 3);
-		assert.equal(recoveryArtifacts.filter((name) => name.endsWith(".response.bin")).length, 3);
+		assert.equal(recoveryArtifacts.filter((name) => name.endsWith(".request.bin")).length, 4);
+		assert.equal(recoveryArtifacts.filter((name) => name.endsWith(".response.bin")).length, 4);
 		assert.doesNotMatch(session, new RegExp(secret));
 		assert.doesNotMatch(providerIndex, new RegExp(secret));
+		const researchDirectory = join(root, "harness", "sessions", "target_sar", "workspace", ".ldm-resources", "research");
+		await mkdir(researchDirectory, { recursive: true });
+		const dataPath = join(researchDirectory, "observations.json");
+		await writeFile(dataPath, '{"observations":[]}');
+		await pool.close();
+		pool = new PiSessionPool(config, secret);
+		await pool.initialize();
+		const [resumed] = await pool.runTurns([recoveryInput], validate, async () => true);
+		assert.equal(resumed?.sessionId, recovered.sessionId);
+		assert.equal(resumed?.replayed, true);
+		assert.equal(await readFile(dataPath, "utf8"), '{"observations":[]}');
+		assert.equal(call, 11);
 		process.stdout.write(`${JSON.stringify({ status: "ok", providerCalls: call, sessionEntries: session.trim().split("\n").length })}\n`);
 	} finally {
 		await pool.close();

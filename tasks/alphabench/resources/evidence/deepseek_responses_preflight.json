@@ -1,0 +1,29 @@
+{
+  "endpoint": "https://api.deepseek.com/responses",
+  "latency_seconds": 1.1,
+  "max_output_tokens": 4096,
+  "model": "deepseek-flash",
+  "qualification": "provider_development_preflight_only",
+  "reasoning_effort": "max",
+  "reasoning_present": true,
+  "reply_ok": true,
+  "request_count": 1,
+  "request_limit": 1,
+  "response_model": "deepseek-flash",
+  "response_nonempty": true,
+  "response_sha256": "53691281298272fdae364f45c50f75aedacbcc10972d811f3033783bf31d9975",
+  "state": "completed",
+  "status": "completed",
+  "usage": {
+    "input_tokens": 35,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 76,
+    "output_tokens_details": {
+      "reasoning_tokens": 74
+    },
+    "total_tokens": 111
+  },
+  "wire_api": "responses"
+}

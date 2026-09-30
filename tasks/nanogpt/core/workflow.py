@@ -55,8 +55,8 @@ from tasks.nanogpt.core.expansion_schema import (
     load_operation_schema,
     normalize_operation_numeric,
     normalize_operation_parameter,
-    operation_feature_dim,
-    operation_feature_version,
+    operation_representation_dimension,
+    operation_representation_version,
     operation_parameter_from_payload,
     operation_parameter_to_json,
     operation_schema_to_json,
@@ -558,7 +558,7 @@ class OperationSearchEngine(SearchEngine):
             "state_id": state_id,
             "active_feature_count": len(self.operation_schema.parameters),
             "active_feature_names": list(self.operation_schema.parameters),
-            "feature_version": operation_feature_version(self.operation_schema),
+            "feature_version": operation_representation_version(self.operation_schema),
         }
         self.expansion_history.append(record)
         self.args.operation_schema_object = self.operation_schema
@@ -1346,14 +1346,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--operation-surrogate",
-        "--operation-features",
         dest="operation_features",
         action="store_true",
         help="Represent candidates for the surrogate through the active expansion schema.",
     )
     parser.add_argument(
         "--initial-expansion-parameters",
-        "--initial-operation-features",
         dest="initial_operation_features",
         default="5",
         help=(
@@ -1363,7 +1361,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-expansion-parameters",
-        "--max-active-operation-features",
         dest="max_active_operation_features",
         type=int,
         default=0,
@@ -1371,7 +1368,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--disable-expansion-schema-updates",
-        "--disable-feature-expansion",
         dest="allow_feature_expansion",
         action="store_false",
         help="Keep the initial reservoir expansion schema fixed.",
@@ -1379,7 +1375,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.set_defaults(allow_feature_expansion=True)
     parser.add_argument(
         "--allow-new-expansion-parameters",
-        "--allow-new-feature-specs",
         dest="allow_new_feature_specs",
         action="store_true",
         help=(
@@ -1483,7 +1478,7 @@ async def async_main(argv: list[str] | None = None) -> int:
         )
         logger.write(
             f"operation_full_schema version={operation_schema.version} "
-            f"path={operation_schema.path} feature_dim={operation_feature_dim(operation_schema)}"
+            f"path={operation_schema.path} feature_dim={operation_representation_dimension(operation_schema)}"
         )
     if resume_info is None or not buffer_snapshot_path.exists():
         sync_run_buffer(buffer_path, buffer_snapshot_path)
@@ -1553,7 +1548,7 @@ async def async_main(argv: list[str] | None = None) -> int:
         logger.write(
             f"operation_active_schema version={engine.operation_schema.version} "
             f"features={list(engine.operation_schema.parameters)} "
-            f"feature_dim={operation_feature_dim(engine.operation_schema)}"
+            f"feature_dim={operation_representation_dimension(engine.operation_schema)}"
         )
     ldm_task_spec = describe_ldm_task(
         args,
@@ -1587,7 +1582,7 @@ async def async_main(argv: list[str] | None = None) -> int:
     if isinstance(engine, OperationSearchEngine):
         def progress_feature_status() -> str:
             schema = engine.operation_schema
-            return f"feature_dim={len(schema.parameters)} gp_dim={operation_feature_dim(schema)}"
+            return f"feature_dim={len(schema.parameters)} gp_dim={operation_representation_dimension(schema)}"
 
     progress = ModelBasedProgress(
         enabled=not args.no_progress,
@@ -1776,11 +1771,11 @@ async def async_main(argv: list[str] | None = None) -> int:
     if isinstance(engine, OperationSearchEngine):
         summary_args["operation_schema_version"] = engine.operation_schema.version
         summary_args["operation_schema_path"] = None if engine.full_operation_schema.path is None else str(engine.full_operation_schema.path)
-        summary_args["operation_feature_version"] = operation_feature_version(engine.operation_schema)
+        summary_args["operation_feature_version"] = operation_representation_version(engine.operation_schema)
         summary_args["operation_full_schema_version"] = engine.full_operation_schema.version
         summary_args["operation_schema_feature_names"] = list(engine.operation_schema.parameters)
         summary_args["operation_schema_feature_count"] = len(engine.operation_schema.parameters)
-        summary_args["operation_schema_feature_dim"] = operation_feature_dim(engine.operation_schema)
+        summary_args["operation_schema_feature_dim"] = operation_representation_dimension(engine.operation_schema)
         summary_args["buffer_projection_mode"] = "reproject_jsonl_rows_to_active_operation_schema"
         summary_args["operation_feature_expansions"] = list(engine.expansion_history)
     summary_args["run_name"] = run_name
@@ -2135,7 +2130,7 @@ class SurrogateSearchAdapter:
     def _refresh_operation_features(self) -> None:
         if not isinstance(self.engine, OperationSearchEngine) or not self.surrogate.entries:
             return
-        current_dim = operation_feature_dim(self.engine.operation_schema)
+        current_dim = operation_representation_dimension(self.engine.operation_schema)
         first_dim = len(self.surrogate.entries[0].feature_vector)
         if first_dim != current_dim:
             self.surrogate.entries = project_buffer_entries(
@@ -2533,14 +2528,14 @@ def score_with_surrogate(
 def surrogate_feature_dim(args: argparse.Namespace, schema: OperationSchema | None) -> int:
     if use_operation_features(args, schema):
         assert schema is not None
-        return operation_feature_dim(schema)
+        return operation_representation_dimension(schema)
     return feature_dim(args.hash_dims)
 
 
 def feature_version_for_args(args: argparse.Namespace, schema: OperationSchema | None) -> str:
     if use_operation_features(args, schema):
         assert schema is not None
-        return operation_feature_version(schema)
+        return operation_representation_version(schema)
     return FEATURE_VERSION
 
 
@@ -2750,7 +2745,7 @@ def describe_ldm_task(
         max_active = int(getattr(args, "max_active_operation_features", 0) or 0)
         if full_schema is not None and max_active <= 0:
             max_active = len(full_schema.parameters)
-        full_dimension = None if full_schema is None else operation_feature_dim(full_schema)
+        full_dimension = None if full_schema is None else operation_representation_dimension(full_schema)
         inactive_names = (
             []
             if full_schema is None
@@ -2780,7 +2775,7 @@ def describe_ldm_task(
             kind="vector",
             representation="normalized numeric and one-hot expansion-schema parameters",
             dimension_policy="evolving" if expansion_available else "fixed",
-            dimension=operation_feature_dim(active_schema),
+            dimension=operation_representation_dimension(active_schema),
             encoder="tasks.nanogpt.core.workflow.featurize_operation_params",
             version=active_schema.version,
             metadata={
@@ -3121,13 +3116,6 @@ def compact_operation_message_for_log(message: dict[str, Any]) -> dict[str, Any]
 
 
 OPERATION_TOOL_NAMES = {"propose_train_operations", "propose_operation_feature"}
-
-
-def extract_operation_json_from_text(text: str) -> dict[str, Any] | None:
-    _tool_name, payload = extract_operation_tool_payload_from_text(text)
-    if isinstance(payload, dict):
-        return payload
-    return None
 
 
 def extract_dynamic_operation_json_from_text(text: str) -> tuple[str, dict[str, Any] | None]:
@@ -4258,8 +4246,8 @@ def project_buffer_entries(
     args: argparse.Namespace,
 ) -> list[BufferEntry]:
     projected: list[BufferEntry] = []
-    expected_dim = operation_feature_dim(schema)
-    expected_version = operation_feature_version(schema)
+    expected_dim = operation_representation_dimension(schema)
+    expected_version = operation_representation_version(schema)
     for entry in entries:
         features = features_for_buffer_entry(entry, schema, args)
         if features is None:
@@ -4308,8 +4296,8 @@ def features_for_buffer_entry(
             pass
     if isinstance(entry.params, dict) and entry.params:
         return featurize_operation_params(entry.params, schema, source_hash=entry.source_hash)
-    expected_version = operation_feature_version(schema)
-    if entry.feature_version == expected_version and len(entry.feature_vector) == operation_feature_dim(schema):
+    expected_version = operation_representation_version(schema)
+    if entry.feature_version == expected_version and len(entry.feature_vector) == operation_representation_dimension(schema):
         return Features(vector=list(entry.feature_vector), params=dict(entry.params), source_hash=entry.source_hash)
     return None
 
@@ -4520,20 +4508,6 @@ def format_gp_progress(summary: dict[str, Any]) -> str:
     if best is not None:
         parts.append(f"best={best:.6g}")
     return " ".join(parts)
-
-
-def format_optional_float(value: Any) -> str:
-    number = as_float(value)
-    return "-" if number is None else f"{number:.6g}"
-
-
-def format_score_delta(score: float | None, previous_best: float | None, minimize: bool) -> str:
-    if score is None or previous_best is None or not finite_score(score) or not finite_score(previous_best):
-        return "-"
-    delta = float(score) - float(previous_best)
-    improved = is_better(score, previous_best, minimize=minimize)
-    sign = "+" if delta >= 0 else ""
-    return f"{sign}{delta:.6g}{' improved' if improved else ''}"
 
 
 def surrogate_sort_key(state: SearchState) -> tuple[float, int, str]:
@@ -4849,15 +4823,10 @@ def explicit_options_from_argv(argv: list[str]) -> set[str]:
         "--operation-schema": "operation_schema",
         "--operation-retries": "operation_retries",
         "--max-operations-per-step": "max_operations_per_step",
-        "--operation-features": "operation_features",
         "--operation-surrogate": "operation_features",
-        "--initial-operation-features": "initial_operation_features",
         "--initial-expansion-parameters": "initial_operation_features",
-        "--max-active-operation-features": "max_active_operation_features",
         "--max-expansion-parameters": "max_active_operation_features",
-        "--disable-feature-expansion": "allow_feature_expansion",
         "--disable-expansion-schema-updates": "allow_feature_expansion",
-        "--allow-new-feature-specs": "allow_new_feature_specs",
         "--allow-new-expansion-parameters": "allow_new_feature_specs",
         "--mock-expand-every": "mock_expand_every",
         "--surrogate-mode": "surrogate_mode",

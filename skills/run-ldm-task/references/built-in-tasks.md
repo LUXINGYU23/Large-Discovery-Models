@@ -9,6 +9,7 @@
 - [Iron Mind](#iron-mind)
 - [SynthonBench](#synthonbench)
 - [NucleoBench](#nucleobench)
+- [Other Registered Tasks](#other-registered-tasks)
 
 ## Common Rules
 
@@ -36,9 +37,7 @@ historical trajectory files from engine events:
 - `antibody`: `results.csv`, `llm_acq_decisions.jsonl`, and legacy summary
   fields merged into `summary.json`.
 
-Resume goes through the engine checkpoint (`checkpoint.json`); `small_molecule`
-additionally accepts a legacy `history.json`/`rounds.jsonl` directory when no
-campaign manifest exists.
+Resume goes through the engine checkpoint (`checkpoint.json`) in the campaign directory.
 
 When a config selects `contract_profile`, do not override locked budget or
 method arguments. Use a checked-in smoke profile, or follow a task README that
@@ -59,6 +58,18 @@ Resolve the direct proposal wire API from the task config: Iron Mind and
 SynthonBench use Chat Completions; NucleoBench also supports Responses.
 The Pi sidecar uses Responses and must be checked through its documented
 capability smoke.
+
+## Other Registered Tasks
+
+The following adapters use the same registration and shared-runner contracts,
+but their task-local guides are the authoritative source for setup and runtime
+requirements:
+
+- [Adaptive KV-cache quantization](../../../tasks/llm_kv_adaptive_quantization/README.md)
+- [AI4Bio mutation-effect prediction](../../../tasks/ai4bio_mutation_effect_prediction/README.md)
+- [Discrete causal discovery](../../../tasks/causal_discovery_discrete/README.md)
+- [AtomWorld](../../../tasks/atomworld/README.md)
+- [ReaSyn](../../../tasks/reasyn/README.md)
 
 ## nanoGPT
 

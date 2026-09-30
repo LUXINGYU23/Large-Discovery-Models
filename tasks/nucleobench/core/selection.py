@@ -22,9 +22,13 @@ from ldm_tts.optimization import (
 from tasks.nucleobench.core.constants import NUCLEOBENCH_Q0_METADATA_KEY
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBSelector
 from tasks.nucleobench.core.optimization_policy import NucleoOptimizationPolicyAdapter
+from tasks.nucleobench.resources.harness.policy_diagnostics import (
+    robust_z_values,
+    softmax_logits,
+    tilt_log_weights,
+)
 
 EPSILON = 1.0e-12
-MAD_SCALE = 1.4826
 
 
 @dataclass(frozen=True)
@@ -230,7 +234,7 @@ class AcquisitionTiltedSelector:
             dtype=float,
         )
         normalized = _robust_z(acquisition, self.config.z_clip)
-        logits = alpha * np.log(q0 + EPSILON) + eta * normalized
+        logits = tilt_log_weights(q0, normalized, alpha, eta, EPSILON)
         probabilities = _softmax(logits)
         selection_seed = _candidate_set_seed(
             self.config.seed,
@@ -453,18 +457,13 @@ def _ranking_overlap(
 
 
 def _robust_z(values: np.ndarray, clip: float) -> np.ndarray:
-    median = float(np.median(values))
-    scale = MAD_SCALE * float(np.median(np.abs(values - median)))
-    if scale <= EPSILON:
-        scale = float(np.std(values))
-    if scale <= EPSILON:
-        return np.zeros_like(values)
-    return np.clip((values - median) / (scale + EPSILON), -clip, clip)
+    if not np.asarray(values).size:
+        return np.asarray(values, dtype=float)
+    return robust_z_values(values, clip, EPSILON)
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
-    exponentials = np.exp(logits - float(np.max(logits)))
-    return exponentials / float(exponentials.sum())
+    return softmax_logits(logits)
 
 
 def _gumbel_top_k(

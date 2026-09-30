@@ -189,7 +189,7 @@
       "sequence_length": 196608,
       "editable_position_count": 256,
       "max_seconds": 43200,
-      "state": "prepared"
+      "state": "qualified"
     }
   ]
 }

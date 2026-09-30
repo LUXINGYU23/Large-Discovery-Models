@@ -90,6 +90,7 @@ def _candidate(
 def _adapter(features: SynthonPolicyFeatureEncoder) -> SynthonOptimizationPolicyAdapter:
     return SynthonOptimizationPolicyAdapter(
         features,
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         target="kif11",
         seed=7,
         acquisition_beta=1.0,

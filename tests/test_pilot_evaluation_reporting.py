@@ -80,6 +80,16 @@ def test_harness_receives_its_own_baseline_verdict() -> None:
     assert result["cases"][0]["ldm_harness_compiled_seed_wins"] == 3
 
 
+def test_partial_matrix_reports_scores_without_an_incomplete_baseline_verdict() -> None:
+    rows = [{"case": "case", "method": method, "seed": seed, "round_auc": 1.0}
+            for seed in (42, 43) for method in ("bo", "harness")]
+    aggregates = [{"case": "case", "method": method, "mean_round_auc": 1.0,
+                   "mean_final_best": 1.0} for method in ("bo", "harness")]
+    result = _verdict(rows, aggregates, "maximize")
+    assert result["cases"] == [{"case": "case"}]
+    assert result["aggregates"] == aggregates
+
+
 def test_harness_methods_have_distinct_release_labels_and_budget_semantics() -> None:
     spec = SimpleNamespace(
         methods=("ldm_harness", "ldm_harness_compiled", "harness"),

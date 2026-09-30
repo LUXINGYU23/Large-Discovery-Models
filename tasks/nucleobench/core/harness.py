@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
+    HarnessError,
     HarnessProfile,
     HarnessSubmissionContract,
     HarnessSubmissionError,
@@ -41,6 +44,8 @@ from tasks.nucleobench.core.proposals import attach_empirical_base_measure
 from tasks.nucleobench.core.constants import TASK_ID
 from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
 from tasks.nucleobench.core.research import serialize_measured_observations, summarize_measured_observations, write_measured_history
+from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
+from tasks.nucleobench.core.surrogate_query import write_surrogate_snapshot
 
 HARNESS_PROFILE_IDS = (
     "target_biology",
@@ -72,6 +77,7 @@ HARNESS_FORBIDDEN_TERMS = (
     "move37-labs/nucleobench",
 )
 HARNESS_TOOL_NAMES = (
+    "compile_candidate_panel",
     "get_task_context",
     "get_measured_history",
     "get_sequence_window",
@@ -174,14 +180,21 @@ def _profile(profile_id: str, *, session_id: str | None = None) -> HarnessProfil
     )
 
 
-def harness_tool_extensions() -> tuple[HarnessToolExtension, ...]:
-    return (
+def harness_tool_extensions(*, surrogate_query: bool = False) -> tuple[HarnessToolExtension, ...]:
+    extensions = (
         HarnessToolExtension(
             Path("/resources/tools/sequence_context.mjs"),
             file_sha256(_LOCAL_TOOL_PATH),
             HARNESS_TOOL_NAMES,
         ),
     )
+    if surrogate_query:
+        extensions += (HarnessToolExtension(
+            Path("/resources/tools/query_surrogate.mjs"),
+            file_sha256(_LOCAL_RESOURCE_ROOT / "tools/query_surrogate.mjs"),
+            ("query_surrogate",),
+        ),)
+    return extensions
 
 
 def harness_guest_runtime() -> PiGuestRuntime:
@@ -203,8 +216,9 @@ class NucleoBenchHarnessExpander:
         attach_empirical_q0: bool,
         allow_repeated_occurrences: bool,
         artifact_root: Path,
-        account: Callable[[dict[str, int]], None] | None = None,
+        account: Callable[..., Any] | None = None,
         benchmark_clock: BenchmarkClock | None = None,
+        surrogate_query_config: HammingGPUCBConfig | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("NucleoBench harness requires at least one profile")
@@ -226,6 +240,7 @@ class NucleoBenchHarnessExpander:
         self.artifact_root = artifact_root.resolve()
         self.account = account
         self.benchmark_clock = benchmark_clock
+        self.surrogate_query_config = surrogate_query_config
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -244,26 +259,41 @@ class NucleoBenchHarnessExpander:
                 {
                     "proposal_attempts": len(turns),
                     "harness_turns": len(turns),
-                }
+                },
+                usage_key=f"harness:round:{request.round_idx}",
             )
-        results = self.client.run_turn(
-            turns,
-            recovery_timeout_seconds=(
-                float(self.benchmark_clock.snapshot()["remaining_seconds"])
-                if self.benchmark_clock is not None
-                else float(self.client.config.limits.wall_time_seconds)
-            ),
-            submission_validator=lambda submission: _validate_submission(
-                submission,
-                self.domain.context,
-                evaluated,
-                artifact_root=self.artifact_root,
-                candidate_count=self.candidates_per_profile,
-                allow_repeated_occurrences=self.allow_repeated_occurrences,
-            ),
-        )
-        if self.account is not None:
-            self.account(_usage_counts(results))
+        started = time.perf_counter()
+        usage_by_profile: dict[str, Mapping[str, Any]] = {}
+        try:
+            results = self.client.run_turn(
+                turns,
+                recovery_timeout_seconds=(
+                    float(self.benchmark_clock.snapshot()["remaining_seconds"])
+                    if self.benchmark_clock is not None
+                    else 2.0 * self.client.config.limits.wall_time_seconds
+                ),
+                submission_validator=lambda submission: _validate_submission(
+                    submission,
+                    self.domain.context,
+                    evaluated,
+                    measured_candidate_ids={item.candidate_id for item in request.observations},
+                    artifact_root=self.artifact_root,
+                    candidate_count=self.candidates_per_profile,
+                    allow_repeated_occurrences=self.allow_repeated_occurrences,
+                ),
+            )
+            usage_by_profile = {result.profile_id: result.usage for result in results}
+        except HarnessError as exc:
+            usage_by_profile = exc.turn_usage
+            raise
+        finally:
+            if self.account is not None:
+                for turn in turns:
+                    self.account(
+                        _usage_counts(usage_by_profile.get(turn.profile_id, {})),
+                        usage_key=f"harness:{turn.turn_id}",
+                    )
+                self.account({"harness_wall_time_seconds": time.perf_counter() - started})
         sampling_mode = (
             "persistent_parallel_research_sessions"
             if self.attach_empirical_q0
@@ -301,6 +331,10 @@ class NucleoBenchHarnessExpander:
         history = _history_delta(request, self.first_active_round)
         serialized_history = serialize_measured_observations(history, self.domain.context)
         write_measured_history(self.artifact_root, request.observations, self.domain.context)
+        surrogate_query = (
+            write_surrogate_snapshot(request, self.domain.context, self.surrogate_query_config, self.artifact_root)
+            if self.surrogate_query_config is not None else None
+        )
         history_to_seq = len(request.observations)
         history_from_seq = history_to_seq - len(history)
         history_digest = canonical_sha256(serialized_history)
@@ -308,7 +342,7 @@ class NucleoBenchHarnessExpander:
         benchmark_time = (
             None if self.benchmark_clock is None else self.benchmark_clock.snapshot()
         )
-        return tuple(
+        turns = tuple(
             HarnessTurn(
                 profile_id=profile.profile_id,
                 turn_id=_turn_id(
@@ -328,6 +362,7 @@ class NucleoBenchHarnessExpander:
                     request,
                     candidate_count=self.candidates_per_profile,
                     observations=summarize_measured_observations(serialized_history),
+                    session_count=len(self.profiles),
                     allow_repeated_occurrences=self.allow_repeated_occurrences,
                     attach_empirical_q0=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
@@ -336,11 +371,31 @@ class NucleoBenchHarnessExpander:
                     history_digest=history_digest,
                     context=self.domain.context,
                     benchmark_time=benchmark_time,
+                    surrogate_query=surrogate_query,
                 ),
                 forbidden_query_terms=forbidden_query_terms,
             )
             for profile in self.profiles
         )
+        restored = []
+        for turn in turns:
+            input_path = self.artifact_root / "sessions" / turn.profile_id / "turns" / turn.turn_id / "input.json"
+            if input_path.exists():
+                saved = json.loads(input_path.read_text(encoding="utf-8"))
+                old_prefix, old_body = saved["message"].split("\n\n", 1)
+                prefix, body = turn.message.split("\n\n", 1)
+                old_payload, payload = json.loads(old_body), json.loads(body)
+                # Replay the original round clock, but reject changes to any task semantics.
+                if "benchmark_time" in payload and "benchmark_time" in old_payload:
+                    for name in ("elapsed_seconds", "remaining_seconds"):
+                        payload["benchmark_time"][name] = old_payload["benchmark_time"][name]
+                if prefix != old_prefix or payload != old_payload:
+                    raise ValueError(f"Persisted Harness turn message changed: {turn.turn_id}")
+                turn = replace(turn, message=saved["message"])
+                if turn.to_dict() != saved:
+                    raise ValueError(f"Persisted Harness turn identity changed: {turn.turn_id}")
+            restored.append(turn)
+        return tuple(restored)
 
     def _proposals(
         self,
@@ -469,6 +524,7 @@ def _turn_message(
     *,
     candidate_count: int,
     observations: Sequence[dict[str, object]],
+    session_count: int,
     allow_repeated_occurrences: bool,
     attach_empirical_q0: bool,
     initial: bool,
@@ -477,6 +533,7 @@ def _turn_message(
     history_digest: str,
     context: MutationContext,
     benchmark_time: dict[str, float | int] | None = None,
+    surrogate_query: dict[str, object] | None = None,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
@@ -517,6 +574,7 @@ def _turn_message(
             "description": "Concise results list IDs, utility and mutation count. Query by candidate IDs or round, sort by utility or recency, and page with next_offset. Use response_format=detailed to read exact patches and original design notes for selected IDs. Unmeasured proposals are not shared.",
         },
         "novelty_contract": {
+            "session_count": session_count,
             "evaluated_candidates_are_forbidden": True,
             "prior_unmeasured_submissions_may_be_reproposed": True,
             "required_not_evaluated_candidate_count": candidate_count,
@@ -527,6 +585,9 @@ def _turn_message(
         },
         "sequence_tools": list(HARNESS_TOOL_NAMES),
         "submission_contract": {
+            "optional_candidate_fields": {
+                "comparison_candidate_ids": "Exact measured IDs from get_measured_history; omit if no measured comparison applies.",
+            },
             "tool": "submit_candidates",
             "arguments": {"artifact_path": "candidates.json"},
             "file_format": {"candidates": [{
@@ -557,15 +618,28 @@ def _turn_message(
                 if allow_repeated_occurrences
                 else "Your minibatch must contain distinct rebuilt sequences. Reordering a patch does not create a new candidate. Cross-session agreement remains allowed."
             ),
-            "Build candidates.json with code and inspect counts and uniqueness without printing the entire array. Use validate_mutations for uncertain patches; submit_candidates validates the complete file.",
-            "Every candidate must include concise English change_summary and rationale strings. Name any comparison candidate explicitly. These notes are frozen before evaluation, do not affect candidate identity or q0, and must match the final patch after repairs. Keep detailed calculations and citations in your research notes.",
+            "Write your chosen edits as compact designs.json data and call compile_candidate_panel to construct candidates.json. Its registered description specifies placements and optional measured-parent IDs. Keep all intended designs in that input file; the tool preserves valid entries and reports rejected design indices. Reach the requested complete draft before optional extended analysis. Do not write a custom full-panel constructor. submit_candidates remains the final admission check.",
+            "Every candidate must include concise English change_summary and rationale strings. Use optional comparison_candidate_ids for exact measured references copied from get_measured_history's guest_file. Unknown references are rejected. Notes do not affect identity or q0 and must match the repaired patch.",
             "Use /workspace or relative paths in sandbox commands and scripts; sidecar paths under /artifacts are not mounted inside the guest.",
-            "If a local check fails, fix its cause; do not disable assertions or bypass validation.",
+            "Use compile_candidate_panel for fixed-length editing, parent inheritance, and patch serialization. Read the biopython Skill when doing motif or other sequence analysis; use the installed library rather than coding an IUPAC matcher. Load exact bases from guest_file rather than copying long DNA strings or coordinates from prose.",
+            "Build and validate one hypothesis-driven candidate end to end, then save each valid entry incrementally. Maintain a complete draft panel early and improve entries in place; do not make the whole panel depend on one unfinished analysis or long generator.",
+            "Task legality is mandatory: preserve length, editable coordinates, base changes, history exclusion, the requested count, and the turn's uniqueness rule. Motif absence, consensus matches, composition targets, and predicted effects are research hypotheses, not additional benchmark constraints. Diagnose a failed check on one construct: repair a coding error, or revise the contradicted design and its rationale. Keep unrelated valid entries. Never bypass task validation or claim a failed biological check passed.",
+            "Preserve exact parent bases outside chosen placements. Do not search for globally motif-free filler or a perfect shuffle: unintended motif matches are scientific diagnostics, not admission gates. Revise the claim, change the placement, or choose another design. Keep scratch analyses independent of candidate construction and reserve time for full submission.",
             "On rejection, edit only the reported file entries, recheck the complete batch, and submit the same file path again. Do not retranscribe candidates in tool arguments.",
         ],
     }
     if benchmark_time is not None:
         payload["benchmark_time"] = benchmark_time
+    if surrogate_query is not None:
+        payload["surrogate_query"] = surrogate_query
+        payload["sequence_tools"].append("query_surrogate")
+        payload["constraints"].append(
+            "query_surrogate supplies a frozen baseline GP from this round's measured history. "
+            "Compare hypotheses in batches and inspect the exported result file before retaining or revising designs. "
+            "A neutral_prior has insufficient history for data-driven ranking. Keep scientifically motivated alternatives and controls; "
+            "high predicted UCB is not a measurement. Explain material disagreements in your existing rationale notes. "
+            "The final compiled-policy GP may differ. Queries neither submit proposals nor add frequency mass to q0."
+        )
     return (
         "Continue your persistent sequence-design research role. Use your "
         "session history, new measurements, public evidence, scratch analysis, and the "
@@ -578,13 +652,13 @@ def _turn_message(
 def _submission_candidate(
     candidate: dict[str, Any],
     context: MutationContext,
-) -> tuple[PreparedMutationCandidate, dict[str, str]]:
-    fields = {"mutations", "change_summary", "rationale"}
+) -> tuple[PreparedMutationCandidate, dict[str, Any]]:
+    fields = {"mutations", "change_summary", "rationale", "comparison_candidate_ids"}
     extra = set(candidate) - fields
     if extra or "mutations" not in candidate:
         raise CandidatePayloadError(
             "invalid_candidate",
-            "Each submitted candidate must contain exactly mutations, change_summary, and rationale; "
+            "Each submitted candidate requires mutations, change_summary, and rationale, with optional comparison_candidate_ids; "
             f"unexpected fields: {sorted(extra)}.",
         )
     annotation = {}
@@ -596,6 +670,8 @@ def _submission_candidate(
                 metadata={"field": name},
             )
         annotation[name] = value.strip()
+    if "comparison_candidate_ids" in candidate:
+        annotation["comparison_candidate_ids"] = candidate["comparison_candidate_ids"]
     return prepare_candidate_payload({"mutations": candidate["mutations"]}, context), annotation
 
 
@@ -631,6 +707,7 @@ def _validate_submission(
     context: MutationContext,
     evaluated: set[str],
     *,
+    measured_candidate_ids: set[str],
     artifact_root: Path,
     candidate_count: int,
     allow_repeated_occurrences: bool,
@@ -711,6 +788,27 @@ def _validate_submission(
             )
             continue
         first_index_by_key.setdefault(prepared.canonical_key, index)
+        references = candidate.get("comparison_candidate_ids", [])
+        if not isinstance(references, list):
+            errors.append(
+                HarnessSubmissionError(
+                    f"{path}/comparison_candidate_ids",
+                    "invalid_comparison_reference",
+                    "comparison_candidate_ids must be an array of exact measured candidate IDs.",
+                    "Read IDs from get_measured_history; omit the field when no measured comparison applies.",
+                )
+            )
+            continue
+        for reference_index, reference in enumerate(references):
+            if not isinstance(reference, str) or reference not in measured_candidate_ids:
+                errors.append(
+                    HarnessSubmissionError(
+                        f"{path}/comparison_candidate_ids/{reference_index}",
+                        "unknown_comparison_candidate",
+                        f"Comparison reference {reference!r} is not an authoritative measured candidate ID.",
+                        "Copy the exact ID from get_measured_history's guest_file, or remove an unsupported comparison.",
+                    )
+                )
     return (
         HarnessSubmissionValidation("retry", tuple(errors))
         if errors
@@ -718,21 +816,19 @@ def _validate_submission(
     )
 
 
-def _usage_counts(results: Sequence[HarnessTurnResult]) -> dict[str, int]:
-    return {
-        "llm_requests": sum(int(result.usage["providerCalls"]) for result in results),
-        "harness_tool_calls": sum(
-            sum(int(count) for count in result.usage["toolCalls"].values())
-            for result in results
-        ),
-        "harness_validation_submissions": sum(
-            int(result.usage.get("validationSubmissions", 0))
-            for result in results
-        ),
-        "harness_artifact_bytes": sum(
-            int(result.usage["artifactBytes"]) for result in results
-        ),
+def _usage_counts(usage: Mapping[str, Any]) -> dict[str, int]:
+    counts = {
+        counter: int(usage[key])
+        for key, counter in (
+            ("providerCalls", "llm_requests"),
+            ("validationSubmissions", "harness_validation_submissions"),
+            ("artifactBytes", "harness_artifact_bytes"),
+        )
+        if key in usage
     }
+    if "toolCalls" in usage:
+        counts["harness_tool_calls"] = sum(int(count) for count in usage["toolCalls"].values())
+    return counts
 
 
 def _candidate_lineage(

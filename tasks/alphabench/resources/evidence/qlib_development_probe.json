@@ -1,0 +1,71 @@
+{
+  "backend": "qlib",
+  "expression": "Mean($close,5)",
+  "market": "csi300",
+  "not_a_blind_benchmark": true,
+  "qualification": "unqualified_development_probe",
+  "reason": "Exploratory direct workers on public data before dataset qualification and formal selection.",
+  "results": {
+    "response.json": {
+      "actual_end": "2020-12-31",
+      "actual_start": "2016-01-04",
+      "daily_rows": 1217,
+      "elapsed_seconds": 10.112491026520729,
+      "label": {
+        "end_exclusive": "2021-01-01",
+        "expressions": [
+          "Ref($close, -1)/$close - 1"
+        ],
+        "purged_dates": [
+          "2020-12-31"
+        ],
+        "semantics": "forward daily correlations averaged across horizons"
+      },
+      "metrics": {
+        "ic": 0.011866326731831913,
+        "icir": 0.10590434016163522,
+        "n_dates": 1217,
+        "rank_ic": 0.008373844828125084,
+        "rank_icir": 0.06076157512048713,
+        "turnover": 6.108322479272881e-05
+      },
+      "nan_ratio": 0.024332958306301222,
+      "response_sha256": "56a30fe76360fd7936d1a1c86ebfb322ccaf8c5059f96315b93dca039e7309a7",
+      "score_rows": 365007,
+      "success": true
+    },
+    "test-response.json": {
+      "actual_end": "2024-12-31",
+      "actual_start": "2022-01-04",
+      "daily_rows": 725,
+      "elapsed_seconds": 34.534158423542976,
+      "label": {
+        "end_exclusive": "2025-01-01",
+        "expressions": [
+          "Ref($close, -1)/$close - 1"
+        ],
+        "purged_dates": [
+          "2024-12-31"
+        ],
+        "semantics": "forward daily correlations averaged across horizons"
+      },
+      "metrics": {
+        "ic": -0.00702603410953893,
+        "icir": -0.0887112743372268,
+        "n_dates": 725,
+        "rank_ic": -0.024935816353010173,
+        "rank_icir": -0.1845914837666924,
+        "turnover": 5.638966564125559e-05
+      },
+      "nan_ratio": 0.00034894398530760373,
+      "portfolio": {
+        "actions": 506,
+        "daily": 725,
+        "holdings": 725
+      },
+      "response_sha256": "8ab251cd8b1d6d8a85bba596cf79c06778d440388c79303934a4b417dd37ab2a",
+      "score_rows": 217500,
+      "success": true
+    }
+  }
+}

@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const catalogPath = process.env.LDM_IRON_MIND_CATALOG;
 if (!catalogPath) throw new Error("LDM_IRON_MIND_CATALOG is required");
@@ -19,6 +21,16 @@ const factorNames = catalog.factors.map((factor) => factor.name);
 
 function jsonResult(value) {
 	return { content: [{ type: "text", text: JSON.stringify(value) }], details: value };
+}
+
+function exportData(ctx, value) {
+	const body = JSON.stringify(value);
+	const sha256 = createHash("sha256").update(body).digest("hex");
+	const directory = join(ctx.cwd, ".ldm-resources", "research");
+	mkdirSync(directory, { recursive: true });
+	const path = join(directory, `${sha256}.json`);
+	if (!existsSync(path)) writeFileSync(path, body);
+	return { path: `/workspace/.ldm-resources/research/${sha256}.json`, sha256 };
 }
 
 function normalizedCandidate(value) {
@@ -66,6 +78,7 @@ export default function reactionSpaceTools(pi) {
 
     pi.registerTool({
         name: "get_measured_history",
+        promptGuidelines: ["Read exact records from guest_file.path in sandbox scripts. The file includes all matching detailed rows, independent of pagination or response_format. Omit candidate_ids and round_index to export the complete authoritative evaluated set; previous proposal files are not exclusions."],
         label: "Read measured research history",
         description: "Query evaluated candidates by ID or round. Concise results contain IDs, round, status and reaction_score; request detailed for exact candidates and original research annotations. Follow next_offset. Unmeasured proposals are not exposed.",
         parameters: {
@@ -80,7 +93,7 @@ export default function reactionSpaceTools(pi) {
             },
             additionalProperties: false,
         },
-        async execute(_id, params) {
+        async execute(_id, params, _signal, _update, ctx) {
             const observations = measuredHistory();
             const ids = new Set(params.candidate_ids ?? []);
             const matched = observations.filter((row) =>
@@ -109,6 +122,10 @@ export default function reactionSpaceTools(pi) {
             }
             const known = new Set(observations.map((row) => row.candidate_id));
             return jsonResult({
+                guest_file: exportData(ctx, {
+                    complete_evaluated_history: ids.size === 0 && params.round_index === undefined,
+                    observations: matched,
+                }),
                 total: matched.length, offset,
                 next_offset: offset + page.length < matched.length ? offset + page.length : null,
                 observations: page,
@@ -120,11 +137,12 @@ export default function reactionSpaceTools(pi) {
 	pi.registerTool({
 		name: "describe_reaction_space",
 		label: "Describe reaction space",
-		description: "Return the source-pinned dataset identity, factors, legal options, and number of complete condition combinations.",
+		description: "Return source-pinned factors and legal options. guest_file contains the complete legal condition catalog for scripts, without hidden outcomes.",
 		promptSnippet: "describe_reaction_space: inspect the exact factors and legal options before choosing conditions",
 		parameters: { type: "object", properties: {}, additionalProperties: false },
-		async execute() {
+		async execute(_id, _params, _signal, _update, ctx) {
 			return jsonResult({
+				guest_file: exportData(ctx, catalog),
 				dataset_id: catalog.dataset_id,
 				schema_sha256: catalog.schema_sha256,
 				condition_count: catalog.condition_count,

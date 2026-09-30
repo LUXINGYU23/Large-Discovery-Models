@@ -20,6 +20,8 @@ Resolve every referenced file relative to the Skill location advertised by Pi.
    `input.json["execution_context"]`, `research_snapshot.json`, and `arrays.npz`
    with JSON/NumPy. Query selected evidence and print compact summaries, not
    entire files. Do not reconstruct numeric feature rows from SMILES or prose.
+   Read `weight_context.proposal_sampling` for actual session counts and
+   repeat rules; shared instructions do not imply statistically independent votes.
 2. Read `enabled_capabilities`. Only for `prior_mean@1`, read
    [prior-mean-and-residual-gp.md](references/prior-mean-and-residual-gp.md).
    Only for `ldm_weights@1`, read

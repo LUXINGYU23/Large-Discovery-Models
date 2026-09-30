@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 from argparse import Namespace
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -396,6 +397,12 @@ def test_official_loader_dispatches_every_model_family(
         device=lambda value: value,
         cuda=SimpleNamespace(is_available=lambda: False),
     )
+
+    @contextmanager
+    def inference_mode():
+        yield
+
+    fake_torch.inference_mode = inference_mode
     fake_lightning = SimpleNamespace(
         LightningModel=SimpleNamespace(
             load_from_checkpoint=lambda *_args, **_kwargs: "checkpoint"
@@ -526,6 +533,11 @@ def test_designer_advances_exact_steps_and_get_samples_is_read_only(
     assert len(set(samples)) == 3
     assert all(sequence[1::2] == "AAAA" for sequence in samples)
     assert samples[0] != MOCK_START_SEQUENCE
+    assert designer.measured_sample_energies(samples) == sorted(
+        item.metrics["energy"] for item in designer.state.observations
+    )[:3]
+    with pytest.raises(ValueError, match="without a measurement"):
+        designer.measured_sample_energies(["C" * len(MOCK_START_SEQUENCE)])
     assert model.call_count == calls_before
     assert json.loads(runtime.status.path.read_text())["phase"] == (
         "awaiting_external_driver"

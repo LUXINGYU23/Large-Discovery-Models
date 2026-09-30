@@ -224,14 +224,16 @@ def load_official_case(
         torch = importlib.import_module("torch")
         lightning = importlib.import_module("grelu.lightning")
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        checkpoint = lightning.LightningModel.load_from_checkpoint(
-            prepared.model_artifact,
-            map_location=device,
-        )
-        model = module.Enformer(
-            override_model=checkpoint,
-            **prepared.model_init_args,
-        )
+        with torch.inference_mode():
+            checkpoint = lightning.LightningModel.load_from_checkpoint(
+                prepared.model_artifact,
+                map_location=device,
+            )
+            model = module.Enformer(
+                override_model=checkpoint,
+                **prepared.model_init_args,
+            )
+        model = torch.inference_mode()(model)
     else:  # pragma: no cover - catalog validation makes this unreachable.
         raise ValueError(f"unsupported model family: {case.model_family}")
 

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "record_type": "nucleobench_enformer_qualification",
+  "task_id": "nucleobench",
+  "case_id": "enformer_muscle_not_liver",
+  "verified_on": "2026-09-09",
+  "status": "passed",
+  "benchmark_comparable": false,
+  "official_contract": {
+    "source_commit": "a6d8b040a4fa80b18266ee5416c904d01f842428",
+    "package_version": "2.0.10",
+    "official_start_count": 100,
+    "start_table_sha256": "577b6bee41363383fcdd4901722a2cc8aeb2f31eddc296d0ffdf04dbf81115d1",
+    "canonical_start_set_sha256": "3c50dcf8e7ae30328cf45d6f37d11fb0cf1e4f89f9d2516a7b0abd00b64c3ffd",
+    "editable_masks_sha256": "028b29645faa3962f1c8d0ddb15eaf8bed3e114a5298203b84f22c3bce0bb3a6",
+    "model_artifact_sha256": "030e706b7b64c744be2c363b73e822694cf404164e8720cafb5940cf81da4db6",
+    "model_init_args": {
+      "aggregation_type": "muscle_not_liver",
+      "run_sanity_checks": true,
+      "spatial_bins_to_aggregate": null
+    },
+    "official_time_limit_seconds": 43200
+  },
+  "configuration": {
+    "source_snapshot_sha256": "5fb6e4fce5005c8c0a67aa57377baa349ab7a78e01ebb5194f7ef6173cc5f8a0",
+    "search_method": "ldm_harness_compiled",
+    "start_index": 62,
+    "official_start_index": 1258,
+    "optimization_seed": 42,
+    "sequence_length": 196608,
+    "editable_position_count": 256,
+    "device": "cpu",
+    "torch_threads": 16,
+    "harness_sessions": 8,
+    "candidates_per_session": 32,
+    "proposal_occurrences_per_round": 256,
+    "bo_pool_size": 176,
+    "evaluations_per_round": 128,
+    "oracle_batch_size": 8,
+    "alpha": 2.0,
+    "eta": 0.25,
+    "model": "gpt-5.6-luna",
+    "wire_api": "responses",
+    "reasoning": "max",
+    "harness_image_sha256": "5d7e05f11dab169c65848424b22e8eccce9bdd20978b722e76c2144586815839"
+  },
+  "validation": {
+    "task_tests_passed": 108,
+    "oracle_batch_equivalence": {
+      "status": "passed",
+      "compared_batch_sizes": [1, 2],
+      "maximum_absolute_difference": 0.00390625,
+      "relative_tolerance": 0.00001,
+      "absolute_tolerance": 0.001
+    },
+    "active_optimization_rounds": 2,
+    "successful_distinct_evaluations": 257,
+    "accepted_proposal_turns": 16,
+    "accepted_policy_turns": 2,
+    "degraded_policy_rounds": 0,
+    "historical_duplicate_measurements": 0,
+    "official_model_calls": 37,
+    "official_sequences_including_runner_rescores": 261,
+    "physical_call_batch_counts": {"1": 5, "8": 32},
+    "candidate_identity_and_editable_mask": "passed",
+    "empirical_q0_occurrence_accounting": "passed",
+    "artifact_hashes_and_measured_references": "passed",
+    "provider_model_and_reasoning": "passed",
+    "compiled_mean_used_by_gp": true
+  },
+  "rounds": [
+    {"round_index": 0, "measured": 1, "best_utility": -3009.28515625},
+    {"round_index": 1, "measured": 128, "best_utility": -79.8515625},
+    {"round_index": 2, "measured": 128, "best_utility": 1206.84375}
+  ],
+  "evidence_sha256": {
+    "checkpoint": "5196fbcda611b82f5ff7ff729dcbaa0cb89034239248a8b1e9125ef8d6c25199",
+    "result": "d48fa796dd9265f57cab476c86ff475bffe57e8d3a7d07d87a1e3d0848af64f3",
+    "oracle_manifest": "7bc723c6a9303e351dc1e4cbe8fd3a4c36b2c934a26d3a76659c6ec378377019",
+    "acceptance_audit": "0d33df479aa7d912676f812256b30924b3dc166220fff48db4e27abb657e2fe5",
+    "oracle_check": "4aba91aebe669fb487a9620226878691f0e22df49b26c0b80877db6bc0210cdb",
+    "task_tests": "690673b14593a453cc8765799c2106efe799cb9b99d9ba4386240505c9dae78a",
+    "official_parquet": "fe86b12f400ba0aa46f8837a67d63ebba890867af6dc4f2a9253f3ddcd3a99d7"
+  },
+  "qualification_boundary": "One paired start and two active optimization rounds verify integration, not full-budget performance across the official start set. The source-pinned model and objective are retained; physical minibatches run without autograd. Recoverable agent script errors occurred, with all candidate and policy turns accepted."
+}

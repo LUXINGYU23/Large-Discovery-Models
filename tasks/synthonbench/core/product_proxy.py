@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
 
-from ldm_tts.contracts import Candidate
 from tasks.synthonbench.core.space_order import (
     ordered_positions,
     ordered_reactions,
@@ -56,12 +55,6 @@ class SynthonProductProxy:
             f"raw_connector_count_morgan_r{self.radius}_"
             f"{self.fingerprint_bits}bit_{chirality}_v1"
         )
-
-    def candidate_counts(self, candidate: Candidate) -> np.ndarray:
-        """Return the public product proxy for a validated candidate payload."""
-
-        reaction_id, synthon_ids = _candidate_tuple(candidate)
-        return self.tuple_counts(reaction_id, synthon_ids)
 
     def tuple_counts(self, reaction_id: str, synthon_ids: Sequence[int]) -> np.ndarray:
         """Sum Count-Morgan vectors in official reaction-slot order."""
@@ -125,19 +118,6 @@ class SynthonProductProxy:
         for index, count in fingerprint.GetNonzeroElements().items():
             output[int(index)] = float(count)
         return output
-
-
-def _candidate_tuple(candidate: Candidate) -> tuple[str, tuple[int, ...]]:
-    payload = candidate.payload
-    if not isinstance(payload, Mapping):
-        raise TypeError("SynthonBench candidate payload must be a mapping")
-    reaction_id = payload.get("reaction_id")
-    synthon_ids = payload.get("synthon_ids")
-    if not isinstance(reaction_id, str) or not reaction_id:
-        raise ValueError("SynthonBench candidate requires a non-empty reaction_id")
-    if not isinstance(synthon_ids, list):
-        raise TypeError("SynthonBench candidate synthon_ids must be a list")
-    return reaction_id, _normalize_synthon_ids(synthon_ids, len(synthon_ids))
 
 
 def _normalize_synthon_ids(raw_ids: Sequence[int], expected_count: int) -> tuple[int, ...]:

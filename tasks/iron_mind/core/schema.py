@@ -93,22 +93,6 @@ class ReactionDatasetSchema:
     def allows_replicates(self) -> bool:
         return self.observation_policy == "replicated_rows"
 
-    def categories_for(self, factor_name: str) -> tuple[ReactionValue, ...]:
-        for factor in self.factors:
-            if factor.name == factor_name:
-                return factor.options
-        raise KeyError(f"Unknown reaction factor {factor_name!r}.")
-
-    def canonical_payload(self) -> dict[str, Any]:
-        return canonical_schema_payload(
-            dataset_id=self.dataset_id,
-            factors=self.factors,
-            measurements=self.measurements,
-            objective=self.objective,
-            direction=self.direction,
-            observation_policy=self.observation_policy,
-        )
-
 
 def load_reaction_schemas(path: Path) -> dict[str, ReactionDatasetSchema]:
     """Load tracked schemas used by the deterministic mock boundary."""

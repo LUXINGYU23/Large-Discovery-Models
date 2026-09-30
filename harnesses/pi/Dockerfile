@@ -3,6 +3,10 @@ FROM node:24.7.0-bookworm-slim AS dependencies
 ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY resolve-sol-pi.mjs ./
+# ADD revalidates this remote revision on each build; the image records its exact pair.
+ADD https://api.github.com/repos/NVlabs/SoL-Pi/commits/main /tmp/sol-pi-head.json
+RUN node resolve-sol-pi.mjs /tmp/sol-pi-head.json ${NPM_REGISTRY}
 RUN npm ci --registry=${NPM_REGISTRY}
 
 FROM dependencies AS build
@@ -26,6 +30,7 @@ RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/
 
 WORKDIR /app
 COPY --from=production-dependencies /app/package.json /app/package-lock.json ./
+COPY --from=production-dependencies /app/sol-pi-version.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY policy_runner.py ./policy_runner.py

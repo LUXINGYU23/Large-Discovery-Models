@@ -19,7 +19,6 @@ SUPPORTED_METHODS = (
     "llm",
     "harness",
 )
-BASELINE_METHODS = frozenset(("ldm", "bo", "llm"))
 STEP_KINDS = ("round", "evaluation_index")
 
 
@@ -109,7 +108,7 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     protocol = raw.get("selection_protocol", "best_so_far")
     task = _required_string(raw.get("task"), "task")
     declared = get_task_definition(task).pilot_evaluation.get("methods", {})
-    methods = _methods(raw.get("methods"), require_baselines=protocol != "final_submission", declared=declared)
+    methods = _methods(raw.get("methods"), declared=declared)
     policy_fields = raw.get("policy_fields", {})
     policy_mean_fields = raw.get("policy_mean_fields", [])
     if not isinstance(policy_fields, dict) or not isinstance(policy_mean_fields, list):
@@ -117,7 +116,7 @@ def load_pilot_evaluation_spec(path: Path) -> PilotEvaluationSpec:
     if any(not isinstance(name, str) for name in policy_mean_fields):
         raise ValueError("policy_mean_fields must contain field names")
     return PilotEvaluationSpec(
-        task=_required_string(raw.get("task"), "task"),
+        task=task,
         name=_required_string(raw.get("name"), "name"),
         base_config=_resolve_base_config(resolved, raw),
         cases=_cases(raw.get("cases")),
@@ -147,7 +146,7 @@ def _require_exact_keys(raw: dict[str, Any]) -> None:
         raise ValueError("pilot evaluation config must use schema_version=1 and the documented fields")
 
 
-def _methods(value: Any, *, require_baselines: bool = True, declared=()) -> tuple[str, ...]:
+def _methods(value: Any, *, declared=()) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
         raise ValueError("pilot evaluation methods must be a non-empty list")
     methods = tuple(value)
@@ -156,8 +155,6 @@ def _methods(value: Any, *, require_baselines: bool = True, declared=()) -> tupl
         raise ValueError(f"pilot evaluation methods must come from {list(supported)}")
     if len(set(methods)) != len(methods):
         raise ValueError("pilot evaluation methods must be unique")
-    if require_baselines and not BASELINE_METHODS <= set(methods):
-        raise ValueError("pilot evaluation methods must include ldm, bo, and llm")
     return methods
 
 
@@ -186,8 +183,8 @@ def _cases(value: Any) -> tuple[EvaluationCase, ...]:
 
 
 def _seeds(value: Any) -> tuple[int, ...]:
-    if not isinstance(value, list) or len(value) != 3:
-        raise ValueError("pilot evaluation requires exactly three seeds")
+    if not isinstance(value, list) or not value:
+        raise ValueError("pilot evaluation seeds must be a non-empty list")
     if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in value):
         raise ValueError("pilot evaluation seeds must be non-negative integers")
     if len(set(value)) != len(value):

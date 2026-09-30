@@ -57,9 +57,9 @@ def prepare_ucb_policy_research(
     normalized = robust_z_acquisition(acquisition, z_clip)
     weight_context = dict(round_input.execution_context["weight_context"])
     alpha, eta = weight_context["default_alpha"], weight_context["default_eta"]
-    logits = alpha * np.log(q0 + 1e-12) + eta * normalized
-    probability = np.exp(logits - logits.max())
-    probability /= probability.sum()
+    probability = selection_probability(q0, acquisition, alpha, eta, {
+        "name": "robust_z", "mad_scale": 1.4826, "epsilon": 1e-12, "z_clip": z_clip,
+    })
     rows = [
         {
             "candidate_id": candidate.candidate_id,

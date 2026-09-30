@@ -112,4 +112,3 @@ def selection_probability(mass, acquisition, alpha, eta, normalization, group_si
     logits = alpha * np.log(mass * sizes + epsilon) - np.log(sizes) + eta * z
     probability = np.exp(logits - logits.max())
     return probability / probability.sum()
-

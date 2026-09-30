@@ -15,7 +15,9 @@ import pytest
 
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation, RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest
+from ldm_tts.engine.run_store import BudgetLedger
 from ldm_tts.harness import (
+    HarnessError,
     HarnessSubmissionRequest,
     HarnessSubmittedArtifact,
     HarnessTurnResult,
@@ -220,9 +222,9 @@ def test_parallel_sessions_preserve_within_and_cross_profile_consensus_for_q0(tm
     }
     attempts[HARNESS_PROFILE_IDS[0]] = [[payloads[0], payloads[0]]]
     client = FakeHarnessClient(tmp_path, attempts)
-    usage = []
+    usage = BudgetLedger(limits={})
 
-    result = _expander(client, candidates_per_profile=2, account=usage.append).expand(
+    result = _expander(client, candidates_per_profile=2, account=usage.consume_many).expand(
         ExpansionRequest(round_idx=1, reservoir_size=8)
     )
 
@@ -249,15 +251,36 @@ def test_parallel_sessions_preserve_within_and_cross_profile_consensus_for_q0(tm
         assert admitted.canonical_key == NucleoBenchCandidateDomain(MOCK_CONTEXT).admit(
             RawProposal(proposal.payload, "without_notes")
         ).canonical_key
-    assert usage == [
-        {"proposal_attempts": 4, "harness_turns": 4},
-        {
-            "llm_requests": 8,
-            "harness_tool_calls": 8,
-            "harness_validation_submissions": 4,
-            "harness_artifact_bytes": 200,
-        },
-    ]
+    assert usage.counters["proposal_attempts"] == usage.counters["harness_turns"] == 4
+    assert usage.counters["llm_requests"] == usage.counters["harness_tool_calls"] == 8
+    assert usage.counters["harness_validation_submissions"] == 4
+    assert usage.counters["harness_artifact_bytes"] == 200
+
+
+def test_failed_harness_usage_survives_resume_without_counting_turns_twice(tmp_path, monkeypatch):
+    client = FakeHarnessClient(tmp_path, {
+        profile: [[_payloads()[index + 1]]]
+        for index, profile in enumerate(HARNESS_PROFILE_IDS)
+    })
+    ledger = BudgetLedger(limits={"harness_turns": 4, "proposal_attempts": 4})
+    expander = _expander(client, account=ledger.consume_many)
+    request = ExpansionRequest(round_idx=1, reservoir_size=4)
+    run_turn = client.run_turn
+
+    def fail(*args, **kwargs):
+        raise HarnessError("session wall-time limit reached", retryable=True,
+                           turn_usage={HARNESS_PROFILE_IDS[0]: {"providerCalls": 1}})
+
+    monkeypatch.setattr(client, "run_turn", fail)
+    with pytest.raises(HarnessError):
+        expander.expand(request)
+    assert ledger.counters["llm_requests"] == 1
+    monkeypatch.setattr(client, "run_turn", run_turn)
+    expander.expand(request)
+    expander.expand(request)
+    assert ledger.counters["harness_turns"] == ledger.counters["proposal_attempts"] == 4
+    assert ledger.counters["llm_requests"] == 8
+    assert ledger.counters["harness_wall_time_seconds"] > 0
 
 
 def test_unique_parallel_batch_repairs_canonical_duplicates_but_keeps_cross_session_q0(tmp_path):
@@ -363,6 +386,7 @@ def test_submission_validation_returns_actionable_mutation_reasons(tmp_path) -> 
         ),
         MOCK_CONTEXT,
         {historical.canonical_key},
+        measured_candidate_ids={historical.candidate_id},
         artifact_root=tmp_path,
         candidate_count=7,
         allow_repeated_occurrences=True,
@@ -386,6 +410,7 @@ def test_submission_validation_returns_actionable_mutation_reasons(tmp_path) -> 
         MOCK_CONTEXT,
         set(),
         artifact_root=tmp_path,
+        measured_candidate_ids=set(),
         candidate_count=2,
         allow_repeated_occurrences=False,
     )
@@ -443,7 +468,37 @@ def test_direct_harness_uses_one_session_without_q0(tmp_path) -> None:
         for item in result.proposals
     )
     assert result.selection_mode == "reservoir_order"
-    assert client.recovery_timeout_seconds == 120
+    assert client.recovery_timeout_seconds == 240
+
+
+def test_wall_time_resume_replays_original_turns_without_resetting_recovery_budget(tmp_path):
+    client = FakeHarnessClient(tmp_path, {
+        profile: [[_payloads()[index + 1]]]
+        for index, profile in enumerate(HARNESS_PROFILE_IDS)
+    })
+    expander = _expander(client)
+    clock = {"max_seconds": 43200, "elapsed_seconds": 3600.0, "remaining_seconds": 39600.0}
+    expander.benchmark_clock = SimpleNamespace(snapshot=lambda: dict(clock))
+    request = ExpansionRequest(round_idx=1, reservoir_size=4)
+    expander.expand(request)
+    original = client.batches[-1]
+    for turn in original:
+        path = tmp_path / "sessions" / turn.profile_id / "turns" / turn.turn_id / "input.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(turn.to_dict()), encoding="utf-8")
+    clock.update(elapsed_seconds=4200.0, remaining_seconds=39000.0)
+    expander.expand(request)
+    assert client.batches[-1] == original
+    assert client.recovery_timeout_seconds == 39000.0
+
+    saved = original[-1].to_dict()
+    path.write_text(json.dumps({**saved, "inputDigest": "0" * 64}), encoding="utf-8")
+    with pytest.raises(ValueError, match="turn identity changed"):
+        expander.expand(request)
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    expander.candidates_per_profile = 2
+    with pytest.raises(ValueError, match="turn message changed"):
+        expander.expand(replace(request, reservoir_size=8))
 
 
 def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
@@ -490,15 +545,25 @@ def test_task_local_harness_resources_cover_proposals_and_compiled_policy(
     assert compiled_spec.proposal_search.parameters["policy_skills_loaded"] is True
 
 
-@pytest.mark.parametrize("policy", [False, True])
-def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy):
+@pytest.mark.parametrize(
+    ("policy", "surrogate_query"),
+    ((False, False), (False, True), (True, True)),
+)
+def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_path, policy, surrogate_query):
+    sol_pi = {"version": 1, "actionFusion": True, "observationPack": True,
+              "evidencePreservingReducer": True, "onlineContextCompact": True,
+              "cacheWriteReadRatio": 50}
+    plugin_path = tmp_path / "sol-pi.json"
+    plugin_path.write_text(json.dumps(sol_pi))
     args = parse_args([
         "--search-method", "ldm_harness_compiled",
         "--harness-cache-dir", str(tmp_path / "cache"),
         "--harness-tool-budget", "web_search=3",
         "--policy-tool-budget", "web_search=2",
         "--no-harness-context7",
-    ])
+        "--harness-sol-pi-config", str(plugin_path),
+        "--llm-extra-body-json", '{"reasoning":{"effort":"max"}}',
+    ] + (["--harness-surrogate-query"] if surrogate_query else []))
     profiles = policy_harness_profile() if policy else harness_profiles()
     provider = ProviderSettings("https://provider.example/v1", "research-model", "test-secret")
     client = _harness_client(
@@ -507,6 +572,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
         ResolvedHarnessMcpConfig(), policy=policy,
     )
     config = client.config
+    assert config.sol_pi == sol_pi
+    assert config.provider_request_body == {"reasoning": {"effort": "max"}}
     assert (config.base_url, config.model, config.thinking) == (provider.base_url, provider.model, "max")
     assert config.profiles == profiles
     assert config.submission_contract.tool_name == ("submit_optimization_policy" if policy else "submit_candidates")
@@ -515,6 +582,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
     assert config.context7_enabled is False
     assert [server.server_id for server in config.mcp_servers] == (["ldm_policy"] if policy else [])
     assert config.tool_extensions[0].tool_names == HARNESS_TOOL_NAMES
+    enabled_query = surrogate_query and not policy
+    assert any("query_surrogate" in tool.tool_names for tool in config.tool_extensions) is enabled_query
     command = "\n".join(client.command)
     root = tmp_path / ("policy_harness" if policy else "harness")
     history = "/measured_history/observations.json" if policy else "/artifacts/measured_history/observations.json"
@@ -522,6 +591,8 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
     assert f"LDM_NUCLEOBENCH_HISTORY={history}" in command
     assert ("dst=/measured_history,readonly" in command) is policy
     assert ("dst=/public/task_README.md,readonly" in command) is policy
+    assert ("dst=/task_runtime/hamming_posterior.py,readonly" in command) is enabled_query
+    assert ("LDM_NUCLEOBENCH_SURROGATE=" in command) is enabled_query
     assert "test-secret" not in command
     context = json.loads((root / "sequence_context.json").read_text())
     assert context["paired_start"]["start_sequence"] == MOCK_CONTEXT.start_sequence
@@ -625,6 +696,7 @@ def _submission(root, payload, *, profile_id="target_biology", turn_id="turn-1",
 def test_candidate_file_shape_and_count_are_validated(tmp_path, payload, reason):
     validation = _validate_submission(
         _submission(tmp_path, payload), MOCK_CONTEXT, set(),
+        measured_candidate_ids=set(),
         artifact_root=tmp_path, candidate_count=1, allow_repeated_occurrences=True,
     )
     assert validation.decision == "retry"
@@ -638,6 +710,7 @@ def test_candidate_file_uses_snapshot_and_rejects_corruption(tmp_path):
     def validate(value):
         return _validate_submission(
             value, MOCK_CONTEXT, set(), artifact_root=tmp_path,
+            measured_candidate_ids=set(),
             candidate_count=1, allow_repeated_occurrences=False,
         )
     assert validate(submitted).decision == "accept"
@@ -649,6 +722,30 @@ def test_candidate_file_uses_snapshot_and_rejects_corruption(tmp_path):
         submitted.artifacts[0], sha256=hashlib.sha256(b"{broken").hexdigest(), size_bytes=7,
     ),))
     assert validate(malformed).decision == "retry"
+
+
+def test_comparison_reference_repair_and_annotation_preservation(tmp_path):
+    measured = _observation(_payloads()[0], round_idx=0)
+    candidate = _annotated(_payloads()[1])
+    candidate["comparison_candidate_ids"] = ["mistyped-id"]
+    def validate():
+        return _validate_submission(
+            _submission(tmp_path, {"candidates": [candidate]}), MOCK_CONTEXT, {measured.canonical_key},
+            measured_candidate_ids={measured.candidate_id}, artifact_root=tmp_path,
+            candidate_count=1, allow_repeated_occurrences=False,
+        )
+    rejected = validate()
+    assert rejected.errors[0].code == "unknown_comparison_candidate"
+    assert rejected.errors[0].path == "/candidates/0/comparison_candidate_ids/0"
+    assert "mistyped-id" in rejected.errors[0].message
+    candidate["comparison_candidate_ids"] = [measured.candidate_id]
+    assert validate().decision == "accept"
+    from tasks.nucleobench.core.harness import _submission_candidate
+    prepared, annotation = _submission_candidate(candidate, MOCK_CONTEXT)
+    assert annotation["comparison_candidate_ids"] == [measured.candidate_id]
+    assert "comparison_candidate_ids" not in prepared.payload
+    candidate["comparison_candidate_ids"] = measured.candidate_id
+    assert validate().errors[0].code == "invalid_comparison_reference"
 
 
 def _annotated(payload: dict) -> dict:
@@ -713,6 +810,7 @@ def test_research_notes_survive_selection_history_and_policy_projection(tmp_path
     )
     adapter = NucleoOptimizationPolicyAdapter(
         NucleoPolicyFeatureEncoder(MOCK_CONTEXT), seed=42, gp_config=HammingGPUCBConfig(),
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         default_alpha=2.0, default_eta=0.25, measured_history_path=tmp_path / MEASURED_HISTORY_FILE,
     )
     with_notes = adapter.build_selection_round(**kwargs)
@@ -734,6 +832,7 @@ def test_candidate_research_note_errors_are_indexed(tmp_path, field, value):
         candidate[field] = value
     validation = _validate_submission(
         _submission(tmp_path, {"candidates": [candidate]}), MOCK_CONTEXT, set(),
+        measured_candidate_ids=set(),
         artifact_root=tmp_path, candidate_count=1, allow_repeated_occurrences=False,
     )
     assert validation.decision == "retry"
@@ -759,24 +858,38 @@ def test_history_tool_reads_filtered_fresh_snapshot(tmp_path):
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {dirname} from 'node:path';
 const {default: load} = await import(process.argv[1]);
 const tools = new Map();
 load({registerTool: tool => tools.set(tool.name, tool)});
-const read = async args => (await tools.get('get_measured_history').execute('test', args)).details;
-const window = async args => (await tools.get('get_sequence_window').execute('test', args)).details;
+const ctx = {cwd: dirname(process.env.LDM_NUCLEOBENCH_HISTORY)};
+const read = async args => (await tools.get('get_measured_history').execute('test', args, undefined, undefined, ctx)).details;
+const window = async args => (await tools.get('get_sequence_window').execute('test', args, undefined, undefined, ctx)).details;
+const exported = result => {
+  const body = readFileSync(result.guest_file.path.replace('/workspace', ctx.cwd));
+  assert.equal(createHash('sha256').update(body).digest('hex'), result.guest_file.sha256);
+  return JSON.parse(body);
+};
 const start = JSON.parse(readFileSync(process.env.LDM_NUCLEOBENCH_CONTEXT)).paired_start.start_sequence;
 const sha = bases => createHash('sha256').update(bases, 'ascii').digest('hex');
 assert.equal((await read({})).total, 1);
 const initial = await window({start: 0, end_exclusive: start.length});
 assert.equal(initial.bases, start);
 assert.equal(initial.bases_sha256, sha(start));
-assert.deepEqual(await window({candidate_id: 'start', start: 0, end_exclusive: start.length}), initial);
+assert.equal((await window({candidate_id: 'start', start: 0, end_exclusive: start.length})).bases, initial.bases);
+assert.deepEqual(exported(initial).bases, start);
+const task = (await tools.get('get_task_context').execute('test', {}, undefined, undefined, ctx)).details;
+assert.equal(exported(task).paired_start.start_sequence, start);
 const rows = [
   {candidate_id: 'start', round_index: 0, mutations: [], research_annotations: []},
   {candidate_id: 'measured', round_index: 1, mutations: [{position: 0, base: 'C'}, {position: 2, base: 'G'}], research_annotations: [{rationale: 'Original hypothesis.'}]},
 ];
 writeFileSync(process.env.LDM_NUCLEOBENCH_HISTORY, JSON.stringify({observations: rows}));
 assert.equal((await read({limit: 1})).next_offset, 1);
+assert.equal(exported(await read({limit: 1})).observations.length, 2);
+assert.equal(exported(await read({})).complete_evaluated_history, true);
+assert.equal(exported(await read({round_index: 1})).complete_evaluated_history, false);
+assert.deepEqual(exported(await read({candidate_ids: ['measured']})).observations, [rows[1]]);
 assert.deepEqual((await read({offset: 1, response_format: 'detailed'})).observations, [rows[0]]);
 assert.deepEqual((await read({round_index: 1, response_format: 'detailed'})).observations, [rows[1]]);
 assert.deepEqual((await read({candidate_ids: ['measured'], response_format: 'detailed'})).observations, [rows[1]]);
@@ -803,6 +916,86 @@ for (const args of [{start: -1, end_exclusive: 4}, {start: 0, end_exclusive: sta
              "LDM_NUCLEOBENCH_HISTORY": str(history_path)},
         capture_output=True, text=True,
     )
+
+
+def test_compiler_retains_parents_reports_errors_and_preserves_occurrences(tmp_path):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is required to execute the Pi task extension")
+    context_path = tmp_path / "context.json"
+    write_harness_sequence_context(MOCK_CONTEXT, context_path)
+    history_path = tmp_path / "history.json"
+    history_path.write_text(json.dumps({"observations": [
+        {"candidate_id": "start", "mutations": []},
+        {"candidate_id": "parent", "mutations": [
+            {"base": "G", "position": 4}, {"base": "C", "position": 0},
+        ]},
+    ]}))
+    (tmp_path.parent / "outside.json").write_text("untouched")
+    script = r"""
+import assert from 'node:assert/strict';
+import {readFileSync, writeFileSync, symlinkSync, unlinkSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+const {default: load} = await import(process.argv[1]);
+const tools = new Map(); load({registerTool: tool => tools.set(tool.name, tool)});
+const ctx = {cwd: dirname(process.env.LDM_NUCLEOBENCH_CONTEXT)};
+const call = async path => (await tools.get('compile_candidate_panel').execute('test', {designs_path: path}, undefined, undefined, ctx)).details;
+const file = join(ctx.cwd, 'designs.json');
+const output = join(ctx.cwd, 'candidates.json');
+const make = placements => ({placements, change_summary: 'Replace the chosen bases.', rationale: 'Test the chosen sequence hypothesis.'});
+const edit = (start, bases) => ({start, bases});
+const parent = {...make([edit(0,'A'), edit(2,'T'), edit(2,'T')]), parent_candidate_id:'parent', comparison_candidate_ids:['parent']};
+const designs = [make([edit(0,'G')]), make([edit(1,'C')]), parent, make([edit(0,'G')]),
+    make([edit(0,'G'),edit(0,'T')]), make([edit(0,'C'),edit(4,'G')]),
+    make([edit(2,'N')]), {...parent, parent_candidate_id:'unknown'},
+    {...parent, comparison_candidate_ids:['unknown']}, make([edit(2,'A')])];
+writeFileSync(file, JSON.stringify({designs}));
+const result = await call('/workspace/designs.json');
+assert.deepEqual(result.output_design_indices, [0,2,3]);
+assert.equal(result.unique_candidate_count, 2);
+assert.deepEqual(result.duplicate_design_groups, [[0,3]]);
+assert.deepEqual(result.rejected.map(x=>x.design_index), [1,4,5,6,7,8,9]);
+for (const [index, reason] of [[1,'non-editable'],[4,'conflicting'],[5,'historical_duplicate'],[6,'A/C/G/T'],[7,'parent'],[8,'comparison_candidate_ids']]) {
+    assert.ok(result.rejected.find(x=>x.design_index===index).reason.includes(reason));
+}
+const candidates = JSON.parse(readFileSync(output)).candidates;
+assert.deepEqual(candidates[1].mutations, [{position:2,base:'T'},{position:4,base:'G'}]);
+assert.deepEqual(candidates[1].comparison_candidate_ids, ['parent']);
+assert.deepEqual(candidates[0], candidates[2]);
+writeFileSync(file, JSON.stringify({designs:[designs[0],parent,make([edit(6,'T')])]}));
+const repaired = await call('designs.json');
+assert.deepEqual(repaired.rejected, []);
+assert.equal(repaired.candidate_count, 3);
+assert.deepEqual(JSON.parse(readFileSync(output)).candidates.slice(0,2), candidates.slice(0,2));
+const history = JSON.parse(readFileSync(process.env.LDM_NUCLEOBENCH_HISTORY));
+history.observations.push({candidate_id:'new', mutations:candidates[0].mutations});
+writeFileSync(process.env.LDM_NUCLEOBENCH_HISTORY,JSON.stringify(history));
+assert.deepEqual((await call('designs.json')).rejected.map(x=>x.design_index),[0]);
+await assert.rejects(call('candidates.json'), /separate/);
+await assert.rejects(call('../outside.json'), /inside this session/);
+symlinkSync(join(ctx.cwd,'../outside.json'),join(ctx.cwd,'external.json'));
+await assert.rejects(call('external.json'), /inside this session/);
+unlinkSync(output); symlinkSync(join(ctx.cwd,'../outside.json'),output);
+await assert.rejects(call('designs.json'), /regular workspace file/);
+assert.equal(readFileSync(join(ctx.cwd,'../outside.json'),'utf8'),'untouched');
+unlinkSync(output);
+console.log(JSON.stringify({candidates}));
+"""
+    extension = Path(__file__).parents[1] / "resources/harness/tools/sequence_context.mjs"
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script, extension.resolve().as_uri()],
+        env={**os.environ, "LDM_NUCLEOBENCH_CONTEXT": str(context_path),
+             "LDM_NUCLEOBENCH_HISTORY": str(history_path)},
+        capture_output=True, text=True, check=True,
+    )
+    submission = _submission(tmp_path, json.loads(result.stdout))
+    arguments = dict(measured_candidate_ids={"parent"}, artifact_root=tmp_path, candidate_count=3)
+    assert _validate_submission(submission, MOCK_CONTEXT, set(),
+                                allow_repeated_occurrences=True, **arguments).decision == "accept"
+    unique = _validate_submission(submission, MOCK_CONTEXT, set(),
+                                  allow_repeated_occurrences=False, **arguments)
+    assert unique.decision == "retry"
+    assert any(error.code == "same_session_duplicate" for error in unique.errors)
 
 
 def _payloads() -> list[dict[str, list[dict[str, object]]]]:

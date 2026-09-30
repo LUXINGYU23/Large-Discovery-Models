@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Redactor, TraceWriter, safeHeaders, sha256 } from "./trace.js";
+import type { ProviderAuthorizer } from "./protocol.js";
 
 interface ActiveTurn {
 	profileId: string;
@@ -12,6 +13,8 @@ interface ActiveTurn {
 	turnId: string;
 	turnRoot: string;
 	requestCount: number;
+	authorizedCount: number;
+	authorize: ProviderAuthorizer;
 	trace: TraceWriter;
 }
 
@@ -47,7 +50,7 @@ export class ProviderProxy {
 
 	constructor(baseUrl: string, private readonly apiKey: string, private readonly campaignId: string,
 		private readonly requestBody: Record<string, unknown> = {}) {
-		const reserved = ["model", "input", "messages", "stream", "tools", "tool_choice", "instructions"];
+		const reserved = ["model", "input", "messages", "stream", "tools", "instructions"];
 		if (reserved.some((key) => key in requestBody)) throw new Error("provider options cannot override protocol fields");
 		this.targetBaseUrl = new URL(baseUrl);
 		if (this.targetBaseUrl.protocol !== "http:" && this.targetBaseUrl.protocol !== "https:") {
@@ -83,6 +86,7 @@ export class ProviderProxy {
 		sessionId: string,
 		turnId: string,
 		turnRoot: string,
+		authorize: ProviderAuthorizer,
 	): Promise<void> {
 		if (this.activeTurns.has(profileId)) throw new Error(`profile already has an active turn: ${profileId}`);
 		const recovered = await existingTrace(turnRoot, turnId);
@@ -92,13 +96,15 @@ export class ProviderProxy {
 			turnId,
 			turnRoot,
 			requestCount: recovered.requestCount,
+			authorizedCount: recovered.authorizedCount,
+			authorize,
 			trace: new TraceWriter(turnRoot, this.redactor, recovered.artifactBytes),
 		});
 	}
 
 	async recoveredTurnSummary(turnRoot: string, turnId: string): Promise<ProviderTurnSummary> {
 		const recovered = await existingTrace(turnRoot, turnId);
-		return { providerCalls: recovered.requestCount, artifactBytes: recovered.artifactBytes };
+		return { providerCalls: recovered.authorizedCount, artifactBytes: recovered.artifactBytes };
 	}
 
 	async endTurn(profileId: string): Promise<ProviderTurnSummary> {
@@ -106,7 +112,7 @@ export class ProviderProxy {
 		if (!active) return { providerCalls: 0, artifactBytes: 0 };
 		this.activeTurns.delete(profileId);
 		await active.trace.flush();
-		return { providerCalls: active.requestCount, artifactBytes: active.trace.bytes };
+		return { providerCalls: active.authorizedCount, artifactBytes: active.trace.bytes };
 	}
 
 	async close(): Promise<void> {
@@ -152,6 +158,26 @@ export class ProviderProxy {
 			const capturedRequest = this.redactor.buffer(body);
 			const target = joinTargetUrl(this.targetBaseUrl, segments.join("/"), incoming.search);
 			await active.trace.writeRaw(join("provider", `${requestId}.request.bin`), capturedRequest);
+			const requestDigest = sha256(JSON.stringify({
+				method: request.method ?? "POST", url: target.toString(), bodySha256: sha256(body),
+			}));
+			const authorized = await active.authorize({
+				profileId, turnId: active.turnId, providerRequestId: requestId, requestDigest,
+			});
+			if (!authorized) {
+				await active.trace.append("provider_index.jsonl", {
+					type: "provider_authorization_denied", campaignId: this.campaignId,
+					profileId, sessionId: active.sessionId, turnId: active.turnId,
+					requestId, requestDigest,
+				});
+				return await this.reject(response, 403, "provider authorization denied");
+			}
+			if (response.destroyed) return;
+			if (this.activeTurns.get(profileId) !== active) {
+				return await this.reject(response, 409, "turn ended before provider dispatch");
+			}
+			await active.trace.writeRaw(join("provider", `${requestId}.authorized.json`), Buffer.from(JSON.stringify({ requestDigest })));
+			active.authorizedCount += 1;
 
 			const headers: Record<string, string | string[]> = {};
 			for (const [name, value] of Object.entries(request.headers)) {
@@ -247,9 +273,12 @@ export class ProviderProxy {
 	}
 }
 
-async function existingTrace(turnRoot: string, turnId: string): Promise<{ requestCount: number; artifactBytes: number }> {
+async function existingTrace(turnRoot: string, turnId: string): Promise<{
+	requestCount: number; authorizedCount: number; artifactBytes: number;
+}> {
 	let artifactBytes = 0;
 	let requestCount = 0;
+	let authorizedCount = 0;
 	const providerRoot = join(turnRoot, "provider");
 	let names: string[] = [];
 	try {
@@ -260,6 +289,7 @@ async function existingTrace(turnRoot: string, turnId: string): Promise<{ reques
 	for (const name of names) {
 		artifactBytes += (await stat(join(providerRoot, name))).size;
 		const prefix = turnId + "-provider-";
+		if (name.startsWith(prefix) && name.endsWith(".authorized.json")) authorizedCount += 1;
 		if (!name.startsWith(prefix) || !name.endsWith(".request.bin")) continue;
 		const value = Number(name.slice(prefix.length, -".request.bin".length));
 		if (Number.isSafeInteger(value) && value > requestCount) requestCount = value;
@@ -269,5 +299,5 @@ async function existingTrace(turnRoot: string, turnId: string): Promise<{ reques
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 	}
-	return { requestCount, artifactBytes };
+	return { requestCount, authorizedCount, artifactBytes };
 }

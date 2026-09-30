@@ -33,16 +33,15 @@ from ldm_tts.registration.dependencies import (
 from tasks.antibody.core.dependencies import check_antibody
 from tasks.nanogpt.core.dependencies import check_nanogpt
 from tasks.small_molecule.core.dependencies import resolve_reasyn_python
-from ldm_tts.engine.runtime import LDMSearchRoundResult, run_budgeted_search
 from tasks.nanogpt.core.expansion_schema import (
     OperationParameter,
     OperationSchema,
     choice_values_equal,
-    initial_operation_feature_names,
+    initial_operation_parameter_names,
     load_operation_schema,
     normalize_operation_numeric,
     normalize_operation_parameter,
-    operation_feature_version,
+    operation_representation_version,
     operation_parameter_from_payload,
     operation_parameter_to_json,
     operation_schema_signature,
@@ -99,7 +98,6 @@ from ldm_tts.contracts import (
     ProposalSearchSpec,
     SurrogateSpaceSpec,
 )
-from ldm_tts.engine.run_store import CandidateTraceRecord, LDMRoundTrace
 from ldm_tts.engine.run_store import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl, utc_timestamp
 
 
@@ -440,7 +438,7 @@ class TestOperationSpaceCoverage:
         payload = operation_schema_to_json(schema)
         assert payload["source_path"] is None
         assert payload["parameters"]["MODE"]["choices"] == ["fast", 2, True, 1.5]
-        assert operation_feature_version(schema) == "operation_schema:v1"
+        assert operation_representation_version(schema) == "operation_schema:v1"
         assert len(operation_schema_signature(schema)) == 12
         replaced = replace_operation_schema(
             schema,
@@ -501,14 +499,14 @@ class TestOperationSpaceCoverage:
 
     def test_initial_feature_selection(self) -> None:
         schema = _schema()
-        assert initial_operation_feature_names(schema, "all") == ["COUNT", "RATE", "MODE"]
-        assert initial_operation_feature_names(schema, "0") == ["COUNT"]
-        assert initial_operation_feature_names(schema, "99") == ["COUNT", "RATE", "MODE"]
-        assert initial_operation_feature_names(schema, "rate, rate, mode") == ["RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "all") == ["COUNT", "RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "0") == ["COUNT"]
+        assert initial_operation_parameter_names(schema, "99") == ["COUNT", "RATE", "MODE"]
+        assert initial_operation_parameter_names(schema, "rate, rate, mode") == ["RATE", "MODE"]
         with pytest.raises(ValueError, match="Unknown expansion-schema parameter"):
-            initial_operation_feature_names(schema, "missing")
+            initial_operation_parameter_names(schema, "missing")
         with pytest.raises(ValueError, match="did not select"):
-            initial_operation_feature_names(schema, ",")
+            initial_operation_parameter_names(schema, ",")
 
     def test_numeric_normalization_and_choice_comparison(self) -> None:
         assert normalize_operation_numeric(2, OperationParameter("x", "float", 2, 2)) == 0
@@ -553,28 +551,7 @@ class TestOperationSpaceCoverage:
             validate_operation_payload(payload, _schema(), max_operations=2)
 
 
-class TestLoopTrajectoryAndSpecs:
-    @pytest.mark.parametrize(
-        ("kwargs", "message"),
-        [
-            ({"budget": -1}, "budget"),
-            ({"budget": 1, "start_round": -1}, "start_round"),
-            ({"budget": 1, "max_empty_reservoir_rounds": 0}, "max_empty"),
-        ],
-    )
-    def test_loop_rejects_invalid_policy(self, kwargs: dict[str, int], message: str) -> None:
-        with pytest.raises(ValueError, match=message):
-            run_budgeted_search([], build_round=lambda *_: LDMSearchRoundResult(), **kwargs)
-
-    def test_loop_honors_explicit_stop_reason(self) -> None:
-        result = run_budgeted_search(
-            [],
-            budget=2,
-            build_round=lambda *_: LDMSearchRoundResult(stop_reason="done"),
-        )
-        assert result.early_stop_reason == "done"
-        assert result.rounds_run == 1
-
+class TestTrajectoryAndSpecs:
     def test_disabled_recorder_and_jsonl_loading(self, tmp_path: Path) -> None:
         recorder = JsonlTrajectoryRecorder(None, existing_rounds=[{"x": 1}])
         recorder.append_round({"x": 2})
@@ -640,10 +617,6 @@ class TestLoopTrajectoryAndSpecs:
         assert task.to_dict()["reservoir"]["expansions"][0]["action_kind"] == "emit_candidate"
         assert task.to_dict()["proposal_search"]["name"] == "beam_search"
         assert BOPrediction("x").to_dict()["candidate_id"] == "x"
-        candidate = CandidateTraceRecord("x", {"a": 1})
-        assert candidate.to_dict()["candidate_id"] == "x"
-        trace = LDMRoundTrace(0, "demo", 0, 1, "items", "ei", candidates=(candidate,))
-        assert trace.to_dict()["candidates"] == (candidate.to_dict(),)
 
     def test_task_spec_rejects_unbound_reservoir_response_space(self) -> None:
         with pytest.raises(ValueError, match="unknown response space"):

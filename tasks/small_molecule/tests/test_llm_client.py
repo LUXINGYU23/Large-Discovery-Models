@@ -9,11 +9,9 @@ from tasks.small_molecule.core.llm_advisor.client import (
     LLMClient,
     MockLLMClient,
     OpenAIChatClient,
-    _serialize_blocks,
     build_default_client_from_env,
 )
 from tasks.small_molecule.core.llm_advisor.config import LLMClientConfig
-from tasks.small_molecule.core.llm_advisor.blocks import NoopBlock, ReviewBOBlock
 
 
 # ---------------------------------------------------------------------------
@@ -21,44 +19,23 @@ from tasks.small_molecule.core.llm_advisor.blocks import NoopBlock, ReviewBOBloc
 # ---------------------------------------------------------------------------
 
 
-def test_mock_serialize_blocks_wraps_in_fences() -> None:
-    text = _serialize_blocks([
-        NoopBlock(rationale="n"),
-        ReviewBOBlock(rationale="r", decisions={"CCO": "ok"}),
-    ])
-    assert "```json" in text
-    assert '"type": "noop"' in text
-    assert '"type": "review_bo"' in text
-    # Two fences, one per block.
-    assert text.count("```json") == 2
-
-
-def test_mock_scripted_blocks_serves_per_call() -> None:
-    client = MockLLMClient(scripted_blocks=[
-        [NoopBlock(rationale="a")],
-        [NoopBlock(rationale="b")],
-        [NoopBlock(rationale="c")],
-    ])
+def test_mock_scripted_responses_serves_per_call() -> None:
+    client = MockLLMClient(scripted_responses=["a", "b", "c"])
     r1 = client.chat("s", "u")
     r2 = client.chat("s", "u")
     r3 = client.chat("s", "u")
-    assert '"rationale": "a"' in r1
-    assert '"rationale": "b"' in r2
-    assert '"rationale": "c"' in r3
+    assert (r1, r2, r3) == ("a", "b", "c")
 
 
 def test_mock_exhausted_raises() -> None:
-    client = MockLLMClient(scripted_blocks=[[NoopBlock(rationale="a")]])
+    client = MockLLMClient(scripted_responses=["a"])
     client.chat("s", "u")
     with pytest.raises(RuntimeError, match="exhausted"):
         client.chat("s", "u")
 
 
 def test_mock_records_call_log() -> None:
-    client = MockLLMClient(scripted_blocks=[
-        [NoopBlock(rationale="x")],
-        [NoopBlock(rationale="y")],
-    ])
+    client = MockLLMClient(scripted_responses=["x", "y"])
     client.chat("sys1", "user1")
     client.chat("sys2", "user2")
     assert len(client.call_log) == 2
@@ -69,24 +46,20 @@ def test_mock_records_call_log() -> None:
 def test_mock_fail_every() -> None:
     """fail_every=2 fails the 2nd, 4th, 6th, ... calls (i.e. every other call after the first)."""
     client = MockLLMClient(
-        scripted_blocks=[
-            [NoopBlock(rationale="x")],  # call 1: success
-            [NoopBlock(rationale="y")],  # call 2: forced fail
-            [NoopBlock(rationale="z")],  # call 3: success
-        ],
+        scripted_responses=["x", "y", "z"],
         fail_every=2,
     )
     r1 = client.chat("s", "u")
     r2 = client.chat("s", "u")
     r3 = client.chat("s", "u")
-    assert "rationale" in r1
+    assert r1 == "x"
     assert r2 == "this is not a json block"
-    assert "rationale" in r3
+    assert r3 == "z"
 
 
 def test_mock_no_script_raises() -> None:
     client = MockLLMClient()
-    with pytest.raises(RuntimeError, match="neither"):
+    with pytest.raises(RuntimeError, match="scripted_responses is not set"):
         client.chat("s", "u")
 
 
@@ -159,7 +132,7 @@ def test_openai_client_strips_trailing_slash(monkeypatch) -> None:
 
 def test_mock_conforms_to_protocol() -> None:
     """Static check: MockLLMClient has model_name + chat()."""
-    client = MockLLMClient(scripted_blocks=[])
+    client = MockLLMClient(scripted_responses=[])
     assert hasattr(client, "model_name")
     assert hasattr(client, "chat")
     assert client.model_name == "mock-llm"

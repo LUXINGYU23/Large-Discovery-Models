@@ -14,6 +14,7 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
+from tasks.antibody.core.cdr_constraints import check_cdr_constraints
 from tasks.antibody.core.ldm.dsl.alphabet import SEQ_LEN, hamming
 from tasks.antibody.core.ldm.dsl.search_space import (
     LatinHyperCubeSampling,
@@ -164,7 +165,6 @@ def parallel_local_search(
                     continue
                 # CDR constraints
                 if cdr_constraints:
-                    from tasks.antibody.core.localbo_utils import check_cdr_constraints
                     if not check_cdr_constraints(nb):
                         continue
 

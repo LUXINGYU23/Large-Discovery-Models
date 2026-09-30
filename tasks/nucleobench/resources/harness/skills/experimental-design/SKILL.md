@@ -25,8 +25,8 @@ For a matched sequence contrast:
 
 1. Retrieve the named parent's exact bases with `get_sequence_window`, using
    its measured candidate ID, and verify the returned checksum in analysis code.
-2. Copy that exact sequence. Modify the declared feature while holding unrelated
-   positions and relevant module context constant.
+2. Specify that parent ID and deliberate placements to `compile_candidate_panel`.
+   It retains unrelated parent positions and derives the start-relative patch.
 3. Compute the complete base-level difference between parent and variant.
    Check motif hits on both strands, background composition, and overlaps.
 4. Describe all material differences in the rationale. A redesigned background
@@ -35,6 +35,16 @@ For a matched sequence contrast:
 A control that damages the leading program is not a competitive alternative
 program. Give an alternative a plausible implementation and a comparison that
 can distinguish a weak implementation from a weak hypothesis.
+
+Check that construction requirements are mutually consistent before expanding
+a panel. Requiring a motif in an inserted module while forbidding it anywhere
+in the final sequence is infeasible. Hold useful native background fixed when
+possible, build one interpretable contrast first, and save valid designs
+incrementally. A difficult control should not prevent unrelated hypotheses
+from being submitted. Do not search for perfect shuffles or globally motif-free
+fillers; use a feasible alternative control. If a diagnostic contradicts the
+intended contrast, revise that design or its interpretation and document the
+discrepancy. Keep these analyses separate from the compiler input and output.
 
 ## Factorial Designs
 

@@ -12,7 +12,8 @@ full benchmark campaign. A registered task may expose six methods:
 | `llm` | Direct model API | None; evaluate the requested minibatch |
 | `harness` | One persistent research Agent | None; evaluate the requested minibatch |
 
-Every committed matrix uses three seeds. Methods share the same task case,
+The supplied matrices use three seeds. Custom matrices may choose any non-empty
+set of distinct seeds and supported methods. Methods share the same task case,
 initialization, optimization rounds, oracle, and real-evaluation count. The
 task continues to own candidate identity, prompts, proposal refill, surrogate,
 acquisition, and scientific dependencies.
@@ -77,6 +78,8 @@ of each method's configuration. Scientific profiles remain in the task's
 | `synthonbench.yaml` | `synthonbench/pilot_evaluation_base.yaml` | 6 |
 | `synthonbench_extended.yaml` | `synthonbench/pilot_evaluation_extended.yaml` | 12 |
 | `nucleobench.yaml` | `nucleobench/malinois_k562_pilot_base.yaml` | 12 |
+| `atomworld.yaml` | `atomworld/ldm_harness_compiled.yaml` | 3 |
+| `reasyn.yaml` | `reasyn/pilot_evaluation_base.yaml` | 5 |
 
 Matrix paths are relative to `config/pilot_evaluation/`; task base paths are
 relative to `config/`. Round one is shared initialization. Mock, qualification,
@@ -143,6 +146,10 @@ Direct model methods may yield fewer valid evaluations when their fixed request
 budget produces malformed or repeated candidates. Harness methods instead use
 in-session rejection and refill to deliver their complete accepted minibatch.
 
+Automatic method verdicts compare against both `bo` and `llm`, and require a
+strict majority of paired seeds to win. Matrices without both baselines still
+produce scores and trajectories, but omit those verdicts.
+
 ## Registering Another Task
 
 1. Implement the applicable method names in the normal task procedure. All
@@ -153,17 +160,20 @@ in-session rejection and refill to deliver their complete accepted minibatch.
    A compiled method also needs a task-local feature and policy adapter,
    residual-GP path, independent policy profile, isolated artifact runner, and
    explicit policy budgets.
-3. Add `config/pilot_evaluation/<task>.yaml` with cases, exactly three seeds,
+3. Add `config/pilot_evaluation/<task>.yaml` with cases, distinct seeds,
    method profiles, trajectory columns, and optional result fields. Do not add
    task-specific branches to `ldm_tts.pilot_evaluation`.
 4. Add config and execution coverage, run `--dry-run`, and verify a task-local
    mock campaign for every registered method before real endpoint evaluation.
 
-Iron Mind, SynthonBench, and NucleoBench are the reference matrices:
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
+reference matrices:
 
 - `config/pilot_evaluation/iron_mind.yaml`
 - `config/pilot_evaluation/synthonbench.yaml`
 - `config/pilot_evaluation/nucleobench.yaml`
+- `config/pilot_evaluation/atomworld.yaml`
+- `config/pilot_evaluation/reasyn.yaml`
 
 ## Final-submission and replenished-sampling protocols
 

@@ -1,9 +1,10 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 import pytest
+import yaml
 from tasks.atomworld.core.pilot import _audit_trajectory as submission_trajectory
-from ldm_tts.pilot_evaluation.config import _methods
-from ldm_tts.registration.registry import get_task_definition
+from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 
 
 def spec():
@@ -112,13 +113,24 @@ def test_submission_result_fields_are_cross_checked(tmp_path):
         submission_trajectory(spec(), records, observations, run_dir=tmp_path, result=result)
 
 
-def test_submission_methods_do_not_require_inapplicable_optimization_baselines():
-    declared = get_task_definition("atomworld").pilot_evaluation["methods"]
-    assert _methods(["llm", "harness", "harness_public_audit"], require_baselines=False, declared=declared) == ("llm", "harness", "harness_public_audit")
+def test_submission_matrix_accepts_task_declared_methods(tmp_path):
+    root = Path(__file__).resolve().parents[3]
+    raw = yaml.safe_load((root / "config/pilot_evaluation/atomworld.yaml").read_text())
+    methods = ["llm", "harness", "harness_public_audit"]
+    raw.update(
+        base_config=str(root / "config/atomworld/ldm_harness_compiled.yaml"),
+        methods=methods, method_overrides={method: [] for method in methods},
+        seeds=[42, 43], output_root=str(tmp_path / "runs"),
+    )
+    path = tmp_path / "matrix.json"
+    path.write_text(json.dumps(raw))
+    result = load_pilot_evaluation_spec(path)
+    assert result.methods == tuple(methods)
+    assert result.seeds == (42, 43)
+    raw["task"] = "nucleobench"
+    path.write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="must come from"):
-        _methods(["harness_public_audit"], require_baselines=False)
-    with pytest.raises(ValueError, match="include ldm"):
-        _methods(["llm", "harness"])
+        load_pilot_evaluation_spec(path)
 
 
 def test_registered_submission_adapter_audits_real_campaign_receipts(tmp_path):

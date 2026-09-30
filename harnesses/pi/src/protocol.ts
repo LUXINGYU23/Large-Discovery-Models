@@ -100,6 +100,8 @@ export interface InitializeFrame extends CommonFrame {
 	model: string;
 	thinking: ThinkingLevel;
 	providerRequestBody?: Record<string, unknown>;
+	forceFirstToolCall?: boolean;
+	solPi?: Record<string, unknown>;
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -156,6 +158,23 @@ export interface SubmissionValidationResultFrame extends CommonFrame {
 	errors: SubmissionError[];
 }
 
+export interface ProviderAuthorizationRequest {
+	profileId: string;
+	turnId: string;
+	providerRequestId: string;
+	requestDigest: string;
+}
+
+export type ProviderAuthorizer = (request: ProviderAuthorizationRequest) => Promise<boolean>;
+
+export interface ProviderAuthorizationResultFrame extends CommonFrame {
+	type: "provider_authorization_result";
+	authorizationId: string;
+	providerRequestId: string;
+	requestDigest: string;
+	authorized: boolean;
+}
+
 export interface SubmissionValidationRequest {
 	profileId: string;
 	turnId: string;
@@ -184,6 +203,7 @@ export type InputFrame =
 	| InitializeFrame
 	| RunTurnFrame
 	| SubmissionValidationResultFrame
+	| ProviderAuthorizationResultFrame
 	| CloseFrame;
 
 export class TurnExecutionError extends Error {
@@ -576,6 +596,23 @@ export function parseFrame(line: string): InputFrame {
 			errors,
 		};
 	}
+	if (identity.type === "provider_authorization_result") {
+		exactKeys(data, [
+			"type", "requestId", "protocolVersion", "campaignId", "authorizationId",
+			"providerRequestId", "requestDigest", "authorized",
+		], "frame");
+		if (typeof data.authorized !== "boolean") {
+			throw new ProtocolError("invalid_frame", "authorized must be a boolean");
+		}
+		return {
+			...identity,
+			type: "provider_authorization_result",
+			authorizationId: string(data.authorizationId, "authorizationId"),
+			providerRequestId: string(data.providerRequestId, "providerRequestId"),
+			requestDigest: digest(data.requestDigest, "requestDigest"),
+			authorized: data.authorized,
+		};
+	}
 	if (identity.type === "run_turn") {
 		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "turns"], "frame");
 		if (!Array.isArray(data.turns) || data.turns.length === 0) {
@@ -621,7 +658,10 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
-		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled", "providerRequestBody",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
+		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
+		...(data.solPi === undefined ? [] : ["solPi"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -685,8 +725,12 @@ export function parseFrame(line: string): InputFrame {
 	if (typeof data.context7Enabled !== "boolean") {
 		throw new ProtocolError("invalid_frame", "context7Enabled must be boolean");
 	}
+	if (data.forceFirstToolCall !== undefined && typeof data.forceFirstToolCall !== "boolean") {
+		throw new ProtocolError("invalid_frame", "forceFirstToolCall must be boolean");
+	}
 
 	const profiles = parseProfiles(data.profiles);
+	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
@@ -694,6 +738,9 @@ export function parseFrame(line: string): InputFrame {
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
+		...(solPi?.actionFusion ? ["edit"] : []),
+		...(solPi?.observationPack ? ["obs_recall"] : []),
+		...(solPi?.onlineContextCompact ? ["update_plan"] : []),
 	]);
 	if (availableTools.has(submissionContract.toolName)) {
 		throw new ProtocolError("invalid_frame", "terminal tool conflicts with another available tool");
@@ -715,6 +762,8 @@ export function parseFrame(line: string): InputFrame {
 		model: string(data.model, "model"),
 		thinking,
 		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
+		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
+		...(solPi === undefined ? {} : { solPi }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

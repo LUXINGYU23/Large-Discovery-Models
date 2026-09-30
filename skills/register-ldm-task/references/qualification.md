@@ -51,13 +51,14 @@ Required evidence:
 
 Required evidence:
 
-- Candidate validation rejects unsafe, malformed, duplicate, and over-budget
-  candidates before expensive evaluation.
+- Candidate validation rejects unsafe, malformed, over-budget, and task-forbidden
+  duplicate candidates before expensive evaluation. Distinguish proposal
+  occurrences from real measurement replicates.
 - Harness profiles, optional skills, candidate schemas, and task tools have
   stable recorded digests; the task validator returns indexed rejection codes
   and actionable reasons before a turn commits.
 - Fixed benchmark code remains unchanged outside the editable region.
-- Tensor shapes, dtypes, finite outputs, parameter count, and requested devices
+- Where applicable, tensor shapes, dtypes, finite outputs, parameter count, and requested devices
   pass the cheap contract evaluator.
 - Parallel benchmark jobs map to the intended devices and per-job timeouts.
 - Reported, optimized, and diagnostic metrics are distinct and documented. A
@@ -68,7 +69,7 @@ Required evidence:
 Required evidence:
 
 - Benchmark URL, immutable commit, and task path come from a primary source.
-- One seed candidate runs with official datasets, hyperparameters, random seed,
+- One seed candidate runs with the applicable official datasets, hyperparameters, random seed,
   checkpoint selection, epoch cap, training-hour cap, and parameter limit.
 - The summary records every reported and diagnostic metric, source candidate,
   evaluator logs, and parameter count.
@@ -93,8 +94,8 @@ Required evidence:
   session. A Chat Completions-only probe does not qualify a Responses-based
   Harness.
 - One configured test-time-search reservoir is generated and cheaply validated.
-- Acquisition scores every valid candidate and selects exactly the configured
-  number for expensive evaluation.
+- Acquisition scores every valid candidate and follows the task's declared
+  fixed-count or up-to-batch contract for expensive evaluation.
 - The selected LDM candidate, not an unmodified benchmark baseline or standalone
   benchmark agent, enters the evaluator.
 - `experiment_contract.json`, `budget.json`, `status.json`, search manifest,
@@ -126,8 +127,9 @@ Required evidence:
 - Monitoring reports search phase, selected candidate, evaluator phase, device
   assignment, completed/remaining budget, best optimized metric, and official
   reported metric.
-- Baseline and LDM comparisons declare the same primary expensive-evaluation
-  budget. Extended-budget results are labeled separately.
+- Baseline and LDM comparisons use the official primary budget, including
+  wall time when applicable, and report actual evaluation counts and other costs.
+  Extended-budget results are labeled separately.
 - Artifact references are run-relative, and completed campaigns provide a
   portable `result.json` plus `trajectory.csv` when the task reports a scalar
   trajectory.

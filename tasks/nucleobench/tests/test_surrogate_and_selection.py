@@ -325,6 +325,7 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
     clock.start()
     adapter = NucleoOptimizationPolicyAdapter(
         features,
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         seed=7,
         gp_config=HammingGPUCBConfig(),
         default_alpha=1.0,
@@ -429,6 +430,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
         policy_controller=controller,  # type: ignore[arg-type]
         policy_adapter=NucleoOptimizationPolicyAdapter(
             NucleoPolicyFeatureEncoder(context),
+            proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
             seed=3,
             gp_config=HammingGPUCBConfig(),
             default_alpha=1.0,

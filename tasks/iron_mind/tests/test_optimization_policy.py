@@ -111,6 +111,7 @@ def test_policy_features_match_schema_and_exclude_mean_leakage(round_index) -> N
     )
     adapter = IronMindOptimizationPolicyAdapter(
         schema,
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         seed=7,
         acquisition_beta=1.0,
         default_alpha=1.0,
@@ -150,6 +151,8 @@ def test_policy_features_match_schema_and_exclude_mean_leakage(round_index) -> N
         }
     ]
     mean_context = json.dumps(round_input.execution_context["mean_context"])
+    assert round_input.execution_context["weight_context"]["proposal_sampling"] == adapter.proposal_sampling
+    assert "proposal_sampling" not in mean_context
     assert all(
         forbidden not in mean_context
         for forbidden in ("q0", "acquisition", "candidate_id", "canonical_key")
@@ -234,7 +237,7 @@ def test_policy_holdouts_use_training_prefix_and_restore_online_gp() -> None:
     gp = ReactionCategoricalGPUCBSelector(schema=schema, objective_name="reaction_score", feature_version=encoder.version)
     gp.fit(history)
     baseline = gp.select(query, representations)
-    adapter = IronMindOptimizationPolicyAdapter(schema, seed=0, acquisition_beta=1.0, default_alpha=2.0, default_eta=0.25)
+    adapter = IronMindOptimizationPolicyAdapter(schema, seed=0, acquisition_beta=1.0, default_alpha=2.0, default_eta=0.25, proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True})
     round_input = adapter.build_selection_round(
         round_index=3,
         history=history, candidates=query, representations=representations,
@@ -275,6 +278,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights(round_index) -> None:
     adapter = IronMindOptimizationPolicyAdapter(
         schema,
         seed=3,
+        proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
         acquisition_beta=1.0,
         default_alpha=1.0,
         default_eta=1.0,

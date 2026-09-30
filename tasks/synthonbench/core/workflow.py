@@ -205,6 +205,12 @@ def _run_campaign(
                     default_alpha=args.alpha,
                     default_eta=args.eta,
                     enabled_capabilities=tuple(args.policy_capability),
+                    proposal_sampling={
+                        "session_count": len(harness_client.config.profiles),
+                        "candidates_per_session": _harness_candidates_per_profile(args),
+                        "within_session_repeats_allowed": False,
+                        "cross_session_agreement_allowed": True,
+                    },
                 )
                 policy_client = stack.enter_context(
                     _harness_client(

@@ -193,6 +193,12 @@ read-only. Start one `HarnessClient` for the campaign, submit versioned
 `HarnessTurn` batches, and pass a task-owned validator to `run_turn`. Candidate
 canonicalization and scientific validity remain authoritative in Python.
 
+Pi-only runtime extensions are configured through `PiHarnessConfig`, not copied
+into task resources or task validation. A task may expose an explicit extension
+config path when needed; omitting it must retain ordinary Pi behavior. The
+extension may improve session operations, but it must not change task-owned
+candidate admission, measured history, surrogate, acquisition, or evaluation.
+
 Submission validation happens before a turn commits. Return indexed, stable,
 actionable reasons for invalid candidates, historical repeats, and any
 task-defined duplicate rule so the Agent can replace rejected entries in the

@@ -75,6 +75,8 @@ class PiHarnessConfig(HarnessPoolConfig):
     web_search: PiWebSearch = field(default_factory=PiWebSearch)
     context7_enabled: bool = True
     provider_request_body: dict[str, Any] = field(default_factory=dict)
+    force_first_tool_call: bool = True
+    sol_pi: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
@@ -101,6 +103,13 @@ class PiHarnessConfig(HarnessPoolConfig):
         }
         if self.context7_enabled:
             ordinary_tools.update(("resolve-library-id", "query-docs"))
+        if self.sol_pi is not None:
+            if self.sol_pi.get("actionFusion"):
+                ordinary_tools.add("edit")
+            if self.sol_pi.get("observationPack"):
+                ordinary_tools.add("obs_recall")
+            if self.sol_pi.get("onlineContextCompact"):
+                ordinary_tools.add("update_plan")
         if self.submission_contract.tool_name in ordinary_tools:
             raise ValueError("harness terminal tool conflicts with another available tool")
         unknown_budgets = set(self.limits.tool_call_budgets) - ordinary_tools
@@ -111,6 +120,8 @@ class PiHarnessConfig(HarnessPoolConfig):
             )
         if self.thinking not in {"off", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("unsupported harness thinking level")
+        if type(self.force_first_tool_call) is not bool:
+            raise ValueError("force_first_tool_call must be boolean")
 
     def initialize_payload(self) -> dict[str, Any]:
         return {
@@ -126,6 +137,8 @@ class PiHarnessConfig(HarnessPoolConfig):
             "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
+            **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),
+            **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
         }
 
 
@@ -135,6 +148,7 @@ def policy_mcp_server(
     *,
     diagnostics_path: str | None = None,
     diagnostics_sha256: str | None = None,
+    draft_execution_enabled: bool = True,
 ) -> HarnessMcpServer:
     root = PurePosixPath(artifact_root)
     if not root.is_absolute():
@@ -143,11 +157,8 @@ def policy_mcp_server(
     fields = {
         "server_id": "ldm_policy",
         "transport": "stdio",
-        "tools": [
-            "inspect_policy_contract",
-            "validate_policy_draft",
-            "evaluate_policy_draft",
-        ],
+        "tools": ["inspect_policy_contract", "validate_policy_draft",
+                  *(["evaluate_policy_draft"] if draft_execution_enabled else [])],
         "command": "node",
         "args": ["/app/dist/policy-mcp.js", "stdio"],
         "env": {

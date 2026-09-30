@@ -6,6 +6,11 @@ web extensions, task-defined terminal submission, and raw model-provider
 transport capture. Task validation, optimization history, `q0`, GP inference,
 acquisition, and evaluation remain in Python.
 
+The Responses model declares `supportsStrictMode` so Pi explicitly transmits
+each tool's strict policy. Ordinary tools use `strict:false`, preserving omitted
+optional arguments instead of provider-side schema normalization. Task validators
+still enforce complete submissions and scientific legality before commit.
+
 For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
 [`docs/research-harness.md`](../../docs/research-harness.md).
@@ -15,6 +20,50 @@ Build the release image from the repository root:
 ```bash
 docker build -t ldm-pi-harness:latest harnesses/pi
 ```
+
+Each image build resolves the current SoL-Pi `main` revision and installs its
+exact tested Pi package versions. The resolved pair is recorded in
+`/app/sol-pi-version.json`; session manifests also record package versions,
+the SoL-Pi source URL, and the effective lockfile digest. Pin the resulting
+image digest for an entire experiment and its resumes.
+
+## SoL-Pi
+
+SoL-Pi is disabled unless `PiHarnessConfig.sol_pi` supplies its configuration.
+NucleoBench exposes this through `--harness-sol-pi-config`:
+
+```json
+{
+  "version": 1,
+  "actionFusion": true,
+  "observationPack": true,
+  "evidencePreservingReducer": true,
+  "onlineContextCompact": true,
+  "cacheWriteReadRatio": 50
+}
+```
+
+Use the provider's cache-miss/cache-hit price ratio for
+`cacheWriteReadRatio`; the value above is an example, not a universal default.
+The effective `sol-pi.json` is saved in each session's `pi-agent` directory.
+The reducer uses that session's model and traced provider. Its calls and Pi
+compaction calls are included in the provider trace, alongside ordinary research
+requests. Provider request-body settings apply to all these calls. A provider that
+does not support forced tool use can set `tool_choice: "auto"` in those settings;
+the Harness still requires a validated terminal submission.
+
+The upstream mechanisms remain unchanged. Action Fusion's file operations and
+follow-up commands use the task guest; its hash checks use the same shared
+workspace files. Observation and evidence archives remain under the native
+session directory and are mounted read-only at `/workspace/.sol-pi` for research.
+`obs_recall` retrieves archived observations; `update_plan` supplies boundaries
+for native compaction and continuation. Enabling the extension does not alter
+task submissions, measured-history validation, GP queries, or evaluation budgets.
+
+See the [SoL-Pi documentation](https://github.com/NVlabs/SoL-Pi) for mechanism
+details and the supported configuration schema.
+
+## Task Guest
 
 Before the first Harness run for a task, build its task-owned guest into a
 user-selected cache and run its offline smoke script:
@@ -39,8 +88,18 @@ environment variables, manifests, or session files. Do not invoke the sidecar
 manually for normal experiments.
 
 The sidecar declares its package SemVer at startup; the client binds every
-subsequent JSONL request and response to that release and one campaign. Turn
-inputs include a monotonic history range and digest;
+subsequent JSONL request and response to that release and one campaign. The
+Python client requires Pi sidecar protocol 0.2.0 when a caller supplies a hard
+provider budget through the task-neutral `provider_authorizer` callback on
+`HarnessClient.run_turn`. The proxy sends a
+`provider_authorization_requested` frame containing the profile, turn, unique
+provider request ID and request digest. It opens the upstream connection only
+after the Host answers `provider_authorization_result` with `authorized=true`.
+A denial returns 403 without forwarding. Per-turn request traces preserve the
+next ID across recovery; authorization markers distinguish approved requests
+from denied attempts in `providerCalls`.
+
+Turn inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
 Committed turns are idempotent and partial turns recover from their saved
 submission, artifact descriptors, and measured usage.
@@ -169,6 +228,9 @@ counts. If a provider stream ends before a committed batch, the sidecar
 continues the existing work with tools available for repair within the same
 wall-time window and retains every raw attempt. Partial-turn recovery continues
 attempt numbering rather than replacing earlier artifact snapshots.
+Transient provider failures, including structured `server_error` responses,
+use the task's recovery window and backoff. Already committed sessions are
+replayed without regeneration; authentication and contract errors remain fatal.
 
 The container requires Linux KVM for Gondolin. The task runner mounts run
 artifacts, read-only task resources, and the selected guest cache explicitly.

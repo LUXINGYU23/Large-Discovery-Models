@@ -205,7 +205,7 @@ def test_harness_provenance_rejects_empty_or_duplicate_profiles(tmp_path: Path, 
 def test_provenance_failure_is_persisted_for_new_and_resumed_children(
     tmp_path: Path, monkeypatch, already_complete,
 ) -> None:
-    spec = SimpleNamespace(output_root=tmp_path)
+    spec = SimpleNamespace(output_root=tmp_path, selection_protocol="best_so_far")
     run = execution._EvaluationRun("case", "ldm_harness_compiled", 0, tmp_path / "campaign")
     manifest = {"runs": {}, "state": "running"}
     plan = {"command_display": "fixture", "contract_sha256": "a", "contract_profile": None}

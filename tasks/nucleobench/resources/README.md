@@ -5,13 +5,14 @@ This directory contains small, versioned protocol inputs only:
 - `upstream_contract.json` pins the official source and verified public API.
 - `cases/catalog.json` declares the 17 source-pinned benchmark cases.
 - `qualification_evidence.json` records the highest completed release gate.
-- `verification_record.json` records compact, reproducible gate outcomes.
+- `verification_record.json` records Malinois qualification outcomes.
+- `enformer_qualification.json` records Enformer oracle and Harness-Compiled qualification outcomes.
 
 Official source checkouts, model weights, start-sequence sets, generated
 manifests, caches, traces, and campaign outputs must be stored outside the Git
 repository. Runtime preparation must record their digests before a case can
-move beyond `planned`. `malinois_k562` is currently the only qualified case;
-15 additional published cases are prepared.
+move beyond `planned`. `malinois_k562` and `enformer_muscle_not_liver` are
+qualified; 14 additional published cases are prepared.
 
 The contract records the shared Malinois artifact, all 12 BPNet artifacts, the
 Enformer checkpoint, the RiNALMo weights, the published CSV and Enformer

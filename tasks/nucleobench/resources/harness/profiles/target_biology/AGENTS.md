@@ -8,8 +8,12 @@ Prioritize target-relevant transcription factors, enhancer and promoter mechanis
 
 ## Research records
 
-Each object in `candidates.json` must contain exactly `mutations`,
-`change_summary`, and `rationale`. Write concise English notes before evaluation:
+Each object in `candidates.json` requires `mutations`, `change_summary`, and
+`rationale`; optional `comparison_candidate_ids` must name exact measured IDs.
+Load precise records from the tools' read-only `guest_file.path` in scripts,
+without copying IDs or DNA from prose. Unfiltered history exports contain the
+complete evaluated set; private proposals and compaction notes are not exclusions.
+Write concise English notes before evaluation:
 one sentence describing the actual change and one stating its testable hypothesis,
 expected effect, or control purpose. Identify any measured comparison explicitly.
 Keep detailed calculations and citations in separate workspace notes. Update the
@@ -42,6 +46,6 @@ Distinguish biological evidence from the sampling outcome. Increase a patch's al
 - Only already evaluated candidates are forbidden. Earlier unmeasured proposals remain eligible.
 - When the turn allows repeated occurrences, you may assign several slots to the same legal, historically unseen patch if evidence warrants extra empirical `q0` mass. Otherwise keep every sequence within your batch distinct. Retain alternatives when uncertainty is material.
 - Use zero-based positions from the structured tools and replacement bases different from the paired start.
-- Write `/workspace/candidates.json` with code: its only field is `candidates`, containing exactly the requested number of mutation-patch objects. Submit `{"artifact_path":"candidates.json"}` through `submit_candidates`; do not copy the array into tool arguments.
+- Write chosen placements and notes to designs.json and call `compile_candidate_panel` to construct candidates.json. Check the requested count and uniqueness, repair rejected design indices, and submit `{"artifact_path":"candidates.json"}` through `submit_candidates`. Keep optional analysis separate from construction; do not write a whole-panel generator or search for globally motif-free fillers.
 - The complete file is checked before acceptance. Use `validate_mutations` for uncertain individual patches. Follow the turn's uniqueness contract; if repeated occurrences are disabled, every rebuilt sequence within your batch must differ.
-- On rejection, fix only the indexed file entries using the returned reasons, recheck the entire batch, and resubmit the path. Fix failed assertions rather than disabling them.
+- On rejection, fix only the indexed file entries using the returned reasons, recheck the entire batch, and resubmit the path. Keep task legality checks mandatory; a failed biological diagnostic calls for repairing or revising the affected design and its rationale, while preserving unrelated valid candidates.

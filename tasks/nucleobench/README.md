@@ -40,8 +40,11 @@ Harness validation, and official adapters remain under this directory.
 
 The 17-case source contract is stored in
 [`resources/cases/catalog.json`](resources/cases/catalog.json).
-`malinois_k562` is qualified through a real start evaluation and tiny
-campaign. Fifteen additional published cases have digest-pinned preparation
+`malinois_k562` and `enformer_muscle_not_liver` are qualified through real
+start evaluations and tiny campaigns. Enformer qualification includes two
+active Harness-Compiled rounds with physical inference minibatches; see
+[`resources/enformer_qualification.json`](resources/enformer_qualification.json).
+Fourteen additional published cases have digest-pinned preparation
 contracts. RiNALMo remains planned because the official 100-sequence paired
 start set is not present in the published benchmark artifacts.
 
@@ -89,9 +92,21 @@ algorithm:
    task-local exact normalized-Hamming GP to previous official measurements.
 6. Compute GP-UCB, robustly standardize it, and sample without replacement from
    `pi(x) proportional to q0(x)^alpha * exp(eta * robust_z(UCB(x)))`.
-7. Rebuild the selected full sequences and evaluate the complete minibatch in
-   one official model call. Each candidate is still charged as one official
-   oracle evaluation.
+7. Rebuild and evaluate the selected full sequences through the official model.
+   `--oracle-batch-size` controls the inference minibatch independently of the
+   selection batch. Enformer defaults to four sequences without gradients to
+   bound memory use; other families default to the full evaluation batch.
+   Every actual model call is recorded, and each candidate is charged as one
+   official oracle evaluation. History advances only after the selected batch
+   has completed.
+
+Round-limited runs reuse recorded energies when the official runner exports
+measured samples, so result reporting does not consume additional oracle
+queries. Official wall-time runs retain the runner's export scoring behavior.
+Round-limited Harness calls allow twice the per-session time limit for recovery;
+completed submissions are replayed while unfinished sessions continue. Official
+wall-time runs use their remaining campaign time. Recovery preserves cumulative
+model usage and does not charge the same logical proposal turn twice.
 
 Only measured candidates are historical exclusions. A candidate proposed in an
 earlier round but not selected for evaluation remains eligible. This preserves
@@ -105,6 +120,8 @@ creates separate persistent sessions sharing the same `AGENTS.md`, with distinct
 session IDs, histories, and workspaces. `--proposal-samples`
 must equal their product. LDM requires
 `evaluations-per-round <= bo-pool-size < proposal-samples`.
+For pure BO, `--proposal-samples` independently controls the score-blind search
+pool and must cover the evaluation batch; it defaults to four times that batch.
 If repeated occurrences leave fewer unique candidates than the evaluation
 batch, evaluate those candidates without adding proposals or duplicate oracle
 evaluations. Occurrence frequencies still define `q0`.
@@ -122,6 +139,20 @@ editable-mask order. Its kernel is
 `exp(-normalized_hamming_distance / length_scale)`; the length scale is chosen
 from a fixed grid by marginal likelihood. The GP standardizes observed utility,
 uses bounded best-plus-recent history, and applies GP-UCB.
+
+Candidate Harness sessions can optionally use `--harness-surrogate-query`.
+Before each research round, the task fits and freezes a baseline GP on measured
+history. All candidate sessions query that same snapshot with `query_surrogate`,
+using a candidate batch or a workspace JSON file. The tool exports predictions
+in original utility units, latent standard deviation, raw UCB, and fit status;
+its inline response previews the first eight entries. Results are independent
+of the query batch, and repeated queries are cached within each session and
+snapshot. Queries do not evaluate or submit candidates, alter history, or add
+proposal occurrences to `q0`. Cold-start predictions are labelled `neutral_prior`.
+The tool is disabled by default and is not loaded into the policy session.
+The compiled-policy GP used for final selection may differ from this baseline.
+Frozen snapshots are stored under `harness/surrogate/`; query exports remain
+in each session workspace alongside its research records.
 
 `ldm_harness_compiled` keeps that kernel, variance model, UCB rule, pool,
 candidate budget, and evaluator unchanged. A separate persistent
@@ -175,7 +206,7 @@ and alternative regulatory programs. Candidate-generation roles load committed
 `AGENTS.md` files and four task-local scientific Skills. They can use the isolated
 task guest, web and
 Context7 tools, configured MCP servers, and task-local structured tools for
-paired-start context, sequence windows, mutable regions, mutation validation,
+paired-start context, sequence windows, mutable regions, candidate compilation, mutation validation,
 and measured research history.
 
 The `comprehensive_research` role combines these perspectives in one lead
@@ -191,6 +222,15 @@ unresolved hypotheses after feedback and choose their balance from comparative
 measurements and remaining time, without fixed role assignments or slot quotas.
 Previously proposed but unmeasured candidates remain eligible unchanged.
 
+Researchers write their chosen placements and annotations to a design file.
+The task-local `compile_candidate_panel` tool applies fixed-length edits to the
+exact start or measured parent and writes `candidates.json`. It reports rejected
+design indices independently, preserves repeated occurrences, and neither
+selects designs nor fills missing slots. The Biopython Skill documents the
+[design format](resources/harness/skills/biopython/references/panel-construction.md).
+Motif and composition analyses remain scientific diagnostics, separate from
+construction; the original submission contract still checks the full batch.
+
 All candidate roles, including the direct `harness` researcher, expose the same
 on-demand Skills: `biopython` for sequence reconstruction and motif analysis,
 `experimental-design` for matched controls and factorial contrasts,
@@ -202,10 +242,10 @@ injected every turn. Sources, adaptation scope, and licenses are documented in
 [the attribution](resources/harness/skills/ATTRIBUTION.md). The policy architect
 continues to load only its task-local `compile-ldm-policy` Skill.
 
-Candidate Agents write `candidates.json` in their workspace with code, then call
+Candidate Agents construct `candidates.json` in their workspace, then call
 `submit_candidates({"artifact_path":"candidates.json"})`. The file contains only
-a `candidates` array of the requested number of objects, each containing exactly
-`mutations`, `change_summary`, and `rationale`. The two notes are concise English
+a `candidates` array of the requested number of objects, each containing
+`mutations`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`. The two notes are concise English
 sentences describing the actual change and its pre-evaluation hypothesis,
 expected effect, or control purpose. Pi
 snapshots the file; task-local Python validates that exact snapshot's digest,
@@ -224,6 +264,20 @@ returns the index; `response_format="detailed"` returns exact patches and origin
 annotations. Pages stop before exceeding 32 KB after the first complete record;
 `next_offset` identifies the next page. Only measured candidates are shared; unmeasured
 proposals remain in their private sessions and immutable submissions.
+
+History queries return a read-only `guest_file` with a path and SHA-256. It
+contains all matching detailed records, independently of response pagination.
+An unfiltered query exports the complete evaluated set; filtered exports are
+not complete exclusion sets. `get_task_context` exports the exact paired start
+and editable mask, and `get_sequence_window` exports the exact requested window.
+Research scripts load these files directly. Draft candidate files and private
+proposal history are not measurement inputs.
+
+Optional `comparison_candidate_ids` identify measured contrasts, not mandatory
+parents. Unknown IDs return indexed `unknown_comparison_candidate` errors.
+Accepted references stay in research metadata and measured history, not the
+oracle payload or GP features. The policy's `weight_context.proposal_sampling`
+records the actual session count, panel size and repeat rules.
 
 `get_sequence_window` returns a zero-based half-open window of the original
 start, or of a measured sequence when `candidate_id` is supplied. It returns
@@ -316,8 +370,8 @@ still waits for the complete configured occurrence count. Fatal provider or
 protocol errors stop execution rather than silently dropping a profile.
 
 Round-limited runs also continue transient proposal-session failures, with a
-recovery-start window equal to `--harness-wall-time-seconds`. Each attempt keeps
-the configured session deadline. Accepted submissions are reused, and recovery
+recovery window of twice `--harness-wall-time-seconds`, including the first
+attempt. Each attempt keeps the configured session deadline. Accepted submissions are reused, and recovery
 does not request extra proposal occurrences or oracle evaluations.
 
 ## Provider and External Data

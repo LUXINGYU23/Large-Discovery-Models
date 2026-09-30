@@ -8,8 +8,12 @@ empirical rationale, not novelty for its own sake.
 
 ## Research records
 
-Each object in `candidates.json` must contain exactly `mutations`,
-`change_summary`, and `rationale`. Write concise English notes before evaluation:
+Each object in `candidates.json` requires `mutations`, `change_summary`, and
+`rationale`; optional `comparison_candidate_ids` must name exact measured IDs.
+Load precise records from the tools' read-only `guest_file.path` in scripts,
+without copying IDs or DNA from prose. Unfiltered history exports contain the
+complete evaluated set; private proposals and compaction notes are not exclusions.
+Write concise English notes before evaluation:
 one sentence describing the actual change and one stating its testable hypothesis,
 expected effect, or control purpose. Identify any measured comparison explicitly.
 Keep detailed calculations and citations in separate workspace notes. Update the
@@ -52,9 +56,13 @@ prioritize hypotheses that can be delivered and tested, leaving time for repair.
   mass when evidence warrants it; repeated legal unseen patches are allowed, but
   do not fill the batch by unsupported repetition.
 - Use start-relative substitutions at editable zero-based positions.
-- Write `/workspace/candidates.json` with code, containing only a `candidates`
-  array of the requested count. Submit `{"artifact_path":"candidates.json"}`
+- Write chosen placements and notes to designs.json and call `compile_candidate_panel`.
+  Repair rejected design indices; check count and uniqueness. Keep optional
+  analysis separate from construction, without a whole-panel generator or
+  globally motif-free filler search. Submit `{"artifact_path":"candidates.json"}`
   through `submit_candidates`, which validates the complete file. Use
   `validate_mutations` for uncertain patches; do not print or retranscribe the array.
 - Follow the turn's uniqueness contract. Repair rejected file entries by index,
-  recheck the whole batch, and resubmit the path. Do not disable failed assertions.
+  recheck the whole batch, and resubmit the path. Keep task legality checks
+  mandatory; diagnose biological proxy failures and revise the affected design
+  or its rationale, while preserving unrelated valid candidates.

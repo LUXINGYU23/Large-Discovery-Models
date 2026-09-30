@@ -165,6 +165,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-seconds", type=int)
     parser.add_argument("--reservoir-size", type=int, default=4)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
+    parser.add_argument("--oracle-batch-size", type=int)
     parser.add_argument("--proposal-samples", type=int)
     parser.add_argument("--bo-pool-size", type=int)
     parser.add_argument("--proposal-candidates-per-request", type=int)
@@ -206,12 +207,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--harness-thinking", choices=HARNESS_THINKING_LEVELS, default="max"
     )
     parser.add_argument("--harness-mcp-config", type=Path)
+    parser.add_argument("--harness-sol-pi-config", type=Path)
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
     parser.add_argument("--harness-response-timeout", type=float, default=2100.0)
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument("--harness-tool-budget", action="append", metavar="NAME=COUNT")
+    parser.add_argument("--harness-surrogate-query", action="store_true")
     parser.add_argument(
         "--policy-capability",
         action="append",
@@ -238,6 +241,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _apply_derived_args(args: argparse.Namespace) -> None:
     if args.iterations is None and args.termination_kind == "rounds":
         args.iterations = 2
+    if args.oracle_batch_size is None:
+        case = MOCK_CASE if args.mock else get_case(args.case_id)
+        args.oracle_batch_size = (
+            4 if case.model_family == "enformer" else args.evaluations_per_round
+        )
     if args.proposal_mode is None:
         args.proposal_mode = (
             "openai" if args.search_method in {"ldm", "llm"} else "none"
@@ -283,9 +291,12 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.harness_surrogate_query and args.search_method not in PERSISTENT_HARNESS_METHODS:
+        parser.error("--harness-surrogate-query requires a persistent Harness method")
     positive_counts = (
         "reservoir_size",
         "evaluations_per_round",
+        "oracle_batch_size",
         "proposal_samples",
         "bo_pool_size",
         "proposal_candidates_per_request",
@@ -345,11 +356,10 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         )
     if args.execution_profile == "pilot_evaluation" and (
         args.termination_kind != "rounds"
-        or args.iterations != 12
         or args.initialization_mode != "shared_start"
     ):
         parser.error(
-            "pilot_evaluation requires 12 rounds and shared_start initialization"
+            "pilot_evaluation requires round termination and shared_start initialization"
         )
     if args.execution_profile == "official_benchmark" and (
         args.termination_kind != "wall_time"
@@ -367,7 +377,9 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         tuple(args.harness_profile) != HARNESS_PROFILE_IDS or args.harness_unique_candidates
     ):
         parser.error("Custom Harness sampling settings require a parallel Harness method")
-    if args.proposal_samples != expected_samples:
+    if args.search_method == "bo" and args.proposal_samples < args.evaluations_per_round:
+        parser.error("BO proposal samples must cover the evaluation batch")
+    if args.search_method != "bo" and args.proposal_samples != expected_samples:
         parser.error(
             f"--proposal-samples must equal {expected_samples} for {args.search_method}"
         )
@@ -461,6 +473,7 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
             get_case(args.case_id),
             search_method=args.search_method,
             evaluations_per_round=args.evaluations_per_round,
+            proposal_samples=args.proposal_samples,
             proposal_max_workers=args.proposal_max_workers,
             harness_profile_count=len(args.harness_profile),
             harness_candidates_per_session=args.harness_candidates_per_session,
@@ -565,6 +578,7 @@ def _execution_summary(args: argparse.Namespace) -> dict[str, Any]:
         "initialization_evaluations": 1,
         "benchmark_comparable": args.execution_profile == "official_benchmark" and args.resume_from is None,
         "hardware_profile": args.hardware_profile,
+        "oracle_batch_size": args.oracle_batch_size,
     }
 
 
@@ -698,6 +712,7 @@ def _run_real(
         prepared.context.case,
         search_method=args.search_method,
         evaluations_per_round=args.evaluations_per_round,
+        proposal_samples=args.proposal_samples,
         proposal_max_workers=args.proposal_max_workers,
         harness_profile_count=len(args.harness_profile),
         harness_candidates_per_session=args.harness_candidates_per_session,
@@ -748,6 +763,12 @@ def _run_real(
                     default_alpha=args.alpha,
                     default_eta=args.eta,
                     enabled_capabilities=tuple(args.policy_capability),
+                    proposal_sampling={
+                        "session_count": len(harness_client.config.profiles),
+                        "candidates_per_session": args.harness_candidates_per_session,
+                        "within_session_repeats_allowed": not args.harness_unique_candidates,
+                        "cross_session_agreement_allowed": True,
+                    },
                     evaluations_per_round=args.evaluations_per_round,
                     benchmark_clock=benchmark_clock,
                     measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
@@ -773,7 +794,7 @@ def _run_real(
                     account=runtime.consume_many,
                     recovery_budget=lambda: (
                         float(benchmark_clock.snapshot()["remaining_seconds"])
-                        if benchmark_clock is not None else float(args.harness_wall_time_seconds)
+                        if benchmark_clock is not None else 2.0 * args.harness_wall_time_seconds
                     ),
                 )
                 encoder, selector = build_surrogate_components(
@@ -797,7 +818,9 @@ def _run_real(
     try:
         official = load_official_case(args.source_dir, prepared, runtime)
         state = _campaign_state(runtime, args.resume_from is not None)
-        evaluator = NucleoBenchEvaluator(prepared.context, official.model)
+        evaluator = NucleoBenchEvaluator(
+            prepared.context, official.model, batch_size=args.oracle_batch_size
+        )
         if not state.observations:
             runtime.consume("outer_iterations")
             state = initialize_designer_state(prepared.context, evaluator, runtime)
@@ -858,7 +881,8 @@ def _run_real(
             )
             report = run_official_driver(
                 run_loop=official.run_loop,
-                model=official.model,
+                model=(designer.measured_sample_energies
+                       if args.termination_kind == "rounds" else official.model),
                 designer=designer,
                 all_args=all_args,
                 runtime=runtime,
@@ -909,6 +933,7 @@ def _real_engine(
         harness_candidates_per_session=args.harness_candidates_per_session,
         harness_unique_candidates=args.harness_unique_candidates,
         benchmark_clock=benchmark_clock,
+        surrogate_query_config=_gp_config(args) if args.harness_surrogate_query else None,
         campaign_id=runtime.run_id,
         first_active_round=1,
         max_workers=args.proposal_max_workers,
@@ -1086,6 +1111,14 @@ def _harness_client(
         artifact_root / "sequence_context.json",
     )
     mounts = [(resource_root, "/resources", True)]
+    surrogate_query = args.harness_surrogate_query and not policy
+    query_environment = {}
+    if surrogate_query:
+        mounts.append((
+            TASK_ROOT / "core/hamming_posterior.py", "/task_runtime/hamming_posterior.py", True,
+        ))
+        query_environment["LDM_NUCLEOBENCH_SURROGATE"] = "/artifacts/surrogate"
+        query_environment["PYTHONPATH"] = "/task_runtime"
     mcp_servers = mcp.servers
     if policy:
         submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
@@ -1118,6 +1151,7 @@ def _harness_client(
             environment={
                 "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
                 "LDM_NUCLEOBENCH_HISTORY": history_path,
+                **query_environment,
             },
             mounts=mounts,
         ),
@@ -1133,9 +1167,11 @@ def _harness_client(
             seed=args.campaign_index,
             submission_contract=submission_contract,
             guest_runtime=harness_guest_runtime(),
-            tool_extensions=harness_tool_extensions(),
+            tool_extensions=harness_tool_extensions(surrogate_query=surrogate_query),
             mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
+            sol_pi=_sol_pi_config(args),
+            provider_request_body=_parse_extra_body(args.llm_extra_body_json),
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
                 tool_call_budgets=parse_tool_call_budgets(
@@ -1325,6 +1361,7 @@ def _oracle_manifest(
             "model_name": prepared.context.case.model_name,
             "model_artifact_sha256": file_digest(prepared.model_artifact),
             "model_init_args": prepared.model_init_args,
+            "inference_batch_size": args.oracle_batch_size,
         },
         "official_runner": {
             "proposals_per_round": OFFICIAL_PROPOSALS_PER_ROUND,
@@ -1379,6 +1416,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
             args.search_method == "harness" or args.harness_unique_candidates
         ),
         "thinking": args.harness_thinking,
+        "surrogate_query": args.harness_surrogate_query,
         "wall_time_seconds": args.harness_wall_time_seconds,
         "response_timeout_seconds": args.harness_response_timeout,
         "tool_call_budgets": parse_tool_call_budgets(
@@ -1389,6 +1427,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "mcp_configured": args.harness_mcp_config is not None,
         "skills_loaded": True,
         "skill_ids": list(HARNESS_SKILL_IDS),
+        "sol_pi": _sol_pi_config(args),
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         description["policy_session"] = {
@@ -1397,6 +1436,15 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
             "editable_components": ["prior_mean", "alpha", "eta"],
         }
     return description
+
+
+def _sol_pi_config(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.harness_sol_pi_config is None:
+        return None
+    value = json.loads(args.harness_sol_pi_config.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("SoL-Pi configuration must be a JSON object")
+    return value
 
 
 def resolve_provider_settings(

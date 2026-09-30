@@ -203,8 +203,8 @@ for evidence-driven refinement, credible alternatives, and informative controls;
 there are no fixed exploration quotas or round-based curriculum switches.
 
 Each session writes `candidates.json` with exactly 16 distinct legal conditions
-and submits `{"artifact_path":"candidates.json"}`. Each candidate contains only
-`dataset_id`, `conditions`, `change_summary`, and `rationale`; the two notes
+and submits `{"artifact_path":"candidates.json"}`. Each candidate contains
+`dataset_id`, `conditions`, `change_summary`, `rationale`, and optional `comparison_candidate_ids`; the two notes
 are short English descriptions of the proposed change and its hypothesis.
 Python validates the immutable snapshot, official table membership, historical
 exclusion, annotations, and within-session uniqueness. Rejections identify the
@@ -227,6 +227,16 @@ request. Validation also returns `already_evaluated`. The authoritative history
 is projected from engine observations to
 `harness/measured_history/observations.json`; it is shared read-only with the
 policy session, not maintained as a second optimization history.
+
+`describe_reaction_space` exports the legal catalog without scores, and history
+queries export all matching detailed records to a read-only `guest_file` with
+a path and SHA-256. Pagination affects only the displayed response. An unfiltered
+history export is the complete evaluated set; private proposal files are not
+exclusions. Scripts load exact conditions and IDs directly from these files.
+Optional `comparison_candidate_ids` must refer to measured records; unknown IDs
+receive indexed repair errors. References remain metadata, not oracle inputs
+or GP features. `weight_context.proposal_sampling` supplies the policy with the
+actual session count, panel size and repeat rules.
 
 Candidate sessions load `experimental-design`, `scientific-critical-thinking`,
 and `statsmodels` on demand. These task-local adaptations of K-Dense Skills

@@ -36,6 +36,10 @@ test("rejected artifacts can be edited and resubmitted across partial-turn recov
 		let providerHook!: (event: { payload: object }) => unknown;
 		first.createExtension()({ on: (_name: string, hook: typeof providerHook) => { providerHook = hook; } } as never);
 		assert.deepEqual(providerHook({ payload: {} }), { tool_choice: "required" });
+		const compatible = new SubmissionController({ ...config, forceFirstToolCall: false }, workspace);
+		await compatible.begin("policy", "turn-2", join(root, "turns", "turn-2"), async () => {}, validate);
+		compatible.createExtension()({ on: (_name: string, hook: typeof providerHook) => { providerHook = hook; } } as never);
+		assert.deepEqual(providerHook({ payload: {} }), {});
 		await assert.rejects(first.tool().execute("call-1", { artifact_path: "policy.py" }, undefined, undefined, {} as never), /wrong_shape.*Expected two objectives/);
 		assert.equal(first.submission, undefined);
 		assert.deepEqual(providerHook({ payload: { tool_choice: "auto" } }), { tool_choice: "auto" });
@@ -85,8 +89,9 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	sessions.set("b", { runTurn: async () => { await pending; return committed; } });
 	const inputs = [{ profileId: "a", turnId: "a-1" }, { profileId: "b", turnId: "b-1" }] as never;
 	const validate = async () => ({} as never);
+	const authorize = async () => true;
 	let settled = false;
-	const failed = pool.runTurns(inputs, validate).finally(() => { settled = true; });
+	const failed = pool.runTurns(inputs, validate, authorize).finally(() => { settled = true; });
 	const assertion = assert.rejects(failed, (error: unknown) => {
 		assert.ok(error instanceof TurnExecutionError);
 		assert.match(error.message, /provider 502/);
@@ -100,13 +105,24 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	assert.equal(settled, false);
 	release();
 	await assertion;
-	assert.deepEqual(await pool.runTurns(inputs, validate), [{ sessionId: "a" }, committed]);
+	assert.deepEqual(await pool.runTurns(inputs, validate, authorize), [{ sessionId: "a" }, committed]);
 });
 
 test("partial-turn continuation keeps history and classifies execution failures", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-failed-turn-"));
 	try {
 		const messages: string[] = [];
+		const failures = [
+			"session wall-time limit reached: 1800s",
+			"provider response failed: server_error: An error occurred while processing your request.",
+			"provider response failed: internal_server_error: Try again later.",
+			"provider response failed: overloaded_error: Try again later.",
+			"provider response failed: rate_limit_exceeded: Slow down.",
+			"provider response failed: request_timeout: Try again later.",
+			"provider response failed: terminated",
+			"provider response failed: 401 unauthorized",
+			"provider response failed: insufficient_quota: Check billing.",
+		];
 		const profile = Object.assign(Object.create(PersistentProfileSession.prototype), {
 			profileRoot: join(root, "sessions/research"),
 			profile: { profileId: "research" }, config: { artifactRoot: root, limits: {}, submissionContract: { toolName: "submit_candidates" } },
@@ -116,21 +132,27 @@ test("partial-turn continuation keeps history and classifies execution failures"
 			proxy: { beginTurn: async () => {}, endTurn: async () => ({ providerCalls: 3, artifactBytes: 120 }) },
 			promptWithTimeout: async (message: string) => {
 				messages.push(message);
-				throw new Error(messages.length === 1 ? "session wall-time limit reached: 1800s" : "provider response failed: 401 unauthorized");
+				throw new Error(failures[messages.length - 1]);
 			},
 		});
 		await assert.rejects(profile.runTurn({
 			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
-		}, async () => ({})), (error: unknown) => {
+		}, async () => ({}), async () => true), (error: unknown) => {
 			assert.ok(error instanceof TurnExecutionError);
 			assert.equal(error.retryable, true);
 			assert.deepEqual(error.turnUsage, [{ profileId: "research", turnId: "turn-1",
 				usage: { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120 } }]);
 			return true;
 		});
-		await assert.rejects(profile.runTurn({
-			profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
-		}, async () => ({})), (error: unknown) => error instanceof TurnExecutionError && !error.retryable);
+		for (let index = 1; index < failures.length; index += 1) {
+			await assert.rejects(profile.runTurn({
+				profileId: "research", turnId: "turn-1", inputDigest: "digest", historyFromSeq: 0, historyToSeq: 1, message: "ORIGINAL_HISTORY",
+			}, async () => ({}), async () => true), (error: unknown) => {
+				assert.ok(error instanceof TurnExecutionError);
+				assert.equal(error.retryable, index < failures.length - 2, failures[index]);
+				return true;
+			});
+		}
 		assert.match(messages[0]!, /ORIGINAL_HISTORY/);
 		assert.doesNotMatch(messages[1]!, /ORIGINAL_HISTORY/);
 		assert.match(messages[1]!, /Continue the interrupted turn.*Tool budgets have not reset/);
@@ -146,7 +168,7 @@ test("a fatal failure is not masked by another session's recoverable failure", a
 	const sessions = (pool as unknown as { sessions: Map<string, { runTurn: () => Promise<unknown> }> }).sessions;
 	sessions.set("a", { runTurn: async () => { throw new TurnExecutionError("timeout", [], true); } });
 	sessions.set("b", { runTurn: async () => { throw new Error("digest mismatch"); } });
-	await assert.rejects(pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never, async () => ({} as never)),
+	await assert.rejects(pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never, async () => ({} as never), async () => true),
 		(error: unknown) => error instanceof TurnExecutionError && !error.retryable && error.message.includes("digest mismatch"));
 });
 

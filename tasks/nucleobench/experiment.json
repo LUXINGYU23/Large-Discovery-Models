@@ -68,7 +68,7 @@
     "settings": {
       "official_runner": "The source-pinned docker_entrypoint.run_loop drives the optimizer without modification.",
       "candidate_contract": "A start-relative mutation patch over the official editable positions.",
-      "pilot_termination": "Twelve total rounds: one shared-start initialization round and eleven active optimization rounds.",
+      "pilot_termination": "Configured total rounds, including one shared-start initialization round.",
       "official_termination": "Wall time only: eight hours for Malinois, BPNet, and RiNALMo; twelve hours for Enformer.",
       "case_status_source": "tasks/nucleobench/resources/cases/catalog.json",
       "method_providers": {
@@ -87,14 +87,11 @@
   "budget": {},
   "profiles": {
     "pilot_evaluation": {
-      "description": "Twelve-round development comparison for a qualified NucleoBench case.",
-      "budget": {
-        "outer_iterations": 12
-      },
+      "description": "Fixed-round development comparison for a qualified NucleoBench case.",
+      "budget": {},
       "locked_args": {
         "execution-profile": "pilot_evaluation",
         "termination-kind": "rounds",
-        "iterations": 12,
         "initialization-mode": "shared_start"
       }
     },

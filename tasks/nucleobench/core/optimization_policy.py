@@ -59,6 +59,7 @@ class NucleoOptimizationPolicyAdapter:
         gp_config: HammingGPUCBConfig,
         default_alpha: float,
         default_eta: float,
+        proposal_sampling: Mapping[str, Any],
         enabled_capabilities: Sequence[str] = ("prior_mean@1", "ldm_weights@1"),
         evaluations_per_round: int | None = None,
         benchmark_clock: BenchmarkClock | None = None,
@@ -68,6 +69,7 @@ class NucleoOptimizationPolicyAdapter:
             raise ValueError("Nucleo policy seed must be non-negative")
         self.features = feature_encoder
         self.seed = seed
+        self.proposal_sampling = dict(proposal_sampling)
         self.gp_config = gp_config
         self.evaluations_per_round = evaluations_per_round
         self.benchmark_clock = benchmark_clock
@@ -172,6 +174,7 @@ class NucleoOptimizationPolicyAdapter:
                 "target_scale": target_scale,
             },
             "weight_context": {
+                "proposal_sampling": self.proposal_sampling,
                 "seed": self.seed,
                 "history_size": len(history),
                 "unique_candidate_count": len(candidates),

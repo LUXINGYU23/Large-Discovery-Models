@@ -1,6 +1,6 @@
 ---
 name: biopython
-description: Reconstruct and compare DNA candidates, manipulate FASTA, scan both strands with motif matrices, and verify sequence changes before interpreting an experiment. Use when writing or checking sequence-analysis code for this campaign.
+description: Compile chosen DNA edits with the task's candidate tool and analyze exact sequences, motif matrices, and composition with Biopython. Use for parent reconstruction, motif analysis, or candidate construction.
 license: MIT
 metadata:
   runtime: Python 3.11 with Biopython 1.88 and NumPy is preinstalled in the research guest.
@@ -14,38 +14,27 @@ Use the installed library for biological operations. Start with the supplied
 sequence context and measured history; save reusable analysis in the workspace.
 The task's mutation and submission contracts remain authoritative.
 
+For candidate construction, write compact edit data and call the registered
+`compile_candidate_panel` tool. It retains the exact parent background and
+derives absolute, start-relative patches. See the input format and repair
+workflow in [references/panel-construction.md](references/panel-construction.md).
+Do not reimplement the constructor as a large Python script. Keep independent
+scientific analysis in scratch files; it does not gate patch serialization.
+
 ## Reconstruct Before Comparing
 
 Patches use zero-based coordinates relative to the original paired start.
 Fetch a measured parent with `get_sequence_window(candidate_id=..., start=...,
 end_exclusive=...)`; omit `candidate_id` for the original start. The returned
-`bases` and `bases_sha256` identify that exact window. Save the bases and verify
+`guest_file.path` contains exact `bases` and `bases_sha256`. Load it and verify
 their ASCII SHA-256 before computing changes, rather than manually transcribing
 a long mutation list. For a 200-base Malinois sequence, retrieve the complete
 window. For longer cases, retain each window's absolute coordinate offset.
 
-Derive every submitted patch against the original start, not the measured parent.
-For complete-sequence windows saved as `reference_window` and `parent_window`:
-
-```python
-from Bio.Seq import Seq
-from hashlib import sha256
-
-reference = reference_window["bases"]
-parent = parent_window["bases"]
-for window in (reference_window, parent_window):
-    assert sha256(window["bases"].encode("ascii")).hexdigest() == window["bases_sha256"]
-# Apply the intended substitutions to a copy of parent before deriving the patch.
-sequence = parent
-assert len(sequence) == len(reference)
-assert set(sequence) <= set("ACGT")
-patch = [
-    {"position": i, "base": new}
-    for i, (old, new) in enumerate(zip(reference, sequence))
-    if old != new
-]
-reverse = str(Seq(sequence).reverse_complement())
-```
+The compiler derives every patch against the original start, including all
+inherited parent changes. Supply its `parent_candidate_id` rather than manually
+transcribing a measured mutation list. For analysis, load the returned JSON
+window, verify `sha256(bases.encode("ascii"))`, and use `Bio.Seq.Seq` operations.
 
 For equal-length substitution-only candidates, compare original coordinates
 directly. A gapped alignment is not the mutation identity. Check editable
@@ -60,6 +49,12 @@ from string replacement or overlapping module writes.
   construct a PSSM. Record the pseudocount, background, and score threshold.
 - Scan both strands. A consensus-string match is a proxy, not measured binding
   or expression; a toy matrix is not a verified biological motif.
+- For a sourced IUPAC consensus, use `Bio.SeqUtils.nt_search` with the forward
+  consensus and `str(Seq(consensus).reverse_complement())`. Both searches operate
+  on the forward sequence, so both return forward coordinates; do not reverse
+  those coordinates a second time. Motif names are not consensus strings.
+  See the [Biopython sequence-search API](https://biopython.org/docs/latest/api/Bio.SeqUtils.html#Bio.SeqUtils.nt_search)
+  for its `[pattern, position, ...]` return format.
 - Compare the complete reconstructed candidate and its named control, including
   native sites, reverse-strand sites, overlaps, spacing, and composition. Do not
   infer that a motif was removed just because the inserted module was changed.
@@ -68,6 +63,7 @@ For forward-coordinate hits on both strands:
 
 ```python
 import numpy as np
+from Bio.Seq import Seq
 
 # pssm is built from a verified matrix; sequence is the complete DNA sequence.
 hits = []
@@ -100,3 +96,13 @@ Write Python source with the native `write` tool, then execute it with `bash`.
 Do not include shell heredoc delimiters or shell commands inside a `.py` file.
 Check a small example before generating the full panel. The submission file
 must contain exactly the fields and candidate count specified by the turn.
+
+Keep sequence legality separate from biological diagnostics. Length, editable
+coordinates, the submission schema, novelty, and required uniqueness are hard
+constraints. Motif matches, absence filters, and composition preferences depend
+on the research hypothesis. A contradiction means repairing the implementation
+or revising that hypothesis and its notes, not retrying the same impossible
+construction. Preserve parent bases outside deliberate edits; do not search for
+globally motif-free spacers or perfect shuffles. Never label a failed diagnostic
+as passed; qualify the affected claim or revise that placement, retaining useful
+candidates from unrelated hypotheses.

@@ -7,36 +7,23 @@ Public surface:
   OpenAI-compatible endpoint. Reads API key / base URL / model from
   :mod:`tasks.small_molecule.core.llm_advisor.config` (which loads ``.env``).
 * :class:`MockLLMClient` — deterministic script-driven client for
-  tests. Accepts a list of pre-recorded LLM response strings (one per
-  call) and an optional ``scripted_blocks`` shortcut for tests that
-  want to pass parsed blocks directly.
+  tests. Accepts a list of pre-recorded LLM response strings.
 
 Both :class:`OpenAIChatClient` and :class:`MockLLMClient` set
 ``model_name`` so the orchestrator / trajectory can log which model
 produced each response.
 
-The ``MockLLMClient`` supports two styles of scripting:
-
-1. ``scripted_responses: list[str]`` — one pre-recorded LLM output
-   text per call. Useful for testing the parser.
-2. ``scripted_blocks: list[list[LLMBlock]]`` — list of (Phase A,
-   Phase B) block lists per round. The client serializes each list
-   to a proper LLM response on the fly. Useful for testing the
-   orchestrator end-to-end.
-
-If both are provided, ``scripted_responses`` wins.
+The ``MockLLMClient`` serves one pre-recorded response per call.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Iterable, List, Optional, Protocol, Sequence, Union
+from typing import Any, List, Optional, Protocol
 
-from tasks.small_molecule.core.llm_advisor.blocks import LLMBlock
 from tasks.small_molecule.core.llm_advisor.config import LLMClientConfig, load_env
 
 LOGGER = logging.getLogger(__name__)
@@ -163,33 +150,12 @@ class OpenAIChatClient:
 # ---------------------------------------------------------------------------
 
 
-def _serialize_blocks(blocks: Sequence[LLMBlock]) -> str:
-    """Render a list of blocks as a multi-block LLM response.
-
-    Each block is wrapped in its own triple-backtick json fence. The
-    output uses the same fenced JSON block format consumed by the
-    LDM-TTS loop.
-    """
-    parts: List[str] = []
-    for b in blocks:
-        parts.append("```json\n" + json.dumps(b.to_dict(), ensure_ascii=False) + "\n```")
-    return "\n\n".join(parts)
-
-
 @dataclass
 class MockLLMClient:
     """Deterministic script-driven client for tests.
 
-    Two scripting modes:
-
-    * ``scripted_responses`` — a list of pre-recorded LLM response
-      strings. The :meth:`chat` method pops one per call.
-    * ``scripted_blocks`` — a list of block lists (Phase A then Phase B
-      per round). The client serializes each list to a response on
-      the fly.
-
-    If both are set, ``scripted_responses`` wins. If neither is set
-    the client raises :class:`RuntimeError` on the first call.
+    The :meth:`chat` method serves each pre-recorded response in order.
+    If no responses are set, it raises :class:`RuntimeError` on the first call.
 
     The mock records every call (system, user, response) in
     :attr:`call_log` for assertion in tests.
@@ -197,7 +163,6 @@ class MockLLMClient:
 
     model_name: str = "mock-llm"
     scripted_responses: Optional[List[str]] = None
-    scripted_blocks: Optional[List[List[LLMBlock]]] = None
     fail_every: int = 0                                # if > 0, fail every Nth call with ParseError-ish text
     fail_text: str = "this is not a json block"
 
@@ -207,8 +172,6 @@ class MockLLMClient:
     def __post_init__(self) -> None:
         if self.scripted_responses is not None:
             self.scripted_responses = list(self.scripted_responses)
-        if self.scripted_blocks is not None:
-            self.scripted_blocks = [list(b) for b in self.scripted_blocks]
 
     def _next_response(self) -> str:
         # Optional fail-every-N for retry tests.
@@ -226,17 +189,8 @@ class MockLLMClient:
                     f"{len(self.scripted_responses)} scripted responses"
                 )
             text = self.scripted_responses[self._idx]
-        elif self.scripted_blocks is not None:
-            if self._idx >= len(self.scripted_blocks):
-                raise RuntimeError(
-                    f"MockLLMClient exhausted: {self._idx} calls vs "
-                    f"{len(self.scripted_blocks)} scripted block lists"
-                )
-            text = _serialize_blocks(self.scripted_blocks[self._idx])
         else:
-            raise RuntimeError(
-                "MockLLMClient: neither scripted_responses nor scripted_blocks is set"
-            )
+            raise RuntimeError("MockLLMClient: scripted_responses is not set")
         self._idx += 1
         return text
 
