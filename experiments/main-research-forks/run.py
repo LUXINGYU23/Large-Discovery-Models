@@ -73,7 +73,7 @@ def prepare(work, project, image):
                 "schema_version": 1, "name": f"enformer_{stage}_forks_{seed}",
                 "task": "nucleobench", "base_config": str(base_path),
                 "cases": [{"id": CASE, "overrides": []}], "methods": [METHOD],
-                "method_overrides": {},
+                "method_overrides": {METHOD: []},
                 "seeds": [seed], "optimization_rounds": rounds, "initialization_mode": "shared_start",
                 "output_root": str(work / stage / f"seed_{seed}"),
                 "trajectory": {"step_column": "round", "step_kind": "round",
