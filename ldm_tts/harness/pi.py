@@ -64,6 +64,26 @@ class PiWebSearch:
 
 
 @dataclass(frozen=True)
+class PiForkSource:
+    """Immutable session/workspace snapshot at artifact_root/fork-source."""
+
+    session_sha256: str
+    workspace_sha256: str
+    history_cursor: int
+
+    def __post_init__(self) -> None:
+        if any(re.fullmatch(r"[0-9a-f]{64}", value) is None for value in (
+            self.session_sha256, self.workspace_sha256,
+        )) or type(self.history_cursor) is not int or self.history_cursor < 0:
+            raise ValueError("fork source requires SHA-256 digests and a non-negative cursor")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"sessionSha256": self.session_sha256,
+                "workspaceSha256": self.workspace_sha256,
+                "historyCursor": self.history_cursor}
+
+
+@dataclass(frozen=True)
 class PiHarnessConfig(HarnessPoolConfig):
     base_url: str
     model: str
@@ -77,6 +97,7 @@ class PiHarnessConfig(HarnessPoolConfig):
     provider_request_body: dict[str, Any] = field(default_factory=dict)
     force_first_tool_call: bool = True
     sol_pi: dict[str, Any] | None = None
+    fork_source: PiForkSource | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
@@ -139,6 +160,7 @@ class PiHarnessConfig(HarnessPoolConfig):
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
             **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),
             **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
+            **({"forkSource": self.fork_source.to_dict()} if self.fork_source else {}),
         }
 
 

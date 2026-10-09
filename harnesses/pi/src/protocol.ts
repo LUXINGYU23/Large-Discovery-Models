@@ -102,6 +102,7 @@ export interface InitializeFrame extends CommonFrame {
 	providerRequestBody?: Record<string, unknown>;
 	forceFirstToolCall?: boolean;
 	solPi?: Record<string, unknown>;
+	forkSource?: { sessionSha256: string; workspaceSha256: string; historyCursor: number };
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -662,6 +663,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
+		...(data.forkSource === undefined ? [] : ["forkSource"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -730,6 +732,17 @@ export function parseFrame(line: string): InputFrame {
 	}
 
 	const profiles = parseProfiles(data.profiles);
+	let forkSource: InitializeFrame["forkSource"];
+	if (data.forkSource !== undefined) {
+		const source = record(data.forkSource, "forkSource");
+		exactKeys(source, ["sessionSha256", "workspaceSha256", "historyCursor"], "forkSource");
+		forkSource = {
+			sessionSha256: digest(source.sessionSha256, "forkSource.sessionSha256"),
+			workspaceSha256: digest(source.workspaceSha256, "forkSource.workspaceSha256"),
+			historyCursor: nonnegativeInteger(source.historyCursor, "forkSource.historyCursor"),
+		};
+		if (data.solPi !== undefined) throw new ProtocolError("invalid_frame", "forkSource cannot inherit SoL-Pi external state");
+	}
 	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
@@ -764,6 +777,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
 		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
 		...(solPi === undefined ? {} : { solPi }),
+		...(forkSource === undefined ? {} : { forkSource }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
-import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
 	createSyntheticSourceInfo,
@@ -115,7 +115,7 @@ async function optionalJson<T>(path: string): Promise<T | undefined> {
 	}
 }
 
-async function directorySha256(root: string): Promise<string> {
+export async function directorySha256(root: string): Promise<string> {
 	const files: Array<{ path: string; sha256: string }> = [];
 	async function visit(directory: string): Promise<void> {
 		const entries = await readdir(directory, { withFileTypes: true });
@@ -168,6 +168,34 @@ async function copyDirectory(source: string, target: string): Promise<void> {
 		else if (entry.isFile()) await copyFile(sourcePath, targetPath);
 		else throw new Error(`unsupported skill resource entry: ${sourcePath}`);
 	}
+}
+
+/** Commit both inherited files and the native Pi fork before any branch runs. */
+export async function initializeFork(root: string, profileRoot: string, source: NonNullable<InitializeFrame["forkSource"]>): Promise<void> {
+	const snapshot = join(root, "fork-source");
+	const sessionPath = join(snapshot, "session.jsonl");
+	if (sha256(await readFile(sessionPath)) !== source.sessionSha256
+		|| await directorySha256(join(snapshot, "workspace")) !== source.workspaceSha256) {
+		throw new Error("fork source digest mismatch");
+	}
+	const previous = await optionalJson(join(profileRoot, "fork.json"));
+	if (previous) {
+		if (canonicalSha256(previous) !== canonicalSha256(source)) throw new Error("fork identity changed");
+		return;
+	}
+	try {
+		await readdir(profileRoot);
+		throw new Error("branch exists without an atomic fork record");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+	}
+	const staging = `${profileRoot}.fork-staging`;
+	await rm(staging, { recursive: true, force: true });
+	await copyDirectory(join(snapshot, "workspace"), join(staging, "workspace"));
+	SessionManager.forkFrom(sessionPath, join(profileRoot, "workspace"), join(staging, "pi-session"));
+	await atomicJson(join(staging, "fork.json"), source);
+	await mkdir(dirname(profileRoot), { recursive: true });
+	await rename(staging, profileRoot);
 }
 
 async function runtimePackages(): Promise<Record<string, string>> {
@@ -425,6 +453,7 @@ export class PersistentProfileSession {
 	}
 
 	async initialize(): Promise<void> {
+		if (this.config.forkSource) await initializeFork(this.config.artifactRoot, this.profileRoot, this.config.forkSource);
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
 		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
@@ -843,7 +872,7 @@ export class PersistentProfileSession {
 		try {
 			names = await readdir(turnRoot);
 		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return this.config.forkSource?.historyCursor ?? 0;
 			throw error;
 		}
 		const commits = (
@@ -851,7 +880,7 @@ export class PersistentProfileSession {
 		)
 			.filter((value): value is CommittedTurn => value?.profileId === this.profile.profileId)
 			.sort((left, right) => left.roundIndex - right.roundIndex);
-		let cursor = 0;
+		let cursor = this.config.forkSource?.historyCursor ?? 0;
 		for (const commit of commits) {
 			await verifySubmissionRecord(commit, this.config.artifactRoot);
 			if (commit.historyFromSeq !== cursor || commit.historyToSeq < cursor) {
@@ -933,6 +962,7 @@ export class PiSessionPool {
 			thinking: this.config.thinking,
 			...(this.config.providerRequestBody ? { providerRequestBody: this.config.providerRequestBody } : {}),
 			...(this.config.solPi ? { solPi: this.config.solPi } : {}),
+			...(this.config.forkSource ? { forkSource: this.config.forkSource } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
 			submissionContractSha256: this.config.submissionContractSha256,

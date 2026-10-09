@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS, PiHarnessConfig, policy_mcp_server
+from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS, PiForkSource, PiHarnessConfig, policy_mcp_server
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.data import DataCollectionSink
@@ -34,6 +34,7 @@ from ldm_tts.harness import (
     HarnessLimits,
     HarnessNetworkPolicy,
     HarnessProfile,
+    HarnessSubmissionContract,
     PolicyResearchController,
     load_harness_mcp_config,
     parse_tool_call_budgets,
@@ -75,6 +76,7 @@ from tasks.nucleobench.core.factory import (
     build_surrogate_components,
 )
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
+from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, main_research_profile, research_contract
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
@@ -208,6 +210,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-sol-pi-config", type=Path)
+    parser.add_argument("--harness-main-research", action="store_true",
+                        help="Experimental persistent main researcher with disposable per-round Pi forks")
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
@@ -291,6 +295,11 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.harness_main_research and (
+        args.search_method not in PARALLEL_HARNESS_METHODS or args.harness_sol_pi_config is not None
+        or args.termination_kind != "rounds" or args.mock
+    ):
+        parser.error("--harness-main-research requires real round-budgeted parallel Harness without SoL-Pi")
     if args.harness_surrogate_query and args.search_method not in PERSISTENT_HARNESS_METHODS:
         parser.error("--harness-surrogate-query requires a persistent Harness method")
     positive_counts = (
@@ -732,6 +741,7 @@ def _run_real(
             raise ValueError("The original wall-time budget is exhausted")
     client: ProposalClient | None = None
     harness_client: HarnessClient | None = None
+    forked_expander = None
     stack = ExitStack()
     profiles = _harness_profiles(args)
     if args.search_method != "bo":
@@ -752,9 +762,31 @@ def _run_real(
         assert provider is not None
         try:
             mcp = load_harness_mcp_config(args.harness_mcp_config)
-            harness_client = stack.enter_context(
-                _harness_client(args, runtime, provider, prepared, profiles, mcp)
-            )
+            if args.harness_main_research:
+                (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
+                forked_expander = ForkedResearchExpander(
+                    root=runtime.run_dir / "harness",
+                    main_client=lambda: _harness_client(
+                        args, runtime, provider, prepared, main_research_profile(), mcp,
+                        artifact_root=runtime.run_dir / "harness/main", contract=research_contract(),
+                    ),
+                    branch_client=lambda root, source: _harness_client(
+                        args, runtime, provider, prepared, profiles, mcp,
+                        artifact_root=root, fork_source=source,
+                    ),
+                    expander_options={
+                        "domain": NucleoBenchCandidateDomain(prepared.context), "profiles": profiles,
+                        "candidates_per_profile": args.harness_candidates_per_session,
+                        "campaign_id": runtime.run_id, "first_active_round": 1,
+                        "attach_empirical_q0": True, "allow_repeated_occurrences": not args.harness_unique_candidates,
+                        "account": runtime.consume_many, "benchmark_clock": benchmark_clock,
+                        "surrogate_query_config": _gp_config(args) if args.harness_surrogate_query else None,
+                    },
+                )
+            else:
+                harness_client = stack.enter_context(
+                    _harness_client(args, runtime, provider, prepared, profiles, mcp)
+                )
             if args.search_method == COMPILED_POLICY_METHOD:
                 policy_adapter = NucleoOptimizationPolicyAdapter(
                     NucleoPolicyFeatureEncoder(prepared.context),
@@ -764,7 +796,7 @@ def _run_real(
                     default_eta=args.eta,
                     enabled_capabilities=tuple(args.policy_capability),
                     proposal_sampling={
-                        "session_count": len(harness_client.config.profiles),
+                        "session_count": len(profiles),
                         "candidates_per_session": args.harness_candidates_per_session,
                         "within_session_repeats_allowed": not args.harness_unique_candidates,
                         "cross_session_agreement_allowed": True,
@@ -836,6 +868,7 @@ def _run_real(
             client,
             harness_client,
             benchmark_clock,
+            forked_expander,
         )
         designer = NucleoBenchDesigner(
             engine=engine,
@@ -893,7 +926,7 @@ def _run_real(
                 expected_active_steps=expected_active_steps,
                 benchmark_clock=benchmark_clock,
             )
-        if harness_client is not None:
+        if harness_client is not None or forked_expander is not None:
             write_measured_history(runtime.run_dir / "harness", designer.state.observations, prepared.context)
     except Exception as exc:
         status = json.loads(runtime.status.path.read_text(encoding="utf-8"))
@@ -920,8 +953,9 @@ def _real_engine(
     client: ProposalClient | None,
     harness_client: HarnessClient | None,
     benchmark_clock: BenchmarkClock | None = None,
+    forked_expander: ForkedResearchExpander | None = None,
 ) -> LDMEngine:
-    expander = build_proposal_expander(
+    expander = forked_expander or build_proposal_expander(
         args.search_method,
         prepared.context,
         seed=args.campaign_index,
@@ -1030,6 +1064,9 @@ def _campaign_budget(
     elif args.search_method in PARALLEL_HARNESS_METHODS:
         turns = active_rounds * len(args.harness_profile)
         limits.update(proposal_attempts=turns, harness_turns=turns)
+        if args.harness_main_research:
+            limits["harness_turns"] += active_rounds
+            limits["main_research_turns"] = active_rounds
         if args.search_method == COMPILED_POLICY_METHOD:
             limits["policy_harness_turns"] = active_rounds
     elif args.search_method == "harness":
@@ -1102,8 +1139,11 @@ def _harness_client(
     mcp,
     *,
     policy: bool = False,
+    artifact_root: Path | None = None,
+    contract: HarnessSubmissionContract | None = None,
+    fork_source: PiForkSource | None = None,
 ) -> HarnessClient:
-    artifact_root = (runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
+    artifact_root = (artifact_root or runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
     write_harness_sequence_context(
@@ -1111,7 +1151,7 @@ def _harness_client(
         artifact_root / "sequence_context.json",
     )
     mounts = [(resource_root, "/resources", True)]
-    surrogate_query = args.harness_surrogate_query and not policy
+    surrogate_query = args.harness_surrogate_query and not policy and contract is None
     query_environment = {}
     if surrogate_query:
         mounts.append((
@@ -1140,7 +1180,7 @@ def _harness_client(
             diagnostics_sha256=file_sha256(resource_root / "policy_diagnostics.py"),
         ))
     else:
-        submission_contract = harness_submission_contract(args.harness_candidates_per_session)
+        submission_contract = contract or harness_submission_contract(args.harness_candidates_per_session)
         history_path = "/artifacts/measured_history/observations.json"
         (artifact_root / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
     return HarnessClient(
@@ -1171,6 +1211,7 @@ def _harness_client(
             mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
             sol_pi=_sol_pi_config(args),
+            fork_source=fork_source,
             provider_request_body=_parse_extra_body(args.llm_extra_body_json),
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
@@ -1428,6 +1469,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "skills_loaded": True,
         "skill_ids": list(HARNESS_SKILL_IDS),
         "sol_pi": _sol_pi_config(args),
+        "main_research": args.harness_main_research,
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         description["policy_session"] = {

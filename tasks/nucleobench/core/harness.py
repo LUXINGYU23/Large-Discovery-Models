@@ -219,6 +219,7 @@ class NucleoBenchHarnessExpander:
         account: Callable[..., Any] | None = None,
         benchmark_clock: BenchmarkClock | None = None,
         surrogate_query_config: HammingGPUCBConfig | None = None,
+        inherited_history_count: int | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("NucleoBench harness requires at least one profile")
@@ -241,6 +242,7 @@ class NucleoBenchHarnessExpander:
         self.account = account
         self.benchmark_clock = benchmark_clock
         self.surrogate_query_config = surrogate_query_config
+        self.inherited_history_count = inherited_history_count
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -329,6 +331,10 @@ class NucleoBenchHarnessExpander:
         request: ExpansionRequest,
     ) -> tuple[HarnessTurn, ...]:
         history = _history_delta(request, self.first_active_round)
+        if self.inherited_history_count is not None:
+            if self.inherited_history_count != len(request.observations):
+                raise ValueError("A fork is scoped to exactly one round's measured history")
+            history = ()
         serialized_history = serialize_measured_observations(history, self.domain.context)
         write_measured_history(self.artifact_root, request.observations, self.domain.context)
         surrogate_query = (
@@ -372,6 +378,7 @@ class NucleoBenchHarnessExpander:
                     context=self.domain.context,
                     benchmark_time=benchmark_time,
                     surrogate_query=surrogate_query,
+                    forked=self.inherited_history_count is not None,
                 ),
                 forbidden_query_terms=forbidden_query_terms,
             )
@@ -534,6 +541,7 @@ def _turn_message(
     context: MutationContext,
     benchmark_time: dict[str, float | int] | None = None,
     surrogate_query: dict[str, object] | None = None,
+    forked: bool = False,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
@@ -640,8 +648,23 @@ def _turn_message(
             "high predicted UCB is not a measurement. Explain material disagreements in your existing rationale notes. "
             "The final compiled-policy GP may differ. Queries neither submit proposals nor add frequency mass to q0."
         )
+    if forked:
+        payload["message_type"] = "research_fork"
+        payload["history_access"]["description"] = (
+            "The inherited main session already received the current measured history. Use get_measured_history "
+            "for exact details and pagination. The inherited branch_feedback directory contains past proposals, "
+            "including unmeasured ones; those are hypotheses, not measurements."
+        )
+        payload["fork_context"] = (
+            "You are a fresh, one-round branch of the main researcher. Adopt the current AGENTS.md role. "
+            "Inherit the common evidence and workspace, but develop your own candidate panel. "
+            "Earlier submit_research calls belong to the parent; your terminal tool is submit_candidates. "
+            "Other current-round branches are isolated; do not infer their proposals."
+        )
     return (
-        "Continue your persistent sequence-design research role. Use your "
+        ("Begin this round's role-specific research fork. Use your " if forked else
+         "Continue your persistent sequence-design research role. Use your ")
+        +
         "session history, new measurements, public evidence, scratch analysis, and the "
         "structured paired-start tools. Submit a complete validated minibatch before the "
         "turn deadline.\n\n"

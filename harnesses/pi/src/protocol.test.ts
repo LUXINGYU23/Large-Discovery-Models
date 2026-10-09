@@ -98,6 +98,12 @@ test("parseFrame accepts the explicit responses configuration", () => {
 	}));
 	assert.equal(plugin.type, "initialize");
 	if (plugin.type === "initialize") assert.equal(plugin.solPi?.actionFusion, true);
+	const forkSource = { sessionSha256: "a".repeat(64), workspaceSha256: "b".repeat(64), historyCursor: 17 };
+	const fork = parseFrame(JSON.stringify({ ...input, forkSource }));
+	if (fork.type !== "initialize") assert.fail("expected initialize frame");
+	assert.deepEqual(fork.forkSource, forkSource);
+	assert.throws(() => parseFrame(JSON.stringify({ ...input, forkSource: { ...forkSource, historyCursor: -1 } })), /historyCursor/);
+	assert.throws(() => parseFrame(JSON.stringify({ ...input, forkSource, solPi: {} })), /external state/);
 });
 
 test("parseFrame rejects a submission contract with a changed digest", () => {
