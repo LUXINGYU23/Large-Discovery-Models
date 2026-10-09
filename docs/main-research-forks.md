@@ -60,6 +60,10 @@ The runner refuses existing experiment paths, performs dependency/dry-run checks
 qualifies two real rounds, verifies native ancestry/cursors/panel counts, then runs
 four independent campaigns and writes `comparison/summary.json` and `report.md`.
 Failed qualification prevents the full experiment from starting.
+Before hashing the deployed source, the runner copies the October 7 deployment's
+guest Dockerfile, recording its path and SHA-256. That recipe changes only OCI and
+Debian mirrors and reuses the existing qualified guest with its pinned base digest.
+The sidecar is rebuilt with the current locked Pi 0.85.1 dependencies.
 
 | Setting | Value |
 |---|---|

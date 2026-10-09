@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import statistics
 import subprocess
 import sys
@@ -38,6 +39,12 @@ def prepare(work, project, image):
     source = work / "source"
     reference = project / "research/sol-pi-validation-20260921"
     historical = json.loads((reference / "experiment.json").read_text())
+    # Reuse the already-qualified guest byte-for-byte. Its pinned base is unchanged;
+    # the historical deployment recipe uses reachable OCI and Debian mirrors.
+    recipe_relative = Path("tasks/nucleobench/resources/harness/image/Dockerfile")
+    recipe_source = project / "research/pure-harness-pi-ablation-20261007/source" / recipe_relative
+    recipe_sha256 = hashlib.sha256(recipe_source.read_bytes()).hexdigest()
+    shutil.copyfile(recipe_source, source / recipe_relative)
     config = historical["config"]
     config.update(name="enformer_main_research_forks", algorithm="main_research_round_forks",
                   description="Native Pi main-session forks; historical comparison, not isolated causal attribution.")
@@ -75,6 +82,8 @@ def prepare(work, project, image):
             (work / "config" / f"{stage}_{seed}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
     save(work / "experiment.json", {
         "source_sha256": digest, "image": image, "config": config, "seeds": SEEDS,
+        "guest_recipe_deployment": {"source": str(recipe_source), "sha256": recipe_sha256,
+                                    "reason": "Reuse previously qualified guest; mirror-only recipe change"},
         "reference": str(reference), "active_rounds": 20, "evaluations_per_round": 16,
         "proposal_sessions_per_round": 4, "persistent_main_sessions": 1,
         "persistent_policy_sessions": 1, "candidates_per_session": 32, "bo_pool_size": 64,
@@ -125,7 +134,10 @@ def verify_forks(root, rounds):
     assert len(observations) == 1 + 16 * rounds
     assert observations[0]["evaluation"]["metrics"]["utility"] == -3009.28515625
     main = root / "harness/main"
-    assert len(list(main.glob("turns/*/turn_committed.json"))) == rounds
+    main_commits = [json.loads(path.read_text()) for path in main.glob("turns/*/turn_committed.json")]
+    assert len(main_commits) == rounds
+    assert len({item["sessionId"] for item in main_commits}) == 1
+    assert len(list((root / "policy_harness").glob("turns/*/turn_committed.json"))) == rounds
     children = []
     for index in range(1, rounds + 1):
         branch = root / "harness/branches" / f"round_{index:04d}"
