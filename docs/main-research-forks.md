@@ -27,6 +27,12 @@ MCTS: no invented reward, UCB over researcher identities, or extra oracle calls.
 The policy researcher remains a separate persistent session. Ending child runtimes
 does not erase their traces, files or cost records.
 
+The main role performs evidence synthesis, not new remote investigations. An
+initial qualification attempt exposed serialized BLAST polling before any branch
+started; that attempt is retained as `qualification-open-ended-main`, including
+its consumed tokens. The main prompt was tightened before the formal experiment.
+New searches and long analyses belong in the parallel branches.
+
 ## State, recovery and costs
 
 - `harness/main`: persistent main identity and turn commits.

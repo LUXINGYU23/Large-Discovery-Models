@@ -210,6 +210,10 @@ def compare(work, project):
               "historical_mean_total_tokens": statistics.mean(r["historical_usage"]["total_tokens"] for r in rows),
               "paired_utility_wins": sum(r["utility_difference"] > 0 for r in rows),
               "limitations": "Four-seed historical comparison; roles, time/endpoint, source and image differ. No causal or stable-improvement claim."}
+    result["qualification_usage"] = usage(campaign(work, "smoke", 42))[0]
+    aborted = work / "qualification-open-ended-main/qualification-aborted.json"
+    if aborted.exists():
+        result["aborted_qualification"] = json.loads(aborted.read_text())
     save(work / "comparison/summary.json", result)
     trajectories = []
     for seed in SEEDS:
