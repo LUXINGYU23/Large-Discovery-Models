@@ -273,18 +273,26 @@ def main():
     if (work / "experiment.json").exists():
         raise FileExistsError("Experiment already prepared; do not silently restart or overwrite it")
     image = subprocess.check_output(["docker", "image", "inspect", args.image, "--format", "{{.Id}}"], text=True).strip()
-    digest = prepare(work, args.project, image)
-    env = environment(work, args.project, digest)
-    with (work / "logs/preflight.log").open("x") as log:
-        for command in ([sys.executable, "scripts/check_task_dependencies.py", str(work / "config/base.yaml")],
-                        [sys.executable, "scripts/run_pilot_evaluation.py", str(work / "config/runs_42.yaml"), "--dry-run"]):
-            subprocess.run(command, cwd=work / "source", env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
-    run(work, "smoke", 42, env)
-    save(work / "smoke-verification.json", verify_forks(campaign(work, "smoke", 42), 2))
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(run, work, "runs", seed, env) for seed in SEEDS]
-        for future in futures: future.result()
-    compare(work, args.project)
+    # Keep the image in use between short-lived pools on a shared pruning host.
+    lease = subprocess.check_output(["docker", "run", "-d", "--rm", "--label",
+                                    "ldm.experiment=main-research-forks", "--entrypoint",
+                                    "/bin/sleep", image, "infinity"], text=True).strip()
+    save(work / "runtime-lease.json", {"container": lease, "image": image})
+    try:
+        digest = prepare(work, args.project, image)
+        env = environment(work, args.project, digest)
+        with (work / "logs/preflight.log").open("x") as log:
+            for command in ([sys.executable, "scripts/check_task_dependencies.py", str(work / "config/base.yaml")],
+                            [sys.executable, "scripts/run_pilot_evaluation.py", str(work / "config/runs_42.yaml"), "--dry-run"]):
+                subprocess.run(command, cwd=work / "source", env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+        run(work, "smoke", 42, env)
+        save(work / "smoke-verification.json", verify_forks(campaign(work, "smoke", 42), 2))
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [pool.submit(run, work, "runs", seed, env) for seed in SEEDS]
+            for future in futures: future.result()
+        compare(work, args.project)
+    finally:
+        subprocess.run(["docker", "rm", "-f", lease], check=False, stdout=subprocess.DEVNULL)
 
 
 if __name__ == "__main__":
