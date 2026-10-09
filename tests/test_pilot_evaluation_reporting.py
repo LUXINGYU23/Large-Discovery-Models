@@ -51,6 +51,21 @@ def test_minimization_verdict_treats_lower_ldm_values_as_better() -> None:
     ]
 
 
+def test_main_research_turns_are_counted_without_inflating_proposal_attempts():
+    spec = SimpleNamespace(methods=("ldm_harness",), iterations=3, optimization_rounds=2)
+    row = {
+        "case": "case", "seed": 42, "method": "ldm_harness", "completed_rounds": 3,
+        "budget_outer_iterations": 3, "candidate_ids_unique": True,
+        "initial_candidate_ids": ("shared",), "proposal_samples": 128,
+        "harness_candidates_per_session": 32, "budget_proposal_attempts": 8,
+        "harness_main_research": True, "budget_main_research_turns": 2, "budget_harness_turns": 10,
+    }
+    assert _integrity(spec, [row], [{}] * 3)["valid"]
+    for overrides in ({"budget_main_research_turns": 0}, {"budget_harness_turns": 8},
+                      {"budget_proposal_attempts": 10}, {"harness_main_research": False}):
+        assert not _integrity(spec, [{**row, **overrides}], [{}] * 3)["valid"]
+
+
 def test_harness_receives_its_own_baseline_verdict() -> None:
     values = {
         "ldm": 2.0,
