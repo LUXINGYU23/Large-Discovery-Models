@@ -40,6 +40,24 @@ def research_contract() -> HarnessSubmissionContract:
     )
 
 
+def write_fork_provenance(root: Path, *, compiled_policy: bool) -> None:
+    """Declare the tree through the pilot runner's existing multi-pool contract."""
+    root = root.resolve()
+    branches = sorted((root / "branches").glob("round_*/manifest.json"))
+    if not branches:
+        raise ValueError("A completed research tree requires branch manifests")
+    paths = {"main_research": root / "main/manifest.json",
+             **{f"proposal_{path.parent.name}": path for path in branches}}
+    if compiled_policy:
+        paths["policy"] = root.parent / "policy_harness/manifest.json"
+    if any(not path.is_file() for path in paths.values()):
+        raise ValueError("A completed research tree is missing a pool manifest")
+    atomic_json_write(root.parent / "harness_provenance.json", {
+        "schema_version": 1,
+        "pools": {name: [path.relative_to(root.parent).as_posix()] for name, path in paths.items()},
+    })
+
+
 def snapshot_fork(source_session: Path, workspace: Path, target: Path, cursor: int) -> PiForkSource:
     """Freeze conversation and ordinary files atomically; never share writable inodes."""
     manifest = target / "snapshot.json"

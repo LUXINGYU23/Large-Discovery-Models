@@ -8,7 +8,7 @@ import pytest
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.harness import HarnessError
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
-from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, snapshot_fork
+from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, snapshot_fork, write_fork_provenance
 from tasks.nucleobench.core.harness import harness_profiles
 from tasks.nucleobench.core.mock import MOCK_CONTEXT
 from tasks.nucleobench.core.workflow import _campaign_budget, parse_args
@@ -113,3 +113,23 @@ def test_failed_main_turn_is_billed_before_any_fork(tmp_path):
     with pytest.raises(HarnessError):
         expander.expand(ExpansionRequest(round_idx=1, reservoir_size=4))
     assert any(c.get("llm_requests") == 7 for c in billed)
+
+
+def test_tree_declaration_is_accepted_by_pilot_reporting(tmp_path):
+    from ldm_tts.pilot_evaluation.execution import _mark_completed
+    pool_paths = ("harness/main", "harness/branches/round_0001", "harness/branches/round_0002", "policy_harness")
+    for name in pool_paths:
+        path = tmp_path / name / "manifest.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"campaignId": "test", "taskId": "nucleobench", "seed": 42,
+                                    "profiles": [{"profileId": "research"}], "limits": {"toolCallBudgets": {}}}))
+    write_fork_provenance(tmp_path / "harness", compiled_policy=True)
+    entry = {}
+    _mark_completed(entry, SimpleNamespace(output_root=tmp_path.parent),
+                    SimpleNamespace(run_dir=tmp_path, method="ldm_harness_compiled"))
+    assert entry["status"] == "completed"
+    assert set(entry["harness"]) == {"main_research", "proposal_round_0001", "proposal_round_0002", "policy"}
+    broken = tmp_path / "harness/branches/round_0002/manifest.json"
+    data = json.loads(broken.read_text()); data["seed"] = 43; broken.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="identities differ"):
+        _mark_completed({}, SimpleNamespace(output_root=tmp_path.parent), SimpleNamespace(run_dir=tmp_path))

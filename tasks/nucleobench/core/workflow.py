@@ -76,7 +76,9 @@ from tasks.nucleobench.core.factory import (
     build_surrogate_components,
 )
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
-from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, main_research_profile, research_contract
+from tasks.nucleobench.core.forked_harness import (
+    ForkedResearchExpander, main_research_profile, research_contract, write_fork_provenance,
+)
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
@@ -298,8 +300,9 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     if args.harness_main_research and (
         args.search_method not in PARALLEL_HARNESS_METHODS or args.harness_sol_pi_config is not None
         or args.termination_kind != "rounds" or args.mock
+        or args.iterations is None or args.iterations < 2
     ):
-        parser.error("--harness-main-research requires real round-budgeted parallel Harness without SoL-Pi")
+        parser.error("--harness-main-research requires real parallel Harness with at least one active round and without SoL-Pi")
     if args.harness_surrogate_query and args.search_method not in PERSISTENT_HARNESS_METHODS:
         parser.error("--harness-surrogate-query requires a persistent Harness method")
     positive_counts = (
@@ -928,6 +931,8 @@ def _run_real(
             )
         if harness_client is not None or forked_expander is not None:
             write_measured_history(runtime.run_dir / "harness", designer.state.observations, prepared.context)
+        if forked_expander is not None:
+            write_fork_provenance(runtime.run_dir / "harness", compiled_policy=args.search_method == COMPILED_POLICY_METHOD)
     except Exception as exc:
         status = json.loads(runtime.status.path.read_text(encoding="utf-8"))
         if status.get("status") != "failed":
