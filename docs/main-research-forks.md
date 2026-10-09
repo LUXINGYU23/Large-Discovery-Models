@@ -97,3 +97,38 @@ usage must be reported. Four-seed historical results cannot isolate the fork
 mechanism: role prompts, source revisions, rebuilt runtime and endpoint time also
 change. A smaller token total alone is not evidence of better performance or
 lower billed cost; compare uncached/output use and per-seed outcomes too.
+
+## Qualification result (2026-10-09)
+
+The two-round seed-42 qualification completed 33 true evaluations, two turns in
+the same main identity, eight distinct native forks, and two policy turns. The
+second parent retained the main session ID and contained no newly created trace
+nodes from the previous children. Real calls confirmed copied parent histories;
+the unit tests also verify workspace isolation and immutable snapshot replay.
+241 Python checks and 38 Pi checks passed on the remote server.
+
+| First two active rounds, seed 42 | Main research forks | Historical LDM |
+|---|---:|---:|
+| Best measured utility | 67.29297 | -1612.30664 |
+| Provider calls | 229 | 224 |
+| Input + output tokens | 20,050,748 | 18,612,784 |
+| Uncached input tokens | 544,237 | 289,222 |
+| Output tokens | 386,383 | 412,394 |
+
+All 229 responses had recorded usage. The main researcher alone consumed
+1,580,333 tokens. Total tokens were 7.7% higher than the historical two-round
+prefix; this qualification does **not** establish token savings or stable utility
+improvement. The earlier aborted open-ended-main trial consumed another 405,602
+tokens, retained separately as development/qualification overhead.
+
+The qualification exposed two reporting assumptions: a single proposal-pool
+manifest and equal proposal-attempt/harness-turn counts. The implementation now
+declares main, per-round proposal and policy pools through `harness_provenance.json`
+and validates the extra main turns separately. Existing completed measurements
+were republished with the repaired reporter without further provider/oracle calls.
+
+Four formal 20-round campaigns were launched at revision `b1a49c68`. Their source
+snapshot is frozen in `formal-launch.json` and `source-manifest.json`; the earlier
+qualification snapshot is retained separately. They are running, so no final
+four-seed claim is available yet. The remote driver will generate the comparison
+JSON, Markdown, trajectories and plots after all four campaigns finish.
