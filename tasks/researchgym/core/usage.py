@@ -43,6 +43,29 @@ class ApiPricing:
         if spent >= self.budget_usd:
             raise ApiBudgetExhausted(f"measured API cost {spent:.4f} USD reached the {self.budget_usd} USD cap")
 
+    def authorize_reservation(self, runtime, *, outstanding_usd: float, request_usd: float) -> None:
+        """Admit one provider request without allowing concurrent turn calls to bypass a cap.
+
+        The provider reports exact usage only after a response. Harness callers
+        therefore reserve a configured upper bound before opening the request and
+        settle it from the sidecar capture afterwards. The reserve must be
+        conservative: it is a hard-stop guard, not a price estimate.
+        """
+        if self.budget_usd is None:
+            return
+        if request_usd <= 0:
+            raise ValueError("provider request reservation must be positive when an API budget is configured")
+        if outstanding_usd < 0:
+            raise ValueError("outstanding provider reservations cannot be negative")
+        spent = float(runtime.budget.counters.get("api_cost_usd", 0.0))
+        projected = spent + outstanding_usd + request_usd
+        if projected > self.budget_usd:
+            raise ApiBudgetExhausted(
+                "API budget would be exceeded by the next Harness provider request: "
+                f"measured={spent:.4f}, reserved={outstanding_usd:.4f}, "
+                f"next={request_usd:.4f}, cap={self.budget_usd:.4f} USD"
+            )
+
 
 def normalize_tokens(usage: Any) -> dict[str, float] | None:
     """Map Chat Completions or Responses usage objects onto input/output tokens."""

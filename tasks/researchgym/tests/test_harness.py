@@ -15,11 +15,12 @@ from tasks.researchgym.core import workflow
 from tasks.researchgym.core.candidate import ProgramDomain
 from tasks.researchgym.core.cases import load_case
 from tasks.researchgym.core.harness import (
-    PROPOSAL_SKILLS, RESOURCE_ROOT, TOOL_FILE, HarnessProgramSource, create_client, profiles, write_context,
+    PROPOSAL_SKILLS, RESOURCE_ROOT, TOOL_FILE, HarnessProgramSource, ProviderAuthorizationLedger, create_client,
+    profiles, write_context,
 )
 from tasks.researchgym.core.proposals import ProposalExhausted
 from tasks.researchgym.core.sampling import Q0_KEY, attach_empirical_base_measure
-from tasks.researchgym.core.usage import ApiPricing
+from tasks.researchgym.core.usage import ApiBudgetExhausted, ApiPricing
 
 CASE = load_case("continual_learning")
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
@@ -33,7 +34,7 @@ class Runtime:
         return self.budget.consume_many(amounts, usage_key=usage_key)
 
 
-def make_source(tmp_path, mode, sessions=2, runtime=None):
+def make_source(tmp_path, mode, sessions=2, runtime=None, pricing=None, reserve_usd=None):
     args = workflow.parse_args(["--mock", "--case", CASE.case_id, "--search-method", "ldm_harness",
                                 "--harness-sessions", str(sessions), "--harness-command-json", "[]"])
     args.provider_api_key = "synthetic-fixture-key"
@@ -41,8 +42,13 @@ def make_source(tmp_path, mode, sessions=2, runtime=None):
     write_context(root, CASE, {"models/base.py": "class BaseLearner: ..."}, {"harness_sessions": sessions})
     client = create_client(args, root, "fixture-campaign", CASE, command=[sys.executable, "-u", str(FIXTURE), mode])
     client.start()
-    source = HarnessProgramSource(client, root, args, CASE, pricing=ApiPricing(1.0, 2.0))
+    pricing = pricing or ApiPricing(1.0, 2.0)
+    source = HarnessProgramSource(client, root, args, CASE, pricing=pricing)
     source.runtime = runtime or Runtime(tmp_path / "budget.json")
+    source.configure_provider_authorization(ProviderAuthorizationLedger(
+        root=root, runtime=source.runtime, pricing=pricing, campaign_id="fixture-campaign",
+        usage_prefix="harness", reserve_usd=reserve_usd,
+    ))
     return source
 
 
@@ -76,9 +82,24 @@ def test_sessions_repair_in_place_and_keep_lineage_and_usage(tmp_path):
     assert sessions[0]["errors"][0]["path"] == "/artifact_path/candidates/0/program"
     counters = source.runtime.budget.counters
     assert counters["harness_turns"] == 2 and counters["harness_provider_calls"] == 4
-    assert counters["harness_input_tokens"] == 2000 and counters["api_cost_usd"] == pytest.approx(2 * (1000 + 400) / 1e6)
+    assert counters["harness_provider_requests"] == 4
+    assert counters["harness_input_tokens"] == 4000 and counters["api_cost_usd"] == pytest.approx(4 * (1000 + 400) / 1e6)
+    assert {json.loads(path.read_text())["status"] for path in (tmp_path / "harness/provider_authorizations").glob("*.json")} == {"reconciled"}
     assert len(batch.attempts) == 2 and all(a.metadata["ldm_proposal_attempt_receipt"].startswith("harness:")
                                             for a in batch.attempts)
+
+
+def test_provider_authorization_reserves_budget_before_a_second_provider_call(tmp_path):
+    pricing = ApiPricing(1.0, 2.0, budget_usd=0.002)
+    source = make_source(tmp_path, "repair", pricing=pricing, reserve_usd=0.0015)
+    try:
+        with pytest.raises(ApiBudgetExhausted, match="would be exceeded"):
+            collect(source)
+    finally:
+        source.client.close()
+    assert source.runtime.budget.counters["harness_provider_requests"] == 1
+    receipts = list((tmp_path / "harness/provider_authorizations").glob("*.json"))
+    assert len(receipts) == 1 and json.loads(receipts[0].read_text())["status"] == "authorized"
 
 
 def test_cross_session_agreement_enters_q0(tmp_path):

@@ -10,7 +10,7 @@ submission. It is available through three search methods:
 | `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
-Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, ReaSyn, and ResearchGym are the current
 task-local integrations. The shared Harness does not know their candidate
 identity, legal search space, duplicate policy, surrogate, or evaluator.
 

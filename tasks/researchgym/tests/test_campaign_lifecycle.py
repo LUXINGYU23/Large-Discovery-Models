@@ -101,7 +101,7 @@ def test_compiled_policy_campaign_applies_mean_and_weights(tmp_path, monkeypatch
     counters = budget(run_dir)
     assert counters["policy_harness_turns"] >= 1 and counters["harness_turns"] == 4
     # Policy-session tokens come from its own provider captures and count toward the API cost.
-    assert counters["policy_input_tokens"] == 1000 * counters["policy_harness_turns"]
+    assert counters["policy_input_tokens"] == 2000 * counters["policy_harness_turns"]
     assert json.loads((run_dir / "harness_provenance.json").read_text())["pools"]["policy_harness"]
 
 
