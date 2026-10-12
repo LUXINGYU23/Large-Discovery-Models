@@ -10,6 +10,7 @@ from pathlib import Path
 from ldm_tts.registration.dependencies import (
     check_cuda_visibility, check_llm_settings, fail, ok, parse_device_ids, plan_check_context, skip, warn,
 )
+from tasks.researchgym.core.workflow import requires_provider_proposals
 
 HARNESS_METHODS = {"harness", "ldm_harness", "ldm_harness_compiled"}
 CASE_IMPORTS = {
@@ -27,15 +28,22 @@ def check_dependencies(plan, *, include_optional=True):
     if method == "bo":
         return [fail(task, "search method", "bo is not supported for ResearchGym program search.")]
     harness = method in HARNESS_METHODS
+    provider_proposals = requires_provider_proposals(_DependencyArgs(args))
     if harness:
-        checks.extend(_harness_checks(task, args, env))
+        if provider_proposals:
+            checks.extend(_harness_checks(task, args, env))
+        else:
+            checks.append(skip(task, "harness sidecar", "One-round shared-start evaluates only the released seed."))
     mock = bool(args.get("mock")) or mode == "mock"
     if mock:
         checks.append(ok(task, "mock", "Synthetic proposals and analytic scores need no dataset, GPU or endpoint."))
         return checks
-    checks.extend(check_llm_settings(task, args, env, url_arg="llm-url", model_arg="llm-model", api_arg="llm-api-key",
-                                     url_env=("LLM_BASE_URL", "LDM_LLM_URL"), model_env=("LLM_MODEL_NAME", "LDM_LLM_MODEL"),
-                                     api_env=("LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"), required=True))
+    if provider_proposals:
+        checks.extend(check_llm_settings(task, args, env, url_arg="llm-url", model_arg="llm-model", api_arg="llm-api-key",
+                                         url_env=("LLM_BASE_URL", "LDM_LLM_URL"), model_env=("LLM_MODEL_NAME", "LDM_LLM_MODEL"),
+                                         api_env=("LLM_API_KEY", "LDM_LLM_API_KEY", "OPENAI_API_KEY"), required=True))
+    else:
+        checks.append(skip(task, "LLM endpoint", "One-round shared-start evaluates only the released seed."))
     from tasks.researchgym.core.cases import load_case
     from tasks.researchgym.core.source import SourceMismatchError, UpstreamCase
 
@@ -71,6 +79,14 @@ def check_dependencies(plan, *, include_optional=True):
     else:
         checks.append(warn(task, "devices", "No --devices; case jobs run without CUDA_VISIBLE_DEVICES assignment."))
     return checks
+
+
+class _DependencyArgs:
+    """Minimal argparse-shaped view for the shared offline-seed predicate."""
+
+    def __init__(self, args):
+        self.initialization_mode = args.get("initialization-mode", "none")
+        self.iterations = int(args.get("iterations", 4))
 
 
 def _tse_checkpoints(task, case, root, data_root):
