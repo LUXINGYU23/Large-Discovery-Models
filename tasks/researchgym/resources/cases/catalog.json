@@ -139,7 +139,8 @@
      "--real-explainer",
      "{slot}"
     ],
-    "scratch_markdown_source": "task_description.md"
+    "scratch_markdown_source": "task_description.md",
+    "rendered_method_label": "LDM"
    },
    "coverage": {
     "kind": "tse_real",
@@ -302,7 +303,8 @@
      "--table",
      "cifar100"
     ],
-    "scratch_markdown_source": "task_description.md"
+    "scratch_markdown_source": "task_description.md",
+    "rendered_method_label": "LDM"
    },
    "coverage": {
     "kind": "cl_table",
@@ -446,8 +448,13 @@
      "qs_image",
      "--json-out",
      "{summary}",
-     "--no-markdown"
-    ]
+     "--md",
+     "{scratch_markdown}",
+     "--method",
+     "LDM"
+    ],
+    "scratch_markdown_source": "task_description.md",
+    "rendered_method_label": "LDM"
    },
    "coverage": {
     "kind": "cmr_row",
@@ -576,8 +583,13 @@
      "results/{slot}",
      "--json-out",
      "{summary}",
-     "--no-markdown"
-    ]
+     "--md",
+     "{scratch_markdown}",
+     "--method",
+     "LDM"
+    ],
+    "scratch_markdown_source": "task_description.md",
+    "rendered_method_label": "LDM"
    },
    "coverage": {
     "kind": "rl_environment",

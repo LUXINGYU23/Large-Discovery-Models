@@ -198,13 +198,13 @@ incomplete rather than scored.
 
 ### Main-table artifacts
 
-For every completed time-series candidate, the upstream grader writes its
-real-data Table 1 into `evaluations/<candidate>/grader_description.md`. The
-row is labelled `LDM` and is rendered from the same 10 cells and five-fold
-aggregates checked for scoring. This is a copy of the pinned task description;
-the source checkout is never edited. It is a Table 1 row only: the synthetic
-Switch-Feature and State tables remain unreported, so the campaign still
-declares `official_protocol: false`.
+For every completed candidate, the upstream grader writes its covered main
+table into `evaluations/<candidate>/grader_description.md`, with the method
+row labelled `LDM`. This is a copy of the pinned task description; the source
+checkout is never edited. The rendered table is limited to the declared
+sub-protocol: TSE real-data Table 1, CL CIFAR100 Table 3a, CMR COCO-C image
+shift Table 1, or RL DMC Table 1. Uncovered cells stay `--`, and every case
+continues to declare `official_protocol: false`.
 
 ## Data collection
 

@@ -144,8 +144,9 @@ class ResearchGymEvaluator(_ReceiptMixin):
         grader_binding = {"python": self.python, "slot": SLOT, "summary": str(summary_path),
                           "scratch_markdown": str(root / "grader_description.md")}
         source = self.case.raw["grader"].get("scratch_markdown_source")
+        scratch_markdown = root / "grader_description.md"
         if source:
-            shutil.copy(workspace / source, root / "grader_description.md")
+            shutil.copy(workspace / source, scratch_markdown)
         remaining = self.clock.remaining()
         grade = ProcessTreeRunner(max_parallel=1, grace_seconds=self.grace_seconds, base_env=self.base_env).run(
             [JobCommand("grader", tuple(render(self.case.raw["grader"]["argv"], grader_binding)))],
@@ -159,6 +160,11 @@ class ResearchGymEvaluator(_ReceiptMixin):
                 error=f"official grader {grade.status} (exit {grade.returncode})",
                 artifacts=artifacts, resource_usage=usage, metadata=metadata))
         artifacts["grade_summary"] = _relative(summary_path, self.run_dir)
+        if source:
+            label = self.case.raw["grader"].get("rendered_method_label")
+            if label:
+                _label_rendered_method_rows(scratch_markdown, label)
+            artifacts["main_table"] = _relative(scratch_markdown, self.run_dir)
         try:
             metrics = score_summary(self.case, json.loads(summary_path.read_text()))
         except (CoverageError, ValueError, TypeError, KeyError) as exc:
@@ -206,3 +212,18 @@ def _relative(path, root: Path) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return str(path)
+
+
+def _label_rendered_method_rows(markdown_path: Path, label: str) -> None:
+    """Relabel upstream placeholder rows in an artifact copy.
+
+    The continual-learning grader hard-codes ``Your Method`` whereas the other
+    ResearchGym graders accept a method-label flag. This runs after the official
+    grader produces its numeric row and edits only the reporting copy. Empty
+    rows remain ``--`` so unsupported table cells are never fabricated.
+    """
+    text = markdown_path.read_text()
+    lines = [line.replace("| Your Method |", f"| {label} |", 1)
+             if line.strip().startswith("| Your Method |") else line
+             for line in text.splitlines()]
+    markdown_path.write_text("\n".join(lines) + ("\n" if text.endswith("\n") else ""))
