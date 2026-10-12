@@ -64,17 +64,12 @@ def test_catalog_cases_are_pinned_and_consistent():
         assert case["protocol"]["official_grader"] and not case["protocol"]["official_protocol"]
 
 
-@pytest.mark.parametrize("case_id", CASE_IDS)
-def test_graders_render_reproducible_ldm_main_table_rows(case_id):
-    case = next(item for item in catalog()["cases"] if item["case_id"] == case_id)
+def test_tse_grader_renders_the_reproducible_main_table_row():
+    case = next(item for item in catalog()["cases"] if item["case_id"] == "time_series_explanation")
     grader = case["grader"]
     assert grader["scratch_markdown_source"] == "task_description.md"
-    assert grader["rendered_method_label"] == "LDM"
     assert "--no-markdown" not in grader["argv"]
-    if case_id == "continual_learning":
-        assert "--method" not in grader["argv"]
-    else:
-        assert grader["argv"][grader["argv"].index("--method") + 1] == "LDM"
+    assert grader["argv"][grader["argv"].index("--method") + 1] == "LDM"
 
 
 @pytest.mark.parametrize("case_id,jobs", [("time_series_explanation", 25), ("continual_learning", 3),

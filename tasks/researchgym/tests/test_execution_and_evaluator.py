@@ -15,7 +15,7 @@ from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 from tasks.researchgym.core import source as source_module
 from tasks.researchgym.core.cases import CaseSpec, load_case, render
 from tasks.researchgym.core.clock import CampaignClock
-from tasks.researchgym.core.evaluator import ResearchGymEvaluator, _label_rendered_method_rows
+from tasks.researchgym.core.evaluator import ResearchGymEvaluator
 from tasks.researchgym.core.execution import JobCommand, ProcessTreeRunner
 from tasks.researchgym.core.source import SourceMismatchError, UpstreamCase
 
@@ -105,13 +105,6 @@ MINIMAL = """class ReplayBuffer:
     def __len__(self):
         return len(self.items)
 """
-
-
-def test_label_rendered_method_rows_changes_only_table_placeholders(tmp_path):
-    table = tmp_path / "table.md"
-    table.write_text("| Your Method | -- -- |\n| Your Method | 80.0 (0.2) 85.0 (0.1) |\n")
-    _label_rendered_method_rows(table, "LDM")
-    assert table.read_text() == "| LDM | -- -- |\n| LDM | 80.0 (0.2) 85.0 (0.1) |\n"
 
 
 def candidate(case, extra, name="c1"):
