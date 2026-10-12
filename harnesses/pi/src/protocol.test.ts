@@ -236,6 +236,20 @@ test("parseFrame accepts a consistent submission validation result", () => {
 	}
 });
 
+test("parseFrame requires an exact provider authorization result", () => {
+	const frame = {
+		type: "provider_authorization_result", requestId: "run-1",
+		protocolVersion: SIDECAR_RELEASE_VERSION, campaignId: "campaign-1",
+		authorizationId: "authorization-1", providerRequestId: "turn-provider-1",
+		requestDigest: "d".repeat(64), authorized: true,
+	};
+	assert.deepEqual(parseFrame(JSON.stringify(frame)), frame);
+	assert.throws(() => parseFrame(JSON.stringify({ ...frame, authorized: 1 })),
+		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame");
+	assert.throws(() => parseFrame(JSON.stringify({ ...frame, extra: true })),
+		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame");
+});
+
 test("parseFrame rejects inconsistent submission validation results", () => {
 	assert.throws(
 		() => parseFrame(JSON.stringify({
