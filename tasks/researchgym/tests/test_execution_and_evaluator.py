@@ -164,6 +164,18 @@ def test_modified_or_missing_pinned_files_are_rejected(synthetic_case):
         upstream.verify()
 
 
+def test_continual_learning_requires_the_pinned_cifar_archive(tmp_path):
+    case = load_case("continual_learning")
+    data_root = tmp_path / "data"
+    (data_root / "data").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError, match="official CIFAR-100 archive"):
+        source_module._verify_case_data_artifacts(case, data_root)
+    archive = data_root / "data/cifar-100-python.tar.gz"
+    archive.write_bytes(b"not the CIFAR archive")
+    with pytest.raises(SourceMismatchError, match="not the official CIFAR-100 archive"):
+        source_module._verify_case_data_artifacts(case, data_root)
+
+
 def pinned_checkout(case, destination):
     """Extract the case from Git objects at the pinned commit, ignoring working-tree edits."""
     root = Path.home() / "ResearchGym"
