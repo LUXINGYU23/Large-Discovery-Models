@@ -64,6 +64,14 @@ def test_catalog_cases_are_pinned_and_consistent():
         assert case["protocol"]["official_grader"] and not case["protocol"]["official_protocol"]
 
 
+def test_tse_grader_renders_the_reproducible_main_table_row():
+    case = next(item for item in catalog()["cases"] if item["case_id"] == "time_series_explanation")
+    grader = case["grader"]
+    assert grader["scratch_markdown_source"] == "task_description.md"
+    assert "--no-markdown" not in grader["argv"]
+    assert grader["argv"][grader["argv"].index("--method") + 1] == "LDM"
+
+
 @pytest.mark.parametrize("case_id,jobs", [("time_series_explanation", 25), ("continual_learning", 3),
                                           ("cross_modal_retrieval", 16), ("improving_replay_buffers", 2)])
 def test_benchmark_job_budget_counts_the_full_job_matrix(case_id, jobs):

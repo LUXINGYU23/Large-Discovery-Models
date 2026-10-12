@@ -196,6 +196,16 @@ campaign files. Pilot reporting requires at least one successful evaluation per
 round; a round in which every candidate fails is reported by the pilot tool as
 incomplete rather than scored.
 
+### Main-table artifacts
+
+For every completed time-series candidate, the upstream grader writes its
+real-data Table 1 into `evaluations/<candidate>/grader_description.md`. The
+row is labelled `LDM` and is rendered from the same 10 cells and five-fold
+aggregates checked for scoring. This is a copy of the pinned task description;
+the source checkout is never edited. It is a Table 1 row only: the synthetic
+Switch-Feature and State tables remain unreported, so the campaign still
+declares `official_protocol: false`.
+
 ## Data collection
 
 Direct methods append accepted submissions as `ldm-2.0` complete-design rows

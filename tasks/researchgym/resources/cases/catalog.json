@@ -130,12 +130,16 @@
      "logs",
      "--json-out",
      "{summary}",
-     "--no-markdown",
+     "--md",
+     "{scratch_markdown}",
+     "--method",
+     "LDM",
      "--table",
      "real",
      "--real-explainer",
      "{slot}"
-    ]
+    ],
+    "scratch_markdown_source": "task_description.md"
    },
    "coverage": {
     "kind": "tse_real",
