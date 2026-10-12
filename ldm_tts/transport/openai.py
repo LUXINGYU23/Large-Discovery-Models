@@ -11,6 +11,7 @@ from ldm_tts.transport import ProposalRequest, ProposalResponse
 from ldm_tts.transport.openai_http import (
     EndpointRequestError,
     chat_completions_url,
+    extract_openai_chat_content,
     extract_openai_responses_content,
     models_url,
     preflight_openai_chat,
@@ -258,13 +259,7 @@ class OpenAICompatibleProposalClient:
                     text, tool_calls = extract_openai_responses_content(raw)
                     finish_reason = raw.get("status")
                 else:
-                    message = raw["choices"][0]["message"]
-                    text = str(message.get("content") or "")
-                    tool_calls = tuple(
-                        dict(item)
-                        for item in message.get("tool_calls", [])
-                        if isinstance(item, dict)
-                    )
+                    text, tool_calls = extract_openai_chat_content(raw)
                     finish_reason = raw["choices"][0].get("finish_reason")
                 return ProposalResponse(
                     text=text,
@@ -309,6 +304,7 @@ __all__ = [
     "OpenAICompatibleProposalClient",
     "call_with_circuit_breaker",
     "chat_completions_url",
+    "extract_openai_chat_content",
     "extract_openai_responses_content",
     "models_url",
     "preflight_openai_chat",
