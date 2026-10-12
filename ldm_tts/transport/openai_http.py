@@ -104,8 +104,8 @@ def request_openai_chat(
         temperature=temperature,
         extra_body=extra_body,
     )
-    content = result["choices"][0]["message"].get("content")
-    if not isinstance(content, str) or not content.strip():
+    content, _ = extract_openai_chat_content(result)
+    if not content:
         raise EndpointRequestError("Chat response content is empty or not text")
     return content
 
@@ -465,13 +465,35 @@ def _chat_message(result: Any) -> Mapping[str, Any]:
         raise EndpointRequestError("Chat response has no choices[0].message") from exc
     if not isinstance(message, Mapping):
         raise EndpointRequestError("Chat response message is not an object")
-    content = message.get("content")
+    content = _chat_text(message)
     tool_calls = message.get("tool_calls")
-    if not (isinstance(content, str) and content.strip()) and not (
+    if not content and not (
         isinstance(tool_calls, list) and tool_calls
     ):
         raise EndpointRequestError("Chat response contains neither text nor tool calls")
     return message
+
+
+def _chat_text(message: Mapping[str, Any]) -> str:
+    """Return portable chat text, preferring OpenAI's standard ``content`` field.
+
+    A few OpenAI-compatible reasoning endpoints place their sole textual output
+    in ``reasoning_content``.  Accept it only when ``content`` is absent or
+    blank; a normal final answer always wins when both fields are present.
+    """
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content
+    reasoning = message.get("reasoning_content")
+    return reasoning if isinstance(reasoning, str) and reasoning.strip() else ""
+
+
+def extract_openai_chat_content(result: Any) -> tuple[str, tuple[dict[str, Any], ...]]:
+    """Extract text and tool calls from one validated chat-completions response."""
+    message = _chat_message(result)
+    return _chat_text(message), tuple(
+        dict(item) for item in message.get("tool_calls", []) if isinstance(item, dict)
+    )
 
 
 def extract_openai_responses_content(
@@ -525,6 +547,7 @@ def extract_openai_responses_content(
 __all__ = [
     "EndpointRequestError",
     "chat_completions_url",
+    "extract_openai_chat_content",
     "extract_openai_responses_content",
     "models_url",
     "preflight_openai_chat",

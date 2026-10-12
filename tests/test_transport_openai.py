@@ -152,6 +152,21 @@ def test_request_openai_chat_response_accepts_tool_calls(monkeypatch: pytest.Mon
     assert result["choices"][0]["message"]["tool_calls"][0]["id"] == "1"
 
 
+def test_request_openai_chat_response_accepts_reasoning_content_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reasoning-compatible endpoints may omit content but return text here."""
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: _FakeResponse(
+            {"choices": [{"message": {"content": "", "reasoning_content": "{\"candidates\": []}"}}]}
+        ),
+    )
+    result = request_openai_chat_response(**_chat_kwargs())
+    assert request_openai_chat(**_chat_kwargs()) == "{\"candidates\": []}"
+    assert result["choices"][0]["message"]["reasoning_content"] == "{\"candidates\": []}"
+
+
 def test_request_openai_chat_response_rejects_non_object_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -402,6 +417,17 @@ def test_propose_captures_text_tool_calls_and_usage(monkeypatch: pytest.MonkeyPa
     assert response.usage["total_tokens"] == 15
     assert response.metadata["finish_reason"] == "tool_calls"
     assert response.metadata["model"] == "served-model"
+
+
+def test_propose_uses_reasoning_content_when_content_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: _FakeResponse(
+            {"choices": [{"message": {"content": "", "reasoning_content": "{\"candidates\": []}"}}]}
+        ),
+    )
+    response = OpenAICompatibleProposalClient(url="https://api.example.com/v1", model="m").propose(_proposal())
+    assert response.text == "{\"candidates\": []}"
 
 
 def test_proposal_client_normalizes_responses_output(
