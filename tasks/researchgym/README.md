@@ -145,7 +145,10 @@ compact delta of newly measured candidates. Web search/fetch, MCP servers
    (upstream `real/main.py --train True`); CMR needs the upstream COCO images,
    Karpathy annotations and BLIP weights under `dataset/` and `weights/`.
    Every download URL is a flag; `cl` accepts any mirror of the official
-   archive and verifies its published md5.
+   archive and verifies its published md5. Keep that verified
+   `data/cifar-100-python.tar.gz` beside the extracted directory: the upstream
+   CL loader requires it and ResearchGym rejects a data root that would trigger
+   an in-evaluation download.
 4. For Harness methods: build and smoke the guest (Linux with Docker and KVM):
 
    ```bash
