@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from ldm_tts.contracts import Candidate
+from ldm_tts.engine.run_store import BudgetLedger
 from ldm_tts.harness import (
     CompiledOptimizationPolicy, HarnessSubmissionError, PolicyResearchController, file_sha256,
 )
@@ -17,16 +18,25 @@ from ldm_tts.optimization.records import BOObservation
 from tasks.researchgym.core import workflow
 from tasks.researchgym.core.candidate import FEATURE_NAMES, ProgramEncoder
 from tasks.researchgym.core.cases import load_case
-from tasks.researchgym.core.harness import RESOURCE_ROOT, create_client
+from tasks.researchgym.core.harness import ProviderAuthorizationLedger, RESOURCE_ROOT, create_client
 from tasks.researchgym.core.optimization_policy import ResearchGymPolicyAdapter
 from tasks.researchgym.core.sampling import Q0_KEY, tilted_distribution
 from tasks.researchgym.core.selection import GPSettings, ProgramLDMSelector
+from tasks.researchgym.core.usage import ApiPricing
 
 CASE = load_case("cross_modal_retrieval")
 ENCODER = ProgramEncoder(CASE)
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
 RUNNER = Path(__file__).resolve().parents[3] / "harnesses/pi/policy_runner.py"
 GP = GPSettings(lengthscale=0.5, noise=0.05, beta=1.0, history_limit=64, target_scale_floor=0.5)
+
+
+class MeterRuntime:
+    def __init__(self, path):
+        self.budget = BudgetLedger(limits={}, path=path)
+
+    def consume_many(self, amounts, *, usage_key=None):
+        return self.budget.consume_many(amounts, usage_key=usage_key)
 
 
 def program(tag, calls=0):
@@ -152,8 +162,11 @@ def test_compiled_policy_repairs_in_session_and_changes_mean_and_weights(tmp_pat
                            command=[sys.executable, "-u", str(FIXTURE), "repair"])
     client.start()
     try:
+        runtime = MeterRuntime(tmp_path / "budget.json")
+        meter = ProviderAuthorizationLedger(root=root, runtime=runtime, pricing=ApiPricing(),
+                                            campaign_id="fixture-campaign", usage_prefix="policy", reserve_usd=None)
         controller = PolicyResearchController(client=client, adapter=adapter(), executor=AuthoredFixtureExecutor(),
-                                              root=root)
+                                              root=root, provider_authorizer=meter.authorize)
         candidates, representations = pool()
         compiled = selector(policy_controller=controller, policy_adapter=controller.adapter)
         compiled.fit(history())
@@ -163,8 +176,11 @@ def test_compiled_policy_repairs_in_session_and_changes_mean_and_weights(tmp_pat
         assert policy["prediction_mean_abs_change"] > 0
         again = compiled.select(candidates, representations, count=2, round_idx=2)
         assert again.selected_candidate_ids == result.selected_candidate_ids
+        meter.settle_captured_turns()
     finally:
         client.close()
     decisions = [json.loads(line)["decision"] for line in (root / "sessions/policy_architect.jsonl").read_text().splitlines()]
     assert decisions == ["retry", "accept"]
     assert len((root / "fixture_requests.jsonl").read_text().splitlines()) == 1
+    assert runtime.budget.counters["policy_provider_requests"] == 2
+    assert {json.loads(path.read_text())["status"] for path in (root / "provider_authorizations").glob("*.json")} == {"reconciled"}

@@ -98,7 +98,7 @@ def test_mock_ldm_harness_uses_protocol_fixture(tmp_path):
     assert code == 0
     budget = json.loads((run_dir / "budget.json").read_text())["counters"]
     assert budget["harness_turns"] == 4 and budget["harness_validation_submissions"] == 8
-    assert budget["harness_input_tokens"] == 4000 and budget["llm_requests"] == 0
+    assert budget["harness_input_tokens"] == 8000 and budget["llm_requests"] == 0
     assert json.loads((run_dir / "harness_provenance.json").read_text())["pools"] == {"harness": ["harness/manifest.json"]}
 
 
@@ -111,6 +111,13 @@ def test_unsupported_and_inconsistent_methods_are_rejected():
         workflow.parse_args(["--proposal-mode", "mock"])
     with pytest.raises(SystemExit):
         workflow.parse_args(["--api-budget-usd", "5"])
+    with pytest.raises(SystemExit):
+        workflow.parse_args(["--search-method", "ldm_harness", "--api-budget-usd", "5",
+                             "--llm-input-usd-per-mtok", "1", "--llm-output-usd-per-mtok", "1"])
+    args = workflow.parse_args(["--search-method", "ldm_harness", "--api-budget-usd", "5",
+                                "--llm-input-usd-per-mtok", "1", "--llm-output-usd-per-mtok", "1",
+                                "--harness-provider-reserve-usd", "0.25"])
+    assert args.harness_provider_reserve_usd == 0.25
 
 
 def test_dry_run_describes_runtime_faithful_spec(capsys):

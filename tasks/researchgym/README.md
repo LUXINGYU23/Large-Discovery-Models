@@ -96,8 +96,12 @@ compact delta of newly measured candidates. Web search/fetch, MCP servers
   proposal pool and the compiled-policy pool alike.
 - `--api-budget-usd` with `--llm-input-usd-per-mtok` and
   `--llm-output-usd-per-mtok` enforces a spending cap: measured cost is always
-  recorded and checked before each new request or turn, so only the request in
-  flight can overshoot. Stopping on the cap sets `stopped_api_budget`.
+  recorded and checked before each new direct request. For Harness methods it
+  additionally requires `--harness-provider-reserve-usd`: this is a
+  conservative upper bound for one provider call, reserved through Pi protocol
+  0.2 before the call opens and settled from its redacted capture. A missing or
+  incomplete capture keeps the reserve live rather than treating its cost as
+  zero. Stopping on the cap sets `stopped_api_budget`.
 - `--campaign-hours` is a durable wall clock: segments persist across resume
   with heartbeats, per-candidate allowances shrink to the remaining time, and
   a resumed run never regains elapsed time.

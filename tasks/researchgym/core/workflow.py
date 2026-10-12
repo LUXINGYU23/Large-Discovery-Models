@@ -32,7 +32,7 @@ from .candidate import FEATURE_VERSION, ProgramDomain, ProgramEncoder
 from .cases import CASE_IDS, TASK_ROOT, load_case
 from .clock import CampaignClock, WallClockExhausted
 from .evaluator import DevicesUnavailable, MockProgramEvaluator, ResearchGymEvaluator
-from .harness import HarnessProgramSource, create_client, write_context
+from .harness import HarnessProgramSource, ProviderAuthorizationLedger, create_client, write_context
 from .optimization_policy import ResearchGymPolicyAdapter
 from .proposals import LDM_METHODS, DirectProgramSource, MockProposalClient, ProgramExpander, ProposalExhausted, seed_proposals
 from .selection import GPSettings, ProgramLDMSelector
@@ -43,9 +43,10 @@ METHODS = ("llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled", "bo")
 HARNESS_METHODS = ("harness", "ldm_harness", "ldm_harness_compiled")
 USAGE_COUNTERS = (
     "llm_failed_requests", "llm_usage_unknown", "llm_input_tokens", "llm_output_tokens",
-    "harness_provider_calls", "harness_tool_calls", "harness_artifact_bytes", "harness_validation_submissions",
+    "harness_provider_calls", "harness_provider_requests", "harness_provider_reservation_usd", "harness_tool_calls",
+    "harness_artifact_bytes", "harness_validation_submissions",
     "harness_usage_unknown", "harness_input_tokens", "harness_output_tokens", "api_cost_usd", "proposal_attempts",
-    "policy_provider_requests", "policy_tool_calls", "policy_validation_submissions", "policy_artifact_bytes",
+    "policy_provider_requests", "policy_provider_reservation_usd", "policy_tool_calls", "policy_validation_submissions",
     "policy_wall_time_seconds", "policy_input_tokens", "policy_output_tokens", "policy_usage_unknown",
 )
 SECRET_ENV = re.compile(r"(API_KEY|SECRET|PASSWORD)", re.IGNORECASE)
@@ -103,6 +104,8 @@ def parse_args(argv=None):
     p.add_argument("--policy-tool-budget", action="append", default=[])
     p.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
     p.add_argument("--policy-submission-attempts", type=int, default=3)
+    p.add_argument("--harness-provider-reserve-usd", type=float,
+                   help="Conservative maximum charge for one Harness provider request; required with an API budget.")
     p.add_argument("--llm-url", default=os.environ.get("LLM_BASE_URL", os.environ.get("LDM_LLM_URL", "")))
     p.add_argument("--llm-model", default=os.environ.get("LLM_MODEL_NAME", os.environ.get("LDM_LLM_MODEL", "")))
     p.add_argument("--llm-max-tokens", type=int, default=16384)
@@ -169,6 +172,11 @@ def parse_args(argv=None):
         p.error("acquisition, GP and clock parameters must be finite and in range")
     if (args.api_budget_usd is not None) and (args.llm_input_usd_per_mtok is None or args.llm_output_usd_per_mtok is None):
         p.error("api-budget-usd requires llm-input-usd-per-mtok and llm-output-usd-per-mtok prices")
+    if args.harness_provider_reserve_usd is not None and (
+            not math.isfinite(args.harness_provider_reserve_usd) or args.harness_provider_reserve_usd <= 0):
+        p.error("harness-provider-reserve-usd must be finite and positive")
+    if harness and args.api_budget_usd is not None and args.harness_provider_reserve_usd is None:
+        p.error("Harness API budgets require --harness-provider-reserve-usd as a conservative per-request upper bound")
     if args.run_name and (Path(args.run_name).name != args.run_name or args.run_name in (".", "..")):
         p.error("run-name must be a single directory name")
     case = load_case(args.case)
@@ -252,7 +260,7 @@ SCIENTIFIC_KEYS = (
     "acquisition_eta", "acquisition_z_clip", "gp_lengthscale", "gp_noise", "gp_history_limit", "seed",
     "evaluation_timeout", "grader_timeout", "campaign_hours", "harness_sessions", "harness_wall_time_seconds",
     "harness_submission_attempts", "harness_tool_budget", "policy_tool_budget", "policy_submission_attempts",
-    "harness_thinking", "harness_context7", "llm_model", "llm_max_tokens", "llm_wire_api", "llm_reasoning",
+    "harness_thinking", "harness_context7", "harness_provider_reserve_usd", "llm_model", "llm_max_tokens", "llm_wire_api", "llm_reasoning",
     "llm_temperature", "llm_extra_body_json", "llm_input_usd_per_mtok", "llm_output_usd_per_mtok", "api_budget_usd",
 )
 
@@ -449,6 +457,10 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
         client.start()
         expander.source = HarnessProgramSource(client, run_dir / "harness", args, case, pricing=pricing)
         expander.source.runtime, expander.source.clock = runtime, clock
+        expander.source.configure_provider_authorization(ProviderAuthorizationLedger(
+            root=run_dir / "harness", runtime=runtime, pricing=pricing, campaign_id=runtime.run_id,
+            usage_prefix="harness", reserve_usd=args.harness_provider_reserve_usd,
+        ))
         if args.search_method == "ldm_harness_compiled":
             write_context(run_dir / "policy_harness", case, references, facts)
             policy_client = create_client(provider, run_dir / "policy_harness", runtime.run_id, case, policy=True,
@@ -460,15 +472,21 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
                                                beta=args.acquisition_beta, z_clip=args.acquisition_z_clip,
                                                proposal_facts=facts)
             from ldm_tts.harness.container import resolve_container_user
+            policy_meter = ProviderAuthorizationLedger(
+                root=run_dir / "policy_harness", runtime=runtime, pricing=pricing, campaign_id=runtime.run_id,
+                usage_prefix="policy", reserve_usd=args.harness_provider_reserve_usd,
+            )
             selector.policy_adapter = adapter
             selector.policy_controller = PolicyResearchController(
                 client=policy_client, adapter=adapter, root=run_dir / "policy_harness", account=runtime.consume_many,
                 executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
                                               resolve_container_user(args.harness_container_user, args.harness_docker_host)),
-                recovery_budget=lambda: min(args.harness_wall_time_seconds * 2, clock.remaining()))
+                recovery_budget=lambda: min(args.harness_wall_time_seconds * 2, clock.remaining()),
+                provider_authorizer=policy_meter.authorize)
             selector.policy_hooks = (
                 lambda: pricing.check(runtime),
-                lambda: account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy"))
+                lambda: (account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy"),
+                         policy_meter.settle_captured_turns()))
 
     status, code = "completed", 0
     try:

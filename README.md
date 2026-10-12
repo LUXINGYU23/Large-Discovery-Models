@@ -76,10 +76,11 @@ in evidence rather than model confidence alone.
 | `nucleobench` | Source-pinned regulatory nucleotide sequence design with direct, persistent-Harness, and compiled-policy LDM methods. | [Clean-room quick start](tasks/nucleobench/QUICKSTART.md) | [Task guide](tasks/nucleobench/README.md) |
 | `atomworld` | Source-pinned target-blind crystal manipulation with the official AtomWorld evaluator. | [Clean-room quick start](tasks/atomworld/QUICKSTART.md) | [Task guide](tasks/atomworld/README.md) |
 | `reasyn` | Source-pinned molecular reconstruction and TDC goal-directed optimization through ReaSyn. | [Clean-room quick start](tasks/reasyn/QUICKSTART.md) | [Task guide](tasks/reasyn/README.md) |
+| `researchgym` | Method programs for four source-pinned ResearchGym cases, scored by their official graders, with direct, persistent-Harness, and compiled-policy LDM methods. | [Clean-room quick start](tasks/researchgym/QUICKSTART.md) | [Task guide](tasks/researchgym/README.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The eleven built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The twelve built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
@@ -87,7 +88,7 @@ scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
 predictor and five-network discrete causal-discovery evaluations. Run the
 documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all eleven
+Task registration and conventional layout validation pass for all twelve
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
 not benchmark-qualified implementations. The AI4Bio mutation-effect and
@@ -99,7 +100,7 @@ official one-iteration campaign and separately labeled 3- and 20-iteration
 extended-budget runs. Discrete causal discovery includes a separately labeled
 20-iteration extended-budget run with 100 official network jobs. Qualification
 is task-specific; evidence from either qualified task does not qualify the
-other adapters. AtomWorld and ReaSyn are registered draft adapters; their
+other adapters. AtomWorld, ReaSyn, and ResearchGym are registered draft adapters; their
 task guides identify the external assets and live-validation gates still needed
 before benchmark claims.
 

@@ -53,8 +53,23 @@ def program(index):
     return seed + f"\n\n\ndef _fixture_variant_{index}(values):\n    return values * {index + 2}\n"
 
 
-def provider_capture(turn_id):
-    request_id = sha(turn_id)[:12]
+def authorize_provider(common, item, attempt):
+    request_id = f"{item['turnId']}-provider-{attempt}"
+    request_digest = sha(canonical({"turn_id": item["turnId"], "attempt": attempt, "fixture": True}))
+    print(json.dumps({
+        "type": "provider_authorization_requested", **common,
+        "authorizationId": f"fixture-authorization-{item['turnId']}-{attempt}",
+        "profileId": item["profileId"], "turnId": item["turnId"],
+        "providerRequestId": request_id, "requestDigest": request_digest,
+    }), flush=True)
+    decision = json.loads(next(sys.stdin))
+    assert decision["type"] == "provider_authorization_result"
+    assert decision["providerRequestId"] == request_id and decision["requestDigest"] == request_digest
+    assert decision["authorized"] is True
+    return request_id
+
+
+def provider_capture(turn_id, request_id):
     body = 'data: {"type":"response.completed","response":{"usage":{"input_tokens":1000,"output_tokens":200}}}\n'
     path = ROOT / "turns" / turn_id / "provider" / f"{request_id}.response.bin"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,10 +124,8 @@ for line in sys.stdin:
                 history = json.loads((ROOT / "measured_history.json").read_text())["observations"]
                 trace(ROOT / "fixture_provider.jsonl", {"profile_id": item["profileId"], "turn_id": item["turnId"],
                                                         "tool": "get_measured_history", "history_count": len(history)})
-                provider_capture(item["turnId"])
-            else:
-                provider_capture(item["turnId"])
             for attempt in range(1, 5):
+                provider_capture(item["turnId"], authorize_provider(common, item, attempt))
                 if POLICY:
                     body, filename = policy_source(attempt > 1 and MODE != "policy_reject"), "optimization_policy.py"
                     submission = {"action": "replace", "artifact_path": filename}
