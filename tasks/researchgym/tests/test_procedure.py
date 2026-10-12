@@ -90,6 +90,34 @@ def test_shared_start_evaluates_the_released_seed_first(tmp_path):
     assert json.loads((run_dir / "budget.json").read_text())["counters"]["external_evaluations"] == 3
 
 
+def test_one_round_shared_start_never_initializes_a_real_provider(tmp_path, monkeypatch):
+    """A source-pinned released seed is independently reproducible offline."""
+    args = workflow.parse_args([
+        "--case", "continual_learning", "--search-method", "ldm", "--initialization-mode", "shared_start",
+        "--iterations", "1", "--case-python", sys.executable, "--upstream-root", str(tmp_path),
+    ])
+    assert not workflow.requires_provider_proposals(args)
+
+    class OfflineEvaluator:
+        def __init__(self, **kwargs):
+            self.run_dir = kwargs["run_dir"]
+
+        def prepare_evaluations(self, candidates):
+            return None
+
+        def evaluate(self, candidate):
+            from ldm_tts.contracts import EvaluationResult
+            return EvaluationResult(candidate.candidate_id, "succeeded", metrics={"cl_cifar100_acc": 1.0})
+
+    monkeypatch.setattr(workflow, "ResearchGymEvaluator", OfflineEvaluator)
+    monkeypatch.setattr(workflow.UpstreamCase, "verify", lambda self: {"pinned": True})
+    monkeypatch.setattr(workflow.UpstreamCase, "reference_sources", lambda self: {})
+    monkeypatch.setattr(workflow, "_direct_client", lambda *_args, **_kwargs: pytest.fail("provider initialized"))
+    assert workflow.run(args, workflow.load_case(args.case), workflow.describe_ldm_task(args),
+                        workflow.load_experiment_contract(workflow.TASK_ROOT / "experiment.json"), None,
+                        tmp_path / "offline-seed", resume=False)[1] == 0
+
+
 def test_mock_ldm_harness_uses_protocol_fixture(tmp_path):
     command = json.dumps([sys.executable, "-u", str(FIXTURE), "repair"])
     code, run_dir = run(tmp_path, "--case", "cross_modal_retrieval", "--search-method", "ldm_harness",

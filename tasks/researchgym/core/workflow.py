@@ -318,6 +318,18 @@ def _proposal_facts(args):
             "historical_repeats": "only authoritative measured candidates are excluded"}
 
 
+def requires_provider_proposals(args) -> bool:
+    """Whether this campaign can reach a round that asks an LLM for programs.
+
+    A one-round ``shared_start`` campaign evaluates only the released seed
+    program.  It is intentionally usable as an offline, source-pinned
+    evaluator qualification run: initializing a provider client or probing an
+    endpoint in that case would add an unnecessary and non-reproducible
+    external dependency.
+    """
+    return not (args.initialization_mode == "shared_start" and args.iterations == 1)
+
+
 def main(argv=None):
     args = parse_args(argv)
     case = load_case(args.case)
@@ -399,7 +411,8 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
         cap = 1 + (rounds - 1) * args.evaluations_per_round
     direct = args.proposal_mode in ("openai", "mock")
     harness = args.proposal_mode == "harness"
-    online = not args.mock and (direct or harness)
+    provider_proposals = requires_provider_proposals(args)
+    online = not args.mock and provider_proposals and (direct or harness)
     total_rounds = rounds + args.recovery_attempts
     minibatches = math.ceil(args.proposal_samples / (args.proposal_batch_size if ldm else args.proposal_samples))
     minibatches += args.max_refill_collections * math.ceil(args.evaluations_per_round / args.proposal_batch_size) if ldm else 0
@@ -432,6 +445,8 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
             if previous.get("status") == "paused_proposal_exhausted":
                 recovery_pass += 1
         expander.recovery_pass = recovery_pass
+        if not provider_proposals:
+            return
         if direct:
             if args.proposal_mode == "openai":
                 if not args.llm_url or not args.llm_model:
