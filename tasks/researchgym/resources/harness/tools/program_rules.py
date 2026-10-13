@@ -29,7 +29,36 @@ def _strip_docstrings(tree):
 def canonical_key(source):
     """Identity that ignores comments, formatting, and docstrings."""
     tree = _strip_docstrings(ast.parse(source))
-    return hashlib.sha256(ast.dump(tree, annotate_fields=False).encode("utf-8")).hexdigest()
+    # ``ast.dump`` is deliberately not used here.  Its output is not a wire
+    # format: adding an optional AST field in a newer CPython (for example
+    # ``type_params``) changes the digest even when the program is identical.
+    # The host validator and the Harness guest can legitimately use different
+    # Python patch/minor versions, so that would let a measured program bypass
+    # the guest-side ``already_measured`` check.
+    return hashlib.sha256(repr(_stable_ast(tree)).encode("utf-8")).hexdigest()
+
+
+def _stable_ast(value):
+    """Return a version-tolerant, attribute-free AST representation.
+
+    Empty optional fields are omitted, which makes a field that did not exist
+    in an older Python equivalent to its empty default in a newer Python.
+    Type comments are comments for this task's identity semantics and are
+    omitted unconditionally.
+    """
+    if isinstance(value, ast.AST):
+        fields = []
+        for name in value._fields:
+            if name == "type_comment":
+                continue
+            item = getattr(value, name, None)
+            if item is None or item == []:
+                continue
+            fields.append((name, _stable_ast(item)))
+        return (type(value).__name__, tuple(fields))
+    if isinstance(value, list):
+        return tuple(_stable_ast(item) for item in value)
+    return value
 
 
 def check_program(source, *, entry, rules, forbidden_prefixes=()):
