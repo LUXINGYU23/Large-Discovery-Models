@@ -27,6 +27,13 @@ def test_parse_actions_accepts_json_and_limits_count():
         parse_actions(rejected)
 
 
+def test_parse_actions_repairs_only_string_literal_newlines_and_escapes():
+    _, actions = parse_actions('{"actions":[{"tool":"bash","command":"printf one\ntwo \\d"}]}')
+    assert actions[0]["command"] == "printf one\ntwo \\d"
+    with pytest.raises(AgentError, match="malformed"):
+        parse_actions('{"actions":[{"tool":"bash" "command":"missing comma"}]}')
+
+
 def test_api_url_accepts_base_or_full_openai_compatible_endpoint():
     assert resolve_api_url("https://provider.example/v1") == "https://provider.example/v1/chat/completions"
     assert resolve_api_url("https://provider.example/v1/chat/completions/") == "https://provider.example/v1/chat/completions"
@@ -91,7 +98,7 @@ class _FormattingThenSubmitClient:
     def complete(self, messages):
         self.calls += 1
         if self.calls == 1:
-            return '{"actions":[{"tool":"bash","command":"printf broken\njson"}]}'
+            return '{"actions":[{"tool":"bash" "command":"missing comma"}]}'
         return json.dumps({"actions": [{"tool": "submit", "summary": "grader ran"}]})
 
 

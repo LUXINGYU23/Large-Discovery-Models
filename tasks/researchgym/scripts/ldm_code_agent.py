@@ -146,10 +146,21 @@ def parse_actions(text: str) -> tuple[str, list[dict[str, Any]]]:
     start = stripped.find("{")
     if start < 0:
         raise AgentError("model response did not contain a JSON action object")
+    action_text = stripped[start:]
     try:
-        payload, _ = json.JSONDecoder().raw_decode(stripped[start:])
-    except json.JSONDecodeError as exc:
-        raise AgentError(f"model returned malformed action JSON: {exc}") from exc
+        payload, _ = json.JSONDecoder().raw_decode(action_text)
+    except json.JSONDecodeError as first_error:
+        # DeepSeek Flash sometimes emits a literal newline, or a regex-style
+        # backslash, inside an otherwise complete JSON string.  Escape only
+        # those string-literal defects; a missing delimiter/truncated object
+        # remains an error and is never guessed into an executable command.
+        repaired = _repair_json_string_literals(action_text)
+        if repaired == action_text:
+            raise AgentError(f"model returned malformed action JSON: {first_error}") from first_error
+        try:
+            payload, _ = json.JSONDecoder().raw_decode(repaired)
+        except json.JSONDecodeError as exc:
+            raise AgentError(f"model returned malformed action JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise AgentError("model action payload must be an object")
     actions = payload.get("actions")
@@ -160,6 +171,43 @@ def parse_actions(text: str) -> tuple[str, list[dict[str, Any]]]:
     if not all(isinstance(action, dict) and isinstance(action.get("tool"), str) for action in actions):
         raise AgentError("each action must be an object with a string tool")
     return str(payload.get("analysis", ""))[:4_000], actions
+
+
+def _repair_json_string_literals(value: str) -> str:
+    """Escape controls and invalid escapes inside JSON string literals only."""
+    output: list[str] = []
+    in_string = False
+    escaped = False
+    valid_escapes = {'"', "\\", "/", "b", "f", "n", "r", "t", "u"}
+    for char in value:
+        if not in_string:
+            output.append(char)
+            if char == '"':
+                in_string = True
+            continue
+        if escaped:
+            if char not in valid_escapes:
+                # The existing backslash plus this one decodes to one literal
+                # backslash; retain the model's following character verbatim.
+                output.append("\\")
+            output.append(char)
+            escaped = False
+            continue
+        if char == "\\":
+            output.append(char)
+            escaped = True
+        elif char == '"':
+            output.append(char)
+            in_string = False
+        elif char == "\n":
+            output.append("\\n")
+        elif char == "\r":
+            output.append("\\r")
+        elif char == "\t":
+            output.append("\\t")
+        else:
+            output.append(char)
+    return "".join(output)
 
 
 class WorkspaceTools:
@@ -388,9 +436,9 @@ def load_prior_receipt(path: Path, *, task_id: str, seed: int,
 def _compact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     # Keep immutable instructions and the latest interaction context.  Tool
     # observations themselves are persisted on disk, so compaction is auditable.
-    if len(messages) <= 18:
+    if len(messages) <= 8:
         return messages
-    return messages[:2] + messages[-16:]
+    return messages[:2] + messages[-6:]
 
 
 def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
@@ -426,6 +474,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
         if time.monotonic() >= deadline:
             break
         try:
+            response = ""
             response = client.complete(_compact_messages(messages))
             analysis, actions = parse_actions(response)
         except BudgetExhausted as exc:
