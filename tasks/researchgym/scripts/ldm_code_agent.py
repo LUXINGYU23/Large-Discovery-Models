@@ -34,7 +34,17 @@ from tasks.researchgym.table3_protocol import PROFILES, TASKS, ProtocolError
 
 MAX_TOOL_OUTPUT_CHARS = 16_000
 MAX_FILE_READ_CHARS = 32_000
-MAX_ACTIONS_PER_TURN = 8
+# Full task inspection commonly needs a short batch of reads plus one command.
+# Eight actions caused otherwise valid DeepSeek trajectories to terminate before
+# they reached an experiment; the bounded value still limits one response while
+# avoiding needless paid retries.
+MAX_ACTIONS_PER_TURN = 16
+NETWORK_COMMAND = re.compile(
+    r"https?://|\b(?:curl|wget|aria2c)\b|\bgit\s+clone\b|"
+    r"\b(?:urllib|requests)\.(?:request|urlopen|get|post)\b|\bpip\s+(?:install|download)\b|"
+    r"\bpretrained\s*=\s*True\b",
+    re.IGNORECASE,
+)
 
 
 class AgentError(RuntimeError):
@@ -212,6 +222,12 @@ class WorkspaceTools:
         command = action.get("command")
         if not isinstance(command, str) or not command.strip():
             raise AgentError("bash command must be a non-empty string")
+        # The manifest used by this harness has external_access=disabled.
+        # Block common direct fetch and package-install forms before execution;
+        # required data, models, and task interpreters are supplied as explicit
+        # read-only mounts by the launcher.
+        if NETWORK_COMMAND.search(command):
+            raise AgentError("network-capable shell command is forbidden: use only mounted task inputs")
         timeout = min(3_600, max(1, int(action.get("timeout_seconds", 600))))
         # The model's credential must never be inherited by an experiment,
         # shell, child Python interpreter, or task code.
@@ -234,14 +250,19 @@ class ChatCompletionsClient:
     """Minimal OpenAI-compatible chat client with explicit usage accounting."""
 
     def __init__(self, *, api_url: str, api_key: str, model: str, pricing: Pricing,
-                 budget_usd: float, request_timeout: int) -> None:
+                 budget_usd: float, request_timeout: int, initial_cost_usd: float = 0.0) -> None:
         if not api_url.startswith(("https://", "http://")):
             raise AgentError("--api-url must be an http(s) URL")
         if not api_key:
             raise AgentError("LLM_API_KEY is required")
         self.api_url, self.api_key, self.model = api_url, api_key, model
+        if not math.isfinite(initial_cost_usd) or initial_cost_usd < 0:
+            raise AgentError("initial API cost must be a finite non-negative USD value")
+        if initial_cost_usd > budget_usd + 1e-9:
+            raise AgentError("prior API cost already exceeds the fixed experiment cap")
         self.pricing, self.budget_usd, self.request_timeout = pricing, budget_usd, request_timeout
-        self.total_cost = 0.0
+        self.prior_cost_usd = initial_cost_usd
+        self.total_cost = initial_cost_usd
         self.usage_events: list[dict[str, Any]] = []
 
     def complete(self, messages: list[dict[str, str]]) -> str:
@@ -304,17 +325,22 @@ Each action must be one of:
 
 Use relative paths.  Work incrementally, read before overwriting, and use bash
 for tests/training/grading.  A submit action ends the trajectory; submit only
-after you have invoked the official grader and inspected its result."""
+after you have invoked the official grader and inspected its result.  JSON
+strings must escape literal newlines as \\n, and emit no more than 16 actions in
+one response."""
 
 
 def _task_prompt(task_id: str, workspace: Path, seed: int, profile_name: str) -> str:
     task = TASKS[task_id]
     description = workspace / "task_description.md"
     text = description.read_text(encoding="utf-8", errors="replace") if description.exists() else "(not found)"
+    task_python = os.environ.get("RESEARCHGYM_TASK_PYTHON", "").strip()
+    runtime = (f"Use {task_python} for task commands; it is the prebuilt task interpreter.\n"
+               if task_python else "Use the task's available Python interpreter for task commands.\n")
     return (
         f"Task={task.display_name} ({task_id}); independent seed={seed}; profile={profile_name}.\n"
         f"Official Table 3 metrics: {', '.join(task.metrics)}. Primary selection: {task.primary_note}.\n"
-        f"Workspace: {workspace}.\n\nTask description (possibly truncated):\n{_clip(text, 24_000)}"
+        f"Workspace: {workspace}.\n{runtime}\nTask description (possibly truncated):\n{_clip(text, 24_000)}"
     )
 
 
@@ -328,6 +354,37 @@ def resolve_api_url(raw: str) -> str:
     return value + "/chat/completions"
 
 
+def load_prior_receipt(path: Path, *, task_id: str, seed: int,
+                       profile_name: str, manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Load one failed predecessor while retaining the per-seed budget cap.
+
+    A harness correction can justify a clean retry, but it must not make the
+    original paid calls disappear from cost or wall-clock accounting.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise AgentError("prior agent receipt must be a JSON object")
+    expected = {
+        "task_id": task_id,
+        "seed": seed,
+        "profile": profile_name,
+        "protocol": manifest.get("protocol"),
+        "source_commit": manifest.get("source_commit"),
+        "model": manifest.get("model"),
+        "harness": manifest.get("harness"),
+    }
+    for field, value in expected.items():
+        if payload.get(field) != value:
+            raise AgentError(f"prior receipt {field} does not match this trajectory")
+    if payload.get("status") == "submitted":
+        raise AgentError("a submitted trajectory cannot be retried")
+    for field in ("api_cost_usd", "wall_clock_hours"):
+        value = payload.get(field)
+        if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise AgentError(f"prior receipt has invalid {field}")
+    return payload
+
+
 def _compact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     # Keep immutable instructions and the latest interaction context.  Tool
     # observations themselves are persisted on disk, so compaction is auditable.
@@ -338,7 +395,7 @@ def _compact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
 
 def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
               manifest: Mapping[str, Any], output_dir: Path, client: ChatCompletionsClient,
-              max_turns: int) -> dict[str, Any]:
+              max_turns: int, prior_receipt: Mapping[str, Any] | None = None) -> dict[str, Any]:
     profile = PROFILES[profile_name]
     if manifest.get("profile", {}).get("name") != profile_name:
         raise AgentError("manifest/profile mismatch")
@@ -350,15 +407,21 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
         raise AgentError("task or seed is not in the immutable manifest")
     if not workspace.is_dir():
         raise AgentError(f"workspace is not a directory: {workspace}")
+    prior_wall_clock_hours = float(prior_receipt.get("wall_clock_hours", 0.0)) if prior_receipt else 0.0
+    if prior_wall_clock_hours > profile.wall_clock_hours + 1e-9:
+        raise AgentError("prior trajectory already exceeds the fixed wall-clock cap")
+    if client.total_cost > profile.api_budget_usd + 1e-9:
+        raise AgentError("prior trajectory already exceeds the fixed API cap")
     output_dir.mkdir(parents=True, exist_ok=False)
     started_monotonic = time.monotonic()
     started_at = _now()
-    deadline = started_monotonic + profile.wall_clock_hours * 3600
+    deadline = started_monotonic + max(0.0, profile.wall_clock_hours - prior_wall_clock_hours) * 3600
     tools = WorkspaceTools(workspace)
     transcript: list[dict[str, Any]] = []
     messages = [{"role": "system", "content": _system_prompt()},
                 {"role": "user", "content": _task_prompt(task_id, workspace, seed, profile_name)}]
     status, submitted = "time_exhausted", None
+    consecutive_invalid_actions = 0
     for turn in range(max_turns):
         if time.monotonic() >= deadline:
             break
@@ -370,9 +433,32 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             transcript.append({"turn": turn, "at": _now(), "error": str(exc)})
             break
         except AgentError as exc:
-            status = "agent_error"
-            transcript.append({"turn": turn, "at": _now(), "error": str(exc)})
-            break
+            # A provider can occasionally return a nearly-valid action object
+            # containing an unescaped newline in a shell command.  No tool has
+            # run at this point, so ask for a corrected action rather than
+            # charging a whole trajectory to a formatting transient.  Bound
+            # retries to avoid an endless paid correction loop.
+            consecutive_invalid_actions += 1
+            transcript.append({
+                "turn": turn,
+                "at": _now(),
+                "error": str(exc),
+                "response_sha256": hashlib.sha256(response.encode()).hexdigest()
+                if "response" in locals() else None,
+            })
+            if consecutive_invalid_actions >= 3:
+                status = "agent_error"
+                break
+            messages.append({
+                "role": "user",
+                "content": (
+                    "Your preceding action response was rejected and no tool was run: "
+                    f"{exc}. Return a replacement as one strict JSON object only. "
+                    "Escape newlines inside JSON strings as \\n and use at most 16 actions."
+                ),
+            })
+            continue
+        consecutive_invalid_actions = 0
         observations = []
         for action in actions:
             observation = tools.execute(action)
@@ -404,13 +490,23 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
         "model": manifest["model"],
         "harness": manifest["harness"],
         "started_at": started_at,
-        "wall_clock_hours": elapsed / 3600.0,
+        "wall_clock_hours": prior_wall_clock_hours + elapsed / 3600.0,
         "api_cost_usd": client.total_cost,
-        "api_calls": len(client.usage_events),
+        "api_calls": int(prior_receipt.get("api_calls", 0)) + len(client.usage_events)
+        if prior_receipt else len(client.usage_events),
         "workspace": str(workspace),
         "transcript_sha256": _sha256(output_dir / "transcript.json"),
         "usage_sha256": _sha256(output_dir / "usage.json"),
     }
+    if prior_receipt:
+        receipt["prior_agent_receipt"] = {
+            "run_id": prior_receipt.get("run_id"),
+            "status": prior_receipt.get("status"),
+            "api_cost_usd": prior_receipt["api_cost_usd"],
+            "wall_clock_hours": prior_receipt["wall_clock_hours"],
+            "transcript_sha256": prior_receipt.get("transcript_sha256"),
+            "usage_sha256": prior_receipt.get("usage_sha256"),
+        }
     (output_dir / "agent_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return receipt
 
@@ -427,6 +523,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default=os.environ.get("LLM_MODEL_NAME", ""))
     parser.add_argument("--max-turns", type=int, default=120)
     parser.add_argument("--request-timeout", type=int, default=180)
+    parser.add_argument("--prior-agent-receipt", type=Path,
+                        help="Failed predecessor receipt; its cost and elapsed time remain charged to this seed.")
     return parser.parse_args()
 
 
@@ -438,12 +536,16 @@ def main() -> int:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         pricing = Pricing.from_env()
         profile = PROFILES[args.profile]
+        prior_receipt = (load_prior_receipt(args.prior_agent_receipt, task_id=args.task, seed=args.seed,
+                                            profile_name=args.profile, manifest=manifest)
+                         if args.prior_agent_receipt else None)
         client = ChatCompletionsClient(api_url=resolve_api_url(args.api_url), api_key=os.environ.get("LLM_API_KEY", ""),
                                        model=args.model, pricing=pricing, budget_usd=profile.api_budget_usd,
-                                       request_timeout=args.request_timeout)
+                                       request_timeout=args.request_timeout,
+                                       initial_cost_usd=float(prior_receipt["api_cost_usd"]) if prior_receipt else 0.0)
         receipt = run_agent(task_id=args.task, workspace=args.workspace, seed=args.seed,
                             profile_name=args.profile, manifest=manifest, output_dir=args.output_dir,
-                            client=client, max_turns=args.max_turns)
+                            client=client, max_turns=args.max_turns, prior_receipt=prior_receipt)
     except (OSError, ValueError, json.JSONDecodeError, ProtocolError, AgentError) as exc:
         print(f"LDM-CodeAgent launch failed: {exc}", file=sys.stderr)
         return 2
