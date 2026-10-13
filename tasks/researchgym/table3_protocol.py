@@ -25,7 +25,14 @@ from typing import Any, Iterable, Mapping
 
 UPSTREAM_COMMIT = "0adc08e93754b606d8a76055ed2f1c9574504312"
 SEEDS = (0, 1, 2)
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# The upstream CMR grader emits more than one QGS base row.  These names can
+# identify a pre-registered *alternative* scored run, but they do not by
+# themselves recover the paper's Table 3 aggregate: the released paper I2TR
+# values match neither source row.  An exact Table 3 campaign also needs a
+# hash-addressed scoring contract from the benchmark authors.
+CMR_PRIMARY_ROWS = ("qgs_clip_base", "qgs_blip_base")
 
 
 @dataclass(frozen=True)
@@ -116,7 +123,8 @@ class ProtocolError(ValueError):
 
 
 def protocol_manifest(profile_name: str, *, model: str, harness: str,
-                      external_access: str = "disabled") -> dict[str, Any]:
+                      cmr_primary_row: str, external_access: str = "disabled",
+                      cmr_table3_contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Create the immutable manifest written before any model call.
 
     ``external_access`` is explicit because a run without the paper's optional
@@ -125,6 +133,15 @@ def protocol_manifest(profile_name: str, *, model: str, harness: str,
     profile = _profile(profile_name)
     if not model.strip() or not harness.strip():
         raise ProtocolError("model and harness are required")
+    if cmr_primary_row not in CMR_PRIMARY_ROWS:
+        raise ProtocolError(
+            "cmr_primary_row must be fixed before launch; choose from "
+            + ", ".join(CMR_PRIMARY_ROWS)
+        )
+    valid_contract = (isinstance(cmr_table3_contract, Mapping)
+                      and isinstance(cmr_table3_contract.get("source"), str)
+                      and isinstance(cmr_table3_contract.get("sha256"), str)
+                      and len(cmr_table3_contract["sha256"]) == 64)
     return {
         "schema_version": SCHEMA_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -136,6 +153,15 @@ def protocol_manifest(profile_name: str, *, model: str, harness: str,
         "harness": harness,
         "seeds": list(SEEDS),
         "external_access": external_access,
+        "metric_selectors": {"cmr_primary_row": cmr_primary_row},
+        "table3_eligibility": {
+            "eligible": valid_contract,
+            "cmr_scoring_contract": dict(cmr_table3_contract) if valid_contract else None,
+            "blocker": None if valid_contract else (
+                "CMR Table 3 selector/aggregation is not recoverable from the released grader; "
+                "author-provided contract required"
+            ),
+        },
         "tasks": {
             task_id: {
                 "upstream_dir": task.upstream_dir,
@@ -156,14 +182,17 @@ def protocol_manifest(profile_name: str, *, model: str, harness: str,
 
 
 def write_manifest(path: Path, *, profile_name: str, model: str, harness: str,
-                   external_access: str = "disabled") -> dict[str, Any]:
+                   cmr_primary_row: str, external_access: str = "disabled",
+                   cmr_table3_contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Write once; refusing overwrite protects configuration provenance."""
     path = Path(path)
     if path.exists():
         raise ProtocolError(f"manifest already exists: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     manifest = protocol_manifest(profile_name, model=model, harness=harness,
-                                 external_access=external_access)
+                                 cmr_primary_row=cmr_primary_row,
+                                 external_access=external_access,
+                                 cmr_table3_contract=cmr_table3_contract)
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
 
@@ -197,12 +226,22 @@ def validate_run_record(record: Mapping[str, Any], manifest: Mapping[str, Any]) 
     evidence = record.get("official_grade")
     if not isinstance(evidence, Mapping) or not evidence.get("summary_sha256"):
         raise ProtocolError(f"{task_id}/seed={record.get('seed')} lacks official-grader evidence")
+    if task_id == "cross_modal_retrieval":
+        if not manifest.get("table3_eligibility", {}).get("eligible"):
+            raise ProtocolError("CMR cannot be reported as Table 3 without a scoring contract")
+        expected_row = manifest.get("metric_selectors", {}).get("cmr_primary_row")
+        if evidence.get("cmr_row") != expected_row:
+            raise ProtocolError(
+                f"{task_id}/seed={record.get('seed')} CMR row does not match immutable manifest"
+            )
 
 
 def aggregate(manifest: Mapping[str, Any], records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Aggregate an all-or-nothing five-task, three-seed Table 3 result."""
     if manifest.get("protocol") != "table3_agent_trajectory_v1":
         raise ProtocolError("wrong manifest protocol")
+    if not manifest.get("table3_eligibility", {}).get("eligible"):
+        raise ProtocolError("Table 3 report blocked: CMR scoring contract is missing")
     by_task: dict[str, dict[int, Mapping[str, Any]]] = {name: {} for name in TASKS}
     for record in records:
         validate_run_record(record, manifest)

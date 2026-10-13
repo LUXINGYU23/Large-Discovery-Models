@@ -240,6 +240,27 @@ must write an immutable manifest before a provider call.  A restricted run
 without the optional external-search services is marked as such in that
 manifest and must not be described as an unrestricted paper reproduction.
 
+Create the manifest and an exact 15-job plan before any model call.  The CMR
+row is deliberately required at this point rather than selected after scores
+are visible:
+
+```bash
+python tasks/researchgym/scripts/prepare_table3_campaign.py \
+  --campaign-dir /runs/rg-table3 --profile table3 \
+  --model "$LLM_MODEL_NAME" --cmr-primary-row qgs_blip_base
+```
+
+The command does not call a provider or start an experiment.  With eight
+independent GPUs its plan is two waves: 24 hours maximum for the 12-hour
+profile (180 GPU-hours), and 48 hours for the 24-hour comparison profile (360
+GPU-hours).  The respective hard API caps are $150 and $300.
+
+The released CMR grader's `qgs_clip_base` and `qgs_blip_base` rows do **not**
+reproduce the paper's published I2TR values.  They may be used only for a
+clearly labelled alternative protocol.  A report is hard-blocked as a strict
+Table 3 result until `--cmr-table3-contract` points to a hash-addressed,
+author-provided primary-source description of the CMR row/aggregation.
+
 `scripts/normalize_table3_grade.py` is the only route from an agent trajectory
 to a Table 3 receipt. It parses the pinned task graders' JSON schemas: CIFAR100
 N=10 (CL), the mean of SOFC/MatScholar test F1 (MDT), a manifest-fixed CMR QGS

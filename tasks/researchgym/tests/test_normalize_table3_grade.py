@@ -8,6 +8,9 @@ from tasks.researchgym.scripts.normalize_table3_grade import GradeError, normali
 from tasks.researchgym.table3_protocol import protocol_manifest
 
 
+CMR_CONTRACT = {"source": "benchmark-authors/contract.json", "sha256": "b" * 64}
+
+
 def _receipt(manifest, task, seed=0):
     return {
         "run_id": f"{task}-{seed}", "status": "budget_exhausted", "task_id": task, "seed": seed,
@@ -18,7 +21,8 @@ def _receipt(manifest, task, seed=0):
 
 
 def _normalize(tmp_path, task, payload, **kwargs):
-    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent")
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base", cmr_table3_contract=CMR_CONTRACT)
     summary = tmp_path / f"{task}.json"
     summary.write_text(json.dumps(payload))
     return normalize(manifest=manifest, agent_receipt=_receipt(manifest, task), summary_path=summary,
@@ -39,10 +43,10 @@ def test_cmr_requires_an_immutable_primary_row_and_reads_paired_columns(tmp_path
     payload = {"rows": [{"row": "qgs_blip_base", "columns": [
         {"id": "flickr:txt_r1", "value": 61.0}, {"id": "flickr:img_r1", "value": 70.0},
     ]}]}
-    with pytest.raises(GradeError, match="requires --cmr-row"):
-        _normalize(tmp_path, "cross_modal_retrieval", payload)
-    record = _normalize(tmp_path, "cross_modal_retrieval", payload, cmr_row="qgs_blip_base")
+    record = _normalize(tmp_path, "cross_modal_retrieval", payload)
     assert record["metrics"] == {"i2tr_at_1": 61.0, "t2ir_at_1": 70.0}
+    with pytest.raises(GradeError, match="does not match"):
+        _normalize(tmp_path, "cross_modal_retrieval", payload, cmr_row="qgs_clip_base")
 
 
 def test_time_and_irb_primary_extractors_preserve_missing_completion(tmp_path):

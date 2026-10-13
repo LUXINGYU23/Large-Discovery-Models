@@ -4,6 +4,7 @@ import math
 import pytest
 
 from tasks.researchgym.table3_protocol import (
+    CMR_PRIMARY_ROWS,
     PROFILES,
     SEEDS,
     TASKS,
@@ -11,6 +12,9 @@ from tasks.researchgym.table3_protocol import (
     aggregate,
     protocol_manifest,
 )
+
+
+CMR_CONTRACT = {"source": "benchmark-authors/contract.json", "sha256": "b" * 64}
 
 
 def _records(manifest):
@@ -32,7 +36,9 @@ def _records(manifest):
                 "metrics": {metric: float(task_index * 10 + seed + position)
                             for position, metric in enumerate(task.metrics)},
                 "official_grade": {"summary_path": f"/immutable/{task_id}/{seed}.json",
-                                   "summary_sha256": "a" * 64},
+                                   "summary_sha256": "a" * 64,
+                                   "cmr_row": (manifest["metric_selectors"]["cmr_primary_row"]
+                                               if task_id == "cross_modal_retrieval" else None)},
             })
     return records
 
@@ -45,7 +51,8 @@ def test_profiles_match_requested_table3_and_scaffold_budgets():
 
 
 def test_aggregate_requires_all_five_tasks_and_three_seeds():
-    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent")
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base", cmr_table3_contract=CMR_CONTRACT)
     records = _records(manifest)
     table = aggregate(manifest, records)
     assert table["status"] == "completed"
@@ -59,7 +66,8 @@ def test_aggregate_requires_all_five_tasks_and_three_seeds():
 
 
 def test_aggregate_rejects_any_non_agent_or_over_budget_record():
-    manifest = protocol_manifest("scaffold_comparison", model="provider/model", harness="LDM-CodeAgent")
+    manifest = protocol_manifest("scaffold_comparison", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base", cmr_table3_contract=CMR_CONTRACT)
     records = _records(manifest)
     invalid = copy.deepcopy(records)
     invalid[0]["protocol"] = "program_search_v0"
@@ -70,3 +78,23 @@ def test_aggregate_rejects_any_non_agent_or_over_budget_record():
     invalid[0]["api_cost_usd"] = 20.00001
     with pytest.raises(ProtocolError, match="API cap"):
         aggregate(manifest, invalid)
+
+
+def test_manifest_requires_a_cmr_selector_and_record_cannot_change_it():
+    with pytest.raises(ProtocolError, match="cmr_primary_row"):
+        protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent", cmr_primary_row="")
+    assert "qgs_clip_base" in CMR_PRIMARY_ROWS
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base", cmr_table3_contract=CMR_CONTRACT)
+    records = _records(manifest)
+    cmr = next(item for item in records if item["task_id"] == "cross_modal_retrieval")
+    cmr["official_grade"]["cmr_row"] = "qgs_clip_base"
+    with pytest.raises(ProtocolError, match="CMR row"):
+        aggregate(manifest, records)
+
+
+def test_aggregate_is_blocked_without_author_cmr_contract():
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
+    with pytest.raises(ProtocolError, match="CMR scoring contract"):
+        aggregate(manifest, _records(manifest))

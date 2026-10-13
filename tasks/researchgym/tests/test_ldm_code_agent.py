@@ -59,7 +59,8 @@ def test_agent_owns_workspace_and_leaves_auditable_transcript(tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "task_description.md").write_text("Do real research.")
-    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent")
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
     receipt = run_agent(task_id="continual_learning", workspace=workspace, seed=0,
                         profile_name="table3", manifest=manifest, output_dir=tmp_path / "run",
                         client=_FakeClient(), max_turns=2)

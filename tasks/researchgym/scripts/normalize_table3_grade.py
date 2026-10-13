@@ -19,7 +19,7 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any, Callable, Mapping
 
-from tasks.researchgym.table3_protocol import TASKS
+from tasks.researchgym.table3_protocol import CMR_PRIMARY_ROWS, TASKS
 
 
 class GradeError(ValueError):
@@ -141,6 +141,8 @@ def normalize(*, manifest: Mapping[str, Any], agent_receipt: Mapping[str, Any], 
               task_id: str, cmr_row: str | None = None) -> dict[str, Any]:
     if task_id not in TASKS:
         raise GradeError(f"unknown task {task_id}")
+    if task_id == "cross_modal_retrieval" and not manifest.get("table3_eligibility", {}).get("eligible"):
+        raise GradeError("CMR cannot be normalized as Table 3 without a scoring contract")
     if agent_receipt.get("task_id") != task_id:
         raise GradeError("agent receipt task mismatch")
     for field in ("profile", "protocol", "source_commit", "model", "harness"):
@@ -150,10 +152,16 @@ def normalize(*, manifest: Mapping[str, Any], agent_receipt: Mapping[str, Any], 
             expected = manifest.get("profile", {}).get("name")
         if expected != actual:
             raise GradeError(f"agent receipt {field} mismatch")
+    manifest_cmr_row = manifest.get("metric_selectors", {}).get("cmr_primary_row")
+    if manifest_cmr_row not in CMR_PRIMARY_ROWS:
+        raise GradeError("manifest has no valid immutable CMR primary row")
+    if cmr_row is not None and cmr_row != manifest_cmr_row:
+        raise GradeError("--cmr-row does not match the immutable manifest selector")
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     if not isinstance(summary, Mapping):
         raise GradeError("official summary is not an object")
-    metrics, completion = EXTRACTORS[task_id](summary, cmr_row)
+    selector = manifest_cmr_row if task_id == "cross_modal_retrieval" else None
+    metrics, completion = EXTRACTORS[task_id](summary, selector)
     return {
         "run_id": agent_receipt["run_id"],
         "status": "completed",
@@ -173,7 +181,7 @@ def normalize(*, manifest: Mapping[str, Any], agent_receipt: Mapping[str, Any], 
             "summary_path": str(summary_path.resolve()),
             "summary_sha256": _sha256(summary_path),
             "extractor": f"{task_id}_official_summary_v1",
-            "cmr_row": cmr_row,
+            "cmr_row": selector,
         },
     }
 
@@ -184,7 +192,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--agent-receipt", type=Path, required=True)
     parser.add_argument("--official-summary", type=Path, required=True)
     parser.add_argument("--task", choices=tuple(TASKS), required=True)
-    parser.add_argument("--cmr-row", choices=("qgs_clip_base", "qgs_blip_base"))
+    parser.add_argument("--cmr-row", choices=CMR_PRIMARY_ROWS,
+                        help="Compatibility check only; must equal the manifest's pre-committed selector.")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
