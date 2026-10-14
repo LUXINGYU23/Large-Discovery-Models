@@ -1,0 +1,16 @@
+{
+  "name": "main_forks",
+  "fork_policy": {
+    "factory": "ldm_tts.harness.joint_gain:JointGainForks",
+    "options": {"samples": 512, "seed": 0, "noise_variance": 0.25}
+  },
+  "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5},
+  "measurement_policy": {
+    "factory": "tasks.nucleobench.core.measurement:HammingShellCoverage",
+    "options": {
+      "boundaries": [0.08333333333333333, 0.3333333333333333, 0.6666666666666666],
+      "max_regions": 3,
+      "pool_per_region": 4
+    }
+  }
+}

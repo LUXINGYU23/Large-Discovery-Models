@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
 
+from ldm_tts.optimization.measurement import MeasurementPolicy
 from ldm_tts.harness.research_tree import (
     ArchivePolicy, CoverageForks, DiverseArchive, ForkPolicy, LatestMainForks,
 )
@@ -22,9 +23,11 @@ class ResearchStrategy:
 
     fork_policy: ForkPolicy | None = None
     archive_policy: ArchivePolicy = DiverseArchive()
+    measurement_policy: MeasurementPolicy | None = None
 
     def __post_init__(self) -> None:
-        for obj, method in ((self.fork_policy, "plan"), (self.archive_policy, "retain")):
+        for obj, method in ((self.fork_policy, "plan"), (self.archive_policy, "retain"),
+                            (self.measurement_policy, "plan")):
             if obj is None and method == "plan":
                 continue
             if not callable(getattr(obj, method, None)) or not callable(getattr(obj, "identity", None)):
@@ -35,9 +38,12 @@ class ResearchStrategy:
         return self.fork_policy is not None
 
     def identity(self) -> dict:
-        return {"lifecycle": "forked" if self.requires_main else "persistent",
-                "fork_policy": self.fork_policy.identity() if self.fork_policy else None,
-                "archive_policy": self.archive_policy.identity() if self.requires_main else None}
+        identity = {"lifecycle": "forked" if self.requires_main else "persistent",
+                    "fork_policy": self.fork_policy.identity() if self.fork_policy else None,
+                    "archive_policy": self.archive_policy.identity() if self.requires_main else None}
+        if self.measurement_policy is not None:
+            identity["measurement_policy"] = self.measurement_policy.identity()
+        return identity
 
 
 def _factory(config: dict[str, Any]):
@@ -62,13 +68,18 @@ def load_research_strategy(config: dict[str, Any]) -> ResearchStrategy:
         if not isinstance(strategy, ResearchStrategy):
             raise TypeError("strategy factory must return ResearchStrategy")
         return strategy
-    if set(config) - {"name", "fork_policy", "archive_policy"}:
+    if set(config) - {"name", "fork_policy", "archive_policy", "measurement_policy"}:
         raise ValueError("unknown research strategy configuration fields")
+    measurement = config.get("measurement_policy")
+    if measurement is not None:
+        if not isinstance(measurement, dict) or "factory" not in measurement:
+            raise ValueError("measurement policy requires an explicit factory")
+        measurement = _factory(measurement)
     name = config.get("name", "independent")
     if name == "independent":
-        if set(config) - {"name"}:
+        if set(config) - {"name", "measurement_policy"}:
             raise ValueError("independent sessions do not use fork/archive policies")
-        return ResearchStrategy()
+        return ResearchStrategy(measurement_policy=measurement)
     if name != "main_forks":
         raise ValueError(f"unknown research strategy: {name}")
     fork = config.get("fork_policy", {"name": "latest"})
@@ -89,4 +100,4 @@ def load_research_strategy(config: dict[str, Any]) -> ResearchStrategy:
         archive_policy = DiverseArchive(**{k: v for k, v in archive.items() if k != "name"})
     else:
         raise ValueError("unknown archive policy configuration")
-    return ResearchStrategy(policy, archive_policy)
+    return ResearchStrategy(policy, archive_policy, measurement)

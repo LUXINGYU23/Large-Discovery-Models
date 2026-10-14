@@ -12,6 +12,9 @@ import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
+from ldm_tts.optimization.measurement import (
+    MeasurementContext, MeasurementPolicy, SelectionRequirements,
+)
 from tasks.nucleobench.core.policy_diagnostics import prepare_ucb_policy_research, prediction_records
 from ldm_tts.optimization import (
     BOObservation,
@@ -79,6 +82,7 @@ class AcquisitionTiltedSelector:
         policy_controller: PolicyResearchController | None = None,
         policy_adapter: NucleoOptimizationPolicyAdapter | None = None,
         policy_mode: bool = False,
+        measurement_policy: MeasurementPolicy | None = None,
     ) -> None:
         self.base_selector = base_selector
         self.config = _TiltConfig(
@@ -96,6 +100,7 @@ class AcquisitionTiltedSelector:
         self.policy_controller = policy_controller
         self.policy_adapter = policy_adapter
         self.policy_mode = policy_mode or policy_controller is not None
+        self.measurement_policy = measurement_policy
         self.history: tuple[BOObservation, ...] = ()
         self.history_size = 0
 
@@ -116,6 +121,8 @@ class AcquisitionTiltedSelector:
         }
         if self.policy_mode:
             parameters["optimization_policy"] = "persistent_harness_compiled"
+        if self.measurement_policy is not None:
+            parameters["measurement_policy"] = self.measurement_policy.identity()
         return AcquisitionSpec(
             name=f"{base.name}_tilted",
             objective_names=base.objective_names,
@@ -146,7 +153,14 @@ class AcquisitionTiltedSelector:
         reservoir = tuple(sorted(candidates, key=lambda item: item.candidate_id))
         if not reservoir:
             return BOSelectionResult(())
-        pool = _maintain_pool(reservoir, self.config, self.history_size)
+        requirements = SelectionRequirements()
+        if self.measurement_policy is not None:
+            context = MeasurementContext(
+                reservoir, representations, self.history, round_idx, self.config.pool_size, count,
+            )
+            requirements = self.measurement_policy.plan(context)
+            requirements.validate(context)
+        pool = _maintain_pool(reservoir, self.config, self.history_size, requirements)
         q0 = _base_masses(pool.candidates)
         policy: CompiledOptimizationPolicy | None = None
         if self.policy_controller is not None and self.history:
@@ -242,10 +256,14 @@ class AcquisitionTiltedSelector:
             pool.candidates,
             "tilted_selection",
         )
-        indices = _gumbel_top_k(
+        ranked_indices = _gumbel_top_k(
             probabilities,
-            min(count, len(pool.candidates)),
+            len(pool.candidates),
             np.random.default_rng(selection_seed),
+        )
+        selected_ids = requirements.select(
+            [pool.candidates[index].candidate_id for index in ranked_indices],
+            min(count, len(pool.candidates)), stage="evaluation",
         )
         annotated = tuple(
             replace(
@@ -291,6 +309,27 @@ class AcquisitionTiltedSelector:
             "pool_seed": pool.seed,
             "base_selection": dict(base.metadata),
         }
+        if self.measurement_policy is not None:
+            pooled_ids = {item.candidate_id for item in pool.candidates}
+            selected = set(selected_ids)
+            metadata["measurement_coverage"] = {
+                "policy": self.measurement_policy.identity(),
+                "requirements": requirements.to_dict(),
+                "selection_probability_semantics": "unconstrained_single_draw_weight",
+                "sampling": "reserve_from_shared_gumbel_ranking_then_fill_globally",
+                "groups": [
+                    {
+                        "group_id": group.group_id,
+                        "available": len(group.candidate_ids),
+                        "min_pool": group.min_pool,
+                        "min_attempts": group.min_attempts,
+                        "pooled_ids": [key for key in group.candidate_ids if key in pooled_ids],
+                        "selected_ids": [key for key in group.candidate_ids if key in selected],
+                        "pool_shortage": max(0, group.min_pool - len(group.candidate_ids)),
+                    }
+                    for group in requirements.groups
+                ],
+            }
         if policy is not None:
             metadata["compiled_policy"] = {
                 "epoch_id": policy.epoch_id,
@@ -303,7 +342,7 @@ class AcquisitionTiltedSelector:
                 **dict(policy.metadata),
             }
         return BOSelectionResult(
-            tuple(pool.candidates[index].candidate_id for index in indices),
+            selected_ids,
             annotated,
             fallback_reason=base.fallback_reason,
             metadata=metadata,
@@ -314,6 +353,7 @@ def _maintain_pool(
     candidates: tuple[Candidate, ...],
     config: _TiltConfig,
     history_size: int,
+    requirements: SelectionRequirements,
 ) -> _EmpiricalPool:
     occurrences = sum(_occurrence_count(item) for item in candidates)
     if {_valid_occurrence_count(item) for item in candidates} != {occurrences}:
@@ -336,23 +376,24 @@ def _maintain_pool(
         candidates,
         "bo_pool_maintenance",
     )
-    indices = _gumbel_top_k(
+    ranked_indices = _gumbel_top_k(
         _base_masses(candidates),
-        config.pool_size,
+        len(candidates),
         np.random.default_rng(seed),
     )
+    selected_ids = set(requirements.select(
+        [candidates[index].candidate_id for index in ranked_indices], config.pool_size, stage="pool",
+    ))
     maintained = tuple(
-        sorted(
-            (candidates[index] for index in indices),
-            key=lambda item: item.candidate_id,
-        )
+        candidate for candidate in candidates if candidate.candidate_id in selected_ids
     )
     return _EmpiricalPool(
         candidates,
         maintained,
         occurrences,
         seed,
-        "q0_gumbel_top_k_without_replacement",
+        "reserved_q0_gumbel_top_k_without_replacement" if requirements.groups
+        else "q0_gumbel_top_k_without_replacement",
     )
 
 

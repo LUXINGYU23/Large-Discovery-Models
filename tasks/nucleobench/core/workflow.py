@@ -310,6 +310,10 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     strategy = args._research_strategy
+    if strategy.measurement_policy is not None and (
+        args.mock or args.search_method not in {"ldm", *PARALLEL_HARNESS_METHODS}
+    ):
+        parser.error("measurement coverage requires real acquisition-tilted selection")
     if isinstance(strategy.fork_policy, CoverageForks) and len(_harness_profiles(args)) < 3:
         parser.error("coverage forks require at least three research profiles")
     if isinstance(strategy.fork_policy, JointGainForks) and len(_harness_profiles(args)) != 4:
@@ -736,6 +740,7 @@ def _run_real(
         alpha=args.alpha,
         eta=args.eta,
         z_clip=args.z_clip,
+        measurement_policy=args._research_strategy.measurement_policy,
     )
     task_spec = build_task_spec(
         prepared.context.case,
@@ -864,6 +869,7 @@ def _run_real(
                     z_clip=args.z_clip,
                     policy_controller=policy_controller,
                     policy_adapter=policy_adapter,
+                    measurement_policy=args._research_strategy.measurement_policy,
                 )
         except HarnessError as exc:
             stack.close()

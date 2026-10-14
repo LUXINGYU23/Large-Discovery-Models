@@ -28,6 +28,7 @@ from tasks.nucleobench.core.hamming_gp import (
 from tasks.nucleobench.core.optimization_policy import NucleoOptimizationPolicyAdapter
 from tasks.nucleobench.core.policy_features import NucleoPolicyFeatureEncoder
 from tasks.nucleobench.core.selection import AcquisitionTiltedSelector
+from tasks.nucleobench.core.measurement import HammingShellCoverage
 
 
 def _context(*, start_sequence: str = "AAAAAAAA") -> MutationContext:
@@ -364,10 +365,14 @@ def test_policy_features_are_stable_and_mean_inputs_exclude_selection_state() ->
 
 
 class _StaticPolicyController:
+    def __init__(self):
+        self.calls = 0
+
     def record_predictions(self, round_index, predictions):
         assert predictions and all("candidate_id" in row for row in predictions)
 
     def resolve(self, round_input):
+        self.calls += 1
         return CompiledOptimizationPolicy(
             epoch_id="epoch_001",
             artifact_digest="a" * 64,
@@ -382,7 +387,8 @@ class _StaticPolicyController:
         )
 
 
-def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
+@pytest.mark.parametrize("coverage", [None, HammingShellCoverage(max_regions=1, pool_per_region=1)])
+def test_compiled_policy_changes_gp_mean_and_ldm_weights(coverage) -> None:
     context = _context()
     encoder = NucleotideHammingEncoder(context)
     observed = _candidate(context, [{"position": 0, "base": "C"}])
@@ -428,6 +434,7 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
         pool_size=2,
         proposal_sample_count=4,
         policy_controller=controller,  # type: ignore[arg-type]
+        measurement_policy=coverage,
         policy_adapter=NucleoOptimizationPolicyAdapter(
             NucleoPolicyFeatureEncoder(context),
             proposal_sampling={"session_count": 4, "candidates_per_session": 16, "within_session_repeats_allowed": False, "cross_session_agreement_allowed": True},
@@ -456,4 +463,5 @@ def test_compiled_policy_changes_gp_mean_and_ldm_weights() -> None:
     assert result.metadata["alpha_base_measure"] == 0.0
     assert result.metadata["eta_acquisition_tilt"] == 0.0
     assert result.metadata["compiled_policy"]["action"] == "replace"
+    assert controller.calls == 1
     assert "compiled_prediction_diagnostics" in result.metadata["compiled_policy"]

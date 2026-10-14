@@ -4,7 +4,7 @@
 
 Select the lifecycle and rules with `--harness-research-strategy-config PATH`.
 The four default research profiles and candidate/evaluation budgets are configured
-as before. Four ready-to-use JSON configurations live in
+as before. Ready-to-use JSON configurations live in
 `config/nucleobench/research_strategies/`:
 
 | File | Behavior with four profiles |
@@ -13,6 +13,7 @@ as before. Four ready-to-use JSON configurations live in
 | `main_forks.json` | One persistent main researcher, four fresh forks of its latest node |
 | `coverage_2plus2.json` | Two latest-main forks, one historical restart, one archived-lineage continuation |
 | `joint_gain_1plus3.json` | One latest-main fork, three jointly selected historical restarts or archived-lineage continuations |
+| `joint_gain_1plus3_coverage.json` | The same JointGain v2 forks and archive, with optional distance-shell reservations in the BO pool and evaluation batch |
 
 For example, add this to the existing real campaign command:
 
@@ -20,9 +21,10 @@ For example, add this to the existing real campaign command:
 --harness-research-strategy-config config/nucleobench/research_strategies/coverage_2plus2.json
 ```
 
-No strategy config means independent sessions. Candidate admission, global empirical q0, GP/acquisition,
-compiled policy and true-evaluation selection are unchanged. No protected
-exploration evaluation slots are introduced.
+No strategy config means independent sessions. The first four configurations keep
+candidate admission, global empirical q0, GP/acquisition, compiled policy and
+true-evaluation selection unchanged. Measurement coverage is enabled only by the
+fifth configuration or an explicit custom measurement policy.
 
 `ResearchStrategy` (`ldm_tts.harness.research_strategy`) defines persistent versus
 forked execution. `ForkPolicy.plan(ForkContext)` selects one `ForkAssignment` per
@@ -58,6 +60,75 @@ when changing its behavior. A fork assignment carries profile ID, available pare
 node ID, purpose (`main`, `restart`, `continue`) and lineage ID. Continuation keeps
 the parent's lineage ID; restarts create a new one. Custom rules choose sources
 without modifying the Pi transport or candidate selector.
+
+### Optional measurement coverage
+
+Use `joint_gain_1plus3_coverage.json` through the same
+`--harness-research-strategy-config` argument. It keeps JointGain v2, the archive
+capacity of three, profile rotation, proposal counts, BO pool size, evaluation
+counts, research reasoning and provider budgets unchanged.
+
+The experimental NucleoBench policy partitions candidates by the fraction of
+editable positions different from the current best measured sequence. Its fixed
+boundaries are 1/12, 1/3 and 2/3, inclusive on the lower-distance shell. Shell zero
+contains candidates at distance at most 1/12; up to three nonzero shells receive
+reservations. These are geometric coverage bins, not validated biological modes.
+The thresholds are an explicit experimental choice, not a demonstrated optimum.
+
+Available shells are ordered by their successful measurement count, then their
+most recent measurement position, then shell ID. Historical sequences are
+classified relative to the current incumbent; the incumbent ID, encoder version,
+boundaries and candidate memberships are recorded for each decision.
+
+For a 64-candidate pool and a 16-candidate evaluation batch, each chosen shell
+reserves up to four pool positions and one evaluation position. Three populated
+shells therefore leave at least 52 pool positions and 13 evaluation positions
+for global competition. Empty or undersized shells release unused positions.
+Reservations shrink to the available pool and batch budgets; they never create
+extra evaluations or retries.
+
+Each stage draws one full Gumbel ranking using the existing seed and weights.
+Reserved candidates are taken from that ranking, and remaining positions are
+filled globally without replacement. Evaluation reservations appear first in
+the dispatch sequence. The compiled policy is resolved once by the existing
+pipeline; measurement coverage adds no model or oracle calls. An empty
+reservation plan preserves the original ranking and metadata, apart from the
+enabled policy's diagnostic record.
+
+`ldm_tts.optimization.measurement.MeasurementPolicy` is a pure interface over
+`MeasurementContext`. A custom factory returns disjoint `EvaluationGroup`
+reservations in a `SelectionRequirements` object. Add the factory to the strategy:
+
+```json
+"measurement_policy": {
+  "factory": "my_research.rules:MyMeasurementPolicy",
+  "options": {}
+}
+```
+
+The selector rejects overlapping groups, unknown candidates and reservations
+exceeding the fixed budgets. Tasks without acquisition-tilted selection reject
+the option during configuration. DNA-specific partitioning lives in
+`tasks/nucleobench/core/measurement.py`; the shared reservation interface and
+ranking operation do not depend on DNA, branches or a particular objective.
+
+The committed selection includes `metadata.measurement_coverage`: policy
+identity, complete requirements, shell membership, pool membership and selected
+IDs. Existing engine recovery reuses that selection, so it does not repartition
+or redraw a pending batch. In constrained selection, the existing prediction
+field `selection_probability` describes the underlying single-draw weight, not
+the marginal inclusion probability after reservations. Selected candidates
+still need evaluator receipts to establish actual attempts or success.
+
+Remote qualification on 2026-10-14 passed 246 tests, including a real engine
+interruption after a synthetic evaluator result had been persisted. Recovery
+completed exactly 16 unique evaluator calls and preserved the selection plan.
+Twelve deterministic comparisons against the frozen experiment's selector
+matched the complete default selection result exactly. A constructed local-bias
+fixture selected three nonlocal candidates with coverage versus zero without,
+at the same 64/16 sizes. These checks validate execution, not scientific utility
+improvement. Artifacts are under `research/evaluation-coverage-dev-20261014/` on
+the experiment server; no provider or scientific evaluator calls were used.
 
 ### Coverage and archive semantics
 
