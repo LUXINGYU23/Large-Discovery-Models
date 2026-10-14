@@ -540,6 +540,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
         # final receipt that has not yet been written.
         progress = {
             "status": "running", "task_id": task_id, "seed": seed,
+            "candidate_written": candidate_written,
             "turns_completed": len(transcript), "api_calls": len(client.usage_events),
             "api_cost_usd": client.total_cost,
             "wall_clock_hours": prior_wall_clock_hours + (time.monotonic() - started_monotonic) / 3600.0,
@@ -560,12 +561,16 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
         try:
             response = ""
             request_messages = _compact_messages(messages)
+            urgency = (" No source code has changed. Your next response MUST include a write or replace "
+                       "action editing a .py or .sh method. A simple runnable baseline is better than more "
+                       "inspection; you can revise it after a smoke test."
+                       if turn >= 10 and not candidate_written else "")
             request_messages.append({
                 "role": "user",
                 "content": (
                     f"Progress: turn {turn + 1}/{max_turns}; API spent "
                     f"${client.total_cost:.4f}/${profile.api_budget_usd:.2f}. "
-                    "Prioritize writing, evaluating, and grading a concrete method now."
+                    "Prioritize writing, evaluating, and grading a concrete method now." + urgency
                 ),
             })
             response = client.complete(request_messages)
@@ -605,12 +610,17 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             continue
         consecutive_invalid_actions = 0
         observations = []
-        for action in actions:
-            observation = tools.execute(action)
-            observations.append(observation)
-            if observation.get("tool") == "submit" and observation.get("ok"):
-                submitted = observation
-                break
+        if turn >= 16 and not candidate_written and not any(
+                action.get("tool") in {"write", "replace"} for action in actions):
+            observations.append({"tool": "source_change_guard", "ok": False,
+                                 "error": "Inspection-only turn refused: edit a .py or .sh source file now."})
+        else:
+            for action in actions:
+                observation = tools.execute(action)
+                observations.append(observation)
+                if observation.get("tool") == "submit" and observation.get("ok"):
+                    submitted = observation
+                    break
         transcript.append({"turn": turn, "at": _now(), "analysis": analysis, "actions": actions,
                            "observations": observations, "response_sha256": hashlib.sha256(response.encode()).hexdigest()})
         candidate_written = candidate_written or _code_snapshot(workspace) != initial_code
@@ -657,6 +667,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
     (output_dir / "agent_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (output_dir / "progress.json").write_text(
         json.dumps({"status": status, "task_id": task_id, "seed": seed,
+                    "candidate_written": candidate_written,
                     "turns_completed": len(transcript), "api_calls": receipt["api_calls"],
                     "api_cost_usd": receipt["api_cost_usd"],
                     "wall_clock_hours": receipt["wall_clock_hours"], "at": _now()}, sort_keys=True) + "\n",

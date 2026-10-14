@@ -133,6 +133,8 @@ def test_inspection_only_trajectory_stops_before_spending_all_240_turns(tmp_path
                         client=_InspectOnlyClient(), max_turns=240)
     assert receipt["status"] == "no_candidate"
     assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 24
+    transcript = json.loads((tmp_path / "run" / "transcript.json").read_text())
+    assert transcript[16]["observations"][0]["tool"] == "source_change_guard"
 
 
 class _FormattingThenSubmitClient:
