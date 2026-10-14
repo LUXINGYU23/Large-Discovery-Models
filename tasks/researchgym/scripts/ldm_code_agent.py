@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -536,24 +537,34 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
     consecutive_invalid_actions = 0
     candidate_written = False
     initial_code = _code_snapshot(workspace)
+    active_action: dict[str, str] | None = None
+    checkpoint_lock = threading.Lock()
+    heartbeat_stop = threading.Event()
 
     def checkpoint() -> None:
         # Persist progress while a trajectory is still running.  A launcher
         # crash must not hide paid calls or leave monitoring dependent on a
         # final receipt that has not yet been written.
-        progress = {
-            "status": "running", "task_id": task_id, "seed": seed,
-            "candidate_written": candidate_written,
-            "turns_completed": len(transcript), "api_calls": len(client.usage_events),
-            "api_cost_usd": client.total_cost,
-            "wall_clock_hours": prior_wall_clock_hours + (time.monotonic() - started_monotonic) / 3600.0,
-            "at": _now(),
-        }
-        tmp = output_dir / "progress.json.tmp"
-        tmp.write_text(json.dumps(progress, sort_keys=True) + "\n", encoding="utf-8")
-        tmp.replace(output_dir / "progress.json")
+        with checkpoint_lock:
+            progress = {
+                "status": "running", "task_id": task_id, "seed": seed,
+                "candidate_written": candidate_written, "active_action": active_action,
+                "turns_completed": len(transcript), "api_calls": len(client.usage_events),
+                "api_cost_usd": client.total_cost,
+                "wall_clock_hours": prior_wall_clock_hours + (time.monotonic() - started_monotonic) / 3600.0,
+                "at": _now(),
+            }
+            tmp = output_dir / "progress.json.tmp"
+            tmp.write_text(json.dumps(progress, sort_keys=True) + "\n", encoding="utf-8")
+            tmp.replace(output_dir / "progress.json")
+
+    def heartbeat() -> None:
+        while not heartbeat_stop.wait(30.0):
+            checkpoint()
 
     checkpoint()
+    heartbeat_thread = threading.Thread(target=heartbeat, name="researchgym-agent-progress", daemon=True)
+    heartbeat_thread.start()
     for turn in range(max_turns):
         if turn >= 24 and not candidate_written:
             status = "no_candidate"
@@ -619,7 +630,12 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                                  "error": "Inspection-only turn refused: edit a .py or .sh source file now."})
         else:
             for action in actions:
+                active_action = {"tool": str(action.get("tool", ""))}
+                if isinstance(action.get("path"), str):
+                    active_action["path"] = action["path"][:300]
+                checkpoint()
                 observation = tools.execute(action)
+                active_action = None
                 observations.append(observation)
                 if observation.get("tool") == "submit" and observation.get("ok"):
                     submitted = observation
@@ -636,6 +652,8 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             status = "submitted"
             break
     elapsed = time.monotonic() - started_monotonic
+    heartbeat_stop.set()
+    heartbeat_thread.join(timeout=1)
     (output_dir / "transcript.json").write_text(json.dumps(transcript, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (output_dir / "usage.json").write_text(json.dumps(client.usage_events, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     receipt = {
@@ -670,7 +688,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
     (output_dir / "agent_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (output_dir / "progress.json").write_text(
         json.dumps({"status": status, "task_id": task_id, "seed": seed,
-                    "candidate_written": candidate_written,
+                    "candidate_written": candidate_written, "active_action": None,
                     "turns_completed": len(transcript), "api_calls": receipt["api_calls"],
                     "api_cost_usd": receipt["api_cost_usd"],
                     "wall_clock_hours": receipt["wall_clock_hours"], "at": _now()}, sort_keys=True) + "\n",
