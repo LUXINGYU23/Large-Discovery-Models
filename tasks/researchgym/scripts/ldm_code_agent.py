@@ -375,7 +375,15 @@ Use relative paths.  Work incrementally, read before overwriting, and use bash
 for tests/training/grading.  A submit action ends the trajectory; submit only
 after you have invoked the official grader and inspected its result.  JSON
 strings must escape literal newlines as \\n, and emit no more than 16 actions in
-one response."""
+one response.
+
+Work toward a scored result, not an exhaustive repository survey.  In your
+first 10 turns, inspect the task entry point and grader, then choose a method
+and write its code.  Run a small smoke test by turn 20, a complete evaluation
+by turn 35, and the official grader as soon as an evaluation log exists.  Do
+not repeatedly read files already inspected.  If an existing candidate or
+checkpoint is in the workspace, build on it.  Every tool action consumes the
+limited API and wall-clock budget."""
 
 
 def _task_prompt(task_id: str, workspace: Path, seed: int, profile_name: str) -> str:
@@ -468,18 +476,47 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
     transcript: list[dict[str, Any]] = []
     messages = [{"role": "system", "content": _system_prompt()},
                 {"role": "user", "content": _task_prompt(task_id, workspace, seed, profile_name)}]
-    status, submitted = "time_exhausted", None
+    status, submitted = "turn_exhausted", None
     consecutive_invalid_actions = 0
+
+    def checkpoint() -> None:
+        # Persist progress while a trajectory is still running.  A launcher
+        # crash must not hide paid calls or leave monitoring dependent on a
+        # final receipt that has not yet been written.
+        progress = {
+            "status": "running", "task_id": task_id, "seed": seed,
+            "turns_completed": len(transcript), "api_calls": len(client.usage_events),
+            "api_cost_usd": client.total_cost,
+            "wall_clock_hours": prior_wall_clock_hours + (time.monotonic() - started_monotonic) / 3600.0,
+            "at": _now(),
+        }
+        tmp = output_dir / "progress.json.tmp"
+        tmp.write_text(json.dumps(progress, sort_keys=True) + "\n", encoding="utf-8")
+        tmp.replace(output_dir / "progress.json")
+
+    checkpoint()
     for turn in range(max_turns):
         if time.monotonic() >= deadline:
+            status = "time_exhausted"
             break
         try:
             response = ""
-            response = client.complete(_compact_messages(messages))
+            request_messages = _compact_messages(messages)
+            request_messages.append({
+                "role": "user",
+                "content": (
+                    f"Progress: turn {turn + 1}/{max_turns}; API spent "
+                    f"${client.total_cost:.4f}/${profile.api_budget_usd:.2f}. "
+                    "Prioritize writing, evaluating, and grading a concrete method now."
+                ),
+            })
+            response = client.complete(request_messages)
+            checkpoint()
             analysis, actions = parse_actions(response)
         except BudgetExhausted as exc:
             status = "budget_exhausted"
             transcript.append({"turn": turn, "at": _now(), "error": str(exc)})
+            checkpoint()
             break
         except AgentError as exc:
             # A provider can occasionally return a nearly-valid action object
@@ -495,6 +532,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                 "response_sha256": hashlib.sha256(response.encode()).hexdigest()
                 if "response" in locals() else None,
             })
+            checkpoint()
             if consecutive_invalid_actions >= 3:
                 status = "agent_error"
                 break
@@ -517,6 +555,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                 break
         transcript.append({"turn": turn, "at": _now(), "analysis": analysis, "actions": actions,
                            "observations": observations, "response_sha256": hashlib.sha256(response.encode()).hexdigest()})
+        checkpoint()
         # Keep the response only as a digest in transcript; complete action
         # requests and tool results are enough to reproduce the workspace edits.
         messages.append({"role": "assistant", "content": json.dumps({"analysis": analysis, "actions": actions})})
@@ -557,6 +596,13 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             "usage_sha256": prior_receipt.get("usage_sha256"),
         }
     (output_dir / "agent_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (output_dir / "progress.json").write_text(
+        json.dumps({"status": status, "task_id": task_id, "seed": seed,
+                    "turns_completed": len(transcript), "api_calls": receipt["api_calls"],
+                    "api_cost_usd": receipt["api_cost_usd"],
+                    "wall_clock_hours": receipt["wall_clock_hours"], "at": _now()}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return receipt
 
 
@@ -570,7 +616,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--api-url", default=os.environ.get("LLM_API_URL") or os.environ.get("LLM_BASE_URL", ""))
     parser.add_argument("--model", default=os.environ.get("LLM_MODEL_NAME", ""))
-    parser.add_argument("--max-turns", type=int, default=120)
+    parser.add_argument("--max-turns", type=int, default=240)
     parser.add_argument("--request-timeout", type=int, default=180)
     parser.add_argument("--prior-agent-receipt", type=Path,
                         help="Failed predecessor receipt; its cost and elapsed time remain charged to this seed.")

@@ -87,6 +87,27 @@ def test_agent_owns_workspace_and_leaves_auditable_transcript(tmp_path):
     transcript = json.loads((tmp_path / "run" / "transcript.json").read_text())
     assert transcript[0]["actions"][0]["tool"] == "write"
     assert transcript[0]["observations"][1]["tool"] == "bash"
+    progress = json.loads((tmp_path / "run" / "progress.json").read_text())
+    assert progress["status"] == "submitted" and progress["turns_completed"] == 1
+
+
+def test_turn_limit_is_distinct_from_wall_clock_limit(tmp_path):
+    class _InspectOnlyClient:
+        total_cost = 0.01
+        usage_events = [{"cost_usd": 0.01}]
+
+        def complete(self, messages):
+            return '{"actions":[{"tool":"list","path":"."}]}'
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
+    receipt = run_agent(task_id="continual_learning", workspace=workspace, seed=0,
+                        profile_name="table3", manifest=manifest, output_dir=tmp_path / "run",
+                        client=_InspectOnlyClient(), max_turns=2)
+    assert receipt["status"] == "turn_exhausted"
+    assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 2
 
 
 class _FormattingThenSubmitClient:
