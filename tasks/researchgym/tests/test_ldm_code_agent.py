@@ -49,6 +49,12 @@ def test_workspace_tools_keep_file_paths_inside_workspace(tmp_path):
     assert not external["ok"] and "network-capable" in external["error"]
     pretrained = tools.execute({"tool": "bash", "command": "python -c 'import timm; timm.create_model(\"vit\", pretrained=True)'"})
     assert not pretrained["ok"] and "network-capable" in pretrained["error"]
+    edited = tools.execute({"tool": "replace", "path": "nested/method.py", "old": "42", "new": "7"})
+    assert not edited["ok"] and (tmp_path / "nested/method.py").read_text() == "x = 1\n"
+    edited = tools.execute({"tool": "replace", "path": "nested/method.py", "old": "x = 1", "new": "x = 7"})
+    assert edited["ok"] and (tmp_path / "nested/method.py").read_text() == "x = 7\n"
+    found = tools.execute({"tool": "search", "path": "nested/method.py", "query": "x ="})
+    assert found["matches"] == [{"line": 1, "offset": 0, "text": "x = 7"}]
 
 
 def test_pricing_handles_cached_input_and_reasoning_without_double_counting():

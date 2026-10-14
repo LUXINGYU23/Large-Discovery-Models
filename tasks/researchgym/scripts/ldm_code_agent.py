@@ -223,8 +223,12 @@ class WorkspaceTools:
                 return self._list(action)
             if tool == "read":
                 return self._read(action)
+            if tool == "search":
+                return self._search(action)
             if tool == "write":
                 return self._write(action)
+            if tool == "replace":
+                return self._replace(action)
             if tool == "bash":
                 return self._bash(action)
             if tool == "submit":
@@ -254,6 +258,24 @@ class WorkspaceTools:
         return {"tool": "read", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
                 "offset": offset, "content": data[offset:offset + limit], "truncated": offset + limit < len(data)}
 
+    def _search(self, action: Mapping[str, Any]) -> dict[str, Any]:
+        """Find exact text in one file, returning line numbers and read offsets."""
+        target = _safe_relative(self.workspace, action.get("path"))
+        query = action.get("query")
+        if not target.is_file() or not isinstance(query, str) or not 1 <= len(query) <= 200:
+            raise AgentError("search needs an existing file and a 1–200 character query")
+        if target.stat().st_size > 2_000_000:
+            raise AgentError("search file exceeds 2 MB")
+        matches, offset = [], 0
+        for number, line in enumerate(target.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True), 1):
+            if query.lower() in line.lower():
+                matches.append({"line": number, "offset": offset, "text": line.strip()[:350]})
+                if len(matches) >= 30:
+                    break
+            offset += len(line)
+        return {"tool": "search", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
+                "query": query, "matches": matches}
+
     def _write(self, action: Mapping[str, Any]) -> dict[str, Any]:
         target = _safe_relative(self.workspace, action.get("path"))
         content = action.get("content")
@@ -265,6 +287,21 @@ class WorkspaceTools:
         target.write_text(content, encoding="utf-8")
         return {"tool": "write", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
                 "bytes": len(content.encode("utf-8")), "sha256": _sha256(target)}
+
+    def _replace(self, action: Mapping[str, Any]) -> dict[str, Any]:
+        """Edit one exact source span without re-emitting a large complete file."""
+        target = _safe_relative(self.workspace, action.get("path"))
+        old, new = action.get("old"), action.get("new")
+        if not target.is_file() or not isinstance(old, str) or not old or not isinstance(new, str):
+            raise AgentError("replace needs an existing file and non-empty old/new string fields")
+        if len(old) > 100_000 or len(new) > 100_000:
+            raise AgentError("replace span exceeds 100 KB")
+        source = target.read_text(encoding="utf-8")
+        if source.count(old) != 1:
+            raise AgentError("replace old span must occur exactly once; read the file and use a precise snippet")
+        target.write_text(source.replace(old, new, 1), encoding="utf-8")
+        return {"tool": "replace", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
+                "sha256": _sha256(target)}
 
     def _bash(self, action: Mapping[str, Any]) -> dict[str, Any]:
         command = action.get("command")
@@ -367,7 +404,9 @@ On every turn respond with exactly one JSON object:
 Each action must be one of:
 {"tool":"list","path":"."}
 {"tool":"read","path":"relative/file.py","offset":0,"limit":12000}
+{"tool":"search","path":"relative/file.py","query":"function or keyword"}
 {"tool":"write","path":"relative/file.py","content":"complete file content"}
+{"tool":"replace","path":"relative/file.py","old":"exact existing snippet","new":"replacement code"}
 {"tool":"bash","command":"command executed in the task workspace","timeout_seconds":600}
 {"tool":"submit","summary":"what changed, commands run, and official-grade file"}
 
@@ -377,9 +416,12 @@ after you have invoked the official grader and inspected its result.  JSON
 strings must escape literal newlines as \\n, and emit no more than 16 actions in
 one response.
 
-Work toward a scored result, not an exhaustive repository survey.  In your
+Work toward a scored result, not an exhaustive repository survey.  Search a
+large file for a function or keyword instead of reading it in tiny sequential
+chunks; search returns character offsets you can pass to read.  In your
 first 10 turns, inspect the task entry point and grader, then choose a method
-and WRITE its code with the write tool.  If you keep reading or listing after
+and WRITE its code with write or replace.  Use replace for a small edit to a
+large existing file.  If you keep reading or listing after
 turn 10 without writing a candidate, the trajectory will be stopped as invalid.
 Run a small smoke test by turn 20, a complete evaluation
 by turn 35, and the official grader as soon as an evaluation log exists.  Do
