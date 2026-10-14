@@ -440,6 +440,9 @@ def _task_prompt(task_id: str, workspace: Path, seed: int, profile_name: str) ->
     return (
         f"Task={task.display_name} ({task_id}); independent seed={seed}; profile={profile_name}.\n"
         f"Official Table 3 metrics: {', '.join(task.metrics)}. Primary selection: {task.primary_note}.\n"
+        "The independent trajectory seed is not necessarily the task's pretrained-model or data seed. "
+        "Inspect available checkpoint filenames and use the benchmark's actual required seed; "
+        "never rename or fabricate missing checkpoints.\n"
         f"Workspace: {workspace}.\n{runtime}\nTask description (possibly truncated):\n{_clip(text, 24_000)}"
     )
 
