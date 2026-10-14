@@ -379,7 +379,9 @@ one response.
 
 Work toward a scored result, not an exhaustive repository survey.  In your
 first 10 turns, inspect the task entry point and grader, then choose a method
-and write its code.  Run a small smoke test by turn 20, a complete evaluation
+and WRITE its code with the write tool.  If you keep reading or listing after
+turn 10 without writing a candidate, the trajectory will be stopped as invalid.
+Run a small smoke test by turn 20, a complete evaluation
 by turn 35, and the official grader as soon as an evaluation log exists.  Do
 not repeatedly read files already inspected.  If an existing candidate or
 checkpoint is in the workspace, build on it.  Every tool action consumes the
@@ -449,6 +451,15 @@ def _compact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     return messages[:2] + messages[-6:]
 
 
+def _code_snapshot(workspace: Path) -> dict[str, str]:
+    """Evidence that the agent changed source, regardless of edit tool."""
+    result = {}
+    for path in workspace.rglob("*"):
+        if path.is_file() and path.suffix in {".py", ".sh"}:
+            result[path.relative_to(workspace).as_posix()] = _sha256(path)
+    return result
+
+
 def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
               manifest: Mapping[str, Any], output_dir: Path, client: ChatCompletionsClient,
               max_turns: int, prior_receipt: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -478,6 +489,8 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                 {"role": "user", "content": _task_prompt(task_id, workspace, seed, profile_name)}]
     status, submitted = "turn_exhausted", None
     consecutive_invalid_actions = 0
+    candidate_written = False
+    initial_code = _code_snapshot(workspace)
 
     def checkpoint() -> None:
         # Persist progress while a trajectory is still running.  A launcher
@@ -496,6 +509,9 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
 
     checkpoint()
     for turn in range(max_turns):
+        if turn >= 24 and not candidate_written:
+            status = "no_candidate"
+            break
         if time.monotonic() >= deadline:
             status = "time_exhausted"
             break
@@ -555,6 +571,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                 break
         transcript.append({"turn": turn, "at": _now(), "analysis": analysis, "actions": actions,
                            "observations": observations, "response_sha256": hashlib.sha256(response.encode()).hexdigest()})
+        candidate_written = candidate_written or _code_snapshot(workspace) != initial_code
         checkpoint()
         # Keep the response only as a digest in transcript; complete action
         # requests and tool results are enough to reproduce the workspace edits.

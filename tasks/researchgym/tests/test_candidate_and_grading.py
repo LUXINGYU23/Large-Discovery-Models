@@ -4,7 +4,7 @@ import pytest
 
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal
 from tasks.researchgym.core.candidate import FEATURE_NAMES, ProgramDomain, ProgramEncoder
-from tasks.researchgym.core.cases import CASE_IDS, load_case
+from tasks.researchgym.core.cases import CASE_IDS, load_case, render
 from tasks.researchgym.core.grading import CoverageError, score_summary
 
 
@@ -41,6 +41,8 @@ def test_canonical_identity_ignores_comments_formatting_and_docstrings():
     variant = "# comment\n" + seed.replace("class ReplayBuffer:", 'class ReplayBuffer:\n    """doc"""', 1) + "\n\n"
     first, second = (domain.admit(RawProposal({"program": p}, "test")) for p in (seed, variant))
     assert isinstance(first, Candidate) and first.canonical_key == second.canonical_key
+    encoder = ProgramEncoder(case)
+    assert encoder.encode(first).values == encoder.encode(second).values
     assert isinstance(domain.admit(RawProposal({"program": seed, "extra": 1}, "test")), CandidateRejection)
 
 
@@ -69,6 +71,17 @@ def test_tse_requires_all_ten_cells_with_five_folds():
         score_summary(case, tse_summary(["Epilepsy", "Wafer", "Freezer"]))
     with pytest.raises(CoverageError, match="4 folds"):
         score_summary(case, tse_summary(full, count=4))
+
+
+@pytest.mark.parametrize("method", ("llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled"))
+def test_tse_grader_receives_actual_campaign_method(method):
+    case = load_case("time_series_explanation")
+    argv = render(case.raw["grader"]["argv"], {
+        "python": "python", "summary": "summary.json", "scratch_markdown": "scratch.md",
+        "slot": "ldm", "method": method,
+    })
+    assert argv[argv.index("--method") + 1] == method
+    assert argv[argv.index("--md") + 1] == "scratch.md"
 
 
 def test_cl_cmr_and_rl_coverage_identities():

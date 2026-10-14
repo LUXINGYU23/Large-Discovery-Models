@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 import time
 from pathlib import Path
 
@@ -22,6 +23,9 @@ class CampaignClock:
         self.max_seconds = max_seconds
         self.segments: list[dict[str, float]] = []
         self._last_write = 0.0
+        self._lock = threading.RLock()
+        self._stop_event = threading.Event()
+        self._heartbeat_thread: threading.Thread | None = None
 
     @classmethod
     def open(cls, path: Path, max_seconds: float | None, *, resume: bool) -> "CampaignClock":
@@ -38,20 +42,33 @@ class CampaignClock:
         return clock
 
     def start(self) -> None:
-        now = time.time()
-        self.segments.append({"started_at": now, "last_seen": now})
-        self._write(force=True)
+        with self._lock:
+            now = time.time()
+            self.segments.append({"started_at": now, "last_seen": now})
+            self._write(force=True)
+        self._stop_event.clear()
+        self._heartbeat_thread = threading.Thread(target=self._heartbeat_loop, name="researchgym-clock", daemon=True)
+        self._heartbeat_thread.start()
+
+    def _heartbeat_loop(self) -> None:
+        while not self._stop_event.wait(HEARTBEAT_SECONDS):
+            self.heartbeat()
 
     def heartbeat(self) -> None:
-        if self.segments and "stopped_at" not in self.segments[-1]:
-            self.segments[-1]["last_seen"] = time.time()
-            self._write()
+        with self._lock:
+            if self.segments and "stopped_at" not in self.segments[-1]:
+                self.segments[-1]["last_seen"] = time.time()
+                self._write()
 
     def stop(self) -> None:
-        if self.segments and "stopped_at" not in self.segments[-1]:
-            now = time.time()
-            self.segments[-1].update(last_seen=now, stopped_at=now)
-            self._write(force=True)
+        self._stop_event.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=1)
+        with self._lock:
+            if self.segments and "stopped_at" not in self.segments[-1]:
+                now = time.time()
+                self.segments[-1].update(last_seen=now, stopped_at=now)
+                self._write(force=True)
 
     def elapsed(self) -> float:
         total = 0.0

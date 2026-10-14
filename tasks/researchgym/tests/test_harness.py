@@ -10,7 +10,7 @@ import pytest
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.run_store import BudgetLedger
-from ldm_tts.harness import file_sha256
+from ldm_tts.harness import HarnessProviderAuthorizationRequest, file_sha256
 from tasks.researchgym.core import workflow
 from tasks.researchgym.core.candidate import ProgramDomain
 from tasks.researchgym.core.cases import load_case
@@ -20,7 +20,7 @@ from tasks.researchgym.core.harness import (
 )
 from tasks.researchgym.core.proposals import ProposalExhausted
 from tasks.researchgym.core.sampling import Q0_KEY, attach_empirical_base_measure
-from tasks.researchgym.core.usage import ApiBudgetExhausted, ApiPricing
+from tasks.researchgym.core.usage import ApiBudgetExhausted, ApiPricing, account_tokens, harness_turn_tokens
 
 CASE = load_case("continual_learning")
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
@@ -89,6 +89,17 @@ def test_sessions_repair_in_place_and_keep_lineage_and_usage(tmp_path):
                                             for a in batch.attempts)
 
 
+def test_refill_smaller_than_pool_still_sends_all_profiles(tmp_path):
+    source = make_source(tmp_path, "valid", sessions=2)
+    try:
+        batch = collect(source, count=1)
+    finally:
+        source.client.close()
+    assert len(batch.rows) == 1
+    frames = jsonl(tmp_path / "harness/fixture_requests.jsonl")
+    assert [turn["profileId"] for turn in frames[0]["turns"]] == ["program_research_01", "program_research_02"]
+
+
 def test_provider_authorization_reserves_budget_before_a_second_provider_call(tmp_path):
     pricing = ApiPricing(1.0, 2.0, budget_usd=0.002)
     source = make_source(tmp_path, "repair", pricing=pricing, reserve_usd=0.0015)
@@ -100,6 +111,55 @@ def test_provider_authorization_reserves_budget_before_a_second_provider_call(tm
     assert source.runtime.budget.counters["harness_provider_requests"] == 1
     receipts = list((tmp_path / "harness/provider_authorizations").glob("*.json"))
     assert len(receipts) == 1 and json.loads(receipts[0].read_text())["status"] == "authorized"
+
+
+def _authorization(turn, number):
+    return HarnessProviderAuthorizationRequest("fixture-campaign", "program_research_01", turn,
+                                               f"{turn}-provider-{number}", "a" * 64)
+
+
+def test_recovery_reconciles_cumulative_captures_against_all_turn_receipts(tmp_path):
+    runtime = Runtime(tmp_path / "budget.json")
+    meter = ProviderAuthorizationLedger(root=tmp_path / "harness", runtime=runtime,
+                                        pricing=ApiPricing(1, 1), campaign_id="fixture-campaign",
+                                        usage_prefix="harness", reserve_usd=None)
+    meter.authorize(_authorization("turn-1", 1))
+    meter.reconcile_turn("turn-1", reported_provider_calls=1,
+                         tokens={"input_tokens": 100, "output_tokens": 20})
+    meter.authorize(_authorization("turn-1", 2))
+    meter.reconcile_turn("turn-1", reported_provider_calls=2,
+                         tokens={"input_tokens": 200, "output_tokens": 40})
+    assert {json.loads(p.read_text())["status"] for p in meter.root.glob("*.json")} == {"reconciled"}
+
+
+def test_candidate_and_policy_pools_share_outstanding_reservations(tmp_path):
+    runtime = Runtime(tmp_path / "budget.json")
+    pricing = ApiPricing(1, 1, budget_usd=1)
+    policy = ProviderAuthorizationLedger(root=tmp_path / "policy_harness", runtime=runtime,
+                                         pricing=pricing, campaign_id="fixture-campaign",
+                                         usage_prefix="policy", reserve_usd=0.6)
+    candidate = ProviderAuthorizationLedger(root=tmp_path / "harness", runtime=runtime,
+                                            pricing=pricing, campaign_id="fixture-campaign",
+                                            usage_prefix="harness", reserve_usd=0.6)
+    policy.authorize(_authorization("policy-turn", 1))
+    with pytest.raises(ApiBudgetExhausted, match="would be exceeded"):
+        candidate.authorize(_authorization("candidate-turn", 1))
+
+
+def test_partial_provider_capture_keeps_known_cost_and_unknown_reserve(tmp_path):
+    capture = tmp_path / "captures"
+    capture.mkdir()
+    (capture / "response.json").write_text(json.dumps({"usage": {"input_tokens": 2000, "output_tokens": 400}}))
+    (capture / "provider_index.jsonl").write_text("\n".join(json.dumps(row) for row in (
+        {"turnId": "turn-1", "type": "provider_exchange", "response": {"artifact": "response.json"}},
+        {"turnId": "turn-1", "type": "provider_transport_error"},
+    )))
+    tokens = harness_turn_tokens(tmp_path, "turn-1")
+    assert tokens == {"input_tokens": 2000, "output_tokens": 400, "unknown_calls": 1.0}
+    runtime = Runtime(tmp_path / "budget.json")
+    account_tokens(runtime, ApiPricing(1, 2), "harness", tokens, usage_key="turn-1")
+    assert runtime.budget.counters["harness_input_tokens"] == 2000
+    assert runtime.budget.counters["harness_usage_unknown"] == 1
 
 
 def test_cross_session_agreement_enters_q0(tmp_path):
@@ -144,7 +204,8 @@ def test_accepted_sessions_are_not_rerun_after_another_exhausts_validation(tmp_p
         retry.client.close()
     assert len(batch.rows) == 4
     frames = jsonl(tmp_path / "harness/fixture_requests.jsonl")
-    assert [t["profileId"] for t in frames[-1]["turns"]] == ["program_research_02"]
+    assert [t["profileId"] for t in frames[-1]["turns"]] == ["program_research_01", "program_research_02"]
+    assert frames[-1]["turns"][0]["turnId"] == frames[0]["turns"][0]["turnId"]
     # A process-level replay of the completed round issues no new turns.
     replay = make_source(tmp_path, "valid", runtime=runtime)
     try:

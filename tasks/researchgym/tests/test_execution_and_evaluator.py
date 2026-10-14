@@ -14,10 +14,24 @@ from ldm_tts.contracts import Candidate
 from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 from tasks.researchgym.core import source as source_module
 from tasks.researchgym.core.cases import CaseSpec, load_case, render
+from tasks.researchgym.core import clock as clock_module
 from tasks.researchgym.core.clock import CampaignClock
 from tasks.researchgym.core.evaluator import ResearchGymEvaluator
 from tasks.researchgym.core.execution import JobCommand, ProcessTreeRunner
 from tasks.researchgym.core.source import SourceMismatchError, UpstreamCase
+
+
+def test_campaign_clock_heartbeats_while_research_is_blocked(tmp_path, monkeypatch):
+    monkeypatch.setattr(clock_module, "HEARTBEAT_SECONDS", 0.02)
+    path = tmp_path / "clock.json"
+    clock = CampaignClock(path, 3600)
+    clock.start()
+    try:
+        first = json.loads(path.read_text())["segments"][0]["last_seen"]
+        time.sleep(0.08)
+        assert json.loads(path.read_text())["segments"][0]["last_seen"] > first
+    finally:
+        clock.stop()
 
 
 def test_timeout_terminates_background_descendants(tmp_path):
@@ -49,6 +63,7 @@ from pathlib import Path
 import ldm_buffer
 seed, out = int(sys.argv[1]), Path(sys.argv[2])
 if getattr(ldm_buffer, "CRASH_SEED", None) == seed:
+    print("RuntimeError: tensor shape mismatch", file=sys.stderr)
     raise SystemExit(3)
 if getattr(ldm_buffer, "HANG", False):
     time.sleep(60)
@@ -133,6 +148,7 @@ def test_crashed_cell_invalidates_candidate_and_interrupted_attempt_is_not_rerun
     ev = evaluator(case, upstream, tmp_path / "run")
     crashed = ev.evaluate(candidate(case, "\nSCORE = 5.0\nCRASH_SEED = 1\n", name="c2"))
     assert crashed.status == "failed" and "1=failed" in crashed.error
+    assert "tensor shape mismatch" in crashed.error
     root = tmp_path / "run/evaluations/c3"
     root.mkdir(parents=True)
     (root / "started.json").write_text("{}")

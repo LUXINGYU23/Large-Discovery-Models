@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import fcntl
 from pathlib import Path
 
 from ldm_tts.engine.expansion import attach_proposal_attempt_receipt
@@ -87,8 +88,19 @@ class ProviderAuthorizationLedger:
         return records
 
     def _outstanding_usd(self) -> float:
-        return sum(float(record.get("reserved_usd", 0.0)) for _, record in self._records()
-                   if record.get("status") == "authorized")
+        # Both Pi pools belong to one campaign and must share the same reserve.
+        outstanding = 0.0
+        for pool in ("harness", "policy_harness"):
+            for path in (self.root.parent.parent / pool / "provider_authorizations").glob("*.json"):
+                try:
+                    record = json.loads(path.read_text())
+                except (OSError, json.JSONDecodeError) as exc:
+                    raise HarnessError(f"invalid provider authorization receipt: {path}") from exc
+                if not isinstance(record, dict):
+                    raise HarnessError(f"invalid provider authorization receipt: {path}")
+                if record.get("campaign_id") == self.campaign_id and record.get("status") == "authorized":
+                    outstanding += float(record.get("reserved_usd", 0.0))
+        return outstanding
 
     def authorize(self, request: HarnessProviderAuthorizationRequest) -> bool:
         if request.campaign_id != self.campaign_id:
@@ -101,40 +113,43 @@ class ProviderAuthorizationLedger:
             "reserved_usd": 0.0 if self.pricing.budget_usd is None else self.reserve_usd,
             "status": "authorized",
         }
-        if path.exists():
-            saved = json.loads(path.read_text())
-            expected = {key: value for key, value in record.items() if key != "status"}
-            previous = {key: value for key, value in saved.items() if key != "status"}
-            if previous != expected or saved.get("status") not in {"authorized", "reconciled"}:
-                raise HarnessError("provider authorization identity was reused with a different request")
-            return True
-        if self.pricing.budget_usd is not None:
-            if self.reserve_usd is None:
-                raise ValueError("Harness API budgets require --harness-provider-reserve-usd")
-            self.pricing.authorize_reservation(
-                self.runtime, outstanding_usd=self._outstanding_usd(), request_usd=self.reserve_usd,
-            )
-        self.runtime.consume_many({
-            f"{self.usage_prefix}_provider_requests": 1,
-            f"{self.usage_prefix}_provider_reservation_usd": record["reserved_usd"],
-        }, usage_key=f"{self.usage_prefix}:provider:{canonical_sha256(identity)}")
-        atomic_json_write(path, record)
+        lock_path = self.root.parent.parent / "provider_authorizations.lock"
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if path.exists():
+                saved = json.loads(path.read_text())
+                expected = {key: value for key, value in record.items() if key != "status"}
+                previous = {key: value for key, value in saved.items() if key != "status"}
+                if previous != expected or saved.get("status") not in {"authorized", "reconciled"}:
+                    raise HarnessError("provider authorization identity was reused with a different request")
+            else:
+                if self.pricing.budget_usd is not None:
+                    if self.reserve_usd is None:
+                        raise ValueError("Harness API budgets require --harness-provider-reserve-usd")
+                    self.pricing.authorize_reservation(
+                        self.runtime, outstanding_usd=self._outstanding_usd(), request_usd=self.reserve_usd,
+                    )
+                atomic_json_write(path, record)
+            self.runtime.consume_many({
+                f"{self.usage_prefix}_provider_requests": 1,
+                f"{self.usage_prefix}_provider_reservation_usd": record["reserved_usd"],
+            }, usage_key=f"{self.usage_prefix}:provider:{canonical_sha256(identity)}")
         return True
 
     def reconcile_turn(self, turn_id: str, *, reported_provider_calls: int | None,
                         tokens: dict[str, float] | None) -> None:
         """Settle only a fully captured turn; unknown calls keep their reserve live."""
-        rows = [(path, record) for path, record in self._records()
-                if record.get("turn_id") == turn_id and record.get("status") == "authorized"]
-        if not rows:
+        all_rows = [(path, record) for path, record in self._records() if record.get("turn_id") == turn_id]
+        rows = [(path, record) for path, record in all_rows if record.get("status") == "authorized"]
+        if not all_rows:
             return
         if reported_provider_calls is not None and (
                 isinstance(reported_provider_calls, bool) or not isinstance(reported_provider_calls, int)
-                or reported_provider_calls < 0 or reported_provider_calls > len(rows)):
+                or reported_provider_calls < 0 or reported_provider_calls > len(all_rows)):
             raise HarnessError("sidecar provider usage exceeds host authorizations")
         # A lower reported count or absent/invalid capture may still contain an
         # in-flight paid request, so leave all reservations outstanding.
-        if reported_provider_calls != len(rows) or tokens is None:
+        if reported_provider_calls != len(all_rows) or tokens is None or tokens.get("unknown_calls", 0):
             return
         for path, record in rows:
             atomic_json_write(path, {**record, "status": "reconciled"})
@@ -308,7 +323,9 @@ class HarnessProgramSource:
         if self.runtime is not None:
             self.pricing.check(self.runtime)
         history_digest = write_history(self.root / "measured_history.json", records)
-        selected = self.session_profiles[:min(count, len(self.session_profiles))]
+        # Pi's runTurns contract is the complete initialized profile set, even
+        # when a refill asks for fewer candidates than there are sessions.
+        selected = self.session_profiles
         counts = {p.profile_id: count // len(selected) + int(i < count % len(selected)) for i, p in enumerate(selected)}
         measured_ids = {r["candidate_id"] for r in records}
         # Sessions accepted earlier for this round and history are never re-run,
@@ -324,7 +341,7 @@ class HarnessProgramSource:
                     accepted[profile.profile_id] = saved
         pending = tuple(p for p in selected if p.profile_id not in accepted)
         if pending:
-            self._run_pending(pending, round_idx, recovery_pass, records, counts, history_digest, measured_keys,
+            self._run_pending(selected, pending, round_idx, recovery_pass, records, counts, history_digest, measured_keys,
                               measured_ids, accepted_dir, accepted, phase, refill, list(avoid))
         rows, turn_records = [], []
         for profile in selected:
@@ -334,21 +351,48 @@ class HarnessProgramSource:
         self._commit_cursors(selected, records)
         return self._batch(rows, turn_records, counts)
 
-    def _run_pending(self, pending, round_idx, recovery_pass, records, counts, history_digest, measured_keys,
+    def _run_pending(self, selected, pending, round_idx, recovery_pass, records, counts, history_digest, measured_keys,
                      measured_ids, accepted_dir, accepted, phase, refill, avoid) -> None:
         request_digest = canonical_sha256({"round": round_idx, "recovery_pass": recovery_pass, "history": history_digest,
                                            "refill": refill, "avoid": avoid,
-                                           "counts": {p.profile_id: counts[p.profile_id] for p in pending},
-                                           "case": self.case.case_id, "profiles": [p.to_dict() for p in pending]})
+                                           "counts": counts,
+                                           "case": self.case.case_id, "profiles": [p.to_dict() for p in selected]})
         batch_root = self.root / "proposal_turns" / f"pass-{recovery_pass:03d}" / phase
-        turns = self._turns(batch_root, request_digest, round_idx, recovery_pass, records, pending, counts,
-                            refill, avoid)
+        new_turns = self._turns(batch_root, request_digest, round_idx, recovery_pass, records, selected, counts,
+                                refill, avoid)
+        turns = []
+        for turn in new_turns:
+            previous = accepted.get(turn.profile_id)
+            if previous is not None:
+                frozen = previous.get("input")
+                if frozen is None:
+                    # Older receipts predate the frozen input field. Recover it
+                    # from the persisted request, never synthesize a new turn.
+                    for path in sorted((self.root / "proposal_turns").glob("pass-*/round-*/input.json")):
+                        for row in json.loads(path.read_text()).get("turns", []):
+                            if row.get("turnId") == previous["turn"]["turn_id"]:
+                                frozen = row
+                                break
+                        if frozen is not None:
+                            break
+                if frozen is None:
+                    raise HarnessError("accepted session has no committed turn input to replay")
+                turn = HarnessTurn(frozen["profileId"], frozen["turnId"], frozen["roundIndex"],
+                                   frozen["historyFromSeq"], frozen["historyToSeq"],
+                                   frozen["historyDigest"], frozen["message"],
+                                   tuple(frozen.get("forbiddenQueryTerms", ())))
+                if turn.input_digest != frozen["inputDigest"]:
+                    raise HarnessError("accepted session committed turn digest mismatch")
+            turns.append(turn)
+        turns = tuple(turns)
         expected = {turn.profile_id: turn for turn in turns}
 
         def validate(submission):
             turn = expected.get(submission.profile_id)
             if turn is None or submission.turn_id != turn.turn_id:
                 raise HarnessError("submission does not match the active independent session")
+            if submission.profile_id in accepted:
+                raise HarnessError("a committed accepted session attempted a new submission")
             if self.runtime is not None:
                 self.runtime.consume_many({"harness_validation_submissions": submission.attempt_index},
                                           usage_key=f"harness:{submission.turn_id}")
@@ -378,8 +422,11 @@ class HarnessProgramSource:
         finally:
             self._account(turns, usage)
         by_profile = {r.profile_id: r for r in results}
-        if set(by_profile) != set(expected) or len(results) != len(turns):
+        if set(by_profile) != set(expected) or len(results) != len(self.session_profiles):
             raise HarnessError("research barrier requires exactly one committed result per session")
+        for profile_id in accepted:
+            if not by_profile[profile_id].replayed:
+                raise HarnessError("accepted session was executed instead of replayed")
         rejected = []
         for profile in pending:
             result, turn = by_profile[profile.profile_id], expected[profile.profile_id]
@@ -393,6 +440,7 @@ class HarnessProgramSource:
                                    count=counts[profile.profile_id], measured_keys=measured_keys,
                                    measured_ids=measured_ids)
             saved = {"history_sha256": history_digest, "count": counts[profile.profile_id],
+                     "input": turn.to_dict(),
                      "turn": {"turn_id": result.turn_id, "profile_id": profile.profile_id,
                               "session_id": result.session_id, "usage": result.usage},
                      "rows": [{**row, "note": {

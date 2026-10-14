@@ -110,6 +110,25 @@ def test_turn_limit_is_distinct_from_wall_clock_limit(tmp_path):
     assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 2
 
 
+def test_inspection_only_trajectory_stops_before_spending_all_240_turns(tmp_path):
+    class _InspectOnlyClient:
+        total_cost = 0.01
+        usage_events = [{"cost_usd": 0.01}]
+
+        def complete(self, messages):
+            return '{"actions":[{"tool":"list","path":"."}]}'
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
+    receipt = run_agent(task_id="continual_learning", workspace=workspace, seed=0,
+                        profile_name="table3", manifest=manifest, output_dir=tmp_path / "run",
+                        client=_InspectOnlyClient(), max_turns=240)
+    assert receipt["status"] == "no_candidate"
+    assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 24
+
+
 class _FormattingThenSubmitClient:
     def __init__(self):
         self.total_cost = 0.02
