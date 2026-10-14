@@ -34,6 +34,7 @@ args:
   llm-max-tokens: 16384
   recovery-attempts: 3
   harness-sidecar-image: ldm-pi-harness:latest
+  harness-cache-dir: ${RESEARCHGYM_HARNESS_CACHE_DIR}
   harness-wall-time-seconds: 1800
   harness-response-timeout: 2400
   harness-tool-budget:
