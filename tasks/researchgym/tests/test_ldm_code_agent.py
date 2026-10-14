@@ -1,9 +1,11 @@
 import json
+import io
 
 import pytest
 
 from tasks.researchgym.scripts.ldm_code_agent import (
     AgentError,
+    ChatCompletionsClient,
     MAX_ACTIONS_PER_TURN,
     Pricing,
     WorkspaceTools,
@@ -64,6 +66,35 @@ def test_pricing_handles_cached_input_and_reasoning_without_double_counting():
              "completion_tokens_details": {"reasoning_tokens": 200}}
     # 600*2 + 400*.5 + max(300, 200)*4 = 2600 token-dollars / 1M
     assert pricing.cost(usage) == pytest.approx(0.0026)
+
+
+@pytest.mark.parametrize("response,expected_cost,unknown", [
+    ({"choices": [{"message": {"content": ""}}],
+      "usage": {"prompt_tokens": 1000, "completion_tokens": 100}}, 0.0011, False),
+    ({"choices": [{"message": {"content": ""}}]}, 0.1, True),
+])
+def test_empty_provider_reply_still_charges_call(monkeypatch, response, expected_cost, unknown):
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            self.close()
+
+    monkeypatch.setattr(
+        "tasks.researchgym.scripts.ldm_code_agent.urllib.request.urlopen",
+        lambda *_args, **_kwargs: FakeResponse(json.dumps(response).encode()),
+    )
+    client = ChatCompletionsClient(
+        api_url="https://provider.example/v1/chat/completions", api_key="test",
+        model="test", pricing=Pricing(1.0, 1.0, 1.0, 0.1),
+        budget_usd=10.0, request_timeout=1,
+    )
+    with pytest.raises(AgentError, match="no assistant content|omitted token usage"):
+        client.complete([{"role": "user", "content": "hello"}])
+    assert client.total_cost == pytest.approx(expected_cost)
+    assert len(client.usage_events) == 1
+    assert client.usage_events[0].get("unknown_usage", False) is unknown
 
 
 class _FakeClient:

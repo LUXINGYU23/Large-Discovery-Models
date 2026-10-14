@@ -376,13 +376,16 @@ class ChatCompletionsClient:
             raise AgentError(f"provider returned HTTP {exc.code}") from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise AgentError(f"provider request failed: {type(exc).__name__}") from exc
-        choices = data.get("choices") or []
-        message = choices[0].get("message", {}) if choices and isinstance(choices[0], Mapping) else {}
-        content = message.get("content") if isinstance(message, Mapping) else None
-        if not isinstance(content, str) or not content.strip():
-            raise AgentError("provider response had no assistant content")
-        usage = data.get("usage")
+        # A successful HTTP response may still have empty assistant content.
+        # It is a paid call, so record usage before validating the content.
+        usage = data.get("usage") if isinstance(data, Mapping) else None
         if not isinstance(usage, Mapping):
+            self.total_cost += self.pricing.call_reserve_usd
+            self.usage_events.append({
+                "at": _now(), "usage": None, "unknown_usage": True,
+                "cost_usd": self.pricing.call_reserve_usd,
+                "cumulative_cost_usd": self.total_cost,
+            })
             raise AgentError("provider response omitted token usage; refusing unaccounted model call")
         cost = self.pricing.cost(usage)
         self.total_cost += cost
@@ -390,6 +393,11 @@ class ChatCompletionsClient:
         self.usage_events.append(event)
         if self.total_cost > self.budget_usd + 1e-9:
             raise BudgetExhausted(f"provider response exceeded the strict ${self.budget_usd:.2f} cap")
+        choices = data.get("choices") or []
+        message = choices[0].get("message", {}) if choices and isinstance(choices[0], Mapping) else {}
+        content = message.get("content") if isinstance(message, Mapping) else None
+        if not isinstance(content, str) or not content.strip():
+            raise AgentError("provider response had no assistant content")
         return content
 
 
