@@ -31,7 +31,7 @@ class JointGainForks:
             raise ValueError("joint gain noise variance must be finite and positive")
 
     def identity(self) -> dict:
-        return {"name": "joint_gain", "version": 1, **asdict(self)}
+        return {"name": "joint_gain", "version": 2, **asdict(self)}
 
     def plan(self, context: ForkContext) -> tuple[ForkAssignment, ...]:
         if len(context.profile_ids) != 4 or len(set(context.profile_ids)) != 4 or not context.main_nodes:
@@ -39,23 +39,25 @@ class JointGainForks:
         offset = (context.round_index - 1) % 4
         roles = context.profile_ids[offset:] + context.profile_ids[:offset]
         older = context.main_nodes[:-1] or context.main_nodes
-        restarts = tuple(ForkAssignment(roles[0], n.node_id, "restart",
-                                       f"explore_{context.round_index:04d}_{roles[0]}") for n in older)
-        continuations = tuple(ForkAssignment(
-            roles[1], n.node_id, "continue" if context.archive else "restart",
-            n.lineage_id if context.archive else f"explore_{context.round_index:04d}_{roles[1]}",
-        ) for n in (context.archive or older))
-        fixed = tuple(ForkAssignment(p, context.main_nodes[-1].node_id, "main", "main") for p in roles[2:])
-        actions = fixed + restarts + continuations
-        pairs = [(i + 2, j + 2 + len(restarts))
-                 for i, j in product(range(len(restarts)), range(len(continuations)))
-                 if context.archive or len(older) == 1 or restarts[i].parent_id != continuations[j].parent_id]
+        parents = tuple((n, "restart") for n in older) + tuple((n, "continue") for n in context.archive)
+        fixed = ForkAssignment(roles[3], context.main_nodes[-1].node_id, "main", "main")
+        actions = (fixed,) + tuple(ForkAssignment(
+            profile, n.node_id, purpose,
+            n.lineage_id if purpose == "continue" else f"explore_{context.round_index:04d}_{profile}",
+        ) for profile in roles[:3] for n, purpose in parents)
+        menus = [range(1 + i * len(parents), 1 + (i + 1) * len(parents)) for i in range(3)]
+        triples = []
+        for choice in product(*menus):
+            continuations = [actions[i].lineage_id for i in choice if actions[i].purpose == "continue"]
+            # An archived lineage has one live successor; restarts create separate lineages.
+            if len(continuations) == len(set(continuations)):
+                triples.append(choice)
         draws = self._sample_gaps(context, actions)
-        fixed_best = np.maximum(0, draws[:, :2].max(axis=1))
-        scores = np.asarray([np.maximum(fixed_best, draws[:, pair].max(axis=1)).mean() for pair in pairs])
-        # All pairs share the same joint draws, including the two fixed branches.
-        chosen = pairs[int(np.argmax(scores))]
-        by_profile = {a.profile_id: a for a in (*fixed, actions[chosen[0]], actions[chosen[1]])}
+        fixed_best = np.maximum(0, draws[:, 0])
+        scores = np.asarray([np.maximum(fixed_best, draws[:, triple].max(axis=1)).mean() for triple in triples])
+        # All triples share the same joint draws, including the fixed main branch.
+        chosen = triples[int(np.argmax(scores))]
+        by_profile = {a.profile_id: a for a in (fixed, *(actions[i] for i in chosen))}
         return tuple(by_profile[p] for p in context.profile_ids)
 
     def _sample_gaps(self, context: ForkContext, actions: tuple[ForkAssignment, ...]) -> np.ndarray:
