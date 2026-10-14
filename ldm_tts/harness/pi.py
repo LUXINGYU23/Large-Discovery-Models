@@ -65,7 +65,7 @@ class PiWebSearch:
 
 @dataclass(frozen=True)
 class PiForkSource:
-    """Immutable session/workspace snapshot at artifact_root/fork-source."""
+    """Immutable session/workspace snapshot with a measured-history cursor."""
 
     session_sha256: str
     workspace_sha256: str
@@ -97,12 +97,17 @@ class PiHarnessConfig(HarnessPoolConfig):
     provider_request_body: dict[str, Any] = field(default_factory=dict)
     force_first_tool_call: bool = True
     sol_pi: dict[str, Any] | None = None
-    fork_source: PiForkSource | None = None
+    fork_sources: dict[str, PiForkSource] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
             raise ValueError("harness base_url and model are required")
         super().__post_init__()
+        if self.fork_sources:
+            if self.sol_pi is not None:
+                raise ValueError("forks cannot combine with SoL-Pi external state")
+            if set(self.fork_sources) != {p.profile_id for p in self.profiles}:
+                raise ValueError("fork_sources must specify exactly the pool profiles")
         tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
         if len(set(tool_names)) != len(tool_names):
             raise ValueError("harness tool names must be unique across extensions")
@@ -160,7 +165,7 @@ class PiHarnessConfig(HarnessPoolConfig):
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
             **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),
             **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
-            **({"forkSource": self.fork_source.to_dict()} if self.fork_source else {}),
+            **({"forkSources": {k: v.to_dict() for k, v in self.fork_sources.items()}} if self.fork_sources else {}),
         }
 
 

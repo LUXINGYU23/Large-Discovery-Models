@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from ldm_tts.harness.pi import PiGuestRuntime, PiHarnessConfig
+from ldm_tts.harness.pi import PiForkSource, PiGuestRuntime, PiHarnessConfig
 from ldm_tts.harness import (
     HarnessClient,
     HarnessPoolConfig,
@@ -44,6 +45,22 @@ def test_generic_pool_configuration_does_not_require_pi_provider_or_guest(tmp_pa
     payload = config.initialize_payload()
     assert payload["taskId"] == "fixture"
     assert not {"model", "baseUrl", "wireApi", "guestRuntime", "mcpServers"} & payload.keys()
+
+
+def test_per_profile_fork_configuration_requires_complete_exclusive_sources(tmp_path):
+    sources = {"left": PiForkSource("a" * 64, "b" * 64, 1),
+               "right": PiForkSource("c" * 64, "d" * 64, 17)}
+    config = PiHarnessConfig(
+        artifact_root=tmp_path, base_url="https://provider.example/v1", model="test",
+        profiles=tuple(HarnessProfile(p, Path("/resources/AGENTS.md"), agents_sha256="a" * 64) for p in sources),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(), guest_runtime=TEST_GUEST_RUNTIME, fork_sources=sources,
+    )
+    assert config.initialize_payload()["forkSources"] == {k: v.to_dict() for k, v in sources.items()}
+    with pytest.raises(ValueError, match="exactly"):
+        replace(config, fork_sources={"left": sources["left"]})
+    with pytest.raises(ValueError, match="combine"):
+        replace(config, sol_pi={})
 
 
 def _candidate_contract(

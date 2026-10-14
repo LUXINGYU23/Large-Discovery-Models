@@ -49,7 +49,7 @@ def prepare(work, project, image):
     config.update(name="enformer_main_research_forks", algorithm="main_research_round_forks",
                   description="Native Pi main-session forks; historical comparison, not isolated causal attribution.")
     config["args"].update({
-        "harness-main-research": True,
+        "harness-research-strategy-config": str(source / "config/nucleobench/research_strategies/main_forks.json"),
         "harness-profile": ["target_biology", "regulatory_grammar", "sequence_landscape", "evidence_critic"],
         "harness-sidecar-image": image,
         "harness-cache-dir": str(project / "research/pure-harness-pi-ablation-20261007/guest-cache"),
@@ -147,12 +147,14 @@ def verify_forks(root, rounds):
         commits = list(branch.glob("turns/*/turn_committed.json"))
         assert len(commits) == 4
         manifest = json.loads((branch / "manifest.json").read_text())
-        assert manifest["forkSource"]["historyCursor"] == 1 + 16 * (index - 1)
-        assert manifest["forkSource"]["sessionSha256"] == panel["main_session_sha256"]
+        for parent in manifest["forkSources"].values():
+            assert parent["historyCursor"] == 1 + 16 * (index - 1)
+            assert parent["sessionSha256"] == panel["main_session_sha256"]
         for path in branch.glob("sessions/*/pi-session/*.jsonl"):
             with path.open() as stream:
                 header = json.loads(next(stream))
-            assert header["parentSession"] == "/artifacts/fork-source/session.jsonl"
+            profile = path.parent.parent.name
+            assert header["parentSession"] == f"/artifacts/fork-sources/{profile}/session.jsonl"
             children.append(header["id"])
     assert len(children) == 4 * rounds and len(set(children)) == len(children)
     return {"evaluations": len(observations), "verified_main_turns": rounds, "verified_native_forks": len(children)}

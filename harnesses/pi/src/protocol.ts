@@ -92,6 +92,12 @@ export interface BootstrapSecretFrame extends CommonFrame {
 	namedSecrets: Record<string, string>;
 }
 
+export interface ForkSource {
+	sessionSha256: string;
+	workspaceSha256: string;
+	historyCursor: number;
+}
+
 export interface InitializeFrame extends CommonFrame {
 	type: "initialize";
 	artifactRoot: string;
@@ -102,7 +108,7 @@ export interface InitializeFrame extends CommonFrame {
 	providerRequestBody?: Record<string, unknown>;
 	forceFirstToolCall?: boolean;
 	solPi?: Record<string, unknown>;
-	forkSource?: { sessionSha256: string; workspaceSha256: string; historyCursor: number };
+	forkSources?: Record<string, ForkSource>;
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -663,7 +669,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
-		...(data.forkSource === undefined ? [] : ["forkSource"]),
+		...(data.forkSources === undefined ? [] : ["forkSources"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -732,16 +738,21 @@ export function parseFrame(line: string): InputFrame {
 	}
 
 	const profiles = parseProfiles(data.profiles);
-	let forkSource: InitializeFrame["forkSource"];
-	if (data.forkSource !== undefined) {
-		const source = record(data.forkSource, "forkSource");
-		exactKeys(source, ["sessionSha256", "workspaceSha256", "historyCursor"], "forkSource");
-		forkSource = {
-			sessionSha256: digest(source.sessionSha256, "forkSource.sessionSha256"),
-			workspaceSha256: digest(source.workspaceSha256, "forkSource.workspaceSha256"),
-			historyCursor: nonnegativeInteger(source.historyCursor, "forkSource.historyCursor"),
-		};
-		if (data.solPi !== undefined) throw new ProtocolError("invalid_frame", "forkSource cannot inherit SoL-Pi external state");
+	let forkSources: InitializeFrame["forkSources"];
+	if (data.forkSources !== undefined) {
+		if (data.solPi !== undefined) throw new ProtocolError("invalid_frame", "forks cannot inherit SoL-Pi external state");
+		const sources = record(data.forkSources, "forkSources");
+		exactKeys(sources, profiles.map((p) => p.profileId), "forkSources");
+		forkSources = {};
+		for (const profile of profiles) {
+			const source = record(sources[profile.profileId], "forkSources entry");
+			exactKeys(source, ["sessionSha256", "workspaceSha256", "historyCursor"], "forkSources entry");
+			forkSources[profile.profileId] = {
+				sessionSha256: digest(source.sessionSha256, "forkSources.sessionSha256"),
+				workspaceSha256: digest(source.workspaceSha256, "forkSources.workspaceSha256"),
+				historyCursor: nonnegativeInteger(source.historyCursor, "forkSources.historyCursor"),
+			};
+		}
 	}
 	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
@@ -777,7 +788,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.providerRequestBody === undefined ? {} : { providerRequestBody: record(data.providerRequestBody, "providerRequestBody") }),
 		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
 		...(solPi === undefined ? {} : { solPi }),
-		...(forkSource === undefined ? {} : { forkSource }),
+		...(forkSources === undefined ? {} : { forkSources }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

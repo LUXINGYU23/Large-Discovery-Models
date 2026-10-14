@@ -21,6 +21,7 @@ import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
 import { TurnExecutionError } from "./protocol.js";
 import type {
+	ForkSource,
 	HarnessLimits,
 	HarnessProfileConfig,
 	InitializeFrame,
@@ -38,15 +39,12 @@ import {
 } from "./submission.js";
 import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 import { createSolPiExtension, SOL_PI_GUEST_ARCHIVE, solPiTools } from "./sol-pi.js";
+import { HistoryController, HistoryRecoveryError, HISTORY_POLICY } from "./history.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCE_DIRECTORY = ".ldm-resources";
 const MODEL_CONTEXT_WINDOW = 262_144;
-const COMPACTION_SETTINGS = {
-	enabled: true,
-	reserveTokens: 16_384,
-	keepRecentTokens: 20_000,
-};
+const COMPACTION_SETTINGS = HISTORY_POLICY.compaction;
 const GUEST_RUNTIME_INSTRUCTIONS = `## Guest runtime
 - /workspace is an isolated writable research workspace, not a checkout of the project repository. Do not use git status to inspect the project. Git is available only for cloning public research material when useful.
 - Use the registered read and write tools for files. apply_patch is not available in the guest.
@@ -171,8 +169,7 @@ async function copyDirectory(source: string, target: string): Promise<void> {
 }
 
 /** Commit both inherited files and the native Pi fork before any branch runs. */
-export async function initializeFork(root: string, profileRoot: string, source: NonNullable<InitializeFrame["forkSource"]>): Promise<void> {
-	const snapshot = join(root, "fork-source");
+export async function initializeFork(snapshot: string, profileRoot: string, source: ForkSource): Promise<void> {
 	const sessionPath = join(snapshot, "session.jsonl");
 	if (sha256(await readFile(sessionPath)) !== source.sessionSha256
 		|| await directorySha256(join(snapshot, "workspace")) !== source.workspaceSha256) {
@@ -408,6 +405,7 @@ export class SubmissionController {
 }
 
 export class PersistentProfileSession {
+	private readonly forkSource: ForkSource | undefined;
 	private readonly profileRoot: string;
 	private readonly workspace: string;
 	private readonly resourceRoot: string;
@@ -418,6 +416,7 @@ export class PersistentProfileSession {
 	private readonly submissions: SubmissionController;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
+	private readonly history = new HistoryController();
 	private agentsSha256 = "";
 	private skillDirSha256: string[] = [];
 
@@ -428,6 +427,7 @@ export class PersistentProfileSession {
 		guestRuntime: ResolvedGuestRuntime,
 		namedSecrets: Readonly<Record<string, string>>,
 	) {
+		this.forkSource = config.forkSources?.[profile.profileId];
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
 		this.resourceRoot = join(this.workspace, RESOURCE_DIRECTORY);
@@ -453,7 +453,8 @@ export class PersistentProfileSession {
 	}
 
 	async initialize(): Promise<void> {
-		if (this.config.forkSource) await initializeFork(this.config.artifactRoot, this.profileRoot, this.config.forkSource);
+		if (this.forkSource) await initializeFork(join(this.config.artifactRoot, "fork-sources", this.profile.profileId),
+			this.profileRoot, this.forkSource);
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
 		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
@@ -542,6 +543,7 @@ export class PersistentProfileSession {
 			additionalExtensionPaths: extensionPaths,
 			additionalSkillPaths: skillDirectories,
 			extensionFactories: [
+				this.history.createExtension("sidecar-proxy-token"),
 				this.gondolin.createExtension(!this.config.solPi?.actionFusion),
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
@@ -673,13 +675,18 @@ export class PersistentProfileSession {
 			this.session.sessionManager.getSessionId(),
 			input.turnId,
 			turnRoot,
-			authorize,
+			async (request) => {
+				// Pi may continue after an automatic compaction failure. Block upstream dispatch.
+				this.history.assertReady();
+				return authorize(request);
+			},
 		);
 		let submission: TerminalSubmission | undefined;
 		let providerSummary: ProviderTurnSummary;
 		let policySummary: ToolUsageSnapshot;
 		let failure: Error | undefined;
 		try {
+			await this.history.begin(turnRoot, this.session.sessionManager);
 			await this.promptWithTimeout(
 				`${priorInput
 					? `Continue the interrupted turn from your existing research and files. The history and submission contract are unchanged. Your previous submission was not accepted; repair any reported errors and call ${this.config.submissionContract.toolName} with the complete result. Tool budgets have not reset.`
@@ -711,7 +718,7 @@ export class PersistentProfileSession {
 					toolCalls: policySummary.toolCalls,
 					artifactBytes: providerSummary.artifactBytes,
 				},
-			}], /session wall-time limit reached|context_length_exceeded|stream_read_error|stream ended before a terminal response event|^provider response failed: terminated$|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
+			}], !(failure instanceof HistoryRecoveryError) && /context_length_exceeded|stream_read_error|stream ended before a terminal response event|^provider response failed: terminated$|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
 		}
 		if (!submission) throw new Error("turn ended without a submission");
 		return this.commit(input, submission, providerSummary, policySummary);
@@ -773,6 +780,7 @@ export class PersistentProfileSession {
 		let expired = false;
 		const run = async () => {
 			await session.prompt(message, options);
+			this.history.assertReady();
 			while (!expired && !this.submissions.submission) {
 				const lastMessage = session.messages.at(-1);
 				const errorMessage = lastMessage?.role === "assistant"
@@ -790,6 +798,7 @@ export class PersistentProfileSession {
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error" && !interrupted) {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
+				await this.history.continueTurn(lastMessage?.role === "assistant" ? lastMessage.stopReason : undefined);
 				await session.prompt(
 					interrupted
 						? "The previous provider stream ended before your submission was accepted. "
@@ -797,6 +806,7 @@ export class PersistentProfileSession {
 						: `No submission has been accepted. Address any validation errors, use the available tools as needed, and call ${this.config.submissionContract.toolName} with the complete result.`,
 					options,
 				);
+				this.history.assertReady();
 			}
 		};
 		let timer: NodeJS.Timeout | undefined;
@@ -814,6 +824,8 @@ export class PersistentProfileSession {
 				session.abortCompaction();
 				await session.abort();
 				await pending.catch(() => undefined);
+				await this.history.fail(`Session wall-time limit reached: ${limits.wallTimeSeconds}s; explicit repair is required before resuming this turn.`);
+				this.history.assertReady();
 			}
 			throw error;
 		} finally {
@@ -872,7 +884,7 @@ export class PersistentProfileSession {
 		try {
 			names = await readdir(turnRoot);
 		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") return this.config.forkSource?.historyCursor ?? 0;
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return this.forkSource?.historyCursor ?? 0;
 			throw error;
 		}
 		const commits = (
@@ -880,7 +892,7 @@ export class PersistentProfileSession {
 		)
 			.filter((value): value is CommittedTurn => value?.profileId === this.profile.profileId)
 			.sort((left, right) => left.roundIndex - right.roundIndex);
-		let cursor = this.config.forkSource?.historyCursor ?? 0;
+		let cursor = this.forkSource?.historyCursor ?? 0;
 		for (const commit of commits) {
 			await verifySubmissionRecord(commit, this.config.artifactRoot);
 			if (commit.historyFromSeq !== cursor || commit.historyToSeq < cursor) {
@@ -962,9 +974,10 @@ export class PiSessionPool {
 			thinking: this.config.thinking,
 			...(this.config.providerRequestBody ? { providerRequestBody: this.config.providerRequestBody } : {}),
 			...(this.config.solPi ? { solPi: this.config.solPi } : {}),
-			...(this.config.forkSource ? { forkSource: this.config.forkSource } : {}),
+			...(this.config.forkSources ? { forkSources: this.config.forkSources } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
+			historyPolicy: HISTORY_POLICY,
 			submissionContractSha256: this.config.submissionContractSha256,
 			submissionContract: {
 				contractId: this.config.submissionContract.contractId,

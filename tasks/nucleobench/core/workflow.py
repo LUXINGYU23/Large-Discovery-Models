@@ -79,6 +79,9 @@ from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.forked_harness import (
     ForkedResearchExpander, main_research_profile, research_contract, write_fork_provenance,
 )
+from ldm_tts.harness.research_tree import CoverageForks
+from ldm_tts.harness.joint_gain import JointGainForks
+from ldm_tts.harness.research_strategy import load_research_strategy
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
@@ -212,8 +215,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--harness-mcp-config", type=Path)
     parser.add_argument("--harness-sol-pi-config", type=Path)
-    parser.add_argument("--harness-main-research", action="store_true",
-                        help="Experimental persistent main researcher with disposable per-round Pi forks")
+    parser.add_argument("--harness-research-strategy-config", type=Path,
+                        help="JSON strategy configuration for independent sessions or configurable research forks")
     parser.add_argument("--harness-cache-dir", type=Path)
     parser.add_argument("--harness-docker-host")
     parser.add_argument("--harness-container-user")
@@ -245,6 +248,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _apply_derived_args(args: argparse.Namespace) -> None:
+    if args.harness_research_strategy_config is not None:
+        config = json.loads(args.harness_research_strategy_config.read_text(encoding="utf-8"))
+    else:
+        config = {"name": "independent"}
+    strategy = load_research_strategy(config)
+    args._research_strategy = strategy
+    args.harness_research_strategy = config
+    args.harness_research_strategy_identity = strategy.identity()
+    args.harness_main_research = strategy.requires_main
     if args.iterations is None and args.termination_kind == "rounds":
         args.iterations = 2
     if args.oracle_batch_size is None:
@@ -297,12 +309,17 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    strategy = args._research_strategy
+    if isinstance(strategy.fork_policy, CoverageForks) and len(_harness_profiles(args)) < 3:
+        parser.error("coverage forks require at least three research profiles")
+    if isinstance(strategy.fork_policy, JointGainForks) and len(_harness_profiles(args)) != 4:
+        parser.error("joint gain forks require exactly four research profiles")
     if args.harness_main_research and (
         args.search_method not in PARALLEL_HARNESS_METHODS or args.harness_sol_pi_config is not None
         or args.termination_kind != "rounds" or args.mock
         or args.iterations is None or args.iterations < 2
     ):
-        parser.error("--harness-main-research requires real parallel Harness with at least one active round and without SoL-Pi")
+        parser.error("fork strategies require real parallel Harness with at least one active round and without SoL-Pi")
     if args.harness_surrogate_query and args.search_method not in PERSISTENT_HARNESS_METHODS:
         parser.error("--harness-surrogate-query requires a persistent Harness method")
     positive_counts = (
@@ -765,7 +782,8 @@ def _run_real(
         assert provider is not None
         try:
             mcp = load_harness_mcp_config(args.harness_mcp_config)
-            if args.harness_main_research:
+            strategy = args._research_strategy
+            if strategy.requires_main:
                 (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
                 forked_expander = ForkedResearchExpander(
                     root=runtime.run_dir / "harness",
@@ -775,8 +793,9 @@ def _run_real(
                     ),
                     branch_client=lambda root, source: _harness_client(
                         args, runtime, provider, prepared, profiles, mcp,
-                        artifact_root=root, fork_source=source,
+                        artifact_root=root, fork_sources=source,
                     ),
+                    strategy=strategy,
                     expander_options={
                         "domain": NucleoBenchCandidateDomain(prepared.context), "profiles": profiles,
                         "candidates_per_profile": args.harness_candidates_per_session,
@@ -1146,7 +1165,7 @@ def _harness_client(
     policy: bool = False,
     artifact_root: Path | None = None,
     contract: HarnessSubmissionContract | None = None,
-    fork_source: PiForkSource | None = None,
+    fork_sources: dict[str, PiForkSource] | None = None,
 ) -> HarnessClient:
     artifact_root = (artifact_root or runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
     resource_root = (TASK_ROOT / "resources" / "harness").resolve()
@@ -1216,7 +1235,7 @@ def _harness_client(
             mcp_servers=mcp_servers,
             thinking=args.harness_thinking,
             sol_pi=_sol_pi_config(args),
-            fork_source=fork_source,
+            fork_sources=fork_sources or {},
             provider_request_body=_parse_extra_body(args.llm_extra_body_json),
             limits=HarnessLimits(
                 wall_time_seconds=args.harness_wall_time_seconds,
@@ -1431,7 +1450,7 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
     result = {
         key: str(value) if isinstance(value, Path) else value
         for key, value in vars(args).items()
-        if key != "api_key_file"
+        if key != "api_key_file" and not key.startswith("_")
     }
     if args.search_method != COMPILED_POLICY_METHOD:
         for key in (
@@ -1475,6 +1494,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "skill_ids": list(HARNESS_SKILL_IDS),
         "sol_pi": _sol_pi_config(args),
         "main_research": args.harness_main_research,
+        "research_strategy": args.harness_research_strategy_identity,
     }
     if args.search_method == COMPILED_POLICY_METHOD:
         description["policy_session"] = {

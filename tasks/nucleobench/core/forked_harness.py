@@ -6,6 +6,7 @@ import json
 import shutil
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +14,11 @@ from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessClient, HarnessError, HarnessSubmissionContract, HarnessSubmissionValidation,
-    HarnessTurn, canonical_sha256, directory_sha256, file_sha256,
+    HarnessTurn, canonical_sha256,
 )
 from ldm_tts.harness.pi import PiForkSource
+from ldm_tts.harness.research_strategy import ResearchStrategy
+from tasks.nucleobench.core.fork_tree import ResearchTree, snapshot_fork
 from tasks.nucleobench.core.harness import (
     NucleoBenchHarnessExpander, _forbidden_query_terms, _history_delta, _profile,
     _usage_counts,
@@ -58,45 +61,21 @@ def write_fork_provenance(root: Path, *, compiled_policy: bool) -> None:
     })
 
 
-def snapshot_fork(source_session: Path, workspace: Path, target: Path, cursor: int) -> PiForkSource:
-    """Freeze conversation and ordinary files atomically; never share writable inodes."""
-    manifest = target / "snapshot.json"
-    if manifest.exists():
-        saved = json.loads(manifest.read_text())
-        source = PiForkSource(saved["sessionSha256"], saved["workspaceSha256"], saved["historyCursor"])
-        if (source.history_cursor != cursor or file_sha256(target / "session.jsonl") != source.session_sha256
-                or directory_sha256(target / "workspace") != source.workspace_sha256):
-            raise ValueError("Frozen fork snapshot identity changed")
-        return source
-    staging = target.with_name(target.name + ".staging")
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir(parents=True)
-    shutil.copyfile(source_session, staging / "session.jsonl")
-    # Include task-tool exports: inherited messages/scripts can reference these files.
-    # Pi replaces only the child's role and skill snapshots during initialization.
-    for path in workspace.rglob("*"):
-        if path.is_symlink():
-            raise ValueError(f"Fork workspace must contain ordinary files: {path}")
-    shutil.copytree(workspace, staging / "workspace")
-    source = PiForkSource(file_sha256(staging / "session.jsonl"), directory_sha256(staging / "workspace"), cursor)
-    atomic_json_write(staging / "snapshot.json", source.to_dict())
-    staging.rename(target)
-    return source
-
-
 class ForkedResearchExpander:
     """Keep one main identity; archive all branch evidence, then prune live children."""
 
     def __init__(self, *, main_client: Callable[[], HarnessClient], root: Path,
-                 branch_client: Callable[[Path, PiForkSource], HarnessClient],
-                 expander_options: dict[str, Any]) -> None:
+                 branch_client: Callable[[Path, dict[str, PiForkSource]], HarnessClient],
+                 expander_options: dict[str, Any], strategy: ResearchStrategy) -> None:
         self.main_client = main_client
         self.root = root.resolve()
         self.branch_client = branch_client
         self.options = expander_options
         self.domain = expander_options["domain"]
         self.account = expander_options.get("account")
+        if strategy.fork_policy is None:
+            raise ValueError("Forked research requires a fork policy")
+        self.tree = ResearchTree(self.root, strategy.fork_policy, strategy.archive_policy)
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         main_root = self.root / "main"
@@ -156,23 +135,32 @@ class ForkedResearchExpander:
         if not session.is_relative_to(main_root.resolve()):
             raise ValueError("Main session escaped its artifact root")
         source = snapshot_fork(session, workspace, round_root / "fork-source", len(request.observations))
-        with self.branch_client(round_root, source) as client:
+        plan = self.tree.prepare(request, self.options["profiles"], self.domain.context)
+        sources = self.tree.materialize(plan)
+        with self.branch_client(round_root, sources) as client:
             expander = NucleoBenchHarnessExpander(
-                client, artifact_root=round_root, inherited_history_count=len(request.observations),
-                **self.options,
+                client, artifact_root=round_root,
+                inherited_history_counts={p: s.history_cursor for p, s in sources.items()}, **self.options,
             )
             expanded = expander.expand(request)
+        assignments = {a["profile_id"]: a for a in plan["assignments"]}
+        expanded = replace(expanded, proposals=tuple(replace(p, metadata={
+            **p.metadata, "research_fork": assignments[p.metadata["harness_lineage"]["profile_id"]],
+        }) for p in expanded.proposals))
+        self.tree.commit(plan, expanded, self.domain.context)
         panel = {
             "round_index": request.round_idx, "main_turn_id": turn.turn_id,
             "main_session_sha256": source.session_sha256, "brief": result.submission["brief"],
             "proposals": [{"payload": p.payload, "annotations": p.metadata["research_annotations"],
                            "lineage": p.metadata["harness_lineage"]} for p in expanded.proposals],
             "sessions": expanded.metadata["sessions"],
+            "fork_plan": plan["assignments"],
             "status": "branches_closed; selection_and_evaluation_follow",
         }
         atomic_json_write(round_root / "panel.json", panel)
         return ExpansionResult(
             proposals=expanded.proposals, selection_mode=expanded.selection_mode,
             metadata={**expanded.metadata, "sampling_mode": "main_research_round_forks",
-                      "main_turn_id": turn.turn_id, "fork_source": source.to_dict()},
+                      "main_turn_id": turn.turn_id, "fork_source": source.to_dict(),
+                      "fork_policy": self.tree.fork_policy.identity(), "fork_plan": plan["assignments"]},
         )
