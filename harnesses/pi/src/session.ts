@@ -17,6 +17,7 @@ import {
 import { Type, type TUnsafe } from "typebox";
 import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
 import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
+import { DeepSeekWebTools } from "./deepseek-web.js";
 import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
 import { TurnExecutionError } from "./protocol.js";
@@ -184,7 +185,6 @@ async function runtimePackages(): Promise<Record<string, string>> {
 		node: process.version,
 		piCodingAgent: version("@earendil-works/pi-coding-agent"),
 		gondolin: version("@earendil-works/gondolin"),
-		piWebAccess: version("pi-web-access"),
 		context7: version("@upstash/context7-pi"),
 		mcpClient: version("@modelcontextprotocol/client"),
 		solPi: version("sol-pi"),
@@ -206,7 +206,6 @@ function sessionTools(
 		"bash",
 		"web_search",
 		"fetch_content",
-		"get_search_content",
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
 		...mcpTools,
@@ -399,6 +398,7 @@ export class PersistentProfileSession {
 		private readonly proxy: ProviderProxy,
 		guestRuntime: ResolvedGuestRuntime,
 		namedSecrets: Readonly<Record<string, string>>,
+		private readonly web: DeepSeekWebTools,
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
@@ -406,7 +406,6 @@ export class PersistentProfileSession {
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
 		this.policy = new PolicyController(
 			config.networkPolicy,
-			config.webSearch.providers,
 			config.limits.toolCallBudgets,
 		);
 		this.gondolin = new GondolinController(
@@ -496,8 +495,7 @@ export class PersistentProfileSession {
 			compaction: COMPACTION_SETTINGS,
 			retry: { enabled: false },
 		});
-		const webExtension = join(packageRoot("pi-web-access"), "index.ts");
-		const extensionPaths = [webExtension];
+		const extensionPaths: string[] = [];
 		if (this.config.context7Enabled) {
 			extensionPaths.push(join(packageRoot("@upstash/context7-pi"), "extensions", "context7.ts"));
 		}
@@ -559,7 +557,7 @@ export class PersistentProfileSession {
 			resourceLoader: loader,
 			settingsManager: settings,
 			sessionManager: manager,
-			customTools: [...this.mcp.toolDefinitions(), this.submissions.tool()],
+			customTools: [...this.web.toolDefinitions(this.config.networkPolicy), ...this.mcp.toolDefinitions(), this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
@@ -894,19 +892,10 @@ export class PiSessionPool {
 		if (profileSetSha256 !== this.config.profileSetSha256) {
 			throw new Error("profile set digest mismatch");
 		}
-		process.env.PI_CODING_AGENT_DIR = join(this.config.artifactRoot, "web-cache");
-		await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true });
-		await writeFile(
-			join(process.env.PI_CODING_AGENT_DIR, "web-search.json"),
-			`${JSON.stringify({
-				searchRouting: this.config.webSearch,
-				fetchContent: { domainPolicy: { allow: this.config.networkPolicy.allowedHosts, deny: this.config.networkPolicy.deniedHosts } },
-				fetchRouting: { providers: ["http"], allowRemoteHostedProviders: false },
-				githubClone: { enabled: false },
-				githubPrIssue: { enabled: false },
-			}, null, 2)}\n`,
-			{ encoding: "utf8", mode: 0o600 },
-		);
+		const web = new DeepSeekWebTools(this.namedSecrets.DEEPSEEK_API_KEY);
+		if (["web_search", "fetch_content"].some((name) => this.config.limits.toolCallBudgets[name] !== 0)) {
+			web.requireKey();
+		}
 		await this.proxy.start();
 		for (const profile of this.config.profiles) {
 			const session = new PersistentProfileSession(
@@ -915,6 +904,7 @@ export class PiSessionPool {
 				this.proxy,
 				guestRuntime,
 				this.namedSecrets,
+				web,
 			);
 			this.sessions.set(profile.profileId, session);
 		}

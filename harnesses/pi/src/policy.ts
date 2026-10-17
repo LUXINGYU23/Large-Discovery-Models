@@ -54,7 +54,7 @@ function values(value: unknown): string[] {
 }
 
 function queryText(input: Record<string, unknown>): string {
-	return [...values(input.query), ...values(input.queries)].join("\n");
+	return [...values(input.query), ...values(input.ori_question)].join("\n");
 }
 
 function strings(value: unknown, seen = new Set<object>()): string[] {
@@ -88,48 +88,11 @@ function fetchUrls(input: Record<string, unknown>): string[] {
 	return [...values(input.url), ...values(input.urls)];
 }
 
-function providerRejection(
-	reason: "invalid_provider_selection" | "provider_not_allowed",
-	requested: unknown,
-	allowed: readonly string[],
-): Error {
-	return new Error(`Web search provider rejected: ${JSON.stringify({
-		accepted: false,
-		reason,
-		requested_provider: requested ?? null,
-		allowed_providers: allowed,
-		guidance: "Use provider auto or select only from allowed_providers.",
-	})}`);
-}
-
-function normalizeProviderSelection(value: unknown, allowed: readonly string[]): "auto" | string | string[] {
-	if (value === undefined || (typeof value === "string" && value.trim().toLowerCase() === "auto")) {
-		return "auto";
-	}
-	const requested = Array.isArray(value) ? value : [value];
-	if (
-		requested.length === 0
-		|| requested.some((provider) => typeof provider !== "string" || provider.trim().length === 0)
-	) {
-		throw providerRejection("invalid_provider_selection", value, allowed);
-	}
-	const normalized = (requested as string[]).map((provider) => provider.trim().toLowerCase());
-	if (new Set(normalized).size !== normalized.length) {
-		throw providerRejection("invalid_provider_selection", value, allowed);
-	}
-	if (normalized.some((provider) => !allowed.includes(provider))) {
-		throw providerRejection("provider_not_allowed", value, allowed);
-	}
-	return Array.isArray(value) ? normalized : normalized[0] as string;
-}
-
 export class PolicyController {
 	private active: ActivePolicyTurn | undefined;
-	private readonly contentIds = new Set<string>();
 
 	constructor(
 		private readonly policy: NetworkPolicy,
-		private readonly webProviders: readonly string[],
 		private readonly budgets: Readonly<Record<string, number>> = {},
 	) {}
 
@@ -174,22 +137,11 @@ export class PolicyController {
 		try {
 			if (event.toolName === "web_search") {
 				assertAllowedQuery(queryText(input), this.policy, active.forbiddenTerms);
-				input.provider = normalizeProviderSelection(input.provider, this.webProviders);
-				input.workflow = "none";
-				if (this.policy.allowedHosts.length > 0) {
-					input.domainFilter = [...this.policy.allowedHosts];
-				}
 			} else if (event.toolName === "fetch_content") {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 				for (const url of fetchUrls(input)) {
 					assertAllowedUrl(url, this.policy);
 				}
-			} else if (event.toolName === "get_search_content") {
-				const responseId = input.responseId;
-				if (typeof responseId !== "string" || !this.contentIds.has(responseId)) {
-					throw new Error("responseId does not belong to this session");
-				}
-				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			} else if (event.toolName === "resolve-library-id" || event.toolName === "query-docs") {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			}
@@ -227,25 +179,15 @@ export class PolicyController {
 		let content = event.content;
 		let details = event.details;
 		let isError = event.isError;
-		if (["web_search", "fetch_content", "get_search_content", "resolve-library-id", "query-docs"].includes(event.toolName)) {
+		if (["web_search", "fetch_content", "resolve-library-id", "query-docs"].includes(event.toolName)) {
 			try {
 				assertAllowedQuery(strings([event.content, event.details]).join("\n"), this.policy, active.forbiddenTerms);
-				if (event.toolName === "web_search" || event.toolName === "fetch_content" || event.toolName === "get_search_content") {
+				if (event.toolName === "web_search" || event.toolName === "fetch_content") {
 					for (const url of urls([event.content, event.details])) {
 						const parsed = new URL(url);
 						if (this.policy.deniedHosts.some((host) => hostMatches(parsed.hostname, host))) {
 							throw new Error(`network policy denies host: ${parsed.hostname}`);
 						}
-					}
-				}
-				if ((event.toolName === "web_search" || event.toolName === "fetch_content") && !event.isError) {
-					const resultDetails = event.details as {
-						responseId?: unknown;
-						searchId?: unknown;
-						fetchId?: unknown;
-					} | undefined;
-					for (const id of [resultDetails?.responseId, resultDetails?.searchId, resultDetails?.fetchId]) {
-						if (typeof id === "string") this.contentIds.add(id);
 					}
 				}
 			} catch {

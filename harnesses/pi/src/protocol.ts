@@ -79,11 +79,8 @@ export interface GuestRuntimeConfig {
 	installPolicy: "session_overlay";
 }
 
-export type SearchFallbackKind = "transient" | "quota" | "network" | "invalid-response" | "unsupported";
-
 export interface WebSearchConfig {
-	providers: string[];
-	fallbackOn: SearchFallbackKind[];
+	provider: "deepseek";
 }
 
 export interface BootstrapSecretFrame extends CommonFrame {
@@ -697,26 +694,9 @@ export function parseFrame(line: string): InputFrame {
 		);
 	}
 	const webSearch = record(data.webSearch, "webSearch");
-	exactKeys(webSearch, ["providers", "fallbackOn"], "webSearch");
-	const providers = stringArray(webSearch.providers, "webSearch.providers");
-	if (
-		providers.length === 0
-		|| new Set(providers).size !== providers.length
-		|| providers.some((provider) => !/^[a-z][a-z0-9-]*$/.test(provider) || provider === "auto" || provider === "all")
-	) {
-		throw new ProtocolError(
-			"invalid_frame",
-			"webSearch.providers must contain unique resolved lowercase provider names",
-		);
-	}
-	const fallbackOn = stringArray(webSearch.fallbackOn, "webSearch.fallbackOn");
-	const fallbackKinds: SearchFallbackKind[] = ["transient", "quota", "network", "invalid-response", "unsupported"];
-	if (
-		fallbackOn.length === 0
-		|| new Set(fallbackOn).size !== fallbackOn.length
-		|| fallbackOn.some((kind) => !fallbackKinds.includes(kind as SearchFallbackKind))
-	) {
-		throw new ProtocolError("invalid_frame", "webSearch.fallbackOn contains invalid or duplicate kinds");
+	exactKeys(webSearch, ["provider"], "webSearch");
+	if (webSearch.provider !== "deepseek") {
+		throw new ProtocolError("invalid_frame", "webSearch.provider must be deepseek");
 	}
 	const thinking = string(data.thinking, "thinking") as ThinkingLevel;
 	const thinkingLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -734,7 +714,7 @@ export function parseFrame(line: string): InputFrame {
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
-		"read", "write", "bash", "web_search", "fetch_content", "get_search_content",
+		"read", "write", "bash", "web_search", "fetch_content",
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
@@ -789,8 +769,7 @@ export function parseFrame(line: string): InputFrame {
 			),
 		},
 		webSearch: {
-			providers,
-			fallbackOn: fallbackOn as SearchFallbackKind[],
+			provider: "deepseek",
 		},
 		context7Enabled: data.context7Enabled,
 	};

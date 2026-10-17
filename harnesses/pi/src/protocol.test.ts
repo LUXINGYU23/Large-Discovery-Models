@@ -74,8 +74,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
 		limits: { wallTimeSeconds: 60, toolCallBudgets: { web_search: 4 } },
 		webSearch: {
-			providers: ["parallel-mcp", "exa", "duckduckgo"],
-			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
+			provider: "deepseek",
 		},
 		context7Enabled: true,
 	};
@@ -85,10 +84,12 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.providerRequestBody, { temperature: 0.5, reasoning: { effort: "max" } });
 		assert.deepEqual(frame.submissionContract, submissionContract);
-		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
+		assert.deepEqual(frame.webSearch, { provider: "deepseek" });
 		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
+	assert.throws(() => parseFrame(JSON.stringify({ ...input, webSearch: { provider: "other" } })), /deepseek/);
+	assert.throws(() => parseFrame(JSON.stringify({ ...input, webSearch: { providers: ["old"] } })), /webSearch/);
 	const { providerRequestBody: _options, ...withoutOptions } = input;
 	assert.equal(parseFrame(JSON.stringify(withoutOptions)).type, "initialize");
 	const plugin = parseFrame(JSON.stringify({
@@ -142,8 +143,7 @@ test("parseFrame rejects a submission contract with a changed digest", () => {
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
 			limits: { wallTimeSeconds: 60, toolCallBudgets: {} },
 			webSearch: {
-				providers: ["parallel-mcp", "exa", "duckduckgo"],
-				fallbackOn: ["quota", "network"],
+				provider: "deepseek",
 			},
 			context7Enabled: true,
 		})),

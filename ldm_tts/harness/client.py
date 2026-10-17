@@ -79,6 +79,7 @@ class HarnessClient:
     def _start_process(self) -> None:
         if not self._api_key:
             raise HarnessError("harness client is closed")
+        self._named_secrets.update(self.config.bootstrap_secrets())
         self._responses = queue.Queue()
         self._stderr = deque(maxlen=40)
         secret_values = {self._api_key, *self._named_secrets.values()}
@@ -93,7 +94,7 @@ class HarnessClient:
             env={
                 name: value
                 for name, value in os.environ.items()
-                if value not in secret_values
+                if name not in self._named_secrets and value not in secret_values
             },
         )
         self._process = process

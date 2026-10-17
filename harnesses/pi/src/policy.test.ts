@@ -30,7 +30,6 @@ function policyHandlers(controller: PolicyController) {
 function controller(budgets: Record<string, number> = {}): PolicyController {
 	return new PolicyController(
 		networkPolicy,
-		["parallel-mcp", "exa", "duckduckgo"],
 		budgets,
 	);
 }
@@ -46,40 +45,35 @@ test("URL policy allows declared domains and rejects unsafe URLs", () => {
 	assert.throws(() => assertAllowedUrl("/mnt/data/oracle.csv", networkPolicy));
 });
 
-test("network policy filters results and keeps content ids session-local", async () => {
+test("network policy filters search results", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
 	const owner = controller();
-	const other = controller();
 	const ownerHandlers = policyHandlers(owner);
-	const otherHandlers = policyHandlers(other);
 	try {
 		await owner.begin(["synthonbench"], join(root, "owner.json"));
-		await other.begin(["synthonbench"], join(root, "other.json"));
 		const hidden = await ownerHandlers.result({
 			type: "tool_result",
 			toolCallId: "hidden",
 			toolName: "web_search",
 			input: { query: "reaction design" },
 			content: [{ type: "text", text: "Hidden SynthonBench answer" }],
-			details: { searchId: "blocked-id" },
+			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
 		assert.equal(hidden?.isError, true);
 
-		await ownerHandlers.result({
+		const allowed = await ownerHandlers.result({
 			type: "tool_result",
 			toolCallId: "allowed",
 			toolName: "web_search",
 			input: { query: "reaction design" },
 			content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
-			details: { searchId: "owner-search" },
+			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
-		assert.equal(await ownerHandlers.call(call("get_search_content", { responseId: "owner-search" })), undefined);
-		assert.equal((await otherHandlers.call(call("get_search_content", { responseId: "owner-search" })))?.block, true);
+		assert.equal(allowed, undefined);
 	} finally {
 		owner.end();
-		other.end();
 		await rm(root, { recursive: true, force: true });
 	}
 });
@@ -89,18 +83,18 @@ test("invalid search inputs are rejected before usage is reserved", async () => 
 	const subject = controller({ web_search: 2 });
 	const handlers = policyHandlers(subject);
 	try {
-		await subject.begin([], join(root, "budget.json"));
+		await subject.begin(["forbidden-original-question"], join(root, "budget.json"));
 		const rejected = await handlers.call(call("web_search", {
 			query: "reaction design",
-			provider: "tavily",
+			ori_question: "forbidden-original-question",
 		}));
 		assert.equal(rejected?.block, true);
-		assert.match(rejected?.reason ?? "", /"reason":"provider_not_allowed"/);
+		assert.match(rejected?.reason ?? "", /benchmark identifier/);
 		assert.equal(subject.snapshot().toolCalls.web_search, undefined);
 
-		const allowed = call("web_search", { query: "reaction design", provider: "DuckDuckGo" });
+		const allowed = call("web_search", { query: "reaction design" });
 		assert.equal(await handlers.call(allowed), undefined);
-		assert.deepEqual(allowed.input, { query: "reaction design", provider: "duckduckgo", workflow: "none", domainFilter: ["nih.gov", "nature.com"] });
+		assert.deepEqual(allowed.input, { query: "reaction design" });
 	} finally {
 		subject.end();
 		await rm(root, { recursive: true, force: true });

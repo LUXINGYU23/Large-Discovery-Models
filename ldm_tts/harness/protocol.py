@@ -363,6 +363,10 @@ class HarnessPoolConfig:
             "limits": self.limits.to_dict(),
         }
 
+    def bootstrap_secrets(self) -> dict[str, str]:
+        """Resolve backend secrets separately from persisted initialization data."""
+        return {}
+
 
 @dataclass(frozen=True)
 class HarnessTurn:

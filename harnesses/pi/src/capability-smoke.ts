@@ -104,8 +104,7 @@ async function main(): Promise<void> {
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
 				query: "Buchwald Hartwig reaction primary literature",
-				numResults: 3,
-				provider: "auto",
+				count: 3,
 			})));
 		} else if (call === 2) {
 			const check = {
@@ -232,12 +231,11 @@ async function main(): Promise<void> {
 			toolCallBudgets: { web_search: 2, fetch_content: 2 },
 		},
 		webSearch: {
-			providers: ["parallel-mcp", "exa", "duckduckgo"],
-			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
+			provider: "deepseek",
 		},
 		context7Enabled: true,
 	};
-	let pool = new PiSessionPool(config, secret);
+	let pool = new PiSessionPool(config, secret, { DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? "" });
 	const validate = async (request: { turnId: string; attemptIndex: number }) => {
 		if (request.turnId === "capability_turn" && request.attemptIndex === 1) {
 			return {
@@ -401,7 +399,7 @@ async function main(): Promise<void> {
 		const dataPath = join(researchDirectory, "observations.json");
 		await writeFile(dataPath, '{"observations":[]}');
 		await pool.close();
-		pool = new PiSessionPool(config, secret);
+		pool = new PiSessionPool(config, secret, { DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? "" });
 		await pool.initialize();
 		const [resumed] = await pool.runTurns([recoveryInput], validate, async () => true);
 		assert.equal(resumed?.sessionId, recovered.sessionId);

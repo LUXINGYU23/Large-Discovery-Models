@@ -145,7 +145,7 @@ args:
 ```
 
 The reference tasks default to eight `web_search` calls, sixteen
-`fetch_content`, sixteen `get_search_content`, four `resolve-library-id`, and eight
+`fetch_content`, four `resolve-library-id`, and eight
 `query-docs` calls per turn. Context7 budgets are omitted when Context7 is
 disabled. A tool absent from the mapping is unlimited; zero disables it.
 The terminal tool named by the submission contract cannot be budgeted.

@@ -34,6 +34,32 @@ TEST_GUEST_RUNTIME = PiGuestRuntime(
 )
 
 
+@pytest.fixture(autouse=True)
+def search_test_credentials(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", " fixture-deepseek-secret ")
+
+
+def test_pi_search_secret_is_separate_from_initialization(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from ldm_tts.harness.protocol import HarnessLimits
+
+    config = PiHarnessConfig(
+        artifact_root=tmp_path, base_url="https://provider.example", model="model",
+        profiles=(HarnessProfile("research", Path("/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(), guest_runtime=TEST_GUEST_RUNTIME,
+    )
+    assert config.bootstrap_secrets() == {"DEEPSEEK_API_KEY": "fixture-deepseek-secret"}
+    assert "fixture-deepseek-secret" not in json.dumps(config.initialize_payload())
+    monkeypatch.delenv("DEEPSEEK_API_KEY")
+    with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
+        config.bootstrap_secrets()
+    offline = replace(config, limits=HarnessLimits(tool_call_budgets={"web_search": 0, "fetch_content": 0}))
+    assert offline.bootstrap_secrets() == {}
+    with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
+        replace(config, limits=HarnessLimits(tool_call_budgets={"web_search": 0})).bootstrap_secrets()
+
+
 def test_generic_pool_configuration_does_not_require_pi_provider_or_guest(tmp_path):
     config = HarnessPoolConfig(
         artifact_root=tmp_path,
@@ -107,14 +133,7 @@ def test_submission_contract_digest_covers_transmitted_json(tmp_path: Path) -> N
     assert "requestId" not in frame
     assert frame["guestRuntime"] == TEST_GUEST_RUNTIME.to_dict()
     assert frame["webSearch"] == {
-        "providers": ["parallel-mcp", "exa", "duckduckgo"],
-        "fallbackOn": [
-            "transient",
-            "quota",
-            "network",
-            "invalid-response",
-            "unsupported",
-        ],
+        "provider": "deepseek",
     }
     assert "webProvider" not in frame
     assert frame["mcpServers"] == []

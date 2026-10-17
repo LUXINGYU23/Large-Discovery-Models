@@ -54,7 +54,7 @@ method_overrides:
     - args.harness-sidecar-image="ldm-pi-harness:latest"
     - args.harness-cache-dir="${SYNTHONBENCH_WORK_ROOT}/gondolin-cache"
     - args.policy-capability=["ldm_weights@1","prior_mean@1"]
-    - args.policy-tool-budget=["web_search=8","fetch_content=16","get_search_content=16","resolve-library-id=4","query-docs=8"]
+    - args.policy-tool-budget=["web_search=8","fetch_content=16","resolve-library-id=4","query-docs=8"]
     - args.policy-max-submission-attempts=3
   bo: []
   llm:

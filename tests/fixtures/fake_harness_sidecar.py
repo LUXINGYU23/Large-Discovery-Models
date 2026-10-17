@@ -12,6 +12,7 @@ from importlib.metadata import version
 
 
 profiles: list[str] = []
+bootstrap_secrets = {}
 committed = {}
 turn_requests = 0
 policy_disable = os.environ.get("HARNESS_TEST_SUBMISSION") == "policy_disable"
@@ -36,12 +37,17 @@ for line in sys.stdin:
         "campaignId": frame["campaignId"],
     }
     if frame["type"] == "bootstrap_secret":
+        bootstrap_secrets = frame["namedSecrets"]
+        if "DEEPSEEK_API_KEY" in bootstrap_secrets:
+            assert "DEEPSEEK_API_KEY" not in os.environ
         response = (
             {"type": "error", **common, "error": {"message": "secret inherited"}}
             if os.environ.get("HARNESS_TEST_SECRET") or os.environ.get("HARNESS_MCP_SECRET")
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
+        if frame.get("webSearch") == {"provider": "deepseek"}:
+            assert bootstrap_secrets.get("DEEPSEEK_API_KEY")
         profiles = [item["profileId"] for item in frame["profiles"]]
         store = Path(frame["artifactRoot"]) / "fake_committed.json"
         if store.exists():

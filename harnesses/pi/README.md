@@ -198,12 +198,36 @@ compaction enabled. The release configuration reserves 16,384 tokens for the
 next response and retains the most recent 20,000 tokens verbatim; Pi writes
 compaction entries into its native session history.
 
-The sidecar writes the configured ordered provider route to Pi Web Access.
-`provider: auto` uses automatic fallback, while an Agent may explicitly retry
-with any provider in that route when returned sources are unsuitable. Provider
-names outside the route are rejected with a model-visible structured reason;
-they are never silently substituted. The default route is `parallel-mcp`,
-`exa`, then `duckduckgo`; all are usable without a task-owned search API key.
+Web research uses the official [DeepSeek Search and Fetch APIs](https://api-docs.deepseek.com/guides/search/).
+Set `DEEPSEEK_API_KEY` in the host task runner environment before starting a campaign.
+Python passes it through the existing `bootstrap_secret.namedSecrets` channel; it is
+removed from the child environment and never written into initialization manifests
+or guest files. It is separate from the model provider key. Campaigns that disable
+both `web_search` and `fetch_content` (budgets of zero) need no search key.
+
+For the local Windows checkout, `.deepseek-api-key.dpapi` in this directory is
+encrypted for the current Windows user and excluded from Git and Docker build
+contexts. Load it into the task runner environment with PowerShell:
+
+```powershell
+$secret = Get-Content -Raw ./harnesses/pi/.deepseek-api-key.dpapi | ConvertTo-SecureString
+$env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password
+```
+
+`npm run smoke:search` tests both live endpoints. It accepts the key through
+`DEEPSEEK_API_KEY` or stdin and prints only result URLs and content length.
+
+`web_search` accepts `query` (1–128 Unicode characters), optional `count` (1–50,
+default 10), `ori_question`, and `need_content`. It returns ranked URLs, summaries,
+and available content directly. `fetch_content` accepts one `url` and returns the
+page title and Markdown. Domain restrictions and benchmark query rules still apply.
+Context7 remains the separate library documentation service.
+
+Search and Fetch each pace requests below five QPS within a pool. HTTP 408, 429,
+5xx and network failures receive at most three attempts with cancellation and a
+60-second overall timeout. Other errors fail immediately. The account-level quota
+is shared with other pools/applications; retry handling also covers that contention.
+There are no alternate search providers or direct-HTTP fetch fallback.
 
 The sidecar can also load explicitly allowlisted MCP tools over stdio or
 Streamable HTTP. Python resolves environment- or file-backed secrets before
