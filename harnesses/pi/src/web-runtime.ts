@@ -1,7 +1,7 @@
 import PQueue from "p-queue";
 import { sha256 } from "./trace.js";
 
-export const WEB_RUNTIME = { concurrency: 4, maxQueued: 128, timeoutMs: 30_000 } as const;
+export const WEB_RUNTIME = { concurrency: 100, maxQueued: 128, timeoutMs: 30_000 } as const;
 export type WebErrorCode = "WEB_AUTH" | "WEB_QUOTA" | "WEB_RATE_LIMIT" | "WEB_HTTP_ERROR"
 	| "WEB_NETWORK" | "WEB_INVALID_RESPONSE" | "WEB_INVALID_REQUEST" | "WEB_POLICY_DENIED"
 	| "WEB_QUEUE_FULL" | "WEB_ABORTED" | "TOOL_TIMEOUT" | "WEB_INTERNAL";

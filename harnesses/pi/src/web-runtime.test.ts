@@ -36,6 +36,8 @@ test("deadline and caller cancellation are distinct, and both wait for task clea
 
 test("credential pool is bounded, FIFO, abortable while queued and retains slots until cleanup", async () => {
 	const key = "queue-test";
+	const limit = WEB_RUNTIME.concurrency;
+	const initialOrder = Array.from({ length: limit }, (_, index) => index);
 	const controller = new AbortController();
 	const releases: Array<() => void> = [];
 	const order: number[] = [];
@@ -46,30 +48,30 @@ test("credential pool is bounded, FIFO, abortable while queued and retains slots
 		await new Promise<void>((resolve) => { releases[index] = resolve; });
 		active--;
 	};
-	const running = Array.from({ length: WEB_RUNTIME.concurrency }, (_, index) => scheduleWebRequest(key, controller.signal, task(index)));
+	const running = initialOrder.map((index) => scheduleWebRequest(key, controller.signal, task(index)));
 	await setImmediate();
 	const queuedAbort = new AbortController();
-	const cancelled = scheduleWebRequest(key, queuedAbort.signal, task(4));
+	const cancelled = scheduleWebRequest(key, queuedAbort.signal, task(limit));
 	const check = assert.rejects(cancelled, (error: unknown) => error instanceof WebToolError && error.failure.code === "WEB_ABORTED");
-	const next = scheduleWebRequest(key, new AbortController().signal, task(5));
+	const next = scheduleWebRequest(key, new AbortController().signal, task(limit + 1));
 	queuedAbort.abort();
 	controller.abort();
 	await check;
 	await setImmediate();
-	assert.equal(active, 4);
-	assert.deepEqual(order, [0, 1, 2, 3]);
+	assert.equal(active, limit);
+	assert.deepEqual(order, initialOrder);
 	releases[0]!();
 	await setImmediate();
-	assert.deepEqual(order, [0, 1, 2, 3, 5]);
+	assert.deepEqual(order, [...initialOrder, limit + 1]);
 	for (const release of releases) release?.();
 	await Promise.all([...running, next]);
-	assert.equal(peak, 4);
+	assert.equal(peak, limit);
 });
 
 test("queue saturation rejects before dispatch and cancelled waiters release capacity", async () => {
 	let release!: () => void;
 	const held = new Promise<void>((resolve) => { release = resolve; });
-	const running = Array.from({ length: 4 }, () => scheduleWebRequest("saturation", new AbortController().signal, () => held));
+	const running = Array.from({ length: WEB_RUNTIME.concurrency }, () => scheduleWebRequest("saturation", new AbortController().signal, () => held));
 	const controllers = Array.from({ length: WEB_RUNTIME.maxQueued }, () => new AbortController());
 	let dispatched = 0;
 	const queued = controllers.map((controller) => scheduleWebRequest("saturation", controller.signal, async () => { dispatched++; }));
@@ -94,11 +96,11 @@ test("separate clients with the same credential share network concurrency and re
 		active--;
 		return new Response("private provider diagnostic", { status: 429, headers: { "retry-after": "3" } });
 	});
-	const clients = Array.from({ length: 9 }, () => new DeepSeekWebTools("shared-credential"));
+	const clients = Array.from({ length: WEB_RUNTIME.concurrency + 5 }, () => new DeepSeekWebTools("shared-credential"));
 	const results = await Promise.allSettled(clients.map((client) => client.toolDefinitions({
 		allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [],
 	})[0]!.execute("call", { queries: ["research"] }, undefined, undefined, {} as never)));
-	assert.equal(peak, 4);
+	assert.equal(peak, WEB_RUNTIME.concurrency);
 	for (const result of results) {
 		assert.equal(result.status, "rejected");
 		if (result.status !== "rejected") continue;
