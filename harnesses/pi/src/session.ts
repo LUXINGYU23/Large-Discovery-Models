@@ -17,6 +17,7 @@ import {
 import { Type, type TUnsafe } from "typebox";
 import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
 import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
+import { DeepSeekWebTools } from "./deepseek-web.js";
 import { McpToolBridge } from "./mcp.js";
 import { PolicyController, type ToolUsageSnapshot } from "./policy.js";
 import { TurnExecutionError } from "./protocol.js";
@@ -38,6 +39,9 @@ import {
 } from "./submission.js";
 import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 import { createSolPiExtension, SOL_PI_GUEST_ARCHIVE, solPiTools } from "./sol-pi.js";
+import { ContextPressureController } from "./context-pressure.js";
+import { WEB_EVIDENCE_GUEST } from "./web-evidence.js";
+import { WEB_RUNTIME } from "./web-runtime.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCE_DIRECTORY = ".ldm-resources";
@@ -50,7 +54,8 @@ const COMPACTION_SETTINGS = {
 const GUEST_RUNTIME_INSTRUCTIONS = `## Guest runtime
 - /workspace is an isolated writable research workspace, not a checkout of the project repository. Do not use git status to inspect the project. Git is available only for cloning public research material when useful.
 - Use the registered read and write tools for files. apply_patch is not available in the guest.
-- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.`;
+- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.
+- Long web results may be archived under /workspace/.web-evidence when context is full. Use read with the receipt's path, offset and limit to recover evidence. Preserve archive paths when summarizing research; bash can list this read-only directory if an old receipt has been compacted.`;
 
 interface SavedSubmission {
 	submission: TerminalSubmission;
@@ -184,7 +189,6 @@ async function runtimePackages(): Promise<Record<string, string>> {
 		node: process.version,
 		piCodingAgent: version("@earendil-works/pi-coding-agent"),
 		gondolin: version("@earendil-works/gondolin"),
-		piWebAccess: version("pi-web-access"),
 		context7: version("@upstash/context7-pi"),
 		mcpClient: version("@modelcontextprotocol/client"),
 		solPi: version("sol-pi"),
@@ -205,8 +209,7 @@ function sessionTools(
 		"write",
 		"bash",
 		"web_search",
-		"fetch_content",
-		"get_search_content",
+		"web_fetch",
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
 		...mcpTools,
@@ -385,6 +388,7 @@ export class PersistentProfileSession {
 	private readonly resourceRoot: string;
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
+	private readonly contextPressure: ContextPressureController;
 	private readonly gondolin: GondolinController;
 	private readonly mcp: McpToolBridge;
 	private readonly submissions: SubmissionController;
@@ -399,14 +403,15 @@ export class PersistentProfileSession {
 		private readonly proxy: ProviderProxy,
 		guestRuntime: ResolvedGuestRuntime,
 		namedSecrets: Readonly<Record<string, string>>,
+		private readonly web: DeepSeekWebTools,
 	) {
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
 		this.resourceRoot = join(this.workspace, RESOURCE_DIRECTORY);
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
+		this.contextPressure = new ContextPressureController(join(this.sessionDirectory, "web-evidence"), COMPACTION_SETTINGS.reserveTokens);
 		this.policy = new PolicyController(
 			config.networkPolicy,
-			config.webSearch.providers,
 			config.limits.toolCallBudgets,
 		);
 		this.gondolin = new GondolinController(
@@ -414,7 +419,8 @@ export class PersistentProfileSession {
 			this.resourceRoot,
 			config.networkPolicy,
 			guestRuntime,
-			config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {},
+			{ [WEB_EVIDENCE_GUEST]: this.contextPressure.archive.root,
+				...(config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {}) },
 		);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
@@ -428,6 +434,7 @@ export class PersistentProfileSession {
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
 		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
+		await mkdir(this.contextPressure.archive.root, { recursive: true });
 		const agents = await readFile(this.profile.agentsPath, "utf8");
 		this.agentsSha256 = sha256(agents);
 		if (this.agentsSha256 !== this.profile.agentsSha256) {
@@ -496,8 +503,7 @@ export class PersistentProfileSession {
 			compaction: COMPACTION_SETTINGS,
 			retry: { enabled: false },
 		});
-		const webExtension = join(packageRoot("pi-web-access"), "index.ts");
-		const extensionPaths = [webExtension];
+		const extensionPaths: string[] = [];
 		if (this.config.context7Enabled) {
 			extensionPaths.push(join(packageRoot("@upstash/context7-pi"), "extensions", "context7.ts"));
 		}
@@ -517,6 +523,7 @@ export class PersistentProfileSession {
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
 				...(solPi ? [solPi] : []),
+				this.contextPressure.createExtension(() => this.session?.messages ?? []),
 			],
 			noPromptTemplates: true,
 			noThemes: true,
@@ -559,7 +566,13 @@ export class PersistentProfileSession {
 			resourceLoader: loader,
 			settingsManager: settings,
 			sessionManager: manager,
-			customTools: [...this.mcp.toolDefinitions(), this.submissions.tool()],
+			customTools: [...this.web.toolDefinitions(this.config.networkPolicy, () => {
+				const message = this.session?.messages.findLast((item) => item.role === "user");
+				if (message?.role !== "user") return undefined;
+				const question = typeof message.content === "string" ? message.content
+					: message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+				return this.policy.searchContext(question);
+			}), ...this.mcp.toolDefinitions(), this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
@@ -894,19 +907,10 @@ export class PiSessionPool {
 		if (profileSetSha256 !== this.config.profileSetSha256) {
 			throw new Error("profile set digest mismatch");
 		}
-		process.env.PI_CODING_AGENT_DIR = join(this.config.artifactRoot, "web-cache");
-		await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true });
-		await writeFile(
-			join(process.env.PI_CODING_AGENT_DIR, "web-search.json"),
-			`${JSON.stringify({
-				searchRouting: this.config.webSearch,
-				fetchContent: { domainPolicy: { allow: this.config.networkPolicy.allowedHosts, deny: this.config.networkPolicy.deniedHosts } },
-				fetchRouting: { providers: ["http"], allowRemoteHostedProviders: false },
-				githubClone: { enabled: false },
-				githubPrIssue: { enabled: false },
-			}, null, 2)}\n`,
-			{ encoding: "utf8", mode: 0o600 },
-		);
+		const web = new DeepSeekWebTools(this.namedSecrets.DEEPSEEK_API_KEY);
+		if (["web_search", "web_fetch"].some((name) => this.config.limits.toolCallBudgets[name] !== 0)) {
+			web.requireKey();
+		}
 		await this.proxy.start();
 		for (const profile of this.config.profiles) {
 			const session = new PersistentProfileSession(
@@ -915,6 +919,7 @@ export class PiSessionPool {
 				this.proxy,
 				guestRuntime,
 				this.namedSecrets,
+				web,
 			);
 			this.sessions.set(profile.profileId, session);
 		}
@@ -955,7 +960,9 @@ export class PiSessionPool {
 			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
 			networkPolicy: this.config.networkPolicy,
 			limits: this.config.limits,
-			webSearch: this.config.webSearch,
+			webSearch: { provider: "deepseek" },
+			webRuntime: WEB_RUNTIME,
+			contextManagement: { evidenceArchive: WEB_EVIDENCE_GUEST, pruning: "pressure-triggered-web-evidence", estimator: "pi-with-provider-input-anchor" },
 			context7Enabled: this.config.context7Enabled,
 			tools: sessionTools(
 				this.config.context7Enabled,

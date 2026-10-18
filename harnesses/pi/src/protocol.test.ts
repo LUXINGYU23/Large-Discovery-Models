@@ -73,10 +73,6 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		}],
 		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
 		limits: { wallTimeSeconds: 60, toolCallBudgets: { web_search: 4 } },
-		webSearch: {
-			providers: ["parallel-mcp", "exa", "duckduckgo"],
-			fallbackOn: ["transient", "quota", "network", "invalid-response", "unsupported"],
-		},
 		context7Enabled: true,
 	};
 	const frame = parseFrame(JSON.stringify(input));
@@ -85,7 +81,6 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.providerRequestBody, { temperature: 0.5, reasoning: { effort: "max" } });
 		assert.deepEqual(frame.submissionContract, submissionContract);
-		assert.deepEqual(frame.webSearch.providers, ["parallel-mcp", "exa", "duckduckgo"]);
 		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
@@ -141,10 +136,6 @@ test("parseFrame rejects a submission contract with a changed digest", () => {
 			mcpServers: [],
 			networkPolicy: { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] },
 			limits: { wallTimeSeconds: 60, toolCallBudgets: {} },
-			webSearch: {
-				providers: ["parallel-mcp", "exa", "duckduckgo"],
-				fallbackOn: ["quota", "network"],
-			},
 			context7Enabled: true,
 		})),
 		(error: unknown) => error instanceof ProtocolError && error.code === "invalid_frame",

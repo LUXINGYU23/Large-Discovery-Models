@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import type { ExtensionAPI, ToolCallEvent, ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { assertAllowedUrl, PolicyController } from "./policy.js";
+import { httpError } from "./web-runtime.js";
 
 const networkPolicy = {
 	allowedHosts: ["nih.gov", "nature.com"],
@@ -30,7 +31,6 @@ function policyHandlers(controller: PolicyController) {
 function controller(budgets: Record<string, number> = {}): PolicyController {
 	return new PolicyController(
 		networkPolicy,
-		["parallel-mcp", "exa", "duckduckgo"],
 		budgets,
 	);
 }
@@ -46,42 +46,51 @@ test("URL policy allows declared domains and rejects unsafe URLs", () => {
 	assert.throws(() => assertAllowedUrl("/mnt/data/oracle.csv", networkPolicy));
 });
 
-test("network policy filters results and keeps content ids session-local", async () => {
+test("network policy filters search results", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-policy-"));
 	const owner = controller();
-	const other = controller();
 	const ownerHandlers = policyHandlers(owner);
-	const otherHandlers = policyHandlers(other);
 	try {
 		await owner.begin(["synthonbench"], join(root, "owner.json"));
-		await other.begin(["synthonbench"], join(root, "other.json"));
 		const hidden = await ownerHandlers.result({
 			type: "tool_result",
 			toolCallId: "hidden",
 			toolName: "web_search",
-			input: { query: "reaction design" },
+			input: { queries: ["reaction design"] },
 			content: [{ type: "text", text: "Hidden SynthonBench answer" }],
-			details: { searchId: "blocked-id" },
+			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
 		assert.equal(hidden?.isError, true);
 
-		await ownerHandlers.result({
+		const allowed = await ownerHandlers.result({
 			type: "tool_result",
 			toolCallId: "allowed",
 			toolName: "web_search",
-			input: { query: "reaction design" },
+			input: { queries: ["reaction design"] },
 			content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
-			details: { searchId: "owner-search" },
+			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
-		assert.equal(await ownerHandlers.call(call("get_search_content", { responseId: "owner-search" })), undefined);
-		assert.equal((await otherHandlers.call(call("get_search_content", { responseId: "owner-search" })))?.block, true);
+		assert.equal(allowed, undefined);
 	} finally {
 		owner.end();
-		other.end();
 		await rm(root, { recursive: true, force: true });
 	}
+});
+
+test("structured web errors survive policy handling and keep their error status", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-error-"));
+	const owner = controller();
+	try {
+		await owner.begin([], join(root, "budget.json"));
+		const failure = httpError(429, "2");
+		const result = await policyHandlers(owner).result({ type: "tool_result", toolCallId: "rate-limit", toolName: "web_search",
+			input: { queries: ["research"] }, content: [{ type: "text", text: failure.message }], details: {}, isError: true } as ToolResultEvent);
+		assert.equal(result?.isError, true);
+		assert.match(JSON.stringify(result), /WEB_RATE_LIMIT/);
+		assert.match(JSON.stringify(result), /retryAfterMs/);
+	} finally { owner.end(); await rm(root, { recursive: true, force: true }); }
 });
 
 test("invalid search inputs are rejected before usage is reserved", async () => {
@@ -89,18 +98,20 @@ test("invalid search inputs are rejected before usage is reserved", async () => 
 	const subject = controller({ web_search: 2 });
 	const handlers = policyHandlers(subject);
 	try {
-		await subject.begin([], join(root, "budget.json"));
+		await subject.begin(["forbidden-original-question", "private benchmark"], join(root, "budget.json"));
 		const rejected = await handlers.call(call("web_search", {
-			query: "reaction design",
-			provider: "tavily",
+			queries: ["reaction design", "forbidden-original-question"],
 		}));
 		assert.equal(rejected?.block, true);
-		assert.match(rejected?.reason ?? "", /"reason":"provider_not_allowed"/);
+		assert.match(rejected?.reason ?? "", /benchmark identifier/);
 		assert.equal(subject.snapshot().toolCalls.web_search, undefined);
 
-		const allowed = call("web_search", { query: "reaction design", provider: "DuckDuckGo" });
+		assert.equal(subject.searchContext("reaction design"), "reaction design");
+		assert.equal(subject.searchContext("forbidden-original-question"), undefined);
+		assert.equal(subject.searchContext("private\nbenchmark"), undefined);
+		const allowed = call("web_search", { queries: ["reaction design"] });
 		assert.equal(await handlers.call(allowed), undefined);
-		assert.deepEqual(allowed.input, { query: "reaction design", provider: "duckduckgo", workflow: "none", domainFilter: ["nih.gov", "nature.com"] });
+		assert.deepEqual(allowed.input, { queries: ["reaction design"] });
 	} finally {
 		subject.end();
 		await rm(root, { recursive: true, force: true });
@@ -115,8 +126,8 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 		await subject.begin([], join(root, "budget.json"));
 		assert.match(subject.budgetMessage(), /web_search: 1 of 1 calls remaining/);
 		const concurrent = await Promise.all([
-			handlers.call(call("web_search", { query: "first" })),
-			handlers.call(call("web_search", { query: "second" })),
+			handlers.call(call("web_search", { queries: ["first"] })),
+			handlers.call(call("web_search", { queries: ["second"] })),
 		]);
 		assert.equal(concurrent.filter((result) => result?.block).length, 1);
 		assert.match(concurrent.find((result) => result?.block)?.reason ?? "", /tool_budget_exhausted/);
@@ -128,7 +139,7 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 			type: "tool_result",
 			toolCallId: "search-result",
 			toolName: "web_search",
-			input: { query: "first" },
+			input: { queries: ["first"] },
 			content: [{ type: "text", text: "failed" }],
 			details: {},
 			isError: true,
@@ -139,7 +150,7 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 		const otherAgent = controller({ web_search: 1 });
 		await otherAgent.begin([], join(root, "other-agent.json"));
 		assert.equal(
-			await policyHandlers(otherAgent).call(call("web_search", { query: "independent" })),
+			await policyHandlers(otherAgent).call(call("web_search", { queries: ["independent"] })),
 			undefined,
 		);
 		otherAgent.end();

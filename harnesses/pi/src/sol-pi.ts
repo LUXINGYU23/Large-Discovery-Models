@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
-import type { ExtensionFactory, ToolsOptions } from "@earendil-works/pi-coding-agent";
+import type { ExtensionFactory, ToolsOptions, ExtensionAPI, ContextEvent, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { isWebResult } from "./web-evidence.js";
 import { guestPath } from "./gondolin.js";
 import { atomicJson } from "./trace.js";
 
@@ -60,9 +61,12 @@ export async function createSolPiExtension(
 			writeOptions?: ToolsOptions["write"];
 		}): ExtensionFactory;
 	}>(join(root, "extensions", "action-fusion", "index.ts"));
+	const { registerObservationPack } = await jiti.import<{ registerObservationPack: (pi: ExtensionAPI) => void }>(
+		join(root, "extensions", "observation-pack", "index.ts"));
 	return (pi) => {
-		// Keep upstream mechanisms intact; only bind file/command I/O to the guest.
-		registerConfiguredFeatures(pi, { ...config, actionFusion: false });
+		// Bind guest I/O and reserve web observations for the common pressure projection.
+		if (config.observationPack) registerObservationPack(webAwareObservationApi(pi));
+		registerConfiguredFeatures(pi, { ...config, actionFusion: false, observationPack: false });
 		if (config.actionFusion) pi.on("session_start", async (_event, ctx) => {
 			const options = await toolOptions();
 			await createActionFusionExtension({
@@ -94,4 +98,22 @@ export async function createSolPiExtension(
 			} : message),
 		}));
 	};
+}
+
+/** Web evidence has one owner: the pressure projection. SoL-Pi continues packing other observations. */
+function webAwareObservationApi(pi: ExtensionAPI): ExtensionAPI {
+	return { ...pi, on: ((name: string, handler: unknown) => {
+		if (name !== "context") {
+			(pi.on as (name: string, handler: unknown) => void)(name, handler);
+			return;
+		}
+		const onContext = handler as (event: ContextEvent, ctx: ExtensionContext) => Promise<{ messages?: ContextEvent["messages"] } | void>;
+		pi.on("context", async (event, ctx) => {
+			const result = await onContext({ ...event, messages: event.messages.map((message) =>
+				message.role === "toolResult" && isWebResult(message) ? { ...message, content: [] } : message) }, ctx);
+			if (!result?.messages) return;
+			if (result.messages.length !== event.messages.length) throw new Error("SoL-Pi observation projection changed message count");
+			return { messages: result.messages.map((message, index) => isWebResult(event.messages[index]!) ? event.messages[index]! : message) };
+		});
+	}) as ExtensionAPI["on"] };
 }

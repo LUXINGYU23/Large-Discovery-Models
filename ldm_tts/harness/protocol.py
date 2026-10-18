@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
+HARNESS_PROTOCOL_VERSION = "0.3.0"
+
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
@@ -362,6 +364,10 @@ class HarnessPoolConfig:
             "profiles": [profile.to_dict() for profile in self.profiles],
             "limits": self.limits.to_dict(),
         }
+
+    def bootstrap_secrets(self) -> dict[str, str]:
+        """Resolve backend secrets separately from persisted initialization data."""
+        return {}
 
 
 @dataclass(frozen=True)

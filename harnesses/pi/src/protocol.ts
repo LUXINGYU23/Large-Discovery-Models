@@ -79,13 +79,6 @@ export interface GuestRuntimeConfig {
 	installPolicy: "session_overlay";
 }
 
-export type SearchFallbackKind = "transient" | "quota" | "network" | "invalid-response" | "unsupported";
-
-export interface WebSearchConfig {
-	providers: string[];
-	fallbackOn: SearchFallbackKind[];
-}
-
 export interface BootstrapSecretFrame extends CommonFrame {
 	type: "bootstrap_secret";
 	apiKey: string;
@@ -114,7 +107,6 @@ export interface InitializeFrame extends CommonFrame {
 	mcpServers: McpServerConfig[];
 	networkPolicy: NetworkPolicy;
 	limits: HarnessLimits;
-	webSearch: WebSearchConfig;
 	context7Enabled: boolean;
 }
 
@@ -658,7 +650,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
-		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "context7Enabled",
 		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
@@ -696,28 +688,6 @@ export function parseFrame(line: string): InputFrame {
 			`${submissionContract.toolName} cannot have a tool call budget`,
 		);
 	}
-	const webSearch = record(data.webSearch, "webSearch");
-	exactKeys(webSearch, ["providers", "fallbackOn"], "webSearch");
-	const providers = stringArray(webSearch.providers, "webSearch.providers");
-	if (
-		providers.length === 0
-		|| new Set(providers).size !== providers.length
-		|| providers.some((provider) => !/^[a-z][a-z0-9-]*$/.test(provider) || provider === "auto" || provider === "all")
-	) {
-		throw new ProtocolError(
-			"invalid_frame",
-			"webSearch.providers must contain unique resolved lowercase provider names",
-		);
-	}
-	const fallbackOn = stringArray(webSearch.fallbackOn, "webSearch.fallbackOn");
-	const fallbackKinds: SearchFallbackKind[] = ["transient", "quota", "network", "invalid-response", "unsupported"];
-	if (
-		fallbackOn.length === 0
-		|| new Set(fallbackOn).size !== fallbackOn.length
-		|| fallbackOn.some((kind) => !fallbackKinds.includes(kind as SearchFallbackKind))
-	) {
-		throw new ProtocolError("invalid_frame", "webSearch.fallbackOn contains invalid or duplicate kinds");
-	}
 	const thinking = string(data.thinking, "thinking") as ThinkingLevel;
 	const thinkingLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 	if (!thinkingLevels.includes(thinking)) throw new ProtocolError("invalid_frame", `invalid thinking level: ${thinking}`);
@@ -734,7 +704,7 @@ export function parseFrame(line: string): InputFrame {
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
-		"read", "write", "bash", "web_search", "fetch_content", "get_search_content",
+		"read", "write", "bash", "web_search", "web_fetch",
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),
@@ -787,10 +757,6 @@ export function parseFrame(line: string): InputFrame {
 					nonnegativeInteger(limit, `limits.toolCallBudgets.${name}`),
 				]),
 			),
-		},
-		webSearch: {
-			providers,
-			fallbackOn: fallbackOn as SearchFallbackKind[],
 		},
 		context7Enabled: data.context7Enabled,
 	};

@@ -68,7 +68,7 @@ def build_harness(protocol, gateway, collection, *, api_key, sidecar_image):
         budgets = {f"mcp__t3__{name}": limit for name, limit in (
             ("get_contract", 5), ("validate_expression", 100), ("check_expression", 30),
             ("get_history", 40), ("get_observation", 40), ("query_surrogate", 50)) if name in names}
-        budgets.update({"web_search": 0, "fetch_content": 0, "get_search_content": 0})
+        budgets.update({"web_search": 0, "web_fetch": 0})
         config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=profiles,
             campaign_id=runtime.run_id, task_id="alphabench",
             case_id=f"{protocol.backend}:{protocol.market}:{variant}", seed=protocol.random_seed,
@@ -104,7 +104,7 @@ def build_policy_harness(protocol, gateway, adapter, meter, *, api_key, sidecar_
     budgets = {"mcp__ldm_policy__inspect_policy_contract": 10,
         "mcp__ldm_policy__validate_policy_draft": 20,
         "read": 40, "write": 20, "bash": 20,
-        "web_search": 0, "fetch_content": 0, "get_search_content": 0}
+        "web_search": 0, "web_fetch": 0}
     config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile,),
         campaign_id=gateway.runtime.run_id, task_id="alphabench",
         case_id=f"{protocol.backend}:{protocol.market}:compiled_policy", seed=protocol.random_seed,

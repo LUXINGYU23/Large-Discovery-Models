@@ -8,14 +8,15 @@ import os
 import sys
 import time
 from pathlib import Path
-from importlib.metadata import version
+from ldm_tts.harness.protocol import HARNESS_PROTOCOL_VERSION
 
 
 profiles: list[str] = []
+bootstrap_secrets = {}
 committed = {}
 turn_requests = 0
 policy_disable = os.environ.get("HARNESS_TEST_SUBMISSION") == "policy_disable"
-print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE") or version("large-discovery-models")}), flush=True)
+print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE", HARNESS_PROTOCOL_VERSION)}), flush=True)
 
 
 def submission_record(submission, artifacts) -> tuple[str, str]:
@@ -36,6 +37,9 @@ for line in sys.stdin:
         "campaignId": frame["campaignId"],
     }
     if frame["type"] == "bootstrap_secret":
+        bootstrap_secrets = frame["namedSecrets"]
+        if "DEEPSEEK_API_KEY" in bootstrap_secrets:
+            assert "DEEPSEEK_API_KEY" not in os.environ
         response = (
             {"type": "error", **common, "error": {"message": "secret inherited"}}
             if os.environ.get("HARNESS_TEST_SECRET") or os.environ.get("HARNESS_MCP_SECRET")

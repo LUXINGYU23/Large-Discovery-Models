@@ -16,6 +16,7 @@ SIDECAR = r"""
 import hashlib, json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[2])
+from ldm_tts.harness.protocol import HARNESS_PROTOCOL_VERSION
 from tasks.atomworld.core.geometry import execute_operations
 
 root = Path(sys.argv[1])
@@ -26,7 +27,7 @@ def send(frame, kind, **fields):
 def log(value):
     with (root / "protocol_fixture.jsonl").open("a") as stream:
         stream.write(json.dumps(value) + "\n")
-print(json.dumps({"type":"ready", "protocolVersion":"1.0.0"}), flush=True)
+print(json.dumps({"type":"ready", "protocolVersion":HARNESS_PROTOCOL_VERSION}), flush=True)
 for line in sys.stdin:
     frame = json.loads(line)
     if frame["type"] == "bootstrap_secret":
