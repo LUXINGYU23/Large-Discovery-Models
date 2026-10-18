@@ -264,7 +264,7 @@ are not inserted into search results. The latest user question supplies optional
 `ori_question`, whitespace-normalized and bounded to 128 Unicode characters; it
 is omitted if benchmark query policy forbids that context.
 
-`web_fetch` accepts only `url` and returns the API's Markdown with the official
+`web_fetch` accepts only `url` (at most 8,192 characters) and returns the API's Markdown with the official
 header and notice. The complete rendered output is capped at 200,000 characters,
 including its truncation footer. No additional LLM summarizes either result.
 Fetch metadata contains URL/status/truncation only, without a second full body.

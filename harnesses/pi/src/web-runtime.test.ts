@@ -6,7 +6,7 @@ import { DeepSeekWebTools } from "./deepseek-web.js";
 
 test("errors retain codes, retry advice and safe HTTP metadata", () => {
 	for (const [status, code, retryable] of [[401, "WEB_AUTH", false], [402, "WEB_QUOTA", false],
-		[404, "WEB_HTTP_ERROR", false], [429, "WEB_RATE_LIMIT", true], [503, "WEB_HTTP_ERROR", true]] as const) {
+		[403, "WEB_POLICY_DENIED", false], [404, "WEB_HTTP_ERROR", false], [429, "WEB_RATE_LIMIT", true], [503, "WEB_HTTP_ERROR", true]] as const) {
 		const failure = httpError(status, "2");
 		assert.equal(failure.failure.code, code);
 		assert.equal(failure.failure.retryable, retryable);

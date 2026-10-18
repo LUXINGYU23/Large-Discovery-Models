@@ -39,7 +39,7 @@ export function abortError(signal: AbortSignal): WebToolError {
 		? signal.reason : webError("WEB_ABORTED", "Web operation was cancelled");
 }
 export function httpError(status: number, retryAfter: string | null): WebToolError {
-	const code = status === 401 || status === 403 ? "WEB_AUTH" : status === 402 ? "WEB_QUOTA"
+	const code = status === 401 ? "WEB_AUTH" : status === 403 ? "WEB_POLICY_DENIED" : status === 402 ? "WEB_QUOTA"
 		: status === 429 ? "WEB_RATE_LIMIT" : "WEB_HTTP_ERROR";
 	const seconds = retryAfter === null ? NaN : Number(retryAfter);
 	const wait = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter ?? "") - Date.now();

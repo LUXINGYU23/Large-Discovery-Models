@@ -74,10 +74,18 @@ test("a failed query cancels siblings, waits for cleanup and returns no partial 
 });
 
 test("schema and query-count errors never reach API; bound precedes deduplication", async (t) => {
+	const tools = new DeepSeekWebTools("search-secret").toolDefinitions(policy);
 	const mock = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not call"); });
 	for (const input of [{ query: "a" }, { queries: [] }, { queries: [" "] }, { queries: [1] },
 		{ queries: Array(5).fill("same") }, { queries: ["a"], need_content: true }]) {
 		await assert.rejects(execute("web_search", input));
+	}
+	for (const queries of [[], Array(5).fill("same"), [""], [" \n "]]) {
+		assert.throws(() => validateToolCall(tools, { type: "toolCall", id: "invalid", name: "web_search", arguments: { queries } }));
+	}
+	for (const count of [1, 4]) {
+		assert.doesNotThrow(() => validateToolCall(tools, { type: "toolCall", id: "valid", name: "web_search",
+			arguments: { queries: Array(count).fill("research") } }));
 	}
 	for (const url of [" ", "file:///etc/passwd", "https://user:pass@nature.com", "relative"]) {
 		await assert.rejects(execute("web_fetch", { url }));
@@ -86,6 +94,26 @@ test("schema and query-count errors never reach API; bound precedes deduplicatio
 	await assert.rejects(execute("web_search", { queries: ["a"] }, { key: "" }), /DEEPSEEK_API_KEY/);
 	await assert.rejects(execute("web_search", { queries: ["a"] }, { signal: AbortSignal.abort() }), /abort/i);
 	assert.equal(mock.mock.callCount(), 0);
+});
+
+test("fetch URL length is bounded in the schema and runtime before dispatch", async (t) => {
+	const tools = new DeepSeekWebTools("search-secret").toolDefinitions(policy);
+	const urls: string[] = [];
+	t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+		urls.push(JSON.parse(init.body as string).url);
+		return Response.json({ content: "Paper" });
+	});
+	for (const character of ["a", "研", "🧪"]) {
+		const prefix = "https://example.org/";
+		const valid = prefix + character.repeat(8192 - prefix.length);
+		const invalid = valid + character;
+		assert.throws(() => validateToolCall(tools, { type: "toolCall", id: "overlong", name: "web_fetch", arguments: { url: invalid } }));
+		await assert.rejects(execute("web_fetch", { url: invalid }), /8192 characters/);
+		assert.doesNotThrow(() => validateToolCall(tools, { type: "toolCall", id: "valid", name: "web_fetch", arguments: { url: valid } }));
+		await execute("web_fetch", { url: valid });
+		assert.equal(urls.at(-1), valid);
+	}
+	assert.equal(urls.length, 3);
 });
 
 test("original question is Unicode-bounded and blank context is omitted", async (t) => {
@@ -119,11 +147,18 @@ test("queries enforce the Unicode character limit before dispatch", async (t) =>
 	assert.deepEqual(queries, ["a", "研", "🧪"].map((character) => character.repeat(128)));
 });
 
-test("HTTP and network failures are never retried and do not disclose response bodies", async (t) => {
-	for (const status of [401, 503]) {
+test("HTTP and network failures are classified, never retried and do not disclose response bodies", async (t) => {
+	for (const [name, status, code] of [["web_search", 401, "WEB_AUTH"], ["web_search", 503, "WEB_HTTP_ERROR"],
+		["web_fetch", 403, "WEB_POLICY_DENIED"]] as const) {
 		const mock = t.mock.method(globalThis, "fetch", async () => new Response("search-secret", { status }));
-		await assert.rejects(execute("web_search", { queries: ["a"] }),
-			(error: Error) => error.message.includes(`HTTP ${status}`) && !error.message.includes("search-secret"));
+		await assert.rejects(execute(name, name === "web_search" ? { queries: ["a"] } : { url: source.url }),
+			(error: Error) => {
+				const failure = JSON.parse(error.message);
+				assert.equal(failure.code, code);
+				assert.equal(failure.httpStatus, status);
+				assert.equal(failure.requests[0].errorCode, code);
+				return !error.message.includes("search-secret");
+			});
 		assert.equal(mock.mock.callCount(), 1);
 		mock.mock.restore();
 	}
