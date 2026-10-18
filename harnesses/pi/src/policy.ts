@@ -56,10 +56,6 @@ function values(value: unknown): string[] {
 	return [];
 }
 
-function queryText(input: Record<string, unknown>): string {
-	return values(input.queries).join("\n");
-}
-
 function strings(value: unknown, seen = new Set<object>()): string[] {
 	if (typeof value === "string") return [value];
 	if (value === null || typeof value !== "object" || seen.has(value)) return [];
@@ -85,10 +81,6 @@ function assertAllowedQuery(query: string, policy: NetworkPolicy, forbiddenTerms
 			throw new Error("network policy blocks this search query");
 		}
 	}
-}
-
-function fetchUrls(input: Record<string, unknown>): string[] {
-	return [...values(input.url), ...values(input.urls)];
 }
 
 export class PolicyController {
@@ -151,12 +143,10 @@ export class PolicyController {
 		const input = event.input as Record<string, unknown>;
 		try {
 			if (event.toolName === "web_search") {
-				assertAllowedQuery(queryText(input), this.policy, active.forbiddenTerms);
+				assertAllowedQuery(values(input.queries).join("\n"), this.policy, active.forbiddenTerms);
 			} else if (event.toolName === "web_fetch") {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
-				for (const url of fetchUrls(input)) {
-					assertAllowedUrl(url, this.policy);
-				}
+				if (typeof input.url === "string") assertAllowedUrl(input.url, this.policy);
 			} else if (event.toolName === "resolve-library-id" || event.toolName === "query-docs") {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			}

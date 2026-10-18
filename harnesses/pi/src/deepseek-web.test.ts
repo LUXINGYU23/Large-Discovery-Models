@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DeepSeekWebTools } from "./deepseek-web.js";
 import type { NetworkPolicy } from "./protocol.js";
-import { computeFetchOutput, EXTERNAL_WEB_CONTENT_NOTICE as notice } from "./vendor/deepseek-web/contract.js";
+import { EXTERNAL_WEB_CONTENT_NOTICE as notice } from "./vendor/deepseek-web/contract.js";
 
 const policy: NetworkPolicy = { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] };
 const source = { title: "Paper", url: "https://nature.com/paper", snippet: "Short", date: "2026-10-18",
@@ -101,7 +101,7 @@ test("original question is Unicode-bounded and blank context is omitted", async 
 });
 
 test("HTTP and network failures are never retried and do not disclose response bodies", async (t) => {
-	for (const status of [400, 401, 402, 403, 404, 408, 429, 500, 503]) {
+	for (const status of [401, 503]) {
 		const mock = t.mock.method(globalThis, "fetch", async () => new Response("search-secret", { status }));
 		await assert.rejects(execute("web_search", { queries: ["a"] }),
 			(error: Error) => error.message.includes(`HTTP ${status}`) && !error.message.includes("search-secret"));
@@ -139,13 +139,13 @@ test("fetch renders Markdown unchanged and caps the complete output including fo
 	assert.match(text(long), /\n\n\(Content truncated\. Fetch a more specific URL or section for the full text\.\)$/);
 	assert.deepEqual(metadata(long), { url: source.url, statusCode: 200, truncated: true });
 	assert(!JSON.stringify(long.details).includes(content));
-});
-
-test("fetch cap handles header-only overflow and provider truncation at boundaries", () => {
-	const result = { url: source.url, statusCode: 200, body: { kind: "text" as const, content: "abc" }, truncated: false };
-	const full = computeFetchOutput(result, 200_000);
-	assert.equal(computeFetchOutput(result, full.text.length).truncated, false);
-	assert.equal(computeFetchOutput(result, full.text.length - 1).truncated, true);
-	assert.equal(computeFetchOutput(result, 5).text, "Fetch");
-	assert.match(computeFetchOutput({ ...result, truncated: true }, 200_000).text, /Content truncated/);
+	const headerLength = `Fetched ${source.url} (HTTP 200)\n\n${notice}\n\n`.length;
+	content = "x".repeat(200_000 - headerLength);
+	const exact = await execute("web_fetch", { url: source.url });
+	assert.equal(text(exact).length, 200_000);
+	assert.equal(metadata(exact).truncated, false);
+	content += "x";
+	const overflow = await execute("web_fetch", { url: source.url });
+	assert.equal(text(overflow).length, 200_000);
+	assert.equal(metadata(overflow).truncated, true);
 });

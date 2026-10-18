@@ -230,9 +230,6 @@ async function main(): Promise<void> {
 			wallTimeSeconds: 120,
 			toolCallBudgets: { web_search: 2, web_fetch: 2 },
 		},
-		webSearch: {
-			provider: "deepseek",
-		},
 		context7Enabled: true,
 	};
 	let pool = new PiSessionPool(config, secret, { DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? "" });

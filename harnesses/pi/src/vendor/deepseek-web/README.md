@@ -2,14 +2,13 @@
 
 Source: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/687f282e8625c6b8d11ff58211a90524be2e4317), revision `687f282e8625c6b8d11ff58211a90524be2e4317`. Copyright (c) 2026 DeepSeek, MIT (see LICENSE).
 
-`contract.ts` preserves these upstream function bodies:
+`contract.ts` adapts algorithms from:
 
-- `packages/web/tool-web/src/search.ts`: parseSearchArgs, sourceLabel, formatSearchOutput, runSearchQueries, mergeSearchResults.
-- `packages/web/tool-web/src/fetch.ts`: parseFetchArgs, computeFetchOutput.
+- `packages/web/tool-web/src/search.ts`: query validation, source formatting, concurrent batching and round-robin merging.
+- `packages/web/tool-web/src/fetch.ts`: bounded output formatting.
 - `packages/web/web-deepseek-api/src/search.ts`: mapSearchResponse, boundedQuestion.
-- `packages/web/web/src/index.ts`: capSources.
 
-Constants and the external-content notice match upstream defaults. Changes at this boundary: local structural types replace framework imports; several private functions are exported; invalidResponse creates an ordinary Error; renderBody includes only the text branch, since the API already returns Markdown. No HTML backend, DOM converter, Cordis lifecycle, desktop card renderer, or account-sign-in service is included.
+Constants and the external-content notice match upstream defaults. The subset uses a search callback, source-only results and Markdown strings directly. Limits are fixed to the current tool contract: four queries, eight sources and 200,000 fetch-output characters. URLs are validated by Pi before formatting. No generic provider context, summary-answer branch, HTML converter, configurable limits or provider-truncation flag is included. Transport status and truncation metadata are produced at the Pi boundary.
 
 `../../deepseek-web.ts` adapts registration, schema validation, prompt guidance, tool result metadata, 30-second cancellation and API-key bootstrap to Pi. API field projection, query batching and output formatting follow upstream. As upstream does, it sends one request per unique query, no automatic retries; a failed query cancels and discards the batch. The tool call budget counts batches, each containing up to four API requests.
 

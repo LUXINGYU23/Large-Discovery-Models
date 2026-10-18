@@ -960,7 +960,7 @@ export class PiSessionPool {
 			networkPolicySha256: canonicalSha256(this.config.networkPolicy),
 			networkPolicy: this.config.networkPolicy,
 			limits: this.config.limits,
-			webSearch: this.config.webSearch,
+			webSearch: { provider: "deepseek" },
 			webRuntime: WEB_RUNTIME,
 			contextManagement: { evidenceArchive: WEB_EVIDENCE_GUEST, pruning: "pressure-triggered-web-evidence", estimator: "pi-with-provider-input-anchor" },
 			context7Enabled: this.config.context7Enabled,

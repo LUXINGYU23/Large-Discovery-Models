@@ -46,8 +46,6 @@ for line in sys.stdin:
             else {"type": "secret_bootstrapped", **common}
         )
     elif frame["type"] == "initialize":
-        if frame.get("webSearch") == {"provider": "deepseek"}:
-            assert bootstrap_secrets.get("DEEPSEEK_API_KEY")
         profiles = [item["profileId"] for item in frame["profiles"]]
         store = Path(frame["artifactRoot"]) / "fake_committed.json"
         if store.exists():

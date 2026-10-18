@@ -132,10 +132,6 @@ def test_submission_contract_digest_covers_transmitted_json(tmp_path: Path) -> N
     assert "protocolVersion" not in frame
     assert "requestId" not in frame
     assert frame["guestRuntime"] == TEST_GUEST_RUNTIME.to_dict()
-    assert frame["webSearch"] == {
-        "provider": "deepseek",
-    }
-    assert "webProvider" not in frame
     assert frame["mcpServers"] == []
     assert frame["limits"] == {"wallTimeSeconds": 1800, "toolCallBudgets": {}}
 

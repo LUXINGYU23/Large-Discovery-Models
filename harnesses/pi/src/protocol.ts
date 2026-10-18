@@ -79,10 +79,6 @@ export interface GuestRuntimeConfig {
 	installPolicy: "session_overlay";
 }
 
-export interface WebSearchConfig {
-	provider: "deepseek";
-}
-
 export interface BootstrapSecretFrame extends CommonFrame {
 	type: "bootstrap_secret";
 	apiKey: string;
@@ -111,7 +107,6 @@ export interface InitializeFrame extends CommonFrame {
 	mcpServers: McpServerConfig[];
 	networkPolicy: NetworkPolicy;
 	limits: HarnessLimits;
-	webSearch: WebSearchConfig;
 	context7Enabled: boolean;
 }
 
@@ -655,7 +650,7 @@ export function parseFrame(line: string): InputFrame {
 	exactKeys(data, [
 		"type", "requestId", "protocolVersion", "campaignId", "artifactRoot", "baseUrl", "wireApi",
 		"model", "thinking", "taskId", "caseId", "seed", "submissionContractJson", "submissionContractSha256", "profileSetSha256",
-		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "webSearch", "context7Enabled",
+		"guestRuntime", "profiles", "toolExtensions", "mcpServers", "networkPolicy", "limits", "context7Enabled",
 		...(data.providerRequestBody === undefined ? [] : ["providerRequestBody"]),
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
@@ -692,11 +687,6 @@ export function parseFrame(line: string): InputFrame {
 			"invalid_frame",
 			`${submissionContract.toolName} cannot have a tool call budget`,
 		);
-	}
-	const webSearch = record(data.webSearch, "webSearch");
-	exactKeys(webSearch, ["provider"], "webSearch");
-	if (webSearch.provider !== "deepseek") {
-		throw new ProtocolError("invalid_frame", "webSearch.provider must be deepseek");
 	}
 	const thinking = string(data.thinking, "thinking") as ThinkingLevel;
 	const thinkingLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -767,9 +757,6 @@ export function parseFrame(line: string): InputFrame {
 					nonnegativeInteger(limit, `limits.toolCallBudgets.${name}`),
 				]),
 			),
-		},
-		webSearch: {
-			provider: "deepseek",
 		},
 		context7Enabled: data.context7Enabled,
 	};

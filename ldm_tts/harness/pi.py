@@ -100,7 +100,6 @@ class PiHarnessConfig(HarnessPoolConfig):
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
             "mcpServers": [server.to_dict() for server in self.mcp_servers],
             "networkPolicy": self.network_policy.to_dict(),
-            "webSearch": {"provider": "deepseek"},
             "context7Enabled": self.context7_enabled,
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
             **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),

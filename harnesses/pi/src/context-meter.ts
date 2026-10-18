@@ -29,7 +29,6 @@ function textTokens(text: string): number {
 	return text ? estimateTokens({ role: "user", content: text, timestamp: 0 }) : 0;
 }
 function prefixHash(messages: AgentMessage[]): string { return canonicalSha256(convertToLlm(messages)); }
-function envelopeHash(envelope: ContextEnvelope): string { return canonicalSha256(envelope); }
 
 /** One estimator for pressure, pruning decisions, and recorded diagnostics. Counts are estimates, not billing. */
 export class ContextMeter {
@@ -55,7 +54,7 @@ export class ContextMeter {
 		let estimatedInputTokens = heuristic.system + heuristic.tools + heuristic.messages;
 		let basis: ContextMeasurement["basis"] = "heuristic";
 		const anchor = this.anchor;
-		if (anchor && anchor.envelopeHash === envelopeHash(envelope) && anchor.prefixLength <= messages.length
+		if (anchor && anchor.envelopeHash === canonicalSha256(envelope) && anchor.prefixLength <= messages.length
 			&& anchor.prefixHash === prefixHash(messages.slice(0, anchor.prefixLength))) {
 			estimatedInputTokens = anchor.inputTokens + sizes.slice(anchor.prefixLength).reduce((sum, size) => sum + size, 0);
 			basis = "provider-anchored";
@@ -65,7 +64,7 @@ export class ContextMeter {
 	}
 
 	prepare(messages: AgentMessage[], envelope: ContextEnvelope): void {
-		this.pending = { envelopeHash: envelopeHash(envelope), prefixHash: prefixHash(messages), prefixLength: messages.length };
+		this.pending = { envelopeHash: canonicalSha256(envelope), prefixHash: prefixHash(messages), prefixLength: messages.length };
 	}
 
 	observe(message: AssistantMessage): ContextAnchor | undefined {
