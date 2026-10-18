@@ -8,7 +8,6 @@ import logging
 import math
 import os
 import queue
-import re
 import subprocess
 import threading
 import time
@@ -17,6 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from ldm_tts.harness.protocol import (
+    HARNESS_PROTOCOL_VERSION,
     HarnessPoolConfig,
     HarnessProviderAuthorizationRequest,
     HarnessSubmissionError,
@@ -29,10 +29,6 @@ from ldm_tts.harness.protocol import (
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
 ProviderAuthorizer = Callable[[HarnessProviderAuthorizationRequest], bool]
-_SEMVER_PATTERN = re.compile(
-    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
-    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
-)
 
 
 class HarnessError(RuntimeError):
@@ -132,8 +128,6 @@ class HarnessClient:
         expected = {turn.profile_id: turn for turn in turns}
         if len(expected) != len(turns):
             raise ValueError("harness turn profile IDs must be unique")
-        if provider_authorizer is not None and self._protocol_version != "0.2.0":
-            raise HarnessError("provider authorization requires Pi sidecar protocol 0.2.0")
         terminal_validations: dict[str, tuple[str, str]] = {}
         validation_submissions: dict[str, int] = {}
 
@@ -472,8 +466,11 @@ class HarnessClient:
         if response.get("type") != "ready":
             raise HarnessError("harness sidecar did not declare a release version")
         version = response.get("protocolVersion")
-        if not isinstance(version, str) or _SEMVER_PATTERN.fullmatch(version) is None:
-            raise HarnessError("harness sidecar declared an invalid release version")
+        if version != HARNESS_PROTOCOL_VERSION:
+            raise HarnessError(
+                f"harness sidecar protocol version mismatch: expected {HARNESS_PROTOCOL_VERSION}, "
+                f"received {version!r}; rebuild the sidecar image"
+            )
         return version
 
     def _send_frame(self, frame: dict[str, Any]) -> None:

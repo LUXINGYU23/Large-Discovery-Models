@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from importlib.metadata import version
+from ldm_tts.harness.protocol import HARNESS_PROTOCOL_VERSION
 
 
 profiles: list[str] = []
@@ -16,7 +16,7 @@ bootstrap_secrets = {}
 committed = {}
 turn_requests = 0
 policy_disable = os.environ.get("HARNESS_TEST_SUBMISSION") == "policy_disable"
-print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE") or version("large-discovery-models")}), flush=True)
+print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE", HARNESS_PROTOCOL_VERSION)}), flush=True)
 
 
 def submission_record(submission, artifacts) -> tuple[str, str]:

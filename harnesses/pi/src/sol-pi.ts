@@ -65,8 +65,8 @@ export async function createSolPiExtension(
 		join(root, "extensions", "observation-pack", "index.ts"));
 	return (pi) => {
 		// Bind guest I/O and reserve web observations for the common pressure projection.
-		registerConfiguredFeatures(pi, { ...config, actionFusion: false, observationPack: false });
 		if (config.observationPack) registerObservationPack(webAwareObservationApi(pi));
+		registerConfiguredFeatures(pi, { ...config, actionFusion: false, observationPack: false });
 		if (config.actionFusion) pi.on("session_start", async (_event, ctx) => {
 			const options = await toolOptions();
 			await createActionFusionExtension({

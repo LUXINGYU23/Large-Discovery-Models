@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from ldm_tts.harness.pi import PiGuestRuntime, PiHarnessConfig
+from ldm_tts.harness.protocol import HARNESS_PROTOCOL_VERSION
 from ldm_tts.harness import (
     HarnessClient,
     HarnessPoolConfig,
@@ -253,7 +254,6 @@ def test_persistent_harness_client_runs_one_profile_batch(
 @pytest.mark.parametrize("decision,bad_identity", [(True, False), (False, False), (True, True)])
 def test_provider_authorization_checks_turn_identity_before_reply(tmp_path, monkeypatch, decision, bad_identity):
     monkeypatch.setenv("HARNESS_TEST_PROVIDER_AUTH", "1")
-    monkeypatch.setenv("HARNESS_TEST_RELEASE", "0.2.0")
     if bad_identity:
         monkeypatch.setenv("HARNESS_TEST_PROVIDER_AUTH_BAD_IDENTITY", "1")
     config = HarnessPoolConfig(
@@ -292,23 +292,34 @@ def test_provider_authorization_checks_turn_identity_before_reply(tmp_path, monk
         assert requests[0].provider_request_id == "turn-1-provider-1"
 
 
-def test_provider_authorization_rejects_old_sidecar_before_turn(tmp_path):
+@pytest.mark.parametrize("version", ["0.2.0", "0.4.0", "invalid"])
+def test_protocol_mismatch_rejected_before_sending_secrets(tmp_path, monkeypatch, version):
+    monkeypatch.setenv("HARNESS_TEST_RELEASE", version)
     config = HarnessPoolConfig(
         artifact_root=tmp_path,
         profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
         campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
         submission_contract=_candidate_contract(),
     )
-    turn = HarnessTurn("research", "turn-1", 0, 0, 0, "c" * 64, "research")
-    with HarnessClient(
+    client = HarnessClient(
         (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
         api_key="fixture", config=config, response_timeout_seconds=5,
-    ) as client:
-        with pytest.raises(HarnessError, match="requires Pi sidecar protocol 0.2.0"):
-            client.run_turn(
-                (turn,), submission_validator=lambda _: HarnessSubmissionValidation(),
-                provider_authorizer=lambda _: True,
-            )
+    )
+    sent = []
+    monkeypatch.setattr(client, "_send_frame", sent.append)
+    try:
+        with pytest.raises(HarnessError, match="protocol version mismatch"):
+            client.start()
+        assert sent == []
+    finally:
+        client.close()
+
+
+def test_protocol_version_matches_sidecar_package_and_lock():
+    root = Path(__file__).resolve().parents[1] / "harnesses/pi"
+    package = json.loads((root / "package.json").read_text())
+    lock = json.loads((root / "package-lock.json").read_text())
+    assert package["version"] == lock["version"] == lock["packages"][""]["version"] == HARNESS_PROTOCOL_VERSION
 
 
 @pytest.mark.parametrize("failure", ["measured", "unknown", "wrong-turn"])

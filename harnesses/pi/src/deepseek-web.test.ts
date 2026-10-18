@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { validateToolCall } from "@earendil-works/pi-ai";
 import { DeepSeekWebTools } from "./deepseek-web.js";
 import type { NetworkPolicy } from "./protocol.js";
 import { EXTERNAL_WEB_CONTENT_NOTICE as notice } from "./vendor/deepseek-web/contract.js";
@@ -98,6 +99,24 @@ test("original question is Unicode-bounded and blank context is omitted", async 
 	assert.equal(bodies[0]!.ori_question, "🧪".repeat(128));
 	assert.equal(bodies[1]!.ori_question, undefined);
 	assert.equal(text(result), `${notice}\n\nNo results found.\n\nCite the relevant URLs above as markdown links in your answer.`);
+});
+
+test("queries enforce the Unicode character limit before dispatch", async (t) => {
+	const tools = new DeepSeekWebTools("search-secret").toolDefinitions(policy);
+	const queries: string[] = [];
+	t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+		queries.push(JSON.parse(init.body as string).query);
+		return Response.json({ results: [] });
+	});
+	for (const character of ["a", "研", "🧪"]) {
+		assert.throws(() => validateToolCall(tools, { type: "toolCall", id: "overlong", name: "web_search",
+			arguments: { queries: [character.repeat(129)] } }));
+		assert.doesNotThrow(() => validateToolCall(tools, { type: "toolCall", id: "valid", name: "web_search",
+			arguments: { queries: [character.repeat(128)] } }));
+		await assert.rejects(execute("web_search", { queries: [character.repeat(129)] }), /128 Unicode characters/);
+		await execute("web_search", { queries: [character.repeat(128)] });
+	}
+	assert.deepEqual(queries, ["a", "研", "🧪"].map((character) => character.repeat(128)));
 });
 
 test("HTTP and network failures are never retried and do not disclose response bodies", async (t) => {

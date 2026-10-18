@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
+HARNESS_PROTOCOL_VERSION = "0.3.0"
+
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 

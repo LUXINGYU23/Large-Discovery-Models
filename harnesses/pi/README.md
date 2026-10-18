@@ -92,9 +92,10 @@ manually for normal experiments.
 
 The sidecar declares its package SemVer at startup; the client binds every
 subsequent JSONL request and response to that release and one campaign. The
-Python client requires Pi sidecar protocol 0.2.0 when a caller supplies a hard
-provider budget through the task-neutral `provider_authorizer` callback on
-`HarnessClient.run_turn`. The proxy sends a
+Python client requires protocol 0.3.0 at startup, before sending credentials
+or initialization. Rebuild stale sidecar images; other versions are rejected.
+Callers supply a hard provider budget through the task-neutral
+`provider_authorizer` callback on `HarnessClient.run_turn`. The proxy sends a
 `provider_authorization_requested` frame containing the profile, turn, unique
 provider request ID and request digest. It opens the upstream connection only
 after the Host answers `provider_authorization_result` with `authorized=true`.
@@ -253,7 +254,8 @@ $env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Passwor
 `DEEPSEEK_API_KEY` or stdin and prints only result URLs and content length.
 
 The model-facing contract uses the [pinned DeepSeek Harness source](src/vendor/deepseek-web/README.md).
-`web_search` accepts only `queries` (1–4 strings). Exact duplicates collapse after
+`web_search` accepts only `queries` (1–4 strings, each at most 128 Unicode characters).
+Overlong queries are rejected locally. Exact duplicates collapse after
 validation; queries run concurrently and sources merge in round-robin order,
 deduplicated by URL and capped at eight. Results contain titles, URLs, snippets
 and dates, with the official untrusted-content notice and citation guidance.
@@ -277,7 +279,7 @@ the account's rate limits. There are no alternate providers or direct-HTTP fetch
 fallback. The existing policy may append a separate budget notice to tool output.
 
 Clients sharing a DeepSeek credential in one sidecar process share a FIFO
-`p-queue` pool: at most four HTTP requests in flight and 128 waiting. Search and
+`p-queue` pool: at most 100 HTTP requests in flight and 128 waiting. Search and
 Fetch use the same pool across all research profiles. The 30-second tool deadline
 includes queueing and complete response-body processing. Waiting requests can be
 cancelled without dispatch; running requests retain their slots until cleanup

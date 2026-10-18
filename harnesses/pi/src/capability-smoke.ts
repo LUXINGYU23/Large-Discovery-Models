@@ -104,7 +104,6 @@ async function main(): Promise<void> {
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
 				queries: ["Buchwald Hartwig reaction primary literature"],
-				count: 3,
 			})));
 		} else if (call === 2) {
 			const check = {
@@ -338,12 +337,17 @@ async function main(): Promise<void> {
 			.filter((name) => name.endsWith(".jsonl"));
 		assert.equal(sessionFiles.length, 1);
 		const session = await readFile(join(root, "harness", "sessions", "target_sar", "pi-session", sessionFiles[0] as string), "utf8");
-		const readResults = session
+		const toolResults = session
 			.trim()
 			.split("\n")
 			.map((line) => JSON.parse(line) as { message?: { role?: string; toolName?: string; content?: unknown; isError?: boolean } })
-			.filter((entry) => entry.message?.role === "toolResult" && entry.message.toolName === "read")
+			.filter((entry) => entry.message?.role === "toolResult")
 			.map((entry) => entry.message);
+		const searchResults = toolResults.filter((result) => result?.toolName === "web_search");
+		assert.equal(searchResults.length, 1);
+		assert.equal(searchResults[0]?.isError, false, JSON.stringify(searchResults));
+		assert.match(JSON.stringify(searchResults[0]?.content), /Sources:/);
+		const readResults = toolResults.filter((result) => result?.toolName === "read");
 		assert.equal(readResults.length, 2);
 		assert(readResults.every((result) => result?.isError === false), JSON.stringify(readResults));
 		assert.match(JSON.stringify(readResults), /task-local-skill-ok/);
