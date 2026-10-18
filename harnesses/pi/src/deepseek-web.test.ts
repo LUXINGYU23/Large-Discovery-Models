@@ -15,6 +15,12 @@ function execute(name: string, input: Record<string, unknown>, options: {
 		.execute("call", input, options.signal, undefined, {} as never);
 }
 function text(result: Awaited<ReturnType<typeof execute>>) { return (result.content[0] as { text: string }).text; }
+function metadata(result: Awaited<ReturnType<typeof execute>>) {
+	const { requests, ...data } = result.details as Record<string, unknown>;
+	assert(Array.isArray(requests));
+	assert(requests.every((item) => item.dispatched && item.queueMs >= 0 && item.durationMs >= 0));
+	return data;
+}
 
 test("official request projection and rendered sources omit API summaries and full content", async (t) => {
 	t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
@@ -32,7 +38,7 @@ test("official request projection and rendered sources omit API summaries and fu
 		question: "  How\n does it work? ", policy: { ...policy, allowedHosts: ["nature.com"], deniedHosts: ["blocked.nature.com"] },
 	});
 	assert.equal(text(result), `${notice}\n\nSources:\n- [Paper](https://nature.com/paper) — Short (2026-10-18)\n\nCite the relevant URLs above as markdown links in your answer.`);
-	assert.deepEqual(result.details, { sources: [{ title: "Paper", url: source.url, snippet: "Short", publishedAt: source.date }], truncated: false });
+	assert.deepEqual(metadata(result), { sources: [{ title: "Paper", url: source.url, snippet: "Short", publishedAt: source.date }], truncated: false });
 });
 
 test("queries run concurrently, exact duplicates collapse, merge is round-robin capped at eight", async (t) => {
@@ -126,12 +132,12 @@ test("fetch renders Markdown unchanged and caps the complete output including fo
 	});
 	const result = await execute("web_fetch", { url: source.url });
 	assert.equal(text(result), `Fetched ${source.url} (HTTP 200)\n\n${notice}\n\n${content}`);
-	assert.deepEqual(result.details, { url: source.url, statusCode: 200, truncated: false });
+	assert.deepEqual(metadata(result), { url: source.url, statusCode: 200, truncated: false });
 	content = "x".repeat(220_000);
 	const long = await execute("web_fetch", { url: source.url });
 	assert.equal(text(long).length, 200_000);
 	assert.match(text(long), /\n\n\(Content truncated\. Fetch a more specific URL or section for the full text\.\)$/);
-	assert.deepEqual(long.details, { url: source.url, statusCode: 200, truncated: true });
+	assert.deepEqual(metadata(long), { url: source.url, statusCode: 200, truncated: true });
 	assert(!JSON.stringify(long.details).includes(content));
 });
 

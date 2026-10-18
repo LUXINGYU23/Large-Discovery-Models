@@ -39,6 +39,9 @@ import {
 } from "./submission.js";
 import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
 import { createSolPiExtension, SOL_PI_GUEST_ARCHIVE, solPiTools } from "./sol-pi.js";
+import { ContextPressureController } from "./context-pressure.js";
+import { WEB_EVIDENCE_GUEST } from "./web-evidence.js";
+import { WEB_RUNTIME } from "./web-runtime.js";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCE_DIRECTORY = ".ldm-resources";
@@ -51,7 +54,8 @@ const COMPACTION_SETTINGS = {
 const GUEST_RUNTIME_INSTRUCTIONS = `## Guest runtime
 - /workspace is an isolated writable research workspace, not a checkout of the project repository. Do not use git status to inspect the project. Git is available only for cloning public research material when useful.
 - Use the registered read and write tools for files. apply_patch is not available in the guest.
-- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.`;
+- Invoke task and MCP tools directly by their registered tool names. Do not run their implementation files; runtimes such as Node.js may not be installed.
+- Long web results may be archived under /workspace/.web-evidence when context is full. Use read with the receipt's path, offset and limit to recover evidence. Preserve archive paths when summarizing research; bash can list this read-only directory if an old receipt has been compacted.`;
 
 interface SavedSubmission {
 	submission: TerminalSubmission;
@@ -384,6 +388,7 @@ export class PersistentProfileSession {
 	private readonly resourceRoot: string;
 	private readonly sessionDirectory: string;
 	private readonly policy: PolicyController;
+	private readonly contextPressure: ContextPressureController;
 	private readonly gondolin: GondolinController;
 	private readonly mcp: McpToolBridge;
 	private readonly submissions: SubmissionController;
@@ -404,6 +409,7 @@ export class PersistentProfileSession {
 		this.workspace = join(this.profileRoot, "workspace");
 		this.resourceRoot = join(this.workspace, RESOURCE_DIRECTORY);
 		this.sessionDirectory = join(this.profileRoot, "pi-session");
+		this.contextPressure = new ContextPressureController(join(this.sessionDirectory, "web-evidence"), COMPACTION_SETTINGS.reserveTokens);
 		this.policy = new PolicyController(
 			config.networkPolicy,
 			config.limits.toolCallBudgets,
@@ -413,7 +419,8 @@ export class PersistentProfileSession {
 			this.resourceRoot,
 			config.networkPolicy,
 			guestRuntime,
-			config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {},
+			{ [WEB_EVIDENCE_GUEST]: this.contextPressure.archive.root,
+				...(config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {}) },
 		);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
@@ -427,6 +434,7 @@ export class PersistentProfileSession {
 		await mkdir(this.workspace, { recursive: true });
 		await mkdir(this.sessionDirectory, { recursive: true });
 		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
+		await mkdir(this.contextPressure.archive.root, { recursive: true });
 		const agents = await readFile(this.profile.agentsPath, "utf8");
 		this.agentsSha256 = sha256(agents);
 		if (this.agentsSha256 !== this.profile.agentsSha256) {
@@ -515,6 +523,7 @@ export class PersistentProfileSession {
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
 				...(solPi ? [solPi] : []),
+				this.contextPressure.createExtension(() => this.session?.messages ?? []),
 			],
 			noPromptTemplates: true,
 			noThemes: true,
@@ -952,6 +961,8 @@ export class PiSessionPool {
 			networkPolicy: this.config.networkPolicy,
 			limits: this.config.limits,
 			webSearch: this.config.webSearch,
+			webRuntime: WEB_RUNTIME,
+			contextManagement: { evidenceArchive: WEB_EVIDENCE_GUEST, pruning: "pressure-triggered-web-evidence", estimator: "pi-with-provider-input-anchor" },
 			context7Enabled: this.config.context7Enabled,
 			tools: sessionTools(
 				this.config.context7Enabled,

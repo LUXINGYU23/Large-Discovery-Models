@@ -7,6 +7,7 @@ import type {
 import type { NetworkPolicy } from "./protocol.js";
 import { atomicJson } from "./trace.js";
 import { boundedQuestion } from "./vendor/deepseek-web/contract.js";
+import { webError } from "./web-runtime.js";
 
 interface ActivePolicyTurn {
 	forbiddenTerms: string[];
@@ -160,7 +161,8 @@ export class PolicyController {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 			}
 		} catch (error) {
-			return { block: true, reason: (error as Error).message };
+			return { block: true, reason: ["web_search", "web_fetch"].includes(event.toolName)
+				? webError("WEB_POLICY_DENIED", (error as Error).message).message : (error as Error).message };
 		}
 		const limit = this.budgets[event.toolName];
 		const used = active.used[event.toolName] ?? 0;
@@ -193,6 +195,13 @@ export class PolicyController {
 		let content = event.content;
 		let details = event.details;
 		let isError = event.isError;
+		if (isError && ["web_search", "web_fetch"].includes(event.toolName)) {
+			try {
+				const block = event.content[0];
+				const failure = JSON.parse(block?.type === "text" ? block.text : "");
+				if (failure.type === "web_error") details = { error: failure };
+			} catch { /* Non-web errors, such as the budget guard, keep their original details. */ }
+		}
 		if (["web_search", "web_fetch", "resolve-library-id", "query-docs"].includes(event.toolName)) {
 			try {
 				assertAllowedQuery(strings([event.content, event.details]).join("\n"), this.policy, active.forbiddenTerms);

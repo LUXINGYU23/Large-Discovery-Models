@@ -52,13 +52,16 @@ requests. Provider request-body settings apply to all these calls. A provider th
 does not support forced tool use can set `tool_choice: "auto"` in those settings;
 the Harness still requires a validated terminal submission.
 
-The upstream mechanisms remain unchanged. Action Fusion's file operations and
+Action Fusion's file operations and
 follow-up commands use the task guest; its hash checks use the same shared
 workspace files. Observation and evidence archives remain under the native
 session directory and are mounted read-only at `/workspace/.sol-pi` for research.
 `obs_recall` retrieves archived observations; `update_plan` supplies boundaries
 for native compaction and continuation. Enabling the extension does not alter
 task submissions, measured-history validation, GP queries, or evaluation budgets.
+Web Search/Fetch results are excluded from SoL-Pi Observation Pack: the common
+pressure-based web evidence projection below owns those results in both modes.
+SoL-Pi continues handling other observations and diagnostic evidence as before.
 
 See the [SoL-Pi documentation](https://github.com/NVlabs/SoL-Pi) for mechanism
 details and the supported configuration schema.
@@ -198,6 +201,38 @@ compaction enabled. The release configuration reserves 16,384 tokens for the
 next response and retains the most recent 20,000 tokens verbatim; Pi writes
 compaction entries into its native session history.
 
+Before each conversational request, one context meter counts the system prompt,
+active tool schemas, messages, and the web-result portion. It uses Pi's existing
+token estimator; when the model reports nonzero input/cache usage for a successful
+request, that input count anchors subsequent estimates only while both the
+envelope and the complete sent prefix still match. Changed tools, prompts,
+models, pruning or compaction invalidate the anchor. Estimates are not billing
+counts, especially for CJK-heavy text; original provider usage is logged separately.
+
+At `contextWindow - reserveTokens`, long textual `web_search`/`web_fetch` results
+(over 8,192 Unicode code points) are archived byte-for-byte under the session's
+`web-evidence/` directory. The model sees a short receipt containing a SHA-256,
+chapter line numbers, an opening preview, and a path under the read-only guest
+mount `/workspace/.web-evidence/`. It can use the existing `read` tool with
+`offset`/`limit`, or search the archive with `bash`, to recover middle sections.
+Canonical session messages keep their full original results. An archived result
+stays projected after pressure falls or the session resumes, avoiding repeated
+expansion. Archive writes are synced and existing objects are hash-checked;
+archive failures retain the original context and produce a diagnostic event.
+
+Pruning makes no LLM call. If it relieves a threshold-triggered compaction, the
+native summary call is skipped. Otherwise Pi's existing summarizer continues
+with recall receipts in its input. Manual and overflow compaction are never
+suppressed based on an estimate. The archive preserves the accepted tool result,
+which is already subject to Fetch's 200,000-character cap and network policy;
+it is not a raw-page cache that bypasses those limits.
+
+Native session JSONL contains `ldm-context-measurement-v1` entries for before/after
+pressure, system/schema/message/web token estimates, archive counts, provider
+usage, and compaction decisions. `ldm-context-anchor-v1` records restore usage
+anchors on resume. Both are internal diagnostic entries and are not sent to the
+model. Effective runtime settings are also recorded in the run manifest.
+
 Web research uses the official [DeepSeek Search and Fetch APIs](https://api-docs.deepseek.com/guides/search/).
 Set `DEEPSEEK_API_KEY` in the host task runner environment before starting a campaign.
 Python passes it through the existing `bootstrap_secret.namedSecrets` channel; it is
@@ -240,6 +275,26 @@ cancels its siblings and discards partial results. One search budget unit counts
 one tool call, which can dispatch up to four API queries. Separate pools share
 the account's rate limits. There are no alternate providers or direct-HTTP fetch
 fallback. The existing policy may append a separate budget notice to tool output.
+
+Clients sharing a DeepSeek credential in one sidecar process share a FIFO
+`p-queue` pool: at most four HTTP requests in flight and 128 waiting. Search and
+Fetch use the same pool across all research profiles. The 30-second tool deadline
+includes queueing and complete response-body processing. Waiting requests can be
+cancelled without dispatch; running requests retain their slots until cleanup
+finishes. Separate sidecar processes are not account-wide coordinated, and the
+pool limits concurrency, not requests per second. Pi retains its existing
+sequential execution barriers for mutating tools.
+
+Errors are JSON envelopes (`type: web_error`) with stable `code`, safe `message`,
+`retryable`, and optional `httpStatus`/`retryAfterMs`. Codes distinguish auth,
+quota, rate limit, HTTP failure, transport failure, invalid response/arguments,
+policy denial, queue saturation, caller cancellation (`WEB_ABORTED`) and the
+tool's own deadline (`TOOL_TIMEOUT`). Retry advice never dispatches an automatic
+retry. Unexpected internal failures use `WEB_INTERNAL` without exposing internals.
+Policy handling preserves the envelope in tool-result metadata. Successful
+metadata and error envelopes include per-request endpoint, queue time, duration,
+dispatch flag, HTTP status and transport error code; no credentials or provider
+error bodies are included. Metrics remain local in the existing session log.
 
 The sidecar can also load explicitly allowlisted MCP tools over stdio or
 Streamable HTTP. Python resolves environment- or file-backed secrets before

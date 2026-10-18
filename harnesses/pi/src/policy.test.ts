@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import type { ExtensionAPI, ToolCallEvent, ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { assertAllowedUrl, PolicyController } from "./policy.js";
+import { httpError } from "./web-runtime.js";
 
 const networkPolicy = {
 	allowedHosts: ["nih.gov", "nature.com"],
@@ -76,6 +77,20 @@ test("network policy filters search results", async () => {
 		owner.end();
 		await rm(root, { recursive: true, force: true });
 	}
+});
+
+test("structured web errors survive policy handling and keep their error status", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-policy-error-"));
+	const owner = controller();
+	try {
+		await owner.begin([], join(root, "budget.json"));
+		const failure = httpError(429, "2");
+		const result = await policyHandlers(owner).result({ type: "tool_result", toolCallId: "rate-limit", toolName: "web_search",
+			input: { queries: ["research"] }, content: [{ type: "text", text: failure.message }], details: {}, isError: true } as ToolResultEvent);
+		assert.equal(result?.isError, true);
+		assert.match(JSON.stringify(result), /WEB_RATE_LIMIT/);
+		assert.match(JSON.stringify(result), /retryAfterMs/);
+	} finally { owner.end(); await rm(root, { recursive: true, force: true }); }
 });
 
 test("invalid search inputs are rejected before usage is reserved", async () => {
