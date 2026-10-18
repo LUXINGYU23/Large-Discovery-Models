@@ -203,7 +203,7 @@ Set `DEEPSEEK_API_KEY` in the host task runner environment before starting a cam
 Python passes it through the existing `bootstrap_secret.namedSecrets` channel; it is
 removed from the child environment and never written into initialization manifests
 or guest files. It is separate from the model provider key. Campaigns that disable
-both `web_search` and `fetch_content` (budgets of zero) need no search key.
+both `web_search` and `web_fetch` (budgets of zero) need no search key.
 
 For the local Windows checkout, `.deepseek-api-key.dpapi` in this directory is
 encrypted for the current Windows user and excluded from Git and Docker build
@@ -217,17 +217,29 @@ $env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Passwor
 `npm run smoke:search` tests both live endpoints. It accepts the key through
 `DEEPSEEK_API_KEY` or stdin and prints only result URLs and content length.
 
-`web_search` accepts `query` (1–128 Unicode characters), optional `count` (1–50,
-default 10), `ori_question`, and `need_content`. It returns ranked URLs, summaries,
-and available content directly. `fetch_content` accepts one `url` and returns the
-page title and Markdown. Domain restrictions and benchmark query rules still apply.
-Context7 remains the separate library documentation service.
+The model-facing contract uses the [pinned DeepSeek Harness source](src/vendor/deepseek-web/README.md).
+`web_search` accepts only `queries` (1–4 strings). Exact duplicates collapse after
+validation; queries run concurrently and sources merge in round-robin order,
+deduplicated by URL and capped at eight. Results contain titles, URLs, snippets
+and dates, with the official untrusted-content notice and citation guidance.
+API requests use `count=8` and `need_content=false`; raw summaries and page content
+are not inserted into search results. The latest user question supplies optional
+`ori_question`, whitespace-normalized and bounded to 128 Unicode characters; it
+is omitted if benchmark query policy forbids that context.
 
-Search and Fetch each pace requests below five QPS within a pool. HTTP 408, 429,
-5xx and network failures receive at most three attempts with cancellation and a
-60-second overall timeout. Other errors fail immediately. The account-level quota
-is shared with other pools/applications; retry handling also covers that contention.
-There are no alternate search providers or direct-HTTP fetch fallback.
+`web_fetch` accepts only `url` and returns the API's Markdown with the official
+header and notice. The complete rendered output is capped at 200,000 characters,
+including its truncation footer. No additional LLM summarizes either result.
+Fetch metadata contains URL/status/truncation only, without a second full body.
+Domain restrictions and benchmark query rules still apply. Context7 remains
+the separate library documentation service.
+
+Both tools use a 30-second overall timeout. Like the official provider, each
+unique query or fetch dispatches once with no automatic retries; a failed query
+cancels its siblings and discards partial results. One search budget unit counts
+one tool call, which can dispatch up to four API queries. Separate pools share
+the account's rate limits. There are no alternate providers or direct-HTTP fetch
+fallback. The existing policy may append a separate budget notice to tool output.
 
 The sidecar can also load explicitly allowlisted MCP tools over stdio or
 Streamable HTTP. Python resolves environment- or file-backed secrets before

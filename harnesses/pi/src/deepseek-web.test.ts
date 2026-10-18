@@ -2,103 +2,144 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DeepSeekWebTools } from "./deepseek-web.js";
 import type { NetworkPolicy } from "./protocol.js";
+import { computeFetchOutput, EXTERNAL_WEB_CONTENT_NOTICE as notice } from "./vendor/deepseek-web/contract.js";
 
 const policy: NetworkPolicy = { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] };
-const source = {
-	title: "Paper", url: "https://nature.com/paper", snippet: "Short", summary: "Long summary",
-	content: "Full page", rerank_score: 2.4, authority: 3, site_name: "Nature", site_icon: null, date: null,
-};
-function execute(client: DeepSeekWebTools, name: string, input: Record<string, unknown>, signal?: AbortSignal,
-	networkPolicy = policy) {
-	return client.toolDefinitions(networkPolicy).find((tool) => tool.name === name)!
-		.execute("call", input, signal, undefined, {} as never);
+const source = { title: "Paper", url: "https://nature.com/paper", snippet: "Short", date: "2026-10-18",
+	summary: "Not for model", content: "Full page excluded", rerank_score: 2.4, authority: 3 };
+function execute(name: string, input: Record<string, unknown>, options: {
+	signal?: AbortSignal; policy?: NetworkPolicy; question?: string; key?: string;
+} = {}) {
+	return new DeepSeekWebTools(options.key ?? "search-secret")
+		.toolDefinitions(options.policy ?? policy, () => options.question).find((tool) => tool.name === name)!
+		.execute("call", input, options.signal, undefined, {} as never);
 }
+function text(result: Awaited<ReturnType<typeof execute>>) { return (result.content[0] as { text: string }).text; }
 
-test("Search sends the official contract and exposes only allowed sources", async (t) => {
-	const calls: Array<{ url: string; init?: RequestInit }> = [];
-	t.mock.method(globalThis, "fetch", async (url: string, init?: RequestInit) => {
-		calls.push({ url, ...(init ? { init } : {}) });
+test("official request projection and rendered sources omit API summaries and full content", async (t) => {
+	t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
+		assert.equal(url, "https://api.deepseek.com/v1/tools/search");
+		assert.equal(init.method, "POST");
+		assert.equal(init.redirect, "error");
+		assert.equal((init.headers as Record<string, string>).authorization, "Bearer search-secret");
+		assert.deepEqual(JSON.parse(init.body as string), {
+			query: "reaction design", count: 8, need_content: false, ori_question: "How does it work?",
+		});
 		return Response.json({ results: [source, { ...source, url: "https://blocked.nature.com/secret" },
 			{ ...source, url: "https://other.org/paper" }] });
 	});
-	const result = await execute(new DeepSeekWebTools("search-secret"), "web_search", {
-		query: 'reaction "design" site:nature.com', count: 3, ori_question: "How does it work?", need_content: true,
-	}, undefined, { ...policy, allowedHosts: ["nature.com"], deniedHosts: ["blocked.nature.com"] });
-	assert.equal(calls[0]?.url, "https://api.deepseek.com/v1/tools/search");
-	assert.equal(calls[0]?.init?.method, "POST");
-	assert.equal(calls[0]?.init?.redirect, "error");
-	assert.deepEqual(calls[0]?.init?.headers, { Authorization: "Bearer search-secret", "Content-Type": "application/json" });
-	assert.deepEqual(JSON.parse(calls[0]?.init?.body as string), {
-		query: 'reaction "design" site:nature.com', count: 3, ori_question: "How does it work?", need_content: true,
+	const result = await execute("web_search", { queries: ["reaction design"] }, {
+		question: "  How\n does it work? ", policy: { ...policy, allowedHosts: ["nature.com"], deniedHosts: ["blocked.nature.com"] },
 	});
-	assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), { results: [source] });
-	assert.deepEqual(result.details, { provider: "deepseek" });
+	assert.equal(text(result), `${notice}\n\nSources:\n- [Paper](https://nature.com/paper) — Short (2026-10-18)\n\nCite the relevant URLs above as markdown links in your answer.`);
+	assert.deepEqual(result.details, { sources: [{ title: "Paper", url: source.url, snippet: "Short", publishedAt: source.date }], truncated: false });
 });
 
-test("Fetch uses the API and returns Markdown without local page fetching", async (t) => {
-	const calls: string[] = [];
-	t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
-		calls.push(url);
-		assert.deepEqual(JSON.parse(init.body as string), { url: source.url });
-		return Response.json({ title: "Paper", content: "# Paper\nMarkdown" });
+test("queries run concurrently, exact duplicates collapse, merge is round-robin capped at eight", async (t) => {
+	let calls = 0;
+	let release!: () => void;
+	const bothStarted = new Promise<void>((resolve) => { release = resolve; });
+	t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+		const body = JSON.parse(init.body as string);
+		assert.equal(body.ori_question, undefined);
+		if (++calls === 2) release();
+		await bothStarted;
+		return Response.json({ results: Array.from({ length: 8 }, (_, i) => ({ ...source,
+			url: i === 0 ? "https://nature.com/shared" : `https://nature.com/${body.query}/${i}` })) });
 	});
-	const result = await execute(new DeepSeekWebTools("key"), "fetch_content", { url: source.url });
-	assert.deepEqual(calls, ["https://api.deepseek.com/v1/tools/fetch"]);
-	assert.match(JSON.stringify(result.content), /Markdown/);
+	const result = await execute("web_search", { queries: ["a", "b", "a"] });
+	assert.equal(calls, 2);
+	assert.deepEqual((result.details as { sources: { url: string }[] }).sources.map((item) => item.url),
+		["shared", "a/1", "b/1", "a/2", "b/2", "a/3", "b/3", "a/4"].map((path) => `https://nature.com/${path}`));
+	assert.match(text(result), /Showing the first 8 sources/);
 });
 
-test("invalid requests, missing keys and forbidden domains never reach the API", async (t) => {
+test("a failed query cancels siblings, waits for cleanup and returns no partial result", async (t) => {
+	let cancelled = false;
+	t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+		if (JSON.parse(init.body as string).query === "bad") return new Response("secret", { status: 429 });
+		return await new Promise<Response>((_resolve, reject) => {
+			init.signal!.addEventListener("abort", () => { cancelled = true; reject(init.signal!.reason); }, { once: true });
+		});
+	});
+	await assert.rejects(execute("web_search", { queries: ["slow", "bad"] }), /HTTP 429/);
+	assert.equal(cancelled, true);
+});
+
+test("schema and query-count errors never reach API; bound precedes deduplication", async (t) => {
 	const mock = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not call"); });
-	const client = new DeepSeekWebTools("key");
-	for (const input of [{ query: " " }, { query: "x".repeat(129) }, { query: "a", count: 51 },
-		{ query: "a", count: 1.5 }, { query: "a", provider: "auto" }, { query: "a", ori_question: " " }]) {
-		await assert.rejects(execute(client, "web_search", input));
+	for (const input of [{ query: "a" }, { queries: [] }, { queries: [" "] }, { queries: [1] },
+		{ queries: Array(5).fill("same") }, { queries: ["a"], need_content: true }]) {
+		await assert.rejects(execute("web_search", input));
 	}
-	for (const url of ["file:///etc/passwd", "https://user:pass@nature.com", "relative", "https://nature.com/" + "a".repeat(8192)]) {
-		await assert.rejects(execute(client, "fetch_content", { url }));
+	for (const url of [" ", "file:///etc/passwd", "https://user:pass@nature.com", "relative"]) {
+		await assert.rejects(execute("web_fetch", { url }));
 	}
-	await assert.rejects(execute(client, "fetch_content", { url: source.url }, undefined,
-		{ ...policy, deniedHosts: ["nature.com"] }));
-	await assert.rejects(execute(new DeepSeekWebTools(undefined), "web_search", { query: "a" }), /DEEPSEEK_API_KEY/);
+	await assert.rejects(execute("web_fetch", { url: source.url }, { policy: { ...policy, deniedHosts: ["nature.com"] } }));
+	await assert.rejects(execute("web_search", { queries: ["a"] }, { key: "" }), /DEEPSEEK_API_KEY/);
+	await assert.rejects(execute("web_search", { queries: ["a"] }, { signal: AbortSignal.abort() }), /abort/i);
 	assert.equal(mock.mock.callCount(), 0);
 });
 
-test("Unicode queries use code points and empty search results are valid", async (t) => {
-	t.mock.method(globalThis, "fetch", async () => Response.json({ results: [] }));
-	const result = await execute(new DeepSeekWebTools("key"), "web_search", { query: "🧪".repeat(128) });
-	assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), { results: [] });
-});
-
-test("transient HTTP errors retry the same API and honor cancellation", async (t) => {
-	let count = 0;
-	t.mock.method(globalThis, "fetch", async () => {
-		count++;
-		return count < 3 ? new Response("busy", { status: count === 1 ? 429 : 503, headers: { "retry-after": "0" } })
-			: Response.json({ results: [] });
+test("original question is Unicode-bounded and blank context is omitted", async (t) => {
+	const bodies: Record<string, unknown>[] = [];
+	t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+		bodies.push(JSON.parse(init.body as string));
+		return Response.json({ results: [] });
 	});
-	const client = new DeepSeekWebTools("key");
-	await execute(client, "web_search", { query: "a" });
-	assert.equal(count, 3);
-	await assert.rejects(execute(client, "web_search", { query: "b" }, AbortSignal.abort()), /abort/i);
-	assert.equal(count, 3);
+	const result = await execute("web_search", { queries: ["a"] }, { question: "🧪".repeat(129) });
+	await execute("web_search", { queries: ["a"] }, { question: " \n " });
+	assert.equal(bodies[0]!.ori_question, "🧪".repeat(128));
+	assert.equal(bodies[1]!.ori_question, undefined);
+	assert.equal(text(result), `${notice}\n\nNo results found.\n\nCite the relevant URLs above as markdown links in your answer.`);
 });
 
-test("permanent errors are not retried or exposed with provider secrets", async (t) => {
-	for (const status of [400, 401, 402, 403, 404]) {
-		const mock = t.mock.method(globalThis, "fetch", async () => new Response("secret-key", { status }));
-		await assert.rejects(execute(new DeepSeekWebTools("secret-key"), "web_search", { query: "a" }),
-			(error: Error) => error.message.includes(`HTTP ${status}`) && !error.message.includes("secret-key"));
+test("HTTP and network failures are never retried and do not disclose response bodies", async (t) => {
+	for (const status of [400, 401, 402, 403, 404, 408, 429, 500, 503]) {
+		const mock = t.mock.method(globalThis, "fetch", async () => new Response("search-secret", { status }));
+		await assert.rejects(execute("web_search", { queries: ["a"] }),
+			(error: Error) => error.message.includes(`HTTP ${status}`) && !error.message.includes("search-secret"));
 		assert.equal(mock.mock.callCount(), 1);
 		mock.mock.restore();
 	}
+	const mock = t.mock.method(globalThis, "fetch", async () => { throw new Error("search-secret"); });
+	await assert.rejects(execute("web_search", { queries: ["a"] }), /network request failed/);
+	assert.equal(mock.mock.callCount(), 1);
 });
 
-test("malformed success responses and empty fetch content are rejected", async (t) => {
+test("malformed payloads fail while optional API fields are not required", async (t) => {
 	for (const body of [{}, { results: [{}] }, { results: "bad" }]) {
 		const mock = t.mock.method(globalThis, "fetch", async () => Response.json(body));
-		await assert.rejects(execute(new DeepSeekWebTools("key"), "web_search", { query: "a" }), /invalid response/);
+		await assert.rejects(execute("web_search", { queries: ["a"] }), /invalid response/);
 		mock.mock.restore();
 	}
-	t.mock.method(globalThis, "fetch", async () => Response.json({ title: "", content: " " }));
-	await assert.rejects(execute(new DeepSeekWebTools("key"), "fetch_content", { url: source.url }), /no page content/);
+	t.mock.method(globalThis, "fetch", async () => Response.json({ results: [{ url: source.url, title: "", snippet: "", date: null }] }));
+	assert.match(text(await execute("web_search", { queries: ["a"] })), /\[nature.com\]/);
+});
+
+test("fetch renders Markdown unchanged and caps the complete output including footer", async (t) => {
+	let content = "# Paper\nMarkdown";
+	t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
+		assert.equal(url, "https://api.deepseek.com/v1/tools/fetch");
+		assert.deepEqual(JSON.parse(init.body as string), { url: source.url });
+		return Response.json({ title: "API title is not copied", content });
+	});
+	const result = await execute("web_fetch", { url: source.url });
+	assert.equal(text(result), `Fetched ${source.url} (HTTP 200)\n\n${notice}\n\n${content}`);
+	assert.deepEqual(result.details, { url: source.url, statusCode: 200, truncated: false });
+	content = "x".repeat(220_000);
+	const long = await execute("web_fetch", { url: source.url });
+	assert.equal(text(long).length, 200_000);
+	assert.match(text(long), /\n\n\(Content truncated\. Fetch a more specific URL or section for the full text\.\)$/);
+	assert.deepEqual(long.details, { url: source.url, statusCode: 200, truncated: true });
+	assert(!JSON.stringify(long.details).includes(content));
+});
+
+test("fetch cap handles header-only overflow and provider truncation at boundaries", () => {
+	const result = { url: source.url, statusCode: 200, body: { kind: "text" as const, content: "abc" }, truncated: false };
+	const full = computeFetchOutput(result, 200_000);
+	assert.equal(computeFetchOutput(result, full.text.length).truncated, false);
+	assert.equal(computeFetchOutput(result, full.text.length - 1).truncated, true);
+	assert.equal(computeFetchOutput(result, 5).text, "Fetch");
+	assert.match(computeFetchOutput({ ...result, truncated: true }, 200_000).text, /Content truncated/);
 });

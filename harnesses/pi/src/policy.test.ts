@@ -55,7 +55,7 @@ test("network policy filters search results", async () => {
 			type: "tool_result",
 			toolCallId: "hidden",
 			toolName: "web_search",
-			input: { query: "reaction design" },
+			input: { queries: ["reaction design"] },
 			content: [{ type: "text", text: "Hidden SynthonBench answer" }],
 			details: { provider: "deepseek" },
 			isError: false,
@@ -66,7 +66,7 @@ test("network policy filters search results", async () => {
 			type: "tool_result",
 			toolCallId: "allowed",
 			toolName: "web_search",
-			input: { query: "reaction design" },
+			input: { queries: ["reaction design"] },
 			content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
 			details: { provider: "deepseek" },
 			isError: false,
@@ -83,18 +83,20 @@ test("invalid search inputs are rejected before usage is reserved", async () => 
 	const subject = controller({ web_search: 2 });
 	const handlers = policyHandlers(subject);
 	try {
-		await subject.begin(["forbidden-original-question"], join(root, "budget.json"));
+		await subject.begin(["forbidden-original-question", "private benchmark"], join(root, "budget.json"));
 		const rejected = await handlers.call(call("web_search", {
-			query: "reaction design",
-			ori_question: "forbidden-original-question",
+			queries: ["reaction design", "forbidden-original-question"],
 		}));
 		assert.equal(rejected?.block, true);
 		assert.match(rejected?.reason ?? "", /benchmark identifier/);
 		assert.equal(subject.snapshot().toolCalls.web_search, undefined);
 
-		const allowed = call("web_search", { query: "reaction design" });
+		assert.equal(subject.searchContext("reaction design"), "reaction design");
+		assert.equal(subject.searchContext("forbidden-original-question"), undefined);
+		assert.equal(subject.searchContext("private\nbenchmark"), undefined);
+		const allowed = call("web_search", { queries: ["reaction design"] });
 		assert.equal(await handlers.call(allowed), undefined);
-		assert.deepEqual(allowed.input, { query: "reaction design" });
+		assert.deepEqual(allowed.input, { queries: ["reaction design"] });
 	} finally {
 		subject.end();
 		await rm(root, { recursive: true, force: true });
@@ -109,8 +111,8 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 		await subject.begin([], join(root, "budget.json"));
 		assert.match(subject.budgetMessage(), /web_search: 1 of 1 calls remaining/);
 		const concurrent = await Promise.all([
-			handlers.call(call("web_search", { query: "first" })),
-			handlers.call(call("web_search", { query: "second" })),
+			handlers.call(call("web_search", { queries: ["first"] })),
+			handlers.call(call("web_search", { queries: ["second"] })),
 		]);
 		assert.equal(concurrent.filter((result) => result?.block).length, 1);
 		assert.match(concurrent.find((result) => result?.block)?.reason ?? "", /tool_budget_exhausted/);
@@ -122,7 +124,7 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 			type: "tool_result",
 			toolCallId: "search-result",
 			toolName: "web_search",
-			input: { query: "first" },
+			input: { queries: ["first"] },
 			content: [{ type: "text", text: "failed" }],
 			details: {},
 			isError: true,
@@ -133,7 +135,7 @@ test("tool budgets reserve atomically, report remaining calls, and leave unliste
 		const otherAgent = controller({ web_search: 1 });
 		await otherAgent.begin([], join(root, "other-agent.json"));
 		assert.equal(
-			await policyHandlers(otherAgent).call(call("web_search", { query: "independent" })),
+			await policyHandlers(otherAgent).call(call("web_search", { queries: ["independent"] })),
 			undefined,
 		);
 		otherAgent.end();

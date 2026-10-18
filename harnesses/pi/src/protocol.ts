@@ -714,7 +714,7 @@ export function parseFrame(line: string): InputFrame {
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
 	const availableTools = new Set([
-		"read", "write", "bash", "web_search", "fetch_content",
+		"read", "write", "bash", "web_search", "web_fetch",
 		...toolExtensions.flatMap((extension) => extension.toolNames),
 		...mcpServers.flatMap((server) => server.tools.map((tool) => `mcp__${server.serverId}__${tool}`)),
 		...(data.context7Enabled ? ["resolve-library-id", "query-docs"] : []),

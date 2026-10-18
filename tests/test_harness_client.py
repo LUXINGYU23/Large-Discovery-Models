@@ -54,7 +54,7 @@ def test_pi_search_secret_is_separate_from_initialization(tmp_path, monkeypatch)
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
         config.bootstrap_secrets()
-    offline = replace(config, limits=HarnessLimits(tool_call_budgets={"web_search": 0, "fetch_content": 0}))
+    offline = replace(config, limits=HarnessLimits(tool_call_budgets={"web_search": 0, "web_fetch": 0}))
     assert offline.bootstrap_secrets() == {}
     with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
         replace(config, limits=HarnessLimits(tool_call_budgets={"web_search": 0})).bootstrap_secrets()

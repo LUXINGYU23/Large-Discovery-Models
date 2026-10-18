@@ -205,7 +205,7 @@ function sessionTools(
 		"write",
 		"bash",
 		"web_search",
-		"fetch_content",
+		"web_fetch",
 		...(context7Enabled ? ["resolve-library-id", "query-docs"] : []),
 		...taskTools,
 		...mcpTools,
@@ -557,7 +557,13 @@ export class PersistentProfileSession {
 			resourceLoader: loader,
 			settingsManager: settings,
 			sessionManager: manager,
-			customTools: [...this.web.toolDefinitions(this.config.networkPolicy), ...this.mcp.toolDefinitions(), this.submissions.tool()],
+			customTools: [...this.web.toolDefinitions(this.config.networkPolicy, () => {
+				const message = this.session?.messages.findLast((item) => item.role === "user");
+				if (message?.role !== "user") return undefined;
+				const question = typeof message.content === "string" ? message.content
+					: message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+				return this.policy.searchContext(question);
+			}), ...this.mcp.toolDefinitions(), this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
@@ -893,7 +899,7 @@ export class PiSessionPool {
 			throw new Error("profile set digest mismatch");
 		}
 		const web = new DeepSeekWebTools(this.namedSecrets.DEEPSEEK_API_KEY);
-		if (["web_search", "fetch_content"].some((name) => this.config.limits.toolCallBudgets[name] !== 0)) {
+		if (["web_search", "web_fetch"].some((name) => this.config.limits.toolCallBudgets[name] !== 0)) {
 			web.requireKey();
 		}
 		await this.proxy.start();

@@ -6,6 +6,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { NetworkPolicy } from "./protocol.js";
 import { atomicJson } from "./trace.js";
+import { boundedQuestion } from "./vendor/deepseek-web/contract.js";
 
 interface ActivePolicyTurn {
 	forbiddenTerms: string[];
@@ -34,11 +35,12 @@ export function assertAllowedUrl(value: string, policy: NetworkPolicy): void {
 	try {
 		url = new URL(value);
 	} catch {
-		throw new Error("fetch_content only accepts absolute HTTP(S) URLs");
+		throw new Error("web_fetch only accepts absolute HTTP(S) URLs");
 	}
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		throw new Error("fetch_content only accepts HTTP(S) URLs");
+		throw new Error("web_fetch only accepts HTTP(S) URLs");
 	}
+	if (url.username || url.password) throw new Error("web_fetch does not accept URLs with credentials");
 	if (policy.deniedHosts.some((host) => hostMatches(url.hostname, host))) {
 		throw new Error(`network policy denies host: ${url.hostname}`);
 	}
@@ -54,7 +56,7 @@ function values(value: unknown): string[] {
 }
 
 function queryText(input: Record<string, unknown>): string {
-	return [...values(input.query), ...values(input.ori_question)].join("\n");
+	return values(input.queries).join("\n");
 }
 
 function strings(value: unknown, seen = new Set<object>()): string[] {
@@ -113,6 +115,18 @@ export class PolicyController {
 		return snapshot(this.active?.used ?? {}, this.budgets);
 	}
 
+	/** Optional search context must not bypass the benchmark query boundary. */
+	searchContext(question: string): string | undefined {
+		try {
+			assertAllowedQuery(question, this.policy, this.active?.forbiddenTerms ?? []);
+			const bounded = boundedQuestion(question);
+			if (bounded !== undefined) assertAllowedQuery(bounded, this.policy, this.active?.forbiddenTerms ?? []);
+			return bounded;
+		} catch {
+			return undefined;
+		}
+	}
+
 	budgetMessage(): string {
 		const finite = Object.entries(this.snapshot().toolBudget);
 		if (finite.length === 0) return "Tool call budget for this turn: all available tools are unlimited.";
@@ -137,7 +151,7 @@ export class PolicyController {
 		try {
 			if (event.toolName === "web_search") {
 				assertAllowedQuery(queryText(input), this.policy, active.forbiddenTerms);
-			} else if (event.toolName === "fetch_content") {
+			} else if (event.toolName === "web_fetch") {
 				assertAllowedQuery(strings(input).join("\n"), this.policy, active.forbiddenTerms);
 				for (const url of fetchUrls(input)) {
 					assertAllowedUrl(url, this.policy);
@@ -179,10 +193,10 @@ export class PolicyController {
 		let content = event.content;
 		let details = event.details;
 		let isError = event.isError;
-		if (["web_search", "fetch_content", "resolve-library-id", "query-docs"].includes(event.toolName)) {
+		if (["web_search", "web_fetch", "resolve-library-id", "query-docs"].includes(event.toolName)) {
 			try {
 				assertAllowedQuery(strings([event.content, event.details]).join("\n"), this.policy, active.forbiddenTerms);
-				if (event.toolName === "web_search" || event.toolName === "fetch_content") {
+				if (event.toolName === "web_search" || event.toolName === "web_fetch") {
 					for (const url of urls([event.content, event.details])) {
 						const parsed = new URL(url);
 						if (this.policy.deniedHosts.some((host) => hostMatches(parsed.hostname, host))) {

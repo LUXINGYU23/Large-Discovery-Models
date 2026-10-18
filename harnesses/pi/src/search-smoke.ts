@@ -8,14 +8,15 @@ const tools = new DeepSeekWebTools(key).toolDefinitions({
 	allowedHosts: ["deepseek.com"], deniedHosts: [], forbiddenQueryPatterns: [],
 });
 const search = await tools[0]!.execute("smoke-search", {
-	query: "DeepSeek Search Fetch API site:api-docs.deepseek.com", count: 3, need_content: true,
+	queries: ["DeepSeek Search Fetch API site:api-docs.deepseek.com"],
 }, undefined, undefined, {} as never);
-const results = JSON.parse((search.content[0] as { text: string }).text).results as Array<{ url: string }>;
+const results = (search.details as { sources: Array<{ url: string }> }).sources;
 assert(results.length > 0, "Search must return at least one allowed result");
 const page = await tools[1]!.execute("smoke-fetch", {
 	url: "https://api-docs.deepseek.com/guides/search/",
 }, undefined, undefined, {} as never);
-const document = JSON.parse((page.content[0] as { text: string }).text) as { title: string; content: string };
-assert(document.content.length > 0);
+const document = (page.content[0] as { text: string }).text;
+assert(document.includes("Fetched https://api-docs.deepseek.com/guides/search/"));
+assert(document.length > 300 && document.length <= 200_000);
 console.log(JSON.stringify({ provider: "deepseek", searchResults: results.length,
-	urls: results.map((result) => result.url), fetchTitle: document.title, fetchCharacters: document.content.length }));
+	urls: results.map((result) => result.url), fetchCharacters: document.length, fetch: page.details }));

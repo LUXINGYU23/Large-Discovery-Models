@@ -15,7 +15,7 @@ from ldm_tts.harness.protocol import (
 
 DEFAULT_NETWORK_TOOL_BUDGETS = (
     "web_search=8",
-    "fetch_content=16",
+    "web_fetch=16",
     "resolve-library-id=4",
     "query-docs=8",
 )
@@ -55,7 +55,7 @@ class PiHarnessConfig(HarnessPoolConfig):
         if set(tool_names) & set(mcp_tool_names):
             raise ValueError("harness task and MCP tool names must not conflict")
         ordinary_tools = {
-            "read", "write", "bash", "web_search", "fetch_content",
+            "read", "write", "bash", "web_search", "web_fetch",
             *tool_names, *mcp_tool_names,
         }
         if self.context7_enabled:
@@ -82,7 +82,7 @@ class PiHarnessConfig(HarnessPoolConfig):
 
     def bootstrap_secrets(self) -> dict[str, str]:
         if all(self.limits.tool_call_budgets.get(name) == 0
-               for name in ("web_search", "fetch_content")):
+               for name in ("web_search", "web_fetch")):
             return {}
         key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
         if not key:

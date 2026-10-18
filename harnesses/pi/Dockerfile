@@ -33,6 +33,7 @@ COPY --from=production-dependencies /app/package.json /app/package-lock.json ./
 COPY --from=production-dependencies /app/sol-pi-version.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY src/vendor/deepseek-web/LICENSE src/vendor/deepseek-web/README.md ./licenses/deepseek-web/
 COPY policy_runner.py ./policy_runner.py
 RUN chmod 0644 package.json package-lock.json policy_runner.py
 

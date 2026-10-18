@@ -103,7 +103,7 @@ async function main(): Promise<void> {
 		call += 1;
 		if (call === 1) {
 			writeEvents(response, toolEvents(call, "web_search", JSON.stringify({
-				query: "Buchwald Hartwig reaction primary literature",
+				queries: ["Buchwald Hartwig reaction primary literature"],
 				count: 3,
 			})));
 		} else if (call === 2) {
@@ -228,7 +228,7 @@ async function main(): Promise<void> {
 		},
 		limits: {
 			wallTimeSeconds: 120,
-			toolCallBudgets: { web_search: 2, fetch_content: 2 },
+			toolCallBudgets: { web_search: 2, web_fetch: 2 },
 		},
 		webSearch: {
 			provider: "deepseek",
