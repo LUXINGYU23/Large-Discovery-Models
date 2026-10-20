@@ -10,7 +10,7 @@ import pytest
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.run_store import BudgetLedger
-from ldm_tts.harness import HarnessProviderAuthorizationRequest, file_sha256
+from ldm_tts.harness import HarnessError, HarnessProviderAuthorizationRequest, file_sha256
 from tasks.researchgym.core import workflow
 from tasks.researchgym.core.candidate import ProgramDomain
 from tasks.researchgym.core.cases import load_case
@@ -69,6 +69,14 @@ def test_profiles_and_tools_are_digest_bound():
     assert file_sha256(RESOURCE_ROOT / TOOL_FILE)
 
 
+def test_researchgym_does_not_force_unsupported_first_tool_choice(tmp_path):
+    source = make_source(tmp_path, "valid", sessions=1)
+    try:
+        assert source.client.config.force_first_tool_call is False
+    finally:
+        source.client.close()
+
+
 def test_sessions_repair_in_place_and_keep_lineage_and_usage(tmp_path):
     source = make_source(tmp_path, "repair")
     try:
@@ -116,6 +124,71 @@ def test_provider_authorization_reserves_budget_before_a_second_provider_call(tm
 def _authorization(turn, number):
     return HarnessProviderAuthorizationRequest("fixture-campaign", "program_research_01", turn,
                                                f"{turn}-provider-{number}", "a" * 64)
+
+
+def _captured_response(root, turn, number, *, status=200, usage=True):
+    request_id = f"{turn}-provider-{number}"
+    turn_root = root / "sessions/program_research_01/turns" / turn
+    response = turn_root / "provider" / f"{request_id}.response.bin"
+    response.parent.mkdir(parents=True, exist_ok=True)
+    response.write_text(json.dumps({"usage": {"input_tokens": 1000, "output_tokens": 200}}
+                                   if usage else {"error": {"message": "invalid request"}}))
+    with (turn_root / "provider_index.jsonl").open("a") as handle:
+        handle.write(json.dumps({"type": "provider_exchange", "turnId": turn,
+                                 "profileId": "program_research_01", "requestId": request_id,
+                                 "response": {"status": status,
+                                              "artifact": f"provider/{request_id}.response.bin"}}) + "\n")
+
+
+def test_completed_request_releases_reserve_before_whole_turn_finishes(tmp_path):
+    runtime = Runtime(tmp_path / "budget.json")
+    meter = ProviderAuthorizationLedger(root=tmp_path / "harness", runtime=runtime,
+                                        pricing=ApiPricing(1, 2, budget_usd=1.01), campaign_id="fixture-campaign",
+                                        usage_prefix="harness", reserve_usd=1.0)
+    meter.authorize(_authorization("turn-1", 1))
+    _captured_response(tmp_path / "harness", "turn-1", 1)
+    meter.authorize(_authorization("turn-1", 2))
+    assert runtime.budget.counters["api_cost_usd"] == pytest.approx(0.0014)
+    receipts = [json.loads(path.read_text()) for path in meter.root.glob("*.json")]
+    assert sorted(row["status"] for row in receipts) == ["authorized", "reconciled"]
+    _captured_response(tmp_path / "harness", "turn-1", 2)
+    meter.reconcile_turn("turn-1", reported_provider_calls=2,
+                         tokens={"input_tokens": 2000, "output_tokens": 400})
+    meter.reconcile_turn("turn-1", reported_provider_calls=2,
+                         tokens={"input_tokens": 2000, "output_tokens": 400})
+    assert runtime.budget.counters["api_cost_usd"] == pytest.approx(0.0028)
+    assert runtime.budget.counters["harness_input_tokens"] == 2000
+    assert {json.loads(path.read_text())["status"] for path in meter.root.glob("*.json")} == {"reconciled"}
+
+
+def test_failed_provider_response_fails_fast_without_releasing_reserve(tmp_path):
+    runtime = Runtime(tmp_path / "budget.json")
+    meter = ProviderAuthorizationLedger(root=tmp_path / "harness", runtime=runtime,
+                                        pricing=ApiPricing(1, 2, budget_usd=2), campaign_id="fixture-campaign",
+                                        usage_prefix="harness", reserve_usd=1.0)
+    meter.authorize(_authorization("turn-1", 1))
+    _captured_response(tmp_path / "harness", "turn-1", 1, status=400, usage=False)
+    with pytest.raises(HarnessError, match="provider returned HTTP 400"):
+        meter.authorize(_authorization("turn-1", 2))
+    assert len(list(meter.root.glob("*.json"))) == 1
+    assert runtime.budget.counters.get("api_cost_usd", 0) == 0
+
+
+def test_settlement_is_shared_across_candidate_and_policy_pools(tmp_path):
+    runtime = Runtime(tmp_path / "budget.json")
+    pricing = ApiPricing(1, 2, budget_usd=1.01)
+    policy = ProviderAuthorizationLedger(root=tmp_path / "policy_harness", runtime=runtime,
+                                         pricing=pricing, campaign_id="fixture-campaign",
+                                         usage_prefix="policy", reserve_usd=1.0)
+    candidate = ProviderAuthorizationLedger(root=tmp_path / "harness", runtime=runtime,
+                                            pricing=pricing, campaign_id="fixture-campaign",
+                                            usage_prefix="harness", reserve_usd=1.0)
+    policy.authorize(_authorization("policy-turn", 1))
+    _captured_response(tmp_path / "policy_harness", "policy-turn", 1)
+    candidate.authorize(_authorization("candidate-turn", 1))
+    assert runtime.budget.counters["policy_input_tokens"] == 1000
+    assert runtime.budget.counters["api_cost_usd"] == pytest.approx(0.0014)
+    assert json.loads(next(policy.root.glob("*.json")).read_text())["status"] == "reconciled"
 
 
 def test_recovery_reconciles_cumulative_captures_against_all_turn_receipts(tmp_path):

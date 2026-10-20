@@ -505,7 +505,8 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
                 provider_authorizer=policy_meter.authorize)
             selector.policy_hooks = (
                 lambda: pricing.check(runtime),
-                lambda: (account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy"),
+                lambda: (account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy")
+                         if pricing.budget_usd is None else None,
                          policy_meter.settle_captured_turns()))
 
     status, code = "completed", 0

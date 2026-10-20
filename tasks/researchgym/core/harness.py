@@ -32,7 +32,7 @@ from .cases import CaseSpec
 from .clock import WallClockExhausted
 from .history import compact, write_history
 from .proposals import ProposalBatch, ProposalExhausted, validate_rows
-from .usage import ApiPricing, account_tokens, harness_turn_tokens
+from .usage import ApiPricing, account_tokens, harness_turn_tokens, provider_response_tokens
 
 RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources" / "harness"
 TOOL_FILE = "tools/researchgym_tools.mjs"
@@ -102,6 +102,81 @@ class ProviderAuthorizationLedger:
                     outstanding += float(record.get("reserved_usd", 0.0))
         return outstanding
 
+    def _settle_completed_requests_locked(self) -> None:
+        """Account captured requests before admitting more calls in any pool.
+
+        A turn may contain many model calls and several turns run concurrently.
+        Waiting for the whole turn to finish can exhaust the budget in *reserves*
+        even when measured spending is tiny.  The shared campaign lock covers
+        both the receipt transition and the budget update, while the usage key
+        makes a crash between those writes safe to replay.
+        """
+        if self.pricing.budget_usd is None:
+            return
+        campaign_root = self.root.parent.parent
+        for pool, prefix in (("harness", "harness"), ("policy_harness", "policy")):
+            pool_root = campaign_root / pool
+            indices: dict[Path, list[dict]] = {}
+            for receipt_path in sorted((pool_root / "provider_authorizations").glob("*.json")):
+                try:
+                    receipt = json.loads(receipt_path.read_text())
+                except (OSError, json.JSONDecodeError) as exc:
+                    raise HarnessError(f"invalid provider authorization receipt: {receipt_path}") from exc
+                if receipt.get("campaign_id") != self.campaign_id or receipt.get("status") != "authorized":
+                    continue
+                turn_root = pool_root / "sessions" / receipt["profile_id"] / "turns" / receipt["turn_id"]
+                index = turn_root / "provider_index.jsonl"
+                if index not in indices:
+                    if not index.is_file():
+                        indices[index] = []
+                    else:
+                        rows = []
+                        # Ignore an incomplete trailing write, but reject a malformed
+                        # completed line instead of silently releasing its reserve.
+                        for line in index.read_text().splitlines(keepends=True):
+                            if not line.endswith("\n"):
+                                continue
+                            try:
+                                rows.append(json.loads(line))
+                            except json.JSONDecodeError as exc:
+                                raise HarnessError(f"invalid provider capture index: {index}") from exc
+                        indices[index] = rows
+                matches = [row for row in indices[index]
+                           if row.get("requestId") == receipt["provider_request_id"]
+                           and row.get("type") in {"provider_exchange", "provider_transport_error"}]
+                if not matches:
+                    continue
+                if len(matches) != 1:
+                    raise HarnessError("duplicate provider capture for one authorization")
+                capture = matches[0]
+                if capture.get("turnId") != receipt["turn_id"] or capture.get("profileId", receipt["profile_id"]) != receipt["profile_id"]:
+                    raise HarnessError("provider capture identity does not match authorization")
+                if capture["type"] == "provider_transport_error":
+                    continue  # The call may have reached the provider; retain its reserve.
+                response = capture.get("response", {})
+                status = response.get("status")
+                if not isinstance(status, int) or not 200 <= status < 300:
+                    raise HarnessError(f"provider returned HTTP {status}; inspect the redacted capture before retrying")
+                artifact = f"provider/{receipt['provider_request_id']}.response.bin"
+                if response.get("artifact") != artifact:
+                    raise HarnessError("provider capture artifact does not match authorization")
+                tokens = provider_response_tokens(turn_root / artifact)
+                if tokens is None:
+                    continue  # Unknown usage must keep the full reservation live.
+                cost = self.pricing.cost(tokens)
+                if cost is None:
+                    raise HarnessError("API budget requires configured provider token prices")
+                amounts = {f"{prefix}_input_tokens": tokens["input_tokens"],
+                           f"{prefix}_output_tokens": tokens["output_tokens"], "api_cost_usd": cost}
+                self.runtime.consume_many(amounts, usage_key=f"{prefix}:provider_usage:{receipt_path.stem}")
+                atomic_json_write(receipt_path, {**receipt, "status": "reconciled"})
+
+    def settle_completed_requests(self) -> None:
+        lock_path = self.root.parent.parent / "provider_authorizations.lock"
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self._settle_completed_requests_locked()
+
     def authorize(self, request: HarnessProviderAuthorizationRequest) -> bool:
         if request.campaign_id != self.campaign_id:
             raise HarnessError("provider authorization belongs to a different campaign")
@@ -116,6 +191,7 @@ class ProviderAuthorizationLedger:
         lock_path = self.root.parent.parent / "provider_authorizations.lock"
         with lock_path.open("a+") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            self._settle_completed_requests_locked()
             if path.exists():
                 saved = json.loads(path.read_text())
                 expected = {key: value for key, value in record.items() if key != "status"}
@@ -139,6 +215,8 @@ class ProviderAuthorizationLedger:
     def reconcile_turn(self, turn_id: str, *, reported_provider_calls: int | None,
                         tokens: dict[str, float] | None) -> None:
         """Settle only a fully captured turn; unknown calls keep their reserve live."""
+        if self.pricing.budget_usd is not None:
+            self.settle_completed_requests()
         all_rows = [(path, record) for path, record in self._records() if record.get("turn_id") == turn_id]
         rows = [(path, record) for path, record in all_rows if record.get("status") == "authorized"]
         if not all_rows:
@@ -147,6 +225,13 @@ class ProviderAuthorizationLedger:
                 isinstance(reported_provider_calls, bool) or not isinstance(reported_provider_calls, int)
                 or reported_provider_calls < 0 or reported_provider_calls > len(all_rows)):
             raise HarnessError("sidecar provider usage exceeds host authorizations")
+        if self.pricing.budget_usd is not None:
+            # Known usage was already accounted once per request.  Unresolved
+            # captures remain reserved and are visible as unknown usage.
+            if reported_provider_calls == len(all_rows):
+                self.runtime.consume_many({f"{self.usage_prefix}_usage_unknown": len(rows)},
+                                          usage_key=f"{self.usage_prefix}:unknown:{turn_id}")
+            return
         # A lower reported count or absent/invalid capture may still contain an
         # in-flight paid request, so leave all reservations outstanding.
         if reported_provider_calls != len(all_rows) or tokens is None or tokens.get("unknown_calls", 0):
@@ -258,6 +343,9 @@ def create_client(args, root: Path, campaign_id: str, case: CaseSpec, *, policy:
                 diagnostics_path="/resources/policy_diagnostics.py",
                 diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"))) if policy else mcp.servers,
             thinking=args.harness_thinking, context7_enabled=args.harness_context7,
+            # The configured LiteLLM model rejects required mode when the
+            # research agent exposes several tools.  Let it choose among them.
+            force_first_tool_call=False,
             provider_request_body={"max_output_tokens": args.llm_max_tokens,
                                    **generation_body(wire_api="responses", reasoning=args.llm_reasoning,
                                                      extra_body=json.loads(args.llm_extra_body_json))},
@@ -477,7 +565,8 @@ class HarnessProgramSource:
                     "harness_artifact_bytes": int(item.get("artifactBytes", 0)),
                 }, usage_key=key)
             tokens = harness_turn_tokens(self.root, turn.turn_id)
-            account_tokens(self.runtime, self.pricing, "harness", tokens, usage_key=key)
+            if self.provider_meter is None or self.pricing.budget_usd is None:
+                account_tokens(self.runtime, self.pricing, "harness", tokens, usage_key=key)
             if self.provider_meter is not None:
                 calls = None if item is None else item.get("providerCalls")
                 self.provider_meter.reconcile_turn(turn.turn_id, reported_provider_calls=calls, tokens=tokens)

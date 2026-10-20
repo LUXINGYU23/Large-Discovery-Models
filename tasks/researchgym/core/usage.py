@@ -108,7 +108,7 @@ def harness_turn_tokens(artifact_root: Path, turn_id: str) -> dict[str, float] |
             if record.get("type") != "provider_exchange":
                 continue
             exchanges += 1
-            tokens = _response_tokens(index.parent / record["response"]["artifact"])
+            tokens = provider_response_tokens(index.parent / record["response"]["artifact"])
             if tokens is None:
                 unknown += 1
                 continue
@@ -120,7 +120,7 @@ def harness_turn_tokens(artifact_root: Path, turn_id: str) -> dict[str, float] |
     return totals
 
 
-def _response_tokens(path: Path) -> dict[str, float] | None:
+def provider_response_tokens(path: Path) -> dict[str, float] | None:
     if not path.is_file():
         return None
     text = path.read_bytes().decode("utf-8", errors="replace")
