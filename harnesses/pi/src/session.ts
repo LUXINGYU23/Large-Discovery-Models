@@ -10,11 +10,8 @@ import {
 	SessionManager,
 	SettingsManager,
 	type AgentSession,
-	type ExtensionFactory,
 	type Skill,
-	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type, type TUnsafe } from "typebox";
 import { GUEST_RESOURCE_ROOT, GondolinController } from "./gondolin.js";
 import { resolveGuestRuntime, type ResolvedGuestRuntime } from "./guest-image.js";
 import { McpToolBridge } from "./mcp.js";
@@ -33,11 +30,11 @@ import type {
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
 import type { ProviderAuthorizer } from "./protocol.js";
 import {
-	snapshotSubmissionArtifacts,
+	SubmissionController,
 	verifySubmissionRecord,
 	type TerminalSubmission,
 } from "./submission.js";
-import { atomicJson, canonicalJson, canonicalSha256, sha256 } from "./trace.js";
+import { atomicJson, canonicalSha256, sha256 } from "./trace.js";
 import { createSolPiExtension, SOL_PI_GUEST_ARCHIVE, solPiTools } from "./sol-pi.js";
 import { HistoryController, HistoryRecoveryError, HISTORY_POLICY } from "./history.js";
 
@@ -244,164 +241,6 @@ function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[
 	return servers.flatMap((server) =>
 		server.tools.map((tool) => "mcp__" + server.serverId + "__" + tool),
 	);
-}
-
-export class SubmissionController {
-	private readonly parameters: TUnsafe<Record<string, unknown>>;
-	private providerRequests = 0;
-	private attemptIndex = 0;
-	private profileId = "";
-	private turnId = "";
-	private turnRoot = "";
-	private value: TerminalSubmission | undefined;
-	private persist: ((submission: TerminalSubmission) => Promise<void>) | undefined;
-	private validate: SubmissionValidator | undefined;
-
-	constructor(
-		private readonly config: InitializeFrame,
-		private readonly workspace: string,
-	) {
-		this.parameters = Type.Unsafe<Record<string, unknown>>(
-			config.submissionContract.payloadSchema,
-		);
-	}
-
-	async begin(
-		profileId: string,
-		turnId: string,
-		turnRoot: string,
-		persist: (submission: TerminalSubmission) => Promise<void>,
-		validate: SubmissionValidator,
-	): Promise<void> {
-		this.profileId = profileId;
-		this.turnId = turnId;
-		this.turnRoot = turnRoot;
-		this.providerRequests = 0;
-		this.attemptIndex = 0;
-		try {
-			for (const name of await readdir(join(turnRoot, "attempts"))) {
-				if (/^\d+$/.test(name)) this.attemptIndex = Math.max(this.attemptIndex, Number(name));
-			}
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-		}
-		this.value = undefined;
-		this.persist = persist;
-		this.validate = validate;
-	}
-
-	get submission(): TerminalSubmission | undefined {
-		return this.value;
-	}
-
-	createExtension(): ExtensionFactory {
-		return (pi) => {
-			pi.on("before_provider_request", (event) => {
-				const payload = event.payload;
-				if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-					throw new Error("provider payload must be a JSON object");
-				}
-				this.providerRequests += 1;
-				if (this.value) return payload;
-			if (this.providerRequests > 1 || this.config.forceFirstToolCall === false) return payload;
-				return {
-					...payload,
-					tool_choice: "required",
-				};
-			});
-		};
-	}
-
-	tool(): ToolDefinition<TUnsafe<Record<string, unknown>>> {
-		const toolName = this.config.submissionContract.toolName;
-		return {
-			name: toolName,
-			label: "Submit result",
-			description: "Submit the complete structured result. Validation errors must be repaired before resubmission.",
-			promptSnippet: `${toolName}: submit the complete structured result`,
-			parameters: this.parameters,
-			executionMode: "sequential",
-			execute: async (_toolCallId, params) => {
-				if (this.value) throw new Error(`${toolName} may be called only once per turn`);
-				this.attemptIndex += 1;
-				if (!this.validate) throw new Error("submission validator is not initialized");
-				const submission = { ...params };
-				const attemptRoot = join(
-					this.turnRoot,
-					"attempts",
-					this.attemptIndex.toString().padStart(4, "0"),
-				);
-				let artifacts: SubmittedArtifact[];
-				try {
-					artifacts = await snapshotSubmissionArtifacts(
-						this.config.submissionContract.artifactRules,
-						this.workspace,
-						this.config.artifactRoot,
-						this.turnRoot,
-						this.attemptIndex,
-						submission,
-					);
-				} catch (error) {
-					await rm(attemptRoot, { recursive: true, force: true });
-					throw error;
-				}
-				const submissionJson = canonicalJson({ artifacts, submission });
-				const submissionDigest = sha256(submissionJson);
-				const decision = await this.validate({
-					profileId: this.profileId,
-					turnId: this.turnId,
-					attemptIndex: this.attemptIndex,
-					submission,
-					artifacts,
-					submissionJson,
-					submissionDigest,
-				});
-				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
-					throw new Error("submission validator returned an inconsistent decision");
-				}
-				await atomicJson(join(attemptRoot, "validation.json"), {
-					attemptIndex: this.attemptIndex,
-					decision: decision.decision,
-					errors: decision.errors,
-					submission,
-					submissionJson,
-					submissionDigest,
-					artifacts,
-				});
-				if (decision.decision === "retry") {
-					throw new Error(
-						"Submission rejected by the task validator. Repair the reported paths and resubmit. "
-						+ `Validation report: ${JSON.stringify(decision)}`,
-					);
-				}
-				const terminal: TerminalSubmission = {
-					submissionStatus: decision.decision === "accept" ? "accepted" : "rejected",
-					submissionId: `${this.turnId}-submission-${this.attemptIndex}`,
-					submissionDigest,
-					submission,
-					submittedArtifacts: artifacts,
-					validationErrors: decision.errors,
-					submissionJson,
-				};
-				if (!this.persist) throw new Error("submission turn is not initialized");
-				await this.persist(terminal);
-				this.value = terminal;
-				return {
-					content: [{
-						type: "text",
-						text: decision.decision === "accept"
-							? "Submission accepted. End this turn now."
-							: "Submission rejected and the turn is closed.",
-					}],
-					details: {
-						submissionId: terminal.submissionId,
-						status: terminal.submissionStatus,
-					},
-				};
-			},
-		};
-	}
-
 }
 
 export class PersistentProfileSession {

@@ -144,7 +144,7 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 涉及 `ldm_tts/harness/client.py`、`protocol.py` 和 `harnesses/pi/src/`。
 
 - [x] 分离 Python 响应解析、结构校验与进程通信，保留请求身份、提交摘要和 usage 检查。
-- [ ] 将 Pi `session.ts` 中的 `SubmissionController` 归入现有提交模块，避免双向依赖。
+- [x] 将 Pi `session.ts` 中的 `SubmissionController` 归入现有提交模块，避免双向依赖。
 - [ ] 集中 fork 初始化、快照验证与原子落盘逻辑，让会话模块调用明确的初始化操作。
 - [ ] 保留现有 `HistoryController` 和 provider 代理边界，检查清理、重放和初始化身份的调用关系。
 - [ ] 迁移测试到对应职责，删除旧导出与仅验证旧组织方式的测试。
@@ -158,6 +158,8 @@ Python 响应校验已归入 `harness/responses.py`，错误契约归入 `protoc
 进程通信与重试仍由客户端负责。客户端、policy 和任务适配测试 67 通过，记录为 `p4-python.xml`。
 
 Python 协议整理、Pi 提交模块归位、Pi fork／会话整理分别提交。
+提交控制器及修复／重提测试已归入 `submission.ts` 和 `submission.test.ts`，
+远程 TypeScript 构建与 45 项测试通过，记录为 `p4-submission.log`。
 新构建记录独立的源码与镜像身份，不部署覆盖历史实验运行环境。
 
 ### P5：全仓调用方和文档验收
