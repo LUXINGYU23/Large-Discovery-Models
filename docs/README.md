@@ -21,6 +21,11 @@ technical and operational contracts.
 - [Agent execution](agent-execution.md): machine-oriented rules for safely
   inspecting, testing, and running the repository.
 
+## Implementation Plans
+
+- [Architecture convergence plan](architecture-convergence-plan.md): staged task
+  assembly, shared execution and recovery, Pi runtime cleanup, and acceptance checks.
+
 ## Task Guides
 
 - [nanoGPT](../tasks/nanogpt/README.md)
