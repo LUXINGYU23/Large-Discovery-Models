@@ -12,7 +12,7 @@ import numpy as np
 # This file is mounted alone in Pi; runtime imports must stay NumPy/stdlib-only.
 if TYPE_CHECKING:
     from ldm_tts.contracts import Candidate
-    from ldm_tts.harness.policy import PolicyRoundInput
+    from ldm_tts.harness.policy_contract import PolicyRoundInput
     from ldm_tts.optimization import BOObservation, BOPrediction, SurrogateVector
 
 DIAGNOSTICS_PATH = Path(__file__).resolve()

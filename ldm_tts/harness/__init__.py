@@ -2,12 +2,12 @@
 
 from ldm_tts.harness.client import HarnessClient, HarnessError
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
-from ldm_tts.harness.policy import (
+from ldm_tts.harness.policy import PolicyResearchController
+from ldm_tts.harness.policy_contract import (
     POLICY_CAPABILITIES,
     CompiledOptimizationPolicy,
     OptimizationPolicyAdapter,
     PolicyCapabilityContract,
-    PolicyResearchController,
     PolicyRoundInput,
     policy_submission_contract,
 )

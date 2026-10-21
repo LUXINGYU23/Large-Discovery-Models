@@ -10,7 +10,7 @@ import pytest
 
 from ldm_tts.harness.pi import policy_mcp_server
 from ldm_tts.harness.client import HarnessError
-from ldm_tts.harness.policy import (
+from ldm_tts.harness import (
     PolicyCapabilityContract,
     PolicyResearchController,
     PolicyRoundInput,
@@ -20,6 +20,7 @@ from ldm_tts.harness.policy_execution import (
     PolicyExecutionError,
     PolicyExecutionResult,
 )
+from ldm_tts.harness.policy_store import PolicyStore
 from ldm_tts.harness.protocol import (
     HarnessSubmissionError,
     HarnessSubmissionRequest,
@@ -459,3 +460,101 @@ def test_policy_resume_rejects_changed_authoritative_inputs(tmp_path: Path, name
     with pytest.raises(ValueError, match="input digest mismatch"):
         controller.resolve(_round(1))
     assert client.calls == 1
+
+
+@pytest.mark.parametrize("name", ["compiled.npz", "result.json"])
+def test_policy_resume_rejects_changed_results_without_execution_or_charge(tmp_path, name):
+    controller, client, executor = _controller(tmp_path, [[_replace()]])
+    charges = []
+    controller.account = charges.append
+    controller.resolve(_round(1))
+    path = tmp_path / "rounds/round_001" / name
+    if name == "compiled.npz":
+        path.write_bytes(path.read_bytes() + b"changed")
+    else:
+        payload = json.loads(path.read_text())
+        payload["input_sha256"] = "0" * 64
+        path.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="persisted policy result .* digest mismatch"):
+        controller.resolve(_round(1))
+    assert client.calls == len(executor.calls) == len(charges) == 1
+
+
+@pytest.mark.parametrize("target", ["artifact", "manifest", "path"])
+def test_policy_rejects_invalid_active_epoch_before_starting_a_turn(tmp_path, target):
+    controller, client, executor = _controller(tmp_path, [[_replace()]])
+    controller.resolve(_round(1))
+    epoch = tmp_path / "epochs/epoch_001"
+    if target == "artifact":
+        artifact = epoch / "optimization_policy.py"
+        artifact.chmod(0o644)
+        artifact.write_text("CHANGED = True\n")
+    else:
+        path = epoch / "manifest.json" if target == "manifest" else tmp_path / "active_policy.json"
+        payload = json.loads(path.read_text())
+        if target == "manifest":
+            payload["artifact_sha256"] = "0" * 64
+        else:
+            outside = tmp_path.parent / f"{tmp_path.name}-outside.py"
+            outside.write_bytes((epoch / "optimization_policy.py").read_bytes())
+            payload["artifact_path"] = "../" + outside.name
+        path.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="active policy"):
+        controller.resolve(_round(2))
+    assert client.calls == len(executor.calls) == 1
+    assert not (tmp_path / "rounds/round_002/result.json").exists()
+
+
+@pytest.mark.parametrize("change", ["symlink", "digest"])
+def test_policy_artifact_snapshot_requires_containment_and_integrity(tmp_path, change):
+    store = PolicyStore(tmp_path / "policy")
+    artifact = store.root / "snapshot.py"
+    artifact.write_text("VALID = True\n")
+    descriptor = HarnessSubmittedArtifact(
+        path_pointer="/artifact_path", relative_path="optimization_policy.py",
+        snapshot_path="snapshot.py", sha256=file_sha256(artifact),
+        size_bytes=artifact.stat().st_size,
+    )
+    if change == "symlink":
+        outside = tmp_path / "outside.py"
+        artifact.rename(outside)
+        artifact.symlink_to(outside)
+        expected = "artifact_snapshot_unavailable"
+    else:
+        artifact.write_text("OTHER = True\n")
+        expected = "artifact_digest_mismatch"
+
+    with pytest.raises(PolicyExecutionError) as caught:
+        store.submitted_artifact(descriptor)
+    assert caught.value.errors[0].code == expected
+
+
+def test_policy_epoch_commit_is_idempotent_and_rejects_collisions(tmp_path):
+    store = PolicyStore(tmp_path)
+    contract = FakeAdapter().capability_contract()
+    directory, digest = store.materialize_round(_round(1), contract)
+    artifact = tmp_path / "snapshot.py"
+    artifact.write_text("VALID = True\n")
+    descriptor = HarnessSubmittedArtifact(
+        path_pointer="/artifact_path", relative_path="optimization_policy.py",
+        snapshot_path="snapshot.py", sha256=file_sha256(artifact),
+        size_bytes=artifact.stat().st_size,
+    )
+    result = SimpleNamespace(submission_digest="a" * 64, turn_id="turn-1", session_id="session-1")
+    execution = FakeExecutor().execute(artifact, directory, directory / "validation")
+    epoch = store.commit_epoch(1, digest, result, descriptor, execution, contract=contract)
+    epoch_files = {path: path.read_bytes() for path in (tmp_path / "epochs/epoch_001").iterdir()}
+
+    store.disable_policy()
+    assert store.commit_epoch(1, digest, result, descriptor, execution, contract=contract) == epoch
+    assert store.active_policy()["artifact_sha256"] == descriptor.sha256
+    assert all(path.read_bytes() == content for path, content in epoch_files.items())
+
+    pointer = (tmp_path / "active_policy.json").read_bytes()
+    result.submission_digest = "b" * 64
+    with pytest.raises(ValueError, match="epoch collision"):
+        store.commit_epoch(1, digest, result, descriptor, execution, contract=contract)
+    assert (tmp_path / "active_policy.json").read_bytes() == pointer
+    assert all(path.read_bytes() == content for path, content in epoch_files.items())

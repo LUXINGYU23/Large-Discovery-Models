@@ -96,7 +96,7 @@ The public `ldm_tts.harness` package provides:
 | `PolicyCapabilityContract` | Versioned task feature schema and enabled compiled-policy capabilities. |
 | `PolicyRoundInput` | Aligned numeric history, explicit history identities and rounds, measured records, and task-owned contexts. |
 | `OptimizationPolicyAdapter` | Task-owned prediction feedback and scientific execution validation. |
-| `PolicyResearchController` | Policy rounds, artifact validation, epoch state, resume, and deterministic fallback. |
+| `PolicyResearchController` | Policy turn orchestration, task validation, execution, fallback and usage accounting. |
 | `PolicyExecutor` | Isolated execution boundary for accepted policy artifacts. |
 
 Pi-specific configuration is imported from `ldm_tts.harness.pi`:
@@ -108,6 +108,36 @@ The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
 session lifecycle, automatic context compaction, isolated file and shell tools,
 web and Context7 extensions, MCP clients, terminal submission, and redacted
 provider capture.
+
+### Compiled policy ownership
+
+The compiled-policy implementation separates task contracts, execution and durable
+state. Tasks import the contracts and controller from `ldm_tts.harness`.
+
+| Module | Owns |
+| --- | --- |
+| `policy_contract.py` | Capability schema, validated round inputs, compiled results, task adapter protocol and the replace/keep/disable submission contract |
+| `policy.py` | `PolicyResearchController`: feedback delivery, turn construction, submission validation, execution, fallback selection and usage accounting |
+| `policy_store.py` | `PolicyStore`: round inputs, prediction records, immutable epochs, active pointers, result persistence and integrity checks on resume |
+| `policy_execution.py` | The executor contract and isolated Docker execution of generated artifacts |
+
+`PolicyStore` is a concrete filesystem component. It does not call the model,
+execute artifacts or decide which policy to use. The controller does not read or
+write JSON/NPZ state itself. This follows the separation of execution from durable
+experiment state used in systems such as [MLflow Tracking](https://mlflow.org/docs/latest/tracking/),
+while keeping this implementation local to the existing artifact directory.
+
+Each round freezes its input files before the research turn starts. A replacement
+epoch copies the submitted snapshot, verifies its digest, writes validation and
+evaluation records, and commits its manifest before updating the active pointer.
+Compiled arrays are written before `result.json`; only a result with matching input
+and array digests can be replayed without another turn or usage charge. Failed
+research retains its usage and uses the existing previous-policy/default fallback.
+Prediction records cannot be replaced with different values.
+
+The on-disk layout remains `rounds/round_NNN`, `epochs/epoch_NNN`,
+`active_round.json` and `active_policy.json`. Task tools, collection readers and
+experiment reports use these persisted artifacts without a migration.
 
 ### Optional Pi Extensions
 
