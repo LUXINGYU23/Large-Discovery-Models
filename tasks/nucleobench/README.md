@@ -25,6 +25,8 @@ The upstream source is pinned to commit
 ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, proposal, surrogate, and method contract
 core/factory.py    task-local proposal and selector assembly
+core/workflow_args.py CLI defaults, validation, campaign budgets and method identity
+core/harness_runtime.py role resources, Pi configuration and client assembly
 core/workflow.py   official runner, provider, Harness, budget, and resume orchestration
 core/              mutation validation, prompts, Hamming GP, policy, oracle, reports
 scripts/           source-pinned external-data preparation

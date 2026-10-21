@@ -16,7 +16,7 @@ from ldm_tts.harness.research_runtime import write_fork_provenance
 from ldm_tts.harness.research_store import snapshot_fork
 from tasks.nucleobench.core.harness import harness_profiles
 from tasks.nucleobench.core.mock import MOCK_CONTEXT
-from tasks.nucleobench.core.workflow import _campaign_budget, parse_args
+from tasks.nucleobench.core.workflow_args import campaign_budget, parse_args
 from tasks.nucleobench.tests.test_harness import FakeHarnessClient, _observation
 
 
@@ -248,7 +248,7 @@ def test_coverage_configuration_and_existing_modes(tmp_path):
         args = parse_args(["--search-method", "ldm_harness_compiled", "--iterations", "3",
                            "--harness-research-strategy-config", str(path)])
         assert args.harness_main_research == (name != "independent")
-        budgets[name] = _campaign_budget(args, None)
+        budgets[name] = campaign_budget(args, None)
     assert budgets["coverage"] == budgets["latest"]
     assert budgets["independent"]["harness_turns"] == 8
     assert budgets["coverage"]["harness_turns"] == 10

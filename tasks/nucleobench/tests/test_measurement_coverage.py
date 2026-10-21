@@ -19,7 +19,7 @@ from tasks.nucleobench.core.hamming_gp import NucleotideHammingEncoder
 from tasks.nucleobench.core.measurement import HammingShellCoverage
 from tasks.nucleobench.core.selection import AcquisitionTiltedSelector
 from tasks.nucleobench.core.task_spec import build_task_spec
-from tasks.nucleobench.core.workflow import _campaign_budget, parse_args
+from tasks.nucleobench.core.workflow_args import campaign_budget, parse_args
 
 
 @pytest.fixture
@@ -137,7 +137,7 @@ def test_coverage_configuration_preserves_fork_archive_and_campaign_budgets(rese
         args = parse_args(["--search-method", "ldm_harness_compiled", "--iterations", "21",
                            "--evaluations-per-round", "16", "--harness-candidates-per-session", "32",
                            "--bo-pool-size", "64", "--harness-research-strategy-config", str(path)])
-        budgets.append(_campaign_budget(args, None))
+        budgets.append(campaign_budget(args, None))
     assert budgets[0] == budgets[1]
     context = reservoir[0]
     _, built = build_surrogate_components("ldm_harness_compiled", context, evaluations_per_round=16,

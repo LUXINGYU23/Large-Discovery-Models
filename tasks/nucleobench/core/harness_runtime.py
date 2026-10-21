@@ -17,9 +17,12 @@ from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.pi import PiForkSource, PiHarnessConfig, policy_mcp_server
 from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
-from tasks.nucleobench.core.constants import PARALLEL_HARNESS_METHODS, TASK_ID
+from tasks.nucleobench.core.constants import (
+    COMPILED_POLICY_METHOD, PARALLEL_HARNESS_METHODS, PERSISTENT_HARNESS_METHODS, TASK_ID,
+)
 from tasks.nucleobench.core.harness import (
-    HARNESS_FORBIDDEN_PATTERNS, direct_harness_profile, harness_guest_runtime,
+    DIRECT_HARNESS_PROFILE_ID, HARNESS_FORBIDDEN_PATTERNS, HARNESS_SKILL_IDS,
+    direct_harness_profile, harness_guest_runtime,
     harness_profiles, harness_submission_contract, harness_tool_extensions,
     write_harness_sequence_context,
 )
@@ -147,3 +150,46 @@ def sol_pi_config(args: argparse.Namespace) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         raise ValueError("SoL-Pi configuration must be a JSON object")
     return value
+
+
+def describe(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.search_method not in PERSISTENT_HARNESS_METHODS:
+        return None
+    profiles = (
+        args.harness_profile
+        if args.search_method in PARALLEL_HARNESS_METHODS
+        else (DIRECT_HARNESS_PROFILE_ID,)
+    )
+    description = {
+        "research_mode": "open_research",
+        "image": args.harness_sidecar_image,
+        "profile_ids": [profile.profile_id for profile in proposal_profiles(args)],
+        "profile_roles": list(profiles),
+        "session_count": len(profiles),
+        "candidates_per_session": args.harness_candidates_per_session,
+        "unique_candidates_per_session": (
+            args.search_method == "harness" or args.harness_unique_candidates
+        ),
+        "thinking": args.harness_thinking,
+        "surrogate_query": args.harness_surrogate_query,
+        "wall_time_seconds": args.harness_wall_time_seconds,
+        "response_timeout_seconds": args.harness_response_timeout,
+        "tool_call_budgets": parse_tool_call_budgets(
+            args.harness_tool_budget,
+            excluded_tools=("submit_candidates",),
+        ),
+        "context7_enabled": args.harness_context7,
+        "mcp_configured": args.harness_mcp_config is not None,
+        "skills_loaded": True,
+        "skill_ids": list(HARNESS_SKILL_IDS),
+        "sol_pi": sol_pi_config(args),
+        "main_research": args.harness_main_research,
+        "research_strategy": args.harness_research_strategy_identity,
+    }
+    if args.search_method == COMPILED_POLICY_METHOD:
+        description["policy_session"] = {
+            "profile_id": "policy_architect",
+            "skills_loaded": True,
+            "editable_components": ["prior_mean", "alpha", "eta"],
+        }
+    return description
