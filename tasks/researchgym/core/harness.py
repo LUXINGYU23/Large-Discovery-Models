@@ -343,10 +343,10 @@ def create_client(args, root: Path, campaign_id: str, case: CaseSpec, *, policy:
                 diagnostics_path="/resources/policy_diagnostics.py",
                 diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"))) if policy else mcp.servers,
             thinking=args.harness_thinking, context7_enabled=args.harness_context7,
-            # The configured LiteLLM model rejects required mode when the
-            # research agent exposes several tools.  Let it choose among them.
-            force_first_tool_call=False,
-            provider_request_body={"max_output_tokens": args.llm_max_tokens,
+            # The deployed Pi sidecar's request-body override is applied after
+            # its first-turn hook.  This endpoint rejects required mode when
+            # the research agent exposes several tools.
+            provider_request_body={"tool_choice": "auto", "max_output_tokens": args.llm_max_tokens,
                                    **generation_body(wire_api="responses", reasoning=args.llm_reasoning,
                                                      extra_body=json.loads(args.llm_extra_body_json))},
             limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds,

@@ -69,10 +69,10 @@ def test_profiles_and_tools_are_digest_bound():
     assert file_sha256(RESOURCE_ROOT / TOOL_FILE)
 
 
-def test_researchgym_does_not_force_unsupported_first_tool_choice(tmp_path):
+def test_researchgym_overrides_unsupported_first_tool_choice(tmp_path):
     source = make_source(tmp_path, "valid", sessions=1)
     try:
-        assert source.client.config.force_first_tool_call is False
+        assert source.client.config.provider_request_body["tool_choice"] == "auto"
     finally:
         source.client.close()
 
