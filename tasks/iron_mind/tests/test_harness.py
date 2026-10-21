@@ -496,7 +496,7 @@ def test_engine_checkpoint_preserves_research_notes(
             )
         )
 
-    monkeypatch.setattr("tasks.iron_mind.core.workflow._harness_client", fake_client)
+    monkeypatch.setattr("tasks.iron_mind.core.harness_runtime.create_client", fake_client)
     assert (
         main(
             [

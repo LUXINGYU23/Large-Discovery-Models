@@ -44,6 +44,33 @@ private research transcript. A task sends initial measurement indexes and then
 monotonic deltas. Its tools and validator check the authoritative evaluated set;
 full candidate details can be retrieved on demand.
 
+### Host runtime assembly
+
+All six tasks use `ldm_tts.harness.container.pi_sidecar_command` for Docker
+launches. It owns Docker host/user selection, local KVM group access, the Gondolin
+cache and overlay directories, runtime environment variables, and the artifact
+and cache mounts. Tasks pass their additional mounts and environment variables
+explicitly; the launcher does not inspect task arguments or choose a research role.
+
+| Component | Owns |
+| --- | --- |
+| Task client factory | Public context files, role profiles, submission contracts, task tools, MCP servers, network policy and per-role limits in `PiHarnessConfig` |
+| `pi_sidecar_command` | Host paths and Docker arguments; common writable runtime mounts and explicitly declared task mounts |
+| `HarnessClient` | Process start/close, secret bootstrap, protocol validation and execution; constructing a client does not start it |
+| `ResearchCoordinator` / task expander | Main and branch scheduling, immutable fork sources, evidence and usage accounting |
+
+Iron Mind, SynthonBench and NucleoBench expose `create_client` in their
+`core/harness_runtime.py`; their workflows compose these clients with scientific
+components. AlphaBench's `core/harness_runtime.py` also owns the lifetime of its
+host tool service. AtomWorld and ReaSyn keep their task client factories beside
+their submission adapters in `core/harness.py`. NucleoBench resolves provider
+settings and request-body JSON in `core/provider.py` for both direct and Pi calls.
+
+The main, proposal and compiled-policy clients retain separate task configurations
+and artifact roots. Read-only resources, policy measurement exports and AlphaBench's
+writable host socket remain explicit mounts. Credentials go through
+`HarnessClient`'s secret bootstrap, not the launch command.
+
 The reference tasks' query tools also export exact data into read-only guest
 files. The tool returns a guest-visible path and SHA-256; scripts read those
 files without retranscribing model-visible records. Content and filtering remain

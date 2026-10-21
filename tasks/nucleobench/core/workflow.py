@@ -5,18 +5,16 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 from argparse import Namespace
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS, PiForkSource, PiHarnessConfig, policy_mcp_server
+from tasks.nucleobench.core import harness_runtime, provider as provider_config
+
+from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.contracts import LDMTaskSpec
-from ldm_tts.harness.protocol import file_sha256
-from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.reporting import (
@@ -32,16 +30,12 @@ from ldm_tts.harness import (
     DockerPolicyExecutor,
     HarnessClient,
     HarnessError,
-    HarnessLimits,
-    HarnessNetworkPolicy,
     HarnessProfile,
-    HarnessSubmissionContract,
     PolicyResearchController,
     load_harness_mcp_config,
     parse_tool_call_budgets,
-    policy_submission_contract,
 )
-from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
+from ldm_tts.harness.container import resolve_container_user
 from ldm_tts.optimization.records import AcquisitionSelector, SurrogateEncoder
 from ldm_tts.registration.experiment import (
     ExperimentContract,
@@ -86,15 +80,8 @@ from ldm_tts.harness.research_strategy import configure_research_strategy
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
-    HARNESS_FORBIDDEN_PATTERNS,
     HARNESS_PROFILE_IDS,
     HARNESS_SKILL_IDS,
-    direct_harness_profile,
-    harness_guest_runtime,
-    harness_profiles,
-    harness_submission_contract,
-    harness_tool_extensions,
-    write_harness_sequence_context,
 )
 from tasks.nucleobench.core.mock import (
     MOCK_CASE,
@@ -143,13 +130,6 @@ LLM_REASONING_LEVELS = (
 HARNESS_THINKING_LEVELS = tuple(
     level for level in LLM_REASONING_LEVELS if level != "none"
 )
-
-
-@dataclass(frozen=True)
-class ProviderSettings:
-    base_url: str
-    model: str
-    api_key: str
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -314,7 +294,7 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         args.mock or args.search_method not in {"ldm", *PARALLEL_HARNESS_METHODS}
     ):
         parser.error("measurement coverage requires real acquisition-tilted selection")
-    if isinstance(strategy.fork_policy, CoverageForks) and len(_harness_profiles(args)) < 3:
+    if isinstance(strategy.fork_policy, CoverageForks) and len(harness_runtime.proposal_profiles(args)) < 3:
         parser.error("coverage forks require at least three research profiles")
     if args.harness_main_research and (
         args.search_method not in PARALLEL_HARNESS_METHODS or args.harness_sol_pi_config is not None
@@ -451,7 +431,7 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             or not value.startswith(("resolve-library-id=", "query-docs="))
         ]
     try:
-        _parse_extra_body(args.llm_extra_body_json)
+        provider_config.parse_extra_body(args.llm_extra_body_json)
         budgets = parse_tool_call_budgets(
             args.harness_tool_budget,
             excluded_tools=("submit_candidates",),
@@ -530,7 +510,7 @@ def main(argv: list[str] | None = None) -> int:
             "official execution. Run the case qualification gates first."
         )
     provider = (
-        resolve_provider_settings(args)
+        provider_config.resolve_provider_settings(args)
         if not args.mock and args.search_method != "bo"
         else None
     )
@@ -560,7 +540,7 @@ def _run_payload(
     task_spec: LDMTaskSpec,
     contract_sha256: str,
     profile_name: str,
-    provider: ProviderSettings | None,
+    provider: provider_config.ProviderSettings | None,
 ) -> dict[str, Any]:
     return {
         "task": TASK_ID,
@@ -686,7 +666,7 @@ def _run_real(
     case: NucleoBenchCase,
     contract: ExperimentContract,
     profile_name: str,
-    provider: ProviderSettings | None,
+    provider: provider_config.ProviderSettings | None,
     payload: dict[str, Any],
 ) -> int:
     if args.source_dir is None or args.prepared_dir is None:
@@ -766,7 +746,7 @@ def _run_real(
     harness_client: HarnessClient | None = None
     forked_expander = None
     stack = ExitStack()
-    profiles = _harness_profiles(args)
+    profiles = harness_runtime.proposal_profiles(args)
     if args.search_method != "bo":
         assert provider is not None
         missing = _missing_provider(provider)
@@ -790,11 +770,11 @@ def _run_real(
                 (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
                 forked_expander = ForkedResearchExpander(
                     root=runtime.run_dir / "harness",
-                    main_client=lambda: _harness_client(
+                    main_client=lambda: harness_runtime.create_client(
                         args, runtime, provider, prepared, main_research_profile(), mcp,
                         artifact_root=runtime.run_dir / "harness/main", contract=research_contract(),
                     ),
-                    branch_client=lambda root, source: _harness_client(
+                    branch_client=lambda root, source: harness_runtime.create_client(
                         args, runtime, provider, prepared, profiles, mcp,
                         artifact_root=root, fork_sources=source,
                     ),
@@ -810,7 +790,7 @@ def _run_real(
                 )
             else:
                 harness_client = stack.enter_context(
-                    _harness_client(args, runtime, provider, prepared, profiles, mcp)
+                    harness_runtime.create_client(args, runtime, provider, prepared, profiles, mcp)
                 )
             if args.search_method == COMPILED_POLICY_METHOD:
                 policy_adapter = NucleoOptimizationPolicyAdapter(
@@ -831,7 +811,7 @@ def _run_real(
                     measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
                 )
                 policy_client = stack.enter_context(
-                    _harness_client(
+                    harness_runtime.create_client(
                         args, runtime, provider, prepared, policy_harness_profile(), mcp,
                         policy=True,
                     )
@@ -1135,7 +1115,7 @@ def _official_output_dir(runtime: CampaignRuntime, next_round: int) -> Path:
 
 def _proposal_client(
     args: argparse.Namespace,
-    provider: ProviderSettings,
+    provider: provider_config.ProviderSettings,
 ) -> Any:
     return build_openai_mutation_client(
         base_url=provider.base_url,
@@ -1146,122 +1126,11 @@ def _proposal_client(
         max_tokens=args.llm_max_tokens,
         temperature=args.llm_temperature,
         reasoning=args.llm_reasoning,
-        extra_body=_parse_extra_body(args.llm_extra_body_json),
+        extra_body=provider_config.parse_extra_body(args.llm_extra_body_json),
     )
 
 
-def _harness_profiles(args: argparse.Namespace):
-    if args.search_method in PARALLEL_HARNESS_METHODS:
-        return harness_profiles(args.harness_profile)
-    if args.search_method == "harness":
-        return direct_harness_profile()
-    return ()
-
-
-def _harness_client(
-    args: argparse.Namespace,
-    runtime: CampaignRuntime,
-    provider: ProviderSettings,
-    prepared: PreparedCase,
-    profiles: Sequence[HarnessProfile],
-    mcp,
-    *,
-    policy: bool = False,
-    artifact_root: Path | None = None,
-    contract: HarnessSubmissionContract | None = None,
-    fork_sources: dict[str, PiForkSource] | None = None,
-) -> HarnessClient:
-    artifact_root = (artifact_root or runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
-    resource_root = (TASK_ROOT / "resources" / "harness").resolve()
-    artifact_root.mkdir(parents=True, exist_ok=True)
-    write_harness_sequence_context(
-        prepared.context,
-        artifact_root / "sequence_context.json",
-    )
-    mounts = [(resource_root, "/resources", True)]
-    surrogate_query = args.harness_surrogate_query and not policy and contract is None
-    query_environment = {}
-    if surrogate_query:
-        mounts.append((
-            TASK_ROOT / "core/hamming_posterior.py", "/task_runtime/hamming_posterior.py", True,
-        ))
-        query_environment["LDM_NUCLEOBENCH_SURROGATE"] = "/artifacts/surrogate"
-        query_environment["PYTHONPATH"] = "/task_runtime"
-    mcp_servers = mcp.servers
-    if policy:
-        mounts.append((DIAGNOSTICS_PATH, "/task_runtime/ucb_diagnostics.py", True))
-        submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
-        history_path = "/measured_history/observations.json"
-        mounts.append((
-            (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.resolve(),
-            "/measured_history", True,
-        ))
-        for source, destination in (
-            ("README.md", "task_README.md"),
-            ("resources/README.md", "resources_README.md"),
-            ("resources/cases/catalog.json", "case_catalog.json"),
-            ("resources/upstream_contract.json", "upstream_contract.json"),
-            ("resources/verification_record.json", "verification_record.json"),
-        ):
-            mounts.append(((TASK_ROOT / source).resolve(), f"/public/{destination}", True))
-        mcp_servers = (*mcp_servers, policy_mcp_server(
-            diagnostics_path="/task_runtime/ucb_diagnostics.py",
-            diagnostics_sha256=file_sha256(DIAGNOSTICS_PATH),
-        ))
-    else:
-        submission_contract = contract or harness_submission_contract(args.harness_candidates_per_session)
-        history_path = "/artifacts/measured_history/observations.json"
-        (artifact_root / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
-    return HarnessClient(
-        pi_sidecar_command(
-            artifact_root,
-            args.harness_sidecar_image,
-            cache_root=args.harness_cache_dir,
-            docker_host=args.harness_docker_host,
-            container_user=args.harness_container_user,
-            environment={
-                "LDM_NUCLEOBENCH_CONTEXT": "/artifacts/sequence_context.json",
-                "LDM_NUCLEOBENCH_HISTORY": history_path,
-                **query_environment,
-            },
-            mounts=mounts,
-        ),
-        api_key=provider.api_key,
-        config=PiHarnessConfig(
-            artifact_root=Path("/artifacts"),
-            base_url=provider.base_url,
-            model=provider.model,
-            profiles=profiles,
-            campaign_id=runtime.run_id,
-            task_id=TASK_ID,
-            case_id=f"{args.case_id}:optimization_policy" if policy else args.case_id,
-            seed=args.campaign_index,
-            submission_contract=submission_contract,
-            guest_runtime=harness_guest_runtime(),
-            tool_extensions=harness_tool_extensions(surrogate_query=surrogate_query),
-            mcp_servers=mcp_servers,
-            thinking=args.harness_thinking,
-            sol_pi=_sol_pi_config(args),
-            fork_sources=fork_sources or {},
-            provider_request_body=_parse_extra_body(args.llm_extra_body_json),
-            limits=HarnessLimits(
-                wall_time_seconds=args.harness_wall_time_seconds,
-                tool_call_budgets=parse_tool_call_budgets(
-                    args.policy_tool_budget if policy else args.harness_tool_budget,
-                    excluded_tools=(submission_contract.tool_name,),
-                ),
-            ),
-            network_policy=HarnessNetworkPolicy(
-                forbidden_query_patterns=HARNESS_FORBIDDEN_PATTERNS,
-            ),
-            context7_enabled=args.harness_context7,
-        ),
-        named_secrets=mcp.named_secrets,
-        response_timeout_seconds=args.harness_response_timeout,
-    )
-
-
-def _missing_provider(provider: ProviderSettings) -> str:
+def _missing_provider(provider: provider_config.ProviderSettings) -> str:
     missing = [
         name
         for name, value in (
@@ -1338,7 +1207,7 @@ def _method_preset_sha256(
             "reasoning": args.llm_reasoning,
             "temperature": args.llm_temperature,
             "max_tokens": args.llm_max_tokens,
-            "extra_body": _parse_extra_body(args.llm_extra_body_json),
+            "extra_body": provider_config.parse_extra_body(args.llm_extra_body_json),
         },
         "harness": _harness_description(args),
         "compiled_policy": (
@@ -1423,7 +1292,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
     description = {
         "research_mode": "open_research",
         "image": args.harness_sidecar_image,
-        "profile_ids": [profile.profile_id for profile in _harness_profiles(args)],
+        "profile_ids": [profile.profile_id for profile in harness_runtime.proposal_profiles(args)],
         "profile_roles": list(profiles),
         "session_count": len(profiles),
         "candidates_per_session": args.harness_candidates_per_session,
@@ -1442,7 +1311,7 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
         "mcp_configured": args.harness_mcp_config is not None,
         "skills_loaded": True,
         "skill_ids": list(HARNESS_SKILL_IDS),
-        "sol_pi": _sol_pi_config(args),
+        "sol_pi": harness_runtime.sol_pi_config(args),
         "main_research": args.harness_main_research,
         "research_strategy": args.harness_research_strategy_identity,
     }
@@ -1453,63 +1322,6 @@ def _harness_description(args: argparse.Namespace) -> dict[str, Any] | None:
             "editable_components": ["prior_mean", "alpha", "eta"],
         }
     return description
-
-
-def _sol_pi_config(args: argparse.Namespace) -> dict[str, Any] | None:
-    if args.harness_sol_pi_config is None:
-        return None
-    value = json.loads(args.harness_sol_pi_config.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError("SoL-Pi configuration must be a JSON object")
-    return value
-
-
-def resolve_provider_settings(
-    args: argparse.Namespace,
-    *,
-    environ: Mapping[str, str] | None = None,
-) -> ProviderSettings:
-    environment = os.environ if environ is None else environ
-    api_key = ""
-    if args.api_key_file is not None:
-        key_path = args.api_key_file.expanduser()
-        if key_path.is_file():
-            api_key = key_path.read_text(encoding="utf-8").strip()
-            if not api_key:
-                raise ValueError("API key file is empty")
-        elif not args.dry_run:
-            raise FileNotFoundError(f"API key file does not exist: {key_path}")
-    if not api_key:
-        api_key = _first_configured(environment, "LLM_API_KEY", "OPENAI_API_KEY")
-    return ProviderSettings(
-        base_url=_configured(args.llm_url)
-        or _first_configured(environment, "LLM_BASE_URL"),
-        model=_configured(args.llm_model_name)
-        or _first_configured(environment, "LLM_MODEL_NAME"),
-        api_key=api_key,
-    )
-
-
-def _parse_extra_body(raw: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"--llm-extra-body-json is not valid JSON: {exc.msg}") from exc
-    if not isinstance(payload, dict):
-        raise TypeError("--llm-extra-body-json must decode to a JSON object")
-    return payload
-
-
-def _configured(value: str | None) -> str:
-    return "" if value is None else str(value).strip()
-
-
-def _first_configured(environment: Mapping[str, str], *names: str) -> str:
-    for name in names:
-        value = _configured(environment.get(name))
-        if value:
-            return value
-    return ""
 
 
 def build_official_runner_args(
@@ -1616,6 +1428,5 @@ __all__ = [
     "describe_ldm_task",
     "main",
     "parse_args",
-    "resolve_provider_settings",
     "run_official_driver",
 ]

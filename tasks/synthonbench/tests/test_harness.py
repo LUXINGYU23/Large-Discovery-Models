@@ -610,7 +610,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
         )
 
     monkeypatch.setattr(
-        "tasks.synthonbench.core.workflow._harness_client",
+        "tasks.synthonbench.core.harness_runtime.create_client",
         fake_client,
     )
 
@@ -705,7 +705,7 @@ def test_mock_direct_harness_evaluates_all_sixteen_submissions(
         )
 
     monkeypatch.setattr(
-        "tasks.synthonbench.core.workflow._harness_client",
+        "tasks.synthonbench.core.harness_runtime.create_client",
         fake_client,
     )
 

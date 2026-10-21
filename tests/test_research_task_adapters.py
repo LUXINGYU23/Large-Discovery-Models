@@ -130,7 +130,7 @@ def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys,
         candidate = {**candidates[turn.round_index], "change_summary": "Test a measured alternative.",
                      "rationale": "Use the task feedback to test this candidate."}
         return "candidates.json", json.dumps({"candidates": [candidate]}), {}
-    events = install_fixture(monkeypatch, workflow, payload)
+    events = install_fixture(monkeypatch, import_module(f"tasks.{task}.core.harness_runtime"), payload)
     assert workflow.main(argv) == 0
     root = Path(json.loads(capsys.readouterr().out)["run_dir"])
     check_tree(root / "harness", 2)

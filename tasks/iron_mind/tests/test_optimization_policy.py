@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+from tasks.iron_mind.core.harness_runtime import create_client
+
 import numpy as np
 import pytest
 
@@ -31,7 +33,6 @@ from tasks.iron_mind.core.schema import (
 )
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.workflow import (
-    _harness_client,
     describe_ldm_task,
     parse_args,
 )
@@ -386,7 +387,7 @@ def test_policy_sidecar_mounts_only_public_task_resources(tmp_path) -> None:
         ]
     )
     table = workflow._load_mock_table(workflow._schema_for("buchwald_hartwig"))
-    client = _harness_client(
+    client = create_client(
         args,
         SimpleNamespace(run_dir=tmp_path / "run", run_id="campaign-test"),
         SimpleNamespace(

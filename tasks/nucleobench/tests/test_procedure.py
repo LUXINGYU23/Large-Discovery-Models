@@ -12,7 +12,8 @@ from ldm_tts.registration.experiment import load_experiment_contract
 from tasks.nucleobench.core import dependencies
 from tasks.nucleobench.core.cases import CaseCatalogError, load_case_catalog
 from tasks.nucleobench.core.constants import CATALOG_PATH
-from tasks.nucleobench.core.workflow import describe_ldm_task, resolve_provider_settings
+from tasks.nucleobench.core.workflow import describe_ldm_task
+from tasks.nucleobench.core.provider import resolve_provider_settings
 from tasks.nucleobench.ldm_task.procedure import main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
