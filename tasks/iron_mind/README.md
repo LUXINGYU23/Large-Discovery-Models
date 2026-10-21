@@ -49,11 +49,18 @@ ldm_task/          shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/harness_runtime.py Pi proposal trees, policy assembly and client lifetimes
 core/research.py   measured-history projection and candidate-file admission
 resources/         versioned fixtures, Harness profiles/tools, and upstream provenance
 scripts/           data preparation and result aggregation
 tests/             task-local tests
 ```
+
+The workflow owns the resource `ExitStack`; runtime assembly registers proposal
+and policy clients before startup. `MeasuredResearchExpander` coordinates the
+shared research tree, while task adapters retain legal conditions, measured
+evidence and compiled-policy validation. Evaluation reservation and replay use
+the shared engine; reaction scoring and empirical q0 remain task-owned.
 
 ## Campaign Protocol
 

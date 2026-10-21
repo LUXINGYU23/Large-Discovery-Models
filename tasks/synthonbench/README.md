@@ -22,6 +22,7 @@ ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/harness_runtime.py Pi proposal trees, policy assembly and client lifetimes
 core/research.py   measured-history projection and candidate-file admission
 core/              tuple validation, prompts, Tanimoto GP, compiled-policy adapter, oracle adapter
 scripts/           source-pinned official data preparation
@@ -45,6 +46,12 @@ LDM interfaces without importing another task.
 The code is MIT licensed and the dataset card declares CC-BY-4.0. See
 [`resources/upstream_contract.json`](resources/upstream_contract.json) for the
 task's machine-readable provenance.
+
+The workflow owns the resource `ExitStack`; runtime assembly opens proposal and
+policy clients and registers cleanup before startup. `MeasuredResearchExpander`
+uses the shared tree coordinator. Reaction ordering, legal synthon tuples,
+product identity and feature encoding remain in task adapters. Shared engine
+receipts preserve selected oracle results across resume without redispatch.
 
 ## LDM Method
 

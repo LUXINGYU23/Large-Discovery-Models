@@ -8,6 +8,15 @@ LDM Harness 默认使用 **CoverageForks 2+2**：两条最新主干分叉、一�
 
 [完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。正式比较合同、预算和矩阵真实 run 尚未完成，全部格仍保持 blocked。用户已允许用同一批不完整数据做方法比较：真实协议须显式设置 `data_policy=partial_comparison`，绑定原始审计的 `data_digest`，各比较方法使用同一数据清单、后端、市场、切分和缺失规则。结果标为部分数据比较，不声称原论文数值复现。`qualified_only` 仍是默认门槛；两种模式都逐文件验证实际资产。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
 
+## 代码职责
+
+`ldm_task/procedure.py` 解析入口与冻结协议，`core/workflow.py` 装配实际的
+`OracleGateway`、科学适配器和共享 `LDMEngine`，不通过延迟绑定字典转发调用。
+`CampaignRequest.open_runtime` 创建并校验预算／运行身份，原生算法继续使用自己的执行路径。
+`harness_runtime.py` 负责 proposal、compiled policy 和 Host 工具服务的装配；工作流的
+`ExitStack` 在正常结束或启动失败时关闭客户端，再关闭 socket 服务。
+共享引擎负责评估回执和 checkpoint 顺序；Host 授权、私有 validation/test 与最终报告仍由任务负责。
+
 ## 已实现的路径
 
 `llm` 与 `ldm` 的共享 Campaign 生命周期已接线：独立初始化、完整表达式准入、最多五次修复、真实请求预算/receipt、search→private validation、固定选择→逐因子 full test、独立组合、质量审计及 accepted-action 训练数据导出。Qlib worker 复用固定 FFO 指标和 TopkDropout 回测。[Assay worker](ASSAY.md) 使用固定官方算子和独立回测器，补齐历史成分、逐日分类、实际基准及离线资产校验。

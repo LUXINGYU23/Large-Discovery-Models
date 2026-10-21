@@ -38,6 +38,11 @@ the existing recovery allowance, sampling seed span, scientific identity checks
 and usage counters. Moving these responsibilities does not change 2+2 selection,
 projection quotas, oracle limits or the report schema.
 
+The shared engine's evaluation executor owns attempt reservation, result
+publication and checkpoint ordering. ReaSyn supplies durable projection/oracle
+receipts and retains ownership of minibatch replenishment and the attribution
+of measured products to their originating proposal occurrences.
+
 ## What LDM controls
 
 | Track | Candidate and reservoir expansion | Expensive evaluation | Reported metric |

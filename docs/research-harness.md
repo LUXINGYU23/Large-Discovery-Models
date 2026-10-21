@@ -56,7 +56,8 @@ explicitly; the launcher does not inspect task arguments or choose a research ro
 | --- | --- |
 | Task client factory | Public context files, role profiles, submission contracts, task tools, MCP servers, network policy and per-role limits in `PiHarnessConfig` |
 | `pi_sidecar_command` | Host paths and Docker arguments; common writable runtime mounts and explicitly declared task mounts |
-| `HarnessClient` | Process start/close, secret bootstrap, protocol validation and execution; constructing a client does not start it |
+| `HarnessClient` | Process start/close, secret bootstrap, request correlation and bounded recovery; constructing a client does not start it |
+| `harness/protocol.py` / `responses.py` | Protocol values and errors / response structure, submission digests and usage validation |
 | `ResearchCoordinator` / task expander | Main and branch scheduling, immutable fork sources, evidence and usage accounting |
 
 Iron Mind, SynthonBench, NucleoBench, ReaSyn and AtomWorld expose `create_client` in their
@@ -65,6 +66,24 @@ components. AlphaBench's `core/harness_runtime.py` also owns the lifetime of its
 host tool service. AtomWorld's submission adapter owns sample-specific evidence
 and client reuse; its runtime factory mounts only the sample's public workspace. NucleoBench resolves provider
 settings and request-body JSON in `core/provider.py` for both direct and Pi calls.
+
+Task workflows own an `ExitStack` for clients and tool services. Runtime assembly
+registers cleanup before explicit startup; `HarnessClient.__enter__` also stops
+a failed startup before returning an error. A main or forked branch has a per-turn lifetime, while
+independent proposal and compiled-policy sessions span the campaign. AtomWorld
+instead owns pools per sample and closes a sample before switching to the next.
+AlphaBench closes its clients before the Host socket service. A completed resume
+uses durable results without starting a new research turn.
+
+The shared engine keeps lifecycle values in `engine/state.py`, round progression
+in `engine/runtime.py` and evaluation execution in `engine/evaluation.py`.
+`CampaignRuntime` remains the storage boundary. A selection is persisted before
+dispatch; a receipt and its attempt charge are saved before the evaluator call.
+Returned results are saved before observation events and checkpoints; batches are
+saved together before publishing the first observation. The completed-round
+checkpoint precedes removal of the active selection. Recovery replays saved
+results and cumulative charges; an unknown dispatched result without a durable
+receipt still pauses. Task adapters do not edit this recovery state.
 
 The main, proposal and compiled-policy clients retain separate task configurations
 and artifact roots. Read-only resources, policy measurement exports and AlphaBench's

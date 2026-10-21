@@ -10,6 +10,17 @@ or latest-main 4fork. Strategy changes require a new campaign identity.
 
 This task uses the shared `run_campaign → LDMEngine → CampaignRuntime` lifecycle to apply a public natural-language operation to a public input CIF. The official evaluator owns the private target. All scheduled revisions are fixed before execution; the **last scheduled answer** determines the final score.
 
+## Code boundaries
+
+`core/workflow_args.py` resolves CLI configuration; `provenance.py` binds the
+fixed sample/revision schedule and checks it on resume. `workflow.py` assembles
+and runs the shared campaign. `harness_runtime.py` owns provider preflight and
+Pi client construction; `harness.py` owns sample-specific pools, submission
+validation and authorized evidence. Each sample gets a separate research tree.
+`reporting.py` reports the final scheduled answer, including when an earlier
+draft received a better hidden score. Evaluator receipts and shared engine
+replay preserve completed judgments without charging them again.
+
 ## Methods and scientific protocol
 
 | Configuration | Method | Visible feedback |

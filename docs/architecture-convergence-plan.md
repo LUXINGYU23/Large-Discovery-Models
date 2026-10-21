@@ -1,9 +1,9 @@
 # 架构收敛实施计划
 
-日期：2026-10-21。状态：执行中。
+日期：2026-10-21。状态：P1—P5 已完成；外部资产限制见最终验收。
 
 代码基线：`31f923efe71e75f7b517039a16b9d0d609321ded`，分支：`codex/default-coverage-tree`。
-本计划落实后续重构范围、顺序和验收要求；下方未勾选的工作尚未完成。
+执行对照基线为计划提交 165f048f，其代码与上述基线相同。下方记录已实施的范围、提交与验收结果。
 
 ## 目标与范围
 
@@ -101,7 +101,7 @@ LDM 模式仅增加既有授权反馈；结果仍按最终提交报告，不使�
 - [x] 检查两者重复逻辑；只合并稳定且任务无关的部分，优先复用现有 `MeasuredResearchExpander`。
 - [x] AlphaBench 集中管理 Harness、policy 客户端和 Host 工具服务的启动、绑定与关闭。
 - [x] 减少 AlphaBench 主流程中通过可变字典和转发对象连接组件的逻辑，保持 Host 授权及 native 执行路径。
-- [ ] 核对 NucleoBench、ReaSyn 的入口、装配和已完成恢复路径，移除遗留绕行。
+- [x] 核对 NucleoBench、ReaSyn 的入口、装配和已完成恢复路径，移除遗留绕行。
 
 验收：三个任务分别完成默认 2+2 的端到端合成 Harness 验证；检查独立 session、4fork
 及 compiled policy 路径；启动中途失败时关闭已创建资源。AlphaBench 验证／测试反馈保持私有，
@@ -123,7 +123,7 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 - [x] 将评估回执、预算预留、dispatch、结果保存和恢复集中为一个明确的执行单元。
 - [x] 使主循环负责阶段推进；存储层继续负责持久化，不让任务自行操作引擎恢复状态。
 - [x] 保持已有持久化位置与顺序，包括 `engine_active_selection`、usage key、批量返回结果先整体保存。
-- [ ] 同步更新六个 Harness 任务及其他共享引擎调用方，不增加新的 Campaign 或恢复框架。
+- [x] 同步更新六个 Harness 任务及其他共享引擎调用方，不增加新的 Campaign 或恢复框架。
 
 验收：在请求发出后、结果保存后、事件写入后、checkpoint 前等现有故障边界恢复；
 已保存结果不重调 evaluator、不重复扣费；未知结果且没有可靠回执时继续暂停。
@@ -167,12 +167,12 @@ length-stop、分支排空及提交重放测试均保留并通过。
 
 ### P5：全仓调用方和文档验收
 
-- [ ] 检查入口、配置、脚本、测试及文档中对移动实现的引用，清除死代码与旧接口。
-- [ ] 整理重复或实现细节测试，保留核心行为、科学边界和恢复故障测试。
-- [ ] 更新六任务 README、`research-harness.md`、`research-search-architecture.md` 和 `testing.md`。
-- [ ] 补齐任务装配、资源所有权、持久化提交顺序和恢复限制的说明，注明可运行验证命令。
-- [ ] 完成任务注册、六任务配置与合成运行、共享引擎调用方、Pi 运行时的最终回归矩阵。
-- [ ] 保存最终验证记录，逐项列出通过、失败和跳过原因；更新本计划状态及各阶段提交。
+- [x] 检查入口、配置、脚本、测试及文档中对移动实现的引用，清除死代码与旧接口。
+- [x] 整理重复或实现细节测试，保留核心行为、科学边界和恢复故障测试。
+- [x] 更新六任务 README、`research-harness.md`、`research-search-architecture.md` 和 `testing.md`。
+- [x] 补齐任务装配、资源所有权、持久化提交顺序和恢复限制的说明，注明可运行验证命令。
+- [x] 完成任务注册、六任务配置与合成运行、共享引擎调用方、Pi 运行时的最终回归矩阵。
+- [x] 保存最终验证记录，逐项列出通过、失败和跳过原因；更新本计划状态及各阶段提交。
 
 文档随每批实现同步更新；本阶段负责汇总与查漏，不让文档长期描述尚未实现的结构。
 
@@ -201,12 +201,61 @@ length-stop、分支排空及提交重放测试均保留并通过。
 
 ## 完成标准
 
-- [ ] P1—P5 全部完成，每批均有独立提交和对应验证证据。
-- [ ] 六个任务的工作流、装配与科学逻辑职责明确，所有受影响调用方完成更新。
-- [ ] 共享层保持任务无关；没有因重构新增无实际用途的接口、依赖或兼容层。
-- [ ] 默认策略、科学预算、数据权限、报告与恢复行为满足上述约束。
-- [ ] 被替代的代码、wrapper、旧测试和失效注释已删除。
-- [ ] 文档与实际实现一致，未验证的集成边界有明确说明。
-- [ ] 历史实验、原始 trace 和 provenance 保留；工作树无遗漏改动。
+- [x] P1—P5 全部完成，每批均有独立提交和对应验证证据。
+- [x] 六个任务的工作流、装配与科学逻辑职责明确，所有受影响调用方完成更新。
+- [x] 共享层保持任务无关；没有因重构新增无实际用途的接口、依赖或兼容层。
+- [x] 默认策略、科学预算、数据权限、报告与恢复行为满足上述约束。
+- [x] 被替代的代码、wrapper、旧测试和失效注释已删除。
+- [x] 文档与实际实现一致，未验证的集成边界有明确说明。
+- [x] 历史实验、原始 trace 和 provenance 保留；工作树无遗漏改动。
 
-下一步：P4 Harness／Pi 边界整理，并完成 P5 全仓验收。
+## 最终验收
+
+全部调试、构建、运行及行为对照在独立远程目录完成：
+/mnt/data1/Large-Discovery-Models/research/architecture-convergence-20261021。
+机器记录为 verification.json，逐文件校验为 source-manifest.json，构建产物校验为 dist-manifest.json。
+历史实验、session、trace 和 provenance 未部署覆盖；没有新增策略、模型调用或科学对照实验。
+
+| 验证 | 结果 | 记录 |
+| --- | --- | --- |
+| 根测试与全部非 Antibody 任务 | 1778 通过、128 跳过 | final-python-recheck.xml |
+| Antibody | 212 通过 | final-antibody.xml |
+| 固定 AlphaBench 上游（额外启用原生算法资产） | 345 通过、9 跳过 | final-alphabench-upstream.xml |
+| 可用 sidecar：Host MCP 和隔离 policy 执行 | 16 通过、1 项因缺 guest 未执行 | final-sidecar-available.xml |
+| Pi 构建／测试 | 45 通过 | final-pi.log |
+| TypeScript 未使用符号检查 | 通过 | final-typescript-unused.log |
+| 任务注册 | 0 错误 | task-registration.json |
+| 配置与行为对照 | 356 组配置、23 个 campaign 及完成后恢复一致 | behavior-*-final/behavior.json、reasyn-*/behavior.json |
+
+这些测试集合有重叠，不将表中数字相加。合成运行核对了预算、观察、选择、报告与恢复；
+不是官方得分复现。配置对照包含默认 2+2、独立 session、4fork、compiled policy、帮助和非法参数。
+AlphaBench 的两个对照 campaign 在两版代码中使用同一组固定 UUID 输入，
+以保证运行身份及其派生回执可逐字段比较；未忽略回执键或科学字段。
+其他归一化仅覆盖记录中列出的时间戳、耗时和运行路径。
+
+环境处理与剩余限制：
+
+- 首轮全量测试暴露了 NucleoBench 中仍引用旧评估方法的故障注入测试，已更新到评估执行模块并通过。
+- 归档不含 Git 元数据，pilot 测试显式使用本次归档 SHA-256 作为来源身份；没有削弱产品身份检查。
+- 通用环境的新版 BoTorch 与 Antibody 不匹配，基线也复现。单独测试时使用任务声明的
+  BoTorch 0.5.0／GPyTorch 1.5.0；212 项通过。这不是完整的 Python 3.9 锁定生产环境验收。
+- 已找到固定 AlphaBench 源码并启用相应测试，补齐原先因源码缺失跳过的 101 项。
+- 本次 sidecar 使用新 dist 和 policy_runner 构建；其 package.json、package-lock.json 与基镜像逐字节一致。
+  新镜像为 sha256:1dd015066e37330bb051e87089a88f5e3cf23ca70c57b4ff872c36eb0819f3ad，
+  标签 ldm-pi-harness:architecture-convergence-20261021。只用于隔离验证；镜像内 dist 已与通过测试的构建逐文件核对。
+- 完整 Pi session 初始化与 guest 私有文件隔离未验证：匹配的 guest 资产缺失。
+  独立重建在获取 Gondolin sandbox helpers 时受网络下载失败阻塞，证据为 guest-build.log。
+  容器 MCP 和 policy 执行可独立验证，已通过；未把它们视作 guest 验收。
+- AtomWorld／ReaSyn 官方资产、真实模型及部分科学后端环境的剩余跳过原因逐项保存在 verification.json。
+  没有为通过测试添加产品 fallback、放宽预算或绕过校验。
+
+| 阶段 | 已提交实现 |
+| --- | --- |
+| P1 AtomWorld | 8616344c、892d9efc |
+| P2 Iron Mind／SynthonBench／AlphaBench | f8f6cdab、a77dc5da、3d3b1a22 |
+| P3 状态、评估和调用方收尾 | 48833c37、8c846fae、8a7975cc |
+| P4 Python 协议、Pi 提交和 fork 存储 | 08d97a87、78d2a25d、a9c3ab2e |
+| P5 文档、测试归位和验收 | 与本计划最终状态一并提交 |
+
+NucleoBench 和 ReaSyn 的既有装配、完成后恢复、候选测量及投影归因路径已在全量测试中核验。
+现有共享协调器足够表达任务差异；没有增加任务基类、插件注册层、兼容 wrapper 或新依赖。

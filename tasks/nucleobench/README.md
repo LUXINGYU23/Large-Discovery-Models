@@ -58,6 +58,12 @@ Endpoint failures pause the campaign; other setup/execution failures are recorde
 as failed. The official driver owns termination arguments, raw-output validation
 and final reporting.
 
+Shared `engine/state.py` owns checkpoint representation and `engine/evaluation.py`
+owns evaluation reservation, result publication and replay. NucleoBench keeps
+mutation legality, Hamming coverage, empirical q0 and oracle batching in task
+adapters. The reserved 16-candidate selection survives an interrupted commit;
+saved results do not trigger another oracle evaluation.
+
 ## Cases and Qualification
 
 | Family | Cases | Sequence length | Editable positions | Official time limit |

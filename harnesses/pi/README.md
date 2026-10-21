@@ -15,6 +15,15 @@ For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
 [`docs/research-harness.md`](../../docs/research-harness.md).
 
+`session.ts` assembles sessions and coordinates turn execution and replay.
+`submission.ts` owns submission tools, artifact snapshots, task validation and
+terminal submission records. `session-store.ts` owns fork initialization,
+resource hashes and initialization identity checks. It publishes an inherited
+workspace and native Pi fork atomically, before a branch can run.
+`history.ts` owns compaction and continuation guards; `provider-proxy.ts` owns
+upstream authorization, request parameters and raw usage traces. These modules
+do not depend on task evaluators or select research parents.
+
 Build the release image from the repository root:
 
 ```bash
@@ -48,7 +57,9 @@ Use the provider's cache-miss/cache-hit price ratio for
 The effective `sol-pi.json` is saved in each session's `pi-agent` directory.
 The reducer uses that session's model and traced provider. Its calls and Pi
 compaction calls are included in the provider trace, alongside ordinary research
-requests. Provider request-body settings apply to all these calls. A provider that
+requests. Research request-body settings apply to research and SoL-Pi calls;
+native compaction uses its dedicated proxy route to retain its own low reasoning
+effort and output budget. A provider that
 does not support forced tool use can set `tool_choice: "auto"` in those settings;
 the Harness still requires a validated terminal submission.
 

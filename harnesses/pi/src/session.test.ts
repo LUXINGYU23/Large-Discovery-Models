@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
 import test from "node:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PiSessionPool, PersistentProfileSession } from "./session.js";
-import type { InitializeFrame } from "./protocol.js";
 import { TurnExecutionError } from "./protocol.js";
 import { HistoryController, HistoryRecoveryError } from "./history.js";
 
