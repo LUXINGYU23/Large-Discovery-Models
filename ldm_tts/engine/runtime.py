@@ -204,7 +204,7 @@ class LDMEngine:
                     )
                     active.next_round = round_idx + 1
                     rounds_run += 1
-                    self._checkpoint(active)
+                    self.runtime.checkpoint(active.to_checkpoint())
                     if (
                         not schema_only
                         and active.empty_reservoir_rounds
@@ -236,7 +236,7 @@ class LDMEngine:
                     stop_reason = "empty_selection"
                     active.next_round = round_idx + 1
                     rounds_run += 1
-                    self._checkpoint(active)
+                    self.runtime.checkpoint(active.to_checkpoint())
                     break
 
                 pending = evaluations.prepare(active, selected, selection, desired, round_idx)
@@ -278,11 +278,11 @@ class LDMEngine:
                 )
             return LDMEngineResult(active, rounds_run, stop_reason, summary)
         except EvaluationPaused as exc:
-            self._checkpoint(active)
+            self.runtime.checkpoint(active.to_checkpoint())
             self.runtime.pause(exc.status, phase="evaluation_recovery", message=str(exc))
             raise
         except BudgetExceededError as exc:
-            self._checkpoint(active)
+            self.runtime.checkpoint(active.to_checkpoint())
             self.runtime.pause("paused_budget", phase="budget_recovery", message=str(exc))
             raise EvaluationPaused(str(exc), status="paused_budget") from exc
         except Exception as exc:
@@ -351,10 +351,6 @@ class LDMEngine:
                 + ", ".join(unknown)
             )
         return [by_id[item] for item in selection.selected_candidate_ids]
-
-
-    def _checkpoint(self, state: LDMEngineState) -> None:
-        self.runtime.checkpoint(state.to_checkpoint())
 
     def _summary(
         self,

@@ -217,7 +217,7 @@ class EvaluationExecutor:
         candidate: Candidate,
         evaluation: EvaluationResult,
         round_idx: int,
-    ) -> int:
+    ) -> None:
         benchmark_jobs = evaluation.resource_usage.get("benchmark_jobs", 0)
         amounts = {}
         if benchmark_jobs:
@@ -253,7 +253,6 @@ class EvaluationExecutor:
             candidate_id=candidate.candidate_id,
             event_key=f"engine:evaluated:{round_idx}:{candidate.candidate_id}",
         )
-        return int(evaluation.succeeded)
 
 
 def _remaining_evaluation_attempts(

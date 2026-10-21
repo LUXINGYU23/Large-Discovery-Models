@@ -6,6 +6,7 @@ import pytest
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate, EvaluationResult, Observation, RawProposal
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
+from ldm_tts.engine.evaluation import EvaluationExecutor
 from ldm_tts.engine.expansion import CallableReservoirExpander, ExpansionResult
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.harness.research_strategy import load_research_strategy
@@ -168,7 +169,7 @@ def test_engine_recovery_keeps_reserved_selection_and_calls_evaluator_only_sixte
         candidate_domain=domain, surrogate_encoder=encoder, selector=selector(HammingShellCoverage()),
         expander=CallableReservoirExpander(expand), evaluator=Evaluator(),
     )
-    original = engine._record_evaluation
+    original = EvaluationExecutor.record
     interrupted = False
 
     def crash_once(*args):
@@ -178,7 +179,7 @@ def test_engine_recovery_keeps_reserved_selection_and_calls_evaluator_only_sixte
             raise KeyboardInterrupt()
         return original(*args)
 
-    monkeypatch.setattr(engine, "_record_evaluation", crash_once)
+    monkeypatch.setattr(EvaluationExecutor, "record", crash_once)
     config = LDMEngineConfig(iterations=2, reservoir_size=128, evaluations_per_round=16)
     state = LDMEngineState(observations=[Observation(initial, EvaluationResult(initial.candidate_id, "succeeded", {"utility": 1.0}),
                                                    surrogate=encoder.encode(initial), round_idx=0)], next_round=1)

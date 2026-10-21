@@ -220,7 +220,6 @@ class CampaignRequest:
         if self.state is not None and self.state_factory is not None:
             raise ValueError("campaign request cannot set both state and state_factory")
 
-
     def open_runtime(self, task_spec: LDMTaskSpec) -> CampaignRuntime:
         """Open the durable runtime before assembling runtime-dependent adapters."""
         runtime = CampaignRuntime.open(
