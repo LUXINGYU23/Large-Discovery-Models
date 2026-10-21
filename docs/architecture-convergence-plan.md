@@ -120,9 +120,9 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 涉及 `ldm_tts/campaign.py`、`engine/runtime.py`、`engine/run_store.py` 及全部调用方。
 
 - [x] 将引擎配置、运行状态与 checkpoint 编解码从轮次编排中分离，保留当前数据格式和验证规则。
-- [ ] 将评估回执、预算预留、dispatch、结果保存和恢复集中为一个明确的执行单元。
-- [ ] 使主循环负责阶段推进；存储层继续负责持久化，不让任务自行操作引擎恢复状态。
-- [ ] 保持已有持久化位置与顺序，包括 `engine_active_selection`、usage key、批量返回结果先整体保存。
+- [x] 将评估回执、预算预留、dispatch、结果保存和恢复集中为一个明确的执行单元。
+- [x] 使主循环负责阶段推进；存储层继续负责持久化，不让任务自行操作引擎恢复状态。
+- [x] 保持已有持久化位置与顺序，包括 `engine_active_selection`、usage key、批量返回结果先整体保存。
 - [ ] 同步更新六个 Harness 任务及其他共享引擎调用方，不增加新的 Campaign 或恢复框架。
 
 验收：在请求发出后、结果保存后、事件写入后、checkpoint 前等现有故障边界恢复；
@@ -134,6 +134,10 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 
 状态和配置已归入 `engine/state.py`，共享引擎、Campaign、AtomWorld、ReaSyn 测试
 319 通过、6 跳过，记录为 `p3-state.xml`。
+
+评估执行已归入 `engine/evaluation.py`；预算预留、批量结果保存、事件和 checkpoint 顺序不变。
+恢复故障测试改为在实际 `CampaignRuntime.checkpoint` 边界注入，329 通过、6 跳过，
+记录为 `p3-evaluation.xml`。
 
 ### P4：收敛 Python Harness 与 Pi 会话边界
 
@@ -197,4 +201,4 @@ Python 协议整理、Pi 提交模块归位、Pi fork／会话整理分别提交
 - [ ] 文档与实际实现一致，未验证的集成边界有明确说明。
 - [ ] 历史实验、原始 trace 和 provenance 保留；工作树无遗漏改动。
 
-下一步：P2 任务装配边界。
+下一步：P4 Harness／Pi 边界整理，并完成 P5 全仓验收。

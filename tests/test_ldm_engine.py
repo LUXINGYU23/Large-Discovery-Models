@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from ldm_tts.engine.evaluation import EvaluationExecutor
+
 from ldm_tts.contracts import (
     AcquisitionSpec,
     BatchCandidateEvaluator,
@@ -1055,17 +1057,17 @@ def test_paid_batch_recovers_only_reserved_candidates_without_new_research(tmp_p
     engine = LDMEngine(task_spec=integer_task_spec(), runtime=runtime, evaluator=Evaluator(),
         candidate_domain=IntegerDomain(), expander=CallableReservoirExpander(expand))
     config = LDMEngineConfig(iterations=3, reservoir_size=3, evaluations_per_round=3, max_evaluation_attempts=2)
-    record = engine._record_evaluation
+    record = EvaluationExecutor.record
     interrupted = False
-    def crash(state, candidate, evaluation, round_idx):
+    def crash(executor, state, candidate, evaluation, round_idx):
         nonlocal interrupted
         if candidate.payload == 1 and not interrupted:
             interrupted = True
             if interrupt_after_result_charge:
-                record(state, candidate, evaluation, round_idx)
+                record(executor, state, candidate, evaluation, round_idx)
             raise KeyboardInterrupt()
-        return record(state, candidate, evaluation, round_idx)
-    monkeypatch.setattr(engine, "_record_evaluation", crash)
+        return record(executor, state, candidate, evaluation, round_idx)
+    monkeypatch.setattr(EvaluationExecutor, "record", crash)
     with pytest.raises(KeyboardInterrupt):
         engine.run(config)
     engine.runtime = CampaignRuntime.open(tmp_path, task="integer_search", resume=True)
@@ -1129,19 +1131,19 @@ def test_full_selection_recovers_unpaid_suffix_with_budget_remaining(tmp_path, m
     runtime = CampaignRuntime.open(tmp_path, task="integer_search")
     engine = LDMEngine(task_spec=integer_task_spec(), runtime=runtime, evaluator=Evaluator(),
                        candidate_domain=IntegerDomain(), expander=CallableReservoirExpander(expand))
-    original = engine._record_evaluation
+    original = EvaluationExecutor.record
     interrupted = False
 
-    def crash(state, candidate, result, round_idx):
+    def crash(executor, state, candidate, result, round_idx):
         nonlocal interrupted
         if not interrupted:
             interrupted = True
             if crash_at == "event":
-                original(state, candidate, result, round_idx)
+                original(executor, state, candidate, result, round_idx)
             raise KeyboardInterrupt()
-        return original(state, candidate, result, round_idx)
+        return original(executor, state, candidate, result, round_idx)
 
-    monkeypatch.setattr(engine, "_record_evaluation", crash)
+    monkeypatch.setattr(EvaluationExecutor, "record", crash)
     config = LDMEngineConfig(iterations=1, reservoir_size=3, evaluations_per_round=3, max_evaluation_attempts=5)
     with pytest.raises(KeyboardInterrupt):
         engine.run(config)

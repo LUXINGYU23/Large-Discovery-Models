@@ -198,13 +198,13 @@ def test_reconstruction_preparation_resumes_same_selection_without_spending_tria
 def test_completed_reconstruction_trials_resume_without_duplicate_scientific_charges(
     tmp_path, monkeypatch, interrupt_round, batch_size, window, error_type
 ):
-    from ldm_tts.engine.runtime import LDMEngine
+    from ldm_tts.engine.run_store import CampaignRuntime
     from tasks.reasyn.core.evaluator import ReconstructionEvaluator
     from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
 
     interrupted = False
     evaluate = ReconstructionEvaluator.evaluate
-    checkpoint = LDMEngine._checkpoint
+    checkpoint = CampaignRuntime.checkpoint
     evaluations = 0
     def after_evaluation(self, candidate):
         nonlocal interrupted, evaluations
@@ -216,12 +216,12 @@ def test_completed_reconstruction_trials_resume_without_duplicate_scientific_cha
         return result
     def before_checkpoint(self, state):
         nonlocal interrupted
-        if window == "before_checkpoint" and state.next_round == interrupt_round + 1 and not interrupted:
+        if window == "before_checkpoint" and state["next_round"] == interrupt_round + 1 and not interrupted:
             interrupted = True
             raise error_type("completed reconstruction trial interrupted")
         return checkpoint(self, state)
     monkeypatch.setattr(ReconstructionEvaluator, "evaluate", after_evaluation)
-    monkeypatch.setattr(LDMEngine, "_checkpoint", before_checkpoint)
+    monkeypatch.setattr(CampaignRuntime, "checkpoint", before_checkpoint)
     root = tmp_path / "reconstruction"
     argv = ["--mock", "--benchmark", "reconstruction", "--iterations", "2",
             "--reservoir-size", str(batch_size), "--evaluations-per-round", str(batch_size), "--out-dir", str(root)]

@@ -238,18 +238,18 @@ def test_oracle_dedup_and_hard_cap(tmp_path):
 
 
 def test_tdc_cached_oracle_resume_does_not_double_charge_evaluation(tmp_path, monkeypatch):
-    from ldm_tts.engine.runtime import LDMEngine
+    from ldm_tts.engine.run_store import CampaignRuntime
 
-    original_checkpoint = LDMEngine._checkpoint
+    original_checkpoint = CampaignRuntime.checkpoint
     interrupted = {"done": False}
 
     def flaky_checkpoint(self, state):
-        if state.observations and not interrupted["done"]:
+        if state["observations"] and not interrupted["done"]:
             interrupted["done"] = True
             raise RuntimeError("fixture stopped after oracle receipt")
         return original_checkpoint(self, state)
 
-    monkeypatch.setattr(LDMEngine, "_checkpoint", flaky_checkpoint)
+    monkeypatch.setattr(CampaignRuntime, "checkpoint", flaky_checkpoint)
     root = tmp_path / "tdc-cache-replay"
     argv = [
         "--mock",

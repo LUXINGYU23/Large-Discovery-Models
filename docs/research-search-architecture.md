@@ -58,7 +58,10 @@ See [policy details and prior experiments](main-research-forks.md).
 | `research_runtime.ResearchCoordinator` | Run the main turn, deliver the preceding branch panel, close it before snapshotting, run tree prepare/commit |
 | Task adapter | Export authorized history, define credit keys and finite maximization scores, validate candidate submissions, preserve q0 and budgets |
 | Pi Harness | Native history, compaction, sandbox lifecycle, strict turn commits, provider traces and recovery guards |
-| Campaign / LDMEngine | Admission, selection, evaluator calls, authoritative observations and checkpoints |
+| Campaign / LDMEngine | Runtime assembly, admission, selection and round progression |
+| `engine/state.py` | Lifecycle configuration, observations and checkpoint representation |
+| `engine/evaluation.py` | Evaluation reservation, receipt validation, dispatch, result publication and replay |
+| `engine/run_store.py` | Durable budget, event, status and checkpoint storage |
 
 `ResearchCoordinator.prepare(step, history, measurements, message=...)` returns a
 frozen plan and one `PiForkSource` per profile. The task runs the branch pool and
