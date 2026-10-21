@@ -54,8 +54,7 @@ def snapshot_fork(source_session: Path, workspace: Path, target: Path, cursor: i
 
 
 def _node(value: dict) -> ResearchNode:
-    return ResearchNode(**{**value, "proposal_keys": tuple(value["proposal_keys"]),
-                           "descriptor": tuple(value["descriptor"])})
+    return ResearchNode(**{**value, "proposal_keys": tuple(value["proposal_keys"])})
 
 
 def _outcome(value: dict) -> ResearchOutcome:
@@ -69,18 +68,17 @@ class ResearchTree:
         self.fork_policy = fork_policy
         self.archive_policy = archive_policy
 
-    def prepare(self, round_index, profiles, history, measurements, *, descriptor=()) -> dict:
+    def prepare(self, round_index, profiles, history, measurements) -> dict:
         round_root = self.root / "branches" / f"round_{round_index:04d}"
         if round_index < 1 or any(o.round_index >= round_index for o in measurements):
             raise ValueError("Research planning requires observations from earlier rounds")
         previous = self.root / "branches" / f"round_{round_index - 1:04d}" / "tree.json"
         identity = {
-            "evidence_version": 1,
+            "evidence_version": 2,
             "fork_policy": self.fork_policy.identity(), "archive_policy": self.archive_policy.identity(),
             "profiles": [p.profile_id for p in profiles], "round_index": round_index,
             "history_digest": canonical_sha256(history),
             "measurements_digest": canonical_sha256([asdict(o) for o in measurements]),
-            "descriptor": list(descriptor),
             "previous_tree_sha256": file_sha256(previous) if round_index > 1 else None,
         }
         path = round_root / "fork-plan.json"
@@ -104,7 +102,7 @@ class ResearchTree:
             snapshot=(round_root / "fork-source").relative_to(self.root).as_posix(),
             round_index=round_index, history_cursor=len(history), lineage_id="main",
             parent_id=main_nodes[-1].node_id if main_nodes else None,
-            measured_count=len(scores), best_score=incumbent, descriptor=descriptor,
+            measured_count=len(scores), best_score=incumbent,
         ))
         archive = [replace(n, measured_count=sum(k in scores for k in n.proposal_keys),
                            best_score=max((scores[k] for k in n.proposal_keys if k in scores), default=None))
@@ -157,7 +155,7 @@ class ResearchTree:
                 raise ValueError("Materialized fork differs from selected parent")
         return sources
 
-    def commit(self, plan: dict, sessions: dict, proposal_keys: dict, *, descriptors=None) -> None:
+    def commit(self, plan: dict, sessions: dict, proposal_keys: dict) -> None:
         """Commit all leaves together; retries reuse the same plan and snapshots."""
         round_index = plan["identity"]["round_index"]
         round_root = self.root / "branches" / f"round_{round_index:04d}"
@@ -197,7 +195,6 @@ class ResearchTree:
                 measured_count=parent.measured_count if continuing else 0,
                 best_score=parent.best_score if continuing else None,
                 expansions=parent.expansions + 1 if continuing else 1, last_expanded=round_index,
-                descriptor=tuple((descriptors or {}).get(a.profile_id, ())),
             ))
         continued = {n.lineage_id for n in children}
         leaves = tuple(n for n in archive if n.lineage_id not in continued) + tuple(children)

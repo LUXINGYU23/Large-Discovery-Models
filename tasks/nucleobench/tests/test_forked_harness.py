@@ -8,7 +8,6 @@ import pytest
 
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.harness import HarnessError
-from ldm_tts.harness.joint_gain import JointGainForks
 from ldm_tts.harness.research_tree import CoverageForks, DiverseArchive, LatestMainForks
 from ldm_tts.harness.research_strategy import ResearchStrategy
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
@@ -24,12 +23,9 @@ from tasks.nucleobench.tests.test_harness import FakeHarnessClient, _observation
 def prepare_tree(tree, request, profiles):
     from ldm_tts.harness.research_store import ResearchMeasurement
     from tasks.nucleobench.core.research import serialize_measured_observations
-    from tasks.nucleobench.core.forked_harness import _descriptor
     measured = [o for o in request.observations if o.evaluation.succeeded]
-    leader = max(measured, key=lambda o: (o.metrics["utility"], o.canonical_key), default=None)
     return tree.prepare(request.round_idx, profiles, serialize_measured_observations(request.observations, MOCK_CONTEXT),
-                        [ResearchMeasurement(o.canonical_key, o.metrics["utility"], o.round_idx) for o in measured],
-                        descriptor=_descriptor([leader.candidate.payload if leader else {"mutations": []}], MOCK_CONTEXT))
+                        [ResearchMeasurement(o.canonical_key, o.metrics["utility"], o.round_idx) for o in measured])
 
 
 def commit_tree(tree, plan, expanded):
@@ -151,8 +147,7 @@ def test_tree_declaration_is_accepted_by_pilot_reporting(tmp_path):
         _mark_completed({}, SimpleNamespace(output_root=tmp_path.parent), SimpleNamespace(run_dir=tmp_path))
 
 
-@pytest.mark.parametrize("policy,main_count", [(CoverageForks(), 2), (JointGainForks(samples=64), 1)])
-def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, main_count):
+def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path):
     profiles = harness_profiles()
     seen, fail = [], [False]
 
@@ -193,7 +188,7 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, ma
         return Branch(root, {p.profile_id: [[payload]] for p in profiles})
 
     expander = ForkedResearchExpander(main_client=Main, root=tmp_path, branch_client=branches,
-        strategy=ResearchStrategy(policy), expander_options={
+        strategy=ResearchStrategy(CoverageForks()), expander_options={
             "domain": NucleoBenchCandidateDomain(MOCK_CONTEXT), "profiles": profiles,
             "candidates_per_profile": 1, "campaign_id": "test", "first_active_round": 1,
             "attach_empirical_q0": True, "allow_repeated_occurrences": True,
@@ -219,11 +214,10 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, ma
         plan = json.loads((root / "fork-plan.json").read_text())
         assert len(plan["outcomes"]) == 4 * (r - 1)
         assert all(o["best_score"] == 1 and o["measured_count"] == 1 for o in plan["outcomes"])
-        assert sum(a["purpose"] == "main" for a in plan["assignments"]) == main_count
+        assert sum(a["purpose"] == "main" for a in plan["assignments"]) == 2
         if r > 1:
             continuations = [a for a in plan["assignments"] if a["purpose"] == "continue"]
-            if isinstance(policy, CoverageForks):
-                assert len(continuations) == 1
+            assert len(continuations) == 1
             assert len({a["lineage_id"] for a in continuations}) == len(continuations)
             for continuation in continuations:
                 assert continuation["parent_id"].startswith("branch_")
@@ -235,10 +229,6 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, ma
             assert turn.history_to_seq == len(observations)
         # Replaying a committed round must not advance visits or replace parents.
         committed = (root / "tree.json").read_bytes()
-        current = [n for n in json.loads(committed)["archive"] if n["round_index"] == r]
-        expected_descriptor = [0.5, 0, 0, 0] * 4
-        expected_descriptor[4 * (r - 1):4 * r] = [0, 0.5, 0, 0]
-        assert all(n["descriptor"] == expected_descriptor for n in current)
         expander.expand(request)
         assert (root / "tree.json").read_bytes() == committed
         observations += (_observation(result.proposals[0].payload, round_idx=r),)
@@ -251,9 +241,7 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, ma
 def test_coverage_configuration_and_existing_modes(tmp_path):
     budgets = {}
     configs = {"independent": {"name": "independent"}, "latest": {"name": "main_forks"},
-               "coverage": {"name": "main_forks", "fork_policy": {"name": "coverage"}},
-               "joint_gain": {"name": "main_forks",
-                              "fork_policy": {"factory": "ldm_tts.harness.joint_gain:JointGainForks"}}}
+               "coverage": {"name": "main_forks", "fork_policy": {"name": "coverage"}}}
     for name, config in configs.items():
         path = tmp_path / f"{name}.json"
         path.write_text(json.dumps(config))
@@ -261,7 +249,7 @@ def test_coverage_configuration_and_existing_modes(tmp_path):
                            "--harness-research-strategy-config", str(path)])
         assert args.harness_main_research == (name != "independent")
         budgets[name] = _campaign_budget(args, None)
-    assert budgets["coverage"] == budgets["latest"] == budgets["joint_gain"]
+    assert budgets["coverage"] == budgets["latest"]
     assert budgets["independent"]["harness_turns"] == 8
     assert budgets["coverage"]["harness_turns"] == 10
     assert budgets["coverage"]["main_research_turns"] == 2
@@ -270,7 +258,7 @@ def test_coverage_configuration_and_existing_modes(tmp_path):
         parse_args(["--search-method", "harness", "--harness-research-strategy-config", str(path)])
     with pytest.raises(SystemExit):
         parse_args(["--search-method", "ldm_harness_compiled", "--iterations", "3",
-                    "--harness-research-strategy-config", str(tmp_path / "joint_gain.json"),
+                    "--harness-research-strategy-config", str(tmp_path / "coverage.json"),
                     "--harness-profile", "target_biology"])
 
 
@@ -305,9 +293,8 @@ def test_action_feedback_preserves_shared_credit_unknowns_and_decision_time_stat
     from ldm_tts.harness.research_store import ResearchTree
 
     profiles = harness_profiles()
-    policy, archive = JointGainForks(samples=64), DiverseArchive()
-    parent = ResearchNode("main_0001", "snapshots/main", 1, 1, "main", best_score=-5,
-                          descriptor=(0.5, 0, 0, 0) * 4)
+    policy, archive = CoverageForks(), DiverseArchive()
+    parent = ResearchNode("main_0001", "snapshots/main", 1, 1, "main", best_score=-5)
     winner = _observation({"mutations": [{"position": 0, "base": "C"}]}, round_idx=1)
     old = _observation({"mutations": [{"position": 2, "base": "G"}]}, round_idx=0)
     later = _observation({"mutations": [{"position": 4, "base": "T"}]}, round_idx=2)
@@ -345,23 +332,25 @@ def test_action_feedback_preserves_shared_credit_unknowns_and_decision_time_stat
 def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_path):
     from dataclasses import asdict
 
-    import numpy as np
-
-    from ldm_tts.harness.research_tree import ResearchNode
+    from ldm_tts.harness.research_tree import ForkAssignment, ResearchNode
     from ldm_tts.harness.research_store import ResearchTree
 
-    class ContinueAll(JointGainForks):
-        def _sample_gaps(self, context, actions):
-            return np.asarray([[10.0 if a.parent_id == leaf else 0.0 for a in actions]
-                               for leaf in ("leaf_a", "leaf_b", "leaf_c")])
+    class ContinueAll:
+        def identity(self):
+            return {"name": "continue_all", "version": 1}
+
+        def plan(self, context):
+            return tuple(ForkAssignment(profile, node.node_id, "continue", node.lineage_id)
+                         for profile, node in zip(context.profile_ids[:3], context.archive, strict=True)) + (
+                ForkAssignment(context.profile_ids[3], context.main_nodes[-1].node_id, "main", "main"),)
 
     profiles = harness_profiles()
     observations = tuple(_observation({"mutations": [{"position": 2 * i, "base": "G"}]}, round_idx=1)
                          for i in range(3))
     archive = tuple(ResearchNode(f"leaf_{p}", f"snapshots/{p}", 1, 3, p,
-                                proposal_keys=(o.canonical_key,), descriptor=(0.5, 0, 0, 0) * 4)
+                                proposal_keys=(o.canonical_key,))
                     for p, o in zip("abc", observations))
-    main = ResearchNode("main_0001", "snapshots/main", 1, 3, "main", descriptor=(0.5, 0, 0, 0) * 4)
+    main = ResearchNode("main_0001", "snapshots/main", 1, 3, "main")
     tree = ResearchTree(tmp_path, ContinueAll(), DiverseArchive())
     previous = tmp_path / "branches/round_0001/tree.json"
     previous.parent.mkdir(parents=True)

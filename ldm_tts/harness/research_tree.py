@@ -23,7 +23,6 @@ class ResearchNode:
     best_score: float | None = None
     expansions: int = 0
     last_expanded: int = 0
-    descriptor: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True)

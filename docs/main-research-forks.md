@@ -13,8 +13,7 @@ as before. Ready-to-use JSON configurations live in
 | `independent.json` | Four persistent independent sessions, no main researcher |
 | `main_forks.json` | One persistent main researcher, four fresh forks of its latest node |
 | `coverage_2plus2.json` | Two latest-main forks, one historical restart, one archived-lineage continuation |
-| `joint_gain_1plus3.json` | One latest-main fork, three jointly selected historical restarts or archived-lineage continuations |
-| `joint_gain_1plus3_coverage.json` | The same JointGain v2 forks and archive, with optional distance-shell reservations in the BO pool and evaluation batch |
+| `coverage_2plus2_measurement.json` | 2+2 forks with optional distance-shell reservations in the BO pool and evaluation batch |
 
 For example, add this to the existing real campaign command:
 
@@ -22,10 +21,10 @@ For example, add this to the existing real campaign command:
 --harness-research-strategy-config config/research_strategies/coverage_2plus2.json
 ```
 
-New LDM Harness campaigns default to 2+2. See the [shared runtime and task boundaries](research-search-architecture.md) for all six task adapters, budgets and recovery. The first four configurations keep
+New LDM Harness campaigns default to 2+2. See the [shared runtime and task boundaries](research-search-architecture.md) for all six task adapters, budgets and recovery. The first three configurations keep
 candidate admission, global empirical q0, GP/acquisition, compiled policy and
 true-evaluation selection unchanged. Measurement coverage is enabled only by the
-fifth configuration or an explicit custom measurement policy.
+fourth configuration or an explicit custom measurement policy.
 
 `ResearchStrategy` (`ldm_tts.harness.research_strategy`) defines persistent versus
 forked execution. `ForkPolicy.plan(ForkContext)` selects one `ForkAssignment` per
@@ -64,8 +63,8 @@ without modifying the Pi transport or candidate selector.
 
 ### Optional measurement coverage
 
-Use `joint_gain_1plus3_coverage.json` through the same
-`--harness-research-strategy-config` argument. It keeps JointGain v2, the archive
+Use `coverage_2plus2_measurement.json` through the same
+`--harness-research-strategy-config` argument. It keeps the 2+2 fork rule, the archive
 capacity of three, profile rotation, proposal counts, BO pool size, evaluation
 counts, research reasoning and provider budgets unchanged.
 
@@ -163,81 +162,6 @@ the experiment server; no provider or scientific evaluator calls were used.
 Only the selected archive is bounded; historical trace/snapshot artifacts remain
 on disk for audit. Final-round leaves have no subsequent scheduling pass to
 reconcile their measurements; the authoritative campaign checkpoint retains them.
-
-### Experimental joint-gain selection
-
-Use `--harness-research-strategy-config config/research_strategies/joint_gain_1plus3.json`.
-It loads `ldm_tts.harness.joint_gain:JointGainForks` through the existing factory
-interface. Independent sessions, latest-main forks and coverage selection remain
-separate choices. No token price, token count or cost estimate enters this policy.
-Existing usage accounting is unchanged.
-
-One rotating profile forks the latest main node. Each of the other three profiles
-can restart from **any older main node** or continue **any retained archive leaf**.
-There is no quota for restarts or continuations: jointly enumerate all feasible
-three-action combinations. An archived lineage can have only one successor per
-round. Different profiles may restart from the same historical node, each creating
-its own lineage. With no archive all three restart; round one shares the only root.
-The existing `DiverseArchive` rule still retains at most three selectable leaves.
-
-A small shared Gaussian process models a research action `(parent, profile,
-purpose)`, using only previous rounds' measured feedback. Its signed target is
-the best utility measured from that branch's current proposal batch, minus the
-incumbent before that batch. This differs from cumulative lineage quality. An
-unmeasured batch has no target; it is never given zero fitness. A later round's
-measurement does not retroactively label an earlier batch as successful. Archive
-quality, separately, still incorporates all available measurements of its lineage.
-
-The action features are log round, relative parent age, log expansion count,
-whether parent quality is known, the scaled parent-to-incumbent gap, profile and
-purpose indicators, and a task-supplied sequence descriptor. For NucleoBench,
-archived leaves use per-position nucleotide frequencies of their latest batch;
-main nodes use the incumbent sequence when their snapshot was created. Frequencies
-are divided by the square root of the number of editable positions. These describe
-sequence location, not the semantic contents of session notes or biological mechanisms.
-
-The RBF kernel has unit length scale. Targets are scaled by the median absolute
-nonzero measured gap (unit scale before any such gap), with a zero-gap prior.
-Observation noise defaults to 0.25 in these scaled units. Branches sharing the
-same best measured canonical key share observation noise, rather than gaining
-independent confidence from the same oracle result. NumPy handles the small
-matrix solves; no new package, language-model call or oracle call is needed.
-
-For each feasible triple, combine its actions with the single fixed main action and
-estimate `mean(max(0, sampled_gap_1, ..., sampled_gap_4))` from **joint** posterior
-samples. Taking the maximum, rather than summing individual expected gains, makes
-complementarity part of the objective. Every triple uses the same 512 antithetic
-draws; the configured seed and round index determine them. The JSON factory
-options expose `samples`, `seed` and `noise_variance`; all are pinned in the policy
-identity. The joint acquisition follows the
-[batch expected-improvement pattern](https://botorch.org/docs/v0.17.1/batching).
-
-This is a one-step acquisition **proxy**, conditional on branches receiving
-measurements. It models uncertainty in their expected best measured gap; it does
-not simulate future candidate generation, competition in the global selector, or
-all stochastic variation of LLM outputs. Base-frequency similarity and the kernel
-are modeling assumptions, not proof of independent discoveries. With sparse data,
-the prior can dominate. Better utility or avoidance of local optima requires new
-controlled campaigns; replaying historical contexts cannot establish either.
-
-`tree.json` records every branch's batch keys and its immutable decision-time
-parent, including main branches and pruned lineages. Before the next plan, the
-task joins those keys to successful finite measurements from the same round.
-`fork-plan.json` freezes this feedback, the incumbent, descriptors, assignments,
-and the preceding tree's SHA-256. Replay reuses that plan and rejects changed
-evidence or policies; it neither resamples nor increments visits twice. These
-feedback-bearing plans have a new evidence identity. Existing campaigns retain
-their frozen runtime and provenance; this implementation does not migrate them.
-
-Validation on 2026-10-11: 82 strategy, Harness and task-boundary tests passed on
-the remote server. They cover all restart/continuation allocations, three concurrent
-continuation snapshots, lineage feedback, interruption/replay and unchanged budgets.
-Read-only checks of 60 recorded contexts from seeds 42, 43 and 10086 produced
-deterministic valid plans, averaging 0.158 seconds per preparation (maximum 0.381).
-All 183 source artifacts retained their hashes. No provider or oracle calls were
-made. These checks establish execution behavior, not improved search performance.
-Receipts and isolated fixtures are in
-`/mnt/data1/Large-Discovery-Models/research/joint-gain-1plus3-20261011/`.
 
 ## State, recovery and costs
 

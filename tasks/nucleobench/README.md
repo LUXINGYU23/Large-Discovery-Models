@@ -5,8 +5,8 @@ one older-main restart and one archived-side continuation. The main research
 turn is additional to the four proposal turns; candidate and evaluation budgets
 remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
 for history, accounting and recovery. Use `--harness-research-strategy-config`
-with a file in `config/research_strategies/` to select independent sessions,
-latest-main 4fork or JointGain. Strategy changes require a new campaign identity.
+with a file in `config/research_strategies/` to select independent sessions
+or latest-main 4fork. Strategy changes require a new campaign identity.
 
 This task adapts the shared LDM engine to the official
 [NucleoBench](https://github.com/move37-labs/nucleobench) sequence-design

@@ -18,19 +18,6 @@ def main_research_profile():
     return (_profile("main_research"),)
 
 
-def _descriptor(payloads, context):
-    positions = {p: i for i, p in enumerate(context.editable_positions)}
-    reference = ["ACGT".index(context.start_sequence[p]) for p in positions]
-    counts = [0.0] * (4 * len(positions))
-    for payload in payloads:
-        bases = reference.copy()
-        for mutation in payload["mutations"]:
-            bases[positions[mutation["position"]]] = "ACGT".index(mutation["base"])
-        for i, base in enumerate(bases):
-            counts[4 * i + base] += 1 / (len(payloads) * math.sqrt(len(positions)))
-    return tuple(counts)
-
-
 class ForkedResearchExpander:
     def __init__(self, *, main_client, root, branch_client, expander_options, strategy):
         self.options, self.branch_client = expander_options, branch_client
@@ -44,12 +31,10 @@ class ForkedResearchExpander:
         write_measured_history(coordinator.root / "main", request.observations, context)
         measured = [o for o in request.observations if o.evaluation.status == "succeeded"
                     and math.isfinite(float(o.evaluation.metrics["utility"]))]
-        leader = max(measured, key=lambda o: (o.evaluation.metrics["utility"], o.canonical_key), default=None)
         prepared = coordinator.prepare(
             request.round_idx, serialize_measured_observations(request.observations, context),
             tuple(ResearchMeasurement(o.canonical_key, float(o.evaluation.metrics["utility"]), o.round_idx)
                   for o in measured),
-            descriptor=_descriptor([leader.candidate.payload if leader else {"mutations": []}], context),
             forbidden_query_terms=_forbidden_query_terms(request),
             message={"new_measurements": summarize_measured_observations(
                 serialize_measured_observations(_history_delta(request, 1), context))},
@@ -70,7 +55,6 @@ class ForkedResearchExpander:
         coordinator.commit(
             prepared, {s["profile_id"]: s for s in expanded.metadata["sessions"]},
             {profile: tuple(p.canonical_key for p in batch) for profile, batch in batches.items()},
-            descriptors={profile: _descriptor([p.payload for p in batch], context) for profile, batch in batches.items()},
             proposals=[{"payload": p.payload, "annotations": p.metadata["research_annotations"],
                         "lineage": p.metadata["harness_lineage"]} for p in expanded.proposals],
         )

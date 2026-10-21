@@ -89,7 +89,7 @@ class ResearchCoordinator:
         self.before_main, self.after_main = before_main, after_main
         self.provider_authorizer = provider_authorizer
 
-    def prepare(self, round_index, history, measurements, *, message, forbidden_query_terms=(), descriptor=()):
+    def prepare(self, round_index, history, measurements, *, message, forbidden_query_terms=()):
         main_root = self.root / "main"
         workspace = main_root / "sessions/main_research/workspace"
         round_root = self.root / "branches" / f"round_{round_index:04d}"
@@ -140,14 +140,14 @@ class ResearchCoordinator:
         if not session.is_relative_to(main_root):
             raise ValueError("Main session escaped its artifact root")
         source = snapshot_fork(session, workspace, round_root / "fork-source", len(history))
-        plan = self.tree.prepare(round_index, self.profiles, history, measurements, descriptor=descriptor)
+        plan = self.tree.prepare(round_index, self.profiles, history, measurements)
         sources = self.tree.materialize(plan)
         return {"root": round_root, "plan": plan, "sources": sources, "source": source,
                 "main_turn_id": turn.turn_id, "brief": result.submission["brief"],
                 "history_count": len(history), "history_digest": canonical_sha256(history)}
 
-    def commit(self, prepared, sessions, proposal_keys, *, proposals, descriptors=None):
-        self.tree.commit(prepared["plan"], sessions, proposal_keys, descriptors=descriptors)
+    def commit(self, prepared, sessions, proposal_keys, *, proposals):
+        self.tree.commit(prepared["plan"], sessions, proposal_keys)
         panel = {k: prepared[k] for k in ("main_turn_id", "brief", "history_count", "history_digest")}
         panel.update(round_index=prepared["plan"]["identity"]["round_index"],
                      main_session_sha256=prepared["source"].session_sha256,

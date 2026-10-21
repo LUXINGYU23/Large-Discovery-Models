@@ -1,8 +1,0 @@
-{
-  "name": "main_forks",
-  "fork_policy": {
-    "factory": "ldm_tts.harness.joint_gain:JointGainForks",
-    "options": {"samples": 512, "seed": 0, "noise_variance": 0.25}
-  },
-  "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5}
-}

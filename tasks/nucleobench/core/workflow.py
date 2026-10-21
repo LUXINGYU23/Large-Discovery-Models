@@ -81,7 +81,6 @@ from tasks.nucleobench.core.forked_harness import (
 )
 from ldm_tts.harness.research_runtime import research_contract, write_fork_provenance
 from ldm_tts.harness.research_tree import CoverageForks
-from ldm_tts.harness.joint_gain import JointGainForks
 from ldm_tts.harness.research_strategy import configure_research_strategy
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
@@ -316,8 +315,6 @@ def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         parser.error("measurement coverage requires real acquisition-tilted selection")
     if isinstance(strategy.fork_policy, CoverageForks) and len(_harness_profiles(args)) < 3:
         parser.error("coverage forks require at least three research profiles")
-    if isinstance(strategy.fork_policy, JointGainForks) and len(_harness_profiles(args)) != 4:
-        parser.error("joint gain forks require exactly four research profiles")
     if args.harness_main_research and (
         args.search_method not in PARALLEL_HARNESS_METHODS or args.harness_sol_pi_config is not None
         or args.termination_kind != "rounds" or args.mock

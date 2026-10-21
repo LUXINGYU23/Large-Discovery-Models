@@ -125,8 +125,8 @@ def test_shell_boundaries_shortages_and_measured_priority(reservoir):
 
 def test_coverage_configuration_preserves_fork_archive_and_campaign_budgets(reservoir):
     root = Path(__file__).resolve().parents[3] / "config"
-    paths = [root / "research_strategies/joint_gain_1plus3.json",
-             root / "nucleobench/research_strategies/joint_gain_1plus3_coverage.json"]
+    paths = [root / "research_strategies/coverage_2plus2.json",
+             root / "nucleobench/research_strategies/coverage_2plus2_measurement.json"]
     old_config = json.loads(paths[0].read_text())
     new_config = json.loads(paths[1].read_text())
     old, new = load_research_strategy(old_config), load_research_strategy(new_config)
