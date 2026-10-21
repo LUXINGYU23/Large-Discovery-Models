@@ -4,26 +4,10 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PiSessionPool, PersistentProfileSession, pinInitialization } from "./session.js";
+import { PiSessionPool, PersistentProfileSession } from "./session.js";
 import type { InitializeFrame } from "./protocol.js";
 import { TurnExecutionError } from "./protocol.js";
 import { HistoryController, HistoryRecoveryError } from "./history.js";
-
-test("session resume pins configuration and runtime identity without rewriting provenance", async () => {
-	const root = await mkdtemp(join(tmpdir(), "ldm-identity-"));
-	try {
-		const identity = { model: "original", profileSha256: "a", runtime: "image", contract: "two-objective" };
-		const digest = await pinInitialization(root, identity);
-		assert.equal(await pinInitialization(root, { ...identity }), digest);
-		const original = await readFile(join(root, "manifest.json"), "utf8");
-		for (const key of Object.keys(identity)) {
-			await assert.rejects(pinInitialization(root, { ...identity, [key]: "changed" }), /identity changed/);
-		}
-		assert.equal(await readFile(join(root, "manifest.json"), "utf8"), original);
-	} finally {
-		await rm(root, { recursive: true, force: true });
-	}
-});
 
 test("a failed parallel turn drains other sessions before recovery", async () => {
 	const pool = new PiSessionPool({ baseUrl: "https://example.test", campaignId: "test" } as never, "test");

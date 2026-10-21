@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { directorySha256, initializeFork } from "./session.js";
+import { directorySha256, initializeFork, pinInitialization } from "./session-store.js";
 import { sha256 } from "./trace.js";
 
 test("per-profile forks restore different historical parents and reject changed identities", async () => {
@@ -39,4 +39,20 @@ test("per-profile forks restore different historical parents and reject changed 
             await assert.rejects(initializeFork(snapshot, child, source), /digest mismatch/);
         }
     } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("session resume pins configuration and runtime identity without rewriting provenance", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-identity-"));
+	try {
+		const identity = { model: "original", profileSha256: "a", runtime: "image", contract: "two-objective" };
+		const digest = await pinInitialization(root, identity);
+		assert.equal(await pinInitialization(root, { ...identity }), digest);
+		const original = await readFile(join(root, "manifest.json"), "utf8");
+		for (const key of Object.keys(identity)) {
+			await assert.rejects(pinInitialization(root, { ...identity, [key]: "changed" }), /identity changed/);
+		}
+		assert.equal(await readFile(join(root, "manifest.json"), "utf8"), original);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
 });

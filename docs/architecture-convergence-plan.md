@@ -145,9 +145,9 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 
 - [x] 分离 Python 响应解析、结构校验与进程通信，保留请求身份、提交摘要和 usage 检查。
 - [x] 将 Pi `session.ts` 中的 `SubmissionController` 归入现有提交模块，避免双向依赖。
-- [ ] 集中 fork 初始化、快照验证与原子落盘逻辑，让会话模块调用明确的初始化操作。
-- [ ] 保留现有 `HistoryController` 和 provider 代理边界，检查清理、重放和初始化身份的调用关系。
-- [ ] 迁移测试到对应职责，删除旧导出与仅验证旧组织方式的测试。
+- [x] 集中 fork 初始化、快照验证与原子落盘逻辑，让会话模块调用明确的初始化操作。
+- [x] 保留现有 `HistoryController` 和 provider 代理边界，检查清理、重放和初始化身份的调用关系。
+- [x] 迁移测试到对应职责，删除旧导出与仅验证旧组织方式的测试。
 
 验收：执行 TypeScript 构建与测试、Python 客户端回归以及具备资产的隔离 sidecar 测试。
 真实代理实现必须验证研究请求仍应用研究参数、原生摘要保留自己的 low 与输出预算。
@@ -160,6 +160,9 @@ Python 响应校验已归入 `harness/responses.py`，错误契约归入 `protoc
 Python 协议整理、Pi 提交模块归位、Pi fork／会话整理分别提交。
 提交控制器及修复／重提测试已归入 `submission.ts` 和 `submission.test.ts`，
 远程 TypeScript 构建与 45 项测试通过，记录为 `p4-submission.log`。
+fork 原子初始化、资源摘要与运行身份校验归入 `session-store.ts`，会话模块不再导出这些实现。
+构建与 45 项测试再次通过，记录为 `p4-session-store.log`；真实代理路径的摘要参数隔离、
+length-stop、分支排空及提交重放测试均保留并通过。
 新构建记录独立的源码与镜像身份，不部署覆盖历史实验运行环境。
 
 ### P5：全仓调用方和文档验收
