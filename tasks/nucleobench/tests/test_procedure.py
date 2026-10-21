@@ -124,6 +124,17 @@ def test_oracle_minibatch_is_independent_of_the_selection_batch() -> None:
         parse_args(["--oracle-batch-size", "0"])
 
 
+@pytest.mark.parametrize("digest_args", [[], ["--expected-start-set-sha256", " " * 64]])
+def test_real_execution_requires_start_set_digest_before_loading_assets(tmp_path, digest_args):
+    with pytest.raises(SystemExit, match="requires --expected-start-set-sha256"):
+        main([
+            "--search-method", "bo",
+            "--source-dir", str(tmp_path / "source"),
+            "--prepared-dir", str(tmp_path / "prepared"),
+            *digest_args,
+        ])
+
+
 def test_pilot_rounds_and_bo_proposal_pool_are_configurable() -> None:
     args = parse_args([
         "--search-method", "bo", "--execution-profile", "pilot_evaluation",

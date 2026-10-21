@@ -673,7 +673,7 @@ def _run_real(
         raise SystemExit(
             "Real NucleoBench execution requires --source-dir and --prepared-dir."
         )
-    expected_digest = _configured(args.expected_start_set_sha256)
+    expected_digest = (args.expected_start_set_sha256 or "").strip()
     if len(expected_digest) != 64:
         raise SystemExit(
             "Real NucleoBench execution requires --expected-start-set-sha256."
