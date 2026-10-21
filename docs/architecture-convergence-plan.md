@@ -119,7 +119,7 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 
 涉及 `ldm_tts/campaign.py`、`engine/runtime.py`、`engine/run_store.py` 及全部调用方。
 
-- [ ] 将引擎配置、运行状态与 checkpoint 编解码从轮次编排中分离，保留当前数据格式和验证规则。
+- [x] 将引擎配置、运行状态与 checkpoint 编解码从轮次编排中分离，保留当前数据格式和验证规则。
 - [ ] 将评估回执、预算预留、dispatch、结果保存和恢复集中为一个明确的执行单元。
 - [ ] 使主循环负责阶段推进；存储层继续负责持久化，不让任务自行操作引擎恢复状态。
 - [ ] 保持已有持久化位置与顺序，包括 `engine_active_selection`、usage key、批量返回结果先整体保存。
@@ -131,6 +131,9 @@ AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 
 
 建议两个提交：状态与配置归位；评估执行与恢复归位。保持回执操作整体可读，
 不把紧密相关的保存步骤拆成跨多个层的回调链。
+
+状态和配置已归入 `engine/state.py`，共享引擎、Campaign、AtomWorld、ReaSyn 测试
+319 通过、6 跳过，记录为 `p3-state.xml`。
 
 ### P4：收敛 Python Harness 与 Pi 会话边界
 

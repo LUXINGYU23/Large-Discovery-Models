@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ldm_tts.contracts import (
@@ -25,6 +23,10 @@ from ldm_tts.engine.expansion import (
     ExpansionRequest,
     ReservoirExpander,
 )
+from ldm_tts.engine.state import (
+    LDMEngineConfig, LDMEngineState, LDMEngineResult,
+    jsonable, completion_reason, desired_round_results,
+)
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime
 from ldm_tts.optimization.records import (
     AcquisitionSelector,
@@ -33,156 +35,6 @@ from ldm_tts.optimization.records import (
     SurrogateEncoder,
     SurrogateVector,
 )
-
-
-@dataclass(frozen=True)
-class LDMEngineConfig:
-    """Task-neutral lifecycle policy for one engine campaign."""
-
-    iterations: int
-    reservoir_size: int
-    evaluations_per_round: int = 1
-    max_empty_reservoir_rounds: int = 3
-    target_observations: int | None = None
-    target_successful_evaluations: int | None = None
-    max_evaluation_attempts: int | None = None
-    max_evaluation_attempts_per_round: int | None = None
-    replace_failed_evaluations: bool = False
-
-    def __post_init__(self) -> None:
-        if self.iterations < 0:
-            raise ValueError("engine iterations must be non-negative")
-        if self.reservoir_size < 1:
-            raise ValueError("engine reservoir_size must be positive")
-        if self.evaluations_per_round < 1:
-            raise ValueError("engine evaluations_per_round must be positive")
-        if self.max_empty_reservoir_rounds < 1:
-            raise ValueError("engine max_empty_reservoir_rounds must be positive")
-        if self.target_observations is not None and self.target_observations < 0:
-            raise ValueError("engine target_observations must be non-negative")
-        if (
-            self.target_successful_evaluations is not None
-            and self.target_successful_evaluations < 0
-        ):
-            raise ValueError(
-                "engine target_successful_evaluations must be non-negative"
-            )
-        if (
-            self.target_observations is not None
-            and self.target_successful_evaluations is not None
-        ):
-            raise ValueError(
-                "engine must target observations or successful evaluations, not both"
-            )
-        if self.max_evaluation_attempts is not None and self.max_evaluation_attempts < 0:
-            raise ValueError("engine max_evaluation_attempts must be non-negative")
-        if (
-            self.max_evaluation_attempts_per_round is not None
-            and self.max_evaluation_attempts_per_round < 1
-        ):
-            raise ValueError(
-                "engine max_evaluation_attempts_per_round must be positive"
-            )
-        if self.replace_failed_evaluations and self.target_successful_evaluations is None:
-            raise ValueError(
-                "replace_failed_evaluations requires target_successful_evaluations"
-            )
-
-
-@dataclass
-class LDMEngineState:
-    """Caller-resumable in-memory engine state."""
-
-    observations: list[Observation] = field(default_factory=list)
-    expansion_schema: dict[str, Any] = field(default_factory=dict)
-    next_round: int = 0
-    empty_reservoir_rounds: int = 0
-
-    def __post_init__(self) -> None:
-        if self.next_round < 0:
-            raise ValueError("engine next_round must be non-negative")
-        if self.empty_reservoir_rounds < 0:
-            raise ValueError("engine empty_reservoir_rounds must be non-negative")
-
-    def to_checkpoint(self) -> dict[str, Any]:
-        return {
-            "next_round": self.next_round,
-            "empty_reservoir_rounds": self.empty_reservoir_rounds,
-            "expansion_schema": _jsonable(self.expansion_schema),
-            "observations": [_jsonable(item.to_dict()) for item in self.observations],
-        }
-
-    @classmethod
-    def from_checkpoint(cls, payload: Mapping[str, Any]) -> "LDMEngineState":
-        observations: list[Observation] = []
-        raw_observations = payload.get("observations", [])
-        if not isinstance(raw_observations, list):
-            raise ValueError("engine checkpoint observations must be a list")
-        for raw in raw_observations:
-            if not isinstance(raw, Mapping):
-                raise ValueError("engine checkpoint observation must be an object")
-            candidate_payload = raw.get("candidate")
-            evaluation_payload = raw.get("evaluation")
-            if not isinstance(candidate_payload, Mapping) or not isinstance(
-                evaluation_payload, Mapping
-            ):
-                raise ValueError("engine checkpoint observation records are malformed")
-            candidate = Candidate(
-                candidate_id=str(candidate_payload.get("candidate_id", "")),
-                payload=candidate_payload.get("payload"),
-                canonical_key=str(candidate_payload.get("canonical_key", "")),
-                source=str(candidate_payload.get("source", "")),
-                metadata=dict(candidate_payload.get("metadata", {})),
-            )
-            evaluation = EvaluationResult(
-                candidate_id=str(evaluation_payload.get("candidate_id", "")),
-                status=str(evaluation_payload.get("status", "failed")),  # type: ignore[arg-type]
-                metrics=dict(evaluation_payload.get("metrics", {})),
-                artifacts=dict(evaluation_payload.get("artifacts", {})),
-                resource_usage=dict(evaluation_payload.get("resource_usage", {})),
-                error=str(evaluation_payload.get("error", "")),
-                metadata=dict(evaluation_payload.get("metadata", {})),
-            )
-            surrogate_payload = raw.get("surrogate")
-            surrogate = None
-            if surrogate_payload is not None:
-                if not isinstance(surrogate_payload, Mapping):
-                    raise ValueError("engine checkpoint surrogate must be an object")
-                surrogate = SurrogateVector(
-                    values=tuple(surrogate_payload["values"]),
-                    version=surrogate_payload["version"],
-                    source_id=surrogate_payload.get("source_id", ""),
-                    metadata=dict(surrogate_payload.get("metadata", {})),
-                )
-            round_idx = raw.get("round_idx")
-            observations.append(
-                Observation(
-                    candidate=candidate,
-                    evaluation=evaluation,
-                    surrogate=surrogate,
-                    round_idx=None if round_idx is None else int(round_idx),
-                    metadata=dict(raw.get("metadata", {})),
-                )
-            )
-        expansion_schema = payload.get("expansion_schema", {})
-        if not isinstance(expansion_schema, Mapping):
-            raise ValueError("engine checkpoint expansion_schema must be an object")
-        return cls(
-            observations=observations,
-            expansion_schema=dict(expansion_schema),
-            next_round=int(payload.get("next_round", 0)),
-            empty_reservoir_rounds=int(payload.get("empty_reservoir_rounds", 0)),
-        )
-
-
-@dataclass(frozen=True)
-class LDMEngineResult:
-    """Final engine state and publication-facing summary."""
-
-    state: LDMEngineState
-    rounds_run: int
-    stop_reason: str
-    summary: dict[str, Any]
 
 
 ParentSelector = Callable[[Sequence[Observation], ObjectiveSet], Optional[Candidate]]
@@ -254,7 +106,7 @@ class LDMEngine:
         rounds_run = 0
         stop_reason = "iteration_budget"
         try:
-            completed = _completion_reason(active, config)
+            completed = completion_reason(active, config)
             if completed is not None:
                 stop_reason = completed
             for round_idx in range(active.next_round, config.iterations):
@@ -271,7 +123,7 @@ class LDMEngine:
                         stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or "evaluation_attempt_budget"
                         break
                     continue
-                completed = _completion_reason(active, config)
+                completed = completion_reason(active, config)
                 if completed is not None:
                     stop_reason = completed
                     break
@@ -290,7 +142,7 @@ class LDMEngine:
                     budget=self.runtime.budget,
                 )
                 parent = self.parent_selector(active.observations, self.objectives)
-                desired = _desired_round_results(active, config)
+                desired = desired_round_results(active, config)
                 effective = min(desired, config.max_evaluation_attempts_per_round or desired)
                 if remaining_attempts is not None:
                     effective = min(effective, remaining_attempts)
@@ -391,9 +243,9 @@ class LDMEngine:
 
                 pending = {
                     "round_idx": round_idx, "desired": desired,
-                    "expansion_schema": _jsonable(active.expansion_schema),
-                    "selection": _jsonable(selection.to_dict()),
-                    "entries": [{"candidate": _jsonable(candidate.to_dict()),
+                    "expansion_schema": jsonable(active.expansion_schema),
+                    "selection": jsonable(selection.to_dict()),
+                    "entries": [{"candidate": jsonable(candidate.to_dict()),
                                  "receipt": None,
                                  "dispatched": False, "result": None}
                                 for candidate in selected],
@@ -410,12 +262,12 @@ class LDMEngine:
                 if budget_exhausted:
                     stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or "evaluation_attempt_budget"
                     break
-                completed = _completion_reason(active, config)
+                completed = completion_reason(active, config)
                 if completed is not None:
                     stop_reason = completed
                     break
 
-            stop_reason = _completion_reason(active, config) or stop_reason
+            stop_reason = completion_reason(active, config) or stop_reason
             if stop_reason == "iteration_budget" and active.next_round < config.iterations:
                 stop_reason = _evaluation_budget_stop_reason(self.runtime, active, config) or stop_reason
             summary = self._summary(active, rounds_run, stop_reason)
@@ -545,7 +397,7 @@ class LDMEngine:
                 **result.metadata, EVALUATION_ATTEMPT_RECEIPT_KEY:
                     expected if expected is not None else f"round:{round_idx}:slot:{index}",
             }})
-            entry["result"] = _jsonable(result.to_dict())
+            entry["result"] = jsonable(result.to_dict())
             self.runtime.budget.write()
             self._record_evaluation(state, candidate, result, round_idx)
             self._checkpoint(state)
@@ -571,7 +423,7 @@ class LDMEngine:
                 results = self._evaluate_batch([item[2] for item in dispatched])
                 # Save the entire returned batch before committing its first observation.
                 for (_, entry, _), result in zip(dispatched, results, strict=True):
-                    entry["result"] = _jsonable(result.to_dict())
+                    entry["result"] = jsonable(result.to_dict())
                 self.runtime.budget.write()
                 for (index, entry, _), result in zip(dispatched, results, strict=True):
                     commit(index, entry, result)
@@ -741,11 +593,11 @@ class LDMEngine:
             "successful_evaluation_count": len(successful),
             "failed_evaluation_count": len(state.observations) - len(successful),
             "stop_reason": stop_reason,
-            "expansion_schema": _jsonable(state.expansion_schema),
+            "expansion_schema": jsonable(state.expansion_schema),
         }
         if len(self.objectives.specs) == 1:
             incumbent = self.objectives.incumbent(state.observations)
-            summary["incumbent"] = None if incumbent is None else _jsonable(incumbent.to_dict())
+            summary["incumbent"] = None if incumbent is None else jsonable(incumbent.to_dict())
         else:
             summary["pareto_candidate_ids"] = [
                 item.candidate_id for item in self.objectives.pareto_front(state.observations)
@@ -794,45 +646,6 @@ def consume_proposal_attempts(
         runtime.consume_many({"proposal_attempts": fresh_count})
 
 
-def _successful_evaluation_count(state: LDMEngineState) -> int:
-    return sum(item.evaluation.succeeded for item in state.observations)
-
-
-def _completion_reason(
-    state: LDMEngineState,
-    config: LDMEngineConfig,
-) -> str | None:
-    if (
-        config.target_observations is not None
-        and len(state.observations) >= config.target_observations
-    ):
-        return "observation_target"
-    if (
-        config.target_successful_evaluations is not None
-        and _successful_evaluation_count(state)
-        >= config.target_successful_evaluations
-    ):
-        return "successful_evaluation_target"
-    return None
-
-
-def _desired_round_results(
-    state: LDMEngineState,
-    config: LDMEngineConfig,
-) -> int:
-    if config.target_observations is not None:
-        remaining = max(0, config.target_observations - len(state.observations))
-        return min(config.evaluations_per_round, remaining)
-    if config.target_successful_evaluations is not None:
-        remaining = max(
-            0,
-            config.target_successful_evaluations
-            - _successful_evaluation_count(state),
-        )
-        return min(config.evaluations_per_round, remaining)
-    return config.evaluations_per_round
-
-
 def _remaining_evaluation_attempts(
     runtime: CampaignRuntime,
     state: LDMEngineState,
@@ -869,17 +682,8 @@ def _remaining_fresh_attempts(runtime, state, config):
     return min(finite) if finite else None
 
 
-def _jsonable(value: Any) -> Any:
-    """Normalize task metadata for durable engine artifacts."""
-
-    return json.loads(json.dumps(value, default=str))
-
-
 __all__ = [
     "LDMEngine",
-    "LDMEngineConfig",
-    "LDMEngineResult",
-    "LDMEngineState",
     "ParentSelector",
     "consume_proposal_attempts",
 ]

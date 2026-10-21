@@ -8,7 +8,7 @@ from pathlib import Path
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation, RawProposal
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetExceededError
-from ldm_tts.engine.runtime import LDMEngineState
+from ldm_tts.engine import LDMEngineState
 from .candidate import FactorDomain
 from .protocol import digest
 from .receipts import Receipts
