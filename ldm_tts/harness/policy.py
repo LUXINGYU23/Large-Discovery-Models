@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from ldm_tts.harness.client import HarnessClient, HarnessError
+from ldm_tts.harness.client import HarnessClient
 from ldm_tts.harness.policy_contract import (
     POLICY_ARTIFACT_NAME,
     CompiledOptimizationPolicy,
@@ -25,6 +25,7 @@ from ldm_tts.harness.policy_execution import (
 )
 from ldm_tts.harness.policy_store import PolicyStore, active_policy_summary
 from ldm_tts.harness.protocol import (
+    HarnessError,
     HarnessProviderAuthorizationRequest,
     HarnessSubmissionError,
     HarnessSubmissionRequest,

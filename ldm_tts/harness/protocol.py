@@ -14,6 +14,12 @@ from typing import Any, Literal
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
+class HarnessError(RuntimeError):
+    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None, retryable: bool = False):
+        super().__init__(message)
+        self.turn_usage = {profile: dict(usage) for profile, usage in (turn_usage or {}).items()}
+        self.retryable = retryable
+
 
 def canonical_sha256(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -566,6 +572,7 @@ class HarnessSubmissionValidation:
 
 
 __all__ = [
+    "HarnessError",
     "HarnessArtifactRule",
     "HarnessLimits",
     "HarnessMcpServer",

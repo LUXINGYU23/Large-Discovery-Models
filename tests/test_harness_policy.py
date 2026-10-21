@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from ldm_tts.harness.pi import policy_mcp_server
-from ldm_tts.harness.client import HarnessError
+from ldm_tts.harness.protocol import HarnessError
 from ldm_tts.harness import (
     PolicyCapabilityContract,
     PolicyResearchController,

@@ -1,6 +1,6 @@
 """Persistent research harness client contracts."""
 
-from ldm_tts.harness.client import HarnessClient, HarnessError
+from ldm_tts.harness.client import HarnessClient
 from ldm_tts.harness.mcp import ResolvedHarnessMcpConfig, load_harness_mcp_config
 from ldm_tts.harness.policy import PolicyResearchController
 from ldm_tts.harness.policy_contract import (
@@ -18,6 +18,7 @@ from ldm_tts.harness.policy_execution import (
     PolicyExecutor,
 )
 from ldm_tts.harness.protocol import (
+    HarnessError,
     HarnessArtifactRule,
     HarnessLimits,
     HarnessMcpServer,
