@@ -12,7 +12,7 @@ from pathlib import Path
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     HarnessError, HarnessSubmissionContract, HarnessSubmissionValidation,
-    HarnessTurn, canonical_sha256, file_sha256,
+    HarnessTurn, HarnessTurnResult, canonical_sha256, file_sha256,
 )
 from ldm_tts.harness.research_store import ResearchMeasurement, ResearchTree, snapshot_fork
 
@@ -56,6 +56,23 @@ def usage_counts(usage):
     if "toolCalls" in usage:
         counts["harness_tool_calls"] = sum(int(v) for v in usage["toolCalls"].values())
     return counts
+
+
+def proposal_turn_summary(result: HarnessTurnResult, candidate_count: int) -> dict[str, object]:
+    return {
+        "profile_id": result.profile_id,
+        "session_id": result.session_id,
+        "session_turn_id": result.turn_id,
+        "round_index": result.round_index,
+        "history_from_seq": result.history_from_seq,
+        "history_to_seq": result.history_to_seq,
+        "history_digest": result.history_digest,
+        "submission_id": result.submission_id,
+        "candidate_count": candidate_count,
+        "usage": result.usage,
+        "tool_budget": result.tool_budget,
+        "artifacts": result.artifacts,
+    }
 
 
 class ResearchCoordinator:

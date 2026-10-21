@@ -1,6 +1,6 @@
 # AlphaBench T3
 
-LDM Harness 默认使用 **CoverageForks 2+2**：两条最新主干分叉、一条较早主干分叉、一条存档侧枝延续。每轮额外运行一次主研究，计入 `harness_turns` 和模型请求预算；每分支候选配额与评估预算不变，默认从两个提案身份增为四个。冻结协议的 `research_strategy_config` 或 `--harness-research-strategy-config config/research_strategies/coverage_2plus2.json` 可显式指定策略；CLI 与冻结协议必须一致。独立 session、4fork 和 JointGain 仍可选。协议须为每轮主研究加四条提案分支预留有限预算。完整接口、身份与恢复约束见[共享树搜索文档](../../docs/research-search-architecture.md)。
+LDM Harness 默认使用 **CoverageForks 2+2**：两条最新主干分叉、一条较早主干分叉、一条存档侧枝延续。每轮额外运行一次主研究，计入 `harness_turns` 和模型请求预算；每分支候选配额与评估预算不变，默认从两个提案身份增为四个。冻结协议的 `research_strategy_config` 或 `--harness-research-strategy-config config/research_strategies/coverage_2plus2.json` 可显式指定策略；CLI 与冻结协议必须一致。独立 session 和 4fork 仍可选；JointGain 所需的任务描述向量目前仅由 NucleoBench 提供。协议须为每轮主研究加四条提案分支预留有限预算。完整接口、身份与恢复约束见[共享树搜索文档](../../docs/research-search-architecture.md)。
 
 目标是完整 T3，包括全部初始化、双方言、三种原生算法、五种 LDM/Agent 方法、私有 validation、冻结后完整 test、组合分析和全市场验收。目前处于实施中，`qualification=draft`；未完成的能力不会映射到其他算法或后端。
 

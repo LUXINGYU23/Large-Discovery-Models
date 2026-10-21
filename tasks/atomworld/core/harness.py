@@ -231,7 +231,7 @@ def make_client(args, root, sample, *, campaign_id, policy=False, profiles=None,
             )
         )
     command.append(args.harness_sidecar_image)
-    client = HarnessClient(
+    return HarnessClient(
         command,
         api_key=os.environ.get(
             "LLM_API_KEY",
@@ -281,7 +281,6 @@ def make_client(args, root, sample, *, campaign_id, policy=False, profiles=None,
             ),
         ),
     )
-    return client
 
 
 class AtomWorldHarnessExpander:
@@ -391,7 +390,7 @@ class AtomWorldHarnessExpander:
                 client = stack.enter_context(create(root, fork_sources=prepared["sources"]))
             else:
                 client, root = self._client(index)
-            write_json(root / "public_history.json", {"drafts": history})
+                write_json(root / "public_history.json", {"drafts": history})
             delta = [{k: v for k, v in row.items() if k != "generated_output"} for row in history[-1:]]
             digest = canonical_sha256(delta)
             message = json.dumps(
@@ -413,6 +412,7 @@ class AtomWorldHarnessExpander:
                 },
                 sort_keys=True,
             )
+            message_payload = json.loads(message) if prepared is not None else None
             turns = []
             for profile in client.config.profiles:
                 cursor = max(0, attempt - 1)
@@ -423,7 +423,7 @@ class AtomWorldHarnessExpander:
                         raise ValueError("Inherited history cursor is outside sample history")
                     delta = [{k: v for k, v in row.items() if k != "generated_output"} for row in history[cursor:]]
                     digest = canonical_sha256(delta)
-                    branch_message = json.dumps({**json.loads(message), "new_public_drafts": delta, "history_from_seq": cursor})
+                    branch_message = json.dumps({**message_payload, "new_public_drafts": delta, "history_from_seq": cursor})
                 turns.append(HarnessTurn(
                     profile.profile_id,
                     f"revision_{attempt:04d}_{canonical_sha256([profile.profile_id, branch_message])[:20]}",

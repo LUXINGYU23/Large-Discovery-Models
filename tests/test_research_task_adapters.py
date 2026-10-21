@@ -205,36 +205,6 @@ def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp
     assert len(events) == 10
 
 
-def test_alphabench_tree_keeps_host_checks_and_occurrence_q0(tmp_path, monkeypatch):
-    from ldm_tts.contracts import RawProposal, Observation, EvaluationResult
-    from ldm_tts.engine.run_store import CampaignRuntime
-    from tasks.alphabench.core import harness_runtime
-    from tasks.alphabench.core.protocol import T3Protocol
-    from tasks.alphabench.core.gateway import OracleGateway
-    from tasks.alphabench.core.candidate import FactorDomain
-    protocol = T3Protocol(method="ldm_harness", cold_seed_count=0, candidates_per_session=2)
-    runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits=protocol.budgets)
-    gateway = OracleGateway(protocol, runtime, mock=True)
-    def payload(root, turn):
-        candidates = [{"name": f"a{i}", "expression": f"Mean($close,{5 + 2 * turn.round_index + i})"} for i in range(2)]
-        return "candidates.json", json.dumps({"candidates": candidates}), {}
-    events = install_fixture(monkeypatch, harness_runtime, payload)
-    client, tools, expander = harness_runtime.build_harness(protocol, gateway, None, api_key="fixture", sidecar_image="fixture")
-    try:
-        first = gateway.host.run(lambda: expander.expand(ExpansionRequest(0, 8)))
-        assert len(first.proposals) == 2 and all(p.metadata["q0"] == .5 for p in first.proposals)
-        candidate = FactorDomain(protocol.backend).admit(RawProposal(first.proposals[0].payload, "fixture"))
-        measured = Observation(candidate, EvaluationResult(candidate.candidate_id, "succeeded", {"mock_rank_ic": .2}), round_idx=0)
-        gateway.host.run(lambda: expander.expand(ExpansionRequest(1, 8, observations=(measured,))))
-        check_tree(runtime.run_dir / "harness", 2)
-        assert runtime.budget.counters["harness_turns"] == 10
-        assert runtime.budget.counters["proposal_attempts"] == 8
-        assert runtime.budget.counters["dynamic_checks"] == 4
-        assert len(events) == 10
-    finally:
-        tools.close()
-
-
 def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch):
     from tasks.alphabench.core import harness_runtime
     from tasks.alphabench.core.protocol import T3Protocol
@@ -257,6 +227,9 @@ def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_pat
     assert report["costs"]["tool_calls"] == 10
     assert report["costs"]["tool_usage_reason"] is None
     assert report["search"]["generation_cost"]["step_count"] == 8
+    assert report["budget"]["counters"]["harness_turns"] == 10
+    assert report["budget"]["counters"]["proposal_attempts"] == 8
+    assert report["budget"]["counters"]["dynamic_checks"] == 4
     assert len(events) == 10
     assert main(["--mock", "--protocol-file", str(config), "--resume-run", str(run)]) == 0
     assert len(events) == 10

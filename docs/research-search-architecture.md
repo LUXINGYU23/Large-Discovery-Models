@@ -16,7 +16,7 @@ followed by four parallel proposal branches:
 | `coverage_2plus2.json` (default) | 2 latest-main forks + 1 older-main restart + 1 archived-lineage continuation |
 | `main_forks.json` | 4 forks of the latest main node |
 | `independent.json` | 4 independent persistent sessions; no main researcher |
-| `joint_gain_1plus3.json` | 1 latest-main fork + 3 jointly chosen historical/archived parents |
+| `joint_gain_1plus3.json` (NucleoBench) | 1 latest-main fork + 3 jointly chosen historical/archived parents |
 
 Use the same CLI argument in all six tasks:
 
@@ -165,7 +165,9 @@ snapshot tampering, deterministic plans, interrupted barriers and failed-call
 accounting. Run these on the remote development server under `/mnt/data1/`.
 
 These are engineering checks, not real-provider optimization experiments.
-JointGain remains optional; its effectiveness outside the measured NucleoBench
-experiments has not been established. The optional NucleoBench measurement
+JointGain requires finite, nonempty task descriptors for parent selection.
+Only the NucleoBench adapter currently supplies them; the other five adapters
+support independent sessions, latest-main 4fork and CoverageForks 2+2.
+The optional NucleoBench measurement
 coverage policy stays task-specific and disabled by default; the other five
 adapters reject it instead of ignoring it.

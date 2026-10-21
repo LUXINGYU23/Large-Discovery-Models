@@ -15,6 +15,7 @@ from ldm_tts.harness.pi import PiGuestRuntime, load_pi_guest_runtime
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.harness.research_runtime import proposal_turn_summary, usage_counts
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
@@ -296,7 +297,7 @@ class NucleoBenchHarnessExpander:
             if self.account is not None:
                 for turn in turns:
                     self.account(
-                        _usage_counts(usage_by_profile.get(turn.profile_id, {})),
+                        usage_counts(usage_by_profile.get(turn.profile_id, {})),
                         usage_key=f"harness:{turn.turn_id}",
                     )
                 self.account({"harness_wall_time_seconds": time.perf_counter() - started})
@@ -326,7 +327,7 @@ class NucleoBenchHarnessExpander:
                     _candidate_lineage(proposal, self.domain.context)
                     for proposal in proposals
                 ],
-                "sessions": [_result_summary(result, self.candidates_per_profile) for result in results],
+                "sessions": [proposal_turn_summary(result, self.candidates_per_profile) for result in results],
             },
         )
 
@@ -846,21 +847,6 @@ def _validate_submission(
     )
 
 
-def _usage_counts(usage: Mapping[str, Any]) -> dict[str, int]:
-    counts = {
-        counter: int(usage[key])
-        for key, counter in (
-            ("providerCalls", "llm_requests"),
-            ("validationSubmissions", "harness_validation_submissions"),
-            ("artifactBytes", "harness_artifact_bytes"),
-        )
-        if key in usage
-    }
-    if "toolCalls" in usage:
-        counts["harness_tool_calls"] = sum(int(count) for count in usage["toolCalls"].values())
-    return counts
-
-
 def _candidate_lineage(
     proposal: RawProposal,
     context: MutationContext,
@@ -869,23 +855,6 @@ def _candidate_lineage(
     lineage = proposal.metadata["harness_lineage"]
     assert isinstance(lineage, dict)
     return {"canonical_key": prepared.canonical_key, **lineage}
-
-
-def _result_summary(result: HarnessTurnResult, candidate_count: int) -> dict[str, object]:
-    return {
-        "profile_id": result.profile_id,
-        "session_id": result.session_id,
-        "session_turn_id": result.turn_id,
-        "round_index": result.round_index,
-        "history_from_seq": result.history_from_seq,
-        "history_to_seq": result.history_to_seq,
-        "history_digest": result.history_digest,
-        "submission_id": result.submission_id,
-        "candidate_count": candidate_count,
-        "usage": result.usage,
-        "tool_budget": result.tool_budget,
-        "artifacts": result.artifacts,
-    }
 
 
 __all__ = [

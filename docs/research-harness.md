@@ -11,7 +11,7 @@ submission. It is available through three search methods:
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
 Iron Mind, SynthonBench, NucleoBench, AtomWorld, ReaSyn, and AlphaBench are the current
-task-local integrations. Their LDM Harness methods default to [shared 2+2 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions, latest-main 4fork and JointGain remain explicit strategies. The shared Harness does not know their candidate
+task-local integrations. Their LDM Harness methods default to [shared 2+2 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions and latest-main 4fork remain explicit strategies; NucleoBench also supplies the descriptors needed by JointGain. The shared Harness does not know their candidate
 identity, legal search space, duplicate policy, surrogate, or evaluator.
 
 ## Architecture
