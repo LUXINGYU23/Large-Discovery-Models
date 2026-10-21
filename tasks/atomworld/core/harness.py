@@ -28,7 +28,7 @@ from ldm_tts.harness import (
     file_sha256,
     parse_tool_call_budgets,
 )
-from ldm_tts.harness.container import docker_identity_args, resolve_container_user
+from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.mcp import load_harness_mcp_config
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
 from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
@@ -192,47 +192,13 @@ def make_client(args, root, sample, *, campaign_id, policy=False, profiles=None,
         "diagnostics_path": "/resources/policy_diagnostics.py",
         "diagnostics_sha256": file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
     } if args.search_method == "ldm_harness_compiled" else {}))) if policy else mcp.servers
-    cache = args.harness_cache_dir.expanduser().resolve()
-    (cache / "runtime-overlays").mkdir(parents=True, exist_ok=True)
-    command = ["docker"]
-    if args.harness_docker_host:
-        command.extend(("--host", args.harness_docker_host))
-    command.extend(("run", "--rm", "-i"))
-    command.extend(
-        docker_identity_args(
-            resolve_container_user(
-                args.harness_container_user, args.harness_docker_host
-            ),
-            args.harness_docker_host,
-        )
-    )
-    command.extend(("--device", "/dev/kvm"))
-    environment = {
-        "HOME": "/runtime-home",
-        "XDG_CACHE_HOME": "/runtime-home/.cache",
-        "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
-        "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
-        "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
-        "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
-        "LDM_ATOMWORLD_PUBLIC_ROOT": "/artifacts",
-    }
-    for name, value in sorted(environment.items()):
-        command.extend(("--env", f"{name}={value}"))
-    for source, destination, readonly in (
-        (root, "/artifacts", False),
-        (cache, "/runtime-home/.cache/gondolin", False),
-        (RESOURCE_ROOT.resolve(), "/resources", True),
-    ):
-        command.extend(
-            (
-                "--mount",
-                f"type=bind,src={source},dst={destination}"
-                + (",readonly" if readonly else ""),
-            )
-        )
-    command.append(args.harness_sidecar_image)
     return HarnessClient(
-        command,
+        pi_sidecar_command(
+            root, args.harness_sidecar_image, cache_root=args.harness_cache_dir,
+            docker_host=args.harness_docker_host, container_user=args.harness_container_user,
+            environment={"LDM_ATOMWORLD_PUBLIC_ROOT": "/artifacts"},
+            mounts=((RESOURCE_ROOT, "/resources", True),),
+        ),
         api_key=os.environ.get(
             "LLM_API_KEY",
             os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),

@@ -9,7 +9,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (HarnessClient, HarnessLimits, HarnessMcpServer, HarnessMcpValue,
     HarnessNetworkPolicy, HarnessProfile, DockerPolicyExecutor, PolicyResearchController,
     canonical_sha256, directory_sha256, file_sha256, policy_submission_contract)
-from ldm_tts.harness.container import docker_identity_args, resolve_container_user
+from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
 from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
 from ldm_tts.harness.research_strategy import load_research_strategy
@@ -23,29 +23,6 @@ TOOL_NAMES = ("get_contract", "validate_expression", "check_expression", "get_hi
 
 def runtime_root():
     return Path(os.environ.get("ALPHABENCH_RUNTIME_ROOT") or tempfile.gettempdir()).expanduser().resolve()
-
-
-def _sidecar_command(artifact_root, sidecar_image, extra_mounts=()):
-    cache_root = runtime_root() / "cache"
-    cache_root.mkdir(parents=True, exist_ok=True)
-    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
-    user = resolve_container_user(None)
-    command = ["docker", "run", "--rm", "-i", *docker_identity_args(user),
-        "--device", "/dev/kvm"]
-    environment = {"HOME": "/runtime-home", "XDG_CACHE_HOME": "/runtime-home/.cache",
-        "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
-        "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
-        "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
-        "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays"}
-    for key, value in sorted(environment.items()):
-        command.extend(("--env", f"{key}={value}"))
-    for source_path, destination, readonly in (
-        (artifact_root, "/artifacts", False), (cache_root, "/runtime-home/.cache/gondolin", False),
-        (RESOURCE_ROOT, "/resources", True), *extra_mounts):
-        command.extend(("--mount", f"type=bind,src={source_path.resolve()},dst={destination}"
-            + (",readonly" if readonly else "")))
-    command.append(sidecar_image)
-    return command
 
 
 def build_harness(protocol, gateway, collection, *, api_key, sidecar_image):
@@ -87,8 +64,9 @@ def build_harness(protocol, gateway, collection, *, api_key, sidecar_image):
             provider_request_body={"reasoning": {"effort": protocol.reasoning_effort}, "store": False})
         def create(root, *, profiles=profiles, contract=config.submission_contract, sources=None):
             root.mkdir(parents=True, exist_ok=True)
-            command = _sidecar_command(root, sidecar_image,
-                ((source, "/app/t3-mcp.mjs", True), (tools.socket_dir, "/t3-host", False)))
+            command = pi_sidecar_command(root, sidecar_image, cache_root=runtime_root() / "cache",
+                mounts=((RESOURCE_ROOT, "/resources", True),
+                        (source, "/app/t3-mcp.mjs", True), (tools.socket_dir, "/t3-host", False)))
             return HarnessClient(command, api_key=api_key,
                 config=replace(config, profiles=profiles, submission_contract=contract, fork_sources=sources or {}),
                 response_timeout_seconds=protocol.request_timeout + 1800)
@@ -140,8 +118,9 @@ def build_policy_harness(protocol, gateway, adapter, meter, *, api_key, sidecar_
         network_policy=HarnessNetworkPolicy(allowed_hosts=("offline.invalid",)),
         force_first_tool_call=False,
         provider_request_body={"reasoning": {"effort": protocol.reasoning_effort}, "store": False})
-    client = HarnessClient(_sidecar_command(artifact_root, sidecar_image), api_key=api_key,
-        config=config, response_timeout_seconds=protocol.request_timeout + 1800)
+    client = HarnessClient(pi_sidecar_command(artifact_root, sidecar_image,
+        cache_root=runtime_root() / "cache", mounts=((RESOURCE_ROOT, "/resources", True),)),
+        api_key=api_key, config=config, response_timeout_seconds=protocol.request_timeout + 1800)
 
     def authorize(request):
         from ldm_tts.contracts.evaluation import EvaluationPaused

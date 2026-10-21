@@ -15,7 +15,7 @@ from ldm_tts.harness import (
     HarnessTurn, canonical_sha256, directory_sha256, file_sha256,
     load_harness_mcp_config, parse_tool_call_budgets, policy_submission_contract,
 )
-from ldm_tts.harness.container import docker_identity_args, resolve_container_user
+from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
 from ldm_tts.harness.research_store import ResearchMeasurement
 from ldm_tts.transport import ProposalResponse
@@ -88,29 +88,18 @@ def create_client(args, root, campaign_id, target, *, policy=False, session_prof
     history_root.mkdir(parents=True, exist_ok=True)
     if not (history_root / "measured_history.json").exists():
         atomic_json_write(history_root / "measured_history.json", {"observations": []})
-    cache = (args.harness_cache_dir or Path.home() / ".cache/ldm-gondolin").expanduser().resolve()
-    (cache / "runtime-overlays").mkdir(parents=True, exist_ok=True)
-    command = ["docker"]
-    if args.harness_docker_host:
-        command += ["--host", args.harness_docker_host]
-    command += ["run", "--rm", "-i"]
-    command += docker_identity_args(resolve_container_user(args.harness_container_user, args.harness_docker_host), args.harness_docker_host)
-    command += ["--device", "/dev/kvm"]
-    env = {"HOME": "/runtime-home", "XDG_CACHE_HOME": "/runtime-home/.cache",
-           "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
-           "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
-           "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
-           "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
-           "LDM_REASYN_CONTEXT": "/artifacts/context.json",
-           "LDM_REASYN_HISTORY": "/measured_history/measured_history.json" if policy else "/artifacts/measured_history.json"}
-    for name, value in env.items():
-        command += ["--env", f"{name}={value}"]
-    mounts = [(root, "/artifacts", False), (cache, "/runtime-home/.cache/gondolin", False), (RESOURCE_ROOT, "/resources", True)]
+    mounts = [(RESOURCE_ROOT, "/resources", True)]
     if policy:
         mounts.append((history_root, "/measured_history", True))
-    for source, destination, readonly in mounts:
-        command += ["--mount", f"type=bind,src={source},dst={destination}" + (",readonly" if readonly else "")]
-    command.append(args.harness_sidecar_image)
+    command = pi_sidecar_command(
+        root, args.harness_sidecar_image, cache_root=args.harness_cache_dir,
+        docker_host=args.harness_docker_host, container_user=args.harness_container_user,
+        environment={
+            "LDM_REASYN_CONTEXT": "/artifacts/context.json",
+            "LDM_REASYN_HISTORY": "/measured_history/measured_history.json" if policy else "/artifacts/measured_history.json",
+        },
+        mounts=mounts,
+    )
     mcp = load_harness_mcp_config(args.harness_mcp_config)
     contract = contract or (policy_submission_contract() if policy else submission_contract())
     return HarnessClient(command, api_key=args.provider_api_key,
