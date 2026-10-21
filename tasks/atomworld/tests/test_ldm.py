@@ -13,7 +13,8 @@ from ldm_tts.transport import CallableProposalClient
 from tasks.atomworld.core import selection
 from tasks.atomworld.core.proposals import AtomWorldDomain
 from tasks.atomworld.core.selection import GeometryEncoder, AtomWorldLDMSelector, pool_result
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 from tasks.atomworld.tests.test_harness import ResearchClient, fixture
 from tasks.atomworld.tests.test_policy import PolicyClient, KnownArtifactExecutor
 

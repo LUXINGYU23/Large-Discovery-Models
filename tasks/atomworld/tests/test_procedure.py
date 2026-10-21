@@ -18,7 +18,8 @@ from tasks.atomworld.core.proposals import (
     BlindRefinementExpander,
     official_prompt,
 )
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 
 
 def fixture():

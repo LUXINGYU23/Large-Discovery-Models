@@ -1,6 +1,6 @@
 # 架构收敛实施计划
 
-日期：2026-10-21。状态：待执行。
+日期：2026-10-21。状态：执行中。
 
 代码基线：`31f923efe71e75f7b517039a16b9d0d609321ded`，分支：`codex/default-coverage-tree`。
 本计划落实后续重构范围、顺序和验收要求；下方未勾选的工作尚未完成。
@@ -73,8 +73,8 @@ compiled policy 是现有优化能力，与已删除的 JointGain 决策策略�
 
 涉及 `tasks/atomworld/core/workflow.py`、`harness.py`、相关入口和测试。
 
-- [ ] 将参数解析及规范化归入 `workflow_args.py`，报告投影归入 `reporting.py`。
-- [ ] 将科学运行身份的构造和校验集中归位，保留 `schedule.json` 的内容与校验语义。
+- [x] 将参数解析及规范化归入 `workflow_args.py`，报告投影归入 `reporting.py`。
+- [x] 将科学运行身份的构造和校验集中归位，保留 `schedule.json` 的内容与校验语义。
 - [ ] 将客户端工厂、provider 预检和装配归入 `harness_runtime.py`。
 - [ ] 理清样本级客户端与研究树的生命周期，保留任务专属提交校验和证据导出。
 - [ ] 更新实际入口和测试导入，删除原位置的实现与间接转发。
@@ -84,6 +84,10 @@ LDM 模式仅增加既有授权反馈；结果仍按最终提交报告，不使�
 覆盖启动失败、部分执行和完成后恢复，核对预算与服务关闭。
 
 建议两个提交：配置、身份与报告；客户端装配与生命周期。
+
+配置、身份与报告已归位；远程 AtomWorld 测试 101 通过、5 跳过。
+本轮证据目录为 `/mnt/data1/Large-Discovery-Models/research/architecture-convergence-20261021`，
+该批记录为 `p1-config.xml` 与 `p1-config.log`。
 
 ### P2：完成其余任务的装配边界
 

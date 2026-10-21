@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import argparse
-import csv
 import json
-import math
 import os
 from pathlib import Path
 
@@ -27,20 +24,21 @@ from ldm_tts.transport.openai import (
     EndpointCircuitBreaker,
     EndpointRequestError,
     OpenAICompatibleProposalClient,
-    WIRE_APIS, REASONING_LEVELS, generation_body,
+    generation_body,
 )
 from tasks.atomworld.core.data import (
-    DEFAULT_UPSTREAM,
     TASK_ROOT,
     load_prepared,
-    sha256_file,
     write_json,
 )
 from tasks.atomworld.core.evaluator import AtomWorldEvaluator, load_official_evaluator
 from tasks.atomworld.core.proposals import AtomWorldDomain, BlindRefinementExpander
 from tasks.atomworld.core.task_spec import describe_ldm_task
 from tasks.atomworld.core.methods import LDM_METHODS, HARNESS_METHODS
-from tasks.atomworld.core.selection import AtomWorldLDMSelector, GeometryEncoder, summarize_rounds
+from .provenance import bind_schedule
+from .reporting import project_result
+from . import workflow_args
+from tasks.atomworld.core.selection import AtomWorldLDMSelector, GeometryEncoder
 
 
 def _provider_api_key():
@@ -74,242 +72,6 @@ def _harness_provider_preflight(args):
     return {"backend": "harness", "wire_api": "responses", **client.preflight()}
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mock", action="store_true")
-    parser.add_argument("--data-dir", type=Path, default=None)
-    parser.add_argument(
-        "--upstream-root",
-        type=Path,
-        default=Path(os.environ.get("ATOMWORLD_UPSTREAM_ROOT", DEFAULT_UPSTREAM)),
-    )
-    parser.add_argument("--out-dir", type=Path, default=Path("runs/atomworld"))
-    parser.add_argument("--run-name", default=None)
-    parser.add_argument("--resume-from", type=Path, default=None)
-    parser.add_argument(
-        "--proposal-mode",
-        choices=("mock", "real", "live", "none", "callable", "openai"),
-        default=None,
-    )
-    parser.add_argument("--attempts-per-sample", type=int, default=1)
-    parser.add_argument(
-        "--search-method",
-        choices=("llm", "harness", "harness_public_audit", *LDM_METHODS),
-        default="llm",
-    )
-    parser.add_argument(
-        "--iterations",
-        type=int,
-        default=None,
-        help="Pilot alias for scheduled attempts per sample",
-    )
-    parser.add_argument("--campaign-index", type=int, default=0)
-    parser.add_argument("--proposal-samples", type=int, default=8)
-    parser.add_argument("--bo-pool-size", type=int, default=32)
-    parser.add_argument("--acquisition-alpha", type=float, default=1.0)
-    parser.add_argument("--acquisition-eta", type=float, default=1.0)
-    parser.add_argument("--ucb-beta", type=float, default=1.0)
-    parser.add_argument("--z-clip", type=float, default=5.0)
-    parser.add_argument("--gp-history-limit", type=int, default=128)
-    parser.add_argument("--gp-lengthscale", type=float, default=1.5)
-    parser.add_argument("--gp-noise", type=float, default=1e-4)
-    parser.add_argument(
-        "--initialization-mode",
-        choices=("shared_start", "independent"),
-        default="shared_start",
-    )
-    parser.add_argument("--service-retry-allowance", type=int, default=3)
-    parser.add_argument(
-        "--harness-profile", nargs="+", action="extend", default=None
-    )
-    parser.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
-    parser.add_argument(
-        "--harness-cache-dir", type=Path, default=Path.home() / ".cache/ldm-gondolin"
-    )
-    parser.add_argument("--harness-docker-host", default="")
-    parser.add_argument("--harness-container-user", default=None)
-    parser.add_argument(
-        "--harness-thinking",
-        choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"),
-        default=None,
-    )
-    parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
-    parser.add_argument("--harness-response-timeout", type=float, default=2100)
-    parser.add_argument("--harness-recovery-seconds", type=float, default=0)
-    parser.add_argument("--harness-max-submission-attempts", type=int, default=3)
-    parser.add_argument(
-        "--harness-tool-budget",
-        nargs="+",
-        action="extend",
-        default=None,
-    )
-    default_harness_tool_budgets = [
-        "web_search=8",
-        "fetch_content=16",
-        "get_search_content=16",
-        "resolve-library-id=4",
-        "query-docs=8",
-        "bash=64",
-    ]
-    parser.add_argument("--harness-mcp-config", type=Path, default=None)
-    parser.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
-    parser.add_argument(
-        "--limit", type=int, default=0, help="0 evaluates every prepared sample"
-    )
-    parser.add_argument(
-        "--sample-id",
-        default=None,
-        help="Select one exact public sample ID for a pilot case",
-    )
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument(
-        "--proposal-format", choices=("cif", "operations"), default="cif"
-    )
-    parser.add_argument(
-        "--tools-root",
-        type=Path,
-        default=None,
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--llm-url",
-        default=os.environ.get(
-            "LLM_BASE_URL",
-            os.environ.get("LDM_LLM_URL", os.environ.get("OPENAI_BASE_URL", "")),
-        ),
-    )
-    parser.add_argument(
-        "--llm-model-name",
-        default=os.environ.get(
-            "LLM_MODEL_NAME",
-            os.environ.get("LDM_LLM_MODEL", os.environ.get("OPENAI_MODEL", "")),
-        ),
-    )
-    parser.add_argument("--llm-max-tokens", type=int, default=8192)
-    parser.add_argument("--llm-timeout", type=float, default=180.0)
-    parser.add_argument("--llm-temperature", type=float, default=0.0)
-    parser.add_argument("--llm-wire-api", choices=WIRE_APIS, default="responses")
-    parser.add_argument("--llm-reasoning", choices=REASONING_LEVELS)
-    parser.add_argument(
-        "--llm-extra-body-json",
-        default="{}",
-        help="Provider reasoning controls; never put credentials here",
-    )
-    parser.add_argument("--harness-research-strategy-config", type=Path)
-    args = parser.parse_args(argv)
-    from ldm_tts.harness.research_strategy import configure_research_strategy
-    try:
-        configure_research_strategy(args, enabled=args.search_method in HARNESS_METHODS)
-    except ValueError as exc:
-        parser.error(str(exc))
-    if args.llm_reasoning is not None and args.harness_thinking is not None and args.llm_reasoning != args.harness_thinking:
-        parser.error("llm-reasoning and harness-thinking must agree")
-    args.llm_reasoning = args.llm_reasoning or args.harness_thinking or "off"
-    args.harness_thinking = "off" if args.llm_reasoning == "none" else args.llm_reasoning
-    if args.search_method in HARNESS_METHODS and args.llm_wire_api != "responses":
-        parser.error("Harness requires llm-wire-api responses")
-    if not math.isfinite(args.llm_temperature) or not 0 <= args.llm_temperature <= 2:
-        parser.error("llm-temperature must be finite and between 0 and 2")
-    # The shared config runner repeats list-valued flags. Preserve all entries
-    # both in that form and in a grouped, interactive command-line invocation.
-    if args.harness_profile is None:
-        from tasks.atomworld.core.harness import PROFILE_IDS
-        args.harness_profile = list(PROFILE_IDS)
-    if args.harness_tool_budget is None:
-        args.harness_tool_budget = default_harness_tool_budgets
-    if args.proposal_mode in {"mock", "callable"}:
-        args.mock = True
-    if args.resume_from is not None:
-        args.out_dir, args.resume = args.resume_from, True
-    elif args.run_name is not None:
-        if Path(args.run_name).name != args.run_name or args.run_name in {".", ".."}:
-            parser.error("run-name must be a single safe path component")
-        args.out_dir = args.out_dir / args.run_name
-    if args.iterations is not None:
-        args.attempts_per_sample = args.iterations
-    if args.attempts_per_sample < 1 or args.limit < 0:
-        parser.error("attempts-per-sample must be positive and limit nonnegative")
-    if args.campaign_index < 0 or args.service_retry_allowance < 0:
-        parser.error("campaign-index and service-retry-allowance must be nonnegative")
-    if min(args.proposal_samples, args.bo_pool_size, args.gp_history_limit) < 1:
-        parser.error("LDM proposal, BO pool and history counts must be positive")
-    if any(not math.isfinite(v) or v < 0 for v in (args.acquisition_alpha, args.acquisition_eta, args.ucb_beta)):
-        parser.error("LDM alpha, eta and beta must be finite and nonnegative")
-    if any(not math.isfinite(v) or v <= 0 for v in (args.z_clip, args.gp_lengthscale, args.gp_noise)):
-        parser.error("LDM scales and noise must be finite and positive")
-    if args.search_method in LDM_METHODS and args.proposal_format != "cif":
-        parser.error("LDM optimizes complete CIF proposals")
-    if args.tools_root is not None:
-        parser.error(
-            "--tools-root is obsolete: bounded geometry tools now ship inside this task"
-        )
-    if args.search_method in HARNESS_METHODS:
-        from ldm_tts.harness import parse_tool_call_budgets
-        from tasks.atomworld.core.harness import harness_profiles
-
-        try:
-            harness_profiles(args.harness_profile)
-            if args._research_strategy.requires_main and len(args.harness_profile) != 4:
-                raise ValueError("AtomWorld research trees require four Harness profiles")
-            if "policy_architect" in args.harness_profile:
-                raise ValueError(
-                    "policy_architect is reserved for the independent policy session"
-                )
-            parse_tool_call_budgets(
-                args.harness_tool_budget,
-                excluded_tools=("submit_answer", "submit_optimization_policy"),
-            )
-        except ValueError as exc:
-            parser.error(str(exc))
-        if (
-            min(
-                args.harness_wall_time_seconds,
-                args.harness_response_timeout,
-                args.harness_max_submission_attempts,
-            )
-            <= 0
-            or args.harness_recovery_seconds < 0
-        ):
-            parser.error(
-                "Harness deadlines and submission count must be positive; recovery nonnegative"
-            )
-        if args.proposal_format != "cif":
-            parser.error(
-                "Harness submits CIF answers; execute geometry operations inside its guest"
-            )
-    if not args.mock and args.data_dir is None:
-        parser.error(
-            "--data-dir is required for real runs; prepare the released data first"
-        )
-    try:
-        extra = json.loads(args.llm_extra_body_json)
-    except ValueError:
-        parser.error("llm-extra-body-json must be a JSON object")
-    if not isinstance(extra, dict):
-        parser.error("llm-extra-body-json must be a JSON object")
-    try:
-        generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning, extra_body=extra)
-        args.llm_extra_body_json = json.dumps(extra, sort_keys=True)
-    except ValueError as exc:
-        parser.error(str(exc))
-    if any(
-        any(
-            word in key.lower()
-            for word in ("token_key", "api_key", "authorization", "password", "secret")
-        )
-        for key in extra
-    ):
-        parser.error(
-            "Credentials must be supplied through environment variables, not extra-body JSON"
-        )
-    if args.mock and args.proposal_format != "cif":
-        parser.error(
-            "Mock fixture uses CIF output; operations mode is verified with the real local geometry tool"
-        )
-    return args
-
-
 def _load_mock():
     fixture = json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
     samples = fixture["public"]
@@ -325,160 +87,6 @@ def _load_mock():
         },
         outputs,
     )
-
-
-def project_result(
-    run_dir: Path,
-    samples: list[dict],
-    attempts: int,
-    result,
-    *,
-    mock: bool,
-    dataset_manifest: dict,
-    proposal_format="cif",
-    search_method="llm",
-    runtime=None,
-) -> dict:
-    # Never select engine.best: it is a hidden-answer oracle. Fixed last-submission reporting.
-    by_key = {
-        observation.canonical_key: observation.evaluation
-        for observation in result.state.observations
-    }
-    rows = []
-    ldm_rounds = []
-    for sample_index, sample in enumerate(samples):
-        details = []
-        for attempt in range(attempts):
-            ordinal = sample_index * attempts + attempt
-            path = run_dir / "attempts" / f"{ordinal:06d}.json"
-            raw = json.loads(path.read_text()) if path.exists() else None
-            evaluation = by_key.get(raw["canonical_key"]) if raw else None
-            if raw and search_method in LDM_METHODS:
-                ldm_rounds.append({"round": ordinal, "sample_id": sample["sample_id"], **raw["selection"]})
-            if evaluation is not None and not evaluation.succeeded:
-                message = (
-                    evaluation.error
-                    or f"evaluation status {evaluation.status}"
-                )
-                error = RuntimeError(
-                    f"AtomWorld evaluation failed for round {ordinal:06d}: {message}"
-                )
-                if runtime is not None:
-                    runtime.fail(error)
-                raise error
-            details.append(
-                {
-                    "attempt": attempt + 1,
-                    "submitted": raw is not None,
-                    "correct": bool(
-                        evaluation and evaluation.metrics.get("correct") == 1
-                    ),
-                    "candidate_id": evaluation.candidate_id if evaluation else None,
-                    "error": None if evaluation else "missing_or_rejected_submission",
-                }
-            )
-        rows.append(
-            {
-                "sample_id": sample["sample_id"],
-                "action_name": sample["action_name"],
-                "one_shot_correct": details[0]["correct"],
-                "final_correct": details[-1]["correct"],
-                "oracle_any_attempt_correct": any(item["correct"] for item in details),
-                "attempts": details,
-            }
-        )
-    count = len(rows)
-    macro = {}
-    for action in sorted({row["action_name"] for row in rows}):
-        group = [row for row in rows if row["action_name"] == action]
-        macro[action] = {
-            "n": len(group),
-            "one_shot_accuracy": sum(r["one_shot_correct"] for r in group) / len(group),
-            "final_accuracy": sum(r["final_correct"] for r in group) / len(group),
-        }
-    payload = {
-        "task": "atomworld",
-        "qualification": "draft",
-        "ldm_applicability": "measured_feedback_optimization" if search_method in LDM_METHODS else "blind_baseline",
-        "feedback_protocol": "measured_correctness_optimization" if search_method in LDM_METHODS else "blind_refinement",
-        "mode": "mock" if mock else "real",
-        "proposal_format": proposal_format,
-        "search_method": search_method,
-        "selection_protocol": "final_submission",
-        "dataset_kind": dataset_manifest["dataset_kind"],
-        "paper_split_verified": dataset_manifest.get("paper_split_verified", False),
-        "sample_count": count,
-        "attempts_per_sample": attempts,
-        "schedule_completed": result.state.next_round >= count * attempts and all(
-            item["error"] is None for row in rows for item in row["attempts"]
-        ),
-        "one_shot_accuracy": sum(row["one_shot_correct"] for row in rows) / count,
-        "extended_final_accuracy": sum(row["final_correct"] for row in rows) / count
-        if attempts > 1
-        else None,
-        "oracle_any_attempt_accuracy_diagnostic": sum(
-            row["oracle_any_attempt_correct"] for row in rows
-        )
-        / count,
-        "final_selection": "last scheduled answer; missing/rejected final answers count as incorrect",
-        "official_paper_score_claimed": False,
-        "by_action": macro,
-        "samples": rows,
-        "engine_summary": result.summary,
-        "warning": "Synthetic fixture only; not an LLM benchmark score"
-        if mock
-        else "Released local subset; not a verified paper test split",
-    }
-    if search_method in LDM_METHODS:
-        payload["ldm_diagnostics"] = summarize_rounds(ldm_rounds)
-    write_json(run_dir / "result.json", payload)
-    if not payload["schedule_completed"] and runtime is not None:
-        runtime.finish({**result.summary, "schedule_completed": False}, status="stopped")
-    if search_method in HARNESS_METHODS:
-        kinds = ("harness", "policy_harness") if (
-            search_method == "harness_public_audit" or
-            (search_method == "ldm_harness_compiled" and attempts > 1)
-        ) else ("harness",)
-        write_json(run_dir / "harness_provenance.json", {
-            "schema_version": 1,
-            "pools": {kind: [p.relative_to(run_dir).as_posix()
-                for pattern in ("sample_*/manifest.json", "sample_*/main/manifest.json", "sample_*/branches/round_*/manifest.json")
-                for p in sorted((run_dir / kind).glob(pattern))] for kind in kinds},
-        })
-    with (run_dir / "trajectory.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=[
-                "sample_id",
-                "action_name",
-                "round",
-                "attempt",
-                "correct",
-                "submitted",
-                "candidate_id",
-            ],
-        )
-        writer.writeheader()
-        for sample_index, row in enumerate(rows):
-            for item in row["attempts"]:
-                writer.writerow(
-                    {
-                        "sample_id": row["sample_id"],
-                        "action_name": row["action_name"],
-                        "round": sample_index * attempts + item["attempt"] - 1,
-                        **{
-                            key: item[key]
-                            for key in (
-                                "attempt",
-                                "correct",
-                                "submitted",
-                                "candidate_id",
-                            )
-                        },
-                        "correct": int(item["correct"]),
-                    }
-                )
-    return payload
 
 
 def run(args, *, client=None, harness_client_factory=None, policy_executor=None):
@@ -575,64 +183,9 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
         proposal_samples=proposal_samples,
         harness_candidates_per_session=1 if harness_mode else 0,
     )
-    # These immutable values prevent resuming against a different task schedule or endpoint policy.
-    immutable = {
-        "samples": samples,
-        "attempts_per_sample": args.attempts_per_sample,
-        "dataset_manifest": manifest,
-        "mock": args.mock,
-        "proposal_format": args.proposal_format,
-        "tool_source_sha256": {
-            str(p.relative_to(TASK_ROOT)): sha256_file(p)
-            for p in sorted(
-                (TASK_ROOT / "resources/harness/image/atomworld_tools").glob("*.py")
-            )
-        }
-        if args.proposal_format == "operations"
-        else {},
-        "llm_model_name": args.llm_model_name,
-        "llm_max_tokens": args.llm_max_tokens,
-        "llm_wire_api": args.llm_wire_api,
-        "llm_reasoning": args.llm_reasoning,
-        "llm_temperature": args.llm_temperature,
-        "llm_extra_body_json": args.llm_extra_body_json,
-        "resolved_generation_body": generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-                                                    extra_body=json.loads(args.llm_extra_body_json)),
-        "search_method": args.search_method,
-        "campaign_index": args.campaign_index,
-        "service_retry_allowance": args.service_retry_allowance,
-        "ldm_configuration": {
-            "feedback_protocol": "measured_correctness_optimization",
-            "proposal_samples": proposal_samples,
-            **{key: config[key] for key in ("bo_pool_size", "acquisition_alpha", "acquisition_eta", "ucb_beta",
-                                            "z_clip", "gp_history_limit", "gp_lengthscale", "gp_noise")},
-            "feature_version": encoder.version,
-        } if ldm_mode else None,
-    }
-    if harness_mode:
-        from ldm_tts.harness import canonical_sha256
-
-        resource_root = TASK_ROOT / "resources/harness"
-        immutable["harness_resources_sha256"] = canonical_sha256(
-            {
-                str(path.relative_to(resource_root)): sha256_file(path)
-                for path in sorted(resource_root.rglob("*"))
-                if path.is_file() and "__pycache__" not in path.parts
-            }
-        )
-        immutable["harness_settings"] = {
-            key: value
-            for key, value in config.items()
-            if key.startswith(("harness_", "policy_"))
-        }
-    immutable_path = run_dir / "schedule.json"
-    if args.resume and immutable_path.exists():
-        if json.loads(immutable_path.read_text()) != immutable:
-            raise ValueError(
-                "Resume requires the same dataset, schedule, model and generation settings"
-            )
-    else:
-        write_json(immutable_path, immutable)
+    bind_schedule(args, run_dir, samples, manifest, config,
+                  proposal_samples=proposal_samples, encoder=encoder,
+                  ldm_mode=ldm_mode, harness_mode=harness_mode)
     write_json(run_dir / "dataset_manifest.json", manifest)
     runtime_ref = []
 
@@ -752,7 +305,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
 
 
 def main(argv=None):
-    args = parse_args(argv)
+    args = workflow_args.parse_args(argv)
     if args.dry_run:
         print(json.dumps(describe_ldm_task(args).to_dict(), indent=2))
         return 0

@@ -134,7 +134,8 @@ def test_submission_matrix_accepts_task_declared_methods(tmp_path):
 
 
 def test_registered_submission_adapter_audits_real_campaign_receipts(tmp_path):
-    from tasks.atomworld.core.workflow import parse_args, run
+    from tasks.atomworld.core.workflow import run
+    from tasks.atomworld.core.workflow_args import parse_args
     from ldm_tts.pilot_evaluation.reporting import _read_trajectory, _observations
     from ldm_tts.pilot_evaluation.submission_reporting import submission_trajectory as normalized
 

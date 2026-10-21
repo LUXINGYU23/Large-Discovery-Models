@@ -10,7 +10,8 @@ from pathlib import Path
 
 from ldm_tts.harness import HarnessClient, HarnessPoolConfig
 from tasks.atomworld.core.harness import harness_profiles, submission_contract
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 
 SIDECAR = r"""
 import hashlib, json, sys

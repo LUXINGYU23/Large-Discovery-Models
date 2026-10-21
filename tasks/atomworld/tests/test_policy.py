@@ -15,7 +15,8 @@ from ldm_tts.harness import (
 )
 from tasks.atomworld.core.geometry import execute_operations
 from tasks.atomworld.core.optimization_policy import FEATURE_NAMES, public_policy_input
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 from tasks.atomworld.tests.test_harness import ResearchClient, fixture
 
 
