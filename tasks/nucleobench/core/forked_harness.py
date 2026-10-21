@@ -1,28 +1,14 @@
-"""Experimental main-session research with one-round native Pi forks."""
+"""NucleoBench evidence adapter for the shared research-tree runtime."""
 
 from __future__ import annotations
 
-import json
-import shutil
-import time
-from collections.abc import Callable
+import math
 from dataclasses import replace
-from pathlib import Path
-from typing import Any
 
-from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
-from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.harness import (
-    HarnessClient, HarnessError, HarnessSubmissionContract, HarnessSubmissionValidation,
-    HarnessTurn, canonical_sha256,
-)
-from ldm_tts.harness.pi import PiForkSource
-from ldm_tts.harness.research_strategy import ResearchStrategy
-from tasks.nucleobench.core.fork_tree import ResearchTree, snapshot_fork
-from tasks.nucleobench.core.harness import (
-    NucleoBenchHarnessExpander, _forbidden_query_terms, _history_delta, _profile,
-    _usage_counts,
-)
+from ldm_tts.harness.research_runtime import ResearchCoordinator
+from ldm_tts.harness.research_store import ResearchMeasurement
+from tasks.nucleobench.core.candidate import prepare_candidate_payload
+from tasks.nucleobench.core.harness import NucleoBenchHarnessExpander, _forbidden_query_terms, _history_delta, _profile
 from tasks.nucleobench.core.research import (
     serialize_measured_observations, summarize_measured_observations, write_measured_history,
 )
@@ -32,135 +18,64 @@ def main_research_profile():
     return (_profile("main_research"),)
 
 
-def research_contract() -> HarnessSubmissionContract:
-    return HarnessSubmissionContract(
-        contract_id="nucleobench_research_brief", tool_name="submit_research",
-        payload_schema={
-            "type": "object", "additionalProperties": False,
-            "properties": {"brief": {"type": "string", "minLength": 1, "maxLength": 4096}},
-            "required": ["brief"],
-        },
-    )
-
-
-def write_fork_provenance(root: Path, *, compiled_policy: bool) -> None:
-    """Declare the tree through the pilot runner's existing multi-pool contract."""
-    root = root.resolve()
-    branches = sorted((root / "branches").glob("round_*/manifest.json"))
-    if not branches:
-        raise ValueError("A completed research tree requires branch manifests")
-    paths = {"main_research": root / "main/manifest.json",
-             **{f"proposal_{path.parent.name}": path for path in branches}}
-    if compiled_policy:
-        paths["policy"] = root.parent / "policy_harness/manifest.json"
-    if any(not path.is_file() for path in paths.values()):
-        raise ValueError("A completed research tree is missing a pool manifest")
-    atomic_json_write(root.parent / "harness_provenance.json", {
-        "schema_version": 1,
-        "pools": {name: [path.relative_to(root.parent).as_posix()] for name, path in paths.items()},
-    })
+def _descriptor(payloads, context):
+    positions = {p: i for i, p in enumerate(context.editable_positions)}
+    reference = ["ACGT".index(context.start_sequence[p]) for p in positions]
+    counts = [0.0] * (4 * len(positions))
+    for payload in payloads:
+        bases = reference.copy()
+        for mutation in payload["mutations"]:
+            bases[positions[mutation["position"]]] = "ACGT".index(mutation["base"])
+        for i, base in enumerate(bases):
+            counts[4 * i + base] += 1 / (len(payloads) * math.sqrt(len(positions)))
+    return tuple(counts)
 
 
 class ForkedResearchExpander:
-    """Keep one main identity; archive all branch evidence, then prune live children."""
-
-    def __init__(self, *, main_client: Callable[[], HarnessClient], root: Path,
-                 branch_client: Callable[[Path, dict[str, PiForkSource]], HarnessClient],
-                 expander_options: dict[str, Any], strategy: ResearchStrategy) -> None:
-        self.main_client = main_client
-        self.root = root.resolve()
-        self.branch_client = branch_client
-        self.options = expander_options
+    def __init__(self, *, main_client, root, branch_client, expander_options, strategy):
+        self.options, self.branch_client = expander_options, branch_client
         self.domain = expander_options["domain"]
-        self.account = expander_options.get("account")
-        if strategy.fork_policy is None:
-            raise ValueError("Forked research requires a fork policy")
-        self.tree = ResearchTree(self.root, strategy.fork_policy, strategy.archive_policy)
+        self.coordinator = ResearchCoordinator(root, strategy, expander_options["profiles"], main_client,
+                                               account=expander_options.get("account"))
 
-    def expand(self, request: ExpansionRequest) -> ExpansionResult:
-        main_root = self.root / "main"
-        workspace = main_root / "sessions/main_research/workspace"
-        round_root = self.root / "branches" / f"round_{request.round_idx:04d}"
-        write_measured_history(self.root, request.observations, self.domain.context)
-        write_measured_history(main_root, request.observations, self.domain.context)
-        previous = self.root / "branches" / f"round_{request.round_idx - 1:04d}" / "panel.json"
-        inbox = workspace / "branch_feedback" / f"round_{request.round_idx - 1:04d}.json"
-        if request.round_idx > 1 and not previous.exists():
-            raise ValueError("Previous branch panel is required to continue main research")
-        if previous.exists():
-            inbox.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(previous, inbox)
-        history = _history_delta(request, 1)
-        rows = serialize_measured_observations(history, self.domain.context)
-        payload = {
-            "round_index": request.round_idx,
-            "new_measurements": summarize_measured_observations(rows),
-            "previous_branch_panel": str(Path("/workspace") / inbox.relative_to(workspace)) if previous.exists() else None,
-            "branch_roles": [p.profile_id for p in self.options["profiles"]],
-            "instructions": (
-                "Use the task context and measured-history tools for exact data. Reconcile prior branch hypotheses "
-                "with the new measurements; the panel archive contains all proposals, including unmeasured ones. "
-                "Update research.md and shared scripts only where evidence warrants. Preserve alternatives. "
-                "Prepare a brief common research foundation; branches will independently construct candidates. "
-                "Finish with submit_research({brief: ...}), at most 4096 characters."
-            ),
-        }
-        turn = HarnessTurn(
-            profile_id="main_research", turn_id=f"main_round_{request.round_idx:04d}",
-            round_index=request.round_idx, history_from_seq=len(request.observations) - len(history),
-            history_to_seq=len(request.observations), history_digest=canonical_sha256(rows),
-            message=json.dumps(payload, sort_keys=True), forbidden_query_terms=_forbidden_query_terms(request),
+    def expand(self, request):
+        coordinator, context = self.coordinator, self.domain.context
+        write_measured_history(coordinator.root, request.observations, context)
+        write_measured_history(coordinator.root / "main", request.observations, context)
+        measured = [o for o in request.observations if o.evaluation.status == "succeeded"
+                    and math.isfinite(float(o.evaluation.metrics["utility"]))]
+        leader = max(measured, key=lambda o: (o.evaluation.metrics["utility"], o.canonical_key), default=None)
+        prepared = coordinator.prepare(
+            request.round_idx, serialize_measured_observations(request.observations, context),
+            tuple(ResearchMeasurement(o.canonical_key, float(o.evaluation.metrics["utility"]), o.round_idx)
+                  for o in measured),
+            descriptor=_descriptor([leader.candidate.payload if leader else {"mutations": []}], context),
+            forbidden_query_terms=_forbidden_query_terms(request),
+            message={"new_measurements": summarize_measured_observations(
+                serialize_measured_observations(_history_delta(request, 1), context))},
         )
-        if self.account:
-            self.account({"harness_turns": 1, "main_research_turns": 1}, usage_key=f"main:{turn.turn_id}:count")
-        usage = {}
-        started = time.perf_counter()
-        try:
-            with self.main_client() as client:
-                result, = client.run_turn(
-                    (turn,), submission_validator=lambda _: HarnessSubmissionValidation("accept"),
-                    recovery_timeout_seconds=2.0 * client.config.limits.wall_time_seconds,
-                )
-                usage = result.usage
-        except HarnessError as exc:
-            usage = exc.turn_usage.get("main_research", {})
-            raise
-        finally:
-            if self.account:
-                self.account(_usage_counts(usage), usage_key=f"main:{turn.turn_id}")
-                self.account({"harness_wall_time_seconds": time.perf_counter() - started})
-        if result.submission_status != "accepted":
-            raise ValueError("Main research brief was rejected")
-        session = (main_root / result.artifacts["session"]).resolve()
-        if not session.is_relative_to(main_root.resolve()):
-            raise ValueError("Main session escaped its artifact root")
-        source = snapshot_fork(session, workspace, round_root / "fork-source", len(request.observations))
-        plan = self.tree.prepare(request, self.options["profiles"], self.domain.context)
-        sources = self.tree.materialize(plan)
-        with self.branch_client(round_root, sources) as client:
-            expander = NucleoBenchHarnessExpander(
-                client, artifact_root=round_root,
-                inherited_history_counts={p: s.history_cursor for p, s in sources.items()}, **self.options,
-            )
-            expanded = expander.expand(request)
-        assignments = {a["profile_id"]: a for a in plan["assignments"]}
+        with self.branch_client(prepared["root"], prepared["sources"]) as client:
+            expanded = NucleoBenchHarnessExpander(
+                client, artifact_root=prepared["root"],
+                inherited_history_counts={p: s.history_cursor for p, s in prepared["sources"].items()},
+                **self.options,
+            ).expand(request)
+        assignments = {a["profile_id"]: a for a in prepared["plan"]["assignments"]}
         expanded = replace(expanded, proposals=tuple(replace(p, metadata={
             **p.metadata, "research_fork": assignments[p.metadata["harness_lineage"]["profile_id"]],
         }) for p in expanded.proposals))
-        self.tree.commit(plan, expanded, self.domain.context)
-        panel = {
-            "round_index": request.round_idx, "main_turn_id": turn.turn_id,
-            "main_session_sha256": source.session_sha256, "brief": result.submission["brief"],
-            "proposals": [{"payload": p.payload, "annotations": p.metadata["research_annotations"],
-                           "lineage": p.metadata["harness_lineage"]} for p in expanded.proposals],
-            "sessions": expanded.metadata["sessions"],
-            "fork_plan": plan["assignments"],
-            "status": "branches_closed; selection_and_evaluation_follow",
-        }
-        atomic_json_write(round_root / "panel.json", panel)
-        return ExpansionResult(
-            proposals=expanded.proposals, selection_mode=expanded.selection_mode,
-            metadata={**expanded.metadata, "sampling_mode": "main_research_round_forks",
-                      "main_turn_id": turn.turn_id, "fork_source": source.to_dict(),
-                      "fork_policy": self.tree.fork_policy.identity(), "fork_plan": plan["assignments"]},
+        batches = {profile: [prepare_candidate_payload(p.payload, context) for p in expanded.proposals
+                            if p.metadata["harness_lineage"]["profile_id"] == profile]
+                   for profile in assignments}
+        coordinator.commit(
+            prepared, {s["profile_id"]: s for s in expanded.metadata["sessions"]},
+            {profile: tuple(p.canonical_key for p in batch) for profile, batch in batches.items()},
+            descriptors={profile: _descriptor([p.payload for p in batch], context) for profile, batch in batches.items()},
+            proposals=[{"payload": p.payload, "annotations": p.metadata["research_annotations"],
+                        "lineage": p.metadata["harness_lineage"]} for p in expanded.proposals],
         )
+        return replace(expanded, metadata={
+            **expanded.metadata, "sampling_mode": "main_research_round_forks",
+            "main_turn_id": prepared["main_turn_id"], "fork_source": prepared["source"].to_dict(),
+            "fork_policy": coordinator.tree.fork_policy.identity(), "fork_plan": prepared["plan"]["assignments"],
+        })

@@ -2,14 +2,38 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from importlib import import_module
+from pathlib import Path
 from typing import Any
 
 from ldm_tts.optimization.measurement import MeasurementPolicy
 from ldm_tts.harness.research_tree import (
     ArchivePolicy, CoverageForks, DiverseArchive, ForkPolicy, LatestMainForks,
 )
+
+
+DEFAULT_RESEARCH_STRATEGY = {
+    "name": "main_forks", "fork_policy": {"name": "coverage"},
+    "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5},
+}
+
+
+def configure_research_strategy(args, *, enabled, measurement_supported=False):
+    path = args.harness_research_strategy_config
+    config = json.loads(Path(path).read_text(encoding="utf-8")) if path else (
+        DEFAULT_RESEARCH_STRATEGY if enabled else {"name": "independent"}
+    )
+    strategy = load_research_strategy(config)
+    if not enabled and strategy.requires_main:
+        raise ValueError("Research forks require a parallel Harness method")
+    if strategy.measurement_policy is not None and not measurement_supported:
+        raise ValueError("This task does not implement measurement coverage")
+    args._research_strategy = strategy
+    args.harness_research_strategy = config
+    args.harness_research_strategy_identity = strategy.identity()
+    return strategy
 
 
 @dataclass(frozen=True)

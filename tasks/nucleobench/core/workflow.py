@@ -77,11 +77,12 @@ from tasks.nucleobench.core.factory import (
 )
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.forked_harness import (
-    ForkedResearchExpander, main_research_profile, research_contract, write_fork_provenance,
+    ForkedResearchExpander, main_research_profile,
 )
+from ldm_tts.harness.research_runtime import research_contract, write_fork_provenance
 from ldm_tts.harness.research_tree import CoverageForks
 from ldm_tts.harness.joint_gain import JointGainForks
-from ldm_tts.harness.research_strategy import load_research_strategy
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
@@ -242,20 +243,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    _apply_derived_args(args)
+    try:
+        _apply_derived_args(args)
+    except ValueError as exc:
+        parser.error(str(exc))
     _validate_args(args, parser)
     return args
 
 
 def _apply_derived_args(args: argparse.Namespace) -> None:
-    if args.harness_research_strategy_config is not None:
-        config = json.loads(args.harness_research_strategy_config.read_text(encoding="utf-8"))
-    else:
-        config = {"name": "independent"}
-    strategy = load_research_strategy(config)
-    args._research_strategy = strategy
-    args.harness_research_strategy = config
-    args.harness_research_strategy_identity = strategy.identity()
+    strategy = configure_research_strategy(
+        args, enabled=args.search_method in PARALLEL_HARNESS_METHODS and not args.mock,
+        measurement_supported=True,
+    )
     args.harness_main_research = strategy.requires_main
     if args.iterations is None and args.termination_kind == "rounds":
         args.iterations = 2

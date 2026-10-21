@@ -12,12 +12,32 @@ from ldm_tts.harness.joint_gain import JointGainForks
 from ldm_tts.harness.research_tree import CoverageForks, DiverseArchive, LatestMainForks
 from ldm_tts.harness.research_strategy import ResearchStrategy
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
-from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, write_fork_provenance
-from tasks.nucleobench.core.fork_tree import snapshot_fork
+from tasks.nucleobench.core.forked_harness import ForkedResearchExpander
+from ldm_tts.harness.research_runtime import write_fork_provenance
+from ldm_tts.harness.research_store import snapshot_fork
 from tasks.nucleobench.core.harness import harness_profiles
 from tasks.nucleobench.core.mock import MOCK_CONTEXT
 from tasks.nucleobench.core.workflow import _campaign_budget, parse_args
 from tasks.nucleobench.tests.test_harness import FakeHarnessClient, _observation
+
+
+def prepare_tree(tree, request, profiles):
+    from ldm_tts.harness.research_store import ResearchMeasurement
+    from tasks.nucleobench.core.research import serialize_measured_observations
+    from tasks.nucleobench.core.forked_harness import _descriptor
+    measured = [o for o in request.observations if o.evaluation.succeeded]
+    leader = max(measured, key=lambda o: (o.metrics["utility"], o.canonical_key), default=None)
+    return tree.prepare(request.round_idx, profiles, serialize_measured_observations(request.observations, MOCK_CONTEXT),
+                        [ResearchMeasurement(o.canonical_key, o.metrics["utility"], o.round_idx) for o in measured],
+                        descriptor=_descriptor([leader.candidate.payload if leader else {"mutations": []}], MOCK_CONTEXT))
+
+
+def commit_tree(tree, plan, expanded):
+    from tasks.nucleobench.core.candidate import prepare_candidate_payload
+    sessions = {s["profile_id"]: s for s in expanded.metadata["sessions"]}
+    keys = {profile: [prepare_candidate_payload(p.payload, MOCK_CONTEXT).canonical_key for p in expanded.proposals
+                      if p.metadata["harness_lineage"]["profile_id"] == profile] for profile in sessions}
+    tree.commit(plan, sessions, keys)
 
 
 def test_snapshot_is_frozen_and_copies_files(tmp_path):
@@ -224,7 +244,7 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, policy, ma
         observations += (_observation(result.proposals[0].payload, round_idx=r),)
 
     with pytest.raises(ValueError, match="identity changed"):
-        expander.tree.archive_policy = DiverseArchive(capacity=2)
+        expander.coordinator.tree.archive_policy = DiverseArchive(capacity=2)
         expander.expand(request)
 
 
@@ -257,7 +277,7 @@ def test_coverage_configuration_and_existing_modes(tmp_path):
 def test_archive_reconciles_delayed_measurements_before_parent_selection(tmp_path):
     from dataclasses import asdict
     from ldm_tts.harness.research_tree import ResearchNode
-    from tasks.nucleobench.core.fork_tree import ResearchTree
+    from ldm_tts.harness.research_store import ResearchTree
 
     policy, archive = CoverageForks(), DiverseArchive()
     measured = _observation({"mutations": [{"position": 0, "base": "C"}]}, round_idx=1)
@@ -270,8 +290,8 @@ def test_archive_reconciles_delayed_measurements_before_parent_selection(tmp_pat
         "policies": {"fork_policy": policy.identity(), "archive_policy": archive.identity()},
         "main_nodes": [asdict(main)], "archive": [asdict(pending), asdict(unknown)], "outcomes": [],
     }))
-    plan = ResearchTree(tmp_path, policy, archive).prepare(
-        ExpansionRequest(round_idx=2, reservoir_size=4, observations=(measured,)), harness_profiles(), MOCK_CONTEXT)
+    plan = prepare_tree(ResearchTree(tmp_path, policy, archive),
+        ExpansionRequest(round_idx=2, reservoir_size=4, observations=(measured,)), harness_profiles())
     leaves = {n["node_id"]: n for n in plan["archive"]}
     assert leaves["pending"]["measured_count"] == 1
     assert leaves["pending"]["best_score"] == 1.0
@@ -282,7 +302,7 @@ def test_archive_reconciles_delayed_measurements_before_parent_selection(tmp_pat
 def test_action_feedback_preserves_shared_credit_unknowns_and_decision_time_state(tmp_path):
     from dataclasses import asdict
     from ldm_tts.harness.research_tree import ResearchNode, ResearchOutcome
-    from tasks.nucleobench.core.fork_tree import ResearchTree
+    from ldm_tts.harness.research_store import ResearchTree
 
     profiles = harness_profiles()
     policy, archive = JointGainForks(samples=64), DiverseArchive()
@@ -305,7 +325,7 @@ def test_action_feedback_preserves_shared_credit_unknowns_and_decision_time_stat
     previous.write_text(json.dumps(state))
     tree = ResearchTree(tmp_path, policy, archive)
     request = ExpansionRequest(3, 4, observations=(old, winner, failed, later))
-    plan = tree.prepare(request, profiles, MOCK_CONTEXT)
+    plan = prepare_tree(tree, request, profiles)
     first, duplicate, unevaluated, unknown = plan["outcomes"]
     assert first["best_key"] == duplicate["best_key"] == winner.canonical_key
     assert first["measured_count"] == duplicate["measured_count"] == 1
@@ -313,14 +333,13 @@ def test_action_feedback_preserves_shared_credit_unknowns_and_decision_time_stat
     assert unevaluated["best_score"] is unknown["best_score"] is None
     assert unevaluated["measured_count"] == unknown["measured_count"] == 0
     assert first["parent"]["best_score"] == -5
-    assert tree.prepare(request, profiles, MOCK_CONTEXT) == json.loads(json.dumps(plan))
+    assert prepare_tree(tree, request, profiles) == json.loads(json.dumps(plan))
     with pytest.raises(ValueError, match="earlier rounds"):
-        tree.prepare(replace(request, observations=(*request.observations, replace(winner, round_idx=3))),
-                     profiles, MOCK_CONTEXT)
+        prepare_tree(tree, replace(request, observations=(*request.observations, replace(winner, round_idx=3))), profiles)
     state["outcomes"][0]["incumbent"] = 100
     previous.write_text(json.dumps(state))
     with pytest.raises(ValueError, match="identity changed"):
-        tree.prepare(request, profiles, MOCK_CONTEXT)
+        prepare_tree(tree, request, profiles)
 
 
 def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_path):
@@ -329,7 +348,7 @@ def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_pat
     import numpy as np
 
     from ldm_tts.harness.research_tree import ResearchNode
-    from tasks.nucleobench.core.fork_tree import ResearchTree
+    from ldm_tts.harness.research_store import ResearchTree
 
     class ContinueAll(JointGainForks):
         def _sample_gaps(self, context, actions):
@@ -350,7 +369,7 @@ def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_pat
         "policies": {"fork_policy": tree.fork_policy.identity(), "archive_policy": tree.archive_policy.identity()},
         "main_nodes": [asdict(main)], "archive": [asdict(n) for n in archive], "outcomes": [],
     }))
-    plan = tree.prepare(ExpansionRequest(2, 4, observations=observations), profiles, MOCK_CONTEXT)
+    plan = prepare_tree(tree, ExpansionRequest(2, 4, observations=observations), profiles)
     continued = [a for a in plan["assignments"] if a["purpose"] == "continue"]
     assert {a["parent_id"] for a in continued} == {n.node_id for n in archive}
     selected = {a["parent_id"] for a in plan["assignments"]}
@@ -378,7 +397,7 @@ def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_pat
         proposals.append(SimpleNamespace(payload=payload, metadata={"harness_lineage": {"profile_id": profile}}))
         new_observations.append(_observation(payload, round_idx=2))
     expanded = SimpleNamespace(metadata={"sessions": sessions}, proposals=proposals)
-    tree.commit(plan, expanded, MOCK_CONTEXT)
+    commit_tree(tree, plan, expanded)
     committed = (round_root / "tree.json").read_bytes()
     leaves = json.loads(committed)["archive"]
     assert len(leaves) == 3
@@ -386,8 +405,8 @@ def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_pat
     for a in continued:
         leaf = next(n for n in leaves if n["lineage_id"] == a["lineage_id"])
         assert (tmp_path / leaf["snapshot"] / "session.jsonl").read_text() == a["profile_id"]
-    tree.commit(plan, expanded, MOCK_CONTEXT)
+    commit_tree(tree, plan, expanded)
     assert (round_root / "tree.json").read_bytes() == committed
-    following = tree.prepare(ExpansionRequest(3, 4, observations=(*observations, *new_observations)), profiles, MOCK_CONTEXT)
+    following = prepare_tree(tree, ExpansionRequest(3, 4, observations=(*observations, *new_observations)), profiles)
     assert len(following["outcomes"]) == 4
     assert all(o["best_score"] == 1 and o["measured_count"] == 1 for o in following["outcomes"])

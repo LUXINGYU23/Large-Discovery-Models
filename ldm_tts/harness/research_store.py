@@ -1,11 +1,11 @@
-"""Durable task-side research tree; selection policies are pure and injectable."""
+"""Durable research plans and immutable native Pi snapshots, shared by tasks."""
 
 from __future__ import annotations
 
 import json
 import math
 import shutil
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
@@ -14,8 +14,16 @@ from ldm_tts.harness.pi import PiForkSource
 from ldm_tts.harness.research_tree import (
     ArchivePolicy, ForkAssignment, ForkContext, ForkPolicy, ResearchNode, ResearchOutcome,
 )
-from tasks.nucleobench.core.candidate import prepare_candidate_payload
-from tasks.nucleobench.core.research import serialize_measured_observations
+
+@dataclass(frozen=True)
+class ResearchMeasurement:
+    canonical_key: str
+    score: float
+    round_index: int
+
+    def __post_init__(self):
+        if not self.canonical_key or not math.isfinite(self.score):
+            raise ValueError("Research measurements require a key and finite maximization score")
 
 
 def snapshot_fork(source_session: Path, workspace: Path, target: Path, cursor: int) -> PiForkSource:
@@ -55,37 +63,25 @@ def _outcome(value: dict) -> ResearchOutcome:
                               "proposal_keys": tuple(value["proposal_keys"])})
 
 
-def _descriptor(payloads, context) -> tuple[float, ...]:
-    """Per-position base frequencies; a leaf describes its latest batch only."""
-    positions = {p: i for i, p in enumerate(context.editable_positions)}
-    reference = ["ACGT".index(context.start_sequence[p]) for p in positions]
-    counts = [0.0] * (4 * len(positions))
-    for payload in payloads:
-        bases = reference.copy()
-        for mutation in payload["mutations"]:
-            bases[positions[mutation["position"]]] = "ACGT".index(mutation["base"])
-        for i, base in enumerate(bases):
-            counts[4 * i + base] += 1 / (len(payloads) * math.sqrt(len(positions)))
-    return tuple(counts)
-
-
 class ResearchTree:
     def __init__(self, root: Path, fork_policy: ForkPolicy, archive_policy: ArchivePolicy):
         self.root = root
         self.fork_policy = fork_policy
         self.archive_policy = archive_policy
 
-    def prepare(self, request, profiles, context) -> dict:
-        round_root = self.root / "branches" / f"round_{request.round_idx:04d}"
-        if any(o.round_idx is None or o.round_idx >= request.round_idx for o in request.observations):
+    def prepare(self, round_index, profiles, history, measurements, *, descriptor=()) -> dict:
+        round_root = self.root / "branches" / f"round_{round_index:04d}"
+        if round_index < 1 or any(o.round_index >= round_index for o in measurements):
             raise ValueError("Research planning requires observations from earlier rounds")
-        previous = self.root / "branches" / f"round_{request.round_idx - 1:04d}" / "tree.json"
+        previous = self.root / "branches" / f"round_{round_index - 1:04d}" / "tree.json"
         identity = {
             "evidence_version": 1,
             "fork_policy": self.fork_policy.identity(), "archive_policy": self.archive_policy.identity(),
-            "profiles": [p.profile_id for p in profiles], "round_index": request.round_idx,
-            "history_digest": canonical_sha256(serialize_measured_observations(request.observations, context)),
-            "previous_tree_sha256": file_sha256(previous) if request.round_idx > 1 else None,
+            "profiles": [p.profile_id for p in profiles], "round_index": round_index,
+            "history_digest": canonical_sha256(history),
+            "measurements_digest": canonical_sha256([asdict(o) for o in measurements]),
+            "descriptor": list(descriptor),
+            "previous_tree_sha256": file_sha256(previous) if round_index > 1 else None,
         }
         path = round_root / "fork-plan.json"
         if path.exists():
@@ -94,23 +90,19 @@ class ResearchTree:
                 raise ValueError("Persisted fork plan identity changed")
             return plan
         main_nodes, archive, outcomes = [], [], []
-        if request.round_idx > 1:
+        if round_index > 1:
             state = json.loads(previous.read_text())
             if state["policies"] != {k: identity[k] for k in ("fork_policy", "archive_policy")}:
                 raise ValueError("Research tree policies changed during campaign")
             main_nodes = [_node(n) for n in state["main_nodes"]]
             archive = [_node(n) for n in state["archive"]]
             outcomes = [_outcome(o) for o in state["outcomes"]]
-        measured = [o for o in request.observations if o.evaluation.status == "succeeded"
-                    and math.isfinite(float(o.evaluation.metrics["utility"]))]
-        scores = {o.canonical_key: float(o.evaluation.metrics["utility"]) for o in measured}
+        scores = {o.canonical_key: o.score for o in measurements}
         incumbent = max(scores.values(), default=None)
-        leader = max(measured, key=lambda o: (scores[o.canonical_key], o.canonical_key), default=None)
-        descriptor = _descriptor([leader.candidate.payload if leader else {"mutations": []}], context)
         main_nodes.append(ResearchNode(
-            node_id=f"main_{request.round_idx:04d}",
+            node_id=f"main_{round_index:04d}",
             snapshot=(round_root / "fork-source").relative_to(self.root).as_posix(),
-            round_index=request.round_idx, history_cursor=len(request.observations), lineage_id="main",
+            round_index=round_index, history_cursor=len(history), lineage_id="main",
             parent_id=main_nodes[-1].node_id if main_nodes else None,
             measured_count=len(scores), best_score=incumbent, descriptor=descriptor,
         ))
@@ -119,8 +111,8 @@ class ResearchTree:
                    for n in archive]
         archive = list(self.archive_policy.retain(tuple(archive)))
         by_round = {}
-        for o in measured:
-            by_round.setdefault(o.round_idx, {})[o.canonical_key] = float(o.evaluation.metrics["utility"])
+        for o in measurements:
+            by_round.setdefault(o.round_index, {})[o.canonical_key] = o.score
         for i, outcome in enumerate(outcomes):
             batch_scores = by_round.get(outcome.round_index, {})
             measured_keys = set(outcome.proposal_keys) & batch_scores.keys()
@@ -129,7 +121,7 @@ class ResearchTree:
                                   best_score=batch_scores[best_key] if best_key is not None else None)
         available = {n.node_id: n for n in (*main_nodes, *archive)}
         assignments = self.fork_policy.plan(ForkContext(
-            request.round_idx, tuple(identity["profiles"]), tuple(main_nodes), tuple(archive),
+            round_index, tuple(identity["profiles"]), tuple(main_nodes), tuple(archive),
             tuple(outcomes), incumbent))
         if len(assignments) != len(profiles) or {a.profile_id for a in assignments} != set(identity["profiles"]):
             raise ValueError("Fork policy must assign every profile exactly once")
@@ -165,22 +157,22 @@ class ResearchTree:
                 raise ValueError("Materialized fork differs from selected parent")
         return sources
 
-    def commit(self, plan: dict, expanded, context) -> None:
+    def commit(self, plan: dict, sessions: dict, proposal_keys: dict, *, descriptors=None) -> None:
         """Commit all leaves together; retries reuse the same plan and snapshots."""
         round_index = plan["identity"]["round_index"]
         round_root = self.root / "branches" / f"round_{round_index:04d}"
         main_nodes = [_node(n) for n in plan["main_nodes"]]
         archive = [_node(n) for n in plan["archive"]]
         nodes = {n.node_id: n for n in (*main_nodes, *archive)}
-        sessions = {s["profile_id"]: s for s in expanded.metadata["sessions"]}
+        expected = {a["profile_id"] for a in plan["assignments"]}
+        if set(sessions) != expected or set(proposal_keys) != expected:
+            raise ValueError("Research commit requires every planned branch exactly once")
         replacements = {}
         children = []
         outcomes = list(plan["outcomes"])
         for value in plan["assignments"]:
             a = ForkAssignment(**value)
-            payloads = [prepare_candidate_payload(p.payload, context) for p in expanded.proposals
-                        if p.metadata["harness_lineage"]["profile_id"] == a.profile_id]
-            keys = {p.canonical_key for p in payloads}
+            keys = set(proposal_keys[a.profile_id])
             outcomes.append(asdict(ResearchOutcome(
                 round_index=round_index, profile_id=a.profile_id, purpose=a.purpose,
                 parent=nodes[a.parent_id], incumbent=plan["incumbent"], proposal_keys=tuple(sorted(keys)),
@@ -205,7 +197,7 @@ class ResearchTree:
                 measured_count=parent.measured_count if continuing else 0,
                 best_score=parent.best_score if continuing else None,
                 expansions=parent.expansions + 1 if continuing else 1, last_expanded=round_index,
-                descriptor=_descriptor([p.payload for p in payloads], context),
+                descriptor=tuple((descriptors or {}).get(a.profile_id, ())),
             ))
         continued = {n.lineage_id for n in children}
         leaves = tuple(n for n in archive if n.lineage_id not in continued) + tuple(children)
