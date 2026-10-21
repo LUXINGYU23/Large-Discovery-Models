@@ -11,6 +11,7 @@ from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
 from tasks.reasyn.core import workflow
+from tasks.reasyn.core.workflow_args import parse_args
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.chemistry import MOCK_SMILES
 from tasks.reasyn.core.projector import Projector as ReaSynProjector
@@ -196,7 +197,7 @@ def test_failed_second_minibatch_replays_first_response_without_endpoint_call(tm
 
 
 def test_recovery_seed_span_keeps_projector_receipts_stable_after_iteration_extension(tmp_path):
-    first_args = workflow.parse_args([
+    first_args = parse_args([
         "--mock",
         "--benchmark",
         "tdc",
@@ -224,7 +225,7 @@ def test_recovery_seed_span_keeps_projector_receipts_stable_after_iteration_exte
     request_path = tmp_path / "projections/recovery-000001/round-000000/batch-000000/request.json"
     before = json.loads(request_path.read_text())
 
-    resumed_args = workflow.parse_args([
+    resumed_args = parse_args([
         "--mock",
         "--benchmark",
         "tdc",

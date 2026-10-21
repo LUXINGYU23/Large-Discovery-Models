@@ -30,7 +30,8 @@ from tasks.reasyn.core.sampling import attach_empirical_base_measure, empirical_
 from tasks.reasyn.core.selection import AcquisitionTiltedSelector, TanimotoGPSelector
 from tasks.reasyn.core.surrogate import MoleculeEncoder
 from tasks.reasyn.core import workflow
-from tasks.reasyn.core.workflow import parse_args
+from tasks.reasyn.core.workflow_args import jsonable_args, parse_args
+from tasks.reasyn.core.provenance import harness_component_digests, scientific_identity
 
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
 RUNNER = Path(__file__).resolve().parents[3] / "harnesses/pi/policy_runner.py"
@@ -77,15 +78,15 @@ def harness_identity(options, target="", source_commit="fixture-source"):
         options.iterations,
         options.max_oracle_calls,
     )
-    configuration = workflow._jsonable(options)
+    configuration = jsonable_args(options)
     configuration.update(
         proposal_samples=options.reservoir_size,
         proposal_candidates_per_request=options.proposal_batch_size,
         proposal_counting="bounded_minibatches",
-        harness_component_digests=workflow._harness_component_digests(options),
+        harness_component_digests=harness_component_digests(options),
     )
     contract = SimpleNamespace(benchmark={"source_commit": source_commit})
-    return workflow._scientific_identity(options, configuration, target, contract)
+    return scientific_identity(options, configuration, target, contract)
 
 
 def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):

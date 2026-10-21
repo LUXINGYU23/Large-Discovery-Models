@@ -16,6 +16,16 @@ resume. No model training is needed. Registration is valid; scientific
 qualification remains **draft** because official assets and a real GPU seed run
 have not been verified. Synthetic mock values are not ReaSyn scores.
 
+## Code boundaries
+
+`core/workflow.py` assembles the shared campaign and handles task-specific
+initialization and recovery. CLI resolution and serialized configuration live in
+`workflow_args.py`; `task_spec.py` declares the candidate and search contract.
+`provenance.py` verifies pinned assets and freezes the scientific identity used
+on resume. `reporting.py` writes campaign artifacts and benchmark metrics.
+Projection, candidate admission, sampling and selection remain in their own
+modules; their outputs are the inputs to reporting and recovery.
+
 ## What LDM controls
 
 | Track | Candidate and reservoir expansion | Expensive evaluation | Reported metric |

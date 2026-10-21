@@ -1,12 +1,8 @@
 """ReaSyn Science Benchmark assembly through ldm_tts.campaign.run_campaign."""
 
 from __future__ import annotations
-import argparse
-import csv
-import hashlib
 import json
 import os
-import sys
 import math
 from copy import copy
 from pathlib import Path
@@ -15,17 +11,6 @@ from ldm_tts.campaign import (
     CampaignRecipe,
     CampaignRequest,
     run_campaign,
-)
-from ldm_tts.contracts import (
-    AcquisitionSpec,
-    CandidateDomainSpec,
-    LDMTaskSpec,
-    ObjectiveSpec,
-    ProposalSearchSpec,
-    ReservoirExpansionSpec,
-    ReservoirSpec,
-    ResponseSpaceSpec,
-    SurrogateSpaceSpec,
 )
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine.runtime import consume_proposal_attempts
@@ -40,350 +25,25 @@ from ldm_tts.registration.experiment import (
 from ldm_tts.transport.openai import (
     OpenAICompatibleProposalClient,
     EndpointRequestError,
-    WIRE_APIS, REASONING_LEVELS, generation_body,
+    generation_body,
 )
 from .candidate import ReaSynDomain
 from .chemistry import canonicalize
 from .evaluator import ReconstructionEvaluator, TDCOracleEvaluator
-from .metrics import ORACLES, WIDTH_ONE, reconstruction_metrics, top_auc, top_mean
+from .metrics import reconstruction_metrics
 from .projector import Projector, ProjectionInterruptedError
 from .proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander, ProposalExhausted
 from .surrogate import MoleculeEncoder
 from ldm_tts.harness import HarnessError, PolicyResearchController, DockerPolicyExecutor
 from .harness import HarnessTargetSource, create_client
 from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
-from ldm_tts.harness.research_strategy import configure_research_strategy
 from .optimization_policy import ReaSynPolicyAdapter
+from .provenance import check_assets, harness_component_digests, scientific_identity
+from .reporting import write_campaign_report
+from .task_spec import describe_ldm_task
+from .workflow_args import jsonable_args, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = TASK_ROOT.parents[1]
-
-
-def parse_args(argv=None):
-    p = argparse.ArgumentParser(
-        description="LDM-guided frozen ReaSyn reconstruction and released 13-oracle TDC optimization."
-    )
-    p.add_argument("--mock", action="store_true")
-    p.add_argument(
-        "--benchmark", choices=("reconstruction", "tdc"), default="reconstruction"
-    )
-    p.add_argument(
-        "--proposal-mode",
-        choices=("auto", "mock", "callable", "none", "openai", "baseline", "harness"),
-        default="auto",
-    )
-    p.add_argument("--iterations", type=int, default=2)
-    p.add_argument("--reservoir-size", "--proposal-samples", dest="reservoir_size", type=int, default=4)
-    p.add_argument("--search-method", choices=("auto", "baseline", "ldm", "bo", "llm", "harness", "ldm_harness", "ldm_harness_compiled"), default="auto")
-    p.add_argument("--proposal-batch-size", type=int, default=2)
-    p.add_argument("--bo-pool-size", type=int)
-    p.add_argument("--bo-targets-file", type=Path, default=os.environ.get("REASYN_BO_TARGETS"))
-    p.add_argument("--max-replenishment-batches", type=int, default=4)
-    p.add_argument("--recovery-attempts", type=int, default=3)
-    p.add_argument("--projection-retry-targets", type=int)
-    p.add_argument("--initialization-mode", choices=("none", "shared_start"), default="none")
-    p.add_argument("--run-name", default="")
-    p.add_argument("--evaluations-per-round", type=int, default=1)
-    p.add_argument("--max-oracle-calls", type=int, default=10000)
-    p.add_argument("--oracle", choices=ORACLES, default="jnk3")
-    p.add_argument("--seed", "--campaign-index", dest="seed", type=int, default=0)
-    p.add_argument(
-        "--upstream-root",
-        type=Path,
-        default=Path(
-            os.environ.get("REASYN_ROOT", str(REPO_ROOT.parent / "ReaSyn-reasyn_v2"))
-        ),
-    )
-    p.add_argument("--model-paths", default=os.environ.get("REASYN_MODEL_PATHS", ""))
-    p.add_argument("--fpindex", type=Path)
-    p.add_argument("--rxn-matrix", type=Path)
-    p.add_argument("--additional-fpindex", type=Path)
-    p.add_argument(
-        "--dataset",
-        choices=("zinc250k", "enamine", "chembl", "custom"),
-        default="zinc250k",
-    )
-    p.add_argument("--targets-file", type=Path)
-    p.add_argument("--target-smiles", default="")
-    p.add_argument("--target-limit", type=int, default=1)
-    p.add_argument("--search-width", type=int, default=0)
-    p.add_argument("--exhaustiveness", type=int, default=4)
-    p.add_argument("--num-cycles", type=int, default=1)
-    p.add_argument("--num-editflow-samples", type=int, default=4)
-    p.add_argument("--max-results", type=int, default=100)
-    p.add_argument("--projection-time-limit", type=int, default=1000)
-    p.add_argument("--projection-timeout", type=int, default=3600,
-        help="Single-target process allowance including loading; each additional serial target adds projection-time-limit seconds.")
-    p.add_argument(
-        "--evaluator-python", default=os.environ.get("REASYN_PYTHON", sys.executable)
-    )
-    p.add_argument("--device", default="cuda:0")
-    p.add_argument("--acquisition-beta", type=float, default=1.0)
-    p.add_argument("--acquisition-alpha", type=float, default=1.0)
-    p.add_argument("--acquisition-eta", type=float, default=1.0)
-    p.add_argument("--acquisition-z-clip", type=float, default=5.0)
-    p.add_argument("--harness-sessions", type=int, default=4)
-    p.add_argument("--harness-sidecar-image", default="ldm-pi-harness:latest")
-    p.add_argument("--harness-docker-host", default="")
-    p.add_argument("--harness-container-user", default="auto")
-    p.add_argument("--harness-cache-dir", type=Path)
-    p.add_argument("--harness-thinking", choices=("off", "minimal", "low", "medium", "high", "xhigh", "max"))
-    p.add_argument("--harness-wall-time-seconds", type=int, default=1800)
-    p.add_argument("--harness-response-timeout", type=int, default=2100)
-    p.add_argument("--harness-mcp-config", type=Path)
-    p.add_argument("--harness-tool-budget", action="append", default=[])
-    p.add_argument("--policy-runner-image", default="ldm-pi-harness:latest")
-    p.add_argument("--gp-history-limit", type=int, default=256)
-    p.add_argument(
-        "--llm-url",
-        default=os.environ.get(
-            "LLM_BASE_URL",
-            os.environ.get("LDM_LLM_URL", os.environ.get("OPENAI_BASE_URL", "")),
-        ),
-    )
-    p.add_argument(
-        "--llm-model",
-        default=os.environ.get("LLM_MODEL_NAME", os.environ.get("LDM_LLM_MODEL", "")),
-    )
-    p.add_argument("--llm-max-tokens", type=int, default=4096)
-    p.add_argument("--llm-wire-api", choices=WIRE_APIS, default="responses")
-    p.add_argument("--llm-reasoning", choices=REASONING_LEVELS)
-    p.add_argument("--llm-temperature", type=float, default=0.7)
-    p.add_argument("--llm-extra-body-json", default="{}")
-    p.add_argument("--out-dir", type=Path, default=Path("runs/reasyn"))
-    p.add_argument("--resume-from", type=Path)
-    p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--harness-research-strategy-config", type=Path)
-    args = p.parse_args(argv)
-    if args.search_method == "auto":
-        args.search_method = "baseline" if args.proposal_mode == "baseline" else "ldm"
-    if args.proposal_mode == "callable":
-        args.proposal_mode = "mock"
-    if args.proposal_mode == "none":
-        args.proposal_mode = "auto"
-    harness_method = args.search_method in ("harness", "ldm_harness", "ldm_harness_compiled")
-    if args.llm_reasoning is not None and args.harness_thinking is not None and args.llm_reasoning != args.harness_thinking:
-        p.error("llm-reasoning and harness-thinking must agree")
-    args.llm_reasoning = args.llm_reasoning or args.harness_thinking or "off"
-    args.harness_thinking = "off" if args.llm_reasoning == "none" else args.llm_reasoning
-    try:
-        extra = json.loads(args.llm_extra_body_json)
-        if not isinstance(extra, dict):
-            raise ValueError("llm-extra-body-json must be an object")
-        generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning, extra_body=extra)
-        args.llm_extra_body_json = json.dumps(extra, sort_keys=True)
-        if not math.isfinite(args.llm_temperature) or not 0 <= args.llm_temperature <= 2:
-            raise ValueError("llm-temperature must be finite and between 0 and 2")
-    except ValueError as exc:
-        p.error(str(exc))
-    if harness_method and args.llm_wire_api != "responses":
-        p.error("Harness requires llm-wire-api responses")
-    if harness_method:
-        if args.proposal_mode not in ("auto", "harness"):
-            p.error("Harness methods require proposal-mode auto or harness; mock controls the evaluator only")
-        args.proposal_mode = "harness"
-    elif args.proposal_mode == "harness":
-        p.error("proposal-mode harness requires a Harness search-method")
-    if args.bo_pool_size is None:
-        args.bo_pool_size = args.reservoir_size
-    if args.projection_retry_targets is None:
-        args.projection_retry_targets = args.reservoir_size * args.recovery_attempts
-    if args.run_name and (Path(args.run_name).name != args.run_name or args.run_name in (".", "..")):
-        p.error("run-name must be a single directory name")
-    args.upstream_root = args.upstream_root.expanduser().resolve()
-    if args.harness_cache_dir:
-        args.harness_cache_dir = args.harness_cache_dir.expanduser().resolve()
-    if args.harness_mcp_config:
-        args.harness_mcp_config = args.harness_mcp_config.expanduser().resolve()
-    if args.proposal_mode == "auto":
-        args.proposal_mode = "mock" if args.mock else "openai"
-    if args.proposal_mode == "mock" and not args.mock:
-        p.error("mock proposals require --mock; they are not scientific results")
-    if args.proposal_mode == "baseline" and args.benchmark == "tdc":
-        p.error("use upstream optimize_tdc.py for Graph GA baseline")
-    if not args.search_width:
-        args.search_width = (
-            (1 if args.oracle in WIDTH_ONE else 2) if args.benchmark == "tdc" else 8
-        )
-    raw = (
-        args.model_paths
-        or "data/trained_model/nv-reasyn-ar-166m-v2.ckpt,data/trained_model/nv-reasyn-eb-174m-v2.ckpt"
-    )
-
-    def upstream_path(value):
-        value = Path(value).expanduser()
-        return (
-            value.resolve()
-            if value.is_absolute()
-            else (args.upstream_root / value).resolve()
-        )
-
-    args.model_paths = [upstream_path(v.strip()) for v in raw.split(",")]
-    args.fpindex = upstream_path(args.fpindex or "data/processed/comp_2048/fpindex.pkl")
-    args.rxn_matrix = upstream_path(
-        args.rxn_matrix or "data/processed/comp_2048/matrix.pkl"
-    )
-    if args.targets_file:
-        args.targets_file = upstream_path(args.targets_file)
-    if args.additional_fpindex:
-        args.additional_fpindex = upstream_path(args.additional_fpindex)
-    elif args.benchmark == "reconstruction" and args.dataset == "zinc250k":
-        args.additional_fpindex = upstream_path(
-            "data/processed/zinc250k_2048/fpindex.pkl"
-        )
-    if (
-        args.iterations < 1
-        or args.reservoir_size < 1
-        or not 1 <= args.evaluations_per_round <= args.reservoir_size
-    ):
-        p.error("positive iterations and 1 <= evaluation batch <= reservoir required")
-    if not 1 <= args.max_oracle_calls <= 10000:
-        p.error("oracle call cap must be in [1,10000]")
-    if any(
-        v < 1
-        for v in (
-            args.search_width,
-            args.exhaustiveness,
-            args.num_cycles,
-            args.num_editflow_samples,
-            args.max_results,
-            args.target_limit,
-            args.gp_history_limit,
-            args.projection_time_limit,
-            args.projection_timeout,
-        )
-    ):
-        p.error("search, dataset and timing limits must be positive")
-    if args.seed < 0 or any(not math.isfinite(v) or v < 0 for v in (args.acquisition_beta, args.acquisition_alpha, args.acquisition_eta)):
-        p.error("seed and acquisition parameters must be finite and nonnegative")
-    if (args.proposal_batch_size < 1 or args.bo_pool_size < args.evaluations_per_round
-            or args.max_replenishment_batches < 0 or args.recovery_attempts < 0
-            or args.projection_retry_targets < 0 or args.harness_sessions < 1
-            or args.harness_wall_time_seconds < 1 or args.harness_response_timeout < 1
-            or not math.isfinite(args.acquisition_z_clip) or args.acquisition_z_clip <= 0):
-        p.error("Invalid sampling, recovery, or Harness limits")
-    try:
-        configure_research_strategy(args, enabled=args.search_method in ("ldm_harness", "ldm_harness_compiled"))
-        if args._research_strategy.requires_main and args.harness_sessions != 4:
-            raise ValueError("ReaSyn research trees require four Harness sessions")
-    except ValueError as exc:
-        p.error(str(exc))
-    return args
-
-
-def describe_ldm_task(args):
-    recon = args.benchmark == "reconstruction"
-    objective = "similarity" if recon else "oracle_score"
-    direct = args.search_method in ("llm", "harness", "baseline")
-    return LDMTaskSpec(
-        task="reasyn",
-        candidate_domain=CandidateDomainSpec(
-            name="ReaSyn projection queries"
-            if recon
-            else "ReaSyn synthesis-verified molecules",
-            kind="molecular_projection_query" if recon else "synthesizable_molecule",
-            dimension=None,
-            representation="Canonical target SMILES and controlled restart seed"
-            if recon
-            else "Canonical product SMILES with replay-verified stock/reaction trace",
-            constraints={"benchmark": args.benchmark, "mock": args.mock},
-        ),
-        objectives=(
-            ObjectiveSpec(
-                objective,
-                "maximize",
-                "Morgan r2/4096 similarity to original target"
-                if recon
-                else "Released TDC oracle score",
-            ),
-        ),
-        response_spaces=(
-            ResponseSpaceSpec(
-                name="projection_targets_json",
-                output_kind="json",
-                schema={
-                    "type": "object",
-                    "required": ["candidates"],
-                    "properties": {
-                        "candidates": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["target_smiles"],
-                                "properties": {"target_smiles": {"type": "string"}},
-                                "additionalProperties": False,
-                            },
-                        }
-                    },
-                    "additionalProperties": False,
-                },
-                parser="tasks.reasyn.core.proposals:parse_targets",
-            ),
-        ),
-        acquisition=AcquisitionSpec(
-            name="direct_proposal_order" if direct else "empirical_q0_tanimoto_gp_ucb" if args.search_method.startswith("ldm") else "tanimoto_gp_ucb",
-            objective_names=(objective,),
-            score_direction="maximize",
-            selection_rule="Empirical group q0 with alpha*log(group_q0+epsilon)-log(group_trial_count)+eta*robust_z(UCB) sampling" if args.search_method.startswith("ldm") else "GP-UCB" if args.search_method == "bo" else "Direct proposal order",
-            parameters={
-                "beta": args.acquisition_beta,
-                "history_limit": args.gp_history_limit,
-                "alpha": args.acquisition_alpha, "eta": args.acquisition_eta,
-                "bo_pool_size": args.bo_pool_size,
-            },
-        ),
-        reservoir=ReservoirSpec(
-            name="projection_query_reservoir"
-            if recon
-            else "projected_product_reservoir",
-            expansions=(
-                ReservoirExpansionSpec(
-                    name="feedback_conditioned_targets",
-                    action_kind="emit_candidate",
-                    response_space="projection_targets_json",
-                    produces_candidates=True,
-                    description="LDM proposes targets; frozen ReaSyn supplies actual valid synthesis pathways",
-                ),
-            ),
-            candidate_validator="tasks.reasyn.core.candidate:ReaSynDomain",
-            deduplication_key="Canonical query plus controlled restart seed"
-            if recon
-            else "Canonical isomeric product SMILES SHA256",
-            max_size=args.reservoir_size,
-        ),
-        surrogate=SurrogateSpaceSpec(
-            kind="none",
-            representation="Direct proposal order without a surrogate",
-            dimension_policy="none",
-        ) if direct else MoleculeEncoder(mock=args.mock).describe(),
-        proposal_search=ProposalSearchSpec(
-            name="independent_minibatch_empirical_q0" if args.search_method.startswith("ldm") else args.search_method,
-            breadth=args.reservoir_size,
-            evaluation_policy="gp_ucb_selected_frozen_projection"
-            if recon
-            else "gp_ucb_selected_tdc_oracle",
-        ),
-        metadata={
-            "benchmark": args.benchmark,
-            "policy_capabilities": ["prior_mean@1", "ldm_weights@1"],
-            "alpha_configurable": True,
-            "mock": args.mock,
-            "proposal_mode": args.proposal_mode,
-            "search_method": args.search_method,
-            "official_suite_oracles": list(ORACLES),
-        },
-    )
-
-
-def _jsonable(args):
-    def convert(v):
-        if isinstance(v, Path):
-            return str(v)
-        if isinstance(v, list):
-            return [convert(x) for x in v]
-        return v
-
-    return {k: convert(v) for k, v in vars(args).items() if k != "provider_api_key" and not k.startswith("_")}
 
 
 def _direct_provider_api_key():
@@ -450,87 +110,6 @@ def _targets(args):
     return targets
 
 
-def _file_hash(path):
-    h = hashlib.sha256()
-    with Path(path).open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1048576), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _directory_hash(root):
-    root = Path(root).resolve()
-    entries = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
-            continue
-        entries.append({"path": path.relative_to(root).as_posix(), "sha256": _file_hash(path)})
-    return hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
-def _harness_component_digests(args):
-    if args.proposal_mode != "harness":
-        return {}
-    digests = {
-        "resource_tree": _directory_hash(TASK_ROOT / "resources/harness"),
-        "harness_mcp_config": None,
-    }
-    if args.harness_mcp_config:
-        digests["harness_mcp_config"] = _file_hash(args.harness_mcp_config)
-    return digests
-
-
-def _scientific_identity(args, configuration, target, contract):
-    identity_keys = (
-        "benchmark",
-        "mock",
-        "oracle",
-        "seed",
-        "proposal_mode",
-        "num_cycles",
-        "search_width",
-        "exhaustiveness",
-        "num_editflow_samples",
-        "model_paths",
-        "fpindex",
-        "rxn_matrix",
-        "additional_fpindex",
-        "reservoir_size",
-        "evaluations_per_round",
-        "max_oracle_calls",
-        "llm_model",
-        "llm_max_tokens",
-        "llm_wire_api", "llm_reasoning", "llm_temperature", "llm_extra_body_json",
-        "max_results",
-        "projection_time_limit",
-        "projection_timeout",
-        "device",
-        "evaluator_python",
-        "gp_history_limit",
-        "acquisition_beta", "acquisition_alpha", "acquisition_eta", "acquisition_z_clip",
-        "search_method", "proposal_batch_size", "bo_pool_size", "max_replenishment_batches",
-        "recovery_attempts", "projection_retry_targets", "initialization_mode",
-        "proposal_recovery_seed_span",
-        "harness_sessions", "harness_thinking", "harness_tool_budget",
-        "harness_research_strategy", "harness_research_strategy_identity",
-        "harness_sidecar_image", "policy_runner_image", "harness_mcp_config",
-        "harness_wall_time_seconds", "harness_response_timeout",
-    )
-    scientific = {k: configuration[k] for k in identity_keys}
-    scientific["resolved_generation_body"] = generation_body(
-        wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-        extra_body=json.loads(args.llm_extra_body_json),
-    )
-    scientific["bo_targets"] = getattr(args, "bo_targets", [])
-    scientific["original_target"] = target
-    scientific["source_archive_digest"] = contract.benchmark["source_commit"]
-    scientific["asset_digests"] = args.asset_digests
-    scientific["harness_component_digests"] = configuration["harness_component_digests"]
-    if args.benchmark == "reconstruction":
-        scientific["q0_identity_version"] = "canonical_query_group_trial_allocation_v1"
-    return scientific
-
-
 def _status_recovery_pass(status_payload):
     details = status_payload.get("details", {}) if isinstance(status_payload, dict) else {}
     value = details.get("proposal_recovery_pass") if isinstance(details, dict) else None
@@ -564,45 +143,6 @@ def _proposal_recovery_seed_span(args, run_dir, *, resume):
     return value
 
 
-def _check_assets(args):
-    args.asset_digests = {}
-    if args.mock:
-        return
-    paths = [
-        args.upstream_root / "reasyn/sampler/sampler.py",
-        args.fpindex,
-        args.rxn_matrix,
-        *args.model_paths,
-    ]
-    if args.additional_fpindex:
-        paths.append(args.additional_fpindex)
-    missing = [str(p) for p in paths if not p.is_file()]
-    if len(args.model_paths) != 2:
-        raise ValueError("exactly two checkpoints required: AR then EB")
-    if missing:
-        raise FileNotFoundError("Missing ReaSyn assets: " + ", ".join(missing))
-
-    # Hash once before all target campaigns. Same-path asset replacement cannot
-    # silently reuse cached products or resume an incompatible scientific run.
-    for path in sorted(set(paths) | set((args.upstream_root / "reasyn").rglob("*.py"))):
-        args.asset_digests[str(path)] = _file_hash(path)
-    pinned = json.loads((TASK_ROOT / "resources/source_provenance.json").read_text())[
-        "files"
-    ]
-    prefix = "ReaSyn-reasyn_v2/"
-    for name, expected in pinned.items():
-        if name.startswith(prefix) and name.endswith((".py", ".yml")):
-            path = args.upstream_root / name[len(prefix) :]
-            actual = _file_hash(path)
-            if actual != expected:
-                raise ValueError(
-                    "Supplied upstream source differs from pinned archive: " + name
-                )
-    args.asset_digests["adapter_projection_worker"] = _file_hash(
-        TASK_ROOT / "core/projection_worker.py"
-    )
-
-
 def main(argv=None):
     args = parse_args(argv)
     spec = describe_ldm_task(args)
@@ -614,14 +154,14 @@ def main(argv=None):
                 {
                     "task": "reasyn",
                     "contract_profile": profile,
-                    "configuration": _jsonable(args),
+                    "configuration": jsonable_args(args),
                     "ldm_task_spec": spec.to_dict(),
                 },
                 indent=2,
             )
         )
         return 0
-    _check_assets(args)
+    check_assets(args)
     if args.search_method == "bo" or args.initialization_mode == "shared_start":
         from .chemistry import MOCK_SMILES
         if args.mock:
@@ -712,15 +252,15 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     previous_status = previous_status_payload.get("status", "")
     previous_proposal_recovery_pass = _status_recovery_pass(previous_status_payload)
     # Preserve scientific config across resume; only iterations may extend.
-    configuration = _jsonable(args)
+    configuration = jsonable_args(args)
     proposal_recovery_seed_span = _proposal_recovery_seed_span(args, run_dir, resume=resume)
     args.proposal_recovery_seed_span = proposal_recovery_seed_span
     configuration.update(proposal_samples=args.reservoir_size,
         proposal_candidates_per_request=args.proposal_batch_size,
         proposal_counting="bounded_minibatches",
         proposal_recovery_seed_span=proposal_recovery_seed_span,
-        harness_component_digests=_harness_component_digests(args))
-    scientific = _scientific_identity(args, configuration, target, contract)
+        harness_component_digests=harness_component_digests(args))
+    scientific = scientific_identity(args, configuration, target, contract)
     identity_path = run_dir / "scientific_identity.json"
     if identity_path.exists() and json.loads(identity_path.read_text()) != scientific:
         raise ValueError("resume scientific configuration mismatch")
@@ -913,7 +453,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
                     "oracle": args.oracle,
                     "mock": args.mock,
                 },
-                artifact_projector=lambda runtime, engine: _report(
+                artifact_projector=lambda runtime, engine: write_campaign_report(
                     args, runtime, target
                 ),
             ),
@@ -933,7 +473,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             runtime.pause(status, phase="proposal_or_projection",
                 message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.",
                 details=_proposal_recovery_details(search_expander))
-            report = _report(args, runtime, target)
+            report = write_campaign_report(args, runtime, target)
             report["status"] = status
             atomic_json_write(run_dir / "result.json", report)
         else:
@@ -950,7 +490,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             message=str(exc),
             details=_proposal_recovery_details(search_expander),
         )
-        report = _report(args, runtime, target)
+        report = write_campaign_report(args, runtime, target)
         report.update(status="paused_proposal_exhausted", proposal_diagnostics=exc.metadata)
         atomic_json_write(run_dir / "result.json", report)
         return report, 1
@@ -962,7 +502,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             message=str(exc),
             details=_proposal_recovery_details(search_expander),
         )
-        report = _report(args, runtime, target)
+        report = write_campaign_report(args, runtime, target)
         report["status"] = "paused_resource_budget"
         atomic_json_write(run_dir / "result.json", report)
         return report, 1
@@ -978,92 +518,3 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
 def resolve_policy_user(args):
     from ldm_tts.harness.container import resolve_container_user
     return resolve_container_user(args.harness_container_user, args.harness_docker_host)
-
-
-def _report(args, runtime, target):
-    if args.proposal_mode == "harness":
-        kinds = ("harness", "policy_harness") if args.search_method == "ldm_harness_compiled" else ("harness",)
-        atomic_json_write(runtime.run_dir / "harness_provenance.json", {
-            "schema_version": 1, "pools": {kind: [p.relative_to(runtime.run_dir).as_posix()
-                for pattern in ("manifest.json", "main/manifest.json", "branches/round_*/manifest.json")
-                for p in sorted((runtime.run_dir / kind).glob(pattern))] for kind in kinds},
-        })
-    checkpoint = runtime.run_dir / "checkpoint.json"
-    observations = load_successful_observations(checkpoint) if checkpoint.exists() else []
-    events = runtime.events()
-    atomic_json_write(
-        runtime.run_dir / "search_manifest.json",
-        {"rounds": [e for e in events if e.get("event_type") == "reservoir_built"]},
-    )
-    atomic_json_write(
-        runtime.run_dir / "selection_record.json",
-        {
-            "selections": [
-                e for e in events if e.get("event_type") == "candidates_selected"
-            ]
-        },
-    )
-    rows = []
-    for i, o in enumerate(observations):
-        rows.append(
-            {
-                "evaluation": i + 1,
-                "candidate_id": o["candidate"]["candidate_id"],
-                "score": o["evaluation"]["metrics"][
-                    "similarity" if target else "oracle_score"
-                ],
-            }
-        )
-    with (runtime.run_dir / "trajectory.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(
-            handle, fieldnames=("evaluation", "candidate_id", "score")
-        )
-        writer.writeheader()
-        writer.writerows(rows)
-    report = {
-        "task": "reasyn",
-        "benchmark": args.benchmark,
-        "mock": args.mock,
-        "qualification": "draft",
-        "successful_evaluations": len(observations),
-        "budget": json.loads((runtime.run_dir / "budget.json").read_text()),
-    }
-    if target:
-        product_rows = []
-        for o in observations:
-            artifact = o["evaluation"]["artifacts"].get("projection")
-            if artifact:
-                data = json.loads((runtime.run_dir / artifact).read_text())
-                product_rows.extend(
-                    {**r, "target": target, "projection_query": r["target"]}
-                    for r in data["rows"]
-                )
-        report["reconstruction_rows"] = product_rows
-        report["metrics"] = reconstruction_metrics(
-            [target], product_rows, mock=args.mock
-        )
-    else:
-        cache_path = runtime.run_dir / "oracle_cache.json"
-        entries = (
-            json.loads(cache_path.read_text())["entries"] if cache_path.exists() else []
-        )
-        scores = [e["score"] for e in entries if e["status"] == "completed"]
-        full = len(scores) == args.max_oracle_calls and len(entries) == len(scores)
-        report.update(
-            oracle=args.oracle,
-            oracle_calls=len(entries),
-            completed_oracle_calls=len(scores),
-            oracle_budget_exhausted=full,
-            official_budget=args.max_oracle_calls == 10000,
-            metrics={
-                "top10": top_mean(scores),
-                "auc_top10_observed": top_auc(scores, max_calls=args.max_oracle_calls),
-                "auc_top10": top_auc(scores, max_calls=args.max_oracle_calls)
-                if full
-                else None,
-            },
-        )
-        # No automatic early-stop padding: an interrupted/pilot campaign is not
-        # upstream scientific convergence. Aggregate only full-budget runs.
-    atomic_json_write(runtime.run_dir / "result.json", report)
-    return report

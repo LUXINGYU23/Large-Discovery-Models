@@ -16,6 +16,7 @@ from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
 from ldm_tts.transport.openai import EndpointRequestError
 from tasks.reasyn.core import workflow
+from tasks.reasyn.core.workflow_args import REPO_ROOT, parse_args
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.evaluator import TDCOracleEvaluator
 from tasks.reasyn.core.metrics import ORACLES, reconstruction_metrics, top_auc
@@ -89,7 +90,7 @@ def test_mock_shared_campaign_collection_and_resume(tmp_path, monkeypatch, bench
 def test_requested_target_count_rejects_short_dataset(tmp_path):
     targets = tmp_path / "targets.txt"
     targets.write_text("SMILES\nCCO\n")
-    args = workflow.parse_args(
+    args = parse_args(
         ["--dataset", "custom", "--targets-file", str(targets), "--target-limit", "2"]
     )
     with pytest.raises(ValueError, match="target-limit requests 2 targets"):
@@ -97,7 +98,7 @@ def test_requested_target_count_rejects_short_dataset(tmp_path):
 
 
 def test_relative_targets_file_is_resolved_from_upstream_root(tmp_path):
-    args = workflow.parse_args(
+    args = parse_args(
         [
             "--upstream-root",
             str(tmp_path),
@@ -183,7 +184,7 @@ def test_reconstruction_diversity_preserves_duplicate_product_occurrences():
 def test_auc_matches_released_source_formula():
     np = pytest.importorskip("numpy")
     upstream = Path(
-        os.environ.get("REASYN_ROOT", workflow.REPO_ROOT.parent / "ReaSyn-reasyn_v2")
+        os.environ.get("REASYN_ROOT", REPO_ROOT.parent / "ReaSyn-reasyn_v2")
     )
     source = upstream / "scripts/optimize_tdc.py"
     if not source.exists():
@@ -295,7 +296,7 @@ def test_resume_keeps_original_recovery_seed_span_when_iterations_extend(tmp_pat
         "iterations": 1,
         "proposal_recovery_seed_span": 12345,
     }))
-    args = workflow.parse_args(["--mock", "--iterations", "5"])
+    args = parse_args(["--mock", "--iterations", "5"])
     assert workflow._proposal_recovery_seed_span(args, run, resume=True) == 12345
 
     (run / "config.json").write_text(json.dumps({"iterations": 2}))
@@ -553,7 +554,7 @@ def test_harness_provider_preflight_failure_pauses_before_sidecar(tmp_path, monk
 def test_cached_projection_rechecks_boundary(tmp_path):
     from tasks.reasyn.core.projector import Projector
 
-    args = workflow.parse_args(["--mock"])
+    args = parse_args(["--mock"])
     projector = Projector(args, tmp_path)
     rows, artifact = projector.project(["CCO"], sampling_seed=0, identity="query")
     output = tmp_path / artifact

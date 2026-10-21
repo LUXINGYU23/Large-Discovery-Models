@@ -9,7 +9,7 @@ import pytest
 
 from tasks.reasyn.core.projector import Projector, ProjectionInterruptedError
 from tasks.reasyn.core.projection_worker import load_progress, write_progress
-from tasks.reasyn.core.workflow import parse_args
+from tasks.reasyn.core.workflow_args import parse_args
 
 
 def _row(request, index):

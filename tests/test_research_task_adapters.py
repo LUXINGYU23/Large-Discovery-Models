@@ -170,8 +170,9 @@ def test_atomworld_tree_is_sample_isolated_and_keeps_feedback_boundary(tmp_path,
 def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp_path, monkeypatch):
     from ldm_tts.transport import ProposalRequest
     from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
-    from tasks.reasyn.core import harness, workflow
-    args = workflow.parse_args(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness",
+    from tasks.reasyn.core import harness
+    from tasks.reasyn.core.workflow_args import parse_args
+    args = parse_args(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness",
         "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
         "--harness-cache-dir", str(tmp_path / "cache")])
     args.provider_api_key = "fixture"
