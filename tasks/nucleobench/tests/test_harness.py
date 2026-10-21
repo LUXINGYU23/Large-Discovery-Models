@@ -561,6 +561,7 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
         "--harness-tool-budget", "web_search=3",
         "--policy-tool-budget", "web_search=2",
         "--no-harness-context7",
+        "--harness-research-strategy-config", "config/research_strategies/independent.json",
         "--harness-sol-pi-config", str(plugin_path),
         "--llm-extra-body-json", '{"reasoning":{"effort":"max"}}',
     ] + (["--harness-surrogate-query"] if surrogate_query else []))

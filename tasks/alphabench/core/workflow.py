@@ -177,7 +177,8 @@ def run(args, protocol, spec):
                 sidecar_image=args.harness_sidecar_image)
             objects.update(harness_client=harness_client, tools=tools)
             try:
-                harness_client.start()
+                if expander.coordinator is None:
+                    harness_client.start()
             except HarnessError as exc:
                 raise EvaluationPaused("Harness startup failed: " + str(exc), status="paused_harness") from exc
             if compiled_selector:
@@ -224,6 +225,9 @@ def run(args, protocol, spec):
             # Engine rounds_run is per invocation; the report records cumulative rounds across resume.
             execution = {"kind": "shared_engine", "summary": {
                 **result.engine.summary, "rounds_run": result.engine.state.next_round}}
+        if harness_method and objects["expander"].coordinator is not None:
+            from ldm_tts.harness.research_runtime import write_fork_provenance
+            write_fork_provenance(run_dir / "harness", compiled_policy=protocol.method == "ldm_harness_compiled")
         report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
                           execution=execution, data_manifest=data_manifest)
         collection.export()

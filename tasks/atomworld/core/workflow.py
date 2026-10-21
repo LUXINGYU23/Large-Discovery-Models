@@ -196,7 +196,13 @@ def parse_args(argv=None):
         default="{}",
         help="Provider reasoning controls; never put credentials here",
     )
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    from ldm_tts.harness.research_strategy import configure_research_strategy
+    try:
+        configure_research_strategy(args, enabled=args.search_method in HARNESS_METHODS)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.llm_reasoning is not None and args.harness_thinking is not None and args.llm_reasoning != args.harness_thinking:
         parser.error("llm-reasoning and harness-thinking must agree")
     args.llm_reasoning = args.llm_reasoning or args.harness_thinking or "off"
@@ -208,7 +214,8 @@ def parse_args(argv=None):
     # The shared config runner repeats list-valued flags. Preserve all entries
     # both in that form and in a grouped, interactive command-line invocation.
     if args.harness_profile is None:
-        args.harness_profile = ["geometry_research", "structure_audit"]
+        from tasks.atomworld.core.harness import PROFILE_IDS
+        args.harness_profile = list(PROFILE_IDS)
     if args.harness_tool_budget is None:
         args.harness_tool_budget = default_harness_tool_budgets
     if args.proposal_mode in {"mock", "callable"}:
@@ -243,6 +250,8 @@ def parse_args(argv=None):
 
         try:
             harness_profiles(args.harness_profile)
+            if args._research_strategy.requires_main and len(args.harness_profile) != 4:
+                raise ValueError("AtomWorld research trees require four Harness profiles")
             if "policy_architect" in args.harness_profile:
                 raise ValueError(
                     "policy_architect is reserved for the independent policy session"
@@ -432,7 +441,9 @@ def project_result(
         ) else ("harness",)
         write_json(run_dir / "harness_provenance.json", {
             "schema_version": 1,
-            "pools": {kind: [f"{kind}/sample_{i:06d}/manifest.json" for i in range(count)] for kind in kinds},
+            "pools": {kind: [p.relative_to(run_dir).as_posix()
+                for pattern in ("sample_*/manifest.json", "sample_*/main/manifest.json", "sample_*/branches/round_*/manifest.json")
+                for p in sorted((run_dir / kind).glob(pattern))] for kind in kinds},
         })
     with (run_dir / "trajectory.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
@@ -558,7 +569,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
     rounds = len(samples) * args.attempts_per_sample
     contract, profile = load_active_experiment_contract()
     contract = contract or load_experiment_contract(TASK_ROOT / "experiment.json")
-    config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
+    config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items() if not k.startswith("_")}
     config.update(
         evaluations_per_round=1,
         proposal_samples=proposal_samples,
@@ -682,9 +693,10 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
                         else 0,
                         "outer_iterations": rounds + args.service_retry_allowance,
                         "harness_turns": (rounds + args.service_retry_allowance)
-                        * len(args.harness_profile)
+                        * (len(args.harness_profile) + int(args._research_strategy.requires_main))
                         if harness_mode
                         else 0,
+                        "main_research_turns": rounds + args.service_retry_allowance if args._research_strategy.requires_main else 0,
                         "policy_harness_turns": rounds
                         if args.search_method in ("harness_public_audit", "ldm_harness_compiled")
                         else 0,

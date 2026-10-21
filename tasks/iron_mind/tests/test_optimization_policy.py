@@ -339,7 +339,7 @@ def test_compiled_method_declares_policy_pool_and_separate_budget() -> None:
 
     assert args.policy_capability == ["ldm_weights@1", "prior_mean@1"]
     assert budget["proposal_attempts"] == 8
-    assert budget["harness_turns"] == 8
+    assert budget["harness_turns"] == 10
     assert budget["policy_harness_turns"] == 2
     assert task_spec.acquisition.parameters["optimization_policy"] == (
         "persistent_harness_compiled"

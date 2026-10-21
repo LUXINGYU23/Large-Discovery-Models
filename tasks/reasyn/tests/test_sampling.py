@@ -78,7 +78,8 @@ def product(smiles):
 def observed(smiles):
     candidate = ReaSynDomain("tdc", mock=True).admit(product(smiles))
     return SimpleNamespace(candidate=candidate, candidate_id=candidate.candidate_id,
-                           canonical_key=candidate.canonical_key, metrics={"oracle_score": 0.5})
+                           canonical_key=candidate.canonical_key, metrics={"oracle_score": 0.5},
+                           evaluation=SimpleNamespace(status="succeeded"))
 
 
 def test_independent_minibatches_preserve_product_occurrences_before_dedup():

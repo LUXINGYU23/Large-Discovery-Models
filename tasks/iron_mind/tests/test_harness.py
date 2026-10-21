@@ -500,6 +500,7 @@ def test_engine_checkpoint_preserves_research_notes(
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 method,

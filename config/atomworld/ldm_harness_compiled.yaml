@@ -9,7 +9,7 @@ args:
   bo-pool-size: 32
   acquisition-alpha: 1.0
   acquisition-eta: 1.0
-  harness-profile: [geometry_research, structure_audit]
+  harness-profile: [geometry_research, structure_audit, geometry_alternative, structure_alternative]
   harness-cache-dir: ${ATOMWORLD_HARNESS_CACHE}
   llm-reasoning: high
   llm-wire-api: responses

@@ -49,7 +49,7 @@ def prepare(work, project, image):
     config.update(name="enformer_main_research_forks", algorithm="main_research_round_forks",
                   description="Native Pi main-session forks; historical comparison, not isolated causal attribution.")
     config["args"].update({
-        "harness-research-strategy-config": str(source / "config/nucleobench/research_strategies/main_forks.json"),
+        "harness-research-strategy-config": str(source / "config/research_strategies/main_forks.json"),
         "harness-profile": ["target_biology", "regulatory_grammar", "sequence_landscape", "evidence_critic"],
         "harness-sidecar-image": image,
         "harness-cache-dir": str(project / "research/pure-harness-pi-ablation-20261007/guest-cache"),

@@ -312,7 +312,7 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
     command = " ".join(client.command)
 
     assert args.policy_capability == ["ldm_weights@1", "prior_mean@1"]
-    assert budget["harness_turns"] == 8
+    assert budget["harness_turns"] == 10
     assert budget["policy_harness_turns"] == 2
     assert spec.acquisition.parameters["optimization_policy"] == (
         "persistent_harness_compiled"

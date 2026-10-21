@@ -6,6 +6,7 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness import (
     POLICY_CAPABILITIES,
@@ -55,7 +56,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     _add_ldm_arguments(parser)
     _add_provider_arguments(parser)
     _add_runtime_arguments(parser)
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    try:
+        configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.proposal_candidates_per_request is None:
         args.proposal_candidates_per_request = (
             min(DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST, args.proposal_samples)

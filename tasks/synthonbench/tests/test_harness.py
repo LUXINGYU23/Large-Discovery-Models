@@ -617,6 +617,7 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 "ldm_harness",
@@ -711,6 +712,7 @@ def test_mock_direct_harness_evaluates_all_sixteen_submissions(
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 "harness",

@@ -39,7 +39,7 @@ def real_fixture_payload():
 
 
 def test_runner_repeated_profile_and_budget_flags_preserve_all_entries():
-    common = ["--mock", "--search-method", "harness"]
+    common = ["--mock", "--search-method", "harness", "--harness-research-strategy-config", "config/research_strategies/independent.json"]
     repeated = parse_args(common + [
         "--harness-profile", "geometry_research",
         "--harness-profile", "structure_audit",
@@ -56,7 +56,7 @@ def test_runner_repeated_profile_and_budget_flags_preserve_all_entries():
     assert repeated.harness_tool_budget == grouped.harness_tool_budget == [
         "bash=4", "web_search=2",
     ]
-    assert parse_args(common).harness_profile == grouped.harness_profile
+    assert len(parse_args(common).harness_profile) == 4
 
 
 class Poison:
@@ -67,7 +67,7 @@ class Poison:
 class ResearchClient:
     """Protocol double for deterministic boundary tests; never a live-model claim."""
 
-    def __init__(self, args, root, sample, *, policy=False):
+    def __init__(self, args, root, sample, *, policy=False, campaign_id="fixture"):
         self.config = SimpleNamespace(profiles=harness_profiles(args.harness_profile))
         self.root, self.sample, self.calls, self.closed = root, sample, [], False
         self.outputs = fixture()["mock_outputs"][fixture()["public"][0]["sample_id"]]
@@ -131,6 +131,9 @@ class ResearchClient:
             )
         return tuple(results)
 
+    def start(self):
+        return self
+
     def close(self):
         self.closed = True
 
@@ -143,8 +146,7 @@ def test_persistent_repair_history_and_full_campaign_resume(tmp_path):
         clients.append(client)
         return client
 
-    args = parse_args(
-        [
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
             "--search-method",
             "harness",
@@ -202,7 +204,7 @@ def test_journal_replay_after_receipt_interruption_counts_turn_once(tmp_path, mo
         write(path, value)
 
     monkeypatch.setattr(harness, "write_json", crash)
-    args = parse_args(["--mock", "--search-method", "harness", "--iterations", "1",
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", "harness", "--iterations", "1",
                        "--out-dir", str(tmp_path / "campaign")])
     with pytest.raises(HarnessError, match="before attempt"):
         run(args, harness_client_factory=JournalClient)
@@ -220,7 +222,7 @@ def test_journal_replay_after_receipt_interruption_counts_turn_once(tmp_path, mo
 
 def test_cif_submission_verifies_immutable_snapshot(tmp_path):
     from tasks.atomworld.core.harness import validate_answer
-    client = ResearchClient(parse_args(["--mock"]), tmp_path, fixture()["public"][0])
+    client = ResearchClient(parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock"]), tmp_path, fixture()["public"][0])
     artifact = client.artifact(SimpleNamespace(turn_id="test"), 1, extract_cif(client.outputs[0]))
     request = HarnessSubmissionRequest("geometry_research", "test", 1,
         {"artifact_path": "answer.cif", "rationale": "Public geometry"}, (artifact,))
@@ -254,7 +256,7 @@ def test_real_harness_preflight_runs_before_first_sidecar_turn(tmp_path, monkeyp
     monkeypatch.setattr("tasks.atomworld.core.harness.public_validation",
                             lambda text, mock=False: {"parseable": "invalid" not in text})
     monkeypatch.setenv("LDM_LLM_API_KEY", "must-not-appear-in-artifacts")
-    args = parse_args([
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--data-dir", str(tmp_path / "data"),
         "--search-method", "harness",
         "--llm-url", "http://fixture.invalid/v1",
@@ -301,7 +303,7 @@ def test_mock_default_harness_preflights_provider_before_sidecar(tmp_path, monke
     monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
     monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
     monkeypatch.setenv("LLM_API_KEY", "mock-harness-secret")
-    args = parse_args([
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--mock",
         "--search-method", "harness",
         "--llm-url", "http://fixture.invalid/v1",
@@ -341,7 +343,7 @@ def test_mock_default_harness_preflight_failure_happens_before_sidecar(tmp_path,
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
-    args = parse_args([
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--mock",
         "--search-method", "harness",
         "--out-dir", str(tmp_path / "run"),
@@ -380,7 +382,7 @@ def test_real_harness_preflight_failure_happens_before_sidecar(tmp_path, monkeyp
                             correct=True, wrong_type=None, rmsd=None, max_dist=None))
     monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
     monkeypatch.setenv("LLM_API_KEY", "fixture-secret")
-    args = parse_args([
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--data-dir", str(tmp_path / "data"),
         "--search-method", "harness",
         "--llm-url", "http://fixture.invalid/v1",
@@ -402,7 +404,7 @@ def test_real_harness_preflight_failure_happens_before_sidecar(tmp_path, monkeyp
 def test_harness_never_reads_judge_and_isolates_questions(tmp_path):
     public = fixture()["public"][0]
     second = {**public, "sample_id": "independent_sample"}
-    args = parse_args(["--mock", "--search-method", "harness", "--iterations", "2"])
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", "harness", "--iterations", "2"])
     clients = []
 
     def factory(*args, **kwargs):
@@ -440,7 +442,7 @@ def test_rejected_or_missing_session_does_not_silently_reduce_batch(tmp_path):
         def run_turn(self, *args, **kwargs):
             return super().run_turn(*args, **kwargs)[:1]
 
-    args = parse_args(["--mock", "--search-method", "harness"])
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", "harness"])
     expander = AtomWorldHarnessExpander(
         fixture()["public"], args, tmp_path, client_factory=Missing
     )
@@ -482,8 +484,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
 
     monkeypatch.setattr("tasks.atomworld.core.harness.HarnessClient", Capture)
     monkeypatch.setenv("LLM_API_KEY", "test-secret")
-    args = parse_args(
-        [
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
             "--search-method",
             "harness",
@@ -496,7 +497,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
         ]
     )
     root = tmp_path / "campaign/harness/sample_000000"
-    make_client(args, root, fixture()["public"][0])
+    make_client(args, root, fixture()["public"][0], campaign_id="fixture")
     command = captured["command"]
     mounts = [command[i + 1] for i, part in enumerate(command) if part == "--mount"]
     assert len(mounts) == 3
@@ -525,8 +526,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
 
 
 def test_pilot_launch_and_resume_cli(tmp_path):
-    args = parse_args(
-        [
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--proposal-mode",
             "mock",
             "--search-method",
@@ -548,7 +548,7 @@ def test_pilot_launch_and_resume_cli(tmp_path):
         and args.attempts_per_sample == 4
         and args.out_dir == tmp_path / "child"
     )
-    resumed = parse_args(["--mock", "--resume-from", str(tmp_path / "child")])
+    resumed = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--resume-from", str(tmp_path / "child")])
     assert resumed.resume and resumed.out_dir == tmp_path / "child"
 
 
@@ -560,8 +560,7 @@ def test_interrupted_harness_resumes_same_turn_without_losing_answer_budget(tmp_
             interrupted_turns.extend(turns)
             raise HarnessError("temporary fixture outage", retryable=True)
 
-    args = parse_args(
-        [
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
             "--search-method",
             "harness",

@@ -6,6 +6,7 @@ import argparse
 import math
 from pathlib import Path
 
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness import (
     POLICY_CAPABILITIES,
@@ -115,7 +116,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Limit one policy-Agent tool per turn; repeat for additional tools.",
     )
     parser.add_argument("--policy-max-submission-attempts", type=int)
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    try:
+        configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.harness_tool_budget is None:
         args.harness_tool_budget = [
             value for value in DEFAULT_NETWORK_TOOL_BUDGETS

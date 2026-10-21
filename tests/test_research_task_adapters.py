@@ -1,0 +1,241 @@
+"""Exercise task factories and native-snapshot orchestration without provider calls."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from ldm_tts.engine.expansion import ExpansionRequest
+from ldm_tts.harness import (HarnessSubmissionRequest, HarnessSubmittedArtifact,
+    HarnessTurnResult, canonical_sha256, file_sha256)
+
+
+class NativeFixture:
+    def __init__(self, command, *, config, payload, events, **kwargs):
+        self.config, self.payload, self.events = config, payload, events
+        mounts = [command[i + 1] for i, value in enumerate(command) if value == "--mount"]
+        self.root = Path(next(m.split("src=", 1)[1].split(",", 1)[0] for m in mounts if "dst=/artifacts" in m))
+
+    def start(self):
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / "manifest.json").write_text(json.dumps({"fixture": True}))
+        return self
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, *_):
+        self.close()
+
+    def close(self):
+        pass
+
+    def run_turn(self, turns, *, submission_validator, **kwargs):
+        results = []
+        for turn in turns:
+            self.events.append((self.root, self.config, turn))
+            session = self.root / "sessions" / turn.profile_id
+            (session / "workspace").mkdir(parents=True, exist_ok=True)
+            (session / "workspace/research.md").write_text("Task research fixture")
+            (session / "session.jsonl").write_text(json.dumps({"turn": turn.turn_id}))
+            if turn.profile_id == "main_research":
+                submission, artifacts = {"brief": "Keep measured and unmeasured alternatives distinct."}, ()
+            else:
+                filename, body, extra = self.payload(self.root, turn)
+                path = session / "turns" / turn.turn_id / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(body)
+                submission = {"artifact_path": filename, **extra}
+                artifacts = (HarnessSubmittedArtifact("/artifact_path", filename,
+                    path.relative_to(self.root).as_posix(), file_sha256(path), path.stat().st_size),)
+            submitted = HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, submission, artifacts)
+            assert submission_validator(submitted).decision == "accept"
+            results.append(HarnessTurnResult(
+                profile_id=turn.profile_id, session_id=turn.profile_id, turn_id=turn.turn_id,
+                round_index=turn.round_index, history_from_seq=turn.history_from_seq,
+                history_to_seq=turn.history_to_seq, history_digest=turn.history_digest,
+                input_digest=turn.input_digest, replayed=False, submission_status="accepted",
+                submission_id=turn.turn_id, submission_digest=submitted.digest,
+                submission=submission, submitted_artifacts=artifacts, validation_errors=(),
+                usage={"providerCalls": 0, "toolCalls": {"read": 1}}, tool_budget={},
+                artifacts={"session": (session / "session.jsonl").relative_to(self.root).as_posix()},
+            ))
+        return tuple(results)
+
+
+def install_fixture(monkeypatch, module, payload):
+    events = []
+    monkeypatch.setattr(module, "HarnessClient", lambda command, **kwargs:
+        NativeFixture(command, payload=payload, events=events, **kwargs))
+    return events
+
+
+def check_tree(root, steps):
+    for step in range(1, steps + 1):
+        path = root / "branches" / f"round_{step:04d}"
+        plan = json.loads((path / "fork-plan.json").read_text())
+        assignments = plan["assignments"]
+        assert len(assignments) == 4
+        assert [a["purpose"] for a in assignments].count("main") == 2
+        assert (path / "tree.json").is_file() and (path / "panel.json").is_file()
+        if step > 1:
+            assert [a["purpose"] for a in assignments].count("continue") == 1
+        for source in (path / "fork-sources").iterdir():
+            manifest = json.loads((source / "snapshot.json").read_text())
+            assert manifest["sessionSha256"] == file_sha256(source / "session.jsonl")
+
+
+@pytest.mark.parametrize("task", ["iron_mind", "synthonbench"])
+def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys, task):
+    from importlib import import_module
+    workflow = import_module(f"tasks.{task}.core.workflow")
+    argv = ["--mock", "--search-method", "ldm_harness", "--proposal-mode", "none",
+            "--iterations", "2", "--proposal-samples", "4", "--harness-candidates-per-session", "1",
+            "--bo-pool-size", "2", "--llm-url", "http://fixture.invalid/v1", "--llm-model-name", "fixture",
+            "--api-key", "fixture", "--out-dir", str(tmp_path)]
+    args = workflow.parse_args(argv)
+    if task == "iron_mind":
+        table = workflow._load_table(args)
+        candidates = [{"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)} for row in table.rows]
+    else:
+        from itertools import product
+        from tasks.synthonbench.core.space_order import ordered_reactions, ordered_positions, ordered_synthon_ids
+        benchmark = workflow._load_benchmark(args)
+        space = benchmark.task.space
+        reaction = ordered_reactions(benchmark.task.allowed_reactions)[0]
+        candidates = [{"reaction_id": reaction, "synthon_ids": list(ids)} for ids in product(
+            *(ordered_synthon_ids(space, reaction, pos) for pos in ordered_positions(space, reaction)))]
+    def payload(root, turn):
+        candidate = {**candidates[turn.round_index], "change_summary": "Test a measured alternative.",
+                     "rationale": "Use the task feedback to test this candidate."}
+        return "candidates.json", json.dumps({"candidates": [candidate]}), {}
+    events = install_fixture(monkeypatch, workflow, payload)
+    assert workflow.main(argv) == 0
+    root = Path(json.loads(capsys.readouterr().out)["run_dir"])
+    check_tree(root / "harness", 2)
+    counters = json.loads((root / "budget.json").read_text())["counters"]
+    assert counters["harness_turns"] == 10 and counters["main_research_turns"] == 2
+    assert counters["proposal_attempts"] == 8 and counters["benchmark_jobs"] == 2
+    assert len(events) == 10
+    provenance = json.loads((root / "harness_provenance.json").read_text())
+    assert len(provenance["pools"]) == 3
+
+
+@pytest.mark.parametrize("method", ["harness", "ldm_harness"])
+def test_atomworld_tree_is_sample_isolated_and_keeps_feedback_boundary(tmp_path, monkeypatch, method):
+    from tasks.atomworld.core import harness, workflow
+    from tasks.atomworld.core.data import TASK_ROOT
+    from tasks.atomworld.core.proposals import extract_cif
+    fixture = json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
+    text = extract_cif(fixture["mock_outputs"][fixture["public"][0]["sample_id"]][0])
+    events = install_fixture(monkeypatch, harness, lambda root, turn: ("answer.cif", text, {"rationale": "Public geometry only."}))
+    args = workflow.parse_args(["--mock", "--search-method", method, "--iterations", "2",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model-name", "fixture",
+        "--harness-cache-dir", str(tmp_path / "cache"), "--out-dir", str(tmp_path / "run")])
+    result = workflow.run(args, harness_client_factory=harness.make_client)
+    roots = sorted((result.runtime.run_dir / "harness").glob("sample_*"))
+    assert roots
+    for root in roots:
+        check_tree(root, 2)
+    assert len([e for e in events if e[2].profile_id == "main_research"]) == len(roots) * 2
+    for root in roots:
+        history = json.loads((root / "main/public_history.json").read_text())["drafts"]
+        assert len(history) == 1
+        assert ("correct" in history[0]) == (method == "ldm_harness")
+        assert not any(key in history[0] for key in ("target_cif", "judge_error", "rmsd"))
+    assert len({config.campaign_id for _, config, _ in events}) == len(roots)
+
+
+def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp_path, monkeypatch):
+    from ldm_tts.transport import ProposalRequest
+    from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
+    from tasks.reasyn.core import harness, workflow
+    args = workflow.parse_args(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+        "--harness-cache-dir", str(tmp_path / "cache")])
+    args.provider_api_key = "fixture"
+    def payload(root, turn):
+        data = json.loads(turn.message.split("\n", 1)[1])
+        return "candidates.json", json.dumps({"candidates": [{"target_smiles": "CCO", "rationale": "Projected hypothesis."}
+            for _ in range(data["candidate_count"])]}), {}
+    events = install_fixture(monkeypatch, harness, payload)
+    root = tmp_path / "harness"
+    def create(location, **kwargs):
+        return harness.create_client(args, location, "fixture", "", **kwargs)
+    client = create(root)
+    coordinator = ResearchCoordinator(root, args._research_strategy, client.config.profiles,
+        lambda: create(root / "main", session_profiles=main_research_profile(root / "main", client.config.profiles[0]), contract=research_contract()))
+    source = harness.HarnessTargetSource(client, root, args, coordinator=coordinator,
+        branch_client=lambda location, sources: create(location, fork_sources=sources))
+    def request(count, round_index, history=()):
+        return ProposalRequest(messages=({"role": "user", "content": "fixture"},), metadata={
+            "count": count, "round_idx": round_index, "history": list(history)})
+    first = source.propose(request(4, 0))
+    lineage = first.metadata["harness_lineage"][2]
+    history = [{"candidate_id": "projected-product", "smiles": "CCC", "metrics": {"oracle_score": 0.8},
+                "evaluation_status": "succeeded", "harness_lineage": lineage}]
+    second = source.propose(request(1, 1, history))
+    assert len(json.loads(second.text)["candidates"]) == 1
+    assert source.propose(request(1, 1, history)) == second
+    check_tree(root, 2)
+    tree = json.loads((root / "branches/round_0002/tree.json").read_text())
+    credited = [o for o in tree["outcomes"] if o["best_key"] == lineage["research_key"]]
+    assert len(credited) == 1 and credited[0]["best_score"] == .8
+    assert len(events) == 10
+
+
+def test_alphabench_tree_keeps_host_checks_and_occurrence_q0(tmp_path, monkeypatch):
+    from ldm_tts.contracts import RawProposal, Observation, EvaluationResult
+    from ldm_tts.engine.run_store import CampaignRuntime
+    from tasks.alphabench.core import harness_runtime
+    from tasks.alphabench.core.protocol import T3Protocol
+    from tasks.alphabench.core.gateway import OracleGateway
+    from tasks.alphabench.core.candidate import FactorDomain
+    protocol = T3Protocol(method="ldm_harness", cold_seed_count=0, candidates_per_session=2)
+    runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits=protocol.budgets)
+    gateway = OracleGateway(protocol, runtime, mock=True)
+    def payload(root, turn):
+        candidates = [{"name": f"a{i}", "expression": f"Mean($close,{5 + 2 * turn.round_index + i})"} for i in range(2)]
+        return "candidates.json", json.dumps({"candidates": candidates}), {}
+    events = install_fixture(monkeypatch, harness_runtime, payload)
+    client, tools, expander = harness_runtime.build_harness(protocol, gateway, None, api_key="fixture", sidecar_image="fixture")
+    try:
+        first = gateway.host.run(lambda: expander.expand(ExpansionRequest(0, 8)))
+        assert len(first.proposals) == 2 and all(p.metadata["q0"] == .5 for p in first.proposals)
+        candidate = FactorDomain(protocol.backend).admit(RawProposal(first.proposals[0].payload, "fixture"))
+        measured = Observation(candidate, EvaluationResult(candidate.candidate_id, "succeeded", {"mock_rank_ic": .2}), round_idx=0)
+        gateway.host.run(lambda: expander.expand(ExpansionRequest(1, 8, observations=(measured,))))
+        check_tree(runtime.run_dir / "harness", 2)
+        assert runtime.budget.counters["harness_turns"] == 10
+        assert runtime.budget.counters["proposal_attempts"] == 8
+        assert runtime.budget.counters["dynamic_checks"] == 4
+        assert len(events) == 10
+    finally:
+        tools.close()
+
+
+def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch):
+    from tasks.alphabench.core import harness_runtime
+    from tasks.alphabench.core.protocol import T3Protocol
+    from tasks.alphabench.ldm_task.procedure import main
+
+    protocol = T3Protocol(method="ldm_harness", cold_seed_count=1, candidates_per_session=2)
+    config = tmp_path / "protocol.json"
+    config.write_text(json.dumps(protocol.to_dict()))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture")
+    def payload(root, turn):
+        return "candidates.json", json.dumps({"candidates": [
+            {"name": f"a{i}", "expression": f"Mean($close,{51 + 2 * turn.round_index + i})"}
+            for i in range(2)]}), {}
+    events = install_fixture(monkeypatch, harness_runtime, payload)
+    run = tmp_path / "run"
+    assert main(["--mock", "--protocol-file", str(config), "--out-dir", str(run)]) == 0
+    check_tree(run / "harness", 2)
+    report = json.loads((run / "result.json").read_text())
+    assert report["initialization"]["seed_count"] == 1
+    assert report["costs"]["tool_calls"] == 10
+    assert report["costs"]["tool_usage_reason"] is None
+    assert report["search"]["generation_cost"]["step_count"] == 8
+    assert len(events) == 10
+    assert main(["--mock", "--protocol-file", str(config), "--resume-run", str(run)]) == 0
+    assert len(events) == 10

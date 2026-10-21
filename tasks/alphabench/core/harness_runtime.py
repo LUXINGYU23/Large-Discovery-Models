@@ -2,13 +2,17 @@
 
 import os
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
+from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (HarnessClient, HarnessLimits, HarnessMcpServer, HarnessMcpValue,
     HarnessNetworkPolicy, HarnessProfile, DockerPolicyExecutor, PolicyResearchController,
     canonical_sha256, directory_sha256, file_sha256, policy_submission_contract)
 from ldm_tts.harness.container import docker_identity_args, resolve_container_user
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
+from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
+from ldm_tts.harness.research_strategy import load_research_strategy
 from .harness import HarnessExpander, submission_contract
 from .harness_tools import HarnessToolService
 
@@ -81,12 +85,31 @@ def build_harness(protocol, gateway, collection, *, api_key, sidecar_image):
             network_policy=HarnessNetworkPolicy(allowed_hosts=("offline.invalid",)),
             force_first_tool_call=False,
             provider_request_body={"reasoning": {"effort": protocol.reasoning_effort}, "store": False})
-        command = _sidecar_command(artifact_root, sidecar_image,
-            ((source, "/app/t3-mcp.mjs", True), (tools.socket_dir, "/t3-host", False)))
-        client = HarnessClient(command, api_key=api_key, config=config,
-            response_timeout_seconds=protocol.request_timeout + 1800)
-        return client, tools, HarnessExpander(client, protocol, gateway, artifact_root,
-            tools=tools, collection=collection)
+        def create(root, *, profiles=profiles, contract=config.submission_contract, sources=None):
+            root.mkdir(parents=True, exist_ok=True)
+            command = _sidecar_command(root, sidecar_image,
+                ((source, "/app/t3-mcp.mjs", True), (tools.socket_dir, "/t3-host", False)))
+            return HarnessClient(command, api_key=api_key,
+                config=replace(config, profiles=profiles, submission_contract=contract, fork_sources=sources or {}),
+                response_timeout_seconds=protocol.request_timeout + 1800)
+        client = create(artifact_root)
+        expander = HarnessExpander(client, protocol, gateway, artifact_root, tools=tools, collection=collection)
+        strategy = load_research_strategy(protocol.research_strategy_config)
+        if strategy.requires_main:
+            def record_main_usage(turn, usage):
+                accounting = expander.meter.reconcile(turn.profile_id, turn.turn_id, usage)
+                gateway.host.call(lambda: atomic_json_write(
+                    artifact_root / "main/usage" / f"{turn.turn_id}.json",
+                    {"turn_id": turn.turn_id, "sidecar_usage": usage, **accounting}))
+
+            expander.coordinator = ResearchCoordinator(artifact_root, strategy, profiles,
+                lambda: create(artifact_root / "main", profiles=main_research_profile(artifact_root / "main", profiles[0]),
+                               contract=research_contract()),
+                before_main=lambda turn: expander.meter.reserve_main(turn.turn_id),
+                after_main=record_main_usage,
+                provider_authorizer=expander.meter.authorize)
+            expander.branch_client = lambda root, sources: create(root, sources=sources)
+        return client, tools, expander
     except BaseException:
         tools.close()
         raise

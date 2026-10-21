@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract, write_fork_provenance
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
@@ -177,9 +178,19 @@ def _run_campaign(
             return 2
         mcp = load_harness_mcp_config(args.harness_mcp_config)
         with ExitStack() as stack:
-            harness_client = stack.enter_context(
-                _harness_client(args, runtime, provider, table, mcp)
-            )
+            harness_client = _harness_client(args, runtime, provider, table, mcp)
+            coordinator = branch_client = None
+            if args._research_strategy.requires_main:
+                root = runtime.run_dir / "harness"
+                branch_client = lambda root, sources: _harness_client(
+                    args, runtime, provider, table, mcp, artifact_root=root, fork_sources=sources)
+                coordinator = ResearchCoordinator(
+                    root, args._research_strategy, harness_client.config.profiles,
+                    lambda: _harness_client(args, runtime, provider, table, mcp, artifact_root=root / "main",
+                        profiles=main_research_profile(root / "main", harness_client.config.profiles[0]),
+                        contract=research_contract()), account=runtime.consume_many)
+            else:
+                harness_client = stack.enter_context(harness_client)
             policy_controller = None
             policy_adapter = None
             if args.search_method == COMPILED_POLICY_METHOD:
@@ -223,8 +234,12 @@ def _run_campaign(
                 harness_client,
                 policy_controller,
                 policy_adapter,
+                research_coordinator=coordinator, harness_branch_client=branch_client,
             )
-            return _finish_campaign(args, components, runtime, payload)
+            outcome = _finish_campaign(args, components, runtime, payload)
+            if coordinator is not None and any((coordinator.root / "branches").glob("round_*/manifest.json")):
+                write_fork_provenance(coordinator.root, compiled_policy=args.search_method == COMPILED_POLICY_METHOD)
+            return outcome
     client = _proposal_client(args, table, provider)
     if args.proposal_mode == "openai":
         assert provider is not None and client is not None
@@ -242,6 +257,7 @@ def _components(
     harness_client,
     policy_controller,
     policy_adapter,
+    *, research_coordinator=None, harness_branch_client=None,
 ):
     sink = DataCollectionSink.from_env(default_root=runtime.run_dir / "ldm_data")
     before_requests = (
@@ -270,6 +286,8 @@ def _components(
             selection_seed=args.campaign_index,
             prompt_policy=args.prompt_policy,
             harness_client=harness_client,
+            research_coordinator=research_coordinator,
+            harness_branch_client=harness_branch_client,
             harness_profiles=profiles,
             harness_candidates_per_profile=_harness_candidates_per_profile(args),
             harness_wall_time_seconds=args.harness_wall_time_seconds,
@@ -298,11 +316,10 @@ def _missing_harness_provider(provider) -> str:
 
 
 def _harness_client(
-    args, runtime: CampaignRuntime, provider, table, mcp, *, policy: bool = False
+    args, runtime: CampaignRuntime, provider, table, mcp, *, policy: bool = False,
+    artifact_root=None, profiles=None, contract=None, fork_sources=None,
 ) -> HarnessClient:
-    artifact_root = (
-        runtime.run_dir / ("policy_harness" if policy else "harness")
-    ).resolve()
+    artifact_root = Path(artifact_root or runtime.run_dir / ("policy_harness" if policy else "harness")).resolve()
     harness_resources = (TASK_ROOT / "resources" / "harness").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
     write_harness_space_catalog(
@@ -350,9 +367,10 @@ def _harness_client(
         )
         history_path = "/measured_history/observations.json"
     else:
-        write_measured_history(artifact_root, ())
-        profiles = _harness_profiles(args)
-        submission_contract = harness_submission_contract(
+        if not (artifact_root / MEASURED_HISTORY_FILE).exists():
+            write_measured_history(artifact_root, ())
+        profiles = profiles or _harness_profiles(args)
+        submission_contract = contract or harness_submission_contract(
             _harness_candidates_per_profile(args)
         )
         mcp_servers = mcp.servers
@@ -362,6 +380,7 @@ def _harness_client(
         base_url=provider.base_url,
         model=provider.model,
         profiles=profiles,
+        fork_sources=fork_sources or {},
         campaign_id=runtime.run_id,
         task_id=TASK_ID,
         case_id=args.dataset_id + (":optimization_policy" if policy else ""),

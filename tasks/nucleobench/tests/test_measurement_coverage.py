@@ -124,17 +124,19 @@ def test_shell_boundaries_shortages_and_measured_priority(reservoir):
 
 
 def test_coverage_configuration_preserves_fork_archive_and_campaign_budgets(reservoir):
-    root = Path(__file__).resolve().parents[3] / "config/nucleobench/research_strategies"
-    old_config = json.loads((root / "joint_gain_1plus3.json").read_text())
-    new_config = json.loads((root / "joint_gain_1plus3_coverage.json").read_text())
+    root = Path(__file__).resolve().parents[3] / "config"
+    paths = [root / "research_strategies/joint_gain_1plus3.json",
+             root / "nucleobench/research_strategies/joint_gain_1plus3_coverage.json"]
+    old_config = json.loads(paths[0].read_text())
+    new_config = json.loads(paths[1].read_text())
     old, new = load_research_strategy(old_config), load_research_strategy(new_config)
     assert old.fork_policy.identity() == new.fork_policy.identity()
     assert old.archive_policy.identity() == new.archive_policy.identity()
     budgets = []
-    for name in ("joint_gain_1plus3", "joint_gain_1plus3_coverage"):
+    for path in paths:
         args = parse_args(["--search-method", "ldm_harness_compiled", "--iterations", "21",
                            "--evaluations-per-round", "16", "--harness-candidates-per-session", "32",
-                           "--bo-pool-size", "64", "--harness-research-strategy-config", str(root / f"{name}.json")])
+                           "--bo-pool-size", "64", "--harness-research-strategy-config", str(path)])
         budgets.append(_campaign_budget(args, None))
     assert budgets[0] == budgets[1]
     context = reservoir[0]

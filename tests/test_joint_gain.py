@@ -101,7 +101,7 @@ def test_duplicate_winning_measurement_is_not_independent_evidence():
 
 
 def test_optional_factory_configuration_and_single_root_bootstrap():
-    path = Path(__file__).resolve().parents[1] / "config/nucleobench/research_strategies/joint_gain_1plus3.json"
+    path = Path(__file__).resolve().parents[1] / "config/research_strategies/joint_gain_1plus3.json"
     strategy = load_research_strategy(json.loads(path.read_text()))
     assert isinstance(strategy.fork_policy, JointGainForks)
     context = ForkContext(1, ("a", "b", "c", "d"), (node("root"),), ())

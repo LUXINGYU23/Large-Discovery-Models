@@ -94,8 +94,8 @@ def test_direct_harness_does_not_offer_gp_query_and_rejects_changed_snapshot(tmp
     assert forbidden["ok"] is False
 
 
-@pytest.mark.parametrize("method,query,count", [("harness", False, 1), ("ldm_harness", False, 2),
-    ("ldm_harness", True, 2)])
+@pytest.mark.parametrize("method,query,count", [("harness", False, 1), ("ldm_harness", False, 4),
+    ("ldm_harness", True, 4)])
 def test_pi_runtime_exposes_only_the_frozen_research_variant(tmp_path, monkeypatch, method, query, count):
     monkeypatch.setenv("ALPHABENCH_RUNTIME_ROOT", tempfile.gettempdir())
     protocol = T3Protocol(method=method, harness_surrogate_query=query,

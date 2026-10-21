@@ -51,6 +51,8 @@ from .proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander, Prop
 from .surrogate import MoleculeEncoder
 from ldm_tts.harness import HarnessError, PolicyResearchController, DockerPolicyExecutor
 from .harness import HarnessTargetSource, create_client
+from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from .optimization_policy import ReaSynPolicyAdapter
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -151,6 +153,7 @@ def parse_args(argv=None):
     p.add_argument("--out-dir", type=Path, default=Path("runs/reasyn"))
     p.add_argument("--resume-from", type=Path)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--harness-research-strategy-config", type=Path)
     args = p.parse_args(argv)
     if args.search_method == "auto":
         args.search_method = "baseline" if args.proposal_mode == "baseline" else "ldm"
@@ -259,6 +262,12 @@ def parse_args(argv=None):
             or args.harness_wall_time_seconds < 1 or args.harness_response_timeout < 1
             or not math.isfinite(args.acquisition_z_clip) or args.acquisition_z_clip <= 0):
         p.error("Invalid sampling, recovery, or Harness limits")
+    try:
+        configure_research_strategy(args, enabled=args.search_method in ("ldm_harness", "ldm_harness_compiled"))
+        if args._research_strategy.requires_main and args.harness_sessions != 4:
+            raise ValueError("ReaSyn research trees require four Harness sessions")
+    except ValueError as exc:
+        p.error(str(exc))
     return args
 
 
@@ -374,7 +383,7 @@ def _jsonable(args):
             return [convert(x) for x in v]
         return v
 
-    return {k: convert(v) for k, v in vars(args).items() if k != "provider_api_key"}
+    return {k: convert(v) for k, v in vars(args).items() if k != "provider_api_key" and not k.startswith("_")}
 
 
 def _direct_provider_api_key():
@@ -503,6 +512,7 @@ def _scientific_identity(args, configuration, target, contract):
         "recovery_attempts", "projection_retry_targets", "initialization_mode",
         "proposal_recovery_seed_span",
         "harness_sessions", "harness_thinking", "harness_tool_budget",
+        "harness_research_strategy", "harness_research_strategy_identity",
         "harness_sidecar_image", "policy_runner_image", "harness_mcp_config",
         "harness_wall_time_seconds", "harness_response_timeout",
     )
@@ -771,7 +781,8 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         "proposal_request_attempts": request_cap if (client or uses_harness) else 0,
         "proposal_attempts": request_cap if (client or uses_harness) else 0,
         "recovery_attempts": args.recovery_attempts,
-        "harness_turns": request_cap * args.harness_sessions if uses_harness else 0,
+        "harness_turns": request_cap * (args.harness_sessions + int(args._research_strategy.requires_main)) if uses_harness else 0,
+        "main_research_turns": request_cap if args._research_strategy.requires_main else 0,
         "oracle_calls": args.max_oracle_calls if not target else 0,
         "projection_targets": projection_cap,
         "projection_cycle_allowance": projection_cap * args.num_cycles,
@@ -852,9 +863,21 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             runtime.record("endpoint_preflight_succeeded", preflight)
             harness_client = create_client(provider_args, run_dir / "harness", runtime.run_id, target)
             harness_clients.append(harness_client)
-            harness_client.start()
-            search_expander.client = HarnessTargetSource(harness_client, run_dir / "harness", args,
-                target=target, account=runtime.consume_many)
+            root = run_dir / "harness"
+            coordinator = branch_client = None
+            if args._research_strategy.requires_main:
+                def account_main(counts, *, usage_key=None):
+                    counts = {("harness_provider_calls" if key == "llm_requests" else key): value for key, value in counts.items()}
+                    runtime.consume_many(counts, usage_key=usage_key)
+                coordinator = ResearchCoordinator(root, args._research_strategy, harness_client.config.profiles,
+                    lambda: create_client(provider_args, root / "main", runtime.run_id, target,
+                        session_profiles=main_research_profile(root / "main", harness_client.config.profiles[0]),
+                        contract=research_contract()), account=account_main)
+                branch_client = lambda location, sources: create_client(provider_args, location, runtime.run_id, target, fork_sources=sources)
+            else:
+                harness_client.start()
+            search_expander.client = HarnessTargetSource(harness_client, root, args,
+                target=target, account=runtime.consume_many, coordinator=coordinator, branch_client=branch_client)
             if args.search_method == "ldm_harness_compiled":
                 policy_client = create_client(provider_args, run_dir / "policy_harness", runtime.run_id, target, policy=True)
                 harness_clients.append(policy_client)
@@ -961,7 +984,9 @@ def _report(args, runtime, target):
     if args.proposal_mode == "harness":
         kinds = ("harness", "policy_harness") if args.search_method == "ldm_harness_compiled" else ("harness",)
         atomic_json_write(runtime.run_dir / "harness_provenance.json", {
-            "schema_version": 1, "pools": {kind: [f"{kind}/manifest.json"] for kind in kinds},
+            "schema_version": 1, "pools": {kind: [p.relative_to(runtime.run_dir).as_posix()
+                for pattern in ("manifest.json", "main/manifest.json", "branches/round_*/manifest.json")
+                for p in sorted((runtime.run_dir / kind).glob(pattern))] for kind in kinds},
         })
     checkpoint = runtime.run_dir / "checkpoint.json"
     observations = load_successful_observations(checkpoint) if checkpoint.exists() else []

@@ -32,7 +32,7 @@ def choose_ldm_weights(context):
 
 
 def options(tmp_path, method="ldm_harness_compiled", rounds=3):
-    return parse_args(["--mock", "--search-method", method, "--iterations", str(rounds),
+    return parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", method, "--iterations", str(rounds),
                        "--out-dir", str(tmp_path / "run")])
 
 

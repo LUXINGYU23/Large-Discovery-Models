@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from copy import deepcopy
+from ldm_tts.harness.research_strategy import DEFAULT_RESEARCH_STRATEGY, load_research_strategy
 import hashlib
 import json
 import math
@@ -44,10 +46,12 @@ class T3Protocol:
     rounds: int = 2
     evaluations: int = 4
     batch_size: int = 2
-    sessions: int = 2
+    sessions: int | None = None
     candidates_per_session: int = 4
     bo_pool_size: int | None = None
     harness_surrogate_query: bool = False
+    research_strategy_config: dict | None = None
+    research_strategy_identity: dict | None = None
     policy_capabilities: tuple[str, ...] = ("prior_mean@1", "ldm_weights@1")
     cold_seed_count: int = 30
     alpha158_groups: tuple[str, ...] = ("kbar", "rolling")
@@ -67,6 +71,21 @@ class T3Protocol:
     })
 
     def __post_init__(self):
+        parallel_harness = self.method in {"ldm_harness", "ldm_harness_compiled"}
+        if self.sessions is None:
+            object.__setattr__(self, "sessions", 4 if parallel_harness else 2)
+        config = self.research_strategy_config
+        if config is None:
+            config = DEFAULT_RESEARCH_STRATEGY if parallel_harness else {"name": "independent"}
+        strategy = load_research_strategy(config)
+        if strategy.measurement_policy is not None:
+            raise ValueError("AlphaBench does not support a measurement policy")
+        if strategy.requires_main and (not parallel_harness or self.sessions != 4):
+            raise ValueError("AlphaBench research trees require four LDM Harness sessions")
+        object.__setattr__(self, "research_strategy_config", deepcopy(config))
+        if self.research_strategy_identity is not None and self.research_strategy_identity != strategy.identity():
+            raise ValueError("Frozen research strategy identity changed")
+        object.__setattr__(self, "research_strategy_identity", strategy.identity())
         if self.backend not in BACKENDS or self.market not in BACKENDS[self.backend]:
             raise ValueError("unsupported backend/market pair")
         if self.method not in METHODS or self.profile not in PROFILES:
@@ -136,6 +155,8 @@ class T3Protocol:
             del value["data_policy"]
         if self.method not in {"harness", "ldm_harness", "ldm_harness_compiled"}:
             del value["harness_surrogate_query"]
+            del value["research_strategy_config"]
+            del value["research_strategy_identity"]
         if self.method != "ldm_harness_compiled":
             del value["policy_capabilities"]
         if self.bo_pool_size is None:

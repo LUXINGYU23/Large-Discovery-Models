@@ -147,7 +147,7 @@ def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path)
                 measured = evaluator.evaluate(candidate)
                 assert measured.succeeded
                 observations.append(SimpleNamespace(candidate=candidate, candidate_id=candidate.candidate_id,
-                    canonical_key=candidate.canonical_key, metrics=measured.metrics))
+                    canonical_key=candidate.canonical_key, metrics=measured.metrics, evaluation=measured))
         assert len(evaluator.entries) == 4
     sent = jsonl(root / "fixture_requests.jsonl")
     assert [len(row["turns"]) for row in sent] == [2, 2]
@@ -376,6 +376,7 @@ def test_workflow_policy_uses_shared_recovery_before_persisting_fallback(tmp_pat
     root = tmp_path / "run"
     assert workflow.main(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness_compiled",
                           "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+                          "--harness-research-strategy-config", "config/research_strategies/independent.json",
                           "--harness-wall-time-seconds", "7", "--harness-sessions", "2",
                           "--iterations", "2", "--reservoir-size", "2", "--out-dir", str(root)]) == 0
     assert len(controllers) == 1

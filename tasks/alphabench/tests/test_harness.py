@@ -63,7 +63,7 @@ class FakeHarnessClient:
 
 
 def fixture(tmp_path, method, batches):
-    protocol = T3Protocol(method=method, cold_seed_count=0, sessions=len(batches),
+    protocol = T3Protocol(method=method, cold_seed_count=0, sessions=len(batches), research_strategy_config={"name": "independent"},
                           candidates_per_session=len(next(iter(batches.values()))))
     runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={
         "model_requests": 0, "harness_turns": 4, "proposal_attempts": 4,

@@ -51,7 +51,7 @@ def test_completed_judge_replays_without_losing_final_round(tmp_path, monkeypatc
         if root not in clients:
             clients[root] = ResearchClient(args, root, sample, **kwargs)
         return clients[root]
-    args = workflow.parse_args(["--mock", "--search-method", method, "--iterations", "2",
+    args = workflow.parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", method, "--iterations", "2",
                                 "--out-dir", str(tmp_path)])
     with pytest.raises(KeyboardInterrupt):
         workflow.run(args, harness_client_factory=factory)

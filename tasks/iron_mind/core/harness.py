@@ -182,6 +182,7 @@ class IronMindHarnessExpander:
         artifact_root: Path,
         wall_time_seconds: int = 1800,
         account: Callable[..., Any] | None = None,
+        inherited_history_counts: Mapping[str, int] | None = None,
     ) -> None:
         if not profiles or len({item.profile_id for item in profiles}) != len(profiles):
             raise ValueError("Harness requires distinct session identities")
@@ -204,6 +205,7 @@ class IronMindHarnessExpander:
         self.artifact_root = artifact_root
         self.wall_time_seconds = wall_time_seconds
         self.account = account
+        self.inherited_history_counts = inherited_history_counts
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -371,6 +373,15 @@ class IronMindHarnessExpander:
             )
         turns = []
         for profile in self.profiles:
+            if self.inherited_history_counts is not None:
+                history_from_seq = self.inherited_history_counts[profile.profile_id]
+                if not 0 <= history_from_seq <= history_to_seq:
+                    raise ValueError("Inherited history cursor is outside measured history")
+                serialized_history = serialize_measured_observations(request.observations[history_from_seq:])
+                history_digest = canonical_sha256(serialized_history)
+                payload.update(message_type="research_fork", history_from_seq=history_from_seq,
+                               history_digest=history_digest, new_measured_observations=summarize_measured_observations(serialized_history))
+                message = "Continue from the inherited research state; reconcile the following feedback and submit the candidate batch.\n\n" + json.dumps(payload)
             digest = canonical_sha256(
                 {
                     "campaignId": self.campaign_id,
