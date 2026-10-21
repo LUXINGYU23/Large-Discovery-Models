@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract, write_fork_provenance
+from ldm_tts.harness.research_runtime import write_fork_provenance
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
@@ -15,12 +15,7 @@ from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
-from ldm_tts.harness import (
-    DockerPolicyExecutor,
-    PolicyResearchController,
-    load_harness_mcp_config,
-)
-from ldm_tts.harness.container import resolve_container_user
+from ldm_tts.harness import load_harness_mcp_config
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -43,8 +38,6 @@ from tasks.synthonbench.core.factory import (
 from tasks.synthonbench.core.research import write_measured_history
 from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
-from tasks.synthonbench.core.optimization_policy import SynthonOptimizationPolicyAdapter
-from tasks.synthonbench.core.policy_features import SynthonPolicyFeatureEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
 from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
 from tasks.synthonbench.core.provider import parse_openai_extra_body_json
@@ -163,67 +156,10 @@ def _run_campaign(
             return 2
         mcp = load_harness_mcp_config(args.harness_mcp_config)
         with ExitStack() as stack:
-            harness_client = harness_runtime.create_client(args, runtime, provider, benchmark, mcp)
-            coordinator = branch_client = None
-            if args._research_strategy.requires_main:
-                root = runtime.run_dir / "harness"
-                branch_client = lambda root, sources: harness_runtime.create_client(
-                    args, runtime, provider, benchmark, mcp, artifact_root=root, fork_sources=sources)
-                coordinator = ResearchCoordinator(
-                    root, args._research_strategy, harness_client.config.profiles,
-                    lambda: harness_runtime.create_client(args, runtime, provider, benchmark, mcp, artifact_root=root / "main",
-                        profiles=main_research_profile(root / "main", harness_client.config.profiles[0]),
-                        contract=research_contract()), account=runtime.consume_many)
-            else:
-                harness_client = stack.enter_context(harness_client)
-            policy_controller = None
-            policy_adapter = None
-            if args.search_method == COMPILED_POLICY_METHOD:
-                policy_adapter = SynthonOptimizationPolicyAdapter(
-                    SynthonPolicyFeatureEncoder(
-                        benchmark.task.space,
-                        benchmark.task.allowed_reactions,
-                    ),
-                    target=benchmark.target,
-                    seed=args.campaign_index,
-                    acquisition_beta=args.acquisition_beta,
-                    gp_signal_std=args.gp_signal_std,
-                    gp_mean_std=args.gp_mean_std,
-                    gp_observation_noise_std=args.gp_observation_noise_std,
-                    gp_reaction_weight=args.gp_reaction_weight,
-                    fingerprint_bits=args.fingerprint_bits,
-                    gp_landmarks=args.gp_landmarks,
-                    gp_kernel_jitter=args.gp_kernel_jitter,
-                    default_alpha=args.alpha,
-                    default_eta=args.eta,
-                    enabled_capabilities=tuple(args.policy_capability),
-                    proposal_sampling={
-                        "session_count": len(harness_client.config.profiles),
-                        "candidates_per_session": harness_runtime.candidates_per_profile(args),
-                        "within_session_repeats_allowed": False,
-                        "cross_session_agreement_allowed": True,
-                    },
-                )
-                policy_client = stack.enter_context(
-                    harness_runtime.create_client(
-                        args, runtime, provider, benchmark, mcp, policy=True
-                    )
-                )
-                policy_controller = PolicyResearchController(
-                    client=policy_client,
-                    adapter=policy_adapter,
-                    executor=DockerPolicyExecutor(
-                        image=args.harness_sidecar_image,
-                        docker_host=args.harness_docker_host or "",
-                        container_user=resolve_container_user(
-                            args.harness_container_user,
-                            args.harness_docker_host,
-                        ),
-                    ),
-                    root=(runtime.run_dir / "policy_harness").resolve(),
-                    account=runtime.consume_many,
-                    recovery_budget=lambda: 2.0 * args.harness_wall_time_seconds,
-                )
+            harness_client, coordinator, branch_client = harness_runtime.open_proposals(
+                args, runtime, provider, benchmark, mcp, stack=stack)
+            policy_controller, policy_adapter = harness_runtime.open_policy(
+                args, runtime, provider, benchmark, mcp, harness_client, stack=stack)
             components = _components(
                 args,
                 benchmark,

@@ -96,9 +96,9 @@ LDM 模式仅增加既有授权反馈；结果仍按最终提交报告，不使�
 涉及 Iron Mind、SynthonBench、AlphaBench 的 `workflow.py`、`harness_runtime.py`
 及相应适配器；NucleoBench、ReaSyn 做一致性收尾。
 
-- [ ] Iron Mind 将主研究、侧枝及 policy 装配移入已有 runtime 模块，主流程仅组合科学组件。
-- [ ] SynthonBench 完成同类整理，保留其特征编码、合法反应空间及产品身份规则。
-- [ ] 检查两者重复逻辑；只合并稳定且任务无关的部分，优先复用现有 `MeasuredResearchExpander`。
+- [x] Iron Mind 将主研究、侧枝及 policy 装配移入已有 runtime 模块，主流程仅组合科学组件。
+- [x] SynthonBench 完成同类整理，保留其特征编码、合法反应空间及产品身份规则。
+- [x] 检查两者重复逻辑；只合并稳定且任务无关的部分，优先复用现有 `MeasuredResearchExpander`。
 - [ ] AlphaBench 集中管理 Harness、policy 客户端和 Host 工具服务的启动、绑定与关闭。
 - [ ] 减少 AlphaBench 主流程中通过可变字典和转发对象连接组件的逻辑，保持 Host 授权及 native 执行路径。
 - [ ] 核对 NucleoBench、ReaSyn 的入口、装配和已完成恢复路径，移除遗留绕行。
@@ -108,6 +108,9 @@ LDM 模式仅增加既有授权反馈；结果仍按最终提交报告，不使�
 ReaSyn 保留补充 minibatch 和投影结果到原提案的归因，NucleoBench 保留官方执行与测量规则。
 
 按任务分别提交；跨任务共享代码只在调用方同时完成迁移时提交。
+
+Iron Mind、SynthonBench 与共享树测试 206 通过，记录为 `p2-measured.xml`。
+装配复用已有协调器，任务特有 adapter 参数仍留在各自 runtime 中。
 
 ### P3：收敛共享执行与恢复逻辑
 
