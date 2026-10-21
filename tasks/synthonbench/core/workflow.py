@@ -26,7 +26,7 @@ from ldm_tts.harness import (
     parse_tool_call_budgets,
     policy_submission_contract,
 )
-from ldm_tts.harness.container import docker_identity_args, resolve_container_user
+from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -538,9 +538,12 @@ def _harness_client(
         context7_enabled=args.harness_context7,
     )
     return HarnessClient(
-        _harness_command(
-            args,
+        pi_sidecar_command(
             artifact_root,
+            args.harness_sidecar_image,
+            cache_root=args.harness_cache_dir,
+            docker_host=args.harness_docker_host,
+            container_user=args.harness_container_user,
             environment={
                 "LDM_SYNTHON_SPACE_CATALOG": "/artifacts/synthon_space.json",
                 "LDM_SYNTHONBENCH_HISTORY": history_path,
@@ -552,61 +555,6 @@ def _harness_client(
         named_secrets=mcp.named_secrets,
         response_timeout_seconds=args.harness_response_timeout,
     )
-
-
-def _harness_command(
-    args,
-    artifact_root: Path,
-    *,
-    environment: dict[str, str],
-    mounts: tuple[tuple[Path, str, bool], ...],
-) -> list[str]:
-    cache_root = (
-        args.harness_cache_dir.expanduser().resolve()
-        if args.harness_cache_dir is not None
-        else (Path.home() / ".cache" / "ldm-gondolin").resolve()
-    )
-    cache_root.mkdir(parents=True, exist_ok=True)
-    (cache_root / "runtime-overlays").mkdir(exist_ok=True)
-    command = ["docker"]
-    if args.harness_docker_host:
-        command.extend(("--host", args.harness_docker_host))
-    command.extend(("run", "--rm", "-i"))
-    container_user = resolve_container_user(
-        args.harness_container_user,
-        args.harness_docker_host,
-    )
-    command.extend(docker_identity_args(container_user, args.harness_docker_host))
-    command.extend(("--device", "/dev/kvm"))
-    runtime_environment = {
-        "HOME": "/runtime-home",
-        "XDG_CACHE_HOME": "/runtime-home/.cache",
-        "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
-        "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
-        "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
-        "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
-        **environment,
-    }
-    for name, value in sorted(runtime_environment.items()):
-        command.extend(("--env", f"{name}={value}"))
-    command.extend(
-        (
-            "--mount",
-            f"type=bind,src={artifact_root},dst=/artifacts",
-            "--mount",
-            f"type=bind,src={cache_root},dst=/runtime-home/.cache/gondolin",
-        )
-    )
-    for source, destination, readonly in mounts:
-        suffix = ",readonly" if readonly else ""
-        command.extend(
-            (
-                "--mount",
-                f"type=bind,src={source},dst={destination}{suffix}",
-            )
-        )
-    command.append(args.harness_sidecar_image)
-    return command
 
 
 def _finish_campaign(
