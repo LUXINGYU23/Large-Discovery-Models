@@ -26,8 +26,10 @@ ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, proposal, surrogate, and method contract
 core/factory.py    task-local proposal and selector assembly
 core/workflow_args.py CLI defaults, validation, campaign budgets and method identity
-core/harness_runtime.py role resources, Pi configuration and client assembly
-core/workflow.py   official runner, provider, Harness, budget, and resume orchestration
+core/harness_runtime.py role resources, Pi clients, proposal trees and compiled-policy assembly
+core/provider.py   provider settings and request-body configuration
+core/workflow.py   case preparation, checkpoint restore and campaign execution
+core/official_driver.py official runner invocation and completion reporting
 core/              mutation validation, prompts, Hamming GP, policy, oracle, reports
 scripts/           source-pinned external-data preparation
 resources/         case catalog, provenance, Harness roles, tools, guest, and policy skill
@@ -38,6 +40,23 @@ runs/              generated artifacts only; never committed
 The task does not import another task. Shared orchestration remains in
 `ldm_tts`; NucleoBench-specific identity, prompts, features, surrogate,
 Harness validation, and official adapters remain under this directory.
+
+`workflow_args` resolves CLI defaults and validates the complete configuration
+before execution. The same resolved arguments determine budget limits, persisted
+configuration and method identity. Harness-specific configuration is described
+and assembled by `harness_runtime`.
+
+Round-limited resumes load their checkpoint before opening clients or loading
+the oracle. A completed campaign returns its stored result without another model
+load or provider call. In-progress campaigns retain their original observation
+history and budget counters. Wall-time resumes retain the original elapsed budget.
+
+The workflow owns an `ExitStack` for persistent clients; partial initialization,
+execution errors and normal completion all close the clients already opened.
+Tree branches keep their per-turn lifetime in the shared research coordinator.
+Endpoint failures pause the campaign; other setup/execution failures are recorded
+as failed. The official driver owns termination arguments, raw-output validation
+and final reporting.
 
 ## Cases and Qualification
 

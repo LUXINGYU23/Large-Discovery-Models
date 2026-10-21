@@ -5,21 +5,30 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
 from ldm_tts.engine.run_store import CampaignRuntime
+from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.harness import (
-    HarnessClient, HarnessLimits, HarnessNetworkPolicy, HarnessProfile,
+    DockerPolicyExecutor, HarnessClient, HarnessLimits, HarnessNetworkPolicy, HarnessProfile,
+    PolicyResearchController,
     HarnessSubmissionContract, parse_tool_call_budgets, policy_submission_contract,
 )
-from ldm_tts.harness.container import pi_sidecar_command
+from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
+from ldm_tts.harness.research_runtime import research_contract
 from ldm_tts.harness.pi import PiForkSource, PiHarnessConfig, policy_mcp_server
 from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from tasks.nucleobench.core.constants import (
     COMPILED_POLICY_METHOD, PARALLEL_HARNESS_METHODS, PERSISTENT_HARNESS_METHODS, TASK_ID,
 )
+from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
+from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
+from tasks.nucleobench.core.factory import build_proposal_expander
+from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, main_research_profile
+from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.harness import (
     DIRECT_HARNESS_PROFILE_ID, HARNESS_FORBIDDEN_PATTERNS, HARNESS_SKILL_IDS,
     direct_harness_profile, harness_guest_runtime,
@@ -27,10 +36,109 @@ from tasks.nucleobench.core.harness import (
     write_harness_sequence_context,
 )
 from tasks.nucleobench.core.oracles.official import PreparedCase
+from tasks.nucleobench.core.optimization_policy import (
+    NucleoOptimizationPolicyAdapter, policy_harness_profile,
+)
+from tasks.nucleobench.core.policy_features import NucleoPolicyFeatureEncoder
 from tasks.nucleobench.core.provider import ProviderSettings, parse_extra_body
 from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
+
+
+def open_proposals(
+    args: argparse.Namespace,
+    runtime: CampaignRuntime,
+    provider: ProviderSettings,
+    prepared: PreparedCase,
+    mcp,
+    *,
+    stack: ExitStack,
+    benchmark_clock: BenchmarkClock | None,
+    gp_config: HammingGPUCBConfig,
+) -> ReservoirExpander:
+    profiles = proposal_profiles(args)
+    if args._research_strategy.requires_main:
+        (runtime.run_dir / "harness" / MEASURED_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
+        return ForkedResearchExpander(
+            root=runtime.run_dir / "harness",
+            main_client=lambda: create_client(
+                args, runtime, provider, prepared, main_research_profile(), mcp,
+                artifact_root=runtime.run_dir / "harness/main", contract=research_contract(),
+            ),
+            branch_client=lambda root, source: create_client(
+                args, runtime, provider, prepared, profiles, mcp,
+                artifact_root=root, fork_sources=source,
+            ),
+            strategy=args._research_strategy,
+            expander_options={
+                "domain": NucleoBenchCandidateDomain(prepared.context), "profiles": profiles,
+                "candidates_per_profile": args.harness_candidates_per_session,
+                "campaign_id": runtime.run_id, "first_active_round": 1,
+                "attach_empirical_q0": True, "allow_repeated_occurrences": not args.harness_unique_candidates,
+                "account": runtime.consume_many, "benchmark_clock": benchmark_clock,
+                "surrogate_query_config": gp_config if args.harness_surrogate_query else None,
+            },
+        )
+    client = stack.enter_context(create_client(args, runtime, provider, prepared, profiles, mcp))
+    return build_proposal_expander(
+        args.search_method, prepared.context,
+        seed=args.campaign_index, evaluations_per_round=args.evaluations_per_round,
+        harness_client=client, harness_artifact_root=runtime.run_dir / "harness",
+        harness_session_profiles=profiles,
+        harness_candidates_per_session=args.harness_candidates_per_session,
+        harness_unique_candidates=args.harness_unique_candidates,
+        campaign_id=runtime.run_id, first_active_round=1,
+        account=runtime.consume_many, benchmark_clock=benchmark_clock,
+        surrogate_query_config=gp_config if args.harness_surrogate_query else None,
+    )
+
+
+def open_policy(
+    args: argparse.Namespace,
+    runtime: CampaignRuntime,
+    provider: ProviderSettings,
+    prepared: PreparedCase,
+    mcp,
+    *,
+    stack: ExitStack,
+    benchmark_clock: BenchmarkClock | None,
+    gp_config: HammingGPUCBConfig,
+) -> tuple[NucleoOptimizationPolicyAdapter, PolicyResearchController]:
+    adapter = NucleoOptimizationPolicyAdapter(
+        NucleoPolicyFeatureEncoder(prepared.context),
+        seed=args.campaign_index, gp_config=gp_config,
+        default_alpha=args.alpha, default_eta=args.eta,
+        enabled_capabilities=tuple(args.policy_capability),
+        proposal_sampling={
+            "session_count": len(proposal_profiles(args)),
+            "candidates_per_session": args.harness_candidates_per_session,
+            "within_session_repeats_allowed": not args.harness_unique_candidates,
+            "cross_session_agreement_allowed": True,
+        },
+        evaluations_per_round=args.evaluations_per_round,
+        benchmark_clock=benchmark_clock,
+        measured_history_path=runtime.run_dir / "harness" / MEASURED_HISTORY_FILE,
+    )
+    client = stack.enter_context(create_client(
+        args, runtime, provider, prepared, policy_harness_profile(), mcp, policy=True,
+    ))
+    controller = PolicyResearchController(
+        client=client, adapter=adapter,
+        executor=DockerPolicyExecutor(
+            image=args.harness_sidecar_image,
+            docker_host=args.harness_docker_host or "",
+            container_user=resolve_container_user(args.harness_container_user, args.harness_docker_host),
+        ),
+        root=(runtime.run_dir / "policy_harness").resolve(),
+        account=runtime.consume_many,
+        recovery_budget=lambda: (
+            float(benchmark_clock.snapshot()["remaining_seconds"])
+            if benchmark_clock is not None else 2.0 * args.harness_wall_time_seconds
+        ),
+    )
+    return adapter, controller
+
 
 def create_client(
     args: argparse.Namespace,

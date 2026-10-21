@@ -50,7 +50,8 @@ from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE
 from tasks.nucleobench.core.task_spec import build_task_spec
 from tasks.nucleobench.core.harness_runtime import create_client
 from tasks.nucleobench.core.provider import ProviderSettings
-from tasks.nucleobench.core.workflow import describe_ldm_task, main, parse_args
+from tasks.nucleobench.core.workflow import describe_ldm_task, main
+from tasks.nucleobench.core.workflow_args import parse_args
 
 
 class FakeHarnessClient:
