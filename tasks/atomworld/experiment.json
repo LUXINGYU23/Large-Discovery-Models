@@ -72,10 +72,10 @@
       "proposal_modes": {
         "mock": "deterministic; no endpoint preflight",
         "real": "Explicit Responses or Chat Completions with matched reasoning controls; preflight required",
-        "harness": "Persistent sample-isolated Pi Harness sessions; Responses provider; task-local submission repair",
+        "harness": "Sample-isolated 2+2 Pi research trees with four proposal branches; Responses provider; task-local submission repair",
         "harness_public_audit": "Independent compiled public-audit prior; no objective history or fitted GP",
         "ldm": "Direct measured-feedback reservoir; empirical q0, fixed residual RBF GP/UCB and Gumbel sampling",
-        "ldm_harness": "Persistent research reservoir with the same measured-feedback LDM selector",
+        "ldm_harness": "2+2 research-tree reservoir with the same measured-feedback LDM selector",
         "ldm_harness_compiled": "Independent policy session compiles prior_mean@1 and ldm_weights@1 on actual measured history; fixed GP/UCB and sampling"
       },
       "collection_modes": {

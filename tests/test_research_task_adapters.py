@@ -86,6 +86,27 @@ def check_tree(root, steps):
 
 
 @pytest.mark.parametrize("task", ["iron_mind", "synthonbench"])
+def test_published_profiles_budget_for_main_research(task):
+    from importlib import import_module
+    root = Path(__file__).resolve().parents[1]
+    parser = import_module(f"tasks.{task}.core.workflow_args")
+    support = import_module(f"tasks.{task}.core.workflow_support")
+    profiles = json.loads((root / "tasks" / task / "experiment.json").read_text())["profiles"]
+    for name, profile in profiles.items():
+        locked = profile.get("locked_args", {})
+        if locked.get("search-method") not in {"ldm_harness", "ldm_harness_compiled"}:
+            continue
+        argv = [arg for key, value in locked.items()
+                for item in (value if isinstance(value, list) else [value])
+                for arg in ("--" + key, str(item))]
+        args = parser.parse_args(argv)
+        dynamic = (support.derived_budget(args, domain_size=10000) if task == "iron_mind"
+                   else support.campaign_budget(args, None))
+        for counter in ("harness_turns", "main_research_turns"):
+            assert profile["budget"][counter] == dynamic[counter], (task, name, counter)
+
+
+@pytest.mark.parametrize("task", ["iron_mind", "synthonbench"])
 def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys, task):
     from importlib import import_module
     workflow = import_module(f"tasks.{task}.core.workflow")

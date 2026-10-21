@@ -1,5 +1,13 @@
 # NucleoBench LDM Task
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; candidate and evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions,
+latest-main 4fork or JointGain. Strategy changes require a new campaign identity.
+
 This task adapts the shared LDM engine to the official
 [NucleoBench](https://github.com/move37-labs/nucleobench) sequence-design
 interface. It does not run the benchmark's reference optimizers. LDM proposes
@@ -58,7 +66,7 @@ official execution.
 | Method | Candidate generation | Selection before official evaluation |
 | --- | --- | --- |
 | `ldm` | Four independent model requests, each returning one `B`-candidate minibatch. | Empirical `q0`, task-local Hamming GP-UCB, and LDM acquisition tilt. |
-| `ldm_harness` | Configured persistent research Agents; by default four, each submitting `B` validated occurrences. | The same `q0 + GP-UCB + LDM` path as direct LDM. |
+| `ldm_harness` | A main researcher and four proposal branches under the default 2+2 tree, each submitting `B` validated occurrences. | The same `q0 + GP-UCB + LDM` path as direct LDM. |
 | `ldm_harness_compiled` | The same proposal Agents plus one independent policy Agent. | The policy may set the GP prior mean and round-specific `alpha`/`eta`; all other optimization components stay fixed. |
 | `bo` | Task-local score-blind mutation search. | Hamming GP-UCB without a model proposal distribution. |
 | `llm` | `B` independent one-candidate model requests. | No surrogate; evaluate the accepted candidates directly. |
@@ -76,7 +84,7 @@ Each active LDM round follows one task-local implementation of the shared
 algorithm:
 
 1. Build independent proposal lineages. Direct LDM issues four concurrent
-   model requests; Harness LDM advances the configured persistent role sessions.
+   model requests; Harness LDM forks role sessions from the histories chosen by its tree strategy.
 2. Reject malformed patches, non-editable positions, unchanged bases, and
    candidates already present in authoritative measured history. Refill the
    affected lineage or Harness submission until all requested occurrences
@@ -116,7 +124,7 @@ exclusion rule.
 Harness proposal counts and evaluation counts are independent. Repeat
 `--harness-profile` once per session and set
 `--harness-candidates-per-session` for their minibatch size. Repeating a role
-creates separate persistent sessions sharing the same `AGENTS.md`, with distinct
+creates separate role identities sharing the same `AGENTS.md`, with distinct
 session IDs, histories, and workspaces. `--proposal-samples`
 must equal their product. LDM requires
 `evaluations-per-round <= bo-pool-size < proposal-samples`.

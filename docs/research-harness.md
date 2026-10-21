@@ -6,12 +6,12 @@ submission. It is available through three search methods:
 
 | Method | Candidate generation | Selection before evaluation |
 | --- | --- | --- |
-| `ldm_harness` | Multiple task-defined persistent Agents submit an over-sampled reservoir. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
+| `ldm_harness` | Four task-defined branches submit an over-sampled reservoir; default parents follow 2+2. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
 | `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
-Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
-task-local integrations. The shared Harness does not know their candidate
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, ReaSyn, and AlphaBench are the current
+task-local integrations. Their LDM Harness methods default to [shared 2+2 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions, latest-main 4fork and JointGain remain explicit strategies. The shared Harness does not know their candidate
 identity, legal search space, duplicate policy, surrogate, or evaluator.
 
 ## Architecture
@@ -160,8 +160,9 @@ turn cannot reset or double-spend its budget.
 
 A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 
-1. Start one `HarnessClient` per independent pool and close each in a `finally`
-   block.
+1. Use a context manager for each `HarnessClient`. Tree adapters close the main
+   pool before freezing its session/workspace, then start the branch pool through
+   the [shared coordinator](research-search-architecture.md).
 2. Define one profile set and strict submission contract per pool.
 3. Build deterministic turns from campaign, profile, round, and history identity.
 4. Send compact newly measured observations and provide task-owned access to
@@ -172,12 +173,14 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
    and official-space checks used by candidate admission.
 6. Return stable JSON-Pointer paths, rejection codes, messages, and repair hints
    so the Agent can repair the same submission in-session.
-7. Refill until the complete valid minibatch is accepted.
+7. Repair or refill within the configured attempt budget until the complete
+   valid minibatch is accepted; stop if that budget is exhausted.
 8. Preserve meaningful same-round occurrences before estimating `q0` for both
    Harness-backed LDM methods. Define real-evaluation replicate semantics in
    the task contract.
-9. Record each pool's turns and measured provider/tool usage separately in the
-   campaign budget.
+9. Record main, proposal and policy turns and measured provider/tool usage in
+   the campaign budget. Declare their actual pool manifests in
+   `harness_provenance.json` so reports include nested tree paths.
 
 For the reference tasks, only candidates in the authoritative evaluated set are historical repeats.
 Candidates proposed in an earlier turn but never evaluated remain eligible.

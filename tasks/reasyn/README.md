@@ -1,5 +1,13 @@
 # ReaSyn Science Benchmark for LDM
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; candidate and evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions,
+latest-main 4fork or JointGain. Strategy changes require a new campaign identity.
+
 This task implements **the first/main reconstruction evaluation** and the
 released TDC goal-directed optimization evaluation from the source-pinned
 ReaSyn v2 code and paper. Both execute through `ldm_tts.campaign.run_campaign`,
@@ -245,7 +253,7 @@ requests. Pure BO draws from a supplied score-blind SMILES pool
 it makes no proposal-provider requests. Real BO never substitutes the mock
 molecular fixture for an external candidate space.
 
-Harness methods create parallel independent persistent research sessions.
+LDM Harness methods default to the shared 2+2 tree: one main researcher and four proposal branches per minibatch.
 `harness` uses accepted candidates in submission order; its shipped configs
 request exactly the evaluation batch from one persistent session.
 `ldm_harness` samples the empirical proposal distribution tilted by GP/UCB. `ldm_harness_compiled` additionally runs a separate persistent

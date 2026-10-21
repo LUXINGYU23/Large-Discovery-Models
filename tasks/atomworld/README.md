@@ -1,5 +1,13 @@
 # AtomWorld
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions,
+latest-main 4fork or JointGain. Strategy changes require a new campaign identity.
+
 This task uses the shared `run_campaign → LDMEngine → CampaignRuntime` lifecycle to apply a public natural-language operation to a public input CIF. The official evaluator owns the private target. All scheduled revisions are fixed before execution; the **last scheduled answer** determines the final score.
 
 ## Methods and scientific protocol
@@ -9,13 +17,13 @@ This task uses the shared `run_campaign → LDMEngine → CampaignRuntime` lifec
 | `one_shot.yaml` | One direct CIF response | Public question only |
 | `extended_reasoning.yaml` | Four direct CIF revisions | Previous draft and public syntax checks |
 | `extended_operations.yaml` | Four bounded JSON operation plans | Previous plan, public tool errors and syntax checks |
-| `harness.yaml` | Persistent parallel research sessions | Current public question and public draft history |
-| `harness_public_audit.yaml` | Persistent research plus independent compiled public audit | Public drafts and structure features; empty objective-label history |
+| `harness.yaml` | Main researcher and four 2+2 research branches | Current public question and public draft history |
+| `harness_public_audit.yaml` | 2+2 research tree plus independent compiled public audit | Public drafts and structure features; empty objective-label history |
 | `ldm.yaml` | Direct reservoir plus fixed GP/UCB and empirical-q0 sampling | Past same-question scalar correctness |
 | `ldm_harness.yaml` | Persistent research reservoir plus the same LDM selector | Past same-question scalar correctness |
 | `ldm_harness_compiled.yaml` | LDM plus independently compiled residual prior and alpha/eta | Measured history, fixed-GP diagnostics and current unmeasured candidate features |
 
-Blind baselines never pass `ExpansionRequest.observations`, `parent`, acquisition feedback or correctness to agents. LDM methods expose only already measured scalar correctness for the current question; never target CIFs, judge errors, RMSD, future scores or cross-question history. Public syntax validation uses no target. The Harness starts a separate pool for each question; each research profile has its own persistent session, receives compact incremental draft updates, and can query complete history on demand. Two profiles run independently in parallel, each submitting exactly one CIF answer per revision. The ordinary blind Harness selects a profile by `(revision + campaign_index) % profile_count`; LDM uses the selector described below. Only the selected answer is evaluated.
+Blind baselines never pass `ExpansionRequest.observations`, `parent`, acquisition feedback or correctness to agents. LDM methods expose only already measured scalar correctness for the current question; never target CIFs, judge errors, RMSD, future scores or cross-question history. Public syntax validation uses no target. The Harness maintains a separate tree for each question. Each revision runs one main researcher and four 2+2 proposal branches, using two geometry and two audit role identities. Each branch receives the history missing from its inherited cursor and submits exactly one CIF answer; full authorized history remains queryable. The ordinary blind Harness selects a profile by `(revision + campaign_index) % profile_count`; LDM uses the selector described below. Only the selected answer is evaluated.
 
 `ldm_harness_compiled` implements the same algorithmic structure as NucleoBench: empirical proposal frequencies before canonical deduplication, an independently maintained BO pool, a measured-history residual GP, fixed UCB, and Gumbel sampling proportional to `q0**alpha * exp(eta * robust_z(UCB))`. The AtomWorld representation is signed-log public input-to-draft geometry, with a fixed exact RBF kernel. The first round of each question uses proposal frequencies without objective feedback. Later rounds fit the GP to measured scalar correctness and run an independent `PolicyResearchController` session with both `prior_mean@1` and `ldm_weights@1`. Compiled history priors are subtracted before fitting and query priors added afterward; covariance remains fixed. Policy diagnostics compare chronological holdouts and actual selection probabilities. No prior argmax is used in LDM.
 

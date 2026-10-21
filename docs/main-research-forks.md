@@ -1,11 +1,12 @@
-# Experimental main research session and round forks
+# Research strategies and experiment record
 
 ## Configurable research strategies
 
 Select the lifecycle and rules with `--harness-research-strategy-config PATH`.
 The four default research profiles and candidate/evaluation budgets are configured
 as before. Ready-to-use JSON configurations live in
-`config/nucleobench/research_strategies/`:
+`config/research_strategies/` (NucleoBench-only measurement coverage remains in
+`config/nucleobench/research_strategies/`):
 
 | File | Behavior with four profiles |
 | --- | --- |
@@ -18,10 +19,10 @@ as before. Ready-to-use JSON configurations live in
 For example, add this to the existing real campaign command:
 
 ```sh
---harness-research-strategy-config config/nucleobench/research_strategies/coverage_2plus2.json
+--harness-research-strategy-config config/research_strategies/coverage_2plus2.json
 ```
 
-No strategy config means independent sessions. The first four configurations keep
+New LDM Harness campaigns default to 2+2. See the [shared runtime and task boundaries](research-search-architecture.md) for all six task adapters, budgets and recovery. The first four configurations keep
 candidate admission, global empirical q0, GP/acquisition, compiled policy and
 true-evaluation selection unchanged. Measurement coverage is enabled only by the
 fifth configuration or an explicit custom measurement policy.
@@ -165,7 +166,7 @@ reconcile their measurements; the authoritative campaign checkpoint retains them
 
 ### Experimental joint-gain selection
 
-Use `--harness-research-strategy-config config/nucleobench/research_strategies/joint_gain_1plus3.json`.
+Use `--harness-research-strategy-config config/research_strategies/joint_gain_1plus3.json`.
 It loads `ldm_tts.harness.joint_gain:JointGainForks` through the existing factory
 interface. Independent sessions, latest-main forks and coverage selection remain
 separate choices. No token price, token count or cost estimate enters this policy.
