@@ -28,7 +28,6 @@ from ldm_tts.registration.dependencies import (
 )
 from ldm_tts.registration.registry import (
     REPOSITORY_RELATIVE_PREFIXES,
-    TASK_DEFINITIONS,
     TaskRegistrationError,
     get_task_definition,
 )

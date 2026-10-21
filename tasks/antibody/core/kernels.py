@@ -6,7 +6,6 @@ from gpytorch.kernels import Kernel
 from gpytorch.kernels.cosine_kernel import CosineKernel
 from gpytorch.kernels.matern_kernel import MaternKernel
 from gpytorch.kernels.rbf_kernel import RBFKernel
-from torch import Tensor
 
 
 def wrap(x1, x2, integer_dims):

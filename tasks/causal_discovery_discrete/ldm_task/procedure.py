@@ -1,19 +1,3 @@
-"""Stable shared-runner adapter for discrete causal discovery."""
+"""Shared-runner entry point."""
 
-from __future__ import annotations
-
-from typing import Any
-
-from tasks.causal_discovery_discrete.core import workflow as _workflow
-
-
-def parse_args(argv: list[str] | None = None) -> Any:
-    return _workflow.parse_args(argv)
-
-
-def describe_ldm_task(*args: Any, **kwargs: Any) -> Any:
-    return _workflow.describe_ldm_task(*args, **kwargs)
-
-
-def main(argv: list[str] | None = None) -> int:
-    return _workflow.main(argv)
+from tasks.causal_discovery_discrete.core.workflow import describe_ldm_task, main, parse_args

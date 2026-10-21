@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# The upstream contract pins the raw bytes of this seed.
+tasks/llm_kv_adaptive_quantization/resources/seed_quantizer.py text eol=lf

@@ -26,7 +26,6 @@ from typing import Any
 import torch
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 MODEL_PATH = os.environ["SERVE_MODEL"]
 SERVED_NAME = os.environ.get(

@@ -35,7 +35,7 @@ plain ``random.Random(seed)`` keeps working unchanged.
 from __future__ import annotations
 
 import random
-from typing import Optional, Sequence, Union
+from typing import Optional, Union
 
 import numpy as np
 

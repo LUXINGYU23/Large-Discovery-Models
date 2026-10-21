@@ -16,7 +16,7 @@ import tempfile
 import threading
 import traceback
 import time
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
 from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import RawCandidate
 

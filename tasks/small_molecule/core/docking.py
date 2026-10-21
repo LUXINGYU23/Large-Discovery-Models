@@ -35,7 +35,6 @@ import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional
 

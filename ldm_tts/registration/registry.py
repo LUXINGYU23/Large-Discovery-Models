@@ -209,11 +209,16 @@ def validate_task_layout(
                 for node in tree.body
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
+            functions.update(
+                alias.asname or alias.name
+                for node in tree.body if isinstance(node, ast.ImportFrom)
+                for alias in node.names
+            )
             if "main" not in functions:
                 issues.append(
                     TaskValidationIssue(
                         "error",
-                        "Procedure must define main(argv) as the runner interface.",
+                        "Procedure must expose main(argv) as the runner interface.",
                         procedure_path,
                     )
                 )
@@ -222,7 +227,7 @@ def validate_task_layout(
                     issues.append(
                         TaskValidationIssue(
                             "warning",
-                            f"Procedure should define {recommended} for consistency and inspection.",
+                            f"Procedure should expose {recommended} for consistency and inspection.",
                             procedure_path,
                         )
                     )

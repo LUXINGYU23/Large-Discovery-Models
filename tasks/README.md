@@ -37,7 +37,9 @@ config/<task_id>/
 
 `ldm_task` is the external seam. The shared runner and dependency checker know
 only `procedure.main(argv)` and the optional manifest hook. Keep implementation
-out of this package so the interface remains small and stable.
+out of this package so the interface remains small and stable. Export the
+`main`, `parse_args`, and `describe_ldm_task` functions with explicit imports
+from `core.workflow`; forwarding functions are unnecessary.
 
 The remaining directories have one ownership rule each:
 

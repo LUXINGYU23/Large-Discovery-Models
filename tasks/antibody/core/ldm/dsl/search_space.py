@@ -24,10 +24,8 @@ from typing import Iterator
 import numpy as np
 
 from tasks.antibody.core.ldm.dsl.alphabet import (
-    AA,
     SEQ_LEN,
     aa_to_idx,
-    hamming,
     idx_to_aa,
 )
 from tasks.antibody.core.ldm.dsl.exceptions import SamplingTimeout

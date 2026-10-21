@@ -25,7 +25,7 @@ import asyncio
 import json
 import random
 import time
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Sequence
 
 from ldm_tts.contracts import (
     AcquisitionSpec,
@@ -36,7 +36,6 @@ from ldm_tts.contracts import (
 )
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.optimization.records import BOObservation, BOSelectionResult, SurrogateVector
-from ldm_tts.transport import ProposalResponse
 
 
 class NanogptCampaignTracker:
