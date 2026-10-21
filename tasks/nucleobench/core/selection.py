@@ -15,7 +15,7 @@ from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
 from ldm_tts.optimization.measurement import (
     MeasurementContext, MeasurementPolicy, SelectionRequirements,
 )
-from tasks.nucleobench.core.policy_diagnostics import prepare_ucb_policy_research, prediction_records
+from ldm_tts.harness.ucb_diagnostics import prepare_ucb_policy_research, prediction_records
 from ldm_tts.optimization import (
     BOObservation,
     BOPrediction,
@@ -25,7 +25,7 @@ from ldm_tts.optimization import (
 from tasks.nucleobench.core.constants import NUCLEOBENCH_Q0_METADATA_KEY
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBSelector
 from tasks.nucleobench.core.optimization_policy import NucleoOptimizationPolicyAdapter
-from tasks.nucleobench.resources.harness.policy_diagnostics import (
+from ldm_tts.harness.ucb_diagnostics import (
     robust_z_values,
     softmax_logits,
     tilt_log_weights,

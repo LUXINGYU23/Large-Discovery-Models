@@ -12,6 +12,7 @@ from typing import Any
 from ldm_tts.harness.pi import PiHarnessConfig, policy_mcp_server
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.harness.protocol import file_sha256
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngineConfig
 from ldm_tts.engine.run_store import CampaignRuntime, unique_run_dir
@@ -465,6 +466,7 @@ def _harness_client(
         runtime.run_dir / "harness" / MEASURED_HISTORY_FILE
     ).parent.resolve()
     if policy:
+        mounts.append((DIAGNOSTICS_PATH, "/task_runtime/ucb_diagnostics.py", True))
         mounts.append((history_root, "/measured_history", True))
         mounts.extend(
             (
@@ -493,10 +495,8 @@ def _harness_client(
         mcp_servers = (
             *mcp.servers,
             policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(
-                    harness_resources / "policy_diagnostics.py"
-                ),
+                diagnostics_path="/task_runtime/ucb_diagnostics.py",
+                diagnostics_sha256=file_sha256(DIAGNOSTICS_PATH),
             ),
         )
         history_path = "/measured_history/observations.json"

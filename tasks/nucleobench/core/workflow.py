@@ -16,6 +16,7 @@ from typing import Any
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS, PiForkSource, PiHarnessConfig, policy_mcp_server
 from ldm_tts.contracts import LDMTaskSpec
 from ldm_tts.harness.protocol import file_sha256
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine import LDMEngine, LDMEngineConfig, LDMEngineState
 from ldm_tts.engine.reporting import (
@@ -1188,6 +1189,7 @@ def _harness_client(
         query_environment["PYTHONPATH"] = "/task_runtime"
     mcp_servers = mcp.servers
     if policy:
+        mounts.append((DIAGNOSTICS_PATH, "/task_runtime/ucb_diagnostics.py", True))
         submission_contract = policy_submission_contract(args.policy_max_submission_attempts)
         history_path = "/measured_history/observations.json"
         mounts.append((
@@ -1203,8 +1205,8 @@ def _harness_client(
         ):
             mounts.append(((TASK_ROOT / source).resolve(), f"/public/{destination}", True))
         mcp_servers = (*mcp_servers, policy_mcp_server(
-            diagnostics_path="/resources/policy_diagnostics.py",
-            diagnostics_sha256=file_sha256(resource_root / "policy_diagnostics.py"),
+            diagnostics_path="/task_runtime/ucb_diagnostics.py",
+            diagnostics_sha256=file_sha256(DIAGNOSTICS_PATH),
         ))
     else:
         submission_contract = contract or harness_submission_contract(args.harness_candidates_per_session)

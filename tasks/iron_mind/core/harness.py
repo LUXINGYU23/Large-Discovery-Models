@@ -11,7 +11,7 @@ from typing import Any
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
-from ldm_tts.harness.research_runtime import proposal_turn_summary, usage_counts
+from ldm_tts.harness.research_runtime import proposal_turn_summary, read_candidate_file, usage_counts
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
@@ -41,7 +41,6 @@ from tasks.iron_mind.core.constants import (
 )
 from tasks.iron_mind.core.proposal_base_measure import attach_empirical_base_measure
 from tasks.iron_mind.core.research import (
-    read_candidate_file,
     serialize_measured_observations,
     summarize_measured_observations,
     write_measured_history,

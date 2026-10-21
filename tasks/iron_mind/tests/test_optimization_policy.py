@@ -14,7 +14,7 @@ from ldm_tts.harness import (
     load_harness_mcp_config,
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
-from tasks.iron_mind.core.policy_diagnostics import prepare_ucb_policy_research
+from ldm_tts.harness.ucb_diagnostics import prepare_ucb_policy_research
 from tasks.iron_mind.core.candidate import IRON_MIND_Q0_METADATA_KEY
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.history import condition_evidence

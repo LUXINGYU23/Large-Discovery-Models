@@ -409,8 +409,8 @@ shrinkage. Draft evaluation compares chronological measured-history holdouts
 under the training-prefix GP and reports current-pool distribution changes.
 The policy receives read-only numeric arrays and subsequent errors of frozen
 pre-measurement predictions. Historical holdouts are development diagnostics.
-The task owns these calculations in `core/policy_diagnostics.py` and the
-digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
+These calculations share `ldm_tts/harness/ucb_diagnostics.py` with Iron Mind,
+NucleoBench and SynthonBench. Pi loads the same file as a digest-pinned hook.
 Feedback preserves the measured point's original pool size, q0 ranks and
 relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
 Selected-point residuals do not validate whole-pool ranking or weight-policy

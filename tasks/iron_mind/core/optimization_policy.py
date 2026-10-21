@@ -27,7 +27,7 @@ from tasks.iron_mind.core.constants import (
     TASK_ID,
 )
 from tasks.iron_mind.core.history import condition_evidence
-from tasks.iron_mind.core.policy_diagnostics import with_feedback
+from ldm_tts.harness.ucb_diagnostics import with_feedback
 from tasks.iron_mind.core.reaction_gp import (
     DEFAULT_MODEL_MISMATCH_VARIANCE,
     PRIOR_MEAN_CLIP,

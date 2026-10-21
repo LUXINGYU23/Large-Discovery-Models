@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 
 from ldm_tts.contracts import Candidate
-from tasks.nucleobench.core.policy_diagnostics import with_feedback
+from ldm_tts.harness.ucb_diagnostics import with_feedback
 from ldm_tts.harness import (
     HarnessProfile,
     HarnessSubmissionError,

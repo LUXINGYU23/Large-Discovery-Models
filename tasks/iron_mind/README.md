@@ -345,8 +345,8 @@ or interactions. Draft evaluation compares chronological measured-history
 holdouts with training-prefix GP hyperparameters frozen. The policy also receives
 exact sampling logits and subsequent errors of frozen pre-measurement predictions.
 Historical holdouts are development diagnostics, not an untouched test set.
-The task owns these calculations in `core/policy_diagnostics.py` and the
-digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
+These calculations share `ldm_tts/harness/ucb_diagnostics.py` with Iron Mind,
+NucleoBench and SynthonBench. Pi loads the same file as a digest-pinned hook.
 Measured feedback retains the original pool's q0 ranks and relative mass,
 acquisition ranks, first-draw probabilities, and actual alpha/eta. These describe
 the selection context, not validation of a ranking or weight policy. Proposal

@@ -314,6 +314,12 @@ tasks/<task_id>/resources/harness/
 `-- tools/                           # optional task-local structured tools
 ```
 
+NucleoBench, Iron Mind and SynthonBench share
+`ldm_tts/harness/ucb_diagnostics.py` for UCB prediction feedback and draft
+evaluation. The policy client mounts that file read-only at
+`/task_runtime/ucb_diagnostics.py` and pins its digest. It uses only NumPy and
+the standard library at runtime so the isolated runner can load it directly.
+
 Record content digests for profile instructions, skills, submission contracts,
 and tool sources. Pi pins initialization configuration, resource digests,
 resolved guest identity, and sidecar implementation in the run manifest.

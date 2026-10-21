@@ -9,7 +9,7 @@ import numpy as np
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 from ldm_tts.harness import CompiledOptimizationPolicy, PolicyResearchController
-from tasks.iron_mind.core.policy_diagnostics import (
+from ldm_tts.harness.ucb_diagnostics import (
     prepare_ucb_policy_research,
     prediction_records,
 )

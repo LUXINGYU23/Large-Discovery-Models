@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from tasks.synthonbench.resources.harness.policy_diagnostics import (
+from ldm_tts.harness.ucb_diagnostics import (
     robust_z_values,
     softmax_logits,
     tilt_log_weights,
