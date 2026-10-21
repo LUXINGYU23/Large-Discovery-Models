@@ -10,7 +10,6 @@ from ldm_tts.contracts import RawProposal, ReservoirBuilder
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
-from tasks.reasyn.core import workflow
 from tasks.reasyn.core.workflow_args import parse_args
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.chemistry import MOCK_SMILES

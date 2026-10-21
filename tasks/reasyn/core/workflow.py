@@ -1,11 +1,14 @@
 """ReaSyn Science Benchmark assembly through ldm_tts.campaign.run_campaign."""
 
 from __future__ import annotations
+
 import json
-import os
 import math
+import os
+from contextlib import ExitStack
 from copy import copy
 from pathlib import Path
+
 from ldm_tts.campaign import (
     CampaignBudget,
     CampaignRecipe,
@@ -16,7 +19,7 @@ from ldm_tts.data import DataCollectionSink
 from ldm_tts.engine.runtime import consume_proposal_attempts
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir, BudgetExceededError
 from ldm_tts.engine.reporting import load_successful_observations
-from .selection import TanimotoGPSelector, AcquisitionTiltedSelector
+from ldm_tts.harness import HarnessError
 from ldm_tts.registration.experiment import (
     load_active_experiment_contract,
     load_experiment_contract,
@@ -27,17 +30,15 @@ from ldm_tts.transport.openai import (
     EndpointRequestError,
     generation_body,
 )
+from . import harness_runtime
 from .candidate import ReaSynDomain
 from .chemistry import canonicalize
 from .evaluator import ReconstructionEvaluator, TDCOracleEvaluator
 from .metrics import reconstruction_metrics
 from .projector import Projector, ProjectionInterruptedError
 from .proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander, ProposalExhausted
+from .selection import TanimotoGPSelector, AcquisitionTiltedSelector
 from .surrogate import MoleculeEncoder
-from ldm_tts.harness import HarnessError, PolicyResearchController, DockerPolicyExecutor
-from .harness import HarnessTargetSource, create_client
-from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
-from .optimization_policy import ReaSynPolicyAdapter
 from .provenance import check_assets, harness_component_digests, scientific_identity
 from .reporting import write_campaign_report
 from .task_spec import describe_ldm_task
@@ -46,37 +47,11 @@ from .workflow_args import jsonable_args, parse_args
 TASK_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _direct_provider_api_key():
+def _provider_api_key():
     return os.environ.get(
         "LLM_API_KEY",
         os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
     )
-
-
-def _harness_provider_api_key():
-    return _direct_provider_api_key()
-
-
-def _preflight_harness_provider(args):
-    if not args.llm_url or not args.llm_model:
-        raise ValueError("Set LLM_BASE_URL and LLM_MODEL_NAME for real Harness proposals")
-    if not getattr(args, "provider_api_key", ""):
-        raise EndpointRequestError(
-            "Set LLM_API_KEY or OPENAI_API_KEY for real Harness proposals"
-        )
-    client = OpenAICompatibleProposalClient(
-        url=args.llm_url,
-        model=args.llm_model,
-        api_key=args.provider_api_key,
-        timeout_seconds=args.harness_response_timeout,
-        max_tokens=args.llm_max_tokens,
-        max_retries=0,
-        wire_api="responses",
-        temperature=args.llm_temperature,
-        extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-                                   extra_body=json.loads(args.llm_extra_body_json)),
-    )
-    return {"backend": "harness", "wire_api": "responses", **client.preflight()}
 
 
 def _targets(args):
@@ -279,7 +254,7 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
         client = OpenAICompatibleProposalClient(
             url=args.llm_url,
             model=args.llm_model,
-            api_key=_direct_provider_api_key(),
+            api_key=_provider_api_key(),
             max_tokens=args.llm_max_tokens,
             max_retries=0,
             wire_api=args.llm_wire_api,
@@ -352,7 +327,6 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
     elif args.search_method in ("llm", "harness", "baseline"):
         selector, encoder = None, None
     holder = {}
-    harness_clients = []
     search_expander = expander
     if args.initialization_mode == "shared_start":
         initial_args = copy(args)
@@ -396,39 +370,14 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             runtime.consume_many(amounts)
         search_expander.before_request = before_request
         if uses_harness:
-            provider_args = copy(args)
-            provider_args.provider_api_key = _harness_provider_api_key()
-            runtime.consume("endpoint_preflight_requests")
-            preflight = _preflight_harness_provider(provider_args)
-            runtime.record("endpoint_preflight_succeeded", preflight)
-            harness_client = create_client(provider_args, run_dir / "harness", runtime.run_id, target)
-            harness_clients.append(harness_client)
-            root = run_dir / "harness"
-            coordinator = branch_client = None
-            if args._research_strategy.requires_main:
-                def account_main(counts, *, usage_key=None):
-                    counts = {("harness_provider_calls" if key == "llm_requests" else key): value for key, value in counts.items()}
-                    runtime.consume_many(counts, usage_key=usage_key)
-                coordinator = ResearchCoordinator(root, args._research_strategy, harness_client.config.profiles,
-                    lambda: create_client(provider_args, root / "main", runtime.run_id, target,
-                        session_profiles=main_research_profile(root / "main", harness_client.config.profiles[0]),
-                        contract=research_contract()), account=account_main)
-                branch_client = lambda location, sources: create_client(provider_args, location, runtime.run_id, target, fork_sources=sources)
-            else:
-                harness_client.start()
-            search_expander.client = HarnessTargetSource(harness_client, root, args,
-                target=target, account=runtime.consume_many, coordinator=coordinator, branch_client=branch_client)
+            api_key = _provider_api_key()
+            search_expander.client = harness_runtime.open_proposals(
+                args, runtime, target, stack=stack, api_key=api_key,
+            )
             if args.search_method == "ldm_harness_compiled":
-                policy_client = create_client(provider_args, run_dir / "policy_harness", runtime.run_id, target, policy=True)
-                harness_clients.append(policy_client)
-                policy_client.start()
-                adapter = ReaSynPolicyAdapter(encoder, benchmark=args.benchmark, alpha=args.acquisition_alpha, eta=args.acquisition_eta, seed=args.seed,
-                    history_limit=args.gp_history_limit, beta=args.acquisition_beta, z_clip=args.acquisition_z_clip)
-                selector.policy_adapter = adapter
-                selector.policy_controller = PolicyResearchController(client=policy_client, adapter=adapter,
-                    executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
-                        resolve_policy_user(args)), root=run_dir / "policy_harness", account=runtime.consume_many,
-                    recovery_budget=lambda: args.harness_wall_time_seconds * 2)
+                selector.policy_adapter, selector.policy_controller = harness_runtime.open_policy(
+                    args, runtime, target, encoder, stack=stack, api_key=api_key,
+                )
 
         if not target:
             evaluator.before_oracle = lambda: runtime.consume("oracle_calls")
@@ -438,83 +387,76 @@ def _run_one(args, spec, contract, profile, run_dir, target, *, resume):
             preflight = client.preflight()
             runtime.record("endpoint_preflight_succeeded", preflight)
 
-    try:
-        result = run_campaign(
-            CampaignRequest(
-                run_dir=run_dir,
-                budget=budget,
-                config=configuration,
-                resume=resume,
-                contract_sha256=contract.digest,
-                contract_profile=profile,
-                runtime_hook=runtime_hook,
-                context={
-                    "original_target": target,
-                    "oracle": args.oracle,
-                    "mock": args.mock,
-                },
-                artifact_projector=lambda runtime, engine: write_campaign_report(
-                    args, runtime, target
+    with ExitStack() as stack:
+        try:
+            result = run_campaign(
+                CampaignRequest(
+                    run_dir=run_dir,
+                    budget=budget,
+                    config=configuration,
+                    resume=resume,
+                    contract_sha256=contract.digest,
+                    contract_profile=profile,
+                    runtime_hook=runtime_hook,
+                    context={
+                        "original_target": target,
+                        "oracle": args.oracle,
+                        "mock": args.mock,
+                    },
+                    artifact_projector=lambda runtime, engine: write_campaign_report(
+                        args, runtime, target
+                    ),
                 ),
-            ),
-            CampaignRecipe(
-                task_spec=spec,
-                expander=expander,
-                candidate_domain=ReaSynDomain(args.benchmark, mock=args.mock),
-                evaluator=evaluator,
-                surrogate_encoder=encoder,
-                selector=selector,
-            ),
-        )
-    except (EndpointRequestError, HarnessError, ProjectionInterruptedError) as exc:
-        runtime = holder.get("runtime")
-        status = "paused_projection_interrupted" if isinstance(exc, ProjectionInterruptedError) else "paused_endpoint_unavailable"
-        if runtime:
-            runtime.pause(status, phase="proposal_or_projection",
-                message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.",
-                details=_proposal_recovery_details(search_expander))
+                CampaignRecipe(
+                    task_spec=spec,
+                    expander=expander,
+                    candidate_domain=ReaSynDomain(args.benchmark, mock=args.mock),
+                    evaluator=evaluator,
+                    surrogate_encoder=encoder,
+                    selector=selector,
+                ),
+            )
+        except (EndpointRequestError, HarnessError, ProjectionInterruptedError) as exc:
+            runtime = holder.get("runtime")
+            status = "paused_projection_interrupted" if isinstance(exc, ProjectionInterruptedError) else "paused_endpoint_unavailable"
+            if runtime:
+                runtime.pause(status, phase="proposal_or_projection",
+                    message="Resolve the interrupted service, then resume this directory within the separate recovery allowance.",
+                    details=_proposal_recovery_details(search_expander))
+                report = write_campaign_report(args, runtime, target)
+                report["status"] = status
+                atomic_json_write(run_dir / "result.json", report)
+            else:
+                report = {"status": status}
+            return report, 2
+        except ProposalExhausted as exc:
+            runtime = holder.get("runtime")
+            runtime.record("proposal_replenishment_exhausted", exc.metadata)
+            if exc.attempts:
+                consume_proposal_attempts(runtime, exc.attempts)
+            runtime.pause(
+                "paused_proposal_exhausted",
+                phase="proposal_replenishment",
+                message=str(exc),
+                details=_proposal_recovery_details(search_expander),
+            )
             report = write_campaign_report(args, runtime, target)
-            report["status"] = status
+            report.update(status="paused_proposal_exhausted", proposal_diagnostics=exc.metadata)
             atomic_json_write(run_dir / "result.json", report)
-        else:
-            report = {"status": status}
-        return report, 2
-    except ProposalExhausted as exc:
-        runtime = holder.get("runtime")
-        runtime.record("proposal_replenishment_exhausted", exc.metadata)
-        if exc.attempts:
-            consume_proposal_attempts(runtime, exc.attempts)
-        runtime.pause(
-            "paused_proposal_exhausted",
-            phase="proposal_replenishment",
-            message=str(exc),
-            details=_proposal_recovery_details(search_expander),
-        )
-        report = write_campaign_report(args, runtime, target)
-        report.update(status="paused_proposal_exhausted", proposal_diagnostics=exc.metadata)
-        atomic_json_write(run_dir / "result.json", report)
-        return report, 1
-    except BudgetExceededError as exc:
-        runtime = holder.get("runtime")
-        runtime.pause(
-            "paused_resource_budget",
-            phase="resource_budget",
-            message=str(exc),
-            details=_proposal_recovery_details(search_expander),
-        )
-        report = write_campaign_report(args, runtime, target)
-        report["status"] = "paused_resource_budget"
-        atomic_json_write(run_dir / "result.json", report)
-        return report, 1
-    finally:
-        for harness_client in reversed(harness_clients):
-            harness_client.close()
+            return report, 1
+        except BudgetExceededError as exc:
+            runtime = holder.get("runtime")
+            runtime.pause(
+                "paused_resource_budget",
+                phase="resource_budget",
+                message=str(exc),
+                details=_proposal_recovery_details(search_expander),
+            )
+            report = write_campaign_report(args, runtime, target)
+            report["status"] = "paused_resource_budget"
+            atomic_json_write(run_dir / "result.json", report)
+            return report, 1
     complete = result.engine.summary["successful_evaluation_count"] == cap
     if not complete:
         result.runtime.status.update("stopped", phase="incomplete_scientific_budget", budget=result.runtime.budget)
     return result.projected, 0 if complete else 1
-
-
-def resolve_policy_user(args):
-    from ldm_tts.harness.container import resolve_container_user
-    return resolve_container_user(args.harness_container_user, args.harness_docker_host)

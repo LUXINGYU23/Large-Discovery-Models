@@ -1,4 +1,4 @@
-"""Persistent, independent ReaSyn research sessions using the shared Harness."""
+"""ReaSyn proposal validation, research history and durable projection handoffs."""
 from __future__ import annotations
 
 import hashlib
@@ -9,21 +9,15 @@ from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
-    HarnessArtifactRule, HarnessClient, HarnessError, HarnessLimits,
-    HarnessNetworkPolicy, HarnessProfile, HarnessSubmissionContract,
-    HarnessSubmissionError, HarnessSubmissionValidation, HarnessToolExtension,
-    HarnessTurn, canonical_sha256, directory_sha256, file_sha256,
-    load_harness_mcp_config, parse_tool_call_budgets, policy_submission_contract,
+    HarnessArtifactRule, HarnessError, HarnessProfile, HarnessSubmissionContract,
+    HarnessSubmissionError, HarnessSubmissionValidation, HarnessTurn,
+    canonical_sha256, directory_sha256, file_sha256,
 )
-from ldm_tts.harness.container import pi_sidecar_command
-from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
 from ldm_tts.harness.research_store import ResearchMeasurement
 from ldm_tts.transport import ProposalResponse
-from ldm_tts.transport.openai import generation_body
 from .chemistry import canonicalize
 
 RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOL_NAMES = ("describe_reasyn_task", "get_measured_history", "check_measured_product")
 
 
 def profiles(count=4, *, policy=False):
@@ -77,60 +71,8 @@ def read_submission(submission, artifacts, root, count, *, mock=False):
     return normalized
 
 
-def create_client(args, root, campaign_id, target, *, policy=False, session_profiles=None, contract=None, fork_sources=None):
-    root = Path(root).resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    context = {"benchmark": args.benchmark, "oracle": args.oracle if not target else None,
-               "original_target": target, "mock": args.mock,
-               "feedback": "Only completed task measurements are available. Projection is not an oracle score."}
-    atomic_json_write(root / "context.json", context)
-    history_root = root.parent / "harness" if policy else root
-    history_root.mkdir(parents=True, exist_ok=True)
-    if not (history_root / "measured_history.json").exists():
-        atomic_json_write(history_root / "measured_history.json", {"observations": []})
-    mounts = [(RESOURCE_ROOT, "/resources", True)]
-    if policy:
-        mounts.append((history_root, "/measured_history", True))
-    command = pi_sidecar_command(
-        root, args.harness_sidecar_image, cache_root=args.harness_cache_dir,
-        docker_host=args.harness_docker_host, container_user=args.harness_container_user,
-        environment={
-            "LDM_REASYN_CONTEXT": "/artifacts/context.json",
-            "LDM_REASYN_HISTORY": "/measured_history/measured_history.json" if policy else "/artifacts/measured_history.json",
-        },
-        mounts=mounts,
-    )
-    mcp = load_harness_mcp_config(args.harness_mcp_config)
-    contract = contract or (policy_submission_contract() if policy else submission_contract())
-    return HarnessClient(command, api_key=args.provider_api_key,
-        named_secrets=mcp.named_secrets, response_timeout_seconds=args.harness_response_timeout,
-        config=PiHarnessConfig(
-            artifact_root=Path("/artifacts"), base_url=args.llm_url, model=args.llm_model,
-            profiles=session_profiles or profiles(args.harness_sessions, policy=policy), campaign_id=campaign_id,
-            fork_sources=fork_sources or {},
-            task_id="reasyn", case_id=f"{args.benchmark}:{target or args.oracle}" + (":policy" if policy else ""),
-            seed=args.seed, submission_contract=contract,
-            guest_runtime=load_pi_guest_runtime("reasyn", RESOURCE_ROOT / "image"),
-            tool_extensions=(HarnessToolExtension(Path("/resources/tools/molecular_research.mjs"),
-                file_sha256(RESOURCE_ROOT / "tools/molecular_research.mjs"), TOOL_NAMES),),
-            mcp_servers=(*mcp.servers, policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
-            )) if policy else mcp.servers,
-            thinking=args.harness_thinking, context7_enabled=False,
-            provider_request_body={
-                "temperature": args.llm_temperature, "max_output_tokens": args.llm_max_tokens,
-                **generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-                                  extra_body=json.loads(args.llm_extra_body_json)),
-            },
-            limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds,
-                tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget, excluded_tools=(contract.tool_name,))),
-            network_policy=HarnessNetworkPolicy(forbidden_query_patterns=("benchmark_result", "oracle_cache", "checkpoint")),
-        ))
-
-
 class HarnessTargetSource:
-    """Run a strict barrier of independent persistent molecular research sessions.
+    """Run a strict barrier of molecular research sessions.
 
     Immutable turn inputs and a durable normalized response make the cursor and
     projection handoff replayable. Usage is cumulative per native turn, including

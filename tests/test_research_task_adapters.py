@@ -170,7 +170,7 @@ def test_atomworld_tree_is_sample_isolated_and_keeps_feedback_boundary(tmp_path,
 def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp_path, monkeypatch):
     from ldm_tts.transport import ProposalRequest
     from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
-    from tasks.reasyn.core import harness
+    from tasks.reasyn.core import harness, harness_runtime
     from tasks.reasyn.core.workflow_args import parse_args
     args = parse_args(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness",
         "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
@@ -180,10 +180,10 @@ def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp
         data = json.loads(turn.message.split("\n", 1)[1])
         return "candidates.json", json.dumps({"candidates": [{"target_smiles": "CCO", "rationale": "Projected hypothesis."}
             for _ in range(data["candidate_count"])]}), {}
-    events = install_fixture(monkeypatch, harness, payload)
+    events = install_fixture(monkeypatch, harness_runtime, payload)
     root = tmp_path / "harness"
     def create(location, **kwargs):
-        return harness.create_client(args, location, "fixture", "", **kwargs)
+        return harness_runtime.create_client(args, location, "fixture", "", **kwargs)
     client = create(root)
     coordinator = ResearchCoordinator(root, args._research_strategy, client.config.profiles,
         lambda: create(root / "main", session_profiles=main_research_profile(root / "main", client.config.profiles[0]), contract=research_contract()))
@@ -204,6 +204,51 @@ def test_reasyn_tree_credits_projected_occurrences_and_preserves_short_batch(tmp
     credited = [o for o in tree["outcomes"] if o["best_key"] == lineage["research_key"]]
     assert len(credited) == 1 and credited[0]["best_score"] == .8
     assert len(events) == 10
+
+
+@pytest.mark.parametrize(("benchmark", "tree_steps"), [("reconstruction", 2), ("tdc", 3)])
+def test_reasyn_tree_workflow_and_completed_resume_preserve_budget(tmp_path, monkeypatch, benchmark, tree_steps):
+    from tasks.reasyn.core import harness_runtime, workflow
+
+    preflights = []
+
+    def preflight(args):
+        preflights.append(args.llm_model)
+        return {"status": "fixture"}
+
+    def payload(root, turn):
+        data = json.loads(turn.message.split("\n", 1)[1])
+        smiles = ("CCO", "CCN", "CCC", "COC")[int(turn.profile_id.rsplit("_", 1)[1]) - 1]
+        return "candidates.json", json.dumps({"candidates": [
+            {"target_smiles": smiles, "rationale": "Test a synthesis hypothesis."}
+            for _ in range(data["candidate_count"])
+        ]}), {}
+
+    monkeypatch.setattr(harness_runtime, "preflight_provider", preflight)
+    events = install_fixture(monkeypatch, harness_runtime, payload)
+    root = tmp_path / "run"
+    argv = [
+        "--mock", "--benchmark", benchmark, "--search-method", "ldm_harness",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+        "--harness-cache-dir", str(tmp_path / "cache"), "--iterations", "2",
+        "--proposal-batch-size", "4", "--reservoir-size", "4", "--out-dir", str(root),
+    ]
+    assert workflow.main(argv) == 0
+    # TDC excludes measured products and replenishes its second-round pool once.
+    check_tree(root / "harness", tree_steps)
+    assert len(events) == tree_steps * 5
+    budget = json.loads((root / "budget.json").read_text())
+    assert budget["counters"]["harness_turns"] == tree_steps * 5
+    assert budget["counters"]["main_research_turns"] == tree_steps
+    assert budget["counters"]["endpoint_preflight_requests"] == 1
+    assert budget["counters"]["successful_evaluations"] == 2
+    checkpoint = json.loads((root / "checkpoint.json").read_text())
+    observations = checkpoint["state"]["observations"]
+    assert len(observations) == 2
+    assert workflow.main([*argv, "--resume-from", str(root)]) == 0
+    assert len(events) == tree_steps * 5 and preflights == ["fixture"]
+    assert json.loads((root / "budget.json").read_text()) == budget
+    assert json.loads((root / "checkpoint.json").read_text())["state"]["observations"] == observations
 
 
 def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch):

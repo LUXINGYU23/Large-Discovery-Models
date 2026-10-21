@@ -25,11 +25,11 @@ from tasks.reasyn.core.evaluator import TDCOracleEvaluator
 from tasks.reasyn.core.harness import HarnessTargetSource, RESOURCE_ROOT, profiles, submission_contract
 from tasks.reasyn.core.optimization_policy import ReaSynPolicyAdapter
 from tasks.reasyn.core.projector import Projector
-from tasks.reasyn.core.proposals import ReaSynExpander
+from tasks.reasyn.core.proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander
 from tasks.reasyn.core.sampling import attach_empirical_base_measure, empirical_base_masses
 from tasks.reasyn.core.selection import AcquisitionTiltedSelector, TanimotoGPSelector
 from tasks.reasyn.core.surrogate import MoleculeEncoder
-from tasks.reasyn.core import workflow
+from tasks.reasyn.core import harness_runtime, workflow
 from tasks.reasyn.core.workflow_args import jsonable_args, parse_args
 from tasks.reasyn.core.provenance import harness_component_digests, scientific_identity
 
@@ -74,7 +74,7 @@ def jsonl(path):
 def harness_identity(options, target="", source_commit="fixture-source"):
     options.asset_digests = {}
     options.proposal_recovery_seed_span = max(
-        workflow.DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
+        DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
         options.iterations,
         options.max_oracle_calls,
     )
@@ -369,10 +369,10 @@ def test_workflow_policy_uses_shared_recovery_before_persisting_fallback(tmp_pat
         controllers.append(result)
         return result
 
-    monkeypatch.setattr(workflow, "PolicyResearchController", controller)
-    monkeypatch.setattr(workflow, "DockerPolicyExecutor", lambda *args: AuthoredFixtureExecutor())
-    monkeypatch.setattr(workflow, "_preflight_harness_provider", lambda args: {"status": "synthetic_fixture"})
-    monkeypatch.setattr(workflow, "create_client", lambda args, root, *rest, policy=False: client(
+    monkeypatch.setattr(harness_runtime, "PolicyResearchController", controller)
+    monkeypatch.setattr(harness_runtime, "DockerPolicyExecutor", lambda *args: AuthoredFixtureExecutor())
+    monkeypatch.setattr(harness_runtime, "preflight_provider", lambda args: {"status": "synthetic_fixture"})
+    monkeypatch.setattr(harness_runtime, "create_client", lambda args, root, *rest, policy=False: client(
         root, policy=policy, count=2, mode="policy_retry" if policy else "molecular"))
     root = tmp_path / "run"
     assert workflow.main(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness_compiled",
@@ -440,5 +440,5 @@ console.log(JSON.stringify({status:"ok",tools:[...tools.keys()]}));
         "LDM_REASYN_CONTEXT": str(context), "LDM_REASYN_HISTORY": str(history)},
         capture_output=True, text=True, timeout=10, check=False)
     assert completed.returncode == 0, completed.stderr
-    from tasks.reasyn.core.harness import TOOL_NAMES
+    from tasks.reasyn.core.harness_runtime import TOOL_NAMES
     assert set(json.loads(completed.stdout)["tools"]) == set(TOOL_NAMES)

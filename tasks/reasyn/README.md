@@ -26,6 +26,18 @@ on resume. `reporting.py` writes campaign artifacts and benchmark metrics.
 Projection, candidate admission, sampling and selection remain in their own
 modules; their outputs are the inputs to reporting and recovery.
 
+`harness_runtime.py` owns provider preflight, Pi client configuration and the
+assembly of proposal trees and compiled policies. The workflow owns their
+`ExitStack`, so a partially started policy client and every earlier client are
+closed on failure. `harness.py` validates submissions and preserves the batch,
+history and projection handoff records. Tree main/branch clients keep their
+per-turn lifetime in the shared coordinator and proposal adapter.
+
+Completed resumes bypass provider preflight and Pi startup. Active resumes keep
+the existing recovery allowance, sampling seed span, scientific identity checks
+and usage counters. Moving these responsibilities does not change 2+2 selection,
+projection quotas, oracle limits or the report schema.
+
 ## What LDM controls
 
 | Track | Candidate and reservoir expansion | Expensive evaluation | Reported metric |
