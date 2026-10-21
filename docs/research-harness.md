@@ -59,11 +59,11 @@ explicitly; the launcher does not inspect task arguments or choose a research ro
 | `HarnessClient` | Process start/close, secret bootstrap, protocol validation and execution; constructing a client does not start it |
 | `ResearchCoordinator` / task expander | Main and branch scheduling, immutable fork sources, evidence and usage accounting |
 
-Iron Mind, SynthonBench, NucleoBench and ReaSyn expose `create_client` in their
+Iron Mind, SynthonBench, NucleoBench, ReaSyn and AtomWorld expose `create_client` in their
 `core/harness_runtime.py`; their workflows compose these clients with scientific
 components. AlphaBench's `core/harness_runtime.py` also owns the lifetime of its
-host tool service. AtomWorld keeps its task client factory beside
-its submission adapter in `core/harness.py`. NucleoBench resolves provider
+host tool service. AtomWorld's submission adapter owns sample-specific evidence
+and client reuse; its runtime factory mounts only the sample's public workspace. NucleoBench resolves provider
 settings and request-body JSON in `core/provider.py` for both direct and Pi calls.
 
 The main, proposal and compiled-policy clients retain separate task configurations

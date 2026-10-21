@@ -18,8 +18,8 @@ from tasks.atomworld.core.data import TASK_ROOT
 from tasks.atomworld.core.harness import (
     AtomWorldHarnessExpander,
     harness_profiles,
-    make_client,
 )
+from tasks.atomworld.core.harness_runtime import create_client
 from tasks.atomworld.core.optimization_policy import FEATURE_NAMES, public_policy_input
 from tasks.atomworld.core.workflow import run
 from tasks.atomworld.core.workflow_args import parse_args
@@ -139,6 +139,30 @@ class ResearchClient:
         self.closed = True
 
 
+def test_failed_start_closes_client_and_preserves_resume_budget(tmp_path):
+    created = []
+
+    class FailedStart(ResearchClient):
+        def start(self):
+            created.append(self)
+            raise HarnessError("startup failed")
+
+    args = parse_args([
+        "--mock", "--search-method", "harness", "--out-dir", str(tmp_path / "run"),
+        "--harness-research-strategy-config", "config/research_strategies/independent.json",
+        "--harness-profile", "geometry_research", "structure_audit",
+    ])
+    with pytest.raises(HarnessError, match="startup failed"):
+        run(args, harness_client_factory=FailedStart)
+    assert created and all(client.closed for client in created)
+    counters = json.loads((args.out_dir / "budget.json").read_text())["counters"]
+    assert counters.get("harness_turns", 0) == 0
+    assert counters.get("external_evaluations", 0) == 0
+    args.resume = True
+    result = run(args, harness_client_factory=ResearchClient)
+    assert result.projected["schedule_completed"]
+
+
 def test_persistent_repair_history_and_full_campaign_resume(tmp_path):
     clients = []
 
@@ -253,7 +277,7 @@ def test_real_harness_preflight_runs_before_first_sidecar_turn(tmp_path, monkeyp
     monkeypatch.setattr("tasks.atomworld.core.workflow.load_official_evaluator",
                         lambda upstream: lambda *args, **kwargs: SimpleNamespace(
                             correct=True, wrong_type=None, rmsd=None, max_dist=None))
-    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.OpenAICompatibleProposalClient", PreflightClient)
     monkeypatch.setattr("tasks.atomworld.core.harness.public_validation",
                             lambda text, mock=False: {"parseable": "invalid" not in text})
     monkeypatch.setenv("LDM_LLM_API_KEY", "must-not-appear-in-artifacts")
@@ -301,8 +325,8 @@ def test_mock_default_harness_preflights_provider_before_sidecar(tmp_path, monke
         calls.append("factory")
         return ResearchClient(*args, **kwargs)
 
-    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
-    monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.create_client", factory)
     monkeypatch.setenv("LLM_API_KEY", "mock-harness-secret")
     args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--mock",
@@ -343,7 +367,7 @@ def test_mock_default_harness_preflight_failure_happens_before_sidecar(tmp_path,
         "OPENAI_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr("tasks.atomworld.core.harness.make_client", factory)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.create_client", factory)
     args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--mock",
         "--search-method", "harness",
@@ -381,7 +405,7 @@ def test_real_harness_preflight_failure_happens_before_sidecar(tmp_path, monkeyp
     monkeypatch.setattr("tasks.atomworld.core.workflow.load_official_evaluator",
                         lambda upstream: lambda *args, **kwargs: SimpleNamespace(
                             correct=True, wrong_type=None, rmsd=None, max_dist=None))
-    monkeypatch.setattr("tasks.atomworld.core.workflow.OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.OpenAICompatibleProposalClient", PreflightClient)
     monkeypatch.setenv("LLM_API_KEY", "fixture-secret")
     args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
         "--data-dir", str(tmp_path / "data"),
@@ -483,7 +507,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
         def start(self):
             pass
 
-    monkeypatch.setattr("tasks.atomworld.core.harness.HarnessClient", Capture)
+    monkeypatch.setattr("tasks.atomworld.core.harness_runtime.HarnessClient", Capture)
     monkeypatch.setenv("LLM_API_KEY", "test-secret")
     args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
@@ -498,7 +522,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
         ]
     )
     root = tmp_path / "campaign/harness/sample_000000"
-    make_client(args, root, fixture()["public"][0], campaign_id="fixture")
+    create_client(args, root, fixture()["public"][0], campaign_id="fixture")
     command = captured["command"]
     mounts = [command[i + 1] for i, part in enumerate(command) if part == "--mount"]
     assert len(mounts) == 3

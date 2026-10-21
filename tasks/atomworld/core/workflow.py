@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from ldm_tts.campaign import (
@@ -37,39 +36,8 @@ from tasks.atomworld.core.task_spec import describe_ldm_task
 from tasks.atomworld.core.methods import LDM_METHODS, HARNESS_METHODS
 from .provenance import bind_schedule
 from .reporting import project_result
-from . import workflow_args
+from . import harness_runtime, workflow_args
 from tasks.atomworld.core.selection import AtomWorldLDMSelector, GeometryEncoder
-
-
-def _provider_api_key():
-    return os.environ.get(
-        "LLM_API_KEY",
-        os.environ.get("LDM_LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
-    )
-
-
-def _harness_provider_preflight(args):
-    if not args.llm_url or not args.llm_model_name:
-        raise EndpointRequestError(
-            "Set LLM_BASE_URL and LLM_MODEL_NAME or the corresponding CLI options"
-        )
-    if not _provider_api_key():
-        raise EndpointRequestError(
-            "Set LLM_API_KEY, LDM_LLM_API_KEY, or OPENAI_API_KEY for Harness proposals"
-        )
-    client = OpenAICompatibleProposalClient(
-        url=args.llm_url,
-        model=args.llm_model_name,
-        api_key=_provider_api_key(),
-        timeout_seconds=args.harness_response_timeout,
-        max_tokens=args.llm_max_tokens,
-        temperature=args.llm_temperature,
-        max_retries=0,
-        wire_api="responses",
-        extra_body=generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-                                   extra_body=json.loads(args.llm_extra_body_json)),
-    )
-    return {"backend": "harness", "wire_api": "responses", **client.preflight()}
 
 
 def _load_mock():
@@ -136,7 +104,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
             client = OpenAICompatibleProposalClient(
                 url=args.llm_url,
                 model=args.llm_model_name,
-                api_key=_provider_api_key(),
+                api_key=harness_runtime.provider_api_key(),
                 timeout_seconds=args.llm_timeout,
                 max_tokens=args.llm_max_tokens,
                 temperature=args.llm_temperature,
@@ -148,13 +116,13 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
     official = None if args.mock else load_official_evaluator(args.upstream_root)
     evaluator = AtomWorldEvaluator(targets, run_dir, official=official, mock=args.mock)
     if harness_mode:
-        from tasks.atomworld.core.harness import AtomWorldHarnessExpander, make_client
+        from tasks.atomworld.core.harness import AtomWorldHarnessExpander
 
         expander = AtomWorldHarnessExpander(
             samples,
             args,
             run_dir,
-            client_factory=harness_client_factory or make_client,
+            client_factory=harness_client_factory or harness_runtime.create_client,
             policy_executor=policy_executor,
         )
     elif ldm_mode:
@@ -201,7 +169,7 @@ def run(args, *, client=None, harness_client_factory=None, policy_executor=None)
             runtime.consume("endpoint_preflights")
             try:
                 report = (
-                    _harness_provider_preflight(args)
+                    harness_runtime.preflight_provider(args)
                     if harness_provider_preflight_required
                     else client.preflight()
                 )
