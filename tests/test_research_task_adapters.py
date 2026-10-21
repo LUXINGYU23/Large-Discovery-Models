@@ -144,16 +144,16 @@ def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys,
 
 @pytest.mark.parametrize("method", ["harness", "ldm_harness"])
 def test_atomworld_tree_is_sample_isolated_and_keeps_feedback_boundary(tmp_path, monkeypatch, method):
-    from tasks.atomworld.core import harness, workflow
+    from tasks.atomworld.core import harness_runtime, workflow, workflow_args
     from tasks.atomworld.core.data import TASK_ROOT
     from tasks.atomworld.core.proposals import extract_cif
     fixture = json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
     text = extract_cif(fixture["mock_outputs"][fixture["public"][0]["sample_id"]][0])
-    events = install_fixture(monkeypatch, harness, lambda root, turn: ("answer.cif", text, {"rationale": "Public geometry only."}))
-    args = workflow.parse_args(["--mock", "--search-method", method, "--iterations", "2",
+    events = install_fixture(monkeypatch, harness_runtime, lambda root, turn: ("answer.cif", text, {"rationale": "Public geometry only."}))
+    args = workflow_args.parse_args(["--mock", "--search-method", method, "--iterations", "2",
         "--llm-url", "http://fixture.invalid/v1", "--llm-model-name", "fixture",
         "--harness-cache-dir", str(tmp_path / "cache"), "--out-dir", str(tmp_path / "run")])
-    result = workflow.run(args, harness_client_factory=harness.make_client)
+    result = workflow.run(args, harness_client_factory=harness_runtime.create_client)
     roots = sorted((result.runtime.run_dir / "harness").glob("sample_*"))
     assert roots
     for root in roots:

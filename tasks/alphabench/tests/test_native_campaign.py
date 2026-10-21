@@ -152,7 +152,7 @@ def test_example_sp500_binds_every_evaluation_to_the_selected_market(tmp_path, s
 @pytest.mark.parametrize("backend", ["qlib", "assay"])
 def test_source_searcher_freezes_entry_and_tests_only_its_actual_final_pool(tmp_path, source, monkeypatch, method, backend):
     monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
-    monkeypatch.setattr(workflow, "run_campaign", lambda *_args, **_kwargs: pytest.fail("source started a search LDMEngine"))
+    monkeypatch.setattr(workflow, "LDMEngine", lambda *_args, **_kwargs: pytest.fail("source started a search LDMEngine"))
     args = arguments(tmp_path, source_protocol(method, backend=backend))
     assert main(args) == 0
     run = tmp_path / "run"
@@ -262,7 +262,7 @@ def test_native_workflow_runs_full_stages_without_starting_search_engine(tmp_pat
     monkeypatch.setattr("tasks.alphabench.core.native_generator.time.sleep", lambda _: None)
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     monkeypatch.setenv("LDM_DATA_COLLECTION_DIR", str(tmp_path / "collection"))
-    monkeypatch.setattr(workflow, "run_campaign", lambda *_args, **_kwargs: pytest.fail("native search started LDMEngine"))
+    monkeypatch.setattr(workflow, "LDMEngine", lambda *_args, **_kwargs: pytest.fail("native search started LDMEngine"))
     args = arguments(tmp_path, protocol(method, backend=backend))
     run = tmp_path / "run"
     assert main(args) == 0

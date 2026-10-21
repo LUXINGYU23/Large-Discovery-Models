@@ -99,8 +99,8 @@ LDM 模式仅增加既有授权反馈；结果仍按最终提交报告，不使�
 - [x] Iron Mind 将主研究、侧枝及 policy 装配移入已有 runtime 模块，主流程仅组合科学组件。
 - [x] SynthonBench 完成同类整理，保留其特征编码、合法反应空间及产品身份规则。
 - [x] 检查两者重复逻辑；只合并稳定且任务无关的部分，优先复用现有 `MeasuredResearchExpander`。
-- [ ] AlphaBench 集中管理 Harness、policy 客户端和 Host 工具服务的启动、绑定与关闭。
-- [ ] 减少 AlphaBench 主流程中通过可变字典和转发对象连接组件的逻辑，保持 Host 授权及 native 执行路径。
+- [x] AlphaBench 集中管理 Harness、policy 客户端和 Host 工具服务的启动、绑定与关闭。
+- [x] 减少 AlphaBench 主流程中通过可变字典和转发对象连接组件的逻辑，保持 Host 授权及 native 执行路径。
 - [ ] 核对 NucleoBench、ReaSyn 的入口、装配和已完成恢复路径，移除遗留绕行。
 
 验收：三个任务分别完成默认 2+2 的端到端合成 Harness 验证；检查独立 session、4fork
@@ -111,6 +111,9 @@ ReaSyn 保留补充 minibatch 和投影结果到原提案的归因，NucleoBench
 
 Iron Mind、SynthonBench 与共享树测试 206 通过，记录为 `p2-measured.xml`。
 装配复用已有协调器，任务特有 adapter 参数仍留在各自 runtime 中。
+AlphaBench、Campaign 和六任务研究树适配测试 265 通过、110 跳过，记录为 `p2-alpha.xml`。
+AlphaBench 直接装配共享 LDMEngine，复用 `CampaignRequest.open_runtime` 的原有预算／身份逻辑，
+已删除延迟绑定字典与 evaluator 转发类；故障测试验证客户端与 Host socket 一起关闭。
 
 ### P3：收敛共享执行与恢复逻辑
 

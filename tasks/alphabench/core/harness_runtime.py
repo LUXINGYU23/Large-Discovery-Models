@@ -4,6 +4,10 @@ import os
 import tempfile
 from dataclasses import replace
 from pathlib import Path
+from contextlib import ExitStack
+
+from ldm_tts.contracts.evaluation import EvaluationPaused
+from ldm_tts.harness import HarnessError
 
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (HarnessClient, HarnessLimits, HarnessMcpServer, HarnessMcpValue,
@@ -123,7 +127,6 @@ def build_policy_harness(protocol, gateway, adapter, meter, *, api_key, sidecar_
         api_key=api_key, config=config, response_timeout_seconds=protocol.request_timeout + 1800)
 
     def authorize(request):
-        from ldm_tts.contracts.evaluation import EvaluationPaused
         try:
             return meter.authorize(request)
         except ValueError as exc:
@@ -134,3 +137,27 @@ def build_policy_harness(protocol, gateway, adapter, meter, *, api_key, sidecar_
         root=artifact_root, account=None, recovery_budget=lambda: 3600.0,
         provider_authorizer=authorize)
     return client, controller
+
+
+def open_proposals(protocol, gateway, collection, *, api_key, sidecar_image, stack: ExitStack):
+    client, tools, expander = build_harness(protocol, gateway, collection,
+        api_key=api_key, sidecar_image=sidecar_image)
+    stack.callback(tools.close)
+    stack.callback(client.close)
+    try:
+        if expander.coordinator is None:
+            client.start()
+    except HarnessError as exc:
+        raise EvaluationPaused("Harness startup failed: " + str(exc), status="paused_harness") from exc
+    return expander
+
+
+def open_policy(protocol, gateway, selector, meter, *, api_key, sidecar_image, stack: ExitStack):
+    client, controller = build_policy_harness(protocol, gateway, selector.adapter, meter,
+        api_key=api_key, sidecar_image=sidecar_image)
+    stack.callback(client.close)
+    try:
+        client.start()
+    except HarnessError as exc:
+        raise EvaluationPaused("policy Harness startup failed: " + str(exc), status="paused_policy") from exc
+    selector.bind(controller, meter, gateway)

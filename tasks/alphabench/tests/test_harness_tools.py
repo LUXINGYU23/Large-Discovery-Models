@@ -1,4 +1,5 @@
 import json
+from contextlib import ExitStack
 import socket
 import tempfile
 from pathlib import Path
@@ -7,6 +8,8 @@ import pytest
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.contracts.evaluation import EvaluationResult, Observation
+from ldm_tts.contracts.evaluation import EvaluationPaused
+from ldm_tts.harness import HarnessClient, HarnessError
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.engine.run_store import CampaignRuntime
 from tasks.alphabench.core.candidate import FactorDomain
@@ -15,6 +18,31 @@ from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness_tools import HarnessToolService, check_position
 from tasks.alphabench.core import harness_runtime
 from tasks.alphabench.core.protocol import T3Protocol
+
+
+def test_start_failure_closes_client_and_host_socket(tmp_path, monkeypatch):
+    created = []
+    start = HarnessClient.start
+
+    def fail_start(client):
+        created.append(client)
+        raise HarnessError("startup failed")
+
+    monkeypatch.setattr(HarnessClient, "start", fail_start)
+    monkeypatch.setenv("ALPHABENCH_RUNTIME_ROOT", tempfile.gettempdir())
+    protocol = T3Protocol(method="harness")
+    runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={})
+    gateway = OracleGateway(protocol, runtime, mock=True)
+    socket_root = Path(tempfile.gettempdir()) / "sockets"
+    before = set(socket_root.glob("t3-*"))
+    with pytest.raises(EvaluationPaused, match="Harness startup failed"):
+        with ExitStack() as stack:
+            harness_runtime.open_proposals(protocol, gateway, AcceptedActions(runtime.run_dir),
+                api_key="test-only", sidecar_image="ldm-pi-t3:local", stack=stack)
+    assert set(socket_root.glob("t3-*")) == before
+    assert runtime.budget.counters == {}
+    with pytest.raises(HarnessError, match="closed"):
+        start(created[0])
 
 
 def call(service, tool, **arguments):
