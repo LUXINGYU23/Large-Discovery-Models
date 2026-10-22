@@ -222,25 +222,19 @@ class CampaignRequest:
 
     def open_runtime(self, task_spec: LDMTaskSpec) -> CampaignRuntime:
         """Open the durable runtime before assembling runtime-dependent adapters."""
-        runtime = CampaignRuntime.open(
+        return CampaignRuntime.open(
             Path(self.run_dir),
             task=task_spec.task,
             run_id=self.run_id,
             config=dict(self.config),
             task_spec=task_spec,
-            # Resumed campaigns may intentionally extend absolute limits. Load the
-            # persisted ledger first, then apply the new recipe below.
-            budget_limits=(None if self.resume else self.budget.runtime_limits()),
+            budget_limits=self.budget.runtime_limits(),
+            allow_budget_extension=True,
             contract_snapshot=self.contract_snapshot,
             contract_sha256=self.contract_sha256,
             contract_profile=self.contract_profile,
             resume=bool(self.resume),
         )
-        # Update absolute limits without discarding the resumed ledger's counters.
-        runtime.budget.limits = self.budget.runtime_limits()
-        runtime.budget.write()
-
-        return runtime
 
 
 @dataclass(frozen=True)

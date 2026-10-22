@@ -690,7 +690,6 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
         metadata={
             "method": args.method,
             "init_strategy": args.init_strategy,
-            "budget": int(args.budget),
             "init_size": int(args.init_size),
         },
     )

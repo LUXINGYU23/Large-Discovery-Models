@@ -158,6 +158,17 @@ flags and accounting remain in task records and native traces, outside the panel
 replay identity: `usage.validationSubmissions` counts validations in the current
 client call and can be zero when an already-committed turn is replayed. Building
 the panel does not alter the original turn result or its accounting.
+AlphaBench generation receipts likewise verify the accepted turn and submission
+identity on replay, and reuse the original accounting without charging the turn
+or its validation again.
+
+Campaign resume checks the frozen scientific configuration and task spec before
+changing durable state. Launch paths and resume flags may differ; scientific
+settings such as acquisition parameters, seeds and evaluator settings must match.
+The shared campaign API permits monotonic extensions of the same budget limits,
+recording old and new limits in the resume event. `config.json` remains the initial
+snapshot; `budget.json` records current limits and cumulative consumption.
+
 Research `max_output_tokens` stops, failed compactions and unknown provider
 outcomes retain the existing recovery guards. A strategy never clears them or
 adds retries. Research request overrides and native-summary parameters remain

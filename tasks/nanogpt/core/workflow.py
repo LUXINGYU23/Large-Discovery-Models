@@ -1550,17 +1550,27 @@ async def async_main(argv: list[str] | None = None) -> int:
             f"features={list(engine.operation_schema.parameters)} "
             f"feature_dim={operation_representation_dimension(engine.operation_schema)}"
         )
+    campaign_args = argparse.Namespace(**vars(args))
+    campaign_args.train_file = train_file.resolve()
+    campaign_args.operation_schema = None if operation_schema is None else operation_schema.path
+    if resume_info is not None:
+        frozen = json.loads((out_dir / "config.json").read_text(encoding="utf-8"))
+        # Active features and completed warmup are restored execution state, not a new recipe.
+        for name in (
+            "initial_operation_features", "max_active_operation_features",
+            "warmup", "evaluate_root", "operation_schema",
+        ):
+            if name not in args._explicit_options:
+                value = frozen[name]
+                setattr(campaign_args, name, Path(value) if name == "operation_schema" and value else value)
+    campaign_schema = resolve_operation_schema(campaign_args, project_root)
     ldm_task_spec = describe_ldm_task(
-        args,
-        operation_schema,
-        active_operation_schema,
+        campaign_args,
+        campaign_schema,
+        None if campaign_schema is None else initial_active_operation_schema(campaign_schema, campaign_args),
         effective_method=effective_method,
     )
     ldm_task_spec_dict = ldm_task_spec.to_dict()
-    (out_dir / "ldm_task_spec.json").write_text(
-        json.dumps(ldm_task_spec_dict, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
     logger.write(
         "ldm_task_spec "
         f"candidate_domain={ldm_task_spec.candidate_domain.name} "
@@ -1700,7 +1710,7 @@ async def async_main(argv: list[str] | None = None) -> int:
     campaign = await async_run_campaign(
         CampaignRequest(
             run_dir=out_dir,
-            config=_jsonable_args(args),
+            config={**_jsonable_args(campaign_args), "buffer": str(buffer_path), "feedback_tsv": str(feedback_path)},
             resume=resume_info is not None and (out_dir / "campaign.json").exists(),
             state=engine_state,
             budget=CampaignBudget(
@@ -1837,7 +1847,7 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
             {
                 key: str(value) if isinstance(value, Path) else value
                 for key, value in vars(args).items()
-                if key not in {"api_key", "operation_schema_object"}
+                if key not in {"api_key", "operation_schema_object"} and not key.startswith("_")
             },
             default=str,
         )
@@ -2936,7 +2946,6 @@ def describe_ldm_task(
         metadata={
             "generator": args.generator,
             "method": method,
-            "iterations": int(args.iterations),
             "warmup": int(args.warmup),
             "seed_policy": args.seed_policy,
         },

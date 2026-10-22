@@ -159,6 +159,25 @@ def test_resume_extends_campaign_through_engine_checkpoint(tmp_path):
     assert event_types.count("campaign_resumed") == 1
 
 
+@pytest.mark.parametrize("evolve", [False, True])
+def test_resume_restores_execution_state_without_changing_frozen_recipe(tmp_path, evolve):
+    options = {"initial_expansion_parameters": "1", "mock_expand_every": 1} if evolve else {}
+    argv = _mock_argv(tmp_path, "minimal_resume", **options)
+    if evolve:
+        argv.remove("--disable-expansion-schema-updates")
+    assert workflow.main(argv) == 0
+    run_dir = tmp_path / "minimal_resume"
+    original = {name: (run_dir / name).read_bytes() for name in ("config.json", "ldm_task_spec.json")}
+    assert workflow.main(["--project-root", str(PROJECT_ROOT), "--resume-from", str(run_dir),
+                          "--iterations", "1"]) == 0
+    assert all((run_dir / name).read_bytes() == data for name, data in original.items())
+    assert len(json.loads((run_dir / "model_based_summary.json").read_text())["iterations"]) == 3
+    with pytest.raises(ValueError, match="resume scientific configuration mismatch"):
+        workflow.main(["--project-root", str(PROJECT_ROOT), "--resume-from", str(run_dir),
+                       "--iterations", "1", "--gp-beta", "9"])
+    assert all((run_dir / name).read_bytes() == data for name, data in original.items())
+
+
 def test_warmup_and_engine_share_max_real_evaluation_cap(tmp_path):
     assert (
         workflow.main(

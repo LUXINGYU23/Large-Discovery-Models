@@ -51,6 +51,24 @@ def test_reservoir_and_surrogate_are_distinct() -> None:
     assert len(selection.selected_candidate_ids) == 1
 
 
+def test_resume_freezes_scientific_config_and_allows_budget_extension(tmp_path, capsys):
+    from tasks.causal_discovery_discrete.core.workflow import main
+
+    assert main(["--mock", "--iterations", "1", "--out-dir", str(tmp_path),
+                 "--run-name", "campaign", "--acquisition-beta", "1"]) == 0
+    capsys.readouterr()
+    run = tmp_path / "campaign"
+    before = {path: path.read_bytes() for path in run.rglob("*") if path.is_file()}
+    resumed = ["--mock", "--iterations", "2", "--resume-from", str(run)]
+    with pytest.raises(ValueError, match="resume scientific configuration mismatch"):
+        main([*resumed, "--acquisition-beta", "9"])
+    assert {path: path.read_bytes() for path in run.rglob("*") if path.is_file()} == before
+    assert main([*resumed, "--acquisition-beta", "1"]) == 0
+    assert json.loads((run / "checkpoint.json").read_text())["state"]["next_round"] == 2
+    assert (run / "config.json").read_bytes() == before[run / "config.json"]
+    assert (run / "ldm_task_spec.json").read_bytes() == before[run / "ldm_task_spec.json"]
+
+
 def test_task_spec_has_no_placeholders() -> None:
     payload = json.dumps(describe_ldm_task(parse_args(["--mock"])).to_dict(), sort_keys=True)
     assert "replace" + "_me" not in payload
