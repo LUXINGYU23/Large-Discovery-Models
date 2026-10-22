@@ -201,11 +201,13 @@ class ResearchCoordinator:
         panel = {k: prepared[k] for k in ("main_turn_id", "brief", "history_count", "history_digest")}
         panel.update(round_index=prepared["plan"]["identity"]["round_index"],
                      main_session_sha256=prepared["source"].session_sha256,
-                     proposals=proposals, sessions=list(sessions.values()),
+                     proposals=proposals,
+                     sessions=[{k: v for k, v in sessions[a["profile_id"]].items() if k != "replayed"}
+                               for a in prepared["plan"]["assignments"]],
                      fork_plan=prepared["plan"]["assignments"],
                      status="branches_closed; selection_and_evaluation_follow")
         path = prepared["root"] / "panel.json"
-        if path.exists() and json.loads(path.read_text(encoding="utf-8")) != panel:
+        if path.exists() and canonical_sha256(json.loads(path.read_text(encoding="utf-8"))) != canonical_sha256(panel):
             raise ValueError("Committed research panel changed on replay")
         atomic_json_write(path, panel)
 

@@ -1,6 +1,7 @@
 """Exercise task factories and native-snapshot orchestration without provider calls."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -11,8 +12,9 @@ from ldm_tts.harness import (HarnessSubmissionRequest, HarnessSubmittedArtifact,
 
 
 class NativeFixture:
-    def __init__(self, command, *, config, payload, events, **kwargs):
+    def __init__(self, command, *, config, payload, events, commits, **kwargs):
         self.config, self.payload, self.events = config, payload, events
+        self.commits = commits
         mounts = [command[i + 1] for i, value in enumerate(command) if value == "--mount"]
         self.root = Path(next(m.split("src=", 1)[1].split(",", 1)[0] for m in mounts if "dst=/artifacts" in m))
 
@@ -33,6 +35,12 @@ class NativeFixture:
     def run_turn(self, turns, *, submission_validator, **kwargs):
         results = []
         for turn in turns:
+            key = (self.root, turn.profile_id, turn.turn_id)
+            if key in self.commits:
+                committed = self.commits[key]
+                assert committed.input_digest == turn.input_digest
+                results.append(replace(committed, replayed=True))
+                continue
             self.events.append((self.root, self.config, turn))
             session = self.root / "sessions" / turn.profile_id
             (session / "workspace").mkdir(parents=True, exist_ok=True)
@@ -60,13 +68,14 @@ class NativeFixture:
                 usage={"providerCalls": 0, "toolCalls": {"read": 1}}, tool_budget={},
                 artifacts={"session": (session / "session.jsonl").relative_to(self.root).as_posix()},
             ))
+            self.commits[key] = results[-1]
         return tuple(results)
 
 
 def install_fixture(monkeypatch, module, payload):
-    events = []
+    events, commits = [], {}
     monkeypatch.setattr(module, "HarnessClient", lambda command, **kwargs:
-        NativeFixture(command, payload=payload, events=events, **kwargs))
+        NativeFixture(command, payload=payload, events=events, commits=commits, **kwargs))
     return events
 
 
@@ -140,6 +149,113 @@ def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys,
     assert len(events) == 10
     provenance = json.loads((root / "harness_provenance.json").read_text())
     assert len(provenance["pools"]) == 3
+
+
+@pytest.mark.parametrize("method", ["harness", "ldm_harness", "harness_public_audit"])
+def test_atomworld_replays_committed_panel_after_task_write_or_audit_failure(tmp_path, monkeypatch, method):
+    from tasks.atomworld.core import harness, harness_runtime, optimization_policy, workflow_args
+    from tasks.atomworld.core.data import TASK_ROOT
+    from tasks.atomworld.core.proposals import extract_cif
+
+    fixture = json.loads((TASK_ROOT / "resources/mock_fixture.json").read_text())
+    sample = fixture["public"][0]
+    cif = extract_cif(fixture["mock_outputs"][sample["sample_id"]][0])
+    events = install_fixture(monkeypatch, harness_runtime,
+        lambda root, turn: ("answer.cif", cif, {"rationale": "Public geometry only."}))
+    args = workflow_args.parse_args(["--mock", "--search-method", method, "--iterations", "2",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model-name", "fixture",
+        "--harness-cache-dir", str(tmp_path / "cache"), "--out-dir", str(tmp_path / "run")])
+    def create():
+        return harness.AtomWorldHarnessExpander([sample], args, tmp_path / "run",
+            client_factory=harness_runtime.create_client)
+    request = ExpansionRequest(round_idx=0, reservoir_size=1)
+    original_write = harness.write_json
+    def interrupted_write(path, value):
+        if path.parent.name in {"attempts", "proposal_pools"}:
+            raise OSError("interrupted after panel commit")
+        return original_write(path, value)
+    def interrupted_audit(*args):
+        raise OSError("interrupted after panel commit")
+    if method == "harness_public_audit":
+        monkeypatch.setattr(optimization_policy, "select_public_answer", interrupted_audit)
+    else:
+        monkeypatch.setattr(harness, "write_json", interrupted_write)
+    expander = create()
+    with pytest.raises(OSError, match="interrupted after panel commit"):
+        expander.expand(request)
+    expander.close()
+    panel_path, = (tmp_path / "run").glob("harness/sample_*/branches/round_0001/panel.json")
+    committed_panel = panel_path.read_bytes()
+    monkeypatch.setattr(harness, "write_json", original_write)
+    monkeypatch.setattr(optimization_policy, "select_public_answer", lambda *args: (0, {"method": "fixture"}))
+    resumed = create()
+    try:
+        result = resumed.expand(request)
+        assert result.proposals
+        assert [p.payload for p in resumed.expand(request).proposals] == [p.payload for p in result.proposals]
+    finally:
+        resumed.close()
+    assert len(events) == 5
+    assert panel_path.read_bytes() == committed_panel
+    assert all("replayed" not in row for row in json.loads(committed_panel)["sessions"])
+
+
+@pytest.mark.parametrize("changed_submission", [False, True])
+def test_reasyn_replays_committed_panel_but_rejects_changed_submission(tmp_path, monkeypatch, changed_submission):
+    from ldm_tts.transport import ProposalRequest
+    from ldm_tts.harness.research_runtime import ResearchCoordinator, main_research_profile, research_contract
+    from tasks.reasyn.core import harness, harness_runtime
+    from tasks.reasyn.core.workflow_args import parse_args
+
+    args = parse_args(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+        "--harness-cache-dir", str(tmp_path / "cache")])
+    args.provider_api_key = "fixture"
+    def payload(root, turn):
+        data = json.loads(turn.message.split("\n", 1)[1])
+        return "candidates.json", json.dumps({"candidates": [
+            {"target_smiles": "CCO", "rationale": "Projected hypothesis."}
+            for _ in range(data["candidate_count"])]}), {}
+    events = install_fixture(monkeypatch, harness_runtime, payload)
+    root = tmp_path / "harness"
+    def create(location, **kwargs):
+        return harness_runtime.create_client(args, location, "fixture", "", **kwargs)
+    def source():
+        client = create(root)
+        coordinator = ResearchCoordinator(root, args._research_strategy, client.config.profiles,
+            lambda: create(root / "main", session_profiles=main_research_profile(root / "main", client.config.profiles[0]),
+                           contract=research_contract()))
+        return harness.HarnessTargetSource(client, root, args, coordinator=coordinator,
+            branch_client=lambda location, sources: create(location, fork_sources=sources))
+    request = ProposalRequest(messages=({"role": "user", "content": "fixture"},),
+        metadata={"count": 4, "round_idx": 0, "history": []})
+    original_write = harness.atomic_json_write
+    def interrupted_write(path, value):
+        if path.name == "response.json":
+            raise OSError("interrupted after panel commit")
+        return original_write(path, value)
+    monkeypatch.setattr(harness, "atomic_json_write", interrupted_write)
+    with pytest.raises(OSError, match="interrupted after panel commit"):
+        source().propose(request)
+    panel_path = root / "branches/round_0001/panel.json"
+    if changed_submission:
+        panel = json.loads(panel_path.read_text())
+        panel["sessions"][0]["submission_digest"] = "0" * 64
+        panel_path.write_text(json.dumps(panel))
+    committed_panel = panel_path.read_bytes()
+    monkeypatch.setattr(harness, "atomic_json_write", original_write)
+    resumed = source()
+    if changed_submission:
+        with pytest.raises(ValueError, match="Committed research panel changed"):
+            resumed.propose(request)
+        assert not list(root.glob("proposal_turns/**/response.json"))
+    else:
+        response = resumed.propose(request)
+        assert len(json.loads(response.text)["candidates"]) == 4
+        assert resumed.propose(request) == response
+        assert all("replayed" not in row for row in json.loads(committed_panel)["sessions"])
+    assert panel_path.read_bytes() == committed_panel
+    assert len(events) == 5
 
 
 @pytest.mark.parametrize("method", ["harness", "ldm_harness"])
