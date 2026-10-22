@@ -9,6 +9,7 @@ import os
 import re
 import shlex
 import sys
+import traceback
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -79,7 +80,12 @@ def main(argv: list[str] | None = None) -> int:
         if not args.skip_preflight:
             preflight_plan(plan)
         print(f"[ldm-tts] {plan['name']}: {plan['command_display']}")
-        return_code = run_plan(plan)
+        try:
+            return_code = run_plan(plan)
+        except Exception:
+            print(f"[ldm-tts] {plan['name']} failed:", file=sys.stderr)
+            traceback.print_exc()
+            return_code = 1
         if return_code != 0:
             failures.append((plan["name"], return_code))
             if not args.keep_going:

@@ -317,6 +317,49 @@ class TestRunnerHelpers:
             with pytest.raises(SystemExit, match="has no main"):
                 run_plan(plan)
 
+    @pytest.mark.parametrize("error,keep_going", [
+        (RuntimeError("task failure"), False),
+        (RuntimeError("task failure"), True),
+        (KeyboardInterrupt(), True),
+        (SystemExit(130), True),
+    ])
+    def test_suite_failure_and_cancellation_restore_process_state(self, tmp_path, monkeypatch, capsys, error, keep_going):
+        original_cwd = Path.cwd()
+        monkeypatch.setenv("RUNNER_SUITE_TEST", "outer")
+        calls = []
+
+        def task_main(argv):
+            name = os.environ["RUNNER_SUITE_TEST"]
+            assert Path.cwd() == tmp_path / name
+            calls.append(name)
+            if name == "first":
+                raise error
+            return 0
+
+        monkeypatch.setitem(sys.modules, "runner_test_task", SimpleNamespace(main=task_main))
+        experiments = []
+        for name in ("first", "second"):
+            directory = tmp_path / name
+            directory.mkdir()
+            experiments.append({"name": name, "task": "iron_mind", "mode": "mock",
+                "runner": {"module": "runner_test_task", "cwd": str(directory)},
+                "env": {"RUNNER_SUITE_TEST": name}})
+        config = tmp_path / "suite.json"
+        config.write_text(json.dumps({"experiments": experiments}), encoding="utf-8")
+        argv = [str(config)] + (["--keep-going"] if keep_going else [])
+
+        if isinstance(error, Exception):
+            assert main(argv) == 1
+            diagnostic = capsys.readouterr().err
+            assert "first failed:" in diagnostic and "RuntimeError: task failure" in diagnostic
+            assert calls == (["first", "second"] if keep_going else ["first"])
+        else:
+            with pytest.raises(type(error)):
+                main(argv)
+            assert calls == ["first"]
+        assert Path.cwd() == original_cwd
+        assert os.environ["RUNNER_SUITE_TEST"] == "outer"
+
     def test_preflight_skips_mock_plans(self) -> None:
         with patch("ldm_tts.cli.runner.check_plan") as check_plan_mock:
             assert preflight_plan({"task": "nanogpt", "mode": "mock"}) == []

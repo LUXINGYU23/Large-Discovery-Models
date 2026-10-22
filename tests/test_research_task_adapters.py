@@ -117,13 +117,16 @@ def test_published_profiles_budget_for_main_research(task):
 
 
 @pytest.mark.parametrize("task", ["iron_mind", "synthonbench"])
-def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys, task):
+def test_measured_task_suite_keeps_going_after_harness_failure(tmp_path, monkeypatch, capsys, task):
     from importlib import import_module
+    from ldm_tts.cli import runner
+    from ldm_tts.harness import HarnessError
+
     workflow = import_module(f"tasks.{task}.core.workflow")
     argv = ["--mock", "--search-method", "ldm_harness", "--proposal-mode", "none",
             "--iterations", "2", "--proposal-samples", "4", "--harness-candidates-per-session", "1",
             "--bo-pool-size", "2", "--llm-url", "http://fixture.invalid/v1", "--llm-model-name", "fixture",
-            "--api-key", "fixture", "--out-dir", str(tmp_path)]
+            "--api-key", "fixture"]
     args = workflow.parse_args(argv)
     if task == "iron_mind":
         table = workflow._load_table(args)
@@ -137,17 +140,28 @@ def test_measured_task_workflow_uses_default_tree(tmp_path, monkeypatch, capsys,
         candidates = [{"reaction_id": reaction, "synthon_ids": list(ids)} for ids in product(
             *(ordered_synthon_ids(space, reaction, pos) for pos in ordered_positions(space, reaction)))]
     def payload(root, turn):
+        if tmp_path / "unavailable" in root.parents:
+            raise HarnessError("sidecar unavailable", retryable=False)
         candidate = {**candidates[turn.round_index], "change_summary": "Test a measured alternative.",
                      "rationale": "Use the task feedback to test this candidate."}
         return "candidates.json", json.dumps({"candidates": [candidate]}), {}
     events = install_fixture(monkeypatch, import_module(f"tasks.{task}.core.harness_runtime"), payload)
-    assert workflow.main(argv) == 0
-    root = Path(json.loads(capsys.readouterr().out)["run_dir"])
+    config = tmp_path / "suite.json"
+    config.write_text(json.dumps({"experiments": [
+        {"name": name, "task": task, "mode": "mock",
+         "extra_args": argv + ["--out-dir", str(tmp_path / name)]}
+        for name in ("unavailable", "completed")
+    ]}), encoding="utf-8")
+    assert runner.main([str(config), "--keep-going"]) == 1
+    diagnostic = capsys.readouterr().err
+    assert "unavailable failed:" in diagnostic and "sidecar unavailable" in diagnostic
+    checkpoint, = (tmp_path / "completed").glob("*/checkpoint.json")
+    root = checkpoint.parent
     check_tree(root / "harness", 2)
     counters = json.loads((root / "budget.json").read_text())["counters"]
     assert counters["harness_turns"] == 10 and counters["main_research_turns"] == 2
     assert counters["proposal_attempts"] == 8 and counters["benchmark_jobs"] == 2
-    assert len(events) == 10
+    assert len([event for event in events if root in event[0].parents]) == 10
     provenance = json.loads((root / "harness_provenance.json").read_text())
     assert len(provenance["pools"]) == 3
 
