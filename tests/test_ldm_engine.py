@@ -1029,23 +1029,27 @@ def test_zero_initial_budget_does_not_call_provider_or_evaluator(tmp_path, budge
     assert runtime.budget.counters.get("outer_iterations", 0) == 0
 
 
+@pytest.mark.parametrize("durable_receipt", [False, True])
 @pytest.mark.parametrize("batched", [False, True])
 @pytest.mark.parametrize("interrupt_after_result_charge", [False, True])
-def test_paid_batch_recovers_only_reserved_candidates_without_new_research(tmp_path, monkeypatch, batched, interrupt_after_result_charge):
+def test_paid_batch_recovers_only_reserved_candidates_without_new_research(
+    tmp_path, monkeypatch, batched, interrupt_after_result_charge, durable_receipt,
+):
     from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY
     calls, expansions = [], []
     class Evaluator:
-        def evaluation_attempt_usage_key(self, candidate):
-            return candidate.canonical_key
         def evaluate(self, candidate):
+            calls.append(candidate.payload)
             path = tmp_path / f"receipt-{candidate.payload}.json"
             if path.exists():
                 return EvaluationResult(**json.loads(path.read_text()))
-            calls.append(candidate.payload)
             result = EvaluationResult(candidate.candidate_id, "succeeded", {"score": 1},
-                metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: candidate.canonical_key}, resource_usage={"benchmark_jobs": 1})
+                metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: candidate.canonical_key} if durable_receipt else {},
+                resource_usage={"benchmark_jobs": 1})
             atomic_json_write(path, result.to_dict())
             return result
+    if durable_receipt:
+        Evaluator.evaluation_attempt_usage_key = lambda self, candidate: candidate.canonical_key
     if batched:
         Evaluator.evaluate_batch = lambda self, candidates: tuple(self.evaluate(c) for c in candidates)
     def expand(request):
@@ -1061,7 +1065,7 @@ def test_paid_batch_recovers_only_reserved_candidates_without_new_research(tmp_p
     interrupted = False
     def crash(executor, state, candidate, evaluation, round_idx):
         nonlocal interrupted
-        if candidate.payload == 1 and not interrupted:
+        if candidate.payload == 2 and not interrupted:
             interrupted = True
             if interrupt_after_result_charge:
                 record(executor, state, candidate, evaluation, round_idx)

@@ -259,3 +259,53 @@ AlphaBench 的两个对照 campaign 在两版代码中使用同一组固定 UUID
 
 NucleoBench 和 ReaSyn 的既有装配、完成后恢复、候选测量及投影归因路径已在全量测试中核验。
 现有共享协调器足够表达任务差异；没有增加任务基类、插件注册层、兼容 wrapper 或新依赖。
+
+## 全面复审（2026-10-22）
+
+复审范围为 `165f048f..7fefe29b` 的 12 次提交及相关调用方。在已审查和验证的范围内，未发现本轮重构引入的功能回归。
+生产代码未修改；本次仅加强恢复测试并记录独立验证结果。
+
+静态审查逐项核对了六任务的装配和资源关闭、共享引擎的持久化顺序、协议错误与响应校验、
+Pi 提交和 fork 初始化，以及移动实现的调用方。34 个移动函数／类中，33 个在明确的命名替换、
+checkpoint 调用展开和删除未使用返回值后 AST 一致；剩余一项将相同的 API key 环境读取表达式
+提取为已有函数，人工核对一致。身份检查、默认 2+2、候选与评估预算、私有反馈边界均保留。
+
+发现并修正了恢复测试的一个盲点：假 evaluator 的缓存会隐藏重复进入 `evaluate`。
+现有测试现在记录每次调用，覆盖有／无持久回执，并在第一条结果发布前后注入中断，
+核对剩余批量结果、选择顺序和四类费用计数。在独立测试副本中故意只保存批量第一条结果，
+四个批量场景均按预期失败，确认断言能够识别未提交后缀丢失；该故障未写入生产代码。
+
+所有执行位于新的远程目录：
+`/mnt/data1/Large-Discovery-Models/research/convergence-review-20261022`。
+
+| 验证 | 结果 | 记录 |
+| --- | --- | --- |
+| 根测试及非 Antibody 任务 | 1778 通过、128 跳过 | `review-python.xml` |
+| Antibody 声明的 GP 依赖组合 | 212 通过 | `review-antibody.xml` |
+| 强化后的共享引擎恢复测试 | 83 通过 | `review-engine-refined.xml` |
+| 固定 AlphaBench 上游资产 | 345 通过、9 跳过 | `review-alpha.xml` |
+| 容器 Host MCP／隔离 policy | 16 通过 | `review-sidecar.xml` |
+| Pi 初始化与 guest 文件／工具／网络隔离 | 2 通过 | `review-guest.xml` |
+| Pi 构建、测试、未使用符号检查 | 45 通过 | `review-pi.log`、`review-typescript-unused.log` |
+| 根与 nanoGPT 核心分支覆盖率 | 82.06%，满足 80% 门槛 | `coverage.json` |
+| 同输入的基线／当前行为对照 | 356 组配置、23 个 campaign 及完成后恢复一致 | `behavior-*/behavior.json`、`reasyn-*/behavior.json` |
+| 任务注册 | 0 错误 | `task-registration.json` |
+
+各测试集合有重叠，不累加计数。全量测试与覆盖率先于恢复测试的四个新增参数组合，
+之后单独重跑了完整引擎测试文件。覆盖率工具按仓库锁定版本安装到本次隔离目录，
+未修改共享依赖环境。跨日期直接比较旧输出曾出现 ReaSyn 默认外部资源路径及派生回执差异；
+在同一父目录重新运行基线后逐字段一致，没有忽略或重写回执身份。
+
+此前受阻的 Pi 初始化和 guest 隔离已补齐。直接下载失败后，通过镜像下载 Gondolin 0.12.0 helpers
+及 libkrunfw v5.2.1 x86_64 资产，分别核对官方 registry／release 声明的 SHA-256；
+没有修改依赖源码或跳过完整性校验。下载来源、哈希和构建结果保存在 `helpers-download.json`、
+`libkrun-download.json`、`guest-build-mirror.log` 和 `guest-build.json`。
+guest recipe 为 `8435da70b7b4625c21af476cb163ffff7407b47d00da43f328fbd2493ce6f818`，
+build ID 为 `d5e84079-e4c5-53b7-adf9-5ff29842276a`。
+
+sidecar 从冻结依赖和本次 dist 重建，镜像身份与前次一致：
+`sha256:1dd015066e37330bb051e87089a88f5e3cf23ca70c57b4ff872c36eb0819f3ad`。
+补测前曾被共享主机清理，首次测试因此未启动；重建相同身份并临时保护后，两项补测均通过。
+`review-verification.json` 汇总源码、镜像 dist、guest 资产、行为对照和各测试结果。
+Antibody 的验证仍是 Python 3.11 上的声明 GP 依赖组合，不等同于完整 Python 3.9 生产环境。
+真实模型、官方检查点及部分科学后端的跳过项保留；没有调用付费 provider、启动科学实验或改写历史实验。
