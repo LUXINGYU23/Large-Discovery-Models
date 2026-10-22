@@ -77,11 +77,22 @@ def main(argv: list[str] | None = None) -> int:
 
     failures: list[tuple[str, int]] = []
     for plan in plans:
-        if not args.skip_preflight:
-            preflight_plan(plan)
-        print(f"[ldm-tts] {plan['name']}: {plan['command_display']}")
         try:
+            if not args.skip_preflight:
+                preflight_plan(plan)
+            print(f"[ldm-tts] {plan['name']}: {plan['command_display']}")
             return_code = run_plan(plan)
+        except SystemExit as exc:
+            if exc.code in (130, 143):
+                raise
+            if exc.code is None:
+                return_code = 0
+            elif isinstance(exc.code, int):
+                return_code = exc.code
+            else:
+                return_code = 1
+            if return_code:
+                print(f"[ldm-tts] {plan['name']} failed: {exc}", file=sys.stderr)
         except Exception:
             print(f"[ldm-tts] {plan['name']} failed:", file=sys.stderr)
             traceback.print_exc()

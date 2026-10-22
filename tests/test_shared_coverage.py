@@ -317,13 +317,18 @@ class TestRunnerHelpers:
             with pytest.raises(SystemExit, match="has no main"):
                 run_plan(plan)
 
-    @pytest.mark.parametrize("error,keep_going", [
-        (RuntimeError("task failure"), False),
-        (RuntimeError("task failure"), True),
-        (KeyboardInterrupt(), True),
-        (SystemExit(130), True),
+    @pytest.mark.parametrize("error,return_code", [
+        (RuntimeError("task failure"), 1),
+        (SystemExit("invalid task configuration"), 1),
+        (SystemExit(2), 2),
+        (SystemExit(None), 0),
+        (SystemExit(0), 0),
+        (KeyboardInterrupt(), None),
+        (SystemExit(130), None),
+        (SystemExit(143), None),
     ])
-    def test_suite_failure_and_cancellation_restore_process_state(self, tmp_path, monkeypatch, capsys, error, keep_going):
+    @pytest.mark.parametrize("keep_going", [False, True])
+    def test_suite_exits_restore_process_state(self, tmp_path, monkeypatch, capsys, error, return_code, keep_going):
         original_cwd = Path.cwd()
         monkeypatch.setenv("RUNNER_SUITE_TEST", "outer")
         calls = []
@@ -348,14 +353,18 @@ class TestRunnerHelpers:
         config.write_text(json.dumps({"experiments": experiments}), encoding="utf-8")
         argv = [str(config)] + (["--keep-going"] if keep_going else [])
 
-        if isinstance(error, Exception):
-            assert main(argv) == 1
+        if return_code is not None:
+            assert main(argv) == return_code
             diagnostic = capsys.readouterr().err
-            assert "first failed:" in diagnostic and "RuntimeError: task failure" in diagnostic
-            assert calls == (["first", "second"] if keep_going else ["first"])
+            if return_code:
+                assert "first failed:" in diagnostic and str(error) in diagnostic
+            else:
+                assert not diagnostic
+            assert calls == (["first", "second"] if keep_going or return_code == 0 else ["first"])
         else:
-            with pytest.raises(type(error)):
+            with pytest.raises(type(error)) as caught:
                 main(argv)
+            assert caught.value is error
             assert calls == ["first"]
         assert Path.cwd() == original_cwd
         assert os.environ["RUNNER_SUITE_TEST"] == "outer"

@@ -116,8 +116,14 @@ def test_published_profiles_budget_for_main_research(task):
             assert profile["budget"][counter] == dynamic[counter], (task, name, counter)
 
 
-@pytest.mark.parametrize("task", ["iron_mind", "synthonbench"])
-def test_measured_task_suite_keeps_going_after_harness_failure(tmp_path, monkeypatch, capsys, task):
+@pytest.mark.parametrize("task,failure,return_code", [
+    ("iron_mind", "sidecar", 1),
+    ("synthonbench", "sidecar", 1),
+    ("iron_mind", "preflight", 1),
+    ("iron_mind", "task_config", 1),
+    ("iron_mind", "argparse", 2),
+])
+def test_measured_task_suite_keeps_going_after_failure(tmp_path, monkeypatch, capsys, task, failure, return_code):
     from importlib import import_module
     from ldm_tts.cli import runner
     from ldm_tts.harness import HarnessError
@@ -140,21 +146,30 @@ def test_measured_task_suite_keeps_going_after_harness_failure(tmp_path, monkeyp
         candidates = [{"reaction_id": reaction, "synthon_ids": list(ids)} for ids in product(
             *(ordered_synthon_ids(space, reaction, pos) for pos in ordered_positions(space, reaction)))]
     def payload(root, turn):
-        if tmp_path / "unavailable" in root.parents:
+        if failure == "sidecar" and tmp_path / "unavailable" in root.parents:
             raise HarnessError("sidecar unavailable", retryable=False)
         candidate = {**candidates[turn.round_index], "change_summary": "Test a measured alternative.",
                      "rationale": "Use the task feedback to test this candidate."}
         return "candidates.json", json.dumps({"candidates": [candidate]}), {}
     events = install_fixture(monkeypatch, import_module(f"tasks.{task}.core.harness_runtime"), payload)
+    failing_argv, failing_mode = argv, "mock"
+    if failure == "preflight":
+        failing_mode = "real"
+        failing_argv = [arg for arg in argv if arg != "--mock"] + [
+            "--dataset-id", "buchwald_hartwig", "--data-dir", str(tmp_path / "absent-data")]
+    elif failure in {"task_config", "argparse"}:
+        failing_argv = argv + ["--harness-wall-time-seconds", "0" if failure == "task_config" else "not-an-int"]
     config = tmp_path / "suite.json"
     config.write_text(json.dumps({"experiments": [
-        {"name": name, "task": task, "mode": "mock",
-         "extra_args": argv + ["--out-dir", str(tmp_path / name)]}
-        for name in ("unavailable", "completed")
+        {"name": name, "task": task, "mode": mode,
+         "extra_args": task_argv + ["--out-dir", str(tmp_path / name)]}
+        for name, mode, task_argv in (("unavailable", failing_mode, failing_argv), ("completed", "mock", argv))
     ]}), encoding="utf-8")
-    assert runner.main([str(config), "--keep-going"]) == 1
+    assert runner.main([str(config), "--keep-going"]) == return_code
     diagnostic = capsys.readouterr().err
-    assert "unavailable failed:" in diagnostic and "sidecar unavailable" in diagnostic
+    assert "unavailable failed:" in diagnostic
+    assert {"sidecar": "sidecar unavailable", "preflight": "Dependency preflight failed",
+            "task_config": "harness-wall-time-seconds", "argparse": "invalid int value"}[failure] in diagnostic
     checkpoint, = (tmp_path / "completed").glob("*/checkpoint.json")
     root = checkpoint.parent
     check_tree(root / "harness", 2)
