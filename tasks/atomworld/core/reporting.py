@@ -123,12 +123,18 @@ def project_result(
             search_method == "harness_public_audit" or
             (search_method == "ldm_harness_compiled" and attempts > 1)
         ) else ("harness",)
-        write_json(run_dir / "harness_provenance.json", {
-            "schema_version": 1,
-            "pools": {kind: [p.relative_to(run_dir).as_posix()
+        pools = {}
+        for kind in kinds:
+            paths = [p
                 for pattern in ("sample_*/manifest.json", "sample_*/main/manifest.json", "sample_*/branches/round_*/manifest.json")
-                for p in sorted((run_dir / kind).glob(pattern))] for kind in kinds},
-        })
+                for p in sorted((run_dir / kind).glob(pattern))]
+            if not paths:
+                pools[kind] = []
+            for path in paths:
+                # Keep one entry per sample, in the same sample order in every pool.
+                role = Path(kind, *path.parent.relative_to(run_dir / kind).parts[1:]).as_posix()
+                pools.setdefault(role, []).append(path.relative_to(run_dir).as_posix())
+        write_json(run_dir / "harness_provenance.json", {"schema_version": 1, "pools": pools})
     with (run_dir / "trajectory.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,

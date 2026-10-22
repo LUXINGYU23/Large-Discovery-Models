@@ -13,11 +13,16 @@ from .metrics import reconstruction_metrics, top_auc, top_mean
 def write_campaign_report(args, runtime, target):
     if args.proposal_mode == "harness":
         kinds = ("harness", "policy_harness") if args.search_method == "ldm_harness_compiled" else ("harness",)
-        atomic_json_write(runtime.run_dir / "harness_provenance.json", {
-            "schema_version": 1, "pools": {kind: [p.relative_to(runtime.run_dir).as_posix()
+        pools = {}
+        for kind in kinds:
+            paths = [p
                 for pattern in ("manifest.json", "main/manifest.json", "branches/round_*/manifest.json")
-                for p in sorted((runtime.run_dir / kind).glob(pattern))] for kind in kinds},
-        })
+                for p in sorted((runtime.run_dir / kind).glob(pattern))]
+            if not paths:
+                pools[kind] = []
+            for path in paths:
+                pools[path.parent.relative_to(runtime.run_dir).as_posix()] = [path.relative_to(runtime.run_dir).as_posix()]
+        atomic_json_write(runtime.run_dir / "harness_provenance.json", {"schema_version": 1, "pools": pools})
     checkpoint = runtime.run_dir / "checkpoint.json"
     observations = load_successful_observations(checkpoint) if checkpoint.exists() else []
     events = runtime.events()
