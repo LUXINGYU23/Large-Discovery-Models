@@ -370,7 +370,8 @@ def test_reasyn_tree_workflow_and_completed_resume_preserve_budget(tmp_path, mon
     assert json.loads((root / "checkpoint.json").read_text())["state"]["observations"] == observations
 
 
-def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch):
+@pytest.mark.parametrize("interrupt", [False, True])
+def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch, interrupt):
     from tasks.alphabench.core import harness_runtime
     from tasks.alphabench.core.protocol import T3Protocol
     from tasks.alphabench.ldm_task.procedure import main
@@ -385,7 +386,25 @@ def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_pat
             for i in range(2)]}), {}
     events = install_fixture(monkeypatch, harness_runtime, payload)
     run = tmp_path / "run"
-    assert main(["--mock", "--protocol-file", str(config), "--out-dir", str(run)]) == 0
+    argv = ["--mock", "--protocol-file", str(config)]
+    if interrupt:
+        from ldm_tts.harness.research_runtime import ResearchCoordinator
+        commit = ResearchCoordinator.commit
+
+        def interrupted(self, *args, **kwargs):
+            commit(self, *args, **kwargs)
+            raise OSError("interrupted after research panel")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(ResearchCoordinator, "commit", interrupted)
+            with pytest.raises(OSError, match="after research panel"):
+                main([*argv, "--out-dir", str(run)])
+        receipts = {path: path.read_bytes() for path in (run / "generation").glob("*.json")}
+        assert len(receipts) == 4
+        assert main([*argv, "--resume-run", str(run)]) == 0
+        assert all(path.read_bytes() == data for path, data in receipts.items())
+    else:
+        assert main([*argv, "--out-dir", str(run)]) == 0
     check_tree(run / "harness", 2)
     report = json.loads((run / "result.json").read_text())
     assert report["initialization"]["seed_count"] == 1

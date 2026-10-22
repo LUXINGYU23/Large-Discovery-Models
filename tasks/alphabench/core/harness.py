@@ -239,13 +239,9 @@ class HarnessExpander:
             if receipt != {"canonical_keys": keys}:
                 raise EvaluationPaused("Harness accepted submission lacks its Host validation receipt", status="paused_harness")
             occurrences.extend((item, key, result, index) for index, (item, key) in enumerate(zip(candidates, keys)))
-            accepted_actions.append((result, candidates))
-            summaries.append({"profile_id": result.profile_id, "turn_id": result.turn_id,
-                "submission_id": result.submission_id, "usage": result.usage,
-                "tool_budget": getattr(result, "tool_budget", {}),
-                "artifacts": getattr(result, "artifacts", {}), **accounting})
+            accepted_actions.append((result, candidates, accounting))
         if self.collection:
-            for result, candidates in accepted_actions:
+            for result, candidates, _ in accepted_actions:
                 ir = make_complete_design_ir(task_id="alphabench", domain="financial factor expressions",
                     task_description="Generate causal factors using only public contract and search observations.",
                     objectives=[{"name": self.protocol.objective, "direction": "maximize"}],
@@ -261,15 +257,13 @@ class HarnessExpander:
                         "native_artifacts": getattr(result, "artifacts", {})}))
         attempts = [json.loads(path.read_text(encoding="utf-8"))
                     for path in self.attempts.root.glob("*.json")]
-        for result, candidates in accepted_actions:
-            self.gateway.host.call(lambda result=result, candidates=candidates, attempts=attempts:
-                Receipts(self.gateway.runtime.run_dir / "generation").accept(["harness", result.turn_id], {
-                    "attempt_kind": "harness_provider_calls", "attempt_count": result.usage.get("providerCalls"),
-                    "submission_attempts": sum(item["turn_id"] == result.turn_id for item in attempts),
-                    "complete": True, "occurrences": [], "candidates": candidates,
-                    "round_index": request.round_idx, "profile_id": result.profile_id,
-                    "turn_id": result.turn_id, "sidecar_usage": result.usage,
-                    "tool_budget": getattr(result, "tool_budget", {})}))
+        for result, candidates, accounting in accepted_actions:
+            record = self.gateway.host.call(lambda result=result, candidates=candidates:
+                self._record_generation(result, candidates, request.round_idx, attempts))
+            summaries.append({"profile_id": result.profile_id, "turn_id": result.turn_id,
+                "submission_id": result.submission_id, "usage": record["sidecar_usage"],
+                "tool_budget": record["tool_budget"], "artifacts": getattr(result, "artifacts", {}),
+                **accounting})
         groups = {}
         for item, key, result, index in occurrences:
             group = groups.setdefault(key, {"candidate": item, "lineage": []})
@@ -282,6 +276,24 @@ class HarnessExpander:
             selection_mode="reservoir_order" if direct else "acquisition",
             metadata={"sampling_mode": "persistent_direct_session" if direct else "persistent_parallel_sessions",
                 "occurrences": len(occurrences), "unique": len(proposals), "turns": summaries})
+
+    def _record_generation(self, result, candidates, round_idx, attempts):
+        receipts = Receipts(self.gateway.runtime.run_dir / "generation")
+        identity = ["harness", result.turn_id]
+        action = {"complete": True, "occurrences": [], "candidates": candidates,
+                  "round_index": round_idx, "profile_id": result.profile_id,
+                  "turn_id": result.turn_id, "input_digest": result.input_digest,
+                  "submission_id": result.submission_id, "submission_digest": result.submission_digest}
+        previous = receipts.load(identity)
+        if previous is not None:
+            if any(previous[key] != value for key, value in action.items()):
+                raise ValueError("accepted action identity conflict")
+            # Replays validate the same action and retain its original accounting.
+            return previous
+        return receipts.accept(identity, {**action,
+            "attempt_kind": "harness_provider_calls", "attempt_count": result.usage.get("providerCalls"),
+            "submission_attempts": sum(item["turn_id"] == result.turn_id for item in attempts),
+            "sidecar_usage": result.usage, "tool_budget": getattr(result, "tool_budget", {})})
 
     def _validate(self, submission, count, evaluated, round_idx):
         identity = [submission.turn_id, submission.attempt_index, submission.digest]

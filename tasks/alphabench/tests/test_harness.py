@@ -38,7 +38,8 @@ class FakeHarnessClient:
     def run_turn(self, turns, *, submission_validator, provider_authorizer, recovery_timeout_seconds):
         if self.committed is not None:
             assert tuple(turn.turn_id for turn in turns) == tuple(result.turn_id for result in self.committed)
-            return self.committed
+            return tuple(SimpleNamespace(**{**vars(result), "usage": {
+                **result.usage, "validationSubmissions": 0}}) for result in self.committed)
         results = []
         for turn in turns:
             body = json.dumps({"candidates": self.batches[turn.profile_id]}).encode()
@@ -56,8 +57,9 @@ class FakeHarnessClient:
                 raise HarnessError("fixture submission rejected")
             results.append(SimpleNamespace(profile_id=turn.profile_id, session_id=turn.profile_id,
                 turn_id=turn.turn_id, submission_status="accepted", submission_id="fixture-" + turn.profile_id,
+                input_digest=turn.input_digest,
                 submission_digest=submission_digest, submission=submission, submitted_artifacts=(artifact,),
-                usage={"providerCalls": 0}))
+                usage={"providerCalls": 0, "validationSubmissions": 1}))
         self.committed = tuple(results)
         return self.committed
 
@@ -79,16 +81,37 @@ def factor(name, window):
     return {"name": name, "expression": f"Mean($close,{window})"}
 
 
-def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_checks(tmp_path):
+@pytest.mark.parametrize("interrupt", [False, True])
+def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_checks(tmp_path, monkeypatch, interrupt):
     protocol, gateway, client, expander = fixture(tmp_path, "harness", {"research": [factor("a", 5)]})
     expander.collection = AcceptedActions(gateway.runtime.run_dir)
     request = ExpansionRequest(0, protocol.batch_size, context={"evaluation_budget": {"effective": 1}})
+    if interrupt:
+        from tasks.alphabench.core.receipts import Receipts
+        accept = Receipts.accept
+
+        def interrupted(self, identity, payload):
+            result = accept(self, identity, payload)
+            if self.root.name == "generation":
+                raise OSError("interrupted after generation receipt")
+            return result
+
+        with monkeypatch.context() as patch:
+            patch.setattr(Receipts, "accept", interrupted)
+            with pytest.raises(OSError, match="after generation receipt"):
+                gateway.host.run(lambda: expander.expand(request))
+    records = gateway.runtime.run_dir / "generation"
     first = gateway.host.run(lambda: expander.expand(request))
+    receipt_bytes = {path.name: path.read_bytes() for path in records.glob("*.json")}
+    budget_bytes = (gateway.runtime.run_dir / "budget.json").read_bytes()
     assert first.selection_mode == "reservoir_order"
     assert len(first.proposals) == 1 and first.proposals[0].metadata["q0"] == 1
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     second = gateway.host.run(lambda: expander.expand(request))
     assert second == first
+    assert {path.name: path.read_bytes() for path in records.glob("*.json")} == receipt_bytes
+    assert (gateway.runtime.run_dir / "budget.json").read_bytes() == budget_bytes
+    assert first.metadata["turns"][0]["usage"]["validationSubmissions"] == 1
     assert gateway.runtime.budget.counters["dynamic_checks"] == 1
     assert gateway.runtime.budget.counters["harness_turns"] == 1
     assert len(list(expander.collection.journal.root.glob("*.json"))) == 1
@@ -98,6 +121,27 @@ def test_direct_harness_uses_effective_tail_batch_and_replays_without_paid_check
     cost = generation_costs(generations)
     assert cost["unit"] == "sidecar provider calls per committed Harness turn"
     assert cost["submission_attempts_per_step"] == [1]
+
+
+@pytest.mark.parametrize("changed", ["submission_id", "submission_digest", "candidates"])
+def test_generation_replay_rejects_changed_submission(tmp_path, changed):
+    protocol, gateway, client, expander = fixture(tmp_path, "harness", {"research": [factor("a", 5)]})
+    request = ExpansionRequest(0, protocol.batch_size, context={"evaluation_budget": {"effective": 1}})
+    gateway.host.run(lambda: expander.expand(request))
+    result, = client.committed
+    if changed == "candidates":
+        body = json.dumps({"candidates": [factor("renamed", 5)]}).encode()
+        artifact, = result.submitted_artifacts
+        (client.root / artifact.snapshot_path).write_bytes(body)
+        result.submitted_artifacts = (HarnessSubmittedArtifact(artifact.path_pointer, artifact.relative_path,
+            artifact.snapshot_path, hashlib.sha256(body).hexdigest(), len(body)),)
+    else:
+        setattr(result, changed, "changed")
+        if changed == "submission_digest":
+            expander.accepted.accept([result.turn_id, "changed"],
+                {"canonical_keys": [expander.domain.admit(RawProposal(factor("a", 5), "harness")).canonical_key]})
+    with pytest.raises(ValueError, match="accepted action identity conflict"):
+        gateway.host.run(lambda: expander.expand(request))
 
 
 def test_ldm_harness_preserves_cross_session_consensus_without_random_fill(tmp_path):
