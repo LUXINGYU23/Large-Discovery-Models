@@ -198,11 +198,18 @@ class ResearchCoordinator:
 
     def commit(self, prepared, sessions, proposal_keys, *, proposals):
         self.tree.commit(prepared["plan"], sessions, proposal_keys)
+        # Delivery flags and accounting can differ when the same committed turn is replayed.
+        session_fields = {
+            "profile_id", "session_id", "turn_id", "session_turn_id", "round_index",
+            "history_from_seq", "history_to_seq", "history_digest", "input_digest",
+            "submission_status", "submission_id", "submission_digest", "submission",
+            "submitted_artifacts", "candidate_count", "artifacts",
+        }
         panel = {k: prepared[k] for k in ("main_turn_id", "brief", "history_count", "history_digest")}
         panel.update(round_index=prepared["plan"]["identity"]["round_index"],
                      main_session_sha256=prepared["source"].session_sha256,
                      proposals=proposals,
-                     sessions=[{k: v for k, v in sessions[a["profile_id"]].items() if k != "replayed"}
+                     sessions=[{k: v for k, v in sessions[a["profile_id"]].items() if k in session_fields}
                                for a in prepared["plan"]["assignments"]],
                      fork_plan=prepared["plan"]["assignments"],
                      status="branches_closed; selection_and_evaluation_follow")

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -418,6 +418,61 @@ def test_partial_session_failure_recovers_without_regenerating_committed_turns(t
     assert [r.replayed for r in results] == [True, False]
     assert [r.turn_id for r in results] == ["turn-a", "turn-b"]
     assert [r.usage["validationSubmissions"] for r in results] == [1, 1]
+
+
+@pytest.mark.parametrize("summary", [False, True], ids=["native-result", "proposal-summary"])
+def test_research_panel_replays_real_client_results_without_changing_accounting(tmp_path, monkeypatch, summary):
+    from ldm_tts.harness.research_runtime import ResearchCoordinator, proposal_turn_summary
+    from ldm_tts.harness.research_store import snapshot_fork
+    from ldm_tts.harness.research_strategy import ResearchStrategy
+    from ldm_tts.harness.research_tree import LatestMainForks
+
+    monkeypatch.setenv("HARNESS_TEST_PARTIAL_FAILURE", "1")
+    config = HarnessPoolConfig(artifact_root=tmp_path,
+        profiles=tuple(HarnessProfile(p, Path("/resources/AGENTS.md"), agents_sha256="a" * 64) for p in ("a", "b")),
+        campaign_id="fixture", task_id="fixture", case_id="fixture", seed=0,
+        submission_contract=_candidate_contract())
+    turns = tuple(HarnessTurn(p, "turn-" + p, 1, 0, 0, canonical_sha256([]), "research") for p in ("a", "b"))
+    coordinator = ResearchCoordinator(tmp_path, ResearchStrategy(LatestMainForks()), config.profiles, None)
+    workspace = tmp_path / "main/workspace"
+    workspace.mkdir(parents=True)
+    session = tmp_path / "main/session.jsonl"
+    session.write_text("main research")
+    root = tmp_path / "branches/round_0001"
+    source = snapshot_fork(session, workspace, root / "fork-source", 0)
+    prepared = {"root": root, "source": source, "plan": coordinator.tree.prepare(1, config.profiles, [], ()),
+                "main_turn_id": "main_round_0001", "brief": "Measured evidence", "history_count": 0,
+                "history_digest": canonical_sha256([])}
+    keys = {p: (p,) for p in ("a", "b")}
+    proposals = [{"payload": {"value": p}} for p in keys]
+    validated = []
+    def validate(request):
+        validated.append(request.profile_id)
+        return HarnessSubmissionValidation()
+    def records(results):
+        return {r.profile_id: proposal_turn_summary(r, 1) if summary else asdict(r) for r in results}
+    with HarnessClient((sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5) as client:
+        first = client.run_turn(turns, submission_validator=validate, recovery_timeout_seconds=5)
+        original = canonical_sha256([asdict(r) for r in first])
+        first_records = records(first)
+        coordinator.commit(prepared, first_records, keys, proposals=proposals)
+        panel = (root / "panel.json").read_bytes()
+        replayed = client.run_turn(turns, submission_validator=validate)
+        assert validated == ["a", "b"]
+        assert [r.usage["validationSubmissions"] for r in first] == [1, 1]
+        assert all(r.replayed and r.usage["validationSubmissions"] == 0 for r in replayed)
+        assert [r.usage["providerCalls"] for r in first] == [r.usage["providerCalls"] for r in replayed] == [1, 1]
+        coordinator.commit(prepared, records(replayed), keys, proposals=proposals)
+    assert canonical_sha256([asdict(r) for r in first]) == original
+    assert first_records == records(first)
+    assert (root / "panel.json").read_bytes() == panel
+    assert all(not {"usage", "replayed", "tool_budget"} & row.keys() for row in json.loads(panel)["sessions"])
+    changed = records(replayed)
+    changed["a"]["submission_id"] = "different-submission"
+    with pytest.raises(ValueError, match="Committed research panel changed"):
+        coordinator.commit(prepared, changed, keys, proposals=proposals)
+    assert (root / "panel.json").read_bytes() == panel
 
 
 @pytest.mark.parametrize("retryable,window", [(False, 10), (True, 0), (True, 0.01)])

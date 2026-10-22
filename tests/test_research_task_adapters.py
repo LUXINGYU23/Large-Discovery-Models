@@ -39,7 +39,8 @@ class NativeFixture:
             if key in self.commits:
                 committed = self.commits[key]
                 assert committed.input_digest == turn.input_digest
-                results.append(replace(committed, replayed=True))
+                results.append(replace(committed, replayed=True,
+                    usage={**committed.usage, "validationSubmissions": 0}))
                 continue
             self.events.append((self.root, self.config, turn))
             session = self.root / "sessions" / turn.profile_id
@@ -65,7 +66,7 @@ class NativeFixture:
                 input_digest=turn.input_digest, replayed=False, submission_status="accepted",
                 submission_id=turn.turn_id, submission_digest=submitted.digest,
                 submission=submission, submitted_artifacts=artifacts, validation_errors=(),
-                usage={"providerCalls": 0, "toolCalls": {"read": 1}}, tool_budget={},
+                usage={"providerCalls": 0, "toolCalls": {"read": 1}, "validationSubmissions": 1}, tool_budget={},
                 artifacts={"session": (session / "session.jsonl").relative_to(self.root).as_posix()},
             ))
             self.commits[key] = results[-1]
@@ -197,7 +198,8 @@ def test_atomworld_replays_committed_panel_after_task_write_or_audit_failure(tmp
         resumed.close()
     assert len(events) == 5
     assert panel_path.read_bytes() == committed_panel
-    assert all("replayed" not in row for row in json.loads(committed_panel)["sessions"])
+    assert all(not {"replayed", "usage", "tool_budget"} & row.keys()
+               for row in json.loads(committed_panel)["sessions"])
 
 
 @pytest.mark.parametrize("changed_submission", [False, True])
@@ -253,7 +255,8 @@ def test_reasyn_replays_committed_panel_but_rejects_changed_submission(tmp_path,
         response = resumed.propose(request)
         assert len(json.loads(response.text)["candidates"]) == 4
         assert resumed.propose(request) == response
-        assert all("replayed" not in row for row in json.loads(committed_panel)["sessions"])
+        assert all(not {"replayed", "usage", "tool_budget"} & row.keys()
+                   for row in json.loads(committed_panel)["sessions"])
     assert panel_path.read_bytes() == committed_panel
     assert len(events) == 5
 

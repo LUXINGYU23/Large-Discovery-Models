@@ -153,6 +153,11 @@ paths; do not count backup snapshots as fresh usage.
 Replay requires the same history prefix, strategy identity, parent snapshots and
 immutable turn inputs. Changed plans or corrupt snapshots fail closed. A partial
 barrier reuses committed native turns; no new plan replaces the unfinished one.
+Panel session records contain only stable turn and submission fields. Delivery
+flags and accounting remain in task records and native traces, outside the panel's
+replay identity: `usage.validationSubmissions` counts validations in the current
+client call and can be zero when an already-committed turn is replayed. Building
+the panel does not alter the original turn result or its accounting.
 Research `max_output_tokens` stops, failed compactions and unknown provider
 outcomes retain the existing recovery guards. A strategy never clears them or
 adds retries. Research request overrides and native-summary parameters remain
