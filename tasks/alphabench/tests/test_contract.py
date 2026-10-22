@@ -16,6 +16,24 @@ from tasks.alphabench.core.reporting import daily_metrics, generation_costs, sea
 from tasks.alphabench.core.selection import FactorEncoder
 
 
+@pytest.mark.parametrize("method", ["ldm_harness", "ldm_harness_compiled"])
+def test_published_harness_pilots_load_with_coverage_tree_budgets(method):
+    from ldm_tts.harness.research_strategy import load_research_strategy
+    from tasks.alphabench.core.protocol import T3Protocol
+
+    path = Path(__file__).resolve().parents[1] / "resources/protocols" / f"partial_csi300_{method}_pilot.json"
+    protocol = T3Protocol(**json.loads(path.read_text()))
+    strategy = load_research_strategy(protocol.research_strategy_config)
+    assert strategy.requires_main and strategy.fork_policy.identity()["name"] == "coverage"
+    assert protocol.sessions == 4
+    assert protocol.budgets["harness_turns"] == protocol.rounds * (protocol.sessions + 1) == 10
+    assert protocol.budgets["proposal_attempts"] >= protocol.rounds * protocol.sessions
+    assert protocol.budgets["model_requests"] >= 20 * (protocol.budgets["harness_turns"] + protocol.budgets["policy_turns"])
+    assert protocol.budgets["surrogate_queries"] >= 30 * protocol.budgets["harness_turns"]
+    assert protocol.evaluations == 2 and protocol.batch_size == 1
+    assert T3Protocol(**protocol.to_dict()).identity == protocol.identity
+
+
 @pytest.mark.parametrize("dialect,operator,signature", [
     (dialect, name, signature) for dialect in ("qlib", "assay") for name, signature in REGISTRY[dialect].items()
 ])
