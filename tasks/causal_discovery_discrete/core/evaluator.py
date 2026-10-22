@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import multiprocessing
 import os
 from pathlib import Path
 import subprocess
@@ -64,6 +65,8 @@ class MLSBenchCausalEvaluator:
         self.upstream_root = Path(upstream_root).resolve()
         self.run_dir = Path(run_dir)
         self.timeout_seconds = min(float(timeout_seconds), 3540.0)
+        if not math.isfinite(float(timeout_seconds)) or self.timeout_seconds <= 0:
+            raise ValueError("evaluation timeout must be finite and positive")
         self.evaluator_python = str(evaluator_python)
         validate_upstream_contract(self.upstream_root)
         self._prepared = self._prepare_cases()
@@ -81,19 +84,21 @@ class MLSBenchCausalEvaluator:
         }
         atomic_json_write(manifest_path, manifest)
         started = time.monotonic()
+        case_records = []
         try:
             metrics: dict[str, float] = {}
-            case_records = []
             for label, prepared in self._prepared.items():
-                estimate = _build_estimated_graph(prepared, candidate.payload["spec"])
-                values = _score_graph(prepared["true_cpdag"], estimate)
+                record = {"label": label, "status": "running"}
+                case_records.append(record)
+                values = _evaluate_case(prepared, candidate.payload["spec"], self.timeout_seconds)
                 for name, value in values.items():
                     metrics[f"{name}_{label}"] = float(value)
-                case_records.append({"label": label, "metrics": values})
+                record.update(status="succeeded", metrics=values)
             scoring = score_with_pinned_mlsbench(
                 self.upstream_root,
                 metrics,
                 evaluator_python=self.evaluator_python,
+                timeout_seconds=min(30.0, self.timeout_seconds),
             )
             metrics["official_score"] = scoring["official_score"]
             metrics["selection_score"] = scoring["official_score"]
@@ -113,7 +118,7 @@ class MLSBenchCausalEvaluator:
                 artifacts={"evaluation_manifest": self._artifact_path(manifest_path)},
                 resource_usage={
                     "wall_seconds": time.monotonic() - started,
-                    "benchmark_jobs": len(OFFICIAL_CASES),
+                    "benchmark_jobs": len(case_records),
                 },
                 metadata={
                     "evaluator": "pinned_mlsbench_causal_discovery_discrete",
@@ -122,18 +127,22 @@ class MLSBenchCausalEvaluator:
                 },
             )
         except Exception as exc:
+            status = "timed_out" if isinstance(exc, (TimeoutError, subprocess.TimeoutExpired)) else "failed"
+            if case_records and case_records[-1]["status"] == "running":
+                case_records[-1]["status"] = status
             manifest.update(
-                status="failed",
+                status=status,
+                cases=case_records,
                 error=str(exc) or repr(exc),
                 error_type=type(exc).__name__,
             )
             atomic_json_write(manifest_path, manifest)
             return EvaluationResult(
                 candidate.candidate_id,
-                "failed",
+                status,
                 error=str(exc),
                 artifacts={"evaluation_manifest": self._artifact_path(manifest_path)},
-                resource_usage={"benchmark_jobs": 0, "wall_seconds": time.monotonic() - started},
+                resource_usage={"benchmark_jobs": len(case_records), "wall_seconds": time.monotonic() - started},
                 metadata={"evaluator": "pinned_mlsbench_causal_discovery_discrete"},
             )
 
@@ -168,6 +177,47 @@ class MLSBenchCausalEvaluator:
                 "true_cpdag": dag2cpdag(dag),
             }
         return prepared
+
+
+def _case_worker(connection, prepared, spec):
+    try:
+        estimate = _build_estimated_graph(prepared, spec)
+        connection.send({"metrics": _score_graph(prepared["true_cpdag"], estimate)})
+    except Exception as exc:
+        connection.send({"error": f"{type(exc).__name__}: {exc}"})
+    finally:
+        connection.close()
+
+
+def _evaluate_case(prepared, spec, timeout_seconds):
+    # A process deadline also interrupts graph code blocked inside native libraries.
+    context = multiprocessing.get_context("spawn")
+    receiver, sender = context.Pipe(duplex=False)
+    process = context.Process(target=_case_worker, args=(sender, prepared, spec))
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        process.start()
+        sender.close()
+        if not receiver.poll(max(0, deadline - time.monotonic())):
+            raise TimeoutError(f"causal network evaluation exceeded {timeout_seconds} seconds")
+        try:
+            result = receiver.recv()
+        except EOFError as exc:
+            raise RuntimeError("causal evaluation worker exited without a result") from exc
+        if "error" in result:
+            raise RuntimeError(result["error"])
+        return result["metrics"]
+    finally:
+        receiver.close()
+        sender.close()
+        if process.pid is not None:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=1)
+            if process.is_alive():
+                process.kill()
+                process.join()
+        process.close()
 
 
 def _association_matrix(data: np.ndarray) -> np.ndarray:
@@ -276,6 +326,7 @@ def score_with_pinned_mlsbench(
     metrics: dict[str, float],
     *,
     evaluator_python: str | Path = sys.executable,
+    timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     meta = Path(upstream_root) / HARBOR_TASK_PATH / "tests" / "meta"
     source = Path(upstream_root) / HARBOR_TASK_PATH / "tests" / "mlsbench_src"
@@ -303,7 +354,7 @@ print(json.dumps({"official_score": score, "record_valid": valid,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        timeout=30,
+        timeout=timeout_seconds,
         check=False,
     )
     if completed.returncode:

@@ -36,3 +36,8 @@ real config. The official profile runs one selected candidate; the extended
 profile runs twenty. Completed runs include `result.json`, `trajectory.csv`,
 budget/status snapshots, search/selection records, and per-candidate evaluation
 manifests below the run directory.
+
+`--evaluation-timeout` bounds each network's graph construction and scoring in a
+separate process. Expired workers are terminated and joined; the evaluation and
+its manifest report `timed_out`, including the networks attempted and elapsed
+time. The final MLS-Bench scoring subprocess also has a bounded timeout.
