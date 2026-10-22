@@ -6,6 +6,12 @@ to **CoverageForks 2+2**. It selects research history; task candidate generation
 empirical q0, surrogate fitting, selection and evaluation remain task-owned.
 There is no second campaign engine and no LLM call inside a fork policy.
 
+Scalar UCB policy draft diagnostics live in `ldm_tts.harness.ucb_diagnostics`.
+Iron Mind, SynthonBench, NucleoBench, ReaSyn and AtomWorld mount this trusted file
+read-only for the policy runner and verify its hash. ReaSyn's grouped trials keep
+their group-level proposal mass and per-trial weighting. Compiled AtomWorld and
+ReaSyn campaigns include the shared diagnostic hash in their resume identity.
+
 ## Default and explicit strategies
 
 With four research profiles, each active step runs one persistent main researcher

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from ldm_tts.transport.openai import generation_body
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from .data import TASK_ROOT, sha256_file, write_json
 
 
@@ -59,6 +60,8 @@ def bind_schedule(args, run_dir, samples, manifest, config, *, proposal_samples,
             for key, value in config.items()
             if key.startswith(("harness_", "policy_"))
         }
+        if args.search_method == "ldm_harness_compiled":
+            immutable["policy_diagnostics_sha256"] = sha256_file(DIAGNOSTICS_PATH)
     immutable_path = run_dir / "schedule.json"
     if args.resume and immutable_path.exists():
         if json.loads(immutable_path.read_text()) != immutable:

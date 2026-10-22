@@ -18,7 +18,7 @@ from ldm_tts.registration.dependencies import (
     resolve_task_path,
 )
 from tasks.iron_mind.core.data import FrozenReactionTable, load_frozen_reaction_table
-from tasks.iron_mind.core.provider import (
+from ldm_tts.transport.openai import (
     API_KEY_ENV_NAMES,
     BASE_URL_ENV_NAMES,
     MODEL_ENV_NAMES,

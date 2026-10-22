@@ -13,7 +13,7 @@ from ldm_tts.engine import LDMEngineState
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.transport.openai_http import EndpointRequestError
-from tasks.synthonbench.core.provider import (
+from ldm_tts.transport.openai import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )

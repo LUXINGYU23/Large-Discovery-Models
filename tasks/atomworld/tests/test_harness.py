@@ -14,6 +14,7 @@ from ldm_tts.harness import (
     HarnessSubmittedArtifact, file_sha256,
 )
 from ldm_tts.transport.openai import EndpointRequestError
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from tasks.atomworld.core.data import TASK_ROOT
 from tasks.atomworld.core.harness import (
     AtomWorldHarnessExpander,
@@ -497,7 +498,8 @@ def test_policy_inputs_have_no_labels_and_remain_public(tmp_path):
     assert "target_cif" not in json.dumps(value.research_snapshot)
 
 
-def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monkeypatch):
+@pytest.mark.parametrize("policy", [False, True])
+def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monkeypatch, policy):
     captured = {}
 
     class Capture:
@@ -512,7 +514,7 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
     args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
             "--search-method",
-            "harness",
+            "ldm_harness_compiled" if policy else "harness",
             "--llm-url",
             "https://provider.example/v1",
             "--llm-model-name",
@@ -522,10 +524,16 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
         ]
     )
     root = tmp_path / "campaign/harness/sample_000000"
-    create_client(args, root, fixture()["public"][0], campaign_id="fixture")
+    create_client(args, root, fixture()["public"][0], campaign_id="fixture", policy=policy)
     command = captured["command"]
     mounts = [command[i + 1] for i, part in enumerate(command) if part == "--mount"]
-    assert len(mounts) == 3
+    assert len(mounts) == 3 + int(policy)
+    if policy:
+        assert f"type=bind,src={DIAGNOSTICS_PATH},dst=/task_runtime/ucb_diagnostics.py,readonly" in mounts
+        server = captured["config"].mcp_servers[-1]
+        env = {key: value.value for key, value in server.env}
+        assert env["LDM_POLICY_DIAGNOSTICS"] == "/task_runtime/ucb_diagnostics.py"
+        assert env["LDM_POLICY_DIAGNOSTICS_SHA256"] == file_sha256(DIAGNOSTICS_PATH)
     assert not any(
         "dst=/artifacts" in item and f"src={tmp_path / 'campaign'}," in item
         for item in mounts
@@ -537,7 +545,9 @@ def test_factory_mounts_only_public_artifacts_and_task_resources(tmp_path, monke
         "get_public_history",
         "get_geometry_contract",
     ]
-    assert payload["profiles"][0]["skillDirs"] == ["/resources/skills/crystal_geometry"]
+    assert payload["profiles"][0]["skillDirs"] == [
+        "/resources/skills/compile_ldm_policy" if policy else "/resources/skills/crystal_geometry"
+    ]
     assert payload["limits"]["toolCallBudgets"]["bash"] == 64
     assert payload["providerRequestBody"] == {
         "temperature": 0.0, "max_output_tokens": 8192, "reasoning": {"effort": "none"},

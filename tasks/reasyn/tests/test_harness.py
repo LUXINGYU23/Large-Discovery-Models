@@ -18,6 +18,7 @@ from ldm_tts.harness import (
     PolicyResearchController, file_sha256, policy_submission_contract,
 )
 from ldm_tts.harness.policy_execution import PolicyExecutionError, PolicyExecutionResult
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalRequest
 from tasks.reasyn.core.candidate import ReaSynDomain
@@ -89,7 +90,7 @@ def harness_identity(options, target="", source_commit="fixture-source"):
     return scientific_identity(options, configuration, target, contract)
 
 
-def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):
+def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path, monkeypatch):
     mcp = tmp_path / "mcp.yaml"
     mcp.write_text("servers: {}\n")
     base_argv = [
@@ -123,6 +124,31 @@ def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):
         changed_mcp["harness_component_digests"]["harness_mcp_config"]
     )
     assert identity != changed_mcp
+    diagnostic = tmp_path / "diagnostics.py"
+    diagnostic.write_bytes(DIAGNOSTICS_PATH.read_bytes())
+    monkeypatch.setattr("tasks.reasyn.core.provenance.DIAGNOSTICS_PATH", diagnostic)
+    compiled_args = parse_args([*base_argv, "--search-method", "ldm_harness_compiled"])
+    compiled_identity = harness_identity(compiled_args)
+    diagnostic.write_text("# changed diagnostics\n")
+    assert compiled_identity["harness_component_digests"]["policy_diagnostics"] != (
+        harness_identity(compiled_args)["harness_component_digests"]["policy_diagnostics"]
+    )
+
+
+def test_policy_client_mounts_verified_diagnostics_readonly(tmp_path):
+    options = parse_args([
+        "--mock", "--search-method", "ldm_harness_compiled",
+        "--llm-url", "https://provider.example/v1", "--llm-model", "fixture",
+    ])
+    options.provider_api_key = "fixture-secret"
+    transport = harness_runtime.create_client(options, tmp_path / "policy", "fixture", "", policy=True)
+    command = transport.command
+    mounts = [command[i + 1] for i, part in enumerate(command) if part == "--mount"]
+    assert f"type=bind,src={DIAGNOSTICS_PATH},dst=/task_runtime/ucb_diagnostics.py,readonly" in mounts
+    env = {key: value.value for key, value in transport.config.mcp_servers[-1].env}
+    assert env["LDM_POLICY_DIAGNOSTICS"] == "/task_runtime/ucb_diagnostics.py"
+    assert env["LDM_POLICY_DIAGNOSTICS_SHA256"] == file_sha256(DIAGNOSTICS_PATH)
+    assert "fixture-secret" not in " ".join(command)
 
 
 def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path):
@@ -325,7 +351,7 @@ class AuthoredFixtureExecutor:
     def execute(self, artifact_path, input_directory, output_directory):
         assert Path(artifact_path).read_text().startswith("# Authored static protocol-test fixture;")
         output = Path(output_directory)
-        diagnostic = RESOURCE_ROOT / "policy_diagnostics.py"
+        diagnostic = DIAGNOSTICS_PATH
         completed = subprocess.run([sys.executable, str(RUNNER), "execute", "--artifact", str(artifact_path),
             "--input", str(input_directory), "--output", str(output),
             "--diagnostics", str(diagnostic), "--diagnostics-sha256", file_sha256(diagnostic)],

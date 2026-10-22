@@ -41,7 +41,7 @@ def selection_receipts(root):
     return [json.loads(p.read_text())["selection"] for p in sorted((root / "attempts").glob("*.json"))]
 
 
-def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_path):
+def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_path, monkeypatch):
     clients = []
 
     def factory(*args, **kwargs):
@@ -78,6 +78,11 @@ def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_p
     args.resume = True
     resumed = run(args, harness_client_factory=lambda *a, **k: pytest.fail("completed run replayed"))
     assert {k: v for k, v in resumed.runtime.budget.counters.items() if v} == {k: v for k, v in before.items() if v}
+    diagnostic = tmp_path / "diagnostics.py"
+    diagnostic.write_text("# changed diagnostics\n")
+    monkeypatch.setattr("tasks.atomworld.core.provenance.DIAGNOSTICS_PATH", diagnostic)
+    with pytest.raises(ValueError, match="Resume requires"):
+        run(args, harness_client_factory=lambda *a, **k: pytest.fail("changed diagnostics resumed"))
 
 
 def test_research_cache_resume_before_selection_has_no_new_provider_draws(tmp_path, monkeypatch):

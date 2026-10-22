@@ -11,6 +11,7 @@ from ldm_tts.harness import (HarnessClient, HarnessLimits, HarnessNetworkPolicy,
 from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.mcp import load_harness_mcp_config
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.transport.openai import EndpointRequestError, OpenAICompatibleProposalClient, generation_body
 from .data import write_json
 from .harness import RESOURCE_ROOT, TOOL_NAMES, harness_profiles, submission_contract
@@ -66,15 +67,18 @@ def create_client(args, root, sample, *, campaign_id, policy=False, profiles=Non
         contract = contract or submission_contract(args.harness_max_submission_attempts)
     mcp = load_harness_mcp_config(args.harness_mcp_config)
     servers = (*mcp.servers, policy_mcp_server(**({
-        "diagnostics_path": "/resources/policy_diagnostics.py",
-        "diagnostics_sha256": file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
+        "diagnostics_path": "/task_runtime/ucb_diagnostics.py",
+        "diagnostics_sha256": file_sha256(DIAGNOSTICS_PATH),
     } if args.search_method == "ldm_harness_compiled" else {}))) if policy else mcp.servers
+    mounts = [(RESOURCE_ROOT, "/resources", True)]
+    if policy and args.search_method == "ldm_harness_compiled":
+        mounts.append((DIAGNOSTICS_PATH, "/task_runtime/ucb_diagnostics.py", True))
     return HarnessClient(
         pi_sidecar_command(
             root, args.harness_sidecar_image, cache_root=args.harness_cache_dir,
             docker_host=args.harness_docker_host, container_user=args.harness_container_user,
             environment={"LDM_ATOMWORLD_PUBLIC_ROOT": "/artifacts"},
-            mounts=((RESOURCE_ROOT, "/resources", True),),
+            mounts=mounts,
         ),
         api_key=provider_api_key(),
         named_secrets=mcp.named_secrets,

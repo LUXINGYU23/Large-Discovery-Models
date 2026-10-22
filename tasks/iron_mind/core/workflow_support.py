@@ -14,7 +14,7 @@ from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.transport import ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
 from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
-from tasks.iron_mind.core.provider import (
+from ldm_tts.transport.openai import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )

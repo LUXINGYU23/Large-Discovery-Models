@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from ldm_tts.harness.protocol import file_sha256
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.transport.openai import generation_body
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,8 @@ def harness_component_digests(args):
     }
     if args.harness_mcp_config:
         digests["harness_mcp_config"] = file_sha256(args.harness_mcp_config)
+    if args.search_method == "ldm_harness_compiled":
+        digests["policy_diagnostics"] = file_sha256(DIAGNOSTICS_PATH)
     return digests
 
 

@@ -22,6 +22,7 @@ from ldm_tts.registration.experiment import (
     snapshot_experiment_contract,
 )
 from ldm_tts.transport import CallableProposalClient, ProposalClient
+from ldm_tts.transport.openai import build_openai_proposal_client
 from ldm_tts.transport.openai_http import EndpointRequestError
 from tasks.synthonbench.core.data import (
     LoadedSynthonBenchmark,
@@ -39,8 +40,6 @@ from tasks.synthonbench.core.research import write_measured_history
 from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 from tasks.synthonbench.core.nystrom_encoder import SynthonNystromEncoder
 from tasks.synthonbench.core.mock import mock_proposal_response
-from tasks.synthonbench.core.proposal_transport import build_openai_synthon_client
-from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.reporting import write_campaign_reports
 from tasks.synthonbench.core.search import (
     COMPILED_POLICY_METHOD,
@@ -51,7 +50,7 @@ from tasks.synthonbench.core.task_spec import (
     build_direct_acquisition,
     build_synthon_task_spec,
 )
-from tasks.synthonbench.core.workflow_args import parse_args, validate_args
+from tasks.synthonbench.core.workflow_args import parse_args, parse_openai_extra_body_json, validate_args
 from tasks.synthonbench.core.workflow_support import (
     campaign_budget,
     jsonable_args,
@@ -221,7 +220,7 @@ def _proposal_client(args: argparse.Namespace, provider) -> ProposalClient | Non
     if args.proposal_mode == "none":
         return None
     assert provider is not None
-    return build_openai_synthon_client(
+    return build_openai_proposal_client(
         base_url=provider.base_url,
         model=provider.model,
         api_key=provider.api_key,

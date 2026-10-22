@@ -7,6 +7,8 @@ from contextlib import ExitStack
 from copy import copy
 from pathlib import Path
 
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
+
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
     DockerPolicyExecutor, HarnessClient, HarnessLimits, HarnessNetworkPolicy,
@@ -117,6 +119,7 @@ def create_client(args, root, campaign_id, target, *, policy=False, session_prof
     mounts = [(RESOURCE_ROOT, "/resources", True)]
     if policy:
         mounts.append((history_root, "/measured_history", True))
+        mounts.append((DIAGNOSTICS_PATH, "/task_runtime/ucb_diagnostics.py", True))
     command = pi_sidecar_command(
         root, args.harness_sidecar_image, cache_root=args.harness_cache_dir,
         docker_host=args.harness_docker_host, container_user=args.harness_container_user,
@@ -140,8 +143,8 @@ def create_client(args, root, campaign_id, target, *, policy=False, session_prof
             tool_extensions=(HarnessToolExtension(Path("/resources/tools/molecular_research.mjs"),
                 file_sha256(RESOURCE_ROOT / "tools/molecular_research.mjs"), TOOL_NAMES),),
             mcp_servers=(*mcp.servers, policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
+                diagnostics_path="/task_runtime/ucb_diagnostics.py",
+                diagnostics_sha256=file_sha256(DIAGNOSTICS_PATH),
             )) if policy else mcp.servers,
             thinking=args.harness_thinking, context7_enabled=False,
             provider_request_body={

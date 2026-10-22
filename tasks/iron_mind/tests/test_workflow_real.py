@@ -193,7 +193,7 @@ def _install_real_fakes(monkeypatch, table, calls: dict[str, object]) -> None:
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     monkeypatch.setattr(workflow, "load_pinned_reaction_table", load_table)
-    monkeypatch.setattr(workflow, "build_openai_reaction_client", build_client)
+    monkeypatch.setattr(workflow, "build_openai_proposal_client", build_client)
 
 
 def _activate_smoke_profile(monkeypatch) -> None:

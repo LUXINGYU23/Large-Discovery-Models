@@ -9,6 +9,8 @@ import pytest
 
 from ldm_tts.transport import ProposalRequest
 from ldm_tts.transport.openai import (
+    build_openai_proposal_client,
+    resolve_openai_provider_settings,
     EndpointCircuitBreaker,
     EndpointCircuitOpen,
     EndpointRequestError,
@@ -501,3 +503,78 @@ def test_propose_does_not_retry_when_circuit_opens(
     with pytest.raises(EndpointCircuitOpen):
         client.propose(_proposal())
     assert calls["n"] == 1
+
+
+def test_provider_settings_resolve_from_standard_environment_names() -> None:
+    settings = resolve_openai_provider_settings(
+        base_url=None,
+        model=None,
+        api_key=None,
+        environ={
+            "LLM_BASE_URL": "https://primary.example/v1",
+            "LLM_MODEL_NAME": "primary-model",
+            "LLM_API_KEY": "primary-key",
+        },
+    )
+
+    assert settings.base_url == "https://primary.example/v1"
+    assert settings.model == "primary-model"
+    assert settings.api_key == "primary-key"
+
+
+def test_explicit_cli_provider_values_override_environment() -> None:
+    settings = resolve_openai_provider_settings(
+        base_url="https://cli.example/v1",
+        model="cli-model",
+        api_key="cli-key",
+        environ={
+            "LLM_BASE_URL": "https://environment.example/v1",
+            "LLM_MODEL_NAME": "environment-model",
+            "LLM_API_KEY": "environment-key",
+        },
+    )
+
+    assert settings.base_url == "https://cli.example/v1"
+    assert settings.model == "cli-model"
+    assert settings.api_key == "cli-key"
+
+
+def test_openai_client_uses_the_standard_chat_completion_contract() -> None:
+    client = build_openai_proposal_client(
+        base_url="https://example.invalid/v1",
+        model="test-model",
+        api_key="",
+        timeout_seconds=10.0,
+        max_tokens=256,
+    )
+
+    assert client.max_retries == 3
+    assert client.retry_backoff_seconds == 10.0
+    assert client.breaker.failure_threshold == 32
+    assert client.require_models_preflight is False
+    assert client.extra_body == {}
+
+    json_client = build_openai_proposal_client(
+        base_url="https://example.invalid/v1",
+        model="test-model",
+        api_key="",
+        timeout_seconds=10.0,
+        max_tokens=256,
+        json_mode=True,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+
+    assert json_client.extra_body == {
+        "thinking": {"type": "disabled"},
+        "response_format": {"type": "json_object"},
+    }
+    with pytest.raises(ValueError, match="cannot be combined"):
+        build_openai_proposal_client(
+            base_url="https://example.invalid/v1",
+            model="test-model",
+            api_key="",
+            timeout_seconds=10.0,
+            max_tokens=256,
+            json_mode=True,
+            extra_body={"response_format": {"type": "text"}},
+        )

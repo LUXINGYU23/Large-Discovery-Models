@@ -128,7 +128,7 @@ def test_reconstruction_alpha_tilts_query_groups_without_double_counting_trials(
     pool = tuple(next(c for c in candidates if c.payload["target_smiles"] == s) for s in ("CCO", "CCN"))
     assert empirical_base_masses(pool) == pytest.approx([0.75, 0.25])
 
-    from tasks.reasyn.resources.harness.policy_diagnostics import selection_probability
+    from ldm_tts.harness.ucb_diagnostics import selection_probability
     normalization = {"name": "robust_z", "epsilon": 1e-12, "mad_scale": 1.4826, "z_clip": 5}
     assert selection_probability(q0, scores, 1, 1, normalization, sizes) == pytest.approx(tilted)
 

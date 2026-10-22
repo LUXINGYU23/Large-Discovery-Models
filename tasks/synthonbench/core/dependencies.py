@@ -19,7 +19,7 @@ from tasks.synthonbench.core.constants import (
     OFFICIAL_SOURCE_COMMIT,
 )
 from tasks.synthonbench.core.data import validate_prepared_data
-from tasks.synthonbench.core.provider import (
+from ldm_tts.transport.openai import (
     API_KEY_ENV_NAMES,
     BASE_URL_ENV_NAMES,
     MODEL_ENV_NAMES,

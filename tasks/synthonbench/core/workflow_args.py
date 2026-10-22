@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
+from typing import Any
 
 from ldm_tts.harness.research_strategy import configure_research_strategy
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
@@ -36,7 +38,6 @@ from tasks.synthonbench.core.constants import (
     TARGETS,
 )
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, PROMPT_POLICIES
-from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 from tasks.synthonbench.core.search import (
     ACQUISITION_TILTED_METHODS,
@@ -331,3 +332,15 @@ def _validate_mode(args: argparse.Namespace) -> None:
 
 
 __all__ = ["parse_args", "validate_args"]
+
+
+def parse_openai_extra_body_json(raw: str | None) -> dict[str, Any]:
+    if raw is None or not str(raw).strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--llm-extra-body-json is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("--llm-extra-body-json must decode to a JSON object")
+    return dict(payload)

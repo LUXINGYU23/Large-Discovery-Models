@@ -22,6 +22,7 @@ from ldm_tts.registration.experiment import (
     snapshot_experiment_contract,
 )
 from ldm_tts.transport import CallableProposalClient, ProposalClient
+from ldm_tts.transport.openai import OpenAIProviderSettings, build_openai_proposal_client
 from ldm_tts.transport.openai_http import EndpointRequestError
 from tasks.iron_mind.core.constants import (
     OBJECTIVE_NAME,
@@ -42,11 +43,6 @@ from tasks.iron_mind.core.mock import (
     load_mock_table,
     mock_proposal_response,
 )
-from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
-from tasks.iron_mind.core.provider import (
-    OpenAIProviderSettings,
-    parse_openai_extra_body_json,
-)
 from tasks.iron_mind.core.reporting import write_campaign_reports
 from tasks.iron_mind.core.schema import ReactionDatasetSchema, load_reaction_schemas
 from tasks.iron_mind.core.search import (
@@ -62,7 +58,7 @@ from tasks.iron_mind.core.task_spec import (
     build_reaction_task_spec,
     disabled_surrogate,
 )
-from tasks.iron_mind.core.workflow_args import parse_args, validate_args
+from tasks.iron_mind.core.workflow_args import parse_args, parse_openai_extra_body_json, validate_args
 from tasks.iron_mind.core.workflow_support import (
     campaign_budget,
     jsonable_args,
@@ -389,7 +385,7 @@ def _proposal_client(
     if args.proposal_mode == "none":
         return None
     assert provider is not None
-    return build_openai_reaction_client(
+    return build_openai_proposal_client(
         base_url=provider.base_url,
         model=provider.model,
         api_key=provider.api_key,

@@ -67,6 +67,10 @@ host tool service. AtomWorld's submission adapter owns sample-specific evidence
 and client reuse; its runtime factory mounts only the sample's public workspace. NucleoBench resolves provider
 settings and request-body JSON in `core/provider.py` for both direct and Pi calls.
 
+Iron Mind and SynthonBench use provider environment resolution and proposal-client
+construction from `ldm_tts.transport.openai`. Their CLI JSON validation stays in
+`core/workflow_args.py`; task budgets and endpoint pause/reporting remain task-owned.
+
 Task workflows own an `ExitStack` for clients and tool services. Runtime assembly
 registers cleanup before explicit startup; `HarnessClient.__enter__` also stops
 a failed startup before returning an error. A main or forked branch has a per-turn lifetime, while
