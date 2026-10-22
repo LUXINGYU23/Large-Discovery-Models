@@ -45,6 +45,13 @@ The mock config uses:
 - `tasks/nanogpt/resources/schemas/mock_operations.json`
 - output under `tasks/nanogpt/runs/`
 
+Resume with `--resume-from <run-directory>` using the same scientific settings.
+`--iterations` requests additional iterations; `--max-real-evaluations` sets a
+cumulative evaluation cap that may be increased, but not reduced. Configuration
+and budget checks run before task artifacts are written, so a rejected resume
+leaves schemas, logs, feedback and checkpoints intact. The initial `config.json`
+stays frozen; `budget.json` and resume events record updated limits and usage.
+
 ## Real Campaign Example
 
 The evaluator-backed LCB N4H4 campaign below uses real 300-second GPU training

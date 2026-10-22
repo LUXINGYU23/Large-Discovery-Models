@@ -172,10 +172,46 @@ def test_resume_restores_execution_state_without_changing_frozen_recipe(tmp_path
                           "--iterations", "1"]) == 0
     assert all((run_dir / name).read_bytes() == data for name, data in original.items())
     assert len(json.loads((run_dir / "model_based_summary.json").read_text())["iterations"]) == 3
+    before_rejection = {path: path.read_bytes() for path in run_dir.rglob("*") if path.is_file()}
     with pytest.raises(ValueError, match="resume scientific configuration mismatch"):
         workflow.main(["--project-root", str(PROJECT_ROOT), "--resume-from", str(run_dir),
                        "--iterations", "1", "--gp-beta", "9"])
-    assert all((run_dir / name).read_bytes() == data for name, data in original.items())
+    assert {path: path.read_bytes() for path in run_dir.rglob("*") if path.is_file()} == before_rejection
+
+
+def test_rejected_resume_preserves_all_artifacts_before_initializing_adapters(tmp_path, monkeypatch):
+    assert workflow.main(_mock_argv(tmp_path, "rejected_resume")) == 0
+    run_dir = tmp_path / "rejected_resume"
+    before = {path: path.read_bytes() if path.is_file() else None for path in run_dir.rglob("*")}
+    monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
+    monkeypatch.setenv("LDM_DATA_COLLECTION_DIR", str(run_dir / "rejected_collection"))
+    with pytest.raises(ValueError, match="resume scientific configuration mismatch"):
+        workflow.main(["--project-root", str(PROJECT_ROOT), "--resume-from", str(run_dir),
+                       "--iterations", "1", "--initial-expansion-parameters", "1"])
+    assert {path: path.read_bytes() if path.is_file() else None for path in run_dir.rglob("*")} == before
+
+
+@pytest.mark.parametrize("evaluate_root", [False, True])
+def test_resume_extends_real_evaluation_cap_and_rejects_decreases_without_writes(tmp_path, evaluate_root):
+    assert workflow.main(_mock_argv(tmp_path, "evaluation_cap", max_real_evaluations=3,
+                                    evaluate_root=evaluate_root)) == 0
+    run_dir = tmp_path / "evaluation_cap"
+    original_config = (run_dir / "config.json").read_bytes()
+    resume = ["--project-root", str(PROJECT_ROOT), "--resume-from", str(run_dir), "--iterations", "1"]
+    assert workflow.main([*resume, "--max-real-evaluations", "4"]) == 0
+    ledger = json.loads((run_dir / "budget.json").read_text())
+    assert ledger["limits"]["external_evaluations"] == 4
+    assert ledger["counters"]["external_evaluations"] == 4
+    assert (run_dir / "config.json").read_bytes() == original_config
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    resumed = [event for event in events if event["event_type"] == "campaign_resumed"]
+    assert len(resumed) == 1
+    assert resumed[0]["payload"]["previous_budget_limits"]["external_evaluations"] == 3
+    assert resumed[0]["payload"]["budget_limits"]["external_evaluations"] == 4
+    before = {path: path.read_bytes() for path in run_dir.rglob("*") if path.is_file()}
+    with pytest.raises(ValueError, match="resume budget limits"):
+        workflow.main([*resume, "--max-real-evaluations", "3"])
+    assert {path: path.read_bytes() for path in run_dir.rglob("*") if path.is_file()} == before
 
 
 def test_warmup_and_engine_share_max_real_evaluation_cap(tmp_path):

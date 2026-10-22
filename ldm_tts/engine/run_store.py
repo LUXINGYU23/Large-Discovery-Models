@@ -23,7 +23,7 @@ _RESUME_LAUNCH_FIELDS = {
     "resume_from", "resume_run", "resume", "dry_run",
     "api_key", "api_key_file", "harness_api_key_file", "provider_api_key",
 }
-_RESUME_LIMIT_FIELDS = {"iterations", "n_evals", "max_evals", "budget"}
+_RESUME_LIMIT_FIELDS = {"iterations", "n_evals", "max_evals", "max_real_evaluations", "budget"}
 
 
 def _validate_resume_snapshot(path: Path, current: Any, *, config: bool = False) -> None:
