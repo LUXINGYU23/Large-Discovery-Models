@@ -630,7 +630,6 @@ def run(args: argparse.Namespace) -> list[str]:
         config["tabular_search_csv"] = None
         config["device"] = "cpu"
         config["seq_len"] = int(config.get("seq_len", 11))
-        antbo_tts.make_llm_client = lambda: DeterministicAntBOTTSLLM()
 
     args._runtime_device = str(config.get("device") or "cpu")
 
@@ -642,7 +641,8 @@ def run(args: argparse.Namespace) -> list[str]:
         runner_args = make_runner_args(args, antigens_path, out_dir)
         for antigen in antigens:
             for seed in range(args.seed, args.seed + args.n_trials):
-                run_dir = antbo_tts.run_one(config, antigen, seed, runner_args)
+                run_dir = antbo_tts.run_one(config, antigen, seed, runner_args,
+                    llm=DeterministicAntBOTTSLLM() if args.mock else None)
                 run_dirs.append(str(Path(run_dir).resolve()))
 
     print(json.dumps({"run_dirs": run_dirs}, indent=2, sort_keys=True))
