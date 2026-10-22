@@ -16,6 +16,7 @@ class MCTSNode(Generic[StateT]):
     children: list[MCTSNode[StateT]] = field(default_factory=list)
     visits: int = 0
     value_sum: float = 0.0
+    expansion_closed: bool = False
     exhausted: bool = False
 
     @property
@@ -83,7 +84,7 @@ async def _run(
         simulation += 1
         child = await _expand_one(engine, leaf, simulation=simulation)
         if child is None:
-            leaf.exhausted = True
+            leaf.expansion_closed = True
             continue
         if engine.should_evaluate_depth(child.state.depth, max(1, depth)):
             await engine.evaluate_many([child.state])
@@ -111,7 +112,7 @@ def _select(
         root.exhausted = True
     if root.exhausted:
         return None
-    if len(root.children) < max_children:
+    if not root.expansion_closed and len(root.children) < max_children:
         return root
     while available := [child for child in root.children if not child.exhausted]:
         child = max(available, key=lambda child: _uct(child, exploration))

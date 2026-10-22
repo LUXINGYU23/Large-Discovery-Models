@@ -259,6 +259,27 @@ def test_mcts_stops_when_expansion_returns_no_children():
     assert engine.evaluation_count == 0
 
 
+@pytest.mark.parametrize("closed_depth,budget,expected", [(0, 1, 1), (0, 20, 6), (1, 20, 6)])
+def test_mcts_searches_existing_descendants_after_empty_sibling(closed_depth, budget, expected):
+    engine = FakeEngine(interval=2)
+    expand = engine.expand_state
+    attempts = {}
+
+    async def sometimes_empty(parent, count, **kwargs):
+        attempts[parent.state_id] = attempts.get(parent.state_id, 0) + 1
+        if parent.depth == closed_depth and attempts[parent.state_id] > 1:
+            return []
+        return await expand(parent, count, **kwargs)
+
+    engine.expand_state = sometimes_empty
+    best = asyncio.run(mcts.run(engine, breadth=2, depth=3, beam_width=1,
+                               max_evaluations=budget, evaluate_root=False))
+    assert best is not None
+    assert engine.evaluation_count == expected
+    assert all(attempts.get(state.state_id, 0) <= 2 for state in engine.states
+               if state.depth == closed_depth)
+
+
 def test_mcts_node_helpers_and_delegated_reward() -> None:
     root = mcts.MCTSNode(FakeState("root", 0, 2.0))
     child = mcts.MCTSNode(FakeState("child", 1, 1.0), parent=root)
