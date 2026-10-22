@@ -22,6 +22,7 @@ from typing import Any, Optional
 from unittest import mock
 
 import numpy as np
+import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
@@ -912,6 +913,45 @@ class PackageExportsTests(unittest.TestCase):
         self.assertIs(VinaScorer, VinaScorer)
         self.assertIs(VinaScorerConfig, VinaScorerConfig)
         self.assertIs(Scorer, Scorer)
+
+@pytest.mark.parametrize("changed", ["receptor_bytes", "binary_path", "binary_bytes"])
+def test_cache_and_pose_identity_follow_scientific_inputs(tmp_path, monkeypatch, changed):
+    receptor = _make_fake_receptor(tmp_path)
+    receptor_path = Path(receptor.receptor_pdbqt)
+    receptor_path.write_text("original receptor")
+    binary = _make_fake_vina(tmp_path)
+    original_binary = Path(binary).read_bytes()
+    compounds = [ExtractedCompound(compound_id="a", full_smiles="CCO")]
+    calls = []
+
+    def dock(cmd, log_path, timeout):
+        calls.append(cmd)
+        Path(cmd[cmd.index("--out") + 1]).write_text(f"pose {len(calls)}")
+        return subprocess.CompletedProcess(cmd, 0, stdout=f"   1  -{len(calls)}.0  0.0  0.0\n")
+
+    monkeypatch.setattr(objective_module, "canonicalize_smiles", lambda s: s)
+    monkeypatch.setattr(objective_module, "prepare_ligand", lambda *a, **k: "/fixture/ligand.pdbqt")
+    monkeypatch.setattr(objective_module, "run_logged_command", dock)
+    first, = vina_dock_batch(compounds, receptor, vina_bin=binary)
+    cached, = vina_dock_batch(compounds, receptor, vina_bin=binary)
+    assert cached.cached and cached.score == first.score and len(calls) == 1
+    original_path = binary
+    if changed == "receptor_bytes":
+        receptor_path.write_text("different receptor")
+    elif changed == "binary_path":
+        binary = _make_fake_vina(tmp_path / "other")
+    else:
+        Path(binary).write_bytes(original_binary + b"# changed version\n")
+    second, = vina_dock_batch(compounds, receptor, vina_bin=binary)
+    assert not second.cached and len(calls) == 2
+    assert second.score != first.score and second.pose_ref != first.pose_ref
+    assert Path(first.pose_ref).read_text() == "pose 1"
+    receptor_path.write_text("original receptor")
+    Path(original_path).write_bytes(original_binary)
+    restored, = vina_dock_batch(compounds, receptor, vina_bin=original_path)
+    assert restored.cached and restored.score == first.score
+    assert restored.pose_ref == first.pose_ref and len(calls) == 2
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
