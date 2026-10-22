@@ -14,6 +14,10 @@ test("per-profile forks restore different historical parents and reject changed 
             const snapshot = join(root, "fork-sources", profile);
             await mkdir(join(snapshot, "workspace"), { recursive: true });
             await writeFile(join(snapshot, "workspace", "research.md"), profile);
+            const evidence = `Archived paper for ${profile}`;
+            const evidenceFile = join(".web-evidence", `${sha256(evidence)}.md`);
+            await mkdir(join(snapshot, "workspace", ".web-evidence"));
+            await writeFile(join(snapshot, "workspace", evidenceFile), evidence);
             const header = { type: "session", version: 3, id: profile, timestamp: new Date().toISOString(), cwd: "/parent" };
             const entry = { type: "message", id: `leaf-${profile}`, parentId: null, timestamp: new Date().toISOString(),
                 message: { role: "user", content: profile, timestamp: Date.now() } };
@@ -29,13 +33,16 @@ test("per-profile forks restore different historical parents and reject changed 
             assert.equal(manager.getHeader()?.parentSession, join(snapshot, "session.jsonl"));
             assert.equal(manager.getLeafId(), `leaf-${profile}`);
             assert.equal(await readFile(join(child, "workspace", "research.md"), "utf8"), profile);
+            assert.equal(await readFile(join(child, "workspace", evidenceFile), "utf8"), evidence);
+            await writeFile(join(child, "workspace", evidenceFile), "child-only");
+            assert.equal(await readFile(join(snapshot, "workspace", evidenceFile), "utf8"), evidence);
             await writeFile(join(child, "workspace", "research.md"), "child-only");
             await initializeFork(snapshot, child, source);
             assert.equal(await readFile(join(child, "workspace", "research.md"), "utf8"), "child-only");
             assert.equal(await readFile(join(snapshot, "workspace", "research.md"), "utf8"), profile);
             assert.deepEqual(await readdir(join(child, "pi-session")), files);
             await assert.rejects(initializeFork(snapshot, child, { ...source, historyCursor: cursor + 1 }), /identity changed/);
-            await writeFile(join(snapshot, "workspace", "research.md"), "corruption");
+            await writeFile(join(snapshot, "workspace", evidenceFile), "corruption");
             await assert.rejects(initializeFork(snapshot, child, source), /digest mismatch/);
         }
     } finally { await rm(root, { recursive: true, force: true }); }

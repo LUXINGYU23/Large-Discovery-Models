@@ -217,15 +217,15 @@ list when configuring more than one tool:
 args:
   harness-tool-budget:
     - web_search=4
-    - fetch_content=8
+    - web_fetch=8
     - mcp__literature__search=2
   policy-tool-budget:
     - web_search=8
-    - fetch_content=16
+    - web_fetch=16
 ```
 
 The reference tasks default to eight `web_search` calls, sixteen
-`fetch_content`, sixteen `get_search_content`, four `resolve-library-id`, and eight
+`web_fetch`, four `resolve-library-id`, and eight
 `query-docs` calls per turn. Context7 budgets are omitted when Context7 is
 disabled. A tool absent from the mapping is unlimited; zero disables it.
 The terminal tool named by the submission contract cannot be budgeted.

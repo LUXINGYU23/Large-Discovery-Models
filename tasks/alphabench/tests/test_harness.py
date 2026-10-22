@@ -189,7 +189,7 @@ config = HarnessPoolConfig(artifact_root=artifact_root,
 turn = HarnessTurn("research", "round-0-research", 0, 0, 0, "c" * 64, "research")
 host = HostDispatcher()
 meter = HarnessMeter(runtime, host)
-os.environ.update(HARNESS_TEST_RELEASE="0.2.0", HARNESS_TEST_PROVIDER_AUTH="1",
+os.environ.update(HARNESS_TEST_PROVIDER_AUTH="1",
     HARNESS_TEST_PROCESS_FAILURE="exit")
 client = HarnessClient((sys.executable, "-u", str(fixture)), api_key="fixture",
     config=config, response_timeout_seconds=5)

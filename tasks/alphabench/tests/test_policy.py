@@ -260,7 +260,7 @@ config = HarnessPoolConfig(artifact_root=root,
     profiles=(HarnessProfile("policy_architect", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
     campaign_id=runtime.run_id, task_id="alphabench", case_id="policy-recovery", seed=0,
     submission_contract=policy_submission_contract())
-os.environ.update(HARNESS_TEST_RELEASE="0.2.0", HARNESS_TEST_PROVIDER_AUTH="1",
+os.environ.update(HARNESS_TEST_PROVIDER_AUTH="1",
     HARNESS_TEST_PROCESS_FAILURE="exit", HARNESS_TEST_SUBMISSION="policy_disable")
 client = HarnessClient((sys.executable, "-u", str(fixture)), api_key="fixture",
     config=config, response_timeout_seconds=5)

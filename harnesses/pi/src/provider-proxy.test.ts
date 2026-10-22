@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ProviderProxy } from "./provider-proxy.js";
+import { Redactor } from "./trace.js";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-responses";
 
 test("provider proxy captures raw stream chunks while redacting credentials", async () => {
@@ -56,7 +57,8 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 			response: { chunks: number; headers: Record<string, string> };
 		};
 		assert.deepEqual([index.campaignId, index.profileId, index.sessionId], ["campaign-1", "target_sar", "session-1"]);
-		assert.equal(index.response.chunks, 4);
+		// HTTP transports can coalesce writes; chunk boundaries are not guaranteed.
+		assert(index.response.chunks >= 1);
 		assert.equal(index.response.headers["set-cookie"], "[REDACTED]");
 
 		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, async () => true);
@@ -72,6 +74,20 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 	} finally {
 		await proxy.close();
 		await new Promise<void>((resolve, reject) => upstream.close((error) => (error ? reject(error) : resolve())));
+	}
+});
+
+test("stream redaction handles credentials split at every byte boundary", () => {
+	const secret = "unit-test-provider-secret";
+	for (let split = 1; split < secret.length; split++) {
+		const stream = new Redactor([secret]).stream();
+		const output = Buffer.concat([
+			stream.update(Buffer.from(`data: ${secret.slice(0, split)}`)),
+			stream.update(Buffer.from(`${secret.slice(split)}\n\n`)),
+			stream.end(),
+		]).toString();
+		assert.doesNotMatch(output, new RegExp(secret));
+		assert.match(output, /\[REDACTED\]/);
 	}
 });
 

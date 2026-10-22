@@ -84,8 +84,7 @@ def parse_args(argv=None):
     )
     default_harness_tool_budgets = [
         "web_search=8",
-        "fetch_content=16",
-        "get_search_content=16",
+        "web_fetch=16",
         "resolve-library-id=4",
         "query-docs=8",
         "bash=64",

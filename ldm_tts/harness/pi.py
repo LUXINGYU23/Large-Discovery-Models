@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -13,54 +14,12 @@ from ldm_tts.harness.protocol import (
     HarnessPoolConfig, HarnessToolExtension, canonical_sha256,
 )
 
-_SEARCH_FALLBACK_KINDS = frozenset(
-    {"transient", "quota", "network", "invalid-response", "unsupported"}
-)
 DEFAULT_NETWORK_TOOL_BUDGETS = (
     "web_search=8",
-    "fetch_content=16",
-    "get_search_content=16",
+    "web_fetch=16",
     "resolve-library-id=4",
     "query-docs=8",
 )
-
-
-@dataclass(frozen=True)
-class PiWebSearch:
-    providers: tuple[str, ...] = ("parallel-mcp", "exa", "duckduckgo")
-    fallback_on: tuple[str, ...] = (
-        "transient",
-        "quota",
-        "network",
-        "invalid-response",
-        "unsupported",
-    )
-
-    def __post_init__(self) -> None:
-        if not self.providers:
-            raise ValueError("harness web search requires at least one provider")
-        if len(set(self.providers)) != len(self.providers):
-            raise ValueError("harness web search providers must be unique")
-        if any(
-            re.fullmatch(r"[a-z][a-z0-9-]*", provider) is None
-            or provider in {"auto", "all"}
-            for provider in self.providers
-        ):
-            raise ValueError(
-                "harness web search providers must be resolved lowercase provider names"
-            )
-        if not self.fallback_on:
-            raise ValueError("harness web search fallback_on must not be empty")
-        if len(set(self.fallback_on)) != len(self.fallback_on):
-            raise ValueError("harness web search fallback kinds must be unique")
-        if any(kind not in _SEARCH_FALLBACK_KINDS for kind in self.fallback_on):
-            raise ValueError("unsupported harness web search fallback kind")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "providers": list(self.providers),
-            "fallbackOn": list(self.fallback_on),
-        }
 
 
 @dataclass(frozen=True)
@@ -92,7 +51,6 @@ class PiHarnessConfig(HarnessPoolConfig):
     mcp_servers: tuple[HarnessMcpServer, ...] = ()
     thinking: str = "off"
     network_policy: HarnessNetworkPolicy = field(default_factory=HarnessNetworkPolicy)
-    web_search: PiWebSearch = field(default_factory=PiWebSearch)
     context7_enabled: bool = True
     provider_request_body: dict[str, Any] = field(default_factory=dict)
     force_first_tool_call: bool = True
@@ -124,8 +82,8 @@ class PiHarnessConfig(HarnessPoolConfig):
         if set(tool_names) & set(mcp_tool_names):
             raise ValueError("harness task and MCP tool names must not conflict")
         ordinary_tools = {
-            "read", "write", "bash", "web_search", "fetch_content",
-            "get_search_content", *tool_names, *mcp_tool_names,
+            "read", "write", "bash", "web_search", "web_fetch",
+            *tool_names, *mcp_tool_names,
         }
         if self.context7_enabled:
             ordinary_tools.update(("resolve-library-id", "query-docs"))
@@ -149,6 +107,15 @@ class PiHarnessConfig(HarnessPoolConfig):
         if type(self.force_first_tool_call) is not bool:
             raise ValueError("force_first_tool_call must be boolean")
 
+    def bootstrap_secrets(self) -> dict[str, str]:
+        if all(self.limits.tool_call_budgets.get(name) == 0
+               for name in ("web_search", "web_fetch")):
+            return {}
+        key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+        if not key:
+            raise ValueError("DEEPSEEK_API_KEY is required for Pi Search and Fetch")
+        return {"DEEPSEEK_API_KEY": key}
+
     def initialize_payload(self) -> dict[str, Any]:
         return {
             **super().initialize_payload(),
@@ -160,7 +127,6 @@ class PiHarnessConfig(HarnessPoolConfig):
             "toolExtensions": [extension.to_dict() for extension in self.tool_extensions],
             "mcpServers": [server.to_dict() for server in self.mcp_servers],
             "networkPolicy": self.network_policy.to_dict(),
-            "webSearch": self.web_search.to_dict(),
             "context7Enabled": self.context7_enabled,
             **({"providerRequestBody": self.provider_request_body} if self.provider_request_body else {}),
             **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),

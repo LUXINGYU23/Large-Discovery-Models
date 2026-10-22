@@ -7,6 +7,9 @@ import test from "node:test";
 import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { HistoryController, HistoryRecoveryError, HISTORY_POLICY } from "./history.js";
 import { ProviderProxy } from "./provider-proxy.js";
+import { ContextPressureController } from "./context-pressure.js";
+import { WEB_EVIDENCE_MARKER } from "./web-evidence.js";
+import { sha256 } from "./trace.js";
 
 test("continuation allowance and blocked history survive a process restart", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-history-resume-"));
@@ -89,12 +92,16 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 			assert(model);
 			const settings = SettingsManager.inMemory({ compaction: HISTORY_POLICY.compaction, retry: { enabled: false } });
 			const history = new HistoryController();
+			const pressure = new ContextPressureController(join(root, ".web-evidence"), HISTORY_POLICY.compaction.reserveTokens);
 			const loader = new DefaultResourceLoader({ cwd: root, agentDir, settingsManager: settings,
 				noExtensions: true, noSkills: true, noContextFiles: true, noPromptTemplates: true, noThemes: true,
-				extensionFactories: [history.createExtension("fixture-key")] });
+				extensionFactories: [pressure.createExtension(() => session?.messages ?? []), history.createExtension("fixture-key")] });
 			await loader.reload();
 			const manager = SessionManager.create(root, join(root, "sessions"));
 			manager.appendMessage({ role: "user", content: "archived evidence ".repeat(10000), timestamp: Date.now() });
+			const webEvidence = "Full paper evidence beyond the receipt preview.\n".repeat(1000);
+			if (mode === "success") manager.appendMessage({ role: "toolResult", toolName: "web_fetch", toolCallId: "paper",
+				content: [{ type: "text", text: webEvidence }], isError: false, timestamp: Date.now() });
 			manager.appendMessage({ role: "assistant", content: [{ type: "text", text: "Recorded evidence" }],
 				api: "openai-responses", provider: "fixture", model: "fixture", stopReason: "stop", timestamp: Date.now(),
 				usage: { input: 210000, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 210010,
@@ -125,6 +132,9 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 			assert.notEqual(requests[0]!.tool_choice, "required");
 			assert.equal(session.thinkingLevel, "max", "research reasoning must remain unchanged");
 			if (mode === "success") {
+				assert(JSON.stringify(requests[0]).includes(WEB_EVIDENCE_MARKER), "summarizer must receive evidence recall receipts");
+				assert(!JSON.stringify(requests[0]).includes(webEvidence.slice(0, 2000)));
+				assert.equal(await readFile(join(pressure.archive.root, `${sha256(webEvidence)}.md`), "utf8"), webEvidence);
 				await session.prompt("Continue research after summarizing");
 				assert.deepEqual(requests.at(-1)!.reasoning, { effort: "max" });
 				assert.equal(requests.at(-1)!.max_output_tokens, 1024);
