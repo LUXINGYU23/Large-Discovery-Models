@@ -52,6 +52,8 @@ class SelectionRequirements:
                 raise ValueError("evaluation groups must have distinct IDs and disjoint candidates")
             if not members <= candidates:
                 raise ValueError("evaluation group references candidates outside the reservoir")
+            if group.min_pool > len(members):
+                raise ValueError("evaluation group reservations exceed its candidate count")
             seen.update(members)
             group_ids.add(group.group_id)
         if sum(group.min_pool for group in self.groups) > context.pool_size:

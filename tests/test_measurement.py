@@ -13,20 +13,22 @@ def context():
 @pytest.mark.parametrize("groups,message", [
     ((EvaluationGroup("one", ("a",), 1, 1), EvaluationGroup("two", ("a",), 1, 1)), "disjoint"),
     ((EvaluationGroup("one", ("z",), 1, 1),), "outside"),
-    ((EvaluationGroup("one", ("a",), 5, 1),), "pool budget"),
+    ((EvaluationGroup("one", tuple("abcde"), 5, 1),), "pool budget"),
     ((EvaluationGroup("one", ("a", "b", "c"), 3, 3),), "selection budget"),
+    ((EvaluationGroup("one", ("a",), 2, 1),), "candidate count"),
+    ((EvaluationGroup("one", ("a",), 2, 2),), "candidate count"),
 ])
 def test_reservations_reject_ambiguous_groups_and_budget_overrides(groups, message):
     with pytest.raises(ValueError, match=message):
         SelectionRequirements(groups).validate(context())
 
 
-def test_short_group_releases_capacity_and_reserved_candidates_are_dispatched_first():
-    requirements = SelectionRequirements((EvaluationGroup("rare", ("f",), 3, 1),))
+def test_reserved_candidates_meet_both_minima_and_are_dispatched_first():
+    requirements = SelectionRequirements((EvaluationGroup("rare", tuple("def"), 3, 1),))
     requirements.validate(context())
     pool = requirements.select(tuple("abcdef"), 4, stage="pool")
-    assert pool == tuple("fabc")
-    assert requirements.select(tuple("abcf"), 2, stage="evaluation") == tuple("fa")
+    assert pool == tuple("defa")
+    assert requirements.select(tuple("adef"), 2, stage="evaluation") == tuple("da")
     assert SelectionRequirements().select(tuple("abcdef"), 2, stage="evaluation") == tuple("ab")
 
 
@@ -40,7 +42,7 @@ def test_unrelated_task_can_supply_a_custom_measurement_policy(monkeypatch):
             return {"name": "integers", "version": 1}
 
         def plan(self, _context):
-            return SelectionRequirements((EvaluationGroup("large", ("f",), 2, 1),))
+            return SelectionRequirements((EvaluationGroup("large", ("f",), 1, 1),))
 
     module = ModuleType("integer_coverage")
     module.policy = IntegerCoverage
