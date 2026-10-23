@@ -34,32 +34,49 @@ def submission_contract():
         "submit_solver",
         {
             "type": "object",
-            "properties": fields,
-            "required": list(fields),
+            "properties": {"candidates": {"type": "array", "minItems": 1, "maxItems": 1,
+                "items": {"type": "object", "properties": fields,
+                          "required": list(fields), "additionalProperties": False}}},
+            "required": ["candidates"],
             "additionalProperties": False,
         },
-        (HarnessArtifactRule("/artifact_path", (".py",), MAX_SOURCE_BYTES),),
+        (HarnessArtifactRule("/candidates/0/artifact_path", (".py",), MAX_SOURCE_BYTES),),
         max_validation_attempts=3,
     )
 
 
 def parse_snapshot(submission, artifacts, artifact_root, known):
-    if set(submission) != {
+    if not isinstance(submission, dict) or set(submission) != {"candidates"}:
+        raise ValueError("submit a candidates array")
+    rows = submission["candidates"]
+    if not isinstance(rows, list) or len(rows) != 1 or len(artifacts) != 1:
+        raise ValueError("submit one solver per researcher")
+    row = rows[0]
+    if not isinstance(row, dict) or set(row) != {
         "artifact_path",
         "parent_sha256",
         "change_summary",
         "rationale",
     }:
         raise ValueError("invalid submission fields")
-    if submission["artifact_path"] != "candidates/0/solver.py" or len(artifacts) != 1:
+    for name, maximum in (("change_summary", 1000), ("rationale", 2000)):
+        if not isinstance(row[name], str) or not 1 <= len(row[name]) <= maximum:
+            raise ValueError("invalid " + name)
+    if row["artifact_path"] != "candidates/0/solver.py":
         raise ValueError("submit one solver")
     a = artifacts[0]
     root = Path(artifact_root).resolve()
-    p = (root / a.snapshot_path).resolve()
+    relative = Path(a.snapshot_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("snapshot path mismatch")
+    p = root / relative
+    if any((root.joinpath(*relative.parts[:i])).is_symlink() for i in range(1, len(relative.parts) + 1)):
+        raise ValueError("snapshot symlink forbidden")
+    p = p.resolve()
     if (
         not p.is_relative_to(root)
-        or a.relative_path != submission["artifact_path"]
-        or a.path_pointer != "/artifact_path"
+        or a.relative_path != row["artifact_path"]
+        or a.path_pointer != "/candidates/0/artifact_path"
     ):
         raise ValueError("snapshot path mismatch")
     source = p.read_bytes()
@@ -69,8 +86,8 @@ def parse_snapshot(submission, artifacts, artifact_root, known):
     if sha in known:
         raise ValueError("source already evaluated; submit a changed algorithm")
     if (
-        submission["parent_sha256"] is not None
-        and submission["parent_sha256"] not in known
+        row["parent_sha256"] is not None
+        and (not isinstance(row["parent_sha256"], str) or row["parent_sha256"] not in known)
     ):
         raise ValueError("unknown parent digest")
     return source
@@ -171,7 +188,7 @@ class Expander:
                 return HarnessSubmissionValidation("accept")
             except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
                 return HarnessSubmissionValidation("retry", (
-                    HarnessSubmissionError("/artifact_path", "invalid_solver", str(exc)),))
+                    HarnessSubmissionError("/candidates/0/artifact_path", "invalid_solver", str(exc)),))
 
         for turn in turns:
             self.account({"harness_turns": 1}, usage_key="copper:turn:" + turn.input_digest)
@@ -202,7 +219,7 @@ class Expander:
             lineage = {"profile_id": result.profile_id, "session_id": result.session_id,
                        "turn_id": result.turn_id, "submission_id": result.submission_id}
             proposals.append(RawProposal(payload, "persistent_harness", metadata={
-                **{k: result.submission[k] for k in ("parent_sha256", "change_summary", "rationale")},
+                **{k: result.submission["candidates"][0][k] for k in ("parent_sha256", "change_summary", "rationale")},
                 "harness_lineage": lineage,
             }))
             attempts.append(attach_proposal_attempt_receipt(

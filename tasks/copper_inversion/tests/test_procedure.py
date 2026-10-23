@@ -31,7 +31,7 @@ def test_mock_submission_correction(tmp_path, monkeypatch):
         path = self.root / "invalid.py"
         path.write_bytes(source)
         artifact = HarnessSubmittedArtifact(
-            path_pointer="/artifact_path",
+            path_pointer="/candidates/0/artifact_path",
             relative_path="candidates/0/solver.py",
             snapshot_path="invalid.py",
             sha256=hashlib.sha256(source).hexdigest(),
@@ -43,12 +43,14 @@ def test_mock_submission_correction(tmp_path, monkeypatch):
             change_summary="invalid attempt",
             rationale="test",
         )
+        submission = {"candidates": [submission]}
         result = submission_validator(
             HarnessSubmissionRequest(
                 "researcher", turn.turn_id, 1, submission, (artifact,)
             )
         )
         assert result.decision == "retry"
+        assert result.errors[0].path == "/candidates/0/artifact_path"
         rejected.append(result)
         return original(self, turns, submission_validator, **kwargs)
 

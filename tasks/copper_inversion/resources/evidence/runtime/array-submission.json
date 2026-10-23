@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "scope": "Array submission contract; no legacy object support; remote Python regression and actual Pi snapshot/commit controller to Python parser integration",
+  "remote_root": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023",
+  "pytest_result": "220 passed in 88.66s (0:01:28)",
+  "native_test": "1 passed; invalid source retry, reopened turn second attempt, indexed pointer, sealed bytes and submission digest verified",
+  "source_sha256": {
+    "tasks/copper_inversion/core/harness.py": "21dfb5e63d76d7d6f164c95346269b88c325509ed84da2749099066006a53c12",
+    "tasks/copper_inversion/core/mock.py": "765efdd3b994aed6f0ac2398012a11d0b4488d3540d27da8946174ce1f954c0f",
+    "tasks/copper_inversion/tests/test_submission.py": "9dded83ee3c8b054e772f101776e236851567de05cd88979d8b2acfe3ce2321d",
+    "tasks/copper_inversion/tests/test_procedure.py": "9eeaa62d33a8685c7349c3e8ca48f48a56d6d1999655fffcaef584ec9e90b987",
+    "tasks/copper_inversion/tests/submission_native.mjs": "7fefc1865529f3959644884229921a1dd29e597bf74afdf5751442c8f6a870c6",
+    "tasks/copper_inversion/resources/harness/profiles/researcher/AGENTS.md": "5dcc598eb293b5f55a3fb3f20115f661a9b6ed41dfba5bc9dece73ce9e079332"
+  },
+  "log_sha256": {
+    "array-submission.log": "a9b88edbf481df21675d9d99c5c33e7d6f68fe6a841633e7fe651d9f60b58367",
+    "array-native.log": "9d59ae1e4ab0949af4a943689b0b41f418acff2b0e05d504702a8ff04565d177"
+  },
+  "sidecar_submission_sha256": "5a83041d22ea3a4d3aae4f12dd2adeb34ac84ee0b1347df9b2ce9f24554bdb2a",
+  "limitations": [
+    "No new model-backed campaign in this validation; historical campaigns retain their earlier contract.",
+    "Four-branch syntax-before-interface barrier is a separate uncompleted spec item."
+  ]
+}

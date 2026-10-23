@@ -62,10 +62,11 @@ class MockClient:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(source)
                 artifacts = (HarnessSubmittedArtifact(
-                    path_pointer="/artifact_path", relative_path="candidates/0/solver.py",
+                    path_pointer="/candidates/0/artifact_path", relative_path="candidates/0/solver.py",
                     snapshot_path=relative, sha256=hashlib.sha256(source).hexdigest(), size_bytes=len(source)),)
                 data = dict(artifact_path="candidates/0/solver.py", parent_sha256=history[-1]["candidate_id"],
                             change_summary="Mock geometry shift", rationale="Protocol fixture, not scientific research")
+                data = {"candidates": [data]}
             submission = HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, data, artifacts)
             validation = submission_validator(submission)
             if validation.decision != "accept":

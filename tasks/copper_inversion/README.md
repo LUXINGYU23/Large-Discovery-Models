@@ -136,3 +136,23 @@ Remote policy regression (using the existing Node runtime):
 ```sh
 node --test tasks/copper_inversion/tests/test_research_budget.mjs
 ```
+
+### Native submission contract integration (remote only)
+
+The task submits a strict `candidates` array with one source per researcher.
+The artifact pointer is `/candidates/0/artifact_path`; flat submissions are rejected.
+Four researchers still contribute four distinct sources to the LDM pool.
+
+After building the existing Pi sidecar, run this on the remote server from the
+repository root, using its Node 24 runtime and the prepared task environment:
+
+```bash
+PYTHONPATH="$PWD" COPPER_PYTHON="$PWD/tasks/copper_inversion/.venv/bin/python" \
+  COPPER_HARNESS_DIST="$PWD/harnesses/pi/dist" \
+  node --test tasks/copper_inversion/tests/submission_native.mjs
+```
+
+This exercises the actual Pi submission controller and task parser, including
+rejection, reopening the same turn for correction, nested artifact paths, and
+immutable snapshots. It uses no model API and does not replace a real campaign
+check. Historical campaigns retain their previous submission contract identity.

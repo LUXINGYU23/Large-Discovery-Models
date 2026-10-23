@@ -19,7 +19,7 @@ def test_snapshot_contract(tmp_path):
     artifact = SimpleNamespace(
         snapshot_path="solver.py",
         relative_path="candidates/0/solver.py",
-        path_pointer="/artifact_path",
+        path_pointer="/candidates/0/artifact_path",
         sha256=sha,
         size_bytes=len(source),
     )
@@ -29,12 +29,34 @@ def test_snapshot_contract(tmp_path):
         change_summary="test",
         rationale="test",
     )
+    submission = {"candidates": [submission]}
     assert parse_snapshot(submission, (artifact,), tmp_path, set()) == source
+    row = submission["candidates"][0]
+    for malformed in [row, {}, {"candidates": []}, {"candidates": [row, row]},
+                      {"candidates": row}, {"candidates": [None]},
+                      {"candidates": [row], "extra": True},
+                      {"candidates": [{**row, "extra": True}]},
+                      {"candidates": [{**row, "rationale": ""}]},
+                      {"candidates": [{**row, "parent_sha256": []}]}]:
+        with pytest.raises(ValueError):
+            parse_snapshot(malformed, (artifact,), tmp_path, set())
+    with pytest.raises(ValueError, match="one solver"):
+        parse_snapshot(submission, (artifact, artifact), tmp_path, set())
+    old_pointer = artifact.path_pointer
+    artifact.path_pointer = "/artifact_path"
+    with pytest.raises(ValueError, match="path mismatch"):
+        parse_snapshot(submission, (artifact,), tmp_path, set())
+    artifact.path_pointer = old_pointer
+    (tmp_path / "link.py").symlink_to(tmp_path / "solver.py")
+    artifact.snapshot_path = "link.py"
+    with pytest.raises(ValueError, match="symlink"):
+        parse_snapshot(submission, (artifact,), tmp_path, set())
+    artifact.snapshot_path = "solver.py"
     with pytest.raises(ValueError, match="already evaluated"):
         parse_snapshot(submission, (artifact,), tmp_path, {sha})
     with pytest.raises(ValueError, match="unknown parent"):
         parse_snapshot(
-            {**submission, "parent_sha256": "unknown"}, (artifact,), tmp_path, set()
+            {"candidates": [{**submission["candidates"][0], "parent_sha256": "unknown"}]}, (artifact,), tmp_path, set()
         )
     (tmp_path / "solver.py").write_bytes(source + b"# tampered")
     with pytest.raises(ValueError, match="digest mismatch"):
