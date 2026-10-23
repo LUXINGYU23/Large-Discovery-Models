@@ -145,12 +145,15 @@ export class ProviderProxy {
 			const encodedProfile = segments.shift();
 			if (!encodedProfile) return await this.reject(response, 404, "missing profile route");
 			const profileId = decodeURIComponent(encodedProfile);
+			const compaction = segments[0] === "compaction";
+			if (compaction) segments.shift();
 			const active = this.activeTurns.get(profileId);
 			if (!active) return await this.reject(response, 409, "profile has no active turn");
 			active.requestCount += 1;
 			const requestId = `${active.turnId}-provider-${active.requestCount}`;
 			let body = await this.readRequest(request);
-			if (request.method === "POST" && segments.join("/") === "responses" && Object.keys(this.requestBody).length) {
+			// Research overrides must not change native summary reasoning or output limits.
+			if (!compaction && request.method === "POST" && segments.join("/") === "responses" && Object.keys(this.requestBody).length) {
 				const payload = JSON.parse(body.toString("utf8"));
 				if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("provider request must be an object");
 				body = Buffer.from(JSON.stringify({ ...payload, ...this.requestBody }));

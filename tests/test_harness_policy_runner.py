@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ import numpy as np
 import pytest
 
 from ldm_tts.harness.protocol import file_sha256
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 
 
 RUNNER = Path(__file__).parents[1] / "harnesses" / "pi" / "policy_runner.py"
@@ -68,8 +70,7 @@ def _run(*args: str) -> tuple[subprocess.CompletedProcess[str], dict[str, object
     return completed, json.loads(completed.stdout)
 
 
-@pytest.mark.parametrize("task", ["iron_mind", "synthonbench", "nucleobench"])
-def test_policy_runner_executes_valid_numpy_artifact(tmp_path: Path, task) -> None:
+def test_policy_runner_executes_valid_numpy_artifact(tmp_path: Path, monkeypatch) -> None:
     artifact = tmp_path / "optimization_policy.py"
     artifact.write_text(
         """\
@@ -95,7 +96,9 @@ def choose_ldm_weights(context):
     round_input = tmp_path / "round"
     output = tmp_path / "output"
     _round_input(round_input)
-    diagnostics_path = RUNNER.parents[2] / "tasks" / task / "resources/harness/policy_diagnostics.py"
+    diagnostics_path = tmp_path / "policy_diagnostics.py"
+    shutil.copyfile(DIAGNOSTICS_PATH, diagnostics_path)
+    monkeypatch.chdir(tmp_path)
 
     completed, result = _run(
         "execute",
@@ -141,7 +144,7 @@ def test_task_skill_single_capability_artifacts_execute(tmp_path, task, capabili
     inputs["execution_context"]["weight_context"].update(default_alpha=1.0, default_eta=1.0)
     input_path.write_text(json.dumps(inputs))
     output = tmp_path / "output"
-    hook = resources / "policy_diagnostics.py"
+    hook = DIAGNOSTICS_PATH
     completed, result = _run(
         "execute", "--artifact", str(artifact), "--input", str(round_input), "--output", str(output),
         "--diagnostics", str(hook), "--diagnostics-sha256", file_sha256(hook),

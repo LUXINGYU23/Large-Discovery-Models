@@ -10,7 +10,7 @@ from ldm_tts.contracts import RawProposal, ReservoirBuilder
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
-from tasks.reasyn.core import workflow
+from tasks.reasyn.core.workflow_args import parse_args
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.chemistry import MOCK_SMILES
 from tasks.reasyn.core.projector import Projector as ReaSynProjector
@@ -78,7 +78,8 @@ def product(smiles):
 def observed(smiles):
     candidate = ReaSynDomain("tdc", mock=True).admit(product(smiles))
     return SimpleNamespace(candidate=candidate, candidate_id=candidate.candidate_id,
-                           canonical_key=candidate.canonical_key, metrics={"oracle_score": 0.5})
+                           canonical_key=candidate.canonical_key, metrics={"oracle_score": 0.5},
+                           evaluation=SimpleNamespace(status="succeeded"))
 
 
 def test_independent_minibatches_preserve_product_occurrences_before_dedup():
@@ -127,7 +128,7 @@ def test_reconstruction_alpha_tilts_query_groups_without_double_counting_trials(
     pool = tuple(next(c for c in candidates if c.payload["target_smiles"] == s) for s in ("CCO", "CCN"))
     assert empirical_base_masses(pool) == pytest.approx([0.75, 0.25])
 
-    from tasks.reasyn.resources.harness.policy_diagnostics import selection_probability
+    from ldm_tts.harness.ucb_diagnostics import selection_probability
     normalization = {"name": "robust_z", "epsilon": 1e-12, "mad_scale": 1.4826, "z_clip": 5}
     assert selection_probability(q0, scores, 1, 1, normalization, sizes) == pytest.approx(tilted)
 
@@ -195,7 +196,7 @@ def test_failed_second_minibatch_replays_first_response_without_endpoint_call(tm
 
 
 def test_recovery_seed_span_keeps_projector_receipts_stable_after_iteration_extension(tmp_path):
-    first_args = workflow.parse_args([
+    first_args = parse_args([
         "--mock",
         "--benchmark",
         "tdc",
@@ -223,7 +224,7 @@ def test_recovery_seed_span_keeps_projector_receipts_stable_after_iteration_exte
     request_path = tmp_path / "projections/recovery-000001/round-000000/batch-000000/request.json"
     before = json.loads(request_path.read_text())
 
-    resumed_args = workflow.parse_args([
+    resumed_args = parse_args([
         "--mock",
         "--benchmark",
         "tdc",

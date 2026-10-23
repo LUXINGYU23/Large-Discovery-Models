@@ -26,7 +26,7 @@ def test_endpoint_preflight_pause_keeps_all_counters_zero_and_redacts_key(
     monkeypatch.setenv("LLM_API_KEY", test_key)
     monkeypatch.setattr(
         workflow,
-        "build_openai_reaction_client",
+        "build_openai_proposal_client",
         lambda **_kwargs: OfflineEndpoint(),
         raising=False,
     )
@@ -56,7 +56,7 @@ def test_preflight_programming_error_is_not_silently_paused(tmp_path: Path, monk
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_openai_reaction_client",
+        "build_openai_proposal_client",
         lambda **_kwargs: BrokenEndpoint(),
         raising=False,
     )
@@ -93,7 +93,7 @@ def test_expansion_endpoint_error_preserves_request_budget_and_can_resume(
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_openai_reaction_client",
+        "build_openai_proposal_client",
         lambda **_kwargs: CircuitOpenClient(),
         raising=False,
     )
@@ -127,7 +127,7 @@ def test_invalid_endpoint_responses_never_reach_the_evaluator(
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_openai_reaction_client",
+        "build_openai_proposal_client",
         lambda **_kwargs: StaticEndpoint(),
         raising=False,
     )
@@ -160,7 +160,7 @@ def test_duplicate_endpoint_responses_are_deduplicated_by_the_shared_reservoir(
     monkeypatch.setenv("LLM_API_KEY", "test-workflow-key")
     monkeypatch.setattr(
         workflow,
-        "build_openai_reaction_client",
+        "build_openai_proposal_client",
         lambda **_kwargs: StaticEndpoint(),
         raising=False,
     )

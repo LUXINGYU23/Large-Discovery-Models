@@ -25,7 +25,7 @@ from tasks.alphabench.core.selection import FEATURE_VERSION, FactorEncoder, Fact
 
 
 def _fixture():
-    protocol = T3Protocol(method="ldm_harness_compiled", sessions=2, candidates_per_session=1, batch_size=1)
+    protocol = T3Protocol(method="ldm_harness_compiled", research_strategy_config={"name": "independent"}, sessions=2, candidates_per_session=1, batch_size=1)
     encoder = FactorEncoder()
     domain = FactorDomain("qlib")
     expressions = ("Mean($close,5)", "Std($close,10)", "Ref($close,5)", "Mean($volume,20)")
@@ -245,7 +245,7 @@ runtime = CampaignRuntime.open(run, task="alphabench",
 host = HostDispatcher()
 gateway = type("Gateway", (), {"runtime": runtime, "host": host})()
 meter = HarnessMeter(runtime, host)
-protocol = T3Protocol(method="ldm_harness_compiled", sessions=1,
+protocol = T3Protocol(method="ldm_harness_compiled", research_strategy_config={"name": "independent"}, sessions=1,
     candidates_per_session=1, batch_size=1)
 selector = CompiledFactorSelector(protocol, mock=True)
 domain, encoder = FactorDomain(), FactorEncoder()

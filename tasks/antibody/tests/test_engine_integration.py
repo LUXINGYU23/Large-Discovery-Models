@@ -99,7 +99,6 @@ class RandomEnergyEvaluator:
 
 
 def _run_one(tmp_path, monkeypatch, args) -> "PathLike":
-    monkeypatch.setattr(ldm_acq, "make_llm_client", lambda: DirectMockLLM())
     monkeypatch.setattr(
         ldm_acq,
         "make_evaluator",
@@ -113,6 +112,7 @@ def _run_one(tmp_path, monkeypatch, args) -> "PathLike":
         "TEST_ANTIGEN",
         17,
         args,
+        llm=DirectMockLLM(),
     )
 
 

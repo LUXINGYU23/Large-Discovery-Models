@@ -1,17 +1,17 @@
 """Assemble the shared campaign and its private post-search stages."""
 
+from contextlib import ExitStack
 from dataclasses import replace
 import json
 import os
 from pathlib import Path
 from uuid import uuid4
 
-from ldm_tts.campaign import CampaignBudget, CampaignRecipe, CampaignRequest, run_campaign
+from ldm_tts.campaign import CampaignBudget, CampaignRequest
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.expansion import CallableReservoirExpander
-from ldm_tts.engine import LDMEngineState
+from ldm_tts.engine import LDMEngine, LDMEngineState
 from ldm_tts.engine.run_store import BudgetExceededError, CampaignRuntime, atomic_json_write, unique_run_dir
-from ldm_tts.harness import HarnessError
 from ldm_tts.transport import CallableProposalClient
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from ldm_tts.registration.experiment import load_active_experiment_contract, snapshot_experiment_contract
@@ -21,7 +21,7 @@ from .data import verify_data_manifest
 from .finalization import finalize, verify_report_artifacts
 from .gateway import FactorEvaluator, OracleGateway
 from .generator import DirectExpander, Generator
-from .harness_runtime import build_harness, build_policy_harness
+from .harness_runtime import open_proposals, open_policy
 from .initialization import freeze_seed_source, run_initialization
 from .native_reference import prepare_native, run_native
 from .protocol import LDM_METHODS, digest
@@ -163,84 +163,62 @@ def run(args, protocol, spec):
     compiled_selector = (CompiledFactorSelector(protocol, mock=args.mock,
         initial_candidate_ids=(item.candidate_id for item in initial_observations), collection=collection)
         if protocol.method == "ldm_harness_compiled" else None)
-    objects = {}
-
-    def configure(runtime):
-        objects["runtime"] = runtime
-        runtime.consume_many({key: 0 for key in protocol.budgets}, usage_key="task:initialize-counters")
-        runtime.consume_many({"external_evaluations": 0, "expensive_evaluation_attempts": 0,
-                              "selected_candidates": 0}, usage_key="task:search-counters")
-        gateway = OracleGateway(protocol, runtime, endpoint=args.oracle_url, mock=args.mock)
-        gateway.preflight()
-        if harness_method:
-            harness_client, tools, expander = build_harness(protocol, gateway, collection, api_key=key,
-                sidecar_image=args.harness_sidecar_image)
-            objects.update(harness_client=harness_client, tools=tools)
-            try:
-                harness_client.start()
-            except HarnessError as exc:
-                raise EvaluationPaused("Harness startup failed: " + str(exc), status="paused_harness") from exc
-            if compiled_selector:
-                policy_client, policy_controller = build_policy_harness(protocol, gateway,
-                    compiled_selector.adapter, expander.meter, api_key=key,
-                    sidecar_image=args.harness_sidecar_image)
-                objects["policy_client"] = policy_client
-                try:
-                    policy_client.start()
-                except HarnessError as exc:
-                    raise EvaluationPaused("policy Harness startup failed: " + str(exc), status="paused_policy") from exc
-                compiled_selector.bind(policy_controller, expander.meter, gateway)
-        else:
-            generator = Generator(protocol, runtime, client, gateway, collection)
-            expander = DirectExpander(generator)
-        objects.update(gateway=gateway, expander=expander, evaluator=FactorEvaluator(gateway))
-
-    class Evaluator:
-        def evaluate(self, candidate):
-            return objects["evaluator"].evaluate(candidate)
-
-        def evaluation_attempt_usage_key(self, candidate):
-            return objects["evaluator"].evaluation_attempt_usage_key(candidate)
+    runtime = None
+    stack = ExitStack()
 
     try:
         if native:
             runtime, gateway, observations, execution = run_native(
                 protocol, args, spec, client, run_dir, initial_observations, native_config, contract_identity)
-            objects.update(runtime=runtime, gateway=gateway)
         else:
             budget = CampaignBudget(rounds=protocol.rounds, reservoir_size=protocol.sessions * protocol.candidates_per_session if protocol.method in LDM_METHODS else protocol.batch_size,
                 batch_size=protocol.batch_size, target_observations=len(initial_observations) + protocol.evaluations,
                 max_evaluation_attempts=protocol.evaluations, extra_limits=protocol.budgets)
-            result = run_campaign(CampaignRequest(run_dir, budget, config={"mock": args.mock, "protocol": protocol.to_dict()},
-                resume=(run_dir / "campaign.json").exists(), runtime_hook=configure, **contract_identity, finalize_runtime=False,
-                run_id=None if (run_dir / "campaign.json").exists() else "alphabench-" + uuid4().hex,
-                state_factory=lambda runtime: LDMEngineState.from_checkpoint(runtime.load_checkpoint()) if runtime.load_checkpoint() else LDMEngineState(observations=initial_observations)),
-                CampaignRecipe(spec, CallableReservoirExpander(lambda request: objects["gateway"].host.run(lambda: objects["expander"].expand(request))),
-                    FactorDomain(protocol.backend), Evaluator(),
-                    selector=(compiled_selector or FactorSelector(("mock_" if args.mock else "") + protocol.objective,
-                        seed=protocol.random_seed, pool_size=protocol.bo_pool_size)) if protocol.method in LDM_METHODS else None,
-                    surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None))
-            observations = result.engine.state.observations
+            request = CampaignRequest(run_dir, budget, config={"mock": args.mock, "protocol": protocol.to_dict()},
+                resume=(run_dir / "campaign.json").exists(), **contract_identity, finalize_runtime=False,
+                run_id=None if (run_dir / "campaign.json").exists() else "alphabench-" + uuid4().hex)
+            runtime = request.open_runtime(spec)
+            runtime.consume_many({key: 0 for key in protocol.budgets}, usage_key="task:initialize-counters")
+            runtime.consume_many({"external_evaluations": 0, "expensive_evaluation_attempts": 0,
+                                  "selected_candidates": 0}, usage_key="task:search-counters")
+            gateway = OracleGateway(protocol, runtime, endpoint=args.oracle_url, mock=args.mock)
+            gateway.preflight()
+            if harness_method:
+                expander = open_proposals(protocol, gateway, collection, api_key=key,
+                    sidecar_image=args.harness_sidecar_image, stack=stack)
+                if compiled_selector:
+                    open_policy(protocol, gateway, compiled_selector, expander.meter, api_key=key,
+                        sidecar_image=args.harness_sidecar_image, stack=stack)
+            else:
+                expander = DirectExpander(Generator(protocol, runtime, client, gateway, collection))
+            checkpoint = runtime.load_checkpoint()
+            state = LDMEngineState.from_checkpoint(checkpoint) if checkpoint else LDMEngineState(observations=initial_observations)
+            engine = LDMEngine(task_spec=spec, runtime=runtime,
+                expander=CallableReservoirExpander(lambda expansion: gateway.host.run(lambda: expander.expand(expansion))),
+                candidate_domain=FactorDomain(protocol.backend), evaluator=FactorEvaluator(gateway),
+                selector=(compiled_selector or FactorSelector(("mock_" if args.mock else "") + protocol.objective,
+                    seed=protocol.random_seed, pool_size=protocol.bo_pool_size)) if protocol.method in LDM_METHODS else None,
+                surrogate_encoder=FactorEncoder() if protocol.method in LDM_METHODS else None)
+            result = engine.run(budget.engine_config(), state=state, finalize_runtime=False)
+            observations = result.state.observations
             # Engine rounds_run is per invocation; the report records cumulative rounds across resume.
             execution = {"kind": "shared_engine", "summary": {
-                **result.engine.summary, "rounds_run": result.engine.state.next_round}}
-        report = finalize(protocol, objects["runtime"], objects["gateway"], observations, initial_pool, initial_budget,
+                **result.summary, "rounds_run": result.state.next_round}}
+        if harness_method and expander.coordinator is not None:
+            from ldm_tts.harness.research_runtime import write_fork_provenance
+            write_fork_provenance(run_dir / "harness", compiled_policy=protocol.method == "ldm_harness_compiled")
+        report = finalize(protocol, runtime, gateway, observations, initial_pool, initial_budget,
                           execution=execution, data_manifest=data_manifest)
         collection.export()
-        objects["runtime"].finish(report)
+        runtime.finish(report)
         print(json.dumps({"task": "alphabench", "run_dir": str(run_dir.resolve()),
                           "qualification": report["qualification"], "complete_t3": report["complete_t3"]}, indent=2))
         return 0
     except (EvaluationPaused, BudgetExceededError) as exc:
         status = exc.status if isinstance(exc, EvaluationPaused) else "paused_budget"
-        if "runtime" in objects:
-            objects["runtime"].pause(status, phase="reconciliation", message=str(exc))
+        if runtime is not None:
+            runtime.pause(status, phase="reconciliation", message=str(exc))
         print(json.dumps({"task": "alphabench", "status": status, "reason": str(exc)}))
         return 2
     finally:
-        if "harness_client" in objects:
-            objects["harness_client"].close()
-        if "policy_client" in objects:
-            objects["policy_client"].close()
-        if "tools" in objects:
-            objects["tools"].close()
+        stack.close()

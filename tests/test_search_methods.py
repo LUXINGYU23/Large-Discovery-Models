@@ -225,6 +225,61 @@ def test_mcts_runs_with_deferred_depths() -> None:
     assert engine.progress[-1][0] == "finished"
 
 
+@pytest.mark.parametrize("breadth,depth,interval,budget,evaluate_root,expected", [
+    (1, 2, 2, 1, False, 1),
+    (2, 3, 2, 4, False, 4),
+    (2, 2, 2, 20, False, 4),
+    (1, 3, 2, 20, False, 2),
+    (1, 2, 2, 1, True, 1),
+    (1, 2, 2, 0, True, 0),
+])
+def test_mcts_evaluation_budget_and_tree_exhaustion(breadth, depth, interval, budget, evaluate_root, expected):
+    engine = FakeEngine(interval=interval, root_score=100.0 if evaluate_root else None)
+    asyncio.run(mcts.run(engine, breadth=breadth, depth=depth, beam_width=1,
+                         max_evaluations=budget, evaluate_root=evaluate_root))
+    assert engine.evaluation_count == expected
+    if not evaluate_root:
+        assert engine.best_state() is not None
+        assert all(state.depth % interval == 0 or state.depth == depth
+                   for state in engine.states if state.status == "evaluated")
+
+
+def test_mcts_stops_when_expansion_returns_no_children():
+    engine = FakeEngine()
+    calls = []
+
+    async def empty(parent, count, **kwargs):
+        calls.append(parent.state_id)
+        return []
+
+    engine.expand_state = empty
+    assert asyncio.run(mcts.run(engine, breadth=2, depth=3, beam_width=1,
+                               max_evaluations=10, evaluate_root=False)) is None
+    assert calls == ["root"]
+    assert engine.evaluation_count == 0
+
+
+@pytest.mark.parametrize("closed_depth,budget,expected", [(0, 1, 1), (0, 20, 6), (1, 20, 6)])
+def test_mcts_searches_existing_descendants_after_empty_sibling(closed_depth, budget, expected):
+    engine = FakeEngine(interval=2)
+    expand = engine.expand_state
+    attempts = {}
+
+    async def sometimes_empty(parent, count, **kwargs):
+        attempts[parent.state_id] = attempts.get(parent.state_id, 0) + 1
+        if parent.depth == closed_depth and attempts[parent.state_id] > 1:
+            return []
+        return await expand(parent, count, **kwargs)
+
+    engine.expand_state = sometimes_empty
+    best = asyncio.run(mcts.run(engine, breadth=2, depth=3, beam_width=1,
+                               max_evaluations=budget, evaluate_root=False))
+    assert best is not None
+    assert engine.evaluation_count == expected
+    assert all(attempts.get(state.state_id, 0) <= 2 for state in engine.states
+               if state.depth == closed_depth)
+
+
 def test_mcts_node_helpers_and_delegated_reward() -> None:
     root = mcts.MCTSNode(FakeState("root", 0, 2.0))
     child = mcts.MCTSNode(FakeState("child", 1, 1.0), parent=root)

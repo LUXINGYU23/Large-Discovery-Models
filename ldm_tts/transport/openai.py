@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -22,6 +23,86 @@ from ldm_tts.transport.openai_http import (
     request_openai_responses_response,
     responses_url,
 )
+
+BASE_URL_ENV_NAMES = ("LLM_BASE_URL",)
+MODEL_ENV_NAMES = ("LLM_MODEL_NAME",)
+API_KEY_ENV_NAMES = ("LLM_API_KEY", "OPENAI_API_KEY")
+
+
+@dataclass(frozen=True)
+class OpenAIProviderSettings:
+    """Resolved endpoint settings; the API key is never persisted by the task."""
+
+    base_url: str
+    model: str
+    api_key: str
+
+
+def resolve_openai_provider_settings(
+    *,
+    base_url: str | None,
+    model: str | None,
+    api_key: str | None,
+    environ: Mapping[str, str] | None = None,
+) -> OpenAIProviderSettings:
+    """Resolve explicit CLI values before the shared provider environment names."""
+
+    environment = os.environ if environ is None else environ
+    return OpenAIProviderSettings(
+        base_url=_configured_value(base_url) or _first_environment_value(environment, BASE_URL_ENV_NAMES),
+        model=_configured_value(model) or _first_environment_value(environment, MODEL_ENV_NAMES),
+        api_key=_configured_value(api_key) or _first_environment_value(environment, API_KEY_ENV_NAMES),
+    )
+
+
+def _configured_value(value: str | None) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _first_environment_value(environment: Mapping[str, str], names: tuple[str, ...]) -> str:
+    for name in names:
+        value = _configured_value(environment.get(name))
+        if value:
+            return value
+    return ""
+
+
+def build_openai_proposal_client(
+    *,
+    base_url: str,
+    model: str,
+    api_key: str,
+    timeout_seconds: float,
+    max_tokens: int,
+    temperature: float = 0.7,
+    json_mode: bool = False,
+    extra_body: Mapping[str, Any] | None = None,
+) -> OpenAICompatibleProposalClient:
+    """Build the shared OpenAI-compatible transport for a real campaign."""
+
+    body = dict(extra_body or {})
+    if json_mode:
+        if "response_format" in body:
+            raise ValueError(
+                "--llm-json-mode cannot be combined with response_format in --llm-extra-body-json."
+            )
+        body["response_format"] = {"type": "json_object"}
+    return OpenAICompatibleProposalClient(
+        url=base_url,
+        model=model,
+        api_key=api_key,
+        timeout_seconds=timeout_seconds,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        max_retries=3,
+        retry_backoff_seconds=10.0,
+        extra_body=body,
+        require_models_preflight=False,
+        breaker=EndpointCircuitBreaker(
+            failure_threshold=32,
+        ),
+    )
+
 
 WIRE_APIS = ("chat_completions", "responses")
 REASONING_LEVELS = ("off", "none", "minimal", "low", "medium", "high", "xhigh", "max")

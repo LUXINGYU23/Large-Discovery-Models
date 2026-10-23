@@ -13,7 +13,8 @@ from ldm_tts.transport import CallableProposalClient
 from tasks.atomworld.core import selection
 from tasks.atomworld.core.proposals import AtomWorldDomain
 from tasks.atomworld.core.selection import GeometryEncoder, AtomWorldLDMSelector, pool_result
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 from tasks.atomworld.tests.test_harness import ResearchClient, fixture
 from tasks.atomworld.tests.test_policy import PolicyClient, KnownArtifactExecutor
 
@@ -32,7 +33,7 @@ def choose_ldm_weights(context):
 
 
 def options(tmp_path, method="ldm_harness_compiled", rounds=3):
-    return parse_args(["--mock", "--search-method", method, "--iterations", str(rounds),
+    return parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", method, "--iterations", str(rounds),
                        "--out-dir", str(tmp_path / "run")])
 
 
@@ -40,7 +41,7 @@ def selection_receipts(root):
     return [json.loads(p.read_text())["selection"] for p in sorted((root / "attempts").glob("*.json"))]
 
 
-def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_path):
+def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_path, monkeypatch):
     clients = []
 
     def factory(*args, **kwargs):
@@ -77,6 +78,11 @@ def test_compiled_campaign_fits_measured_gp_and_executes_both_capabilities(tmp_p
     args.resume = True
     resumed = run(args, harness_client_factory=lambda *a, **k: pytest.fail("completed run replayed"))
     assert {k: v for k, v in resumed.runtime.budget.counters.items() if v} == {k: v for k, v in before.items() if v}
+    diagnostic = tmp_path / "diagnostics.py"
+    diagnostic.write_text("# changed diagnostics\n")
+    monkeypatch.setattr("tasks.atomworld.core.provenance.DIAGNOSTICS_PATH", diagnostic)
+    with pytest.raises(ValueError, match="Resume requires"):
+        run(args, harness_client_factory=lambda *a, **k: pytest.fail("changed diagnostics resumed"))
 
 
 def test_research_cache_resume_before_selection_has_no_new_provider_draws(tmp_path, monkeypatch):

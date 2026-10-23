@@ -12,10 +12,12 @@ from ldm_tts.engine import InitialRoundReservoirExpander, LDMEngine
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.harness import HarnessClient, HarnessProfile, PolicyResearchController
+from ldm_tts.harness.research_runtime import MeasuredResearchExpander, ResearchCoordinator
 from ldm_tts.optimization.records import AcquisitionSelector
 from ldm_tts.transport import ProposalClient
 from tasks.iron_mind.core import task_spec as task_contracts
-from tasks.iron_mind.core.candidate import IronMindCandidateDomain
+from tasks.iron_mind.core.candidate import IronMindCandidateDomain, prepare_candidate_payload
+from tasks.iron_mind.core.research import serialize_measured_observations, write_measured_history
 from tasks.iron_mind.core.constants import OBJECTIVE_NAME
 from tasks.iron_mind.core.data import FrozenReactionTable
 from tasks.iron_mind.core.evaluator import FrozenReactionEvaluator
@@ -66,6 +68,8 @@ class CampaignComponentOptions:
     selection_seed: int = 0
     prompt_policy: str = DEFAULT_PROMPT_POLICY
     harness_client: HarnessClient | None = None
+    research_coordinator: ResearchCoordinator | None = None
+    harness_branch_client: Callable | None = None
     harness_profiles: tuple[HarnessProfile, ...] = ()
     harness_candidates_per_profile: int = 0
     harness_wall_time_seconds: int = 1800
@@ -227,18 +231,28 @@ def _expander(options: CampaignComponentOptions, domain: IronMindCandidateDomain
         search: ReservoirExpander = FullReactionDomainExpander(options.table)
     elif options.search_method in PERSISTENT_HARNESS_METHODS:
         assert options.harness_client is not None
-        search = IronMindHarnessExpander(
-            options.harness_client,
-            domain,
+        kwargs = dict(
             profiles=options.harness_profiles,
             candidates_per_profile=options.harness_candidates_per_profile,
             campaign_id=options.runtime.run_id,
             first_active_round=1 if options.initialization_mode == "shared_random" else 0,
             attach_empirical_q0=options.search_method in PARALLEL_HARNESS_METHODS,
             account=options.account_harness_usage,
-            artifact_root=options.runtime.run_dir / "harness",
             wall_time_seconds=options.harness_wall_time_seconds,
         )
+        if options.research_coordinator is not None:
+            search = MeasuredResearchExpander(
+                options.research_coordinator, options.harness_branch_client,
+                lambda client, root, cursors: IronMindHarnessExpander(
+                    client, domain, artifact_root=root, inherited_history_counts=cursors, **kwargs),
+                serialize_history=serialize_measured_observations,
+                write_history=write_measured_history,
+                proposal_key=lambda p: prepare_candidate_payload(p.payload, domain.schema, domain.table).canonical_key,
+                objective_name=OBJECTIVE_NAME, first_active_round=kwargs["first_active_round"],
+            )
+        else:
+            search = IronMindHarnessExpander(options.harness_client, domain,
+                artifact_root=options.runtime.run_dir / "harness", **kwargs)
     else:
         assert options.client is not None
         search = IronMindProposalExpander(

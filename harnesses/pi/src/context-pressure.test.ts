@@ -13,6 +13,7 @@ import { ContextPressureController, CONTEXT_MEASUREMENT_ENTRY } from "./context-
 import { WebEvidenceArchive, WEB_EVIDENCE_GUEST, WEB_EVIDENCE_MARKER } from "./web-evidence.js";
 import { sha256 } from "./trace.js";
 import { createSolPiExtension } from "./sol-pi.js";
+import { HistoryController } from "./history.js";
 
 const envelope: ContextEnvelope = { provider: "test", model: "model", systemPrompt: "system",
 	tools: [{ name: "web_fetch", parameters: { type: "object" } }], contextWindow: 1000, reserveTokens: 100 };
@@ -129,13 +130,16 @@ test(`actual Pi SDK preserves/recalls evidence (SoL-Pi=${withSolPi}, pressure=${
 			assert(!JSON.stringify(web).includes(WEB_EVIDENCE_MARKER));
 			return fauxAssistantMessage("Full evidence retained after repeated requests.");
 		}]);
-		const settingsManager = SettingsManager.inMemory({ retry: { enabled: false }, compaction: { enabled: false } });
+		const settingsManager = SettingsManager.inMemory({ retry: { enabled: false },
+			compaction: { enabled: true, reserveTokens: 1000, keepRecentTokens: 1000 } });
+		const history = new HistoryController();
 		const sol = withSolPi ? await createSolPiExtension({ version: 1, actionFusion: false, observationPack: true,
 			evidencePreservingReducer: false, onlineContextCompact: false, cacheWriteReadRatio: 50 }, agentDir,
 			faux.getModel().provider, faux.getModel().id, async () => ({}), join(agentDir, "sessions", "sol-pi")) : undefined;
 		const loader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, noExtensions: true, noSkills: true,
 			noPromptTemplates: true, noThemes: true, noContextFiles: true, extensionFactories: [
 				(pi) => pi.registerProvider(faux.provider), ...(sol ? [sol] : []), controller.createExtension(() => session?.messages ?? []),
+				history.createExtension("fixture-key"),
 			] });
 		await loader.reload();
 		assert.deepEqual(loader.getExtensions().errors, []);
@@ -154,7 +158,9 @@ test(`actual Pi SDK preserves/recalls evidence (SoL-Pi=${withSolPi}, pressure=${
 					} },
 			] }));
 		await session.bindExtensions({});
+		await history.begin(cwd, session.sessionManager);
 		await session.prompt("Read the paper's methods", { expandPromptTemplates: false });
+		history.assertReady();
 		assert.equal(faux.state.callCount, underPressure ? 3 : 4);
 		assert.equal(session.messages.filter((message) => message.role === "toolResult" && message.toolName === "web_fetch").length, 1);
 		const originalWeb = session.messages.find((message) => message.role === "toolResult" && message.toolName === "web_fetch");
@@ -164,5 +170,49 @@ test(`actual Pi SDK preserves/recalls evidence (SoL-Pi=${withSolPi}, pressure=${
 		assert(log.includes(CONTEXT_MEASUREMENT_ENTRY));
 		assert(log.includes("MIDDLE_RESULT=42"));
 		assert.equal(log.includes('"archivedResults":1'), underPressure);
+	} finally { session?.dispose(); await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("resumed Pi threshold pressure is relieved before the bounded summary hook runs", async () => {
+	const cwd = await mkdtemp(join(tmpdir(), "ldm-pressure-history-"));
+	const agentDir = join(cwd, "agent");
+	await mkdir(agentDir);
+	let session: AgentSession | undefined;
+	try {
+		const faux = fauxProvider({ provider: "pressure-resume", api: "pressure-resume-api",
+			models: [{ id: "model", contextWindow: 8000, maxTokens: 1000 }] });
+		faux.setResponses([(context) => {
+			assert.match(JSON.stringify(context.messages), /ldm_web_evidence_v1/);
+			return fauxAssistantMessage("Evidence retained.");
+		}]);
+		const manager = SessionManager.create(cwd, join(agentDir, "sessions"));
+		manager.appendMessage(user);
+		const evidence = paper(body);
+		assert(evidence.role === "toolResult");
+		manager.appendMessage(evidence);
+		const previous = fauxAssistantMessage("Recorded the paper.");
+		previous.provider = faux.getModel().provider;
+		previous.model = faux.getModel().id;
+		previous.usage = { ...previous.usage, input: 7500, totalTokens: 7500 };
+		manager.appendMessage(previous);
+		const pressure = new ContextPressureController(join(cwd, ".web-evidence"), 1000);
+		const history = new HistoryController();
+		const settingsManager = SettingsManager.inMemory({ retry: { enabled: false },
+			compaction: { enabled: true, reserveTokens: 1000, keepRecentTokens: 1000 } });
+		const loader = new DefaultResourceLoader({ cwd, agentDir, settingsManager,
+			noExtensions: true, noSkills: true, noContextFiles: true, noPromptTemplates: true, noThemes: true,
+			extensionFactories: [(pi) => pi.registerProvider(faux.provider),
+				pressure.createExtension(() => session?.messages ?? []), history.createExtension("fixture-key")] });
+		await loader.reload();
+		({ session } = await createAgentSession({ cwd, agentDir, model: faux.getModel(),
+			resourceLoader: loader, settingsManager, sessionManager: manager, tools: [] }));
+		await session.bindExtensions({});
+		await history.begin(cwd, manager);
+		await session.prompt("Continue from the preserved paper", { expandPromptTemplates: false });
+		history.assertReady();
+		assert.equal(faux.state.callCount, 1);
+		assert.equal(manager.getBranch().filter((entry) => entry.type === "compaction").length, 0);
+		assert.match(await readFile(manager.getSessionFile()!, "utf8"), /"skipSummary":true/);
+		await assert.rejects(readFile(join(cwd, "history-events.jsonl")), { code: "ENOENT" });
 	} finally { session?.dispose(); await rm(cwd, { recursive: true, force: true }); }
 });

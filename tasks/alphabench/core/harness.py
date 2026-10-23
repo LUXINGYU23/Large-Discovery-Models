@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import math
+from dataclasses import replace
 from pathlib import Path
 
 from ldm_tts.contracts import Candidate, RawProposal
@@ -11,6 +13,7 @@ from ldm_tts.engine.expansion import ExpansionResult
 from ldm_tts.harness import (HarnessArtifactRule, HarnessError, HarnessProviderAuthorizationRequest,
     HarnessSubmissionContract, HarnessSubmissionError, HarnessSubmissionValidation,
     HarnessTurn, canonical_sha256)
+from ldm_tts.harness.research_store import ResearchMeasurement
 from .candidate import FactorDomain
 from .protocol import digest
 from .receipts import Receipts
@@ -30,6 +33,10 @@ class HarnessMeter:
         if len(groups) != len(turn_ids):
             raise ValueError("Harness turn IDs must be unique")
         self.host.call(lambda: self.runtime.consume_groups(groups))
+
+    def reserve_main(self, turn_id):
+        self.host.call(lambda: self.runtime.consume_many({"harness_turns": 1},
+                       usage_key="task:main_research:" + turn_id))
 
     def authorize(self, request: HarnessProviderAuthorizationRequest):
         if request.campaign_id != self.runtime.run_id:
@@ -118,6 +125,8 @@ class HarnessExpander:
         self.tools = tools
         self.collection = collection
         self.profiles = client.config.profiles
+        self.coordinator = self.branch_client = None
+        self.inherited_history_counts = None
         expected = 1 if protocol.method == "harness" else protocol.sessions
         if len(self.profiles) != expected:
             raise ValueError("Harness session count differs from the frozen protocol")
@@ -125,10 +134,43 @@ class HarnessExpander:
     def expand(self, request):
         snapshot = self.tools.prepare(request) if self.tools else None
         try:
-            return self._expand(request, snapshot)
+            if self.coordinator is None:
+                return self._expand(request, snapshot)
+            return self._expand_tree(request, snapshot)
+        except HarnessError as exc:
+            if self.tools and self.tools.failure:
+                raise self.tools.failure from exc
+            raise EvaluationPaused("Research tree requires recovery: " + str(exc), status="paused_harness") from exc
         finally:
             if self.tools:
                 self.tools.clear()
+
+    def _expand_tree(self, request, snapshot):
+        objective = ("mock_" if self.gateway.mock else "") + self.protocol.objective
+        measurements = tuple(ResearchMeasurement(o.canonical_key,
+            self.protocol.direction * float(o.metrics[objective]), 0 if o.round_idx is None else o.round_idx + 1)
+            for o in request.observations if o.evaluation.succeeded and math.isfinite(float(o.metrics[objective])))
+        prepared = self.coordinator.prepare(request.round_idx + 1,
+            [public_observation(o) for o in request.observations], measurements,
+            message={"backend": self.protocol.backend, "market": self.protocol.market,
+                     "objective": self.protocol.objective, "direction": self.protocol.direction,
+                     "history_access": "get_history", "research_snapshot": snapshot},
+            forbidden_query_terms=tuple(o.candidate_id for o in request.observations))
+        with self.branch_client(prepared["root"], prepared["sources"]) as client:
+            branch = HarnessExpander(client, self.protocol, self.gateway, prepared["root"],
+                                     tools=self.tools, collection=self.collection)
+            branch.inherited_history_counts = {p: s.history_cursor for p, s in prepared["sources"].items()}
+            result = branch._expand(request, snapshot)
+        assignments = {a["profile_id"]: a for a in prepared["plan"]["assignments"]}
+        proposals = tuple(replace(p, metadata={**p.metadata, "research_fork":
+            [assignments[lineage["profile_id"]] for lineage in p.metadata["harness_lineage"]]}) for p in result.proposals)
+        keys = {profile: tuple(self.domain.admit(p).canonical_key for p in proposals
+            if any(lineage["profile_id"] == profile for lineage in p.metadata["harness_lineage"])) for profile in assignments}
+        self.coordinator.commit(prepared, {s["profile_id"]: s for s in result.metadata["turns"]}, keys,
+            proposals=[{"payload": p.payload, "lineage": p.metadata["harness_lineage"]} for p in proposals])
+        return replace(result, proposals=proposals, metadata={**result.metadata,
+            "sampling_mode": "main_research_round_forks", "main_turn_id": prepared["main_turn_id"],
+            "fork_plan": prepared["plan"]["assignments"]})
 
     def _expand(self, request, snapshot):
         direct = self.protocol.method == "harness"
@@ -141,21 +183,30 @@ class HarnessExpander:
         from_seq = len(history) - len(delta)
         history_digest = canonical_sha256(delta)
         evaluated = {item.canonical_key for item in request.observations}
-        turns = tuple(HarnessTurn(
-            profile_id=profile.profile_id,
-            turn_id=f"round_{request.round_idx:04d}_{profile.profile_id}_" + canonical_sha256({
-                "run": self.gateway.runtime.run_id, "profile_set": self.client.config.profile_set_sha256,
-                "profile": profile.profile_id, "round": request.round_idx, "history": history_digest,
-            })[:16],
-            round_index=request.round_idx, history_from_seq=from_seq,
-            history_to_seq=len(history), history_digest=history_digest,
-            message=json.dumps({"backend": self.protocol.backend, "market": self.protocol.market,
-                "objective": self.protocol.objective, "candidate_count": count,
-                "history_delta": delta, "history_digest": history_digest,
-                "evaluated_count": len(history), "filter_profile": self.protocol.filter_profile,
-                **({"research_snapshot": snapshot} if snapshot else {})}, sort_keys=True),
-            forbidden_query_terms=tuple(sorted({item.candidate_id for item in request.observations})),
-        ) for profile in self.profiles)
+        turns = []
+        for profile in self.profiles:
+            if self.inherited_history_counts is not None:
+                from_seq = self.inherited_history_counts[profile.profile_id]
+                if not 0 <= from_seq <= len(history):
+                    raise ValueError("Inherited history cursor is outside measured history")
+                delta = history[from_seq:]
+                history_digest = canonical_sha256(delta)
+            turns.append(HarnessTurn(
+                profile_id=profile.profile_id,
+                turn_id=f"round_{request.round_idx:04d}_{profile.profile_id}_" + canonical_sha256({
+                    "run": self.gateway.runtime.run_id, "profile_set": self.client.config.profile_set_sha256,
+                    "profile": profile.profile_id, "round": request.round_idx, "history": history_digest,
+                })[:16],
+                round_index=request.round_idx, history_from_seq=from_seq,
+                history_to_seq=len(history), history_digest=history_digest,
+                message=json.dumps({"backend": self.protocol.backend, "market": self.protocol.market,
+                    "objective": self.protocol.objective, "candidate_count": count,
+                    "history_delta": delta, "history_digest": history_digest,
+                    "evaluated_count": len(history), "filter_profile": self.protocol.filter_profile,
+                    **({"research_snapshot": snapshot} if snapshot else {})}, sort_keys=True),
+                forbidden_query_terms=tuple(sorted({item.candidate_id for item in request.observations})),
+            ))
+        turns = tuple(turns)
         self.meter.reserve_turns([turn.turn_id for turn in turns])
         try:
             results = self.client.run_turn(turns,
@@ -188,13 +239,9 @@ class HarnessExpander:
             if receipt != {"canonical_keys": keys}:
                 raise EvaluationPaused("Harness accepted submission lacks its Host validation receipt", status="paused_harness")
             occurrences.extend((item, key, result, index) for index, (item, key) in enumerate(zip(candidates, keys)))
-            accepted_actions.append((result, candidates))
-            summaries.append({"profile_id": result.profile_id, "turn_id": result.turn_id,
-                "submission_id": result.submission_id, "usage": result.usage,
-                "tool_budget": getattr(result, "tool_budget", {}),
-                "artifacts": getattr(result, "artifacts", {}), **accounting})
+            accepted_actions.append((result, candidates, accounting))
         if self.collection:
-            for result, candidates in accepted_actions:
+            for result, candidates, _ in accepted_actions:
                 ir = make_complete_design_ir(task_id="alphabench", domain="financial factor expressions",
                     task_description="Generate causal factors using only public contract and search observations.",
                     objectives=[{"name": self.protocol.objective, "direction": "maximize"}],
@@ -210,15 +257,13 @@ class HarnessExpander:
                         "native_artifacts": getattr(result, "artifacts", {})}))
         attempts = [json.loads(path.read_text(encoding="utf-8"))
                     for path in self.attempts.root.glob("*.json")]
-        for result, candidates in accepted_actions:
-            self.gateway.host.call(lambda result=result, candidates=candidates, attempts=attempts:
-                Receipts(self.gateway.runtime.run_dir / "generation").accept(["harness", result.turn_id], {
-                    "attempt_kind": "harness_provider_calls", "attempt_count": result.usage.get("providerCalls"),
-                    "submission_attempts": sum(item["turn_id"] == result.turn_id for item in attempts),
-                    "complete": True, "occurrences": [], "candidates": candidates,
-                    "round_index": request.round_idx, "profile_id": result.profile_id,
-                    "turn_id": result.turn_id, "sidecar_usage": result.usage,
-                    "tool_budget": getattr(result, "tool_budget", {})}))
+        for result, candidates, accounting in accepted_actions:
+            record = self.gateway.host.call(lambda result=result, candidates=candidates:
+                self._record_generation(result, candidates, request.round_idx, attempts))
+            summaries.append({"profile_id": result.profile_id, "turn_id": result.turn_id,
+                "submission_id": result.submission_id, "usage": record["sidecar_usage"],
+                "tool_budget": record["tool_budget"], "artifacts": getattr(result, "artifacts", {}),
+                **accounting})
         groups = {}
         for item, key, result, index in occurrences:
             group = groups.setdefault(key, {"candidate": item, "lineage": []})
@@ -231,6 +276,24 @@ class HarnessExpander:
             selection_mode="reservoir_order" if direct else "acquisition",
             metadata={"sampling_mode": "persistent_direct_session" if direct else "persistent_parallel_sessions",
                 "occurrences": len(occurrences), "unique": len(proposals), "turns": summaries})
+
+    def _record_generation(self, result, candidates, round_idx, attempts):
+        receipts = Receipts(self.gateway.runtime.run_dir / "generation")
+        identity = ["harness", result.turn_id]
+        action = {"complete": True, "occurrences": [], "candidates": candidates,
+                  "round_index": round_idx, "profile_id": result.profile_id,
+                  "turn_id": result.turn_id, "input_digest": result.input_digest,
+                  "submission_id": result.submission_id, "submission_digest": result.submission_digest}
+        previous = receipts.load(identity)
+        if previous is not None:
+            if any(previous[key] != value for key, value in action.items()):
+                raise ValueError("accepted action identity conflict")
+            # Replays validate the same action and retain its original accounting.
+            return previous
+        return receipts.accept(identity, {**action,
+            "attempt_kind": "harness_provider_calls", "attempt_count": result.usage.get("providerCalls"),
+            "submission_attempts": sum(item["turn_id"] == result.turn_id for item in attempts),
+            "sidecar_usage": result.usage, "tool_budget": getattr(result, "tool_budget", {})})
 
     def _validate(self, submission, count, evaluated, round_idx):
         identity = [submission.turn_id, submission.attempt_index, submission.digest]

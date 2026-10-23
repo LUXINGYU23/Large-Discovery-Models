@@ -37,12 +37,12 @@ from tasks.nucleobench.core.oracles.official import (
     load_prepared_case,
 )
 from tasks.nucleobench.core.source import require_clean_revision
-from tasks.nucleobench.core.workflow import (
-    _finish_completed_resume,
+from tasks.nucleobench.core.official_driver import (
     build_official_runner_args,
-    parse_args,
     run_official_driver,
 )
+from tasks.nucleobench.core.workflow import _finish_completed_resume
+from tasks.nucleobench.core.workflow_args import parse_args
 from tasks.nucleobench.scripts import prepare_official_data as prepare_module
 from tasks.nucleobench.scripts.prepare_official_data import prepare_case_data
 

@@ -10,7 +10,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional, Sequence
+from typing import Any, Iterable, Optional
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from tasks.small_molecule.core.docking import (
     run_logged_command,
     work_dir_for_receptor,
 )
+from tasks.small_molecule.core.model_artifact import sha256_file
 
 
 LOGGER = logging.getLogger(__name__)
@@ -150,6 +151,17 @@ class VinaScorerConfig:
 # ---------------------------------------------------------------------------
 
 
+def _docking_identity(receptor, vina_bin, exhaustiveness, n_poses, seed):
+    executable = Path(shutil.which(vina_bin) or vina_bin).expanduser().resolve()
+    receptor_path = Path(receptor.receptor_pdbqt).resolve()
+    return {"engine": "vina", "receptor": str(receptor_path),
+            "receptor_sha256": sha256_file(receptor_path),
+            "vina_bin": str(executable), "vina_sha256": sha256_file(executable),
+            "box_center": receptor.box_center, "box_size": receptor.box_size,
+            "prep_method": receptor.prep_method, "exhaustiveness": exhaustiveness,
+            "n_poses": n_poses, "seed": seed}
+
+
 def vina_dock_one(
     smiles: str,
     receptor: ReceptorConfig,
@@ -191,26 +203,12 @@ def vina_dock_one(
 
     pose_dir = work_path / "poses"
     pose_dir.mkdir(parents=True, exist_ok=True)
-    cache_key = hash_text(
-        json.dumps(
-            {
-                "smiles": canonical,
-                "receptor": str(Path(receptor.receptor_pdbqt).resolve()),
-                "box_center": receptor.box_center,
-                "box_size": receptor.box_size,
-                "prep_method": receptor.prep_method,
-                "exhaustiveness": exhaustiveness,
-                "n_poses": n_poses,
-                "seed": seed,
-            },
-            sort_keys=True,
-        ),
-        20,
-    )
+    identity = _docking_identity(receptor, vina_bin, exhaustiveness, n_poses, seed)
+    cache_key = hash_text(json.dumps({**identity, "smiles": canonical}, sort_keys=True), 20)
     pose_path = pose_dir / f"{result_id}_{cache_key}.pdbqt"
     log_path = pose_dir / f"{result_id}_{cache_key}.log"
     cmd = [
-        vina_bin,
+        identity["vina_bin"],
         "--receptor",
         receptor.receptor_pdbqt,
         "--ligand",
@@ -290,17 +288,12 @@ def vina_dock_batch(
     max_workers: int = 1,
     timeout: int = 3600,
 ) -> list[DockingResult]:
-    """Dock a batch of compounds. Local replica of
-    ``extract_and_dock.dock_batch`` with ``vina_bin`` as a real argument.
-
-    Per-compound cache key matches ``extract_and_dock.dock_batch``
-    (canonical SMILES + receptor + box + prep_method + docking params)
-    so cache files written by either implementation are interoperable.
-    """
+    """Dock compounds with cache and pose identities bound to scientific inputs."""
     require_production_receptor(receptor, allow_debug_receptor=allow_debug_receptor)
     work_path = work_dir_for_receptor(receptor)
     cache_dir = work_path / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
+    identity = _docking_identity(receptor, vina_bin, exhaustiveness, n_poses, seed)
 
     def dock_or_read_cache(compound: ExtractedCompound) -> DockingResult:
         canonical = canonicalize_smiles(compound.full_smiles or "")
@@ -313,23 +306,7 @@ def vina_dock_batch(
                 status="prep_failed",
                 message="Compound has no SMILES.",
             )
-        cache_key = hash_text(
-            json.dumps(
-                {
-                    "engine": "vina",
-                    "smiles": canonical,
-                    "receptor": str(Path(receptor.receptor_pdbqt).resolve()),
-                    "box_center": receptor.box_center,
-                    "box_size": receptor.box_size,
-                    "prep_method": receptor.prep_method,
-                    "exhaustiveness": exhaustiveness,
-                    "n_poses": n_poses,
-                    "seed": seed,
-                },
-                sort_keys=True,
-            ),
-            20,
-        )
+        cache_key = hash_text(json.dumps({**identity, "smiles": canonical}, sort_keys=True), 20)
         cache_path = cache_dir / f"docking_{cache_key}.json"
         if use_cache and cache_path.exists():
             try:
@@ -344,7 +321,7 @@ def vina_dock_batch(
         result = vina_dock_one(
             canonical,
             receptor,
-            vina_bin=vina_bin,
+            vina_bin=identity["vina_bin"],
             exhaustiveness=exhaustiveness,
             n_poses=n_poses,
             seed=seed,

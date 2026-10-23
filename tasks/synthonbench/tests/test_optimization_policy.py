@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+from tasks.synthonbench.core.harness_runtime import create_client
+
 import numpy as np
 import pytest
 
@@ -25,7 +27,6 @@ from tasks.synthonbench.core.tanimoto_gp import (
 )
 from tasks.synthonbench.core.workflow import (
     _load_benchmark,
-    _harness_client,
     describe_ldm_task,
     parse_args,
 )
@@ -295,7 +296,7 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
         ]
     )
     benchmark = _load_benchmark(args)
-    client = _harness_client(
+    client = create_client(
         args,
         SimpleNamespace(run_dir=tmp_path / "run", run_id="campaign-test"),
         SimpleNamespace(
@@ -312,7 +313,7 @@ def test_compiled_method_declares_policy_pool_budget_and_public_mounts(
     command = " ".join(client.command)
 
     assert args.policy_capability == ["ldm_weights@1", "prior_mean@1"]
-    assert budget["harness_turns"] == 8
+    assert budget["harness_turns"] == 10
     assert budget["policy_harness_turns"] == 2
     assert spec.acquisition.parameters["optimization_policy"] == (
         "persistent_harness_compiled"

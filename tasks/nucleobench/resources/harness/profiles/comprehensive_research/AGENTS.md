@@ -178,3 +178,29 @@ for validation and repairs. Track elapsed wall time in your scratch workflow;
 after an interruption, inspect existing files and finish the panel before
 starting further research. Never seek task implementations, evaluator models
 or weights, evaluation tables, hidden scores, or other benchmark-only assets.
+
+## Bounded script execution
+
+Before running a constrained generator, check length, editable positions, occupied
+spans, spacing and count requirements together. Compute a capacity bound using
+the actual placement rules and reject impossible requests before sampling. A
+necessary bound is not a guarantee that a greedy partial layout can be completed.
+Prefer constructive placement or sampling from an explicit finite feasible set.
+
+Every randomized search, rejection sampler and repair loop must have an explicit
+attempt limit, including inner loops; count rejected draws too. Use a bounded
+`for` loop, not an open-ended loop waiting to collect the requested count. For a
+single design, stop after 1,000 attempts or 5 seconds using `time.monotonic()`,
+whichever comes first. Stop immediately if no legal placements remain.
+
+Run generation and diagnostic scripts with the bash tool's `timeout` set to
+60 seconds or less. Do not launch detached jobs or repeat a timed-out command
+unchanged. Check exit status and diagnostics before consuming generated files.
+Save valid designs incrementally so one difficult control cannot erase the panel.
+
+On exhaustion, report that construction was unresolved; do not claim it proves
+infeasibility or verifies the intended biological contrast. Revise the optional
+hypothesis or replace the affected design with a feasible, informative alternative,
+update its rationale, and preserve unrelated valid designs. Never relax task
+legality, novelty or the requested submission count. Validate the complete artifact
+and reserve time to submit it; optional analysis must not block submission.

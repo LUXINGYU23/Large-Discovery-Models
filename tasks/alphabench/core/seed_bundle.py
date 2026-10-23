@@ -16,7 +16,7 @@ from .protocol import T3Protocol, digest
 def initialization_contract(protocol):
     search_only = {"method", "rounds", "evaluations", "batch_size", "sessions", "candidates_per_session", "bo_pool_size",
                    "factor_select_n", "stock_topk", "stock_n_drop", "assay_portfolio", "validation_metric", "budgets", "native_parameters",
-                   "harness_surrogate_query", "policy_capabilities"}
+                   "harness_surrogate_query", "policy_capabilities", "research_strategy_config", "research_strategy_identity"}
     return {key: value for key, value in protocol.to_dict().items() if key not in search_only}
 
 

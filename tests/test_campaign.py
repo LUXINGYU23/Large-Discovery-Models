@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -215,6 +216,28 @@ def test_run_campaign_resumes_from_checkpoint_and_extends_target(
     events = [item["event_type"] for item in resumed.runtime.events()]
     assert "campaign_resumed" in events
     assert "campaign_finished" in events
+    resumed_event = next(event for event in resumed.runtime.events() if event["event_type"] == "campaign_resumed")
+    assert resumed_event["payload"]["previous_budget_limits"]["external_evaluations"] == 2
+    assert resumed_event["payload"]["budget_limits"]["external_evaluations"] == 4
+
+
+@pytest.mark.parametrize("changed", ["config", "task_spec", "budget"])
+def test_resume_rejects_changed_science_or_reduced_budget_without_writes(tmp_path, changed):
+    request = _request(tmp_path, CampaignBudget(rounds=2, reservoir_size=1))
+    recipe = _recipe()
+    run_campaign(request, recipe)
+    before = {path: path.read_bytes() for path in request.run_dir.rglob("*") if path.is_file()}
+    request = replace(request, resume=True)
+    if changed == "config":
+        request = replace(request, config={"mode": "real"})
+    elif changed == "task_spec":
+        recipe = replace(recipe, task_spec=replace(recipe.task_spec,
+            acquisition=replace(recipe.task_spec.acquisition, parameters={"beta": 9})))
+    else:
+        request = replace(request, budget=CampaignBudget(rounds=1, reservoir_size=1))
+    with pytest.raises(ValueError, match="resume (scientific|budget)"):
+        run_campaign(request, recipe)
+    assert {path: path.read_bytes() for path in request.run_dir.rglob("*") if path.is_file()} == before
 
 
 def test_state_factory_seeds_initial_observations(tmp_path: Path) -> None:

@@ -10,7 +10,8 @@ from pathlib import Path
 
 from ldm_tts.harness import HarnessClient, HarnessPoolConfig
 from tasks.atomworld.core.harness import harness_profiles, submission_contract
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 
 SIDECAR = r"""
 import hashlib, json, sys
@@ -75,7 +76,7 @@ def test_shared_client_runs_geometry_repair_history_and_evaluation(tmp_path):
     script.write_text(SIDECAR)
     roots = []
 
-    def factory(args, root, sample, *, policy=False):
+    def factory(args, root, sample, *, policy=False, campaign_id):
         roots.append(root)
         root.mkdir(parents=True, exist_ok=True)
         (root / "public_task.json").write_text(json.dumps(sample))
@@ -98,12 +99,10 @@ def test_shared_client_runs_geometry_repair_history_and_evaluation(tmp_path):
             ),
             response_timeout_seconds=30,
         )
-        client.start()
         return client
 
     result = run(
-        parse_args(
-            [
+        parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
                 "--mock",
                 "--search-method",
                 "harness",

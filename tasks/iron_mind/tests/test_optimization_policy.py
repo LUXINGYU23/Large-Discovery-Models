@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+from tasks.iron_mind.core.harness_runtime import create_client
+
 import numpy as np
 import pytest
 
@@ -14,7 +16,7 @@ from ldm_tts.harness import (
     load_harness_mcp_config,
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
-from tasks.iron_mind.core.policy_diagnostics import prepare_ucb_policy_research
+from ldm_tts.harness.ucb_diagnostics import prepare_ucb_policy_research
 from tasks.iron_mind.core.candidate import IRON_MIND_Q0_METADATA_KEY
 from tasks.iron_mind.core.ldm_selector import AcquisitionTiltedSelector
 from tasks.iron_mind.core.history import condition_evidence
@@ -31,7 +33,6 @@ from tasks.iron_mind.core.schema import (
 )
 from tasks.iron_mind.core.surrogate import ReactionOneHotEncoder
 from tasks.iron_mind.core.workflow import (
-    _harness_client,
     describe_ldm_task,
     parse_args,
 )
@@ -339,7 +340,7 @@ def test_compiled_method_declares_policy_pool_and_separate_budget() -> None:
 
     assert args.policy_capability == ["ldm_weights@1", "prior_mean@1"]
     assert budget["proposal_attempts"] == 8
-    assert budget["harness_turns"] == 8
+    assert budget["harness_turns"] == 10
     assert budget["policy_harness_turns"] == 2
     assert task_spec.acquisition.parameters["optimization_policy"] == (
         "persistent_harness_compiled"
@@ -386,7 +387,7 @@ def test_policy_sidecar_mounts_only_public_task_resources(tmp_path) -> None:
         ]
     )
     table = workflow._load_mock_table(workflow._schema_for("buchwald_hartwig"))
-    client = _harness_client(
+    client = create_client(
         args,
         SimpleNamespace(run_dir=tmp_path / "run", run_id="campaign-test"),
         SimpleNamespace(

@@ -1,12 +1,20 @@
 # Iron Mind Reaction-Condition Optimization
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; candidate and evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions
+or latest-main 4fork. Strategy changes require a new campaign identity.
+
 This task evaluates the repository's LDM method on source-pinned Iron Mind
 reaction-condition tables. It does not run the upstream Iron Mind optimizer.
 
 Each external round follows the Iron Mind comparison protocol: exactly one
 reaction condition is evaluated. The direct backend asks the model for 64
 independent proposal samples. `ldm_harness` instead collects 16 candidates from
-each of four persistent research sessions; both LDM methods estimate empirical
+each of four research branches; both LDM methods estimate empirical
 `q0` and use the same task-local GP and acquisition-tilted policy.
 `ldm_harness_compiled` keeps that 4-by-16 proposal path and adds one independent
 persistent policy session that may define the GP prior mean and round-specific
@@ -41,11 +49,18 @@ ldm_task/          shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/harness_runtime.py Pi proposal trees, policy assembly and client lifetimes
 core/research.py   measured-history projection and candidate-file admission
 resources/         versioned fixtures, Harness profiles/tools, and upstream provenance
 scripts/           data preparation and result aggregation
 tests/             task-local tests
 ```
+
+The workflow owns the resource `ExitStack`; runtime assembly registers proposal
+and policy clients before startup. `MeasuredResearchExpander` coordinates the
+shared research tree, while task adapters retain legal conditions, measured
+evidence and compiled-policy validation. Evaluation reservation and replay use
+the shared engine; reaction scoring and empirical q0 remain task-owned.
 
 ## Campaign Protocol
 
@@ -195,12 +210,13 @@ proposal. Providers that do not support this extension can use
 
 ## Persistent Research Harness
 
-The `ldm_harness` method keeps four independent Pi sessions alive for a campaign.
-Each uses the same task-local `comprehensive_research/AGENTS.md` and maintains
-its own transcript and workspace. The researcher combines chemical mechanisms,
+The `ldm_harness` method defaults to a persistent main researcher with four
+proposal branches: two fork its latest node, one restarts from older main history,
+and one continues an archived side lineage. Each branch uses the task-local
+`comprehensive_research/AGENTS.md` in its own transcript and workspace. The researcher combines chemical mechanisms,
 measured interactions, literature, and design-space coverage. Instructions call
 for evidence-driven refinement, credible alternatives, and informative controls;
-there are no fixed exploration quotas or round-based curriculum switches.
+the tree selects parents while researchers choose their candidate designs.
 
 Each session writes `candidates.json` with exactly 16 distinct legal conditions
 and submits `{"artifact_path":"candidates.json"}`. Each candidate contains
@@ -311,7 +327,7 @@ secret references, and trace semantics are documented in
 ## Harness-Compiled LDM
 
 `ldm_harness_compiled` preserves the complete Harness proposal path: four
-persistent proposal sessions still produce 64 valid unseen occurrences, and
+proposal branches still produce 64 valid unseen occurrences, and
 the task still computes empirical `q0` and maintains the same 32-candidate BO
 pool. Before final selection, one separate `policy_architect` session receives
 compact measured indexes, factor schema, proposal-distribution summaries,
@@ -336,8 +352,8 @@ or interactions. Draft evaluation compares chronological measured-history
 holdouts with training-prefix GP hyperparameters frozen. The policy also receives
 exact sampling logits and subsequent errors of frozen pre-measurement predictions.
 Historical holdouts are development diagnostics, not an untouched test set.
-The task owns these calculations in `core/policy_diagnostics.py` and the
-digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
+These calculations share `ldm_tts/harness/ucb_diagnostics.py` with Iron Mind,
+NucleoBench and SynthonBench. Pi loads the same file as a digest-pinned hook.
 Measured feedback retains the original pool's q0 ranks and relative mass,
 acquisition ranks, first-draw probabilities, and actual alpha/eta. These describe
 the selection context, not validation of a ranking or weight policy. Proposal
@@ -458,7 +474,7 @@ confirmation matrix for the same six methods. The six-round standard matrix
 provides the corresponding lower-cost screen.
 
 Direct LDM retains 64 independent requests with at most 4 concurrent workers.
-Harness LDM uses four concurrent persistent sessions with 16 candidates each.
+Harness LDM uses four concurrent research branches with 16 candidates each.
 Harness-Compiled LDM uses the same proposal sessions and adds one independent
 policy session per campaign. All three use empirical `q0`, a 32-candidate
 maintained pool, `beta=1`, and acquisition z-clipping at 2. The two fixed LDM

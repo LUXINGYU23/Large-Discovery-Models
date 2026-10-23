@@ -13,7 +13,7 @@ from ldm_tts.engine import LDMEngineState
 from ldm_tts.engine.run_store import CampaignRuntime
 from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.transport.openai_http import EndpointRequestError
-from tasks.synthonbench.core.provider import (
+from ldm_tts.transport.openai import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )
@@ -37,7 +37,7 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
             if args.search_method in PARALLEL_HARNESS_METHODS
             else 1
         )
-        harness_turns = search_rounds * profile_count
+        harness_turns = search_rounds * (profile_count + int(args._research_strategy.requires_main))
     else:
         harness_turns = 0
         llm_requests = proposal_attempts if args.proposal_mode == "openai" else 0
@@ -45,6 +45,7 @@ def campaign_budget(args: Any, profile_budget: Mapping[str, int | float] | None)
         "outer_iterations": args.iterations,
         "proposal_attempts": proposal_attempts,
         "harness_turns": harness_turns,
+        "main_research_turns": search_rounds if args._research_strategy.requires_main else 0,
         "valid_search_candidates": _valid_candidate_count(args, initial, search_rounds),
         "selected_candidates": selected,
         "external_evaluations": selected,
@@ -90,7 +91,7 @@ def _valid_candidate_count(args: Any, initial: int, search_rounds: int) -> int:
 def jsonable_args(args: Any) -> dict[str, Any]:
     return {key: str(value) if isinstance(value, Path) else value
             for key, value in vars(args).items()
-            if key != "api_key"
+            if key != "api_key" and not key.startswith("_")
             and not (
                 key.startswith("policy_")
                 and args.search_method != COMPILED_POLICY_METHOD

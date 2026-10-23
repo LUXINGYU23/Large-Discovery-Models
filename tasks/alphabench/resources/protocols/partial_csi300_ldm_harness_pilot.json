@@ -23,7 +23,12 @@
   "rounds": 2,
   "evaluations": 2,
   "batch_size": 1,
-  "sessions": 2,
+  "sessions": 4,
+  "research_strategy_config": {
+    "name": "main_forks",
+    "fork_policy": {"name": "coverage"},
+    "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5}
+  },
   "candidates_per_session": 2,
   "harness_surrogate_query": true,
   "cold_seed_count": 0,
@@ -38,7 +43,7 @@
   "max_model_tokens": 32768,
   "assay_portfolio": {},
   "budgets": {
-    "model_requests": 80,
+    "model_requests": 200,
     "proposal_attempts": 30,
     "dynamic_checks": 100,
     "lint_checks": 0,
@@ -50,7 +55,7 @@
     "oracle_job_slots": 300,
     "benchmark_jobs": 300,
     "policy_turns": 0,
-    "harness_turns": 4,
-    "surrogate_queries": 120
+    "harness_turns": 10,
+    "surrogate_queries": 300
   }
 }

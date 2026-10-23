@@ -12,6 +12,7 @@ from typing import Any
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.harness.research_runtime import proposal_turn_summary, read_candidate_file, usage_counts
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
@@ -41,7 +42,6 @@ from tasks.synthonbench.core.constants import (
 )
 from tasks.synthonbench.core.proposal_base_measure import attach_empirical_base_measure
 from tasks.synthonbench.core.research import (
-    read_candidate_file,
     serialize_measured_observations,
     write_measured_history,
 )
@@ -203,6 +203,7 @@ class SynthonHarnessExpander:
         artifact_root: Path,
         wall_time_seconds: int = 1800,
         account: Callable[..., Any] | None = None,
+        inherited_history_counts: Mapping[str, int] | None = None,
     ) -> None:
         if not profiles or len({item.profile_id for item in profiles}) != len(profiles):
             raise ValueError("Harness requires distinct session identities")
@@ -226,6 +227,7 @@ class SynthonHarnessExpander:
         self.artifact_root = artifact_root
         self.wall_time_seconds = wall_time_seconds
         self.account = account
+        self.inherited_history_counts = inherited_history_counts
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -275,7 +277,7 @@ class SynthonHarnessExpander:
             if self.account is not None:
                 for turn in turns:
                     self.account(
-                        _usage_counts(usage_by_profile.get(turn.profile_id, {})),
+                        usage_counts(usage_by_profile.get(turn.profile_id, {})),
                         usage_key=f"harness:{turn.turn_id}",
                     )
                 self.account({"harness_wall_time_seconds": time.perf_counter() - started})
@@ -315,7 +317,7 @@ class SynthonHarnessExpander:
                     for item in proposals
                 ],
                 "sessions": [
-                    _result_summary(item, self.candidates_per_profile)
+                    proposal_turn_summary(item, self.candidates_per_profile)
                     for item in results
                 ],
             },
@@ -400,6 +402,15 @@ class SynthonHarnessExpander:
             )
         turns = []
         for profile in self.profiles:
+            if self.inherited_history_counts is not None:
+                history_from_seq = self.inherited_history_counts[profile.profile_id]
+                if not 0 <= history_from_seq <= history_to_seq:
+                    raise ValueError("Inherited history cursor is outside measured history")
+                serialized_history = serialize_measured_observations(request.observations[history_from_seq:], self.domain.space)
+                history_digest = canonical_sha256(serialized_history)
+                payload.update(message_type="research_fork", history_from_seq=history_from_seq,
+                               history_digest=history_digest, new_measured_observations=tuple({key: row[key] for key in ("candidate_id", "round_index", OBJECTIVE_NAME)} for row in serialized_history))
+                message = "Continue from the inherited research state; reconcile the following feedback and submit the candidate batch.\n\n" + json.dumps(payload)
             digest = canonical_sha256(
                 {
                     "campaignId": self.campaign_id,
@@ -624,37 +635,3 @@ def _validate_submission(
         if errors
         else HarnessSubmissionValidation()
     )
-
-
-def _usage_counts(usage: Mapping[str, Any]) -> dict[str, int]:
-    counts = {
-        counter: int(usage[key])
-        for key, counter in (
-            ("providerCalls", "llm_requests"),
-            ("validationSubmissions", "harness_validation_submissions"),
-            ("artifactBytes", "harness_artifact_bytes"),
-        )
-        if key in usage
-    }
-    if "toolCalls" in usage:
-        counts["harness_tool_calls"] = sum(int(count) for count in usage["toolCalls"].values())
-    return counts
-
-
-def _result_summary(
-    result: HarnessTurnResult, candidate_count: int
-) -> dict[str, object]:
-    return {
-        "profile_id": result.profile_id,
-        "session_id": result.session_id,
-        "session_turn_id": result.turn_id,
-        "round_index": result.round_index,
-        "history_from_seq": result.history_from_seq,
-        "history_to_seq": result.history_to_seq,
-        "history_digest": result.history_digest,
-        "submission_id": result.submission_id,
-        "candidate_count": candidate_count,
-        "usage": result.usage,
-        "tool_budget": result.tool_budget,
-        "artifacts": result.artifacts,
-    }

@@ -17,6 +17,32 @@ from typing import Any, Mapping
 
 _EVENT_LOCK = threading.Lock()
 
+# Launch locations and absolute completion limits do not change the scientific recipe.
+_RESUME_LAUNCH_FIELDS = {
+    "out_dir", "out_root", "output_dir", "trajectory_dir", "run_name",
+    "resume_from", "resume_run", "resume", "dry_run",
+    "api_key", "api_key_file", "harness_api_key_file", "provider_api_key",
+}
+_RESUME_LIMIT_FIELDS = {"iterations", "n_evals", "max_evals", "max_real_evaluations", "budget"}
+
+
+def _validate_resume_snapshot(path: Path, current: Any, *, config: bool = False) -> None:
+    if not path.is_file():
+        raise ValueError(f"resume requires the frozen {path.name}")
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    current = json.loads(json.dumps(current, sort_keys=True))
+    if config:
+        ignored = _RESUME_LAUNCH_FIELDS | _RESUME_LIMIT_FIELDS
+        changed = sorted(
+            key for key in saved.keys() | current.keys()
+            if key not in ignored
+            and (key not in saved or key not in current or saved[key] != current[key])
+        )
+        if changed:
+            raise ValueError("resume scientific configuration mismatch: " + ", ".join(changed))
+    elif saved != current:
+        raise ValueError(f"resume scientific snapshot mismatch: {path.name}")
+
 
 class BudgetExceededError(RuntimeError):
     """Raised before a campaign consumes more than a declared budget."""
@@ -228,6 +254,7 @@ class CampaignRuntime:
         contract_sha256: str = "",
         contract_profile: str = "",
         resume: bool = False,
+        allow_budget_extension: bool = False,
     ) -> "CampaignRuntime":
         path = Path(run_dir)
         manifest_path = path / "campaign.json"
@@ -236,6 +263,7 @@ class CampaignRuntime:
             raise ValueError("campaign task must not be empty")
         if not requested_run_id.strip():
             raise ValueError("campaign run_id must not be empty")
+        spec_payload = task_spec.to_dict() if hasattr(task_spec, "to_dict") else task_spec
 
         existing_manifest: dict[str, Any] | None = None
         if manifest_path.exists():
@@ -255,6 +283,16 @@ class CampaignRuntime:
                     f"cannot resume run_id {requested_run_id!r} from {existing_run_id!r}"
                 )
             requested_run_id = existing_run_id
+            if config is not None:
+                _validate_resume_snapshot(path / "config.json", dict(config), config=True)
+            if spec_payload is not None:
+                _validate_resume_snapshot(path / "ldm_task_spec.json", spec_payload)
+            for key, value in (
+                ("contract_sha256", contract_sha256),
+                ("contract_profile", contract_profile),
+            ):
+                if value and value != existing_manifest.get(key):
+                    raise ValueError(f"resume {key} differs from the persisted campaign")
             contract_sha256 = str(existing_manifest.get("contract_sha256", contract_sha256))
             contract_profile = str(existing_manifest.get("contract_profile", contract_profile))
         elif resume:
@@ -262,10 +300,18 @@ class CampaignRuntime:
 
         path.mkdir(parents=True, exist_ok=True)
         budget_path = path / "budget.json"
+        previous_limits = None
         if resume and budget_path.exists():
             budget = BudgetLedger.load(budget_path)
             if budget_limits is not None and dict(budget_limits) != budget.limits:
-                raise ValueError("resume budget limits do not match the persisted campaign")
+                limits = _validated_numbers(dict(budget_limits), "limits")
+                if (
+                    not allow_budget_extension
+                    or limits.keys() != budget.limits.keys()
+                    or any(limits[key] < value for key, value in budget.limits.items())
+                ):
+                    raise ValueError("resume budget limits do not match or extend the persisted campaign")
+                previous_limits, budget.limits = budget.limits, limits
         else:
             budget = BudgetLedger(
                 limits=dict(budget_limits or {}),
@@ -320,15 +366,22 @@ class CampaignRuntime:
             if config is not None:
                 atomic_json_write(path / "config.json", dict(config))
             if task_spec is not None:
-                payload = task_spec.to_dict() if hasattr(task_spec, "to_dict") else task_spec
-                atomic_json_write(path / "ldm_task_spec.json", payload)
+                atomic_json_write(path / "ldm_task_spec.json", spec_payload)
             if contract_snapshot is not None:
                 atomic_json_write(path / "experiment_contract.json", dict(contract_snapshot))
             runtime.status.update("running", phase="initializing", budget=budget)
             runtime.record("campaign_started")
         else:
+            if previous_limits is not None:
+                budget.write()
             runtime.status.update("running", phase="resumed", budget=budget)
-            runtime.record("campaign_resumed")
+            runtime.record(
+                "campaign_resumed",
+                {} if previous_limits is None else {
+                    "previous_budget_limits": previous_limits,
+                    "budget_limits": budget.limits,
+                },
+            )
         return runtime
 
     @property

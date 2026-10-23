@@ -15,7 +15,8 @@ from ldm_tts.harness import (
 )
 from tasks.atomworld.core.geometry import execute_operations
 from tasks.atomworld.core.optimization_policy import FEATURE_NAMES, public_policy_input
-from tasks.atomworld.core.workflow import parse_args, run
+from tasks.atomworld.core.workflow import run
+from tasks.atomworld.core.workflow_args import parse_args
 from tasks.atomworld.tests.test_harness import ResearchClient, fixture
 
 
@@ -69,8 +70,11 @@ CAPABILITIES = {"prior_mean": 1}
 def compute_prior_mean(history_features, history_utilities, query_features, context):
     return query_features[:, 3] / 1000000.0
 """
-    def __init__(self, args, root, sample, *, policy=False):
+    def __init__(self, args, root, sample, *, policy=False, campaign_id):
         self.root, self.turns, self.closed = root, [], False
+
+    def start(self):
+        return self
 
     def close(self):
         self.closed = True
@@ -139,8 +143,7 @@ def test_independent_compiled_agent_executes_public_artifact_and_resumes(tmp_pat
         clients.append(client)
         return client
 
-    args = parse_args(
-        [
+    args = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit",
             "--mock",
             "--search-method",
             "harness_public_audit",

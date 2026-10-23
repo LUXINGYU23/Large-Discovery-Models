@@ -15,6 +15,7 @@ from ldm_tts.harness.pi import PiGuestRuntime, load_pi_guest_runtime
 from ldm_tts.contracts import RawProposal
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.harness.research_runtime import proposal_turn_summary, usage_counts
 from ldm_tts.harness import (
     HarnessArtifactRule,
     HarnessClient,
@@ -219,6 +220,7 @@ class NucleoBenchHarnessExpander:
         account: Callable[..., Any] | None = None,
         benchmark_clock: BenchmarkClock | None = None,
         surrogate_query_config: HammingGPUCBConfig | None = None,
+        inherited_history_counts: Mapping[str, int] | None = None,
     ) -> None:
         if not profiles:
             raise ValueError("NucleoBench harness requires at least one profile")
@@ -241,6 +243,11 @@ class NucleoBenchHarnessExpander:
         self.account = account
         self.benchmark_clock = benchmark_clock
         self.surrogate_query_config = surrogate_query_config
+        self.inherited_history_counts = inherited_history_counts
+        if inherited_history_counts is not None and (
+            set(inherited_history_counts) != {p.profile_id for p in self.profiles}
+        ):
+            raise ValueError("per-profile history cursors must specify exactly the pool profiles")
 
     def expand(self, request: ExpansionRequest) -> ExpansionResult:
         expected = len(self.profiles) * self.candidates_per_profile
@@ -290,7 +297,7 @@ class NucleoBenchHarnessExpander:
             if self.account is not None:
                 for turn in turns:
                     self.account(
-                        _usage_counts(usage_by_profile.get(turn.profile_id, {})),
+                        usage_counts(usage_by_profile.get(turn.profile_id, {})),
                         usage_key=f"harness:{turn.turn_id}",
                     )
                 self.account({"harness_wall_time_seconds": time.perf_counter() - started})
@@ -320,7 +327,7 @@ class NucleoBenchHarnessExpander:
                     _candidate_lineage(proposal, self.domain.context)
                     for proposal in proposals
                 ],
-                "sessions": [_result_summary(result, self.candidates_per_profile) for result in results],
+                "sessions": [proposal_turn_summary(result, self.candidates_per_profile) for result in results],
             },
         )
 
@@ -328,55 +335,62 @@ class NucleoBenchHarnessExpander:
         self,
         request: ExpansionRequest,
     ) -> tuple[HarnessTurn, ...]:
-        history = _history_delta(request, self.first_active_round)
-        serialized_history = serialize_measured_observations(history, self.domain.context)
+        default_history = _history_delta(request, self.first_active_round)
+        default_cursor = len(request.observations) - len(default_history)
         write_measured_history(self.artifact_root, request.observations, self.domain.context)
         surrogate_query = (
             write_surrogate_snapshot(request, self.domain.context, self.surrogate_query_config, self.artifact_root)
             if self.surrogate_query_config is not None else None
         )
         history_to_seq = len(request.observations)
-        history_from_seq = history_to_seq - len(history)
-        history_digest = canonical_sha256(serialized_history)
         forbidden_query_terms = _forbidden_query_terms(request)
         benchmark_time = (
             None if self.benchmark_clock is None else self.benchmark_clock.snapshot()
         )
-        turns = tuple(
-            HarnessTurn(
+        turns = []
+        for profile in self.profiles:
+            profile_from = (default_cursor if self.inherited_history_counts is None
+                            else self.inherited_history_counts[profile.profile_id])
+            if type(profile_from) is not int or not 0 <= profile_from <= history_to_seq:
+                raise ValueError("History cursor is outside measured history")
+            profile_history = serialize_measured_observations(
+                default_history if self.inherited_history_counts is None else request.observations[profile_from:],
+                self.domain.context,
+            )
+            profile_digest = canonical_sha256(profile_history)
+            turns.append(HarnessTurn(
                 profile_id=profile.profile_id,
                 turn_id=_turn_id(
                     campaign_id=self.campaign_id,
                     profile_id=profile.profile_id,
                     profile_set_digest=self.profile_set_sha256,
                     round_index=request.round_idx,
-                    history_from_seq=history_from_seq,
+                    history_from_seq=profile_from,
                     history_to_seq=history_to_seq,
-                    history_digest=history_digest,
+                    history_digest=profile_digest,
                 ),
                 round_index=request.round_idx,
-                history_from_seq=history_from_seq,
+                history_from_seq=profile_from,
                 history_to_seq=history_to_seq,
-                history_digest=history_digest,
+                history_digest=profile_digest,
                 message=_turn_message(
                     request,
                     candidate_count=self.candidates_per_profile,
-                    observations=summarize_measured_observations(serialized_history),
+                    observations=summarize_measured_observations(profile_history),
                     session_count=len(self.profiles),
                     allow_repeated_occurrences=self.allow_repeated_occurrences,
                     attach_empirical_q0=self.attach_empirical_q0,
                     initial=request.round_idx == self.first_active_round,
-                    history_from_seq=history_from_seq,
+                    history_from_seq=profile_from,
                     history_to_seq=history_to_seq,
-                    history_digest=history_digest,
+                    history_digest=profile_digest,
                     context=self.domain.context,
                     benchmark_time=benchmark_time,
                     surrogate_query=surrogate_query,
+                    forked=self.inherited_history_counts is not None,
                 ),
                 forbidden_query_terms=forbidden_query_terms,
-            )
-            for profile in self.profiles
-        )
+            ))
         restored = []
         for turn in turns:
             input_path = self.artifact_root / "sessions" / turn.profile_id / "turns" / turn.turn_id / "input.json"
@@ -534,6 +548,7 @@ def _turn_message(
     context: MutationContext,
     benchmark_time: dict[str, float | int] | None = None,
     surrogate_query: dict[str, object] | None = None,
+    forked: bool = False,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
@@ -640,8 +655,24 @@ def _turn_message(
             "high predicted UCB is not a measurement. Explain material disagreements in your existing rationale notes. "
             "The final compiled-policy GP may differ. Queries neither submit proposals nor add frequency mass to q0."
         )
+    if forked:
+        payload["message_type"] = "research_fork"
+        payload["history_access"]["description"] = (
+            "The inherited research node received history only up to history_from_seq. The new measurements "
+            "bring it up to history_to_seq. Use get_measured_history "
+            "for exact details and pagination. The inherited branch_feedback directory contains past proposals, "
+            "including unmeasured ones; those are hypotheses, not measurements."
+        )
+        payload["fork_context"] = (
+            "You are a fresh, one-round branch of a saved research node. Adopt the current AGENTS.md role. "
+            "Inherit the common evidence and workspace, but develop your own candidate panel. "
+            "Earlier submissions belong to ancestors; your terminal tool is submit_candidates. "
+            "Other current-round branches are isolated; do not infer their proposals."
+        )
     return (
-        "Continue your persistent sequence-design research role. Use your "
+        ("Begin this round's role-specific research fork. Use your " if forked else
+         "Continue your persistent sequence-design research role. Use your ")
+        +
         "session history, new measurements, public evidence, scratch analysis, and the "
         "structured paired-start tools. Submit a complete validated minibatch before the "
         "turn deadline.\n\n"
@@ -816,21 +847,6 @@ def _validate_submission(
     )
 
 
-def _usage_counts(usage: Mapping[str, Any]) -> dict[str, int]:
-    counts = {
-        counter: int(usage[key])
-        for key, counter in (
-            ("providerCalls", "llm_requests"),
-            ("validationSubmissions", "harness_validation_submissions"),
-            ("artifactBytes", "harness_artifact_bytes"),
-        )
-        if key in usage
-    }
-    if "toolCalls" in usage:
-        counts["harness_tool_calls"] = sum(int(count) for count in usage["toolCalls"].values())
-    return counts
-
-
 def _candidate_lineage(
     proposal: RawProposal,
     context: MutationContext,
@@ -839,23 +855,6 @@ def _candidate_lineage(
     lineage = proposal.metadata["harness_lineage"]
     assert isinstance(lineage, dict)
     return {"canonical_key": prepared.canonical_key, **lineage}
-
-
-def _result_summary(result: HarnessTurnResult, candidate_count: int) -> dict[str, object]:
-    return {
-        "profile_id": result.profile_id,
-        "session_id": result.session_id,
-        "session_turn_id": result.turn_id,
-        "round_index": result.round_index,
-        "history_from_seq": result.history_from_seq,
-        "history_to_seq": result.history_to_seq,
-        "history_digest": result.history_digest,
-        "submission_id": result.submission_id,
-        "candidate_count": candidate_count,
-        "usage": result.usage,
-        "tool_budget": result.tool_budget,
-        "artifacts": result.artifacts,
-    }
 
 
 __all__ = [

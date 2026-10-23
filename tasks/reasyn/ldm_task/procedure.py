@@ -1,18 +1,8 @@
-"""Stable shared-runner adapter; scientific implementation lives in core."""
+"""Shared-runner entry point."""
 
-from tasks.reasyn.core import workflow
-
-
-def parse_args(argv=None):
-    return workflow.parse_args(argv)
-
-
-def describe_ldm_task(*args, **kwargs):
-    return workflow.describe_ldm_task(*args, **kwargs)
-
-
-def main(argv=None):
-    return workflow.main(argv)
+from tasks.reasyn.core.task_spec import describe_ldm_task
+from tasks.reasyn.core.workflow import main
+from tasks.reasyn.core.workflow_args import parse_args
 
 
 if __name__ == "__main__":

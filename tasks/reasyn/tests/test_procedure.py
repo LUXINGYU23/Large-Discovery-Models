@@ -15,7 +15,8 @@ from ldm_tts.data.rendering import render_prose
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalResponse
 from ldm_tts.transport.openai import EndpointRequestError
-from tasks.reasyn.core import workflow
+from tasks.reasyn.core import harness_runtime, workflow
+from tasks.reasyn.core.workflow_args import REPO_ROOT, parse_args
 from tasks.reasyn.core.candidate import ReaSynDomain
 from tasks.reasyn.core.evaluator import TDCOracleEvaluator
 from tasks.reasyn.core.metrics import ORACLES, reconstruction_metrics, top_auc
@@ -89,7 +90,7 @@ def test_mock_shared_campaign_collection_and_resume(tmp_path, monkeypatch, bench
 def test_requested_target_count_rejects_short_dataset(tmp_path):
     targets = tmp_path / "targets.txt"
     targets.write_text("SMILES\nCCO\n")
-    args = workflow.parse_args(
+    args = parse_args(
         ["--dataset", "custom", "--targets-file", str(targets), "--target-limit", "2"]
     )
     with pytest.raises(ValueError, match="target-limit requests 2 targets"):
@@ -97,7 +98,7 @@ def test_requested_target_count_rejects_short_dataset(tmp_path):
 
 
 def test_relative_targets_file_is_resolved_from_upstream_root(tmp_path):
-    args = workflow.parse_args(
+    args = parse_args(
         [
             "--upstream-root",
             str(tmp_path),
@@ -183,7 +184,7 @@ def test_reconstruction_diversity_preserves_duplicate_product_occurrences():
 def test_auc_matches_released_source_formula():
     np = pytest.importorskip("numpy")
     upstream = Path(
-        os.environ.get("REASYN_ROOT", workflow.REPO_ROOT.parent / "ReaSyn-reasyn_v2")
+        os.environ.get("REASYN_ROOT", REPO_ROOT.parent / "ReaSyn-reasyn_v2")
     )
     source = upstream / "scripts/optimize_tdc.py"
     if not source.exists():
@@ -237,18 +238,18 @@ def test_oracle_dedup_and_hard_cap(tmp_path):
 
 
 def test_tdc_cached_oracle_resume_does_not_double_charge_evaluation(tmp_path, monkeypatch):
-    from ldm_tts.engine.runtime import LDMEngine
+    from ldm_tts.engine.run_store import CampaignRuntime
 
-    original_checkpoint = LDMEngine._checkpoint
+    original_checkpoint = CampaignRuntime.checkpoint
     interrupted = {"done": False}
 
     def flaky_checkpoint(self, state):
-        if state.observations and not interrupted["done"]:
+        if state["observations"] and not interrupted["done"]:
             interrupted["done"] = True
             raise RuntimeError("fixture stopped after oracle receipt")
         return original_checkpoint(self, state)
 
-    monkeypatch.setattr(LDMEngine, "_checkpoint", flaky_checkpoint)
+    monkeypatch.setattr(CampaignRuntime, "checkpoint", flaky_checkpoint)
     root = tmp_path / "tdc-cache-replay"
     argv = [
         "--mock",
@@ -295,7 +296,7 @@ def test_resume_keeps_original_recovery_seed_span_when_iterations_extend(tmp_pat
         "iterations": 1,
         "proposal_recovery_seed_span": 12345,
     }))
-    args = workflow.parse_args(["--mock", "--iterations", "5"])
+    args = parse_args(["--mock", "--iterations", "5"])
     assert workflow._proposal_recovery_seed_span(args, run, resume=True) == 12345
 
     (run / "config.json").write_text(json.dumps({"iterations": 2}))
@@ -463,9 +464,9 @@ def test_harness_provider_preflight_runs_before_sidecar_and_is_counted(tmp_path,
         calls.append("create_client")
         return Harness()
 
-    monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", PreflightClient)
-    monkeypatch.setattr(workflow, "create_client", fake_create_client)
-    monkeypatch.setattr(workflow, "HarnessTargetSource", Source)
+    monkeypatch.setattr(harness_runtime, "OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr(harness_runtime, "create_client", fake_create_client)
+    monkeypatch.setattr(harness_runtime, "HarnessTargetSource", Source)
     monkeypatch.setenv("LLM_API_KEY", "must-not-appear-in-artifacts")
     root = tmp_path / "run"
     argv = [
@@ -520,8 +521,8 @@ def test_harness_provider_preflight_failure_pauses_before_sidecar(tmp_path, monk
     def fake_create_client(*args, **kwargs):
         pytest.fail("Harness sidecar should not start before provider preflight passes")
 
-    monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", PreflightClient)
-    monkeypatch.setattr(workflow, "create_client", fake_create_client)
+    monkeypatch.setattr(harness_runtime, "OpenAICompatibleProposalClient", PreflightClient)
+    monkeypatch.setattr(harness_runtime, "create_client", fake_create_client)
     monkeypatch.setenv("LLM_API_KEY", "fixture-secret")
     root = tmp_path / "run"
     argv = [
@@ -550,10 +551,48 @@ def test_harness_provider_preflight_failure_pauses_before_sidecar(tmp_path, monk
     assert not (root / "harness").exists()
 
 
+def test_policy_start_failure_closes_both_clients_without_spending_search_budget(tmp_path, monkeypatch):
+    from ldm_tts.harness import HarnessError
+
+    events = []
+
+    class Client:
+        def __init__(self, policy):
+            self.name = "policy" if policy else "proposal"
+
+        def start(self):
+            events.append((self.name, "start"))
+            if self.name == "policy":
+                raise HarnessError("fixture policy startup failure")
+
+        def close(self):
+            events.append((self.name, "close"))
+
+    monkeypatch.setattr(harness_runtime, "preflight_provider", lambda args: {"status": "fixture"})
+    monkeypatch.setattr(harness_runtime, "create_client", lambda *args, policy=False, **kwargs: Client(policy))
+    monkeypatch.setattr(harness_runtime, "HarnessTargetSource", lambda *args, **kwargs: object())
+    root = tmp_path / "partial-startup"
+    assert workflow.main([
+        "--mock", "--benchmark", "tdc", "--search-method", "ldm_harness_compiled",
+        "--harness-research-strategy-config", "config/research_strategies/independent.json",
+        "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+        "--out-dir", str(root),
+    ]) == 2
+    assert events == [("proposal", "start"), ("policy", "start"),
+                      ("policy", "close"), ("proposal", "close")]
+    assert json.loads((root / "status.json").read_text())["status"] == "paused_endpoint_unavailable"
+    counters = json.loads((root / "budget.json").read_text())["counters"]
+    assert counters["endpoint_preflight_requests"] == 1
+    assert all(counters.get(key, 0) == 0 for key in (
+        "recovery_attempts", "proposal_request_attempts", "harness_turns", "oracle_calls",
+        "projection_targets", "successful_evaluations",
+    ))
+
+
 def test_cached_projection_rechecks_boundary(tmp_path):
     from tasks.reasyn.core.projector import Projector
 
-    args = workflow.parse_args(["--mock"])
+    args = parse_args(["--mock"])
     projector = Projector(args, tmp_path)
     rows, artifact = projector.project(["CCO"], sampling_seed=0, identity="query")
     output = tmp_path / artifact

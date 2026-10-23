@@ -6,12 +6,12 @@ submission. It is available through three search methods:
 
 | Method | Candidate generation | Selection before evaluation |
 | --- | --- | --- |
-| `ldm_harness` | Multiple task-defined persistent Agents submit an over-sampled reservoir. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
+| `ldm_harness` | Four task-defined branches submit an over-sampled reservoir; default parents follow 2+2. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
 | `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
-Iron Mind, SynthonBench, NucleoBench, AtomWorld, and ReaSyn are the current
-task-local integrations. The shared Harness does not know their candidate
+Iron Mind, SynthonBench, NucleoBench, AtomWorld, ReaSyn, and AlphaBench are the current
+task-local integrations. Their LDM Harness methods default to [shared 2+2 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions and latest-main 4fork remain explicit strategies. The shared Harness does not know their candidate
 identity, legal search space, duplicate policy, surrogate, or evaluator.
 
 ## Architecture
@@ -44,6 +44,56 @@ private research transcript. A task sends initial measurement indexes and then
 monotonic deltas. Its tools and validator check the authoritative evaluated set;
 full candidate details can be retrieved on demand.
 
+### Host runtime assembly
+
+All six tasks use `ldm_tts.harness.container.pi_sidecar_command` for Docker
+launches. It owns Docker host/user selection, local KVM group access, the Gondolin
+cache and overlay directories, runtime environment variables, and the artifact
+and cache mounts. Tasks pass their additional mounts and environment variables
+explicitly; the launcher does not inspect task arguments or choose a research role.
+
+| Component | Owns |
+| --- | --- |
+| Task client factory | Public context files, role profiles, submission contracts, task tools, MCP servers, network policy and per-role limits in `PiHarnessConfig` |
+| `pi_sidecar_command` | Host paths and Docker arguments; common writable runtime mounts and explicitly declared task mounts |
+| `HarnessClient` | Process start/close, secret bootstrap, request correlation and bounded recovery; constructing a client does not start it |
+| `harness/protocol.py` / `responses.py` | Protocol values and errors / response structure, submission digests and usage validation |
+| `ResearchCoordinator` / task expander | Main and branch scheduling, immutable fork sources, evidence and usage accounting |
+
+Iron Mind, SynthonBench, NucleoBench, ReaSyn and AtomWorld expose `create_client` in their
+`core/harness_runtime.py`; their workflows compose these clients with scientific
+components. AlphaBench's `core/harness_runtime.py` also owns the lifetime of its
+host tool service. AtomWorld's submission adapter owns sample-specific evidence
+and client reuse; its runtime factory mounts only the sample's public workspace. NucleoBench resolves provider
+settings and request-body JSON in `core/provider.py` for both direct and Pi calls.
+
+Iron Mind and SynthonBench use provider environment resolution and proposal-client
+construction from `ldm_tts.transport.openai`. Their CLI JSON validation stays in
+`core/workflow_args.py`; task budgets and endpoint pause/reporting remain task-owned.
+
+Task workflows own an `ExitStack` for clients and tool services. Runtime assembly
+registers cleanup before explicit startup; `HarnessClient.__enter__` also stops
+a failed startup before returning an error. A main or forked branch has a per-turn lifetime, while
+independent proposal and compiled-policy sessions span the campaign. AtomWorld
+instead owns pools per sample and closes a sample before switching to the next.
+AlphaBench closes its clients before the Host socket service. A completed resume
+uses durable results without starting a new research turn.
+
+The shared engine keeps lifecycle values in `engine/state.py`, round progression
+in `engine/runtime.py` and evaluation execution in `engine/evaluation.py`.
+`CampaignRuntime` remains the storage boundary. A selection is persisted before
+dispatch; a receipt and its attempt charge are saved before the evaluator call.
+Returned results are saved before observation events and checkpoints; batches are
+saved together before publishing the first observation. The completed-round
+checkpoint precedes removal of the active selection. Recovery replays saved
+results and cumulative charges; an unknown dispatched result without a durable
+receipt still pauses. Task adapters do not edit this recovery state.
+
+The main, proposal and compiled-policy clients retain separate task configurations
+and artifact roots. Read-only resources, policy measurement exports and AlphaBench's
+writable host socket remain explicit mounts. Credentials go through
+`HarnessClient`'s secret bootstrap, not the launch command.
+
 The reference tasks' query tools also export exact data into read-only guest
 files. The tool returns a guest-visible path and SHA-256; scripts read those
 files without retranscribing model-visible records. Content and filtering remain
@@ -69,7 +119,7 @@ The public `ldm_tts.harness` package provides:
 | `PolicyCapabilityContract` | Versioned task feature schema and enabled compiled-policy capabilities. |
 | `PolicyRoundInput` | Aligned numeric history, explicit history identities and rounds, measured records, and task-owned contexts. |
 | `OptimizationPolicyAdapter` | Task-owned prediction feedback and scientific execution validation. |
-| `PolicyResearchController` | Policy rounds, artifact validation, epoch state, resume, and deterministic fallback. |
+| `PolicyResearchController` | Policy turn orchestration, task validation, execution, fallback and usage accounting. |
 | `PolicyExecutor` | Isolated execution boundary for accepted policy artifacts. |
 
 Pi-specific configuration is imported from `ldm_tts.harness.pi`:
@@ -81,6 +131,36 @@ The Pi sidecar in `harnesses/pi` uses the OpenAI Responses wire format. It owns
 session lifecycle, automatic context compaction, isolated file and shell tools,
 web and Context7 extensions, MCP clients, terminal submission, and redacted
 provider capture.
+
+### Compiled policy ownership
+
+The compiled-policy implementation separates task contracts, execution and durable
+state. Tasks import the contracts and controller from `ldm_tts.harness`.
+
+| Module | Owns |
+| --- | --- |
+| `policy_contract.py` | Capability schema, validated round inputs, compiled results, task adapter protocol and the replace/keep/disable submission contract |
+| `policy.py` | `PolicyResearchController`: feedback delivery, turn construction, submission validation, execution, fallback selection and usage accounting |
+| `policy_store.py` | `PolicyStore`: round inputs, prediction records, immutable epochs, active pointers, result persistence and integrity checks on resume |
+| `policy_execution.py` | The executor contract and isolated Docker execution of generated artifacts |
+
+`PolicyStore` is a concrete filesystem component. It does not call the model,
+execute artifacts or decide which policy to use. The controller does not read or
+write JSON/NPZ state itself. This follows the separation of execution from durable
+experiment state used in systems such as [MLflow Tracking](https://mlflow.org/docs/latest/tracking/),
+while keeping this implementation local to the existing artifact directory.
+
+Each round freezes its input files before the research turn starts. A replacement
+epoch copies the submitted snapshot, verifies its digest, writes validation and
+evaluation records, and commits its manifest before updating the active pointer.
+Compiled arrays are written before `result.json`; only a result with matching input
+and array digests can be replayed without another turn or usage charge. Failed
+research retains its usage and uses the existing previous-policy/default fallback.
+Prediction records cannot be replaced with different values.
+
+The on-disk layout remains `rounds/round_NNN`, `epochs/epoch_NNN`,
+`active_round.json` and `active_policy.json`. Task tools, collection readers and
+experiment reports use these persisted artifacts without a migration.
 
 ### Optional Pi Extensions
 
@@ -160,8 +240,9 @@ turn cannot reset or double-spend its budget.
 
 A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
 
-1. Start one `HarnessClient` per independent pool and close each in a `finally`
-   block.
+1. Use a context manager for each `HarnessClient`. Tree adapters close the main
+   pool before freezing its session/workspace, then start the branch pool through
+   the [shared coordinator](research-search-architecture.md).
 2. Define one profile set and strict submission contract per pool.
 3. Build deterministic turns from campaign, profile, round, and history identity.
 4. Send compact newly measured observations and provide task-owned access to
@@ -172,12 +253,14 @@ A Harness-enabled task keeps its adapter in `tasks/<task_id>/core/` and must:
    and official-space checks used by candidate admission.
 6. Return stable JSON-Pointer paths, rejection codes, messages, and repair hints
    so the Agent can repair the same submission in-session.
-7. Refill until the complete valid minibatch is accepted.
+7. Repair or refill within the configured attempt budget until the complete
+   valid minibatch is accepted; stop if that budget is exhausted.
 8. Preserve meaningful same-round occurrences before estimating `q0` for both
    Harness-backed LDM methods. Define real-evaluation replicate semantics in
    the task contract.
-9. Record each pool's turns and measured provider/tool usage separately in the
-   campaign budget.
+9. Record main, proposal and policy turns and measured provider/tool usage in
+   the campaign budget. Declare their actual pool manifests in
+   `harness_provenance.json` so reports include nested tree paths.
 
 For the reference tasks, only candidates in the authoritative evaluated set are historical repeats.
 Candidates proposed in an earlier turn but never evaluated remain eligible.
@@ -310,6 +393,12 @@ tasks/<task_id>/resources/harness/
 |-- image/smoke.sh
 `-- tools/                           # optional task-local structured tools
 ```
+
+NucleoBench, Iron Mind and SynthonBench share
+`ldm_tts/harness/ucb_diagnostics.py` for UCB prediction feedback and draft
+evaluation. The policy client mounts that file read-only at
+`/task_runtime/ucb_diagnostics.py` and pins its digest. It uses only NumPy and
+the standard library at runtime so the isolated runner can load it directly.
 
 Record content digests for profile instructions, skills, submission contracts,
 and tool sources. Pi pins initialization configuration, resource digests,

@@ -14,7 +14,7 @@ from ldm_tts.registration.dependencies import is_local_url
 from ldm_tts.transport import ProposalClient
 from ldm_tts.transport.openai_http import EndpointRequestError
 from tasks.iron_mind.core.harness import HARNESS_PROFILE_IDS
-from tasks.iron_mind.core.provider import (
+from ldm_tts.transport.openai import (
     OpenAIProviderSettings,
     resolve_openai_provider_settings,
 )
@@ -51,7 +51,9 @@ def derived_budget(args: Any, *, domain_size: int) -> dict[str, int]:
             if args.search_method in PARALLEL_HARNESS_METHODS
             else 1
         )
-        budget["harness_turns"] = search_rounds * profile_count
+        main_turns = search_rounds if args._research_strategy.requires_main else 0
+        budget["harness_turns"] = search_rounds * profile_count + main_turns
+        budget["main_research_turns"] = main_turns
         if args.search_method == COMPILED_POLICY_METHOD:
             budget["policy_harness_turns"] = search_rounds
         else:
@@ -116,7 +118,7 @@ def jsonable_args(args: Any) -> dict[str, Any]:
     return {
         key: str(value) if isinstance(value, Path) else value
         for key, value in vars(args).items()
-        if key != "api_key"
+        if key != "api_key" and not key.startswith("_")
         and not (
             key.startswith("policy_")
             and args.search_method != COMPILED_POLICY_METHOD

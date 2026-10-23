@@ -16,6 +16,8 @@ class MCTSNode(Generic[StateT]):
     children: list[MCTSNode[StateT]] = field(default_factory=list)
     visits: int = 0
     value_sum: float = 0.0
+    expansion_closed: bool = False
+    exhausted: bool = False
 
     @property
     def value_mean(self) -> float:
@@ -33,11 +35,8 @@ async def run(
 ) -> StateT | None:
     """Run a lightweight UCT search through the shared engine interface."""
 
-    root_evals = 1 if evaluate_root else 0
-    candidate_total = max_evaluations if max_evaluations is not None else max(1, breadth) * max(1, depth)
-    if max_evaluations is not None:
-        candidate_total = max(0, max_evaluations - root_evals)
-    engine.start_progress(candidate_total + root_evals, label="mcts")
+    budget = max_evaluations if max_evaluations is not None else max(1, breadth) * max(1, depth)
+    engine.start_progress(max(0, budget), label="mcts")
     try:
         return await _run(
             engine,
@@ -60,32 +59,32 @@ async def _run(
     max_evaluations: int | None,
     evaluate_root: bool,
 ) -> StateT | None:
+    budget = max_evaluations if max_evaluations is not None else max(1, breadth) * max(1, depth)
     root_state = engine.create_seed_state()
-    if evaluate_root:
+    if evaluate_root and engine.evaluation_count < budget:
         await engine.evaluate_many([root_state])
 
     root = MCTSNode(root_state)
     if root_state.score is not None:
         _backpropagate(root, _reward(engine, root_state))
 
-    budget = max_evaluations if max_evaluations is not None else max(1, breadth) * max(1, depth)
-    budget = max(0, budget - engine.evaluation_count)
     exploration = max(0.1, float(beam_width))
 
-    for simulation in range(budget):
+    simulation = 0
+    while engine.evaluation_count < budget:
         leaf = _select(
             root,
             max_depth=max(1, depth),
             max_children=max(1, breadth),
             exploration=exploration,
         )
-        if leaf.state.depth >= max(1, depth):
-            if leaf.state.score is not None:
-                _backpropagate(leaf, _reward(engine, leaf.state))
-            continue
+        if leaf is None:
+            break
 
-        child = await _expand_one(engine, leaf, simulation=simulation + 1)
+        simulation += 1
+        child = await _expand_one(engine, leaf, simulation=simulation)
         if child is None:
+            leaf.expansion_closed = True
             continue
         if engine.should_evaluate_depth(child.state.depth, max(1, depth)):
             await engine.evaluate_many([child.state])
@@ -108,11 +107,20 @@ def _select(
     max_depth: int,
     max_children: int,
     exploration: float,
-) -> MCTSNode[StateT]:
-    node = root
-    while node.state.depth < max_depth and len(node.children) >= max_children and node.children:
-        node = max(node.children, key=lambda child: _uct(child, exploration))
-    return node
+) -> MCTSNode[StateT] | None:
+    if root.state.depth >= max_depth:
+        root.exhausted = True
+    if root.exhausted:
+        return None
+    if not root.expansion_closed and len(root.children) < max_children:
+        return root
+    while available := [child for child in root.children if not child.exhausted]:
+        child = max(available, key=lambda child: _uct(child, exploration))
+        leaf = _select(child, max_depth=max_depth, max_children=max_children, exploration=exploration)
+        if leaf is not None:
+            return leaf
+    root.exhausted = True
+    return None
 
 
 async def _expand_one(

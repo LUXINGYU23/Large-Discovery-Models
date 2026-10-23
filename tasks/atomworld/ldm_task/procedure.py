@@ -1,18 +1,8 @@
-"""Stable manifest-driven shared-runner entrypoint."""
+"""Shared-runner entry point."""
 
-from tasks.atomworld.core import workflow
-
-
-def parse_args(argv=None):
-    return workflow.parse_args(argv)
-
-
-def describe_ldm_task(args=None):
-    return workflow.describe_ldm_task(args)
-
-
-def main(argv=None):
-    return workflow.main(argv)
+from tasks.atomworld.core.workflow import main
+from tasks.atomworld.core.task_spec import describe_ldm_task
+from tasks.atomworld.core.workflow_args import parse_args
 
 
 if __name__ == "__main__":

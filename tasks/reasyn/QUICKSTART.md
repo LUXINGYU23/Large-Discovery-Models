@@ -1,5 +1,7 @@
 # Quick start
 
+LDM Harness defaults to **CoverageForks 2+2**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
+
 See [README.md](README.md) for the scientific adaptation and assets.
 
 ```bash

@@ -80,7 +80,7 @@ in evidence rather than model confidence alone.
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The eleven built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
@@ -88,7 +88,7 @@ scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
 predictor and five-network discrete causal-discovery evaluations. Run the
 documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all eleven
+Task registration and conventional layout validation pass for all twelve
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
 not benchmark-qualified implementations. The AI4Bio mutation-effect and

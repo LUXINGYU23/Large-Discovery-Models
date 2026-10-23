@@ -29,6 +29,7 @@ _REPORT_BUDGET_COUNTERS = (
     "llm_requests",
     "proposal_attempts",
     "harness_turns",
+    "main_research_turns",
     "harness_tool_calls",
     "harness_validation_submissions",
     "harness_artifact_bytes",
@@ -151,6 +152,7 @@ def _collect(
             "proposal_counting": config.get("proposal_counting", "fixed"),
             "max_replenishment_batches": int(config.get("max_replenishment_batches", 0)),
             "harness_sessions": int(config.get("harness_sessions", 1)),
+            "harness_main_research": bool(config.get("harness_main_research", False)),
             "mock_proposals": bool(config.get("mock")) and config.get("proposal_mode") == "mock",
         }
         if method == _COMPILED_METHOD:
@@ -246,7 +248,12 @@ def _integrity(spec, rows, trajectories) -> dict[str, Any]:
                 )
             else:
                 turns = spec.optimization_rounds * (row["proposal_samples"] // per_session)
-                if row["budget_proposal_attempts"] != turns or row["budget_harness_turns"] != turns:
+                main_turns = spec.optimization_rounds if row.get("harness_main_research") else 0
+                if (
+                    row["budget_proposal_attempts"] != turns
+                    or row["budget_harness_turns"] != turns + main_turns
+                    or row.get("budget_main_research_turns", 0) != main_turns
+                ):
                     errors.append(
                         f"unexpected LDM Harness turn count for {row['case']}/{row['method']}/{row['seed']}"
                     )

@@ -18,6 +18,7 @@ from ldm_tts.harness import (
     PolicyResearchController, file_sha256, policy_submission_contract,
 )
 from ldm_tts.harness.policy_execution import PolicyExecutionError, PolicyExecutionResult
+from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
 from ldm_tts.optimization.records import BOObservation
 from ldm_tts.transport import ProposalRequest
 from tasks.reasyn.core.candidate import ReaSynDomain
@@ -25,12 +26,13 @@ from tasks.reasyn.core.evaluator import TDCOracleEvaluator
 from tasks.reasyn.core.harness import HarnessTargetSource, RESOURCE_ROOT, profiles, submission_contract
 from tasks.reasyn.core.optimization_policy import ReaSynPolicyAdapter
 from tasks.reasyn.core.projector import Projector
-from tasks.reasyn.core.proposals import ReaSynExpander
+from tasks.reasyn.core.proposals import DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN, ReaSynExpander
 from tasks.reasyn.core.sampling import attach_empirical_base_measure, empirical_base_masses
 from tasks.reasyn.core.selection import AcquisitionTiltedSelector, TanimotoGPSelector
 from tasks.reasyn.core.surrogate import MoleculeEncoder
-from tasks.reasyn.core import workflow
-from tasks.reasyn.core.workflow import parse_args
+from tasks.reasyn.core import harness_runtime, workflow
+from tasks.reasyn.core.workflow_args import jsonable_args, parse_args
+from tasks.reasyn.core.provenance import harness_component_digests, scientific_identity
 
 FIXTURE = Path(__file__).with_name("fixtures") / "harness_sidecar.py"
 RUNNER = Path(__file__).resolve().parents[3] / "harnesses/pi/policy_runner.py"
@@ -73,22 +75,22 @@ def jsonl(path):
 def harness_identity(options, target="", source_commit="fixture-source"):
     options.asset_digests = {}
     options.proposal_recovery_seed_span = max(
-        workflow.DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
+        DEFAULT_PROPOSAL_RECOVERY_SEED_SPAN,
         options.iterations,
         options.max_oracle_calls,
     )
-    configuration = workflow._jsonable(options)
+    configuration = jsonable_args(options)
     configuration.update(
         proposal_samples=options.reservoir_size,
         proposal_candidates_per_request=options.proposal_batch_size,
         proposal_counting="bounded_minibatches",
-        harness_component_digests=workflow._harness_component_digests(options),
+        harness_component_digests=harness_component_digests(options),
     )
     contract = SimpleNamespace(benchmark={"source_commit": source_commit})
-    return workflow._scientific_identity(options, configuration, target, contract)
+    return scientific_identity(options, configuration, target, contract)
 
 
-def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):
+def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path, monkeypatch):
     mcp = tmp_path / "mcp.yaml"
     mcp.write_text("servers: {}\n")
     base_argv = [
@@ -122,6 +124,31 @@ def test_scientific_identity_freezes_harness_images_and_mcp_content(tmp_path):
         changed_mcp["harness_component_digests"]["harness_mcp_config"]
     )
     assert identity != changed_mcp
+    diagnostic = tmp_path / "diagnostics.py"
+    diagnostic.write_bytes(DIAGNOSTICS_PATH.read_bytes())
+    monkeypatch.setattr("tasks.reasyn.core.provenance.DIAGNOSTICS_PATH", diagnostic)
+    compiled_args = parse_args([*base_argv, "--search-method", "ldm_harness_compiled"])
+    compiled_identity = harness_identity(compiled_args)
+    diagnostic.write_text("# changed diagnostics\n")
+    assert compiled_identity["harness_component_digests"]["policy_diagnostics"] != (
+        harness_identity(compiled_args)["harness_component_digests"]["policy_diagnostics"]
+    )
+
+
+def test_policy_client_mounts_verified_diagnostics_readonly(tmp_path):
+    options = parse_args([
+        "--mock", "--search-method", "ldm_harness_compiled",
+        "--llm-url", "https://provider.example/v1", "--llm-model", "fixture",
+    ])
+    options.provider_api_key = "fixture-secret"
+    transport = harness_runtime.create_client(options, tmp_path / "policy", "fixture", "", policy=True)
+    command = transport.command
+    mounts = [command[i + 1] for i, part in enumerate(command) if part == "--mount"]
+    assert f"type=bind,src={DIAGNOSTICS_PATH},dst=/task_runtime/ucb_diagnostics.py,readonly" in mounts
+    env = {key: value.value for key, value in transport.config.mcp_servers[-1].env}
+    assert env["LDM_POLICY_DIAGNOSTICS"] == "/task_runtime/ucb_diagnostics.py"
+    assert env["LDM_POLICY_DIAGNOSTICS_SHA256"] == file_sha256(DIAGNOSTICS_PATH)
+    assert "fixture-secret" not in " ".join(command)
 
 
 def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path):
@@ -147,7 +174,7 @@ def test_real_client_parallel_history_repair_projection_and_evaluation(tmp_path)
                 measured = evaluator.evaluate(candidate)
                 assert measured.succeeded
                 observations.append(SimpleNamespace(candidate=candidate, candidate_id=candidate.candidate_id,
-                    canonical_key=candidate.canonical_key, metrics=measured.metrics))
+                    canonical_key=candidate.canonical_key, metrics=measured.metrics, evaluation=measured))
         assert len(evaluator.entries) == 4
     sent = jsonl(root / "fixture_requests.jsonl")
     assert [len(row["turns"]) for row in sent] == [2, 2]
@@ -324,7 +351,7 @@ class AuthoredFixtureExecutor:
     def execute(self, artifact_path, input_directory, output_directory):
         assert Path(artifact_path).read_text().startswith("# Authored static protocol-test fixture;")
         output = Path(output_directory)
-        diagnostic = RESOURCE_ROOT / "policy_diagnostics.py"
+        diagnostic = DIAGNOSTICS_PATH
         completed = subprocess.run([sys.executable, str(RUNNER), "execute", "--artifact", str(artifact_path),
             "--input", str(input_directory), "--output", str(output),
             "--diagnostics", str(diagnostic), "--diagnostics-sha256", file_sha256(diagnostic)],
@@ -368,14 +395,15 @@ def test_workflow_policy_uses_shared_recovery_before_persisting_fallback(tmp_pat
         controllers.append(result)
         return result
 
-    monkeypatch.setattr(workflow, "PolicyResearchController", controller)
-    monkeypatch.setattr(workflow, "DockerPolicyExecutor", lambda *args: AuthoredFixtureExecutor())
-    monkeypatch.setattr(workflow, "_preflight_harness_provider", lambda args: {"status": "synthetic_fixture"})
-    monkeypatch.setattr(workflow, "create_client", lambda args, root, *rest, policy=False: client(
+    monkeypatch.setattr(harness_runtime, "PolicyResearchController", controller)
+    monkeypatch.setattr(harness_runtime, "DockerPolicyExecutor", lambda *args: AuthoredFixtureExecutor())
+    monkeypatch.setattr(harness_runtime, "preflight_provider", lambda args: {"status": "synthetic_fixture"})
+    monkeypatch.setattr(harness_runtime, "create_client", lambda args, root, *rest, policy=False: client(
         root, policy=policy, count=2, mode="policy_retry" if policy else "molecular"))
     root = tmp_path / "run"
     assert workflow.main(["--mock", "--benchmark", "tdc", "--search-method", "ldm_harness_compiled",
                           "--llm-url", "http://fixture.invalid/v1", "--llm-model", "fixture",
+                          "--harness-research-strategy-config", "config/research_strategies/independent.json",
                           "--harness-wall-time-seconds", "7", "--harness-sessions", "2",
                           "--iterations", "2", "--reservoir-size", "2", "--out-dir", str(root)]) == 0
     assert len(controllers) == 1
@@ -438,5 +466,5 @@ console.log(JSON.stringify({status:"ok",tools:[...tools.keys()]}));
         "LDM_REASYN_CONTEXT": str(context), "LDM_REASYN_HISTORY": str(history)},
         capture_output=True, text=True, timeout=10, check=False)
     assert completed.returncode == 0, completed.stderr
-    from tasks.reasyn.core.harness import TOOL_NAMES
+    from tasks.reasyn.core.harness_runtime import TOOL_NAMES
     assert set(json.loads(completed.stdout)["tools"]) == set(TOOL_NAMES)

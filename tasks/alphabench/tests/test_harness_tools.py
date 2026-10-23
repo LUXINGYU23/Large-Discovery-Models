@@ -1,4 +1,5 @@
 import json
+from contextlib import ExitStack
 import socket
 import tempfile
 from pathlib import Path
@@ -7,6 +8,8 @@ import pytest
 
 from ldm_tts.contracts import RawProposal
 from ldm_tts.contracts.evaluation import EvaluationResult, Observation
+from ldm_tts.contracts.evaluation import EvaluationPaused
+from ldm_tts.harness import HarnessClient, HarnessError
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.engine.run_store import CampaignRuntime
 from tasks.alphabench.core.candidate import FactorDomain
@@ -15,6 +18,31 @@ from tasks.alphabench.core.gateway import OracleGateway
 from tasks.alphabench.core.harness_tools import HarnessToolService, check_position
 from tasks.alphabench.core import harness_runtime
 from tasks.alphabench.core.protocol import T3Protocol
+
+
+def test_start_failure_closes_client_and_host_socket(tmp_path, monkeypatch):
+    created = []
+    start = HarnessClient.start
+
+    def fail_start(client):
+        created.append(client)
+        raise HarnessError("startup failed")
+
+    monkeypatch.setattr(HarnessClient, "start", fail_start)
+    monkeypatch.setenv("ALPHABENCH_RUNTIME_ROOT", tempfile.gettempdir())
+    protocol = T3Protocol(method="harness")
+    runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={})
+    gateway = OracleGateway(protocol, runtime, mock=True)
+    socket_root = Path(tempfile.gettempdir()) / "sockets"
+    before = set(socket_root.glob("t3-*"))
+    with pytest.raises(EvaluationPaused, match="Harness startup failed"):
+        with ExitStack() as stack:
+            harness_runtime.open_proposals(protocol, gateway, AcceptedActions(runtime.run_dir),
+                api_key="test-only", sidecar_image="ldm-pi-t3:local", stack=stack)
+    assert set(socket_root.glob("t3-*")) == before
+    assert runtime.budget.counters == {}
+    with pytest.raises(HarnessError, match="closed"):
+        start(created[0])
 
 
 def call(service, tool, **arguments):
@@ -94,8 +122,8 @@ def test_direct_harness_does_not_offer_gp_query_and_rejects_changed_snapshot(tmp
     assert forbidden["ok"] is False
 
 
-@pytest.mark.parametrize("method,query,count", [("harness", False, 1), ("ldm_harness", False, 2),
-    ("ldm_harness", True, 2)])
+@pytest.mark.parametrize("method,query,count", [("harness", False, 1), ("ldm_harness", False, 4),
+    ("ldm_harness", True, 4)])
 def test_pi_runtime_exposes_only_the_frozen_research_variant(tmp_path, monkeypatch, method, query, count):
     monkeypatch.setenv("ALPHABENCH_RUNTIME_ROOT", tempfile.gettempdir())
     protocol = T3Protocol(method=method, harness_surrogate_query=query,

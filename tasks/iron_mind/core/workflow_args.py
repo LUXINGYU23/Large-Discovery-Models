@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
+from typing import Any
 
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness import (
     POLICY_CAPABILITIES,
@@ -19,7 +22,6 @@ from tasks.iron_mind.core.prompting import (
     validate_prompt_policy,
 )
 from tasks.iron_mind.core.proposals import DEFAULT_PROPOSAL_MAX_WORKERS
-from tasks.iron_mind.core.provider import parse_openai_extra_body_json
 from tasks.iron_mind.core.search import (
     ACQUISITION_TILTED_METHODS,
     COMPILED_POLICY_METHOD,
@@ -115,7 +117,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Limit one policy-Agent tool per turn; repeat for additional tools.",
     )
     parser.add_argument("--policy-max-submission-attempts", type=int)
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    try:
+        configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.harness_tool_budget is None:
         args.harness_tool_budget = [
             value for value in DEFAULT_NETWORK_TOOL_BUDGETS
@@ -252,3 +259,17 @@ def _validate_search_mode(args: argparse.Namespace) -> None:
         raise SystemExit("Real model methods require --proposal-mode=openai")
     if not args.mock and not model_method and args.proposal_mode != "none":
         raise SystemExit("Real BO requires --proposal-mode=none")
+
+
+def parse_openai_extra_body_json(raw: str | None) -> dict[str, Any]:
+    """Parse an optional provider-specific OpenAI-compatible request object."""
+
+    if raw is None or not str(raw).strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--llm-extra-body-json is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("--llm-extra-body-json must decode to a JSON object.")
+    return dict(payload)

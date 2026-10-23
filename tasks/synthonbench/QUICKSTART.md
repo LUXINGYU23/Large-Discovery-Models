@@ -1,5 +1,7 @@
 # SynthonBench Quick Start
 
+LDM Harness defaults to **CoverageForks 2+2**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
+
 Run every command from the repository root.
 
 ## 1. Install and Verify the Official Example
@@ -78,8 +80,8 @@ uv run --locked --project tasks/synthonbench \
 
 Guest building requires Docker, `e2fsprogs`, `cpio`, and `lz4` on Linux. Guest
 smoke additionally requires the host-architecture QEMU system emulator. Docker
-must have access to Linux KVM at campaign time. The profile creates four persistent
-sessions, requests 16 candidates from each, and feeds all 64 occurrences into
+must have access to Linux KVM at campaign time. The profile creates a main researcher and four 2+2 proposal
+branches, requests 16 candidates from each branch, and feeds all 64 occurrences into
 the existing LDM `q0 + GP-UCB acquisition tilt` path. Each session chooses its
 own reaction types and exact tuples through structured official SynthonSpace
 tools. See `README.md` for
@@ -90,7 +92,7 @@ distinct legal tuples, and evaluates all 16 without `q0`, GP, or acquisition.
 Both methods accept `--harness-mcp-config`; per-tool turn limits are configured
 with `harness-tool-budget` in runner YAML. See `docs/research-harness.md`.
 
-The default four independent sessions share one comprehensive researcher
+The default four proposal branches share one comprehensive researcher
 template and load RDKit, experimental-design, scientific-critical-thinking,
 and statsmodels Skills on demand. Each writes an annotated
 `candidates.json` with 16 distinct tuples; agreement across sessions still

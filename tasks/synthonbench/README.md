@@ -1,5 +1,13 @@
 # SynthonBench LDM Task
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; candidate and evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions
+or latest-main 4fork. Strategy changes require a new campaign identity.
+
 This task applies the repository's shared `LDMEngine` to the official
 [SynthonBench](https://github.com/mireklzicar/synthonbench) budgeted-search
 interface. It does not run SynthonBench reference optimizers. Instead, it
@@ -14,6 +22,7 @@ ldm_task/          stable shared-runner adapter
 core/task_spec.py  declarative candidate, response, surrogate, and search contract
 core/factory.py    executable domain, selector, evaluator, and engine assembly
 core/workflow.py   campaign configuration and runtime orchestration
+core/harness_runtime.py Pi proposal trees, policy assembly and client lifetimes
 core/research.py   measured-history projection and candidate-file admission
 core/              tuple validation, prompts, Tanimoto GP, compiled-policy adapter, oracle adapter
 scripts/           source-pinned official data preparation
@@ -37,6 +46,12 @@ LDM interfaces without importing another task.
 The code is MIT licensed and the dataset card declares CC-BY-4.0. See
 [`resources/upstream_contract.json`](resources/upstream_contract.json) for the
 task's machine-readable provenance.
+
+The workflow owns the resource `ExitStack`; runtime assembly opens proposal and
+policy clients and registers cleanup before startup. `MeasuredResearchExpander`
+uses the shared tree coordinator. Reaction ordering, legal synthon tuples,
+product identity and feature encoding remain in task adapters. Shared engine
+receipts preserve selected oracle results across resume without redispatch.
 
 ## LDM Method
 
@@ -212,14 +227,14 @@ This section documents the SynthonBench adapter. The shared interface and task
 registration rules are in the
 [Research Harness integration guide](../../docs/research-harness.md).
 
-The `ldm_harness` method changes only candidate generation. It creates four
-independent persistent Pi sessions from one task-owned
-`comprehensive_research/AGENTS.md`. Each combines target SAR, reaction
+The `ldm_harness` method changes only candidate generation. A persistent main
+researcher supplies four proposal branches through the shared 2+2 tree policy.
+Branches use the task-owned `comprehensive_research/AGENTS.md`. Each combines target SAR, reaction
 feasibility, scaffold coverage, and property analysis in its own workspace and
 transcript. It autonomously selects reaction types and searches the read-only
 official SynthonSpace; no adapter-generated slot menu constrains its research.
 Instructions balance supported refinement, credible alternatives, and
-informative controls without fixed quotas or hardcoded curriculum rounds.
+informative controls; the tree chooses histories, not candidate-design quotas.
 Each session writes one 16-candidate file of exact
 `reaction_id + ordered synthon_ids` tuples. The
 combined 64 raw occurrences enter the
@@ -401,8 +416,8 @@ shrinkage. Draft evaluation compares chronological measured-history holdouts
 under the training-prefix GP and reports current-pool distribution changes.
 The policy receives read-only numeric arrays and subsequent errors of frozen
 pre-measurement predictions. Historical holdouts are development diagnostics.
-The task owns these calculations in `core/policy_diagnostics.py` and the
-digest-pinned Pi hook `resources/harness/policy_diagnostics.py`.
+These calculations share `ldm_tts/harness/ucb_diagnostics.py` with Iron Mind,
+NucleoBench and SynthonBench. Pi loads the same file as a digest-pinned hook.
 Feedback preserves the measured point's original pool size, q0 ranks and
 relative mass, acquisition ranks, first-draw probability, and actual alpha/eta.
 Selected-point residuals do not validate whole-pool ranking or weight-policy
@@ -487,7 +502,7 @@ pool, `beta=0.5`, `alpha=2`, `eta=0.25`, and acquisition z-clipping at 2. The
 twelve-round confirmation keeps the same 64 proposal occurrences and 16 real
 evaluations per round, but locks a 48-candidate pool, `alpha=2`, `eta=0.25`, and
 z-clipping at 5. Harness LDM uses the same 4-by-16 proposal shape through four
-persistent research sessions, each submitting 16 independently researched
+research branches, each submitting 16 independently researched
 official-space tuples, then uses the same `q0`, pool maintenance, GP, and
 acquisition tilt. Harness-Compiled LDM uses that identical proposal path and
 adds one independent policy session that may replace the residual-GP prior mean

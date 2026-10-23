@@ -9,6 +9,7 @@ from typing import Any
 from ldm_tts.engine.expansion import ReservoirExpander
 from ldm_tts.harness import HarnessClient, HarnessProfile, PolicyResearchController
 from ldm_tts.optimization.records import AcquisitionSelector
+from ldm_tts.optimization.measurement import MeasurementPolicy
 from ldm_tts.transport import ProposalClient
 from tasks.nucleobench.core.candidate import (
     MutationContext,
@@ -56,6 +57,7 @@ def build_surrogate_components(
     z_clip: float = 5.0,
     policy_controller: PolicyResearchController | None = None,
     policy_adapter: NucleoOptimizationPolicyAdapter | None = None,
+    measurement_policy: MeasurementPolicy | None = None,
 ) -> tuple[NucleotideHammingEncoder | None, AcquisitionSelector | None]:
     """Build the sole task-local surrogate path for one campaign method."""
 
@@ -63,6 +65,8 @@ def build_surrogate_components(
         raise ValueError(f"unknown NucleoBench search method: {search_method!r}")
     if evaluations_per_round < 1:
         raise ValueError("evaluations_per_round must be positive")
+    if measurement_policy is not None and search_method not in {"ldm", *PARALLEL_HARNESS_METHODS}:
+        raise ValueError("measurement coverage requires acquisition-tilted selection")
     if search_method in DIRECT_SEARCH_METHODS:
         return None, None
 
@@ -88,6 +92,7 @@ def build_surrogate_components(
         policy_controller=policy_controller,
         policy_adapter=policy_adapter,
         policy_mode=search_method == COMPILED_POLICY_METHOD,
+        measurement_policy=measurement_policy,
     )
 
 

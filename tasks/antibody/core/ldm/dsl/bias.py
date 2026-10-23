@@ -17,9 +17,8 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from typing import Union
 
-from tasks.antibody.core.ldm.dsl.alphabet import SEQ_LEN, idx_to_aa
+from tasks.antibody.core.ldm.dsl.alphabet import idx_to_aa
 
 HYDROPHOBIC = set("AILMFWVY")
 AROMATIC = set("FWY")

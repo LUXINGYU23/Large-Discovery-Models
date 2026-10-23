@@ -100,6 +100,8 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     generation = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((runtime.run_dir / "generation").glob("*.json"))]
     sidecar_usage = [record["sidecar_usage"] for record in generation
                      if record.get("attempt_kind") == "harness_provider_calls"]
+    sidecar_usage.extend(json.loads(path.read_text(encoding="utf-8"))["sidecar_usage"]
+        for path in sorted((runtime.run_dir / "harness/main/usage").glob("*.json")))
     if protocol.method == "ldm_harness_compiled":
         sidecar_usage.extend(json.loads(path.read_text(encoding="utf-8")).get("harness_turn", {}).get("usage")
             for path in sorted((runtime.run_dir / "policy_harness/rounds").glob("round_*/result.json")))
@@ -122,7 +124,7 @@ def finalize(protocol, runtime, gateway, observations, initial_pool, initial_bud
     if tool_usage_complete:
         for usage in sidecar_usage:
             tool_calls.update(usage["toolCalls"])
-    costs = {"scope": "entire run including initialization, proposal and policy",
+    costs = {"scope": "entire run including initialization, main research, proposal and policy",
              "model_requests": (initial_budget["counters"].get("model_requests", 0) +
                                 budget["counters"].get("model_requests", 0)),
              "model_requests_by_stage": {"initialization": initial_budget["counters"].get("model_requests", 0),

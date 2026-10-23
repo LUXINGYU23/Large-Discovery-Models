@@ -7,7 +7,6 @@ import json
 import os
 import shutil
 import subprocess
-from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 
@@ -48,6 +47,12 @@ from tasks.iron_mind.core.workflow_args import validate_args
 
 
 class FakeHarnessClient:
+    def start(self):
+        self.started = True
+
+    def close(self):
+        self.closed = True
+
     def __init__(self, artifact_root, candidates_by_profile, *, replacements=None):
         self.artifact_root = artifact_root
         self.candidates_by_profile = candidates_by_profile
@@ -489,17 +494,16 @@ def test_engine_checkpoint_preserves_research_notes(
         profiles = (
             direct_harness_profile() if method == "harness" else harness_profiles()
         )
-        return nullcontext(
-            FakeHarnessClient(
+        return FakeHarnessClient(
                 runtime.run_dir / "harness",
                 {profile.profile_id: [payload] for profile in profiles},
             )
-        )
 
-    monkeypatch.setattr("tasks.iron_mind.core.workflow._harness_client", fake_client)
+    monkeypatch.setattr("tasks.iron_mind.core.harness_runtime.create_client", fake_client)
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 method,

@@ -30,6 +30,47 @@ trainer, and single-search wrapper. `.coveragerc` enforces a minimum total of
 80%. GPU training code, remote model clients, and domain adapters are verified
 in their package environments instead of being counted as uncovered core code.
 
+## Pi tasks and shared recovery
+
+Use the task environments for their scientific dependencies. In an environment
+containing the six tasks' test dependencies, run from the repository root:
+
+```bash
+python -m pytest tests tasks/nucleobench/tests tasks/iron_mind/tests \
+  tasks/synthonbench/tests tasks/reasyn/tests tasks/atomworld/tests \
+  tasks/alphabench/tests
+npm --prefix harnesses/pi ci
+npm --prefix harnesses/pi test
+npm --prefix harnesses/pi run typecheck -- --noUnusedLocals --noUnusedParameters
+```
+
+`tests/test_research_task_adapters.py` exercises task factories and default 2+2
+trees with synthetic Harness responses. Shared engine tests cover single and
+batch result persistence, unknown-result pauses, failure replenishment and
+completed replay. Task recovery tests verify receipt and checkpoint fault
+windows, scientific budgets, private feedback and attribution. These tests do
+not call a paid provider or qualify official benchmark scores.
+
+Pi tests exercise the actual provider proxy against a local fixture server,
+including research parameter overrides and native compaction's low reasoning
+and output budget. Submission repair, partial commits, identity tampering,
+timeouts and length-stop are tested in their owning modules.
+
+For AlphaBench integration, set `ALPHABENCH_SOURCE_ROOT` to the pinned source
+checkout to enable native algorithm tests. Set `ALPHABENCH_T3_SIDECAR_IMAGE` to
+an immutable built image only after building the matching task guest in
+`$ALPHABENCH_RUNTIME_ROOT/cache`; guest tests also require KVM. Then run
+`test_harness_mcp.py`, `test_harness_guest.py` and `test_policy.py` under
+`tasks/alphabench/tests`. A sidecar image alone supports MCP and policy artifact
+execution but does not satisfy tests that initialize Pi sessions. Missing guest,
+upstream or real-model assets must be reported separately from mock test passes.
+
+Run builds and tests on the designated Linux server under `/mnt/data1/`.
+Use an isolated copy, a short `TMPDIR` for Unix sockets, distinct image tags and
+source/build hashes. An archive without `.git` must supply its actual archive
+identity via `LDM_PILOT_EVALUATION_COMMIT` for pilot-run provenance. Never change
+an old experiment's identity or checkpoint to test a new implementation.
+
 ## Antibody
 
 Use the locked antibody environment documented in

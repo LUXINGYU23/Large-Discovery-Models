@@ -220,6 +220,8 @@ class ReaSynExpander:
         return [
             {"candidate_id": o.candidate.candidate_id,
              "round_idx": getattr(o, "round_idx", None),
+             "evaluation_status": o.evaluation.status,
+             **({"harness_lineage": o.candidate.metadata["harness_lineage"]} if o.candidate.metadata.get("harness_lineage") else {}),
              "smiles": o.candidate.payload.get("smiles", o.candidate.payload.get("target_smiles")),
              **({"sampling_seed": o.candidate.payload["sampling_seed"]} if "sampling_seed" in o.candidate.payload else {}),
              **({"research_annotations": o.candidate.metadata["research_annotations"]}

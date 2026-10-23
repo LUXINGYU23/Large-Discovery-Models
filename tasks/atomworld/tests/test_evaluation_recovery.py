@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from ldm_tts.contracts import RawProposal
-from ldm_tts.engine.runtime import LDMEngine
-from tasks.atomworld.core import workflow
+from ldm_tts.engine.run_store import CampaignRuntime
+from tasks.atomworld.core import workflow, workflow_args
 from tasks.atomworld.core.evaluator import AtomWorldEvaluator
 from tasks.atomworld.core.proposals import AtomWorldDomain, extract_cif
 from tasks.atomworld.tests.test_harness import ResearchClient, fixture
@@ -19,7 +19,7 @@ def test_completed_judge_replays_without_losing_final_round(tmp_path, monkeypatc
     tmp_path = tmp_path / "run"
     calls = []
     interrupted = False
-    checkpoint = LDMEngine._checkpoint
+    checkpoint = CampaignRuntime.checkpoint
 
     def judge(target, text, **kwargs):
         calls.append(text)
@@ -39,19 +39,19 @@ def test_completed_judge_replays_without_losing_final_round(tmp_path, monkeypatc
 
     def crash(self, state):
         nonlocal interrupted
-        if interrupt_at == "checkpoint" and not interrupted and len(state.observations) == interrupt_round + 1:
+        if interrupt_at == "checkpoint" and not interrupted and len(state["observations"]) == interrupt_round + 1:
             interrupted = True
             raise KeyboardInterrupt()
         checkpoint(self, state)
 
     monkeypatch.setattr(workflow, "AtomWorldEvaluator", Evaluator)
-    monkeypatch.setattr(LDMEngine, "_checkpoint", crash)
+    monkeypatch.setattr(CampaignRuntime, "checkpoint", crash)
     clients = {}
     def factory(args, root, sample, **kwargs):
         if root not in clients:
             clients[root] = ResearchClient(args, root, sample, **kwargs)
         return clients[root]
-    args = workflow.parse_args(["--mock", "--search-method", method, "--iterations", "2",
+    args = workflow_args.parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--search-method", method, "--iterations", "2",
                                 "--out-dir", str(tmp_path)])
     with pytest.raises(KeyboardInterrupt):
         workflow.run(args, harness_client_factory=factory)

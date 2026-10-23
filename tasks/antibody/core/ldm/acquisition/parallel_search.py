@@ -9,13 +9,13 @@ can pool, rank, and present top-k to the LLM for review.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 import torch
 
 from tasks.antibody.core.cdr_constraints import check_cdr_constraints
-from tasks.antibody.core.ldm.dsl.alphabet import SEQ_LEN, hamming
+from tasks.antibody.core.ldm.dsl.alphabet import hamming
 from tasks.antibody.core.ldm.dsl.search_space import (
     LatinHyperCubeSampling,
     LocalSearch,

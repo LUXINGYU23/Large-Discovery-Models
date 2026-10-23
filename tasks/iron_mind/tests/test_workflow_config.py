@@ -183,7 +183,8 @@ def test_harness_smoke_config_is_portable_and_profile_locked(
     profile = contract.profile("ldm_harness_official_smoke")
 
     assert plan["contract_profile"] == "ldm_harness_official_smoke"
-    assert profile.budget["harness_turns"] == 4
+    assert profile.budget["harness_turns"] == 5
+    assert profile.budget["main_research_turns"] == 1
     assert config["args"]["search-method"] == "ldm_harness"
     assert config["args"]["proposal-mode"] == "none"
     assert config["args"]["harness-candidates-per-session"] == 16

@@ -12,6 +12,7 @@ technical and operational contracts.
   coverage thresholds.
 - [Fixed-budget pilot evaluation](pilot-evaluation.md): reusable LDM, BO,
   direct-LLM, and Harness comparison matrices and task onboarding.
+- [Shared Pi research trees](research-search-architecture.md): six task adapters, default 2+2, strategy configuration, budgets, provenance and recovery.
 - [Research Harness integration](research-harness.md): persistent Agent
   proposal and compiled-policy sessions, optional Pi extensions, task
   validation, resources, traces, and qualification.
@@ -19,6 +20,11 @@ technical and operational contracts.
   augmentation, rendering, and validation workflow.
 - [Agent execution](agent-execution.md): machine-oriented rules for safely
   inspecting, testing, and running the repository.
+
+## Implementation Plans
+
+- [Architecture convergence plan](architecture-convergence-plan.md): staged task
+  assembly, shared execution and recovery, Pi runtime cleanup, and acceptance checks.
 
 ## Task Guides
 
@@ -33,6 +39,7 @@ technical and operational contracts.
 - [NucleoBench](../tasks/nucleobench/README.md)
 - [AtomWorld](../tasks/atomworld/README.md)
 - [ReaSyn](../tasks/reasyn/README.md)
+- [AlphaBench](../tasks/alphabench/README.md)
 - [Task registration](../tasks/README.md)
 
 ## Runbooks And Agent Skills

@@ -12,7 +12,8 @@ from ldm_tts.registration.experiment import load_experiment_contract
 from tasks.nucleobench.core import dependencies
 from tasks.nucleobench.core.cases import CaseCatalogError, load_case_catalog
 from tasks.nucleobench.core.constants import CATALOG_PATH
-from tasks.nucleobench.core.workflow import describe_ldm_task, resolve_provider_settings
+from tasks.nucleobench.core.workflow import describe_ldm_task
+from tasks.nucleobench.core.provider import resolve_provider_settings
 from tasks.nucleobench.ldm_task.procedure import main, parse_args
 
 TASK_ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +122,17 @@ def test_oracle_minibatch_is_independent_of_the_selection_batch() -> None:
     assert parse_args(["--evaluations-per-round", "128"]).oracle_batch_size == 128
     with pytest.raises(SystemExit):
         parse_args(["--oracle-batch-size", "0"])
+
+
+@pytest.mark.parametrize("digest_args", [[], ["--expected-start-set-sha256", " " * 64]])
+def test_real_execution_requires_start_set_digest_before_loading_assets(tmp_path, digest_args):
+    with pytest.raises(SystemExit, match="requires --expected-start-set-sha256"):
+        main([
+            "--search-method", "bo",
+            "--source-dir", str(tmp_path / "source"),
+            "--prepared-dir", str(tmp_path / "prepared"),
+            *digest_args,
+        ])
 
 
 def test_pilot_rounds_and_bo_proposal_pool_are_configurable() -> None:

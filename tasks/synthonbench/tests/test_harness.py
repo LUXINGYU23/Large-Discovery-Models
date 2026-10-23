@@ -7,7 +7,6 @@ import json
 import os
 import shutil
 import subprocess
-from contextlib import nullcontext
 from dataclasses import replace
 from itertools import product
 from pathlib import Path
@@ -50,6 +49,12 @@ from tasks.synthonbench.core.workflow_args import validate_args
 
 
 class FakeHarnessClient:
+    def start(self):
+        self.started = True
+
+    def close(self):
+        self.closed = True
+
     def __init__(self, artifact_root, candidates_by_profile, *, replacements=None):
         self.artifact_root = artifact_root
         self.candidates_by_profile = candidates_by_profile
@@ -602,21 +607,20 @@ def test_mock_campaign_routes_harness_candidates_through_the_existing_engine(
                 for position in ordered_positions(benchmark.task.space, reaction_id)
             ],
         }
-        return nullcontext(
-            FakeHarnessClient(
+        return FakeHarnessClient(
                 _runtime.run_dir / "harness",
                 {profile: [candidate] for profile in HARNESS_PROFILE_IDS},
             )
-        )
 
     monkeypatch.setattr(
-        "tasks.synthonbench.core.workflow._harness_client",
+        "tasks.synthonbench.core.harness_runtime.create_client",
         fake_client,
     )
 
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 "ldm_harness",
@@ -696,21 +700,20 @@ def test_mock_direct_harness_evaluates_all_sixteen_submissions(
             if len(candidates) >= 16:
                 break
         submitted_payloads.extend(candidates[:16])
-        return nullcontext(
-            FakeHarnessClient(
+        return FakeHarnessClient(
                 _runtime.run_dir / "harness",
                 {direct_harness_profile()[0].profile_id: candidates[:16]},
             )
-        )
 
     monkeypatch.setattr(
-        "tasks.synthonbench.core.workflow._harness_client",
+        "tasks.synthonbench.core.harness_runtime.create_client",
         fake_client,
     )
 
     assert (
         main(
             [
+                "--harness-research-strategy-config", "config/research_strategies/independent.json",
                 "--mock",
                 "--search-method",
                 "harness",

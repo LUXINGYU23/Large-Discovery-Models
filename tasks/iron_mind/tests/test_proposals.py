@@ -28,7 +28,6 @@ from tasks.iron_mind.core.proposal_parsing import (
     parse_reaction_response,
     parse_reaction_responses,
 )
-from tasks.iron_mind.core.proposal_transport import build_openai_reaction_client
 from tasks.iron_mind.core.proposals import (
     IronMindProposalExpander,
     build_reaction_proposal_request,
@@ -336,44 +335,3 @@ def test_request_uses_the_runtime_reservoir_size() -> None:
     assert request.metadata["proposal_count"] == 64
     assert request.metadata["slot_focus_capacity"] >= 64
     assert "Independent proposal slot: 64 of 64" in content
-
-
-def test_openai_client_uses_the_standard_chat_completion_contract() -> None:
-    client = build_openai_reaction_client(
-        base_url="https://example.invalid/v1",
-        model="test-model",
-        api_key="",
-        timeout_seconds=10.0,
-        max_tokens=256,
-    )
-
-    assert client.max_retries == 3
-    assert client.retry_backoff_seconds == 10.0
-    assert client.breaker.failure_threshold == 32
-    assert client.require_models_preflight is False
-    assert client.extra_body == {}
-
-    json_client = build_openai_reaction_client(
-        base_url="https://example.invalid/v1",
-        model="test-model",
-        api_key="",
-        timeout_seconds=10.0,
-        max_tokens=256,
-        json_mode=True,
-        extra_body={"thinking": {"type": "disabled"}},
-    )
-
-    assert json_client.extra_body == {
-        "thinking": {"type": "disabled"},
-        "response_format": {"type": "json_object"},
-    }
-    with pytest.raises(ValueError, match="cannot be combined"):
-        build_openai_reaction_client(
-            base_url="https://example.invalid/v1",
-            model="test-model",
-            api_key="",
-            timeout_seconds=10.0,
-            max_tokens=256,
-            json_mode=True,
-            extra_body={"response_format": {"type": "text"}},
-        )

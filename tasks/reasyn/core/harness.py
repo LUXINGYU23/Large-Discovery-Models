@@ -1,26 +1,23 @@
-"""Persistent, independent ReaSyn research sessions using the shared Harness."""
+"""ReaSyn proposal validation, research history and durable projection handoffs."""
 from __future__ import annotations
 
 import hashlib
 import json
+import math
+from dataclasses import asdict
 from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import (
-    HarnessArtifactRule, HarnessClient, HarnessError, HarnessLimits,
-    HarnessNetworkPolicy, HarnessProfile, HarnessSubmissionContract,
-    HarnessSubmissionError, HarnessSubmissionValidation, HarnessToolExtension,
-    HarnessTurn, canonical_sha256, directory_sha256, file_sha256,
-    load_harness_mcp_config, parse_tool_call_budgets, policy_submission_contract,
+    HarnessArtifactRule, HarnessError, HarnessProfile, HarnessSubmissionContract,
+    HarnessSubmissionError, HarnessSubmissionValidation, HarnessTurn,
+    canonical_sha256, directory_sha256, file_sha256,
 )
-from ldm_tts.harness.container import docker_identity_args, resolve_container_user
-from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
+from ldm_tts.harness.research_store import ResearchMeasurement
 from ldm_tts.transport import ProposalResponse
-from ldm_tts.transport.openai import generation_body
 from .chemistry import canonicalize
 
 RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOL_NAMES = ("describe_reasyn_task", "get_measured_history", "check_measured_product")
 
 
 def profiles(count=4, *, policy=False):
@@ -74,79 +71,18 @@ def read_submission(submission, artifacts, root, count, *, mock=False):
     return normalized
 
 
-def create_client(args, root, campaign_id, target, *, policy=False):
-    root = Path(root).resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    context = {"benchmark": args.benchmark, "oracle": args.oracle if not target else None,
-               "original_target": target, "mock": args.mock,
-               "feedback": "Only completed task measurements are available. Projection is not an oracle score."}
-    atomic_json_write(root / "context.json", context)
-    history_root = root.parent / "harness" if policy else root
-    history_root.mkdir(parents=True, exist_ok=True)
-    if not (history_root / "measured_history.json").exists():
-        atomic_json_write(history_root / "measured_history.json", {"observations": []})
-    cache = (args.harness_cache_dir or Path.home() / ".cache/ldm-gondolin").expanduser().resolve()
-    (cache / "runtime-overlays").mkdir(parents=True, exist_ok=True)
-    command = ["docker"]
-    if args.harness_docker_host:
-        command += ["--host", args.harness_docker_host]
-    command += ["run", "--rm", "-i"]
-    command += docker_identity_args(resolve_container_user(args.harness_container_user, args.harness_docker_host), args.harness_docker_host)
-    command += ["--device", "/dev/kvm"]
-    env = {"HOME": "/runtime-home", "XDG_CACHE_HOME": "/runtime-home/.cache",
-           "GONDOLIN_IMAGE_STORE": "/runtime-home/.cache/gondolin/images",
-           "GONDOLIN_SESSIONS_DIR": "/runtime-home/.cache/gondolin/sessions",
-           "LDM_HARNESS_CACHE_ROOT": "/runtime-home/.cache/gondolin",
-           "TMPDIR": "/runtime-home/.cache/gondolin/runtime-overlays",
-           "LDM_REASYN_CONTEXT": "/artifacts/context.json",
-           "LDM_REASYN_HISTORY": "/measured_history/measured_history.json" if policy else "/artifacts/measured_history.json"}
-    for name, value in env.items():
-        command += ["--env", f"{name}={value}"]
-    mounts = [(root, "/artifacts", False), (cache, "/runtime-home/.cache/gondolin", False), (RESOURCE_ROOT, "/resources", True)]
-    if policy:
-        mounts.append((history_root, "/measured_history", True))
-    for source, destination, readonly in mounts:
-        command += ["--mount", f"type=bind,src={source},dst={destination}" + (",readonly" if readonly else "")]
-    command.append(args.harness_sidecar_image)
-    mcp = load_harness_mcp_config(args.harness_mcp_config)
-    contract = policy_submission_contract() if policy else submission_contract()
-    return HarnessClient(command, api_key=args.provider_api_key,
-        named_secrets=mcp.named_secrets, response_timeout_seconds=args.harness_response_timeout,
-        config=PiHarnessConfig(
-            artifact_root=Path("/artifacts"), base_url=args.llm_url, model=args.llm_model,
-            profiles=profiles(args.harness_sessions, policy=policy), campaign_id=campaign_id,
-            task_id="reasyn", case_id=f"{args.benchmark}:{target or args.oracle}" + (":policy" if policy else ""),
-            seed=args.seed, submission_contract=contract,
-            guest_runtime=load_pi_guest_runtime("reasyn", RESOURCE_ROOT / "image"),
-            tool_extensions=(HarnessToolExtension(Path("/resources/tools/molecular_research.mjs"),
-                file_sha256(RESOURCE_ROOT / "tools/molecular_research.mjs"), TOOL_NAMES),),
-            mcp_servers=(*mcp.servers, policy_mcp_server(
-                diagnostics_path="/resources/policy_diagnostics.py",
-                diagnostics_sha256=file_sha256(RESOURCE_ROOT / "policy_diagnostics.py"),
-            )) if policy else mcp.servers,
-            thinking=args.harness_thinking, context7_enabled=False,
-            provider_request_body={
-                "temperature": args.llm_temperature, "max_output_tokens": args.llm_max_tokens,
-                **generation_body(wire_api=args.llm_wire_api, reasoning=args.llm_reasoning,
-                                  extra_body=json.loads(args.llm_extra_body_json)),
-            },
-            limits=HarnessLimits(wall_time_seconds=args.harness_wall_time_seconds,
-                tool_call_budgets=parse_tool_call_budgets(args.harness_tool_budget, excluded_tools=(contract.tool_name,))),
-            network_policy=HarnessNetworkPolicy(forbidden_query_patterns=("benchmark_result", "oracle_cache", "checkpoint")),
-        ))
-
-
 class HarnessTargetSource:
-    """Run a strict barrier of independent persistent molecular research sessions.
+    """Run a strict barrier of molecular research sessions.
 
     Immutable turn inputs and a durable normalized response make the cursor and
     projection handoff replayable. Usage is cumulative per native turn, including
     task validation attempts observed before an interrupted provider response.
     """
-    def __init__(self, client, root, args, *, target="", account=None):
+    def __init__(self, client, root, args, *, target="", account=None, coordinator=None, branch_client=None):
         self.client, self.root, self.args, self.target = client, Path(root), args, target
         self.root.mkdir(parents=True, exist_ok=True)
         self.account = account
+        self.coordinator, self.branch_client = coordinator, branch_client
         self.session_profiles = tuple(client.config.profiles)
         if not self.session_profiles:
             raise ValueError("ReaSyn Harness needs at least one independent session")
@@ -172,26 +108,31 @@ class HarnessTargetSource:
         batch_root = turn_root / f"round-{round_index:06d}" / f"batch-{batch:06d}"
         allocation_path = batch_root / "allocation.json"
         cursor_path = self.root / "session_allocation.json"
-        cursor = json.loads(cursor_path.read_text())["next_occurrence"] if cursor_path.exists() else 0
+        cursor_state = json.loads(cursor_path.read_text()) if cursor_path.exists() else {"next_occurrence": 0, "next_tree_step": 1}
+        cursor = cursor_state["next_occurrence"]
         if allocation_path.exists():
             allocation = json.loads(allocation_path.read_text())
         else:
             allocation = {"start": cursor, "count": count}
+            if self.coordinator is not None:
+                allocation["tree_step"] = cursor_state["next_tree_step"]
             atomic_json_write(allocation_path, allocation)
         if allocation["count"] != count:
             raise ValueError("Harness session allocation changed on resume")
         # Reconcile a crash between reserving a barrier and advancing its cursor.
         next_occurrence = max(cursor, allocation["start"] + count)
-        if not cursor_path.exists() or next_occurrence != cursor:
-            atomic_json_write(cursor_path, {"next_occurrence": next_occurrence})
+        cursor_state["next_occurrence"] = next_occurrence
+        if self.coordinator is not None:
+            cursor_state["next_tree_step"] = max(cursor_state["next_tree_step"], allocation["tree_step"] + 1)
+        atomic_json_write(cursor_path, cursor_state)
         selected = tuple(self.session_profiles[(allocation["start"] + i) % len(self.session_profiles)]
-                         for i in range(min(count, len(self.session_profiles))))
+                         for i in range(len(self.session_profiles) if self.coordinator else min(count, len(self.session_profiles))))
         counts = {p.profile_id: count // len(selected) + int(i < count % len(selected)) for i, p in enumerate(selected)}
         request_digest = canonical_sha256({
             "metadata": meta, "profiles": [profile.to_dict() for profile in selected], "counts": counts,
             "benchmark": self.args.benchmark, "target": self.target, "oracle": self.args.oracle,
+            "tree_step": allocation.get("tree_step"),
         })
-        turns = self._turns(batch_root, request_digest, meta, history, selected, counts)
         response_path = batch_root / "response.json"
         if response_path.exists():
             record = json.loads(response_path.read_text())
@@ -201,6 +142,31 @@ class HarnessTargetSource:
             data = record["response"]
             data["tool_calls"] = tuple(data.get("tool_calls", ()))
             return ProposalResponse(**data)
+        if self.coordinator is not None:
+            objective = "similarity" if self.target else "oracle_score"
+            measurements = []
+            for row in history:
+                score = row.get("metrics", {}).get(objective)
+                lineage = row.get("harness_lineage", {})
+                if row.get("evaluation_status") == "succeeded" and isinstance(score, (int, float)) and math.isfinite(score):
+                    measurements.append(ResearchMeasurement(lineage.get("research_key", row["candidate_id"]),
+                        float(score), lineage.get("research_step", 0)))
+            atomic_json_write(self.root / "main/measured_history.json", {"observations": history})
+            prepared = self.coordinator.prepare(allocation["tree_step"], history, tuple(measurements),
+                message={"task": "reasyn", "goal": {"target": self.target} if self.target else {"oracle": self.args.oracle},
+                         "history_access": "get_measured_history", "feedback": "Scores belong to measured projected products, not unprojected targets."})
+            root = prepared["root"]
+            atomic_json_write(root / "measured_history.json", {"observations": history})
+            with self.branch_client(root, prepared["sources"]) as client:
+                turns = self._turns(batch_root, request_digest, meta, history, selected, counts,
+                    cursors={p: s.history_cursor for p, s in prepared["sources"].items()})
+                return self._run_batch(client, root, turns, selected, counts, prepared,
+                                       response_path, request_digest, history)
+        turns = self._turns(batch_root, request_digest, meta, history, selected, counts)
+        return self._run_batch(self.client, self.root, turns, selected, counts, None,
+                               response_path, request_digest, history)
+
+    def _run_batch(self, client, root, turns, selected, counts, prepared, response_path, request_digest, history):
         expected_turns = {turn.profile_id: turn for turn in turns}
 
         def validate(submission):
@@ -210,7 +176,7 @@ class HarnessTargetSource:
                 self.account({"harness_validation_submissions": submission.attempt_index},
                              usage_key=f"harness:{submission.turn_id}")
             try:
-                read_submission(submission.submission, submission.artifacts, self.root,
+                read_submission(submission.submission, submission.artifacts, root,
                                 counts[submission.profile_id], mock=self.args.mock)
             except (ValueError, KeyError, TypeError, OSError) as exc:
                 return HarnessSubmissionValidation("retry", (HarnessSubmissionError(
@@ -223,7 +189,7 @@ class HarnessTargetSource:
                 self.account({"harness_turns": 1}, usage_key=f"harness:{turn.turn_id}")
         usage = {}
         try:
-            results = self.client.run_turn(turns, submission_validator=validate,
+            results = client.run_turn(turns, submission_validator=validate,
                 recovery_timeout_seconds=self.args.harness_wall_time_seconds * 2)
             usage = {r.profile_id: r.usage for r in results}
         except HarnessError as exc:
@@ -247,7 +213,7 @@ class HarnessTargetSource:
             turn = expected_turns[profile.profile_id]
             if result.submission_status != "accepted" or result.turn_id != turn.turn_id or result.input_digest != turn.input_digest:
                 raise HarnessError("ReaSyn research submission is not accepted for this frozen turn")
-            rows = read_submission(result.submission, result.submitted_artifacts, self.root,
+            rows = read_submission(result.submission, result.submitted_artifacts, root,
                                    counts[profile.profile_id], mock=self.args.mock)
             for index, row in enumerate(rows):
                 candidates.append({"target_smiles": row["target_smiles"]})
@@ -257,9 +223,15 @@ class HarnessTargetSource:
                     "submission_digest": result.submission_digest, "item_index": index,
                     "rationale": row["rationale"], "artifacts": result.artifacts,
                     "submitted_artifacts": [a.to_dict() for a in result.submitted_artifacts],
+                    **({"research_step": prepared["plan"]["identity"]["round_index"],
+                        "research_key": f"{prepared['main_turn_id']}:{profile.profile_id}:{index}"} if prepared else {}),
                 })
+        if prepared is not None:
+            self.coordinator.commit(prepared, {r.profile_id: asdict(r) for r in results},
+                {p.profile_id: tuple(row["research_key"] for row in lineage if row["profile_id"] == p.profile_id) for p in selected},
+                proposals=[{"payload": candidate, "lineage": source} for candidate, source in zip(candidates, lineage, strict=True)])
         response = ProposalResponse(text=json.dumps({"candidates": candidates}),
-            metadata={"harness_lineage": lineage, "mode": "persistent_harness"})
+            metadata={"harness_lineage": lineage, "mode": "main_research_round_forks" if prepared else "persistent_harness"})
         atomic_json_write(response_path, {"request_sha256": request_digest, "response": response.to_dict()})
         self._commit_cursors(selected, history)
         return response
@@ -278,7 +250,7 @@ class HarnessTargetSource:
                 "history_to_seq": len(history), "history_prefix_sha256": canonical_sha256(history),
             })
 
-    def _turns(self, batch_root, request_digest, meta, history, selected, counts):
+    def _turns(self, batch_root, request_digest, meta, history, selected, counts, *, cursors=None):
         path = batch_root / "input.json"
         if path.exists():
             saved = json.loads(path.read_text())
@@ -296,7 +268,8 @@ class HarnessTargetSource:
         turns = []
         for profile in selected:
             cursor_path = self.root / f"history_cursor_{profile.profile_id}.json"
-            cursor_state = json.loads(cursor_path.read_text()) if cursor_path.exists() else {"history_to_seq": 0}
+            cursor_state = ({"history_to_seq": cursors[profile.profile_id]} if cursors is not None else
+                            json.loads(cursor_path.read_text()) if cursor_path.exists() else {"history_to_seq": 0})
             cursor = cursor_state["history_to_seq"]
             if isinstance(cursor, bool) or not isinstance(cursor, int) or not 0 <= cursor <= len(history):
                 raise ValueError("Invalid Harness measured-history cursor")
@@ -315,6 +288,7 @@ class HarnessTargetSource:
                 "history_digest": canonical_sha256(delta),
                 "omitted_delta_observations": max(0, len(delta) - len(compact)),
                 "candidate_count": counts[profile.profile_id],
+                "zero_quota": "If candidate_count is zero, preserve research notes and submit an empty candidates array. Do not add target occurrences.",
                 "rejection_feedback": feedback[-16:], "rejection_count": len(feedback),
                 "history_query_tool": "get_measured_history", "product_membership_tool": "check_measured_product",
                 "history_query": {"offset": cursor, "limit": 32, "total_observations": len(history)},

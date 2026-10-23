@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
+from typing import Any
 
+from ldm_tts.harness.research_strategy import configure_research_strategy
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness import (
     POLICY_CAPABILITIES,
@@ -35,7 +38,6 @@ from tasks.synthonbench.core.constants import (
     TARGETS,
 )
 from tasks.synthonbench.core.prompting import DEFAULT_PROMPT_POLICY, PROMPT_POLICIES
-from tasks.synthonbench.core.provider import parse_openai_extra_body_json
 from tasks.synthonbench.core.harness import HARNESS_PROFILE_IDS
 from tasks.synthonbench.core.search import (
     ACQUISITION_TILTED_METHODS,
@@ -55,7 +57,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     _add_ldm_arguments(parser)
     _add_provider_arguments(parser)
     _add_runtime_arguments(parser)
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    try:
+        configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.proposal_candidates_per_request is None:
         args.proposal_candidates_per_request = (
             min(DEFAULT_PROPOSAL_CANDIDATES_PER_REQUEST, args.proposal_samples)
@@ -325,3 +332,15 @@ def _validate_mode(args: argparse.Namespace) -> None:
 
 
 __all__ = ["parse_args", "validate_args"]
+
+
+def parse_openai_extra_body_json(raw: str | None) -> dict[str, Any]:
+    if raw is None or not str(raw).strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--llm-extra-body-json is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("--llm-extra-body-json must decode to a JSON object")
+    return dict(payload)

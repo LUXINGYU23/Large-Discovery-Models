@@ -1039,7 +1039,7 @@ def collect_direct_sequence_action(
     return True
 
 
-def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Namespace) -> Path:
+def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Namespace, *, llm=None) -> Path:
     rng = random.Random(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -1055,7 +1055,8 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
         print(f"[llm-acq] Loaded candidate library: {len(candidate_library)} sequences from {pool_csv}")
     elif method == "legacy_policy_max":
         print("[llm-acq] No candidate library provided; using random temporary candidate reservoirs.")
-    llm = make_llm_client()
+    if llm is None:
+        llm = make_llm_client()
     evaluator, bbox = make_evaluator(config, antigen, run_id)
 
     acq_name = str(getattr(args, "acq", ACQ_NAME)).lower()

@@ -19,7 +19,6 @@ from tasks.nanogpt.core.expansion_schema import (
     initial_active_operation_schema,
     load_operation_schema,
     operation_representation_dimension,
-    operation_representation_dimension,
     validate_operation_payload,
 )
 from ldm_tts.transport.parsing import load_json_object, reject_keys
@@ -464,7 +463,7 @@ class LDMBOTraceContractTests(unittest.TestCase):
 
 class LDMTaskSpecTests(unittest.TestCase):
     def test_nanogpt_operation_spec_reports_active_and_full_dimensions(self) -> None:
-        from tasks.nanogpt.ldm_task import procedure as nanogpt_procedure
+        from tasks.nanogpt.core import workflow as nanogpt_procedure
 
         project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         args = nanogpt_procedure.parse_args([
@@ -483,10 +482,6 @@ class LDMTaskSpecTests(unittest.TestCase):
             project_root,
         )
         active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)
-        self.assertEqual(
-            operation_representation_dimension(active_schema),
-            operation_representation_dimension(active_schema),
-        )
 
         spec = nanogpt_procedure.describe_ldm_task(
             args,

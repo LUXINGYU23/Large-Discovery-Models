@@ -5,7 +5,6 @@ import json
 import random
 from typing import Any, Iterable
 
-import numpy as np
 
 from tasks.antibody.core.ldm_light.ldm_acq import (
     AA,

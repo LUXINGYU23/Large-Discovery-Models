@@ -1,5 +1,13 @@
 # ReaSyn Science Benchmark for LDM
 
+The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
+one older-main restart and one archived-side continuation. The main research
+turn is additional to the four proposal turns; candidate and evaluation budgets
+remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
+for history, accounting and recovery. Use `--harness-research-strategy-config`
+with a file in `config/research_strategies/` to select independent sessions
+or latest-main 4fork. Strategy changes require a new campaign identity.
+
 This task implements **the first/main reconstruction evaluation** and the
 released TDC goal-directed optimization evaluation from the source-pinned
 ReaSyn v2 code and paper. Both execute through `ldm_tts.campaign.run_campaign`,
@@ -7,6 +15,33 @@ including shared candidate admission, budgets, acquisition, checkpoints and
 resume. No model training is needed. Registration is valid; scientific
 qualification remains **draft** because official assets and a real GPU seed run
 have not been verified. Synthetic mock values are not ReaSyn scores.
+
+## Code boundaries
+
+`core/workflow.py` assembles the shared campaign and handles task-specific
+initialization and recovery. CLI resolution and serialized configuration live in
+`workflow_args.py`; `task_spec.py` declares the candidate and search contract.
+`provenance.py` verifies pinned assets and freezes the scientific identity used
+on resume. `reporting.py` writes campaign artifacts and benchmark metrics.
+Projection, candidate admission, sampling and selection remain in their own
+modules; their outputs are the inputs to reporting and recovery.
+
+`harness_runtime.py` owns provider preflight, Pi client configuration and the
+assembly of proposal trees and compiled policies. The workflow owns their
+`ExitStack`, so a partially started policy client and every earlier client are
+closed on failure. `harness.py` validates submissions and preserves the batch,
+history and projection handoff records. Tree main/branch clients keep their
+per-turn lifetime in the shared coordinator and proposal adapter.
+
+Completed resumes bypass provider preflight and Pi startup. Active resumes keep
+the existing recovery allowance, sampling seed span, scientific identity checks
+and usage counters. Moving these responsibilities does not change 2+2 selection,
+projection quotas, oracle limits or the report schema.
+
+The shared engine's evaluation executor owns attempt reservation, result
+publication and checkpoint ordering. ReaSyn supplies durable projection/oracle
+receipts and retains ownership of minibatch replenishment and the attribution
+of measured products to their originating proposal occurrences.
 
 ## What LDM controls
 
@@ -245,7 +280,7 @@ requests. Pure BO draws from a supplied score-blind SMILES pool
 it makes no proposal-provider requests. Real BO never substitutes the mock
 molecular fixture for an external candidate space.
 
-Harness methods create parallel independent persistent research sessions.
+LDM Harness methods default to the shared 2+2 tree: one main researcher and four proposal branches per minibatch.
 `harness` uses accepted candidates in submission order; its shipped configs
 request exactly the evaluation batch from one persistent session.
 `ldm_harness` samples the empirical proposal distribution tilted by GP/UCB. `ldm_harness_compiled` additionally runs a separate persistent

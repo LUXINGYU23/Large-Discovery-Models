@@ -6,14 +6,10 @@ import numpy as np
 import pytest
 
 from ldm_tts.optimization import BOPrediction
+from ldm_tts.harness import ucb_diagnostics as diagnostics
 
 
-@pytest.fixture(params=["iron_mind", "synthonbench", "nucleobench"])
-def diagnostics(request):
-    return import_module(f"tasks.{request.param}.core.policy_diagnostics")
-
-
-def test_feedback_matches_the_measurement_round_not_later_labels(diagnostics) -> None:
+def test_feedback_matches_the_measurement_round_not_later_labels() -> None:
     predictions = [
         {"round_index": 1, "predictions": [
             {"candidate_id": "a", "baseline_mean": 1.0, "active_mean": 2.0},
@@ -33,7 +29,8 @@ def test_feedback_matches_the_measurement_round_not_later_labels(diagnostics) ->
 
 
 
-def test_task_predictions_preserve_ranks_and_actual_sampling_probabilities(diagnostics):
+@pytest.mark.parametrize("task", ["iron_mind", "synthonbench", "nucleobench"])
+def test_task_predictions_preserve_ranks_and_actual_sampling_probabilities(task):
     baseline = tuple(
         BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
         for key, value in zip(("a", "b", "c"), (1.0, 1.0, 3.0), strict=True)
@@ -42,7 +39,6 @@ def test_task_predictions_preserve_ranks_and_actual_sampling_probabilities(diagn
         BOPrediction.scalar(key, mean=value, std=1.0, acquisition_score=value)
         for key, value in zip(("a", "b", "c"), (0.0, 2.0, 2.0), strict=True)
     )
-    task = diagnostics.__name__.split(".")[1]
     if task == "nucleobench":
         normalize = import_module(f"tasks.{task}.core.selection")._robust_z
     else:
@@ -64,9 +60,7 @@ def test_task_predictions_preserve_ranks_and_actual_sampling_probabilities(diagn
         diagnostics.prediction_records(baseline, active[::-1], q0, alpha=0.8, eta=0.3, z_clip=2.0)
 
 
-def test_task_draft_distribution_matches_frozen_prediction_records(diagnostics):
-    task = diagnostics.__name__.split(".")[1]
-    hook = import_module(f"tasks.{task}.resources.harness.policy_diagnostics")
+def test_draft_distribution_matches_frozen_prediction_records():
     q0 = np.asarray([0.75, 0.25])
     baseline_scores = np.asarray([10.0, 2.0])
     history_prior = np.asarray([0.4, -0.1])
@@ -79,7 +73,7 @@ def test_task_draft_distribution_matches_frozen_prediction_records(diagnostics):
     baseline, active = predictions(baseline_scores), predictions(active_scores)
     before = diagnostics.prediction_records(baseline, baseline, q0, alpha=2.0, eta=0.25, z_clip=2.0)
     after = diagnostics.prediction_records(baseline, active, q0, alpha=0.4, eta=2.0, z_clip=2.0)
-    result = hook.evaluate_policy_draft(None, {
+    result = diagnostics.evaluate_policy_draft(None, {
         "arrays": {
             "history_features": np.eye(2), "history_utilities": np.asarray([4.0, 8.0]),
             "diagnostic_current_weights": operator,

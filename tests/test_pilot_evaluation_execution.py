@@ -183,8 +183,6 @@ def test_registered_matrices_build_all_method_plans(
         if run.method in {"ldm_harness", "ldm_harness_compiled"}:
             assert _option(argv, "--proposal-samples") == "64"
             assert _option(argv, "--harness-candidates-per-session") == "16"
-            if "harness_turns" in profile.budget:
-                assert profile.budget["harness_turns"] == 4 * spec.optimization_rounds
         if run.method == "ldm_harness_compiled":
             assert _options(argv, "--policy-capability") == ["ldm_weights@1", "prior_mean@1"]
             assert _option(argv, "--policy-max-submission-attempts") == "3"

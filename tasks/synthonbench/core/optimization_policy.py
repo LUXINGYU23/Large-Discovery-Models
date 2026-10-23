@@ -21,7 +21,7 @@ from ldm_tts.harness import (
 )
 from ldm_tts.optimization import BOObservation, BOPrediction
 from tasks.synthonbench.core.constants import OBJECTIVE_NAME, TASK_ID
-from tasks.synthonbench.core.policy_diagnostics import with_feedback
+from ldm_tts.harness.ucb_diagnostics import with_feedback
 from tasks.synthonbench.core.policy_features import SynthonPolicyFeatureEncoder
 from tasks.synthonbench.core.proposal_pool import empirical_base_masses
 from tasks.synthonbench.core.tanimoto_gp import PRIOR_MEAN_CLIP, TARGET_STD_FLOOR

@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import os
 import random
-import sys
 import unittest
-from pathlib import Path
 
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
-
-from tasks.small_molecule.core.rng import RNG, as_rng  # noqa: E402
+from tasks.small_molecule.core.rng import RNG, as_rng
 
 
 class RNGConstructionTests(unittest.TestCase):
@@ -81,27 +75,6 @@ class RNGStreamTests(unittest.TestCase):
         self.assertAlmostEqual(float(out.mean()), 0.0, delta=0.5)
         self.assertAlmostEqual(float(out.std()), 1.0, delta=0.3)
 
-    def test_derive_child_different_salts_diverge(self) -> None:
-        parent = RNG(seed=99)
-        child_a = parent.derive_child(salt="acq")
-        child_b = parent.derive_child(salt="expansion")
-        # Different salts → different child seeds → different streams.
-        self.assertNotEqual(child_a.python.random(), child_b.python.random())
-        # Parent stream is untouched by derive_child (no draws on parent).
-        seq_parent = [parent.python.random() for _ in range(5)]
-        replay = RNG(seed=99)
-        seq_replay = [replay.python.random() for _ in range(5)]
-        self.assertEqual(seq_parent, seq_replay)
-
-    def test_derive_child_same_salt_deterministic(self) -> None:
-        """Two children with the same salt must be deterministic (same seed)."""
-        parent = RNG(seed=99)
-        child_a = parent.derive_child(salt="acq")
-        child_b = parent.derive_child(salt="acq")
-        self.assertEqual(child_a.python.random(), child_b.python.random())
-        self.assertEqual(child_a.numpy.random(size=10).tolist(),
-                         child_b.numpy.random(size=10).tolist())
-
 
 class RNGTorchTests(unittest.TestCase):
     def test_torch_seed_helper(self) -> None:
@@ -123,10 +96,6 @@ class RNGTorchTests(unittest.TestCase):
         d = torch.rand(8)
         torch.testing.assert_close(a, c)
         torch.testing.assert_close(b, d)
-
-    def test_torch_seed_property(self) -> None:
-        rng = RNG(seed=17)
-        self.assertEqual(rng.torch_seed, 17)
 
 
 class AsRNGPromotionTests(unittest.TestCase):

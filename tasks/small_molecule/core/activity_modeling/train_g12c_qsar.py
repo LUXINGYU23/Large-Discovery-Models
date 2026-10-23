@@ -10,12 +10,10 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import csv
 import datetime as dt
 import hashlib
 import json
 import math
-import os
 import sys
 import time
 from dataclasses import dataclass

@@ -60,6 +60,58 @@ def test_child_declares_provenance_without_method_or_directory_inference(tmp_pat
         execution._mark_completed({}, spec, run)
 
 
+@pytest.mark.parametrize("task,method", [
+    ("atomworld", "harness"), ("atomworld", "harness_public_audit"),
+    ("atomworld", "ldm_harness_compiled"),
+    ("reasyn", "ldm_harness"), ("reasyn", "ldm_harness_compiled"),
+])
+@pytest.mark.parametrize("tree", [False, True])
+def test_task_reports_preserve_pool_topology_and_sample_identity(tmp_path, task, method, tree):
+    roots = ("sample_000001", "sample_000000") if task == "atomworld" else ("",)
+    has_policy = method in {"harness_public_audit", "ldm_harness_compiled"}
+    research = ("main/manifest.json", "branches/round_0001/manifest.json",
+                "branches/round_0002/manifest.json") if tree else ("manifest.json",)
+    expected_paths = set()
+    for sample in roots:
+        paths = [tmp_path / "harness" / sample / name for name in research]
+        if has_policy:
+            paths.append(tmp_path / "policy_harness" / sample / "manifest.json")
+        for path in paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"campaignId": "campaign-" + sample, "taskId": task,
+                "seed": 42, "caseId": sample, "limits": {}, "profiles": [{"profileId": "research"}]}))
+            expected_paths.add(path.relative_to(tmp_path).as_posix())
+    if task == "atomworld":
+        from tasks.atomworld.core.reporting import project_result
+        project_result(tmp_path, [{"sample_id": sample, "action_name": "fixture"} for sample in sorted(roots)],
+            2, SimpleNamespace(state=SimpleNamespace(observations=[], next_round=4), summary={}),
+            mock=True, dataset_manifest={"dataset_kind": "fixture"}, search_method=method)
+    else:
+        from tasks.reasyn.core.reporting import write_campaign_report
+        (tmp_path / "budget.json").write_text("{}")
+        write_campaign_report(SimpleNamespace(proposal_mode="harness", search_method=method,
+            benchmark="reconstruction", mock=True), SimpleNamespace(run_dir=tmp_path, events=lambda: []), "CCO")
+    pools = json.loads((tmp_path / "harness_provenance.json").read_text())["pools"]
+    assert len(pools) == len(research) + has_policy
+    assert all(len(paths) == len(roots) for paths in pools.values())
+    assert [path for paths in pools.values() for path in paths] == list(dict.fromkeys(
+        path for paths in pools.values() for path in paths))
+    assert {path for paths in pools.values() for path in paths} == expected_paths
+    entry = {}
+    spec, run = SimpleNamespace(output_root=tmp_path), SimpleNamespace(run_dir=tmp_path)
+    execution._mark_completed(entry, spec, run)
+    assert entry["status"] == "completed"
+    for receipts in entry["harness"].values():
+        assert [r["campaign_id"] for r in receipts] == ["campaign-" + sample for sample in sorted(roots)]
+    if len(pools) > 1:
+        path = tmp_path / next(reversed(pools.values()))[0]
+        manifest = json.loads(path.read_text())
+        manifest["campaignId"] = "wrong-sample"
+        path.write_text(json.dumps(manifest))
+        with pytest.raises(ValueError, match="identities differ"):
+            execution._mark_completed({}, spec, run)
+
+
 def test_harness_provenance_keeps_only_redacted_release_fields(tmp_path: Path) -> None:
     run_dir = tmp_path / "campaigns" / "case" / "harness" / "seed_0"
     manifest_path = run_dir / "harness" / "manifest.json"

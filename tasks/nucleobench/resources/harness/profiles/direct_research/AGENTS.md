@@ -52,3 +52,29 @@ Balance strong exploitation with a small number of informative alternatives when
 - Use only editable zero-based positions and bases that differ from the paired start.
 - The compiler writes `/workspace/candidates.json`, whose only field is `candidates`. Check the requested count, distinct count and rejected entries before calling `submit_candidates({"artifact_path":"candidates.json"})`. Compilation does not evaluate or submit candidates.
 - The complete file is checked before acceptance. Use `validate_mutations` for uncertain individual patches. Repair indexed file entries from the returned reasons, recheck the whole batch, and resubmit the path. Keep task legality checks mandatory. A failed biological proxy check calls for diagnosing the code or revising that design and its rationale, not blocking unrelated valid candidates or claiming the failed hypothesis was verified.
+
+## Bounded script execution
+
+Before running a constrained generator, check length, editable positions, occupied
+spans, spacing and count requirements together. Compute a capacity bound using
+the actual placement rules and reject impossible requests before sampling. A
+necessary bound is not a guarantee that a greedy partial layout can be completed.
+Prefer constructive placement or sampling from an explicit finite feasible set.
+
+Every randomized search, rejection sampler and repair loop must have an explicit
+attempt limit, including inner loops; count rejected draws too. Use a bounded
+`for` loop, not an open-ended loop waiting to collect the requested count. For a
+single design, stop after 1,000 attempts or 5 seconds using `time.monotonic()`,
+whichever comes first. Stop immediately if no legal placements remain.
+
+Run generation and diagnostic scripts with the bash tool's `timeout` set to
+60 seconds or less. Do not launch detached jobs or repeat a timed-out command
+unchanged. Check exit status and diagnostics before consuming generated files.
+Save valid designs incrementally so one difficult control cannot erase the panel.
+
+On exhaustion, report that construction was unresolved; do not claim it proves
+infeasibility or verifies the intended biological contrast. Revise the optional
+hypothesis or replace the affected design with a feasible, informative alternative,
+update its rationale, and preserve unrelated valid designs. Never relax task
+legality, novelty or the requested submission count. Validate the complete artifact
+and reserve time to submit it; optional analysis must not block submission.

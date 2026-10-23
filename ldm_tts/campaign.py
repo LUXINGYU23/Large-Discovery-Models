@@ -220,6 +220,22 @@ class CampaignRequest:
         if self.state is not None and self.state_factory is not None:
             raise ValueError("campaign request cannot set both state and state_factory")
 
+    def open_runtime(self, task_spec: LDMTaskSpec) -> CampaignRuntime:
+        """Open the durable runtime before assembling runtime-dependent adapters."""
+        return CampaignRuntime.open(
+            Path(self.run_dir),
+            task=task_spec.task,
+            run_id=self.run_id,
+            config=dict(self.config),
+            task_spec=task_spec,
+            budget_limits=self.budget.runtime_limits(),
+            allow_budget_extension=True,
+            contract_snapshot=self.contract_snapshot,
+            contract_sha256=self.contract_sha256,
+            contract_profile=self.contract_profile,
+            resume=bool(self.resume),
+        )
+
 
 @dataclass(frozen=True)
 class CampaignResult:
@@ -233,25 +249,7 @@ class CampaignResult:
 def run_campaign(request: CampaignRequest, recipe: CampaignRecipe) -> CampaignResult:
     """Run one complete campaign through the shared LDM algorithm."""
 
-    runtime = CampaignRuntime.open(
-        Path(request.run_dir),
-        task=recipe.task_spec.task,
-        run_id=request.run_id,
-        config=dict(request.config),
-        task_spec=recipe.task_spec,
-        # Resumed campaigns may intentionally extend absolute limits. Load the
-        # persisted ledger first, then apply the new recipe below.
-        budget_limits=(None if request.resume else request.budget.runtime_limits()),
-        contract_snapshot=request.contract_snapshot,
-        contract_sha256=request.contract_sha256,
-        contract_profile=request.contract_profile,
-        resume=bool(request.resume),
-    )
-    # A resumed runtime loads its previous ledger. The recipe is authoritative
-    # for the new absolute limits, allowing a caller to extend a campaign while
-    # preserving already-consumed counters.
-    runtime.budget.limits = request.budget.runtime_limits()
-    runtime.budget.write()
+    runtime = request.open_runtime(recipe.task_spec)
 
     if request.runtime_hook is not None:
         request.runtime_hook(runtime)

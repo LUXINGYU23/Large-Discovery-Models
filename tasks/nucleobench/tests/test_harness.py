@@ -48,7 +48,10 @@ from tasks.nucleobench.core.mock import MOCK_CONTEXT
 from tasks.nucleobench.core.optimization_policy import policy_harness_profile
 from tasks.nucleobench.core.research import MEASURED_HISTORY_FILE
 from tasks.nucleobench.core.task_spec import build_task_spec
-from tasks.nucleobench.core.workflow import ProviderSettings, _harness_client, describe_ldm_task, main, parse_args
+from tasks.nucleobench.core.harness_runtime import create_client
+from tasks.nucleobench.core.provider import ProviderSettings
+from tasks.nucleobench.core.workflow import describe_ldm_task, main
+from tasks.nucleobench.core.workflow_args import parse_args
 
 
 class FakeHarnessClient:
@@ -561,12 +564,13 @@ def test_harness_launch_preserves_role_specific_tools_budgets_and_mounts(tmp_pat
         "--harness-tool-budget", "web_search=3",
         "--policy-tool-budget", "web_search=2",
         "--no-harness-context7",
+        "--harness-research-strategy-config", "config/research_strategies/independent.json",
         "--harness-sol-pi-config", str(plugin_path),
         "--llm-extra-body-json", '{"reasoning":{"effort":"max"}}',
     ] + (["--harness-surrogate-query"] if surrogate_query else []))
     profiles = policy_harness_profile() if policy else harness_profiles()
     provider = ProviderSettings("https://provider.example/v1", "research-model", "test-secret")
-    client = _harness_client(
+    client = create_client(
         args, SimpleNamespace(run_dir=tmp_path, run_id="test-campaign"),
         provider, SimpleNamespace(context=MOCK_CONTEXT), profiles,
         ResolvedHarnessMcpConfig(), policy=policy,
@@ -646,8 +650,8 @@ def test_harness_dry_run_exposes_current_settings_without_secret(
 
 
 def test_local_harness_uses_host_identity(monkeypatch) -> None:
-    monkeypatch.setattr("tasks.nucleobench.core.workflow.os.getuid", lambda: 1001, raising=False)
-    monkeypatch.setattr("tasks.nucleobench.core.workflow.os.getgid", lambda: 1002, raising=False)
+    monkeypatch.setattr("ldm_tts.harness.container.os.getuid", lambda: 1001, raising=False)
+    monkeypatch.setattr("ldm_tts.harness.container.os.getgid", lambda: 1002, raising=False)
 
     args = parse_args(["--search-method", "harness"])
 

@@ -15,6 +15,15 @@ For the task-neutral Python interface, task ownership boundary, resource
 layout, and qualification rules, see
 [`docs/research-harness.md`](../../docs/research-harness.md).
 
+`session.ts` assembles sessions and coordinates turn execution and replay.
+`submission.ts` owns submission tools, artifact snapshots, task validation and
+terminal submission records. `session-store.ts` owns fork initialization,
+resource hashes and initialization identity checks. It publishes an inherited
+workspace and native Pi fork atomically, before a branch can run.
+`history.ts` owns compaction and continuation guards; `provider-proxy.ts` owns
+upstream authorization, request parameters and raw usage traces. These modules
+do not depend on task evaluators or select research parents.
+
 Build the release image from the repository root:
 
 ```bash
@@ -48,7 +57,9 @@ Use the provider's cache-miss/cache-hit price ratio for
 The effective `sol-pi.json` is saved in each session's `pi-agent` directory.
 The reducer uses that session's model and traced provider. Its calls and Pi
 compaction calls are included in the provider trace, alongside ordinary research
-requests. Provider request-body settings apply to all these calls. A provider that
+requests. Research request-body settings apply to research and SoL-Pi calls;
+native compaction uses its dedicated proxy route to retain its own low reasoning
+effort and output budget. A provider that
 does not support forced tool use can set `tool_choice: "auto"` in those settings;
 the Harness still requires a validated terminal submission.
 
@@ -198,7 +209,7 @@ tool budgets, and usage counters. Reference tasks store them under
 `<run_dir>/harness/` and `<run_dir>/policy_harness/` respectively.
 
 Pi sessions use a 262,144-token model context window with built-in automatic
-compaction enabled. The release configuration reserves 16,384 tokens for the
+compaction enabled. The release configuration reserves 65,536 tokens for the
 next response and retains the most recent 20,000 tokens verbatim; Pi writes
 compaction entries into its native session history.
 
@@ -211,8 +222,10 @@ models, pruning or compaction invalidate the anchor. Estimates are not billing
 counts, especially for CJK-heavy text; original provider usage is logged separately.
 
 At `contextWindow - reserveTokens`, long textual `web_search`/`web_fetch` results
-(over 8,192 Unicode code points) are archived byte-for-byte under the session's
-`web-evidence/` directory. The model sees a short receipt containing a SHA-256,
+(over 8,192 Unicode code points) are archived byte-for-byte under the session workspace's
+`.web-evidence/` directory. Fork snapshots include and hash this archive, so a
+child can recall evidence referenced by inherited summaries without sharing
+writable files with its parent. The model sees a short receipt containing a SHA-256,
 chapter line numbers, an opening preview, and a path under the read-only guest
 mount `/workspace/.web-evidence/`. It can use the existing `read` tool with
 `offset`/`limit`, or search the archive with `bash`, to recover middle sections.

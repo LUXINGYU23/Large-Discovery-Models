@@ -7,7 +7,7 @@ import pytest
 from ldm_tts.cli.runner import build_plan, load_config
 from ldm_tts.pilot_evaluation.config import load_pilot_evaluation_spec
 from ldm_tts.pilot_evaluation.execution import _child_plan, _select_runs
-from tasks.reasyn.core.workflow import parse_args
+from tasks.reasyn.core.workflow_args import parse_args
 from tasks.reasyn.ldm_task.dependencies import check_dependencies
 
 

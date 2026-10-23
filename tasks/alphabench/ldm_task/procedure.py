@@ -29,6 +29,7 @@ def parse_args(argv=None):
     parser.add_argument("--oracle-url")
     parser.add_argument("--api-key-file", type=Path)
     parser.add_argument("--harness-sidecar-image", default="ldm-pi-t3:local")
+    parser.add_argument("--harness-research-strategy-config", type=Path)
     parser.add_argument("--harness-surrogate-query", action="store_true")
     return parser.parse_args(argv)
 
@@ -36,6 +37,8 @@ def parse_args(argv=None):
 def resolve_protocol(args):
     overrides = {key: getattr(args, key) for key in ("method", "backend", "market", "init_mode", "evaluations",
         "batch_size", "sessions", "candidates_per_session", "random_seed") if getattr(args, key) is not None}
+    if args.harness_research_strategy_config:
+        overrides["research_strategy_config"] = json.loads(args.harness_research_strategy_config.read_text(encoding="utf-8"))
     if args.iterations is not None:
         overrides["rounds"] = args.iterations
     if args.protocol_profile is not None:

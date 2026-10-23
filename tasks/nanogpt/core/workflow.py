@@ -32,11 +32,9 @@ from ldm_tts.contracts.evaluation import as_float as shared_as_float
 from ldm_tts.contracts.evaluation import is_finite_number
 from ldm_tts.campaign import (
     CampaignBudget,
-    CampaignRecipe,
     CampaignRequest,
-    async_run_campaign,
 )
-from ldm_tts.engine import LDMEngineState
+from ldm_tts.engine import LDMEngine, LDMEngineState
 from ldm_tts.optimization.acquisition import make_acquisition
 from ldm_tts.data import DataCollectionSink, make_parameter_edit_ir
 from ldm_tts.optimization.search import (
@@ -1461,6 +1459,70 @@ async def async_main(argv: list[str] | None = None) -> int:
     run_buffer_path = out_dir / "model_based_buffer.jsonl"
     buffer_path = resolve_buffer_path(args.buffer, project_root, run_buffer_path)
     buffer_snapshot_path = run_buffer_path
+    feedback_path = resolve_feedback_path(args.feedback_tsv, project_root, out_dir)
+
+    if args.generator in OPERATION_GENERATORS and operation_schema is None:
+        raise SystemExit(
+            "--generator operation_tool/operation_tool_plain_text/operation_mock requires --operation-schema, "
+            "or a default resources/schemas/real_operations.json / resources/schemas/mock_operations.json."
+        )
+    generated_estimate = estimate_generated(args.breadth, args.depth, args.beam_width, effective_method)
+    total_progress = estimate_progress_total(args, generated_estimate)
+    if args.max_generated_per_iteration > 0 and generated_estimate > args.max_generated_per_iteration:
+        raise SystemExit(
+            f"Refusing to generate about {generated_estimate} states per iteration. "
+            f"Raise --max-generated-per-iteration or use --beam-width."
+        )
+
+    campaign_args = argparse.Namespace(**vars(args))
+    campaign_args.train_file = train_file.resolve()
+    campaign_args.operation_schema = None if operation_schema is None else operation_schema.path
+    if resume_info is not None:
+        frozen = json.loads((out_dir / "config.json").read_text(encoding="utf-8"))
+        # Active features and completed warmup are restored execution state, not a new recipe.
+        for name in (
+            "initial_operation_features", "max_active_operation_features",
+            "warmup", "evaluate_root", "operation_schema",
+        ):
+            if name not in args._explicit_options:
+                value = frozen[name]
+                setattr(campaign_args, name, Path(value) if name == "operation_schema" and value else value)
+    campaign_schema = resolve_operation_schema(campaign_args, project_root)
+    ldm_task_spec = describe_ldm_task(
+        campaign_args,
+        campaign_schema,
+        None if campaign_schema is None else initial_active_operation_schema(campaign_schema, campaign_args),
+        effective_method=effective_method,
+    )
+    ldm_task_spec_dict = ldm_task_spec.to_dict()
+    engine_state = LDMEngineState()
+    if resume_info is not None:
+        checkpoint_path = out_dir / "checkpoint.json"
+        if checkpoint_path.exists():
+            checkpoint_payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            engine_state = LDMEngineState.from_checkpoint(
+                checkpoint_payload.get("state", checkpoint_payload)
+            )
+    warmup_target = max(0, int(args.warmup)) if resume_info is None and not args.skip_eval else 0
+    engine_iterations = engine_state.next_round + warmup_target + max(0, int(args.iterations))
+    evaluation_limit = (
+        int(args.max_real_evaluations) if args.max_real_evaluations > 0 else engine_iterations * 2
+    )
+    request = CampaignRequest(
+        run_dir=out_dir,
+        config={**_jsonable_args(campaign_args), "buffer": str(buffer_path), "feedback_tsv": str(feedback_path)},
+        resume=resume_info is not None,
+        budget=CampaignBudget(
+            rounds=engine_iterations,
+            reservoir_size=max(2, int(generated_estimate) + (1 if campaign_args.evaluate_root else 0)),
+            batch_size=2,
+            max_evaluation_attempts=evaluation_limit,
+            max_empty_reservoir_rounds=max(engine_iterations, 1),
+        ),
+    )
+    # Validate resume identity and budgets before adapters, schemas or logs can write.
+    runtime = request.open_runtime(ldm_task_spec)
+
     log_path = out_dir / "model_based.log"
     logger = RunLogger(log_path)
     logger.write(
@@ -1487,20 +1549,6 @@ async def async_main(argv: list[str] | None = None) -> int:
         warning = "--eval-command does not contain {train_path}; evaluation will not run the generated child state."
         print(f"warning: {warning}", file=sys.stderr)
         logger.write(f"warning {warning}")
-    if args.generator in OPERATION_GENERATORS and operation_schema is None:
-        raise SystemExit(
-            "--generator operation_tool/operation_tool_plain_text/operation_mock requires --operation-schema, "
-            "or a default resources/schemas/real_operations.json / resources/schemas/mock_operations.json."
-        )
-
-    generated_estimate = estimate_generated(args.breadth, args.depth, args.beam_width, effective_method)
-    total_progress = estimate_progress_total(args, generated_estimate)
-    if args.max_generated_per_iteration > 0 and generated_estimate > args.max_generated_per_iteration:
-        raise SystemExit(
-            f"Refusing to generate about {generated_estimate} states per iteration. "
-            f"Raise --max-generated-per-iteration or use --beam-width."
-        )
-
     task_context = build_task_context(project_root, args)
     config = SearchConfig(
         project_root=project_root,
@@ -1550,24 +1598,12 @@ async def async_main(argv: list[str] | None = None) -> int:
             f"features={list(engine.operation_schema.parameters)} "
             f"feature_dim={operation_representation_dimension(engine.operation_schema)}"
         )
-    ldm_task_spec = describe_ldm_task(
-        args,
-        operation_schema,
-        active_operation_schema,
-        effective_method=effective_method,
-    )
-    ldm_task_spec_dict = ldm_task_spec.to_dict()
-    (out_dir / "ldm_task_spec.json").write_text(
-        json.dumps(ldm_task_spec_dict, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
     logger.write(
         "ldm_task_spec "
         f"candidate_domain={ldm_task_spec.candidate_domain.name} "
         f"dimension={ldm_task_spec.candidate_domain.dimension} "
         f"acquisition={ldm_task_spec.acquisition.name}"
     )
-    feedback_path = resolve_feedback_path(args.feedback_tsv, project_root, out_dir)
     feedback_memory = FeedbackMemory(
         feedback_path,
         score_key=args.score_key,
@@ -1626,29 +1662,6 @@ async def async_main(argv: list[str] | None = None) -> int:
     )
     if best_actual is not None and best_actual.score is not None:
         tracker.previous_best_score = float(best_actual.score)
-    engine_state = LDMEngineState()
-    if resume_info is not None:
-        checkpoint_path = out_dir / "checkpoint.json"
-        if checkpoint_path.exists():
-            checkpoint_payload = json.loads(
-                checkpoint_path.read_text(encoding="utf-8")
-            )
-            engine_state = LDMEngineState.from_checkpoint(
-                checkpoint_payload.get("state", checkpoint_payload)
-            )
-    warmup_target = (
-        max(0, int(args.warmup))
-        if resume_info is None and not args.skip_eval
-        else 0
-    )
-    engine_iterations = (
-        engine_state.next_round
-        + warmup_target
-        + max(0, int(args.iterations))
-    )
-    evaluation_limit = engine_iterations * 2
-    if args.max_real_evaluations > 0:
-        evaluation_limit = max(0, int(args.max_real_evaluations))
     search_expander = engine_adapters.NanogptIterationExpander(
         engine=engine,
         args=args,
@@ -1690,33 +1703,17 @@ async def async_main(argv: list[str] | None = None) -> int:
         search_expander,
         objective_name=engine.config.score_key,
     )
-    recipe = CampaignRecipe(
+    shared_engine = LDMEngine(
         task_spec=ldm_task_spec,
+        runtime=runtime,
         expander=expander,
         candidate_domain=engine_adapters.NanogptCandidateDomain(),
         evaluator=evaluator,
         selector=selector,
     )
-    campaign = await async_run_campaign(
-        CampaignRequest(
-            run_dir=out_dir,
-            config=_jsonable_args(args),
-            resume=resume_info is not None and (out_dir / "campaign.json").exists(),
-            state=engine_state,
-            budget=CampaignBudget(
-                rounds=engine_iterations,
-                reservoir_size=max(
-                    2,
-                    int(generated_estimate) + (1 if args.evaluate_root else 0),
-                ),
-                batch_size=2,
-                max_evaluation_attempts=evaluation_limit,
-                max_empty_reservoir_rounds=max(engine_iterations, 1),
-            ),
-        ),
-        recipe,
+    engine_result = await asyncio.to_thread(
+        shared_engine.run, request.budget.engine_config(), state=engine_state,
     )
-    engine_result = campaign.engine
     if resume_info is None:
         warmup_record = _warmup_record_from_engine(
             engine_result,
@@ -1837,7 +1834,7 @@ def _jsonable_args(args: argparse.Namespace) -> dict[str, Any]:
             {
                 key: str(value) if isinstance(value, Path) else value
                 for key, value in vars(args).items()
-                if key not in {"api_key", "operation_schema_object"}
+                if key not in {"api_key", "operation_schema_object"} and not key.startswith("_")
             },
             default=str,
         )
@@ -2936,7 +2933,6 @@ def describe_ldm_task(
         metadata={
             "generator": args.generator,
             "method": method,
-            "iterations": int(args.iterations),
             "warmup": int(args.warmup),
             "seed_policy": args.seed_policy,
         },

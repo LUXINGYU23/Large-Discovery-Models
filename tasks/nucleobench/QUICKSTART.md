@@ -1,5 +1,7 @@
 # NucleoBench Quick Start
 
+LDM Harness defaults to **CoverageForks 2+2**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
+
 Run every command from the repository root. Real source, data, model, cache,
 trace, and run directories should be outside the clone.
 
@@ -228,6 +230,7 @@ uv run --locked --project tasks/nucleobench --extra official \
   --set 'args.harness-profile=["comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research","comprehensive_research"]' \
   --set args.harness-unique-candidates=true \
   --set args.harness-candidates-per-session=32 \
+  --set args.harness-research-strategy-config=config/research_strategies/independent.json \
   --set args.proposal-samples=256 \
   --set args.bo-pool-size=176 \
   --set args.evaluations-per-round=128 \

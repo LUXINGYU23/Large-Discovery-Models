@@ -1,10 +1,21 @@
 # AlphaBench T3
 
+LDM Harness 默认使用 **CoverageForks 2+2**：两条最新主干分叉、一条较早主干分叉、一条存档侧枝延续。每轮额外运行一次主研究，计入 `harness_turns` 和模型请求预算；每分支候选配额与评估预算不变，默认从两个提案身份增为四个。冻结协议的 `research_strategy_config` 或 `--harness-research-strategy-config config/research_strategies/coverage_2plus2.json` 可显式指定策略；CLI 与冻结协议必须一致。独立 session 和 4fork 仍可选。协议须为每轮主研究加四条提案分支预留有限预算。完整接口、身份与恢复约束见[共享树搜索文档](../../docs/research-search-architecture.md)。
+
 目标是完整 T3，包括全部初始化、双方言、三种原生算法、五种 LDM/Agent 方法、私有 validation、冻结后完整 test、组合分析和全市场验收。目前处于实施中，`qualification=draft`；未完成的能力不会映射到其他算法或后端。
 
 [数据准备](DATA.md) 包含官方数据资产核查、本机代理下载、固定来源/哈希、SSH 传输和服务器离线审计。所有数值测试和实验在指定服务器的 `/mnt/data1/` 下执行。
 
 [完整功能矩阵](qualification_records/completeness_matrix.json)逐格列出九个后端/市场与八种方法的 72 项必需验收。正式比较合同、预算和矩阵真实 run 尚未完成，全部格仍保持 blocked。用户已允许用同一批不完整数据做方法比较：真实协议须显式设置 `data_policy=partial_comparison`，绑定原始审计的 `data_digest`，各比较方法使用同一数据清单、后端、市场、切分和缺失规则。结果标为部分数据比较，不声称原论文数值复现。`qualified_only` 仍是默认门槛；两种模式都逐文件验证实际资产。在服务器运行 `tasks/alphabench/.venv/bin/python -m tasks.alphabench.qualify_matrix --check` 可核对台账与当前数据和任务证据；审计更新后用 `--write` 重建。该台账不是可执行的正式 profile。
+
+## 代码职责
+
+`ldm_task/procedure.py` 解析入口与冻结协议，`core/workflow.py` 装配实际的
+`OracleGateway`、科学适配器和共享 `LDMEngine`，不通过延迟绑定字典转发调用。
+`CampaignRequest.open_runtime` 创建并校验预算／运行身份，原生算法继续使用自己的执行路径。
+`harness_runtime.py` 负责 proposal、compiled policy 和 Host 工具服务的装配；工作流的
+`ExitStack` 在正常结束或启动失败时关闭客户端，再关闭 socket 服务。
+共享引擎负责评估回执和 checkpoint 顺序；Host 授权、私有 validation/test 与最终报告仍由任务负责。
 
 ## 已实现的路径
 
@@ -12,9 +23,11 @@
 
 原生 CoT/ToT/EA 的 [workflow](NATIVE.md) 已接入固定算法、原生 cold/修复、整批预算、并发重放、私有 validation 和终局报告。Qlib/Assay searcher source 与 example source 使用实际原生最终池，matched 使用完整已测池；source 保留原生轮数，预算不足即暂停。example 原入口没有 validation/test，本 task 明确冻结独立的后续区间。Assay source 固定原始面板、开盘标签、复权及诊断规则，完整独立 portfolio 在初始化前校验。
 
-`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者合并各 session 的候选并用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。`ldm_harness_compiled` 另启独立 policy session，在受限 Docker runner 中执行其提交的 prior/weight 策略；Host 仍固定 GP、选择、Oracle 和预算。
+`harness` 与 `ldm_harness` 已接入持久 Pi session、发送前模型请求授权、Host 工具服务和隔离 guest。前者按提交顺序评价，后者默认使用共享 2+2 树：一个主研究 session，四个提案分支，合并候选后用冻结 GP 选择；GP 查询只在显式启用的 LDM Harness 变体开放。`ldm_harness_compiled` 另启独立 policy session，在受限 Docker runner 中执行其提交的 prior/weight 策略；Host 仍固定 GP、选择、Oracle 和预算。
 
-固定 CSI300 部分数据上的真实 DeepSeek Responses/Qlib pilot 已覆盖 [llm](resources/evidence/partial_csi300_llm_pilot.json)、[ldm](resources/evidence/partial_csi300_ldm_pilot.json)、[CoT](resources/evidence/partial_csi300_cot_pilot.json)、[ToT](resources/evidence/partial_csi300_tot_pilot.json)、[EA](resources/evidence/partial_csi300_ea_pilot.json)、[Harness](resources/evidence/partial_csi300_harness_pilot.json)、[LDM Harness](resources/evidence/partial_csi300_ldm_harness_pilot.json) 和 [compiled policy](resources/evidence/partial_csi300_ldm_harness_compiled_pilot.json)。各自的冻结协议位于 `resources/protocols/`，结果、receipt 和模型轨迹留在证据所指的远端运行目录。三种 Harness 方法与原生 CoT/ToT/EA 使用同一份已测 Alpha158 `kbar` 种子信息；不同 pilot 的搜索评价预算未完全匹配，不能据此排列性能。Assay portfolio REST 已在离线 fixture 验证；其他市场、故障矩阵和完整资格矩阵尚未关闭，故这些运行仍标记 `partial_comparison`、`complete_t3=false`。
+固定 CSI300 部分数据上的真实 DeepSeek Responses/Qlib pilot 已覆盖 [llm](resources/evidence/partial_csi300_llm_pilot.json)、[ldm](resources/evidence/partial_csi300_ldm_pilot.json)、[CoT](resources/evidence/partial_csi300_cot_pilot.json)、[ToT](resources/evidence/partial_csi300_tot_pilot.json)、[EA](resources/evidence/partial_csi300_ea_pilot.json)、[Harness](resources/evidence/partial_csi300_harness_pilot.json)、[LDM Harness](resources/evidence/partial_csi300_ldm_harness_pilot.json) 和 [compiled policy](resources/evidence/partial_csi300_ldm_harness_compiled_pilot.json)。原始冻结协议、结果、receipt 和模型轨迹留在证据所指的远端运行目录。三种 Harness 方法与原生 CoT/ToT/EA 使用同一份已测 Alpha158 `kbar` 种子信息；不同 pilot 的搜索评价预算未完全匹配，不能据此排列性能。Assay portfolio REST 已在离线 fixture 验证；其他市场、故障矩阵和完整资格矩阵尚未关闭，故这些运行仍标记 `partial_comparison`、`complete_t3=false`。
+
+`resources/protocols/` 中的两个 LDM Harness pilot 配置供新运行使用，已明确采用 Coverage 2+2：两轮共 10 个研究 turn、16 个候选出现次数、2 次搜索评估。模型请求上限分别为 200（无 compiled policy）和 240（另含 2 个 policy turn），按每 turn 20 次请求分配；研究 surrogate query 总上限为 300。原有其他预算保持不变。这些配置不代表历史双 session 证据已经验证了新策略，也不能用于续跑旧协议身份。
 
 ## 服务器验证
 

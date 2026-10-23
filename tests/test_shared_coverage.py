@@ -317,6 +317,58 @@ class TestRunnerHelpers:
             with pytest.raises(SystemExit, match="has no main"):
                 run_plan(plan)
 
+    @pytest.mark.parametrize("error,return_code", [
+        (RuntimeError("task failure"), 1),
+        (SystemExit("invalid task configuration"), 1),
+        (SystemExit(2), 2),
+        (SystemExit(None), 0),
+        (SystemExit(0), 0),
+        (KeyboardInterrupt(), None),
+        (SystemExit(130), None),
+        (SystemExit(143), None),
+    ])
+    @pytest.mark.parametrize("keep_going", [False, True])
+    def test_suite_exits_restore_process_state(self, tmp_path, monkeypatch, capsys, error, return_code, keep_going):
+        original_cwd = Path.cwd()
+        monkeypatch.setenv("RUNNER_SUITE_TEST", "outer")
+        calls = []
+
+        def task_main(argv):
+            name = os.environ["RUNNER_SUITE_TEST"]
+            assert Path.cwd() == tmp_path / name
+            calls.append(name)
+            if name == "first":
+                raise error
+            return 0
+
+        monkeypatch.setitem(sys.modules, "runner_test_task", SimpleNamespace(main=task_main))
+        experiments = []
+        for name in ("first", "second"):
+            directory = tmp_path / name
+            directory.mkdir()
+            experiments.append({"name": name, "task": "iron_mind", "mode": "mock",
+                "runner": {"module": "runner_test_task", "cwd": str(directory)},
+                "env": {"RUNNER_SUITE_TEST": name}})
+        config = tmp_path / "suite.json"
+        config.write_text(json.dumps({"experiments": experiments}), encoding="utf-8")
+        argv = [str(config)] + (["--keep-going"] if keep_going else [])
+
+        if return_code is not None:
+            assert main(argv) == return_code
+            diagnostic = capsys.readouterr().err
+            if return_code:
+                assert "first failed:" in diagnostic and str(error) in diagnostic
+            else:
+                assert not diagnostic
+            assert calls == (["first", "second"] if keep_going or return_code == 0 else ["first"])
+        else:
+            with pytest.raises(type(error)) as caught:
+                main(argv)
+            assert caught.value is error
+            assert calls == ["first"]
+        assert Path.cwd() == original_cwd
+        assert os.environ["RUNNER_SUITE_TEST"] == "outer"
+
     def test_preflight_skips_mock_plans(self) -> None:
         with patch("ldm_tts.cli.runner.check_plan") as check_plan_mock:
             assert preflight_plan({"task": "nanogpt", "mode": "mock"}) == []
