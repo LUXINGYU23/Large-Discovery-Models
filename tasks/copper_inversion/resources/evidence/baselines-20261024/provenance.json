@@ -1,0 +1,14 @@
+{
+  "upstream_commit": "94b8615bb2a9ca135583852a23ba114964a4b5af",
+  "repository": "https://github.com/xiaolongw1223/Knowledge-driven-stochastic-modeling",
+  "paper": "https://doi.org/10.1016/j.cageo.2024.105779",
+  "identical_source_hashes": {
+    "shpmc/level_set_mc.py": "593fa9d8fd73afdeb4fe8be4062186786ec51045d86faeb7e73f7e02e9fe8406",
+    "shpmc/loss_functions.py": "395cb52e5fb62ca2bf7074256e7f73ba0b08b07d282d36078e2b092ed13beb68",
+    "shpmc/geo_stats.py": "bd41c37d003a6322ab3a7ffeb26201aff927439ba094121820c54f9549479596",
+    "examples/01-drillholes-3d/mcmc_main.py": "06ce01548a696a788b7fbb013cdd81eb7e7b0be0046b3e488e9a7112b4ed8483",
+    "examples/02-drillholes-outcrops-3d/mcmc_main.py": "7a3ce8c4f3d5a69b15efa8c0258f1cfb8d1211bd8ab8ec385a71e14bb4f7ed15"
+  },
+  "package_runner_sha256": "79d0b3634e87051515a9c71e8c653e44f2bebe8a2cd016ca147359bf7a303e09",
+  "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5"
+}

@@ -1,0 +1,15 @@
+{
+  "finished_at": 1792775680.5330107,
+  "jobs": [
+    {
+      "case": "drillholes_3d",
+      "method": "paper_mcmc",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "paper_mcmc",
+      "status": "completed"
+    }
+  ]
+}
