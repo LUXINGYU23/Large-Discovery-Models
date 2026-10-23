@@ -25,7 +25,8 @@
       "evidence": [
         "config/copper_inversion/mock.yaml",
         "tasks/copper_inversion/tests/test_procedure.py",
-        "tasks/copper_inversion/resources/evidence/verification.json"
+        "tasks/copper_inversion/resources/evidence/verification.json",
+        "tasks/copper_inversion/resources/evidence/runtime/final-registration.json"
       ]
     },
     "contract_verified": {
@@ -35,7 +36,9 @@
         "tasks/copper_inversion/tests/test_isolation.py",
         "tasks/copper_inversion/tests/test_science.py",
         "tasks/copper_inversion/resources/evidence/verification.json",
-        "docs/evidence/copper-inversion/reference-check.json"
+        "docs/evidence/copper-inversion/reference-check.json",
+        "tasks/copper_inversion/resources/evidence/runtime/input-integrity.json",
+        "tasks/copper_inversion/resources/evidence/runtime/supervisor.json"
       ]
     },
     "seed_evaluated": {

@@ -1,0 +1,48 @@
+{
+  "mock": {
+    "status": "completed",
+    "counters": {
+      "benchmark_jobs": 0,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "harness_wall_time_seconds": 0.007484084460884333,
+      "interface_jobs": 0,
+      "llm_requests": 3,
+      "main_research_turns": 0,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 0,
+      "selected_candidates": 4,
+      "solver_jobs": 0,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "resume_unchanged": true,
+    "mock": true
+  },
+  "ldm_mock": {
+    "status": "completed",
+    "counters": {
+      "benchmark_jobs": 0,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 15,
+      "harness_wall_time_seconds": 0.048379671294242144,
+      "interface_jobs": 0,
+      "llm_requests": 15,
+      "main_research_turns": 3,
+      "outer_iterations": 4,
+      "proposal_attempts": 12,
+      "scorer_jobs": 0,
+      "selected_candidates": 4,
+      "solver_jobs": 0,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 13
+    },
+    "resume_unchanged": true,
+    "mock": true
+  },
+  "registration_log": "[INFO] copper_inversion: Experiment contract is draft; campaign qualification is incomplete. (/Aidata/shared/ldm/copper-final-audit-20261023/tasks/copper_inversion/experiment.json)\n[OK] copper_inversion: Qualification evidence reaches stage 'contract_verified'. (/Aidata/shared/ldm/copper-final-audit-20261023/tasks/copper_inversion/resources/qualification_evidence.json)\n[OK] copper_inversion: Task registration and layout are valid. (/Aidata/shared/ldm/copper-final-audit-20261023/tasks/copper_inversion)\n[OK] copper_inversion: numpy: Python dependency availability\n[OK] copper_inversion: scipy: Python dependency availability\n[OK] copper_inversion: skfmm: Python dependency availability\n[OK] copper_inversion: discretize: Python dependency availability\n[SKIP] copper_inversion: docker/provider: Mock is service-free\n",
+  "initial_packaging_failure": "docs/evidence missing from source-only archive; copied tracked docs and reran required gates before mock execution"
+}
