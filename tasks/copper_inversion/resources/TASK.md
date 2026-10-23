@@ -26,7 +26,10 @@ part of mandatory admission. The public selfcheck uses only NumPy and is a devel
 aid; controller validates the sealed source independently, outside candidate Python.
 The official score is recomputed in a separate process with no solver source mounted.
 
-history.json contains every measured source and feedback. Lower loss_total is better.
+history.json contains every measured source and feedback. Successful evaluations include
+model_slices: sampled central-plane sign maps with axis/index/physical coordinates,
+model digest and seed. These previews are not full-resolution geometry or scores.
+Resource diagnostics explicitly distinguish sampled memory/CPU from lifetime totals. Lower loss_total is better.
 Valid weak scores are observations. Unmeasured/invalid is not a zero score. Refer to
 exact parent digests and explain what changed and why. Research resources and tests
 are read-only. Work in /workspace/candidates/0/solver.py; submit via submit_solver.

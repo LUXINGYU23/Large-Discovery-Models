@@ -80,6 +80,9 @@ def serialize_history(root, observations):
     return [
         {"candidate_id": o.canonical_key, "round_index": o.round_idx,
          "status": o.evaluation.status, "metrics": o.metrics,
+         "resource_usage": o.evaluation.resource_usage,
+         "model_slices": json.loads((Path(root) / o.evaluation.artifacts["model_slices"]).read_text())
+             if o.evaluation.succeeded and "model_slices" in o.evaluation.artifacts else None,
          "research_utility": o.metrics.get("research_utility") if o.evaluation.succeeded else None,
          "error": o.evaluation.error,
          "source": (Path(root) / o.candidate.payload["source_path"]).read_text(),

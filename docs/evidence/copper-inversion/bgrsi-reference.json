@@ -1,0 +1,21 @@
+{
+  "review_date": "2026-10-23",
+  "repository": "https://github.com/LUXINGYU23/BGRSI",
+  "commit": "f029001e06577e2b1416adff62739b0922d41f0f",
+  "scope": "Pinned follow-up review of reference behavior, not an assertion about the revision used during initial design. No private source copied.",
+  "files": {
+    "runtime/src/bgrsi/tasks/rsi_exam/interface_checks.py": {
+      "git_blob_sha": "70994b69f1bf325f80831bd69fa268bc386f99c8",
+      "observed": "Readonly source, test and data mounts; identity includes image/data/gate/source/timeout; durable interface job and usage reconciliation."
+    },
+    "runtime/src/bgrsi/tasks/rsi_exam/research.py": {
+      "git_blob_sha": "051999c196969bc8e6cef2b1121d347c714b9c44",
+      "observed": "Whole submitted batch syntax, path, hash, parent and duplicate validation precedes native interface jobs; all jobs drain before acceptance."
+    },
+    "runtime/src/bgrsi/tasks/rsi_exam/programs.py": {
+      "git_blob_sha": "cb1705cb637acaf348beb2a95498dd491fbea5eb",
+      "observed": "Canonical byte identity and artifact sealing; method executes in ephemeral copy of readonly submitted source."
+    }
+  },
+  "remaining_alignment": "Copper currently admits each one-source branch before the cross-branch barrier. No partial reservoir is published, but whole four-source syntax-before-interface ordering is not yet proven and remains an explicit spec audit item."
+}

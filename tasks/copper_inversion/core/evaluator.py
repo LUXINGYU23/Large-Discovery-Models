@@ -11,6 +11,7 @@ from ldm_tts.contracts.evaluation import (
 from ldm_tts.engine.run_store import atomic_json_write
 from .data import save_problem
 from .execution import digest, freeze_model, source_identity
+from .feedback import model_slices
 
 
 class Evaluator:
@@ -67,6 +68,8 @@ class Evaluator:
         error = ""
         jobs = 1
         artifacts = {}
+        resource_usage = {"solver_wall_seconds": r["wall_seconds"]}
+        samples = {"solver": r["resource_sampling"]}
         if r["reason"] == "timeout":
             status = "timed_out"
             error = "solver timeout"
@@ -89,6 +92,8 @@ class Evaluator:
                     timeout=30,
                 )
                 jobs += 1
+                resource_usage["scorer_wall_seconds"] = s["wall_seconds"]
+                samples["scorer"] = s["resource_sampling"]
                 if s["exit_code"] or s["oom"] or s["reason"]:
                     raise EvaluationPaused("independent scorer failed")
                 try:
@@ -112,14 +117,23 @@ class Evaluator:
                         (score_root / "output/result.json").relative_to(self.root)
                     ),
                 }
+                if status == "succeeded":
+                    preview = root / "model/slices.json"
+                    atomic_json_write(preview, model_slices(root / "model/model.npy", self.problem, seed=47))
+                    artifacts["model_slices"] = str(preview.relative_to(self.root))
+        for phase, sampling in samples.items():
+            for name in ("cpu_seconds_observed", "sampled_peak_memory_bytes"):
+                if sampling[name] is not None:
+                    resource_usage[f"{phase}_{name}"] = sampling[name]
         result = EvaluationResult(
             candidate.candidate_id,
             status,
             metrics=metrics,
             artifacts=artifacts,
-            resource_usage={"benchmark_jobs": jobs},
+            resource_usage={"benchmark_jobs": jobs, **resource_usage},
             error=error,
-            metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: key, "seed": 47},
+            metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: key, "seed": 47,
+                      "resource_sampling": samples},
         )
         atomic_json_write(receipt, result.to_dict())
         return result

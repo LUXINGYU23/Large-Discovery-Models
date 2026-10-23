@@ -1,6 +1,6 @@
 # Copper Inversion：Agent 反演算法发现任务规格
 
-日期：2026-10-23。版本：1.1，已对齐 main PR #14。状态：第一阶段已实现并完成远程 2D 与两个 3D case 单 agent 三轮闭环；验收详情见 [实现记录](copper-inversion-implementation.md)。后续 surrogate/GP 阶段未实现；逐项进展见 [验收台账](copper-inversion-acceptance.md)。
+日期：2026-10-23。版本：1.2，已对齐 main PR #14。状态：第一阶段已完成远程 2D 与两个 3D case 单 agent 三轮闭环；P5 共享研究树和 GP 选点已实现并通过远程 mock，真实 native fork 三轮已完成，完整 spec 边界审计仍在进行。详见 [实现记录](copper-inversion-implementation.md) 和 [验收台账](copper-inversion-acceptance.md)。
 
 本规格规定新增 `copper_inversion` 任务的科学问题、候选接口、可信执行边界和交付门槛。第一阶段完成持久 Agent 设计、提交、执行、读取反馈并修改反演算法的闭环；第二阶段在相同科学契约上接入 LDM surrogate/acquisition。各阶段独立记录证据，不能把注册成功、mock 运行或分数下降当成完整方法有效性证明。
 
@@ -20,10 +20,10 @@ LDM 的 Candidate 是反演算法源码，矿体是其执行产物。Agent 可�
 
 - LDM 实现基线：`37ebd33d`（PR #14）。使用现有 [Campaign](../ldm_tts/campaign.py)、[任务注册规范](../tasks/README.md)、[Harness 规范](research-harness.md)及[共享研究树](research-search-architecture.md)。架构收敛文档用于理解职责，下面的复用表以当前实际代码为准。
 - 铜矿来源：工作区原始 `copper_ldm_3d_skill_portable/Knowledge-driven-stochastic-modeling/` 中的 examples 和 `shpmc/loss_functions.py`。迁入时生成逐文件 SHA-256 manifest，记录原 ZIP 摘要；不得依赖开发机相邻目录运行。原始包保留为来源档案，新任务仅迁入所需数据和科学计算。沿用代码的 MIT 声明及 Xiaolong Wei 版权信息；数据来源与许可单独列明，不能只凭代码许可证推断所有外部资产许可。
-- BGRSI 参考为读取时的 `main`：`runtime/src/bgrsi/tasks/rsi_exam/{cases,research,interface_checks,programs,verifier}.py`。参考机制为公开自检、全批接口准入、源码封存、选后评估与回执。实现时记录所参考 commit，当前未把远程分支称为不可变源码基线。
+- BGRSI 于 2026-10-23 复核固定 commit `f029001e06577e2b1416adff62739b0922d41f0f`：接口检查、批次验证和方法封存的文件身份与行为见 [参考记录](evidence/copper-inversion/bgrsi-reference.json)。这次复核不追溯声称初始设计所读 main 的确切版本。
 - BGRSI 私有源码不直接复制到此仓库；按已核对的行为实现任务适配，复用本仓库共享能力。其 ControlStore、调度器和研究循环不整体迁移。
 
-可核对的参考入口：[BGRSI 接口检查](https://github.com/LUXINGYU23/BGRSI/blob/main/runtime/src/bgrsi/tasks/rsi_exam/interface_checks.py)、[批次验证](https://github.com/LUXINGYU23/BGRSI/blob/main/runtime/src/bgrsi/tasks/rsi_exam/research.py)、[方法封存](https://github.com/LUXINGYU23/BGRSI/blob/main/runtime/src/bgrsi/tasks/rsi_exam/programs.py)。参考测试的只读挂载不等价于抗任意代码干扰；本任务增加进程外输出验证和独立评分。
+可核对的参考入口：[BGRSI 接口检查](https://github.com/LUXINGYU23/BGRSI/blob/f029001e06577e2b1416adff62739b0922d41f0f/runtime/src/bgrsi/tasks/rsi_exam/interface_checks.py)、[批次验证](https://github.com/LUXINGYU23/BGRSI/blob/f029001e06577e2b1416adff62739b0922d41f0f/runtime/src/bgrsi/tasks/rsi_exam/research.py)、[方法封存](https://github.com/LUXINGYU23/BGRSI/blob/f029001e06577e2b1416adff62739b0922d41f0f/runtime/src/bgrsi/tasks/rsi_exam/programs.py)。参考测试的只读挂载不等价于抗任意代码干扰；本任务增加进程外输出验证和独立评分。
 
 ## 3. 数据与科学定义
 
@@ -209,6 +209,10 @@ LDMEngine 自动使用 `EvaluationExecutor`：持久化 selection、预留正式
 
 诊断：钻孔/露头/草图分项、排除接触点后的标签不匹配数、接触点距离误差、体积、空气占用、运行时间、峰值内存。最优算法是 aggregate loss 最小的合法候选；多 seed 保存全部矿体，展示某个代表矿体需标明 seed。
 
+资源诊断的当前实现从宿主读取实际容器 cgroup v2 的 memory.current 和 cpu.stat，目标采样间隔 0.2 秒。`sampled_peak_memory_bytes` 是采样最大值，`cpu_seconds_observed` 是最后观测到的累计 CPU 时间；不能称为完整生命周期峰值或精确总量。容器退出后未能读取的值保留未知。独立容器内 deadline 在控制器断连时仍生效。完整生命周期峰值的要求仍需单独验收。
+
+矿体反馈从独立评分成功后的封存 model.npy 派生：2D 平面或 3D 三个中央索引切片，每轴最多 32 个等步长采样点，以正负号表示内外部，保留原网格索引、物理坐标、源码外的矿体摘要及 seed。该预览不插值、不参与评分，不等同于完整矿体或实际恢复精度。
+
 | 情况 | 记录与预算 |
 | --- | --- |
 | 语法或准入不合格 | 拒绝并允许修复；消耗准入资源，不占正式槽 |
@@ -233,20 +237,23 @@ tasks/copper_inversion/
   core/
     data.py, geometry.py, objective.py, candidate.py
     interface_checks.py, execution.py, runner.py, scorer.py, evaluator.py
-    harness.py, harness_runtime.py, history.py, task_spec.py, workflow.py
-    surrogate.py                         # 第二阶段
+    harness.py, harness_runtime.py, task_spec.py, workflow.py
+    mock.py, dependencies.py, surrogate.py
   resources/
     cases/<case_id>/                      # 原始必要数据、manifest
-    contracts/v1/                        # fixtures、参考值、schema
+    selfcheck.py, TASK.md                 # 固定公开自检；fixture/schema 在可信 core 内
     seeds/solver.py                      # 直接返回初始几何的弱基线
     harness/profiles/researcher/AGENTS.md
+    harness/research_coverage.json
     provenance.json, qualification_evidence.json, LICENSE.upstream
   tests/                                 # 接口、科学回归、隔离与恢复
 config/copper_inversion/
-  mock.yaml, harness_2d_smoke.yaml, harness_3d_smoke.yaml
+  mock.yaml, harness_2d_smoke.yaml
+  harness_drillholes_3d.yaml, harness_drillholes_outcrops_3d.yaml
+  ldm_mock.yaml, ldm_3d_tiny.yaml, ldm_drillholes_3d.yaml
 ```
 
-文件名为目标设计，当前尚未存在。只通过 task.json 注册，不添加中央 task-name 分支。`harness_runtime.py` 只负责客户端/工具资源装配，使用 ExitStack 关闭；`execution.py` 是任务内唯一容器与子回执实现。参数/报告复杂到需要独立职责时再提取 workflow_args/reporting，不机械复制其他任务全部模块。首阶段预计无需修改共享引擎、Pi 或 strategy；确有共享缺口时用定向测试证明并最小修改，领域评分与验证始终留在任务内。
+以上为当前主要文件布局；历史序列化与提交共用 harness.py，未为少量胶水新增单独 history 模块。只通过 task.json 注册，不添加中央 task-name 分支。`harness_runtime.py` 只负责客户端/工具资源装配，使用 ExitStack 关闭；`execution.py` 是任务内唯一容器与子回执实现。参数/报告复杂到需要独立职责时再提取 workflow_args/reporting，不机械复制其他任务全部模块。首阶段预计无需修改共享引擎、Pi 或 strategy；确有共享缺口时用定向测试证明并最小修改，领域评分与验证始终留在任务内。
 
 ## 10. 初版工程 profile
 

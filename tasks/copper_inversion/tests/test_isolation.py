@@ -33,6 +33,14 @@ def test_real_seed_isolation_and_replay(tmp_path, case):
     result = evaluator.evaluate(candidate)
     assert result.succeeded, result.error
     assert result.metrics["loss_total"] > 0
+    preview = json.loads((tmp_path / result.artifacts["model_slices"]).read_text())
+    assert preview["seed"] == 47
+    assert len(preview["slices"]) == (1 if case.endswith("2d") else 3)
+    from types import SimpleNamespace
+    from tasks.copper_inversion.core.harness import serialize_history
+    observation = SimpleNamespace(canonical_key=candidate.canonical_key, round_idx=0,
+                                  candidate=candidate, evaluation=result, metrics=result.metrics)
+    assert serialize_history(tmp_path, [observation])[0]["model_slices"] == preview
     count = len(calls)
     assert evaluator.evaluate(candidate).to_dict() == result.to_dict()
     assert len(calls) == count

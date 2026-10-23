@@ -200,3 +200,67 @@ def test_resources_and_cleanup_on_recovery(tmp_path, fault):
         assert result["exit_code"] == 0
     assert execution.docker("inspect", result["container"], check=False).returncode != 0
     assert runner.run(fault, **kwargs)[1] == result
+
+
+def test_hard_deadline_survives_controller_loss(tmp_path, monkeypatch):
+    from tasks.copper_inversion.core.candidate import seal
+    from tasks.copper_inversion.core.data import load_problem, save_problem
+
+    inputs = tmp_path / "inputs"
+    save_problem(load_problem("drillholes_3d", fixture=True), inputs)
+    execution.atomic_json_write(inputs / "budget.json", {
+        "seed": 47, "wall_time_seconds": 1, "cpu_count": 1, "memory_mb": 256,
+    })
+    payload = seal(tmp_path, b"def solve(problem, budget, seed):\n    while True: pass\n")
+    original = execution.docker
+
+    def disconnect(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if args[0] == "start":
+            raise EvaluationPaused("controller disconnected after start")
+        return result
+
+    runner = execution.Execution(tmp_path / "jobs", os.environ["COPPER_TEST_IMAGE"])
+    monkeypatch.setattr(execution, "docker", disconnect)
+    kwargs = dict(phase="solver", inputs=inputs, timeout=1, memory_mb=256,
+                  source=(tmp_path / payload["source_path"]).parent)
+    with pytest.raises(EvaluationPaused, match="disconnected"):
+        runner.run("controller-loss", **kwargs)
+    job = json.loads(next((tmp_path / "jobs").glob("*/job.json")).read_text())
+    # No Execution polling/kill occurs while waiting for the container's own deadline.
+    assert original("wait", job["name"]).stdout.strip() == "137"
+    state = json.loads(original("inspect", job["name"]).stdout)[0]["State"]
+    assert not state["Running"] and not state["OOMKilled"]
+    monkeypatch.setattr(execution, "docker", original)
+    _, result = runner.run("controller-loss", **kwargs)
+    assert result["reason"] == "timeout" and 1 <= result["wall_seconds"] < 10
+    assert result["resource_sampling"]["samples"] == 0
+    assert result["resource_sampling"]["cpu_seconds_observed"] is None
+
+
+def test_host_resource_samples_ignore_candidate_claims(tmp_path):
+    from tasks.copper_inversion.core.candidate import seal, Domain
+    from tasks.copper_inversion.core.data import load_problem
+    from ldm_tts.contracts import RawProposal
+
+    source = b'''import time
+def solve(problem, budget, seed):
+    open('/output/resource_sampling.json','w').write('{"cpu_seconds_observed":99999999}')
+    data = bytearray(64 * 1024 * 1024)
+    end = time.monotonic() + 1.2
+    while time.monotonic() < end:
+        data[0] = 1
+    return problem['initial_level_set'].copy()
+'''
+    payload = seal(tmp_path, source)
+    candidate = Domain(tmp_path).admit(RawProposal(payload, "test"))
+    runner = execution.Execution(tmp_path / "jobs", os.environ["COPPER_TEST_IMAGE"])
+    result = Evaluator(tmp_path, runner, load_problem("drillholes_3d"), 10).evaluate(candidate)
+    assert result.succeeded
+    samples = result.metadata["resource_sampling"]["solver"]
+    assert samples["method"] == "host_cgroup_v2_polling" and samples["samples"] >= 2
+    assert samples["sampled_peak_memory_bytes"] >= 64 * 1024 * 1024
+    assert .1 < samples["cpu_seconds_observed"] < 10
+    assert not samples["complete_lifetime_measurement"]
+    assert result.resource_usage["solver_sampled_peak_memory_bytes"] == samples["sampled_peak_memory_bytes"]
+    assert result.resource_usage["solver_cpu_seconds_observed"] == samples["cpu_seconds_observed"]

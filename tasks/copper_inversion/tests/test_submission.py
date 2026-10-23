@@ -86,6 +86,13 @@ def test_default_provider_is_official_deepseek_low():
     assert args.thinking == "low"
 
 
+def test_explicit_zero_solver_budget_is_rejected():
+    from tasks.copper_inversion.core.workflow import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args(["--solver-seconds", "0"])
+
+
 def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
     from contextlib import ExitStack
     from tasks.copper_inversion.core import harness_runtime as h

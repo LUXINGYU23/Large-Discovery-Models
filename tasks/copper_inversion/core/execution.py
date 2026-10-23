@@ -52,6 +52,31 @@ def docker(*args, check=True):
     return r
 
 
+def sample_resources(record, pid):
+    """Host-owned cgroup v2 samples, including all container descendants.
+
+    memory.current is sampled, not a lifetime high-water mark. CPU is cumulative
+    through the last available sample. Never substitute zero for missing data.
+    """
+    try:
+        membership = (Path("/proc") / str(pid) / "cgroup").read_text()
+        relative = next(line[3:] for line in membership.splitlines() if line.startswith("0::"))
+        if record["container_id"] not in relative:
+            raise ValueError("PID no longer belongs to the dispatched container")
+        group = Path("/sys/fs/cgroup") / relative.lstrip("/")
+        memory = int((group / "memory.current").read_text())
+        cpu = dict(line.split() for line in (group / "cpu.stat").read_text().splitlines())
+        seconds = int(cpu["usage_usec"]) / 1e6
+    except (OSError, ValueError, KeyError, StopIteration):
+        # Short-lived/exited containers may have already lost their cgroup.
+        record.setdefault("resource_samples", 0)
+        return
+    record["resource_samples"] = record.get("resource_samples", 0) + 1
+    record["sampled_peak_memory_bytes"] = max(record.get("sampled_peak_memory_bytes", 0), memory)
+    record["cpu_seconds_observed"] = max(record.get("cpu_seconds_observed", 0), seconds)
+    record["last_resource_sample_unix"] = time.time()
+
+
 class Execution:
     def __init__(self, root, image, account=None):
         self.root = Path(root).resolve()
@@ -171,13 +196,20 @@ class Execution:
                 ]
             command += [
                 self.image,
+                "timeout",
+                "--signal=KILL",
+                str(timeout),
                 "python",
                 "-m",
                 "tasks.copper_inversion.core."
                 + ("scorer" if phase == "scorer" else "runner"),
             ]
             docker(*command)
-        state = json.loads(docker("inspect", name).stdout)[0]["State"]
+        inspected = json.loads(docker("inspect", name).stdout)[0]
+        if record.get("container_id") not in (None, inspected["Id"]):
+            raise EvaluationPaused("container identity changed after dispatch")
+        record["container_id"] = inspected["Id"]
+        state = inspected["State"]
         if state["Status"] == "created":
             record.update(started=True, start_time=time.time())
             atomic_json_write(job, record)
@@ -190,6 +222,8 @@ class Execution:
             state = json.loads(docker("inspect", name).stdout)[0]["State"]
             if not state["Running"]:
                 break
+            sample_resources(record, state["Pid"])
+            atomic_json_write(job, record)
             # Filesize limits apply per-file; also stop candidates that create many files.
             count = 0
             size = 0
@@ -216,6 +250,15 @@ class Execution:
         state = json.loads(docker("inspect", name).stdout)[0]["State"]
         if state["Running"]:
             raise EvaluationPaused("container did not stop")
+        wall_seconds = max(
+            0,
+            datetime.fromisoformat(state["FinishedAt"].replace("Z", "+00:00")).timestamp()
+            - datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00")).timestamp(),
+        )
+        # The in-container coreutils deadline remains active while the controller
+        # is offline. A terminal kill at its deadline is still a timeout on replay.
+        if reason is None and not state["OOMKilled"] and state["ExitCode"] == 137 and wall_seconds >= timeout:
+            reason = "timeout"
         log = docker("logs", name, check=False)
         (root / "log.txt").write_text((log.stdout + log.stderr)[-1024 * 1024 :])
         result = {
@@ -223,15 +266,21 @@ class Execution:
             "oom": state["OOMKilled"],
             "reason": reason,
             # Docker's terminal timestamps exclude controller downtime on replay.
-            "wall_seconds": max(
-                0,
-                datetime.fromisoformat(state["FinishedAt"].replace("Z", "+00:00")).timestamp()
-                - datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00")).timestamp(),
-            ),
+            "wall_seconds": wall_seconds,
             "container": name,
+            "container_id": record["container_id"],
             "key": key,
             "image": self.image,
             "cpus": cpus,
+            "resource_sampling": {
+                "method": "host_cgroup_v2_polling",
+                "target_interval_seconds": 0.2,
+                "samples": record.get("resource_samples", 0),
+                "sampled_peak_memory_bytes": record.get("sampled_peak_memory_bytes"),
+                "cpu_seconds_observed": record.get("cpu_seconds_observed"),
+                "last_sample_unix": record.get("last_resource_sample_unix"),
+                "complete_lifetime_measurement": False,
+            },
         }
         atomic_json_write(receipt, result)
         self._account(key, result, phase)
@@ -240,8 +289,12 @@ class Execution:
 
     def _account(self, key, result, phase):
         if self.account:
+            counts = {f"{phase}_jobs": 1, f"{phase}_wall_seconds": result["wall_seconds"]}
+            sampling = result["resource_sampling"]
+            if sampling["cpu_seconds_observed"] is not None:
+                counts[f"{phase}_cpu_seconds_observed"] = sampling["cpu_seconds_observed"]
             self.account(
-                {f"{phase}_jobs": 1, f"{phase}_wall_seconds": result["wall_seconds"]},
+                counts,
                 usage_key="copper:job:" + key,
             )
 

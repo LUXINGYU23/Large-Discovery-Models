@@ -46,7 +46,8 @@ def parse_args(argv=None):
     a = p.parse_args(argv)
     if a.iterations < 0 or a.harness_seconds < 1:
         p.error("invalid budget")
-    a.solver_seconds = a.solver_seconds or (60 if a.case_id.endswith("2d") else 120)
+    if a.solver_seconds is None:
+        a.solver_seconds = 60 if a.case_id.endswith("2d") else 120
     if a.solver_seconds < 1:
         p.error("invalid solver seconds")
     configure_research_strategy(a, enabled=a.search_method == "ldm_harness", measurement_supported=False)
@@ -208,7 +209,7 @@ def main(argv=None):
             )
             return 0 if len(observations) == args.iterations + 1 and successful else 1
     except HarnessError as exc:
-        runtime.pause("paused_endpoint_unavailable", phase="harness", message=str(exc))
+        runtime.pause("paused_harness", phase="harness", message=str(exc))
         raise
     except EvaluationPaused as exc:
         runtime.status.update(
