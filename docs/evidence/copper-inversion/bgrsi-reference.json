@@ -17,5 +17,10 @@
       "observed": "Canonical byte identity and artifact sealing; method executes in ephemeral copy of readonly submitted source."
     }
   },
-  "remaining_alignment": "Copper currently admits each one-source branch before the cross-branch barrier. No partial reservoir is published, but whole four-source syntax-before-interface ordering is not yet proven and remains an explicit spec audit item."
+  "remaining_alignment": "Whole-pool static validation before interfaces is implemented and covered by remote batch-admission tests plus current-version native P5 tiny. Complete current-version three-round acceptance remains pending; historical native runs retain the previous protocol identity.",
+  "alignment_evidence": [
+    "tasks/copper_inversion/resources/evidence/runtime/batch-admission.json",
+    "docs/copper-inversion-batch-admission.md",
+    "tasks/copper_inversion/resources/evidence/research-tree/final-tiny.json"
+  ]
 }
