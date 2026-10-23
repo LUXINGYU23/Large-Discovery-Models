@@ -134,7 +134,8 @@ def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
     monkeypatch.setattr(h, "HarnessClient", Client)
     monkeypatch.setattr(h, "_preflight", lambda *args: None)
     with ExitStack() as stack:
-        h.open_client(parse_args([]), tmp_path, load_problem("drillholes_sketch_2d", fixture=True), stack, lambda *a, **k: None)
+        h.open_client(parse_args(["--harness-cache-dir", str(tmp_path / "cache")]), tmp_path,
+                      load_problem("drillholes_sketch_2d", fixture=True), stack, lambda *a, **k: None)
     assert captured[0].limits.tool_call_budgets["bash"] == 8
     assert captured[0].thinking == "low"
     assert captured[0].force_first_tool_call is False

@@ -5,18 +5,37 @@ read-only code/input. The independent scorer never mounts candidate source.
 """
 
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
 import subprocess
 import time
 import shutil
+import secrets
 from datetime import datetime
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from .geometry import read_model, MAX_MODEL_BYTES
 
 TASK = Path(__file__).resolve().parents[1]
+
+
+def authenticated_resources(log, key):
+    """Ignore candidate stdout, including forged resource records."""
+    from .supervisor import PREFIX
+    for line in reversed(log.splitlines()):
+        if not line.startswith(PREFIX):
+            continue
+        try:
+            envelope = json.loads(line[len(PREFIX):])
+            encoded, mac = envelope["payload"], envelope["mac"]
+            expected = hmac.new(bytes.fromhex(key), encoded.encode(), hashlib.sha256).hexdigest()
+            if hmac.compare_digest(expected, mac):
+                return json.loads(encoded)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return None
 
 
 def digest(value):
@@ -115,6 +134,14 @@ class Execution:
         job = root / "job.json"
         out = root / "output"
         out.mkdir(exist_ok=True)
+        # The unprivileged worker is a different UID from PID 1 and the host.
+        out.chmod(0o1777)
+        # Only public problem/budget files are mounted here. Atomic JSON writes
+        # default to 0600. Keep host-owner write access for recovery; the worker
+        # receives a read-only bind mount and can only read these public files.
+        Path(inputs).chmod(0o755)
+        for path in Path(inputs).iterdir():
+            path.chmod(0o644)
         name = "ldm-copper-" + digest(str(self.root))[:10] + "-" + key[:20]
         if receipt.exists():
             result = json.loads(receipt.read_text())
@@ -131,6 +158,7 @@ class Execution:
                 "name": name,
                 "created": time.time(),
                 "started": False,
+                "resource_key": secrets.token_hex(32),
             }
             atomic_json_write(job, record)
         inspection = docker("inspect", name, check=False)
@@ -148,6 +176,9 @@ class Execution:
                 "--read-only",
                 "--cap-drop",
                 "ALL",
+                "--cap-add", "SETUID",
+                "--cap-add", "SETGID",
+                "--cap-add", "KILL",
                 "--security-opt",
                 "no-new-privileges",
                 "--pids-limit",
@@ -159,7 +190,7 @@ class Execution:
                 "--memory-swap",
                 f"{memory_mb}m",
                 "--user",
-                f"{os.getuid()}:{os.getgid()}",
+                "0:0",
                 "--tmpfs",
                 "/tmp:rw,nosuid,size=128m",
                 "--ulimit",
@@ -176,6 +207,8 @@ class Execution:
                 "OMP_NUM_THREADS=1",
                 "-e",
                 "PYTHONPATH=/code",
+                "-e",
+                "COPPER_RESOURCE_KEY=" + record["resource_key"],
                 "-w",
                 "/tmp",
             ]
@@ -196,11 +229,10 @@ class Execution:
                 ]
             command += [
                 self.image,
-                "timeout",
-                "--signal=KILL",
-                str(timeout),
                 "python",
                 "-m",
+                "tasks.copper_inversion.core.supervisor",
+                str(timeout),
                 "tasks.copper_inversion.core."
                 + ("scorer" if phase == "scorer" else "runner"),
             ]
@@ -216,7 +248,9 @@ class Execution:
             docker("start", name)
         elif not record["started"]:
             raise EvaluationPaused("container state differs from pre-dispatch receipt")
-        deadline = record["start_time"] + timeout
+        # Workload timeout remains inside the container; allow only a bounded
+        # finalization interval for descendant reap and authenticated counters.
+        deadline = record["start_time"] + timeout + 3
         reason = record.get("stop_reason")
         while True:
             state = json.loads(docker("inspect", name).stdout)[0]["State"]
@@ -257,13 +291,20 @@ class Execution:
         )
         # The in-container coreutils deadline remains active while the controller
         # is offline. A terminal kill at its deadline is still a timeout on replay.
-        if reason is None and not state["OOMKilled"] and state["ExitCode"] == 137 and wall_seconds >= timeout:
-            reason = "timeout"
         log = docker("logs", name, check=False)
         (root / "log.txt").write_text((log.stdout + log.stderr)[-1024 * 1024 :])
+        resources = authenticated_resources(log.stdout, record["resource_key"])
+        oom = state["OOMKilled"] or bool(resources and resources["oom_kill_count"])
+        if reason is None and not oom and state["ExitCode"] == 137 and wall_seconds >= timeout:
+            reason = "timeout"
+        if reason is not None:
+            record["stop_reason"] = reason
+            atomic_json_write(job, record)
+        if resources is None and not (oom or reason):
+            raise EvaluationPaused("authenticated workload counters unavailable")
         result = {
             "exit_code": state["ExitCode"],
-            "oom": state["OOMKilled"],
+            "oom": oom,
             "reason": reason,
             # Docker's terminal timestamps exclude controller downtime on replay.
             "wall_seconds": wall_seconds,
@@ -272,6 +313,7 @@ class Execution:
             "key": key,
             "image": self.image,
             "cpus": cpus,
+            "workload_resources": resources,
             "resource_sampling": {
                 "method": "host_cgroup_v2_polling",
                 "target_interval_seconds": 0.2,
@@ -291,6 +333,9 @@ class Execution:
         if self.account:
             counts = {f"{phase}_jobs": 1, f"{phase}_wall_seconds": result["wall_seconds"]}
             sampling = result["resource_sampling"]
+            workload = result["workload_resources"]
+            if workload is not None:
+                counts[f"{phase}_cpu_seconds_through_reap"] = workload["cpu_seconds_through_reap"]
             if sampling["cpu_seconds_observed"] is not None:
                 counts[f"{phase}_cpu_seconds_observed"] = sampling["cpu_seconds_observed"]
             self.account(

@@ -213,7 +213,7 @@ LDMEngine 自动使用 `EvaluationExecutor`：持久化 selection、预留正式
 
 几何诊断按重新距离化后的正值网格统计：2D 报 `positive_area`，3D 报 `positive_volume`，等于正值网格数乘各轴 spacing 的乘积；这是体素近似，不做曲面积分。空气占用是正值区域与 `~active_mask` 的交集，报告网格数、面积/体积和占全部正值网格的比例。没有 active_mask 时省略空气指标，不假定为零。这些量只诊断、不加入 loss。
 
-资源诊断的当前实现从宿主读取实际容器 cgroup v2 的 memory.current 和 cpu.stat，目标采样间隔 0.2 秒。`sampled_peak_memory_bytes` 是采样最大值，`cpu_seconds_observed` 是最后观测到的累计 CPU 时间；不能称为完整生命周期峰值或精确总量。容器退出后未能读取的值保留未知。独立容器内 deadline 在控制器断连时仍生效。完整生命周期峰值的要求仍需单独验收。
+资源诊断由可信容器 PID 1 收尾。候选/评分 worker 使用 UID/GID 65534、无 capabilities；监督器保留 SETUID/SETGID/KILL，并使用 worker 不可读取的每作业密钥认证记录。工作进程及全部后代结束并回收后，监督器读取 cgroup v2 `memory.peak` 和 `cpu.stat`。峰值范围包含工作负载及监督器至最终回收；CPU 字段为 `cpu_seconds_through_reap`，不声称包含读数之后的遥测序列化开销。没有可信收尾记录时保留未知，非已知超时/OOM 则暂停排查。真实 campaign 预检要求 memory.peak。宿主 0.2 秒采样继续单独记录，不能替代内核峰值。容器内 deadline 在控制器断连时仍生效；宿主另允许 3 秒有界收尾期供清理及认证记录。
 
 矿体反馈从独立评分成功后的封存 model.npy 派生：2D 平面或 3D 三个中央索引切片，每轴最多 32 个等步长采样点，以正负号表示内外部，保留原网格索引、物理坐标、源码外的矿体摘要及 seed。该预览不插值、不参与评分，不等同于完整矿体或实际恢复精度。
 
@@ -336,7 +336,7 @@ P3 验收不要求分数一定改进：必须能证明 agent 完成代码设计�
 
 资格阶段为 contract_verified，experiment 保持 draft：ZIP 来源有内容摘要，但尚未完成
 官方 benchmark 来源/预算认证；2D 闭环工程证据不自动升级为方法有效性证明。
-P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导留在后续阶段。
+P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导随后已实现并完成旧版真实三轮；当前版本整批准入与监督执行器的最终 P5 真运行仍待验收，见验收台账。
 
 后续所有真实调试和运行使用 DeepSeek 官方 `https://api.deepseek.com`、`deepseek-flash`（V4.1 Flash）、`low` 思考强度；API key 从远程受保护存储读取。已有旧模型实验保留原模型身份，切换后创建新运行目录。
 

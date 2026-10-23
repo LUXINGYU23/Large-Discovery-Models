@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "scope": "Authenticated cgroup workload lifetime counters on kernel with memory.peak; full scoped remote regression",
+  "host": "120.133.37.228:10522",
+  "root": "/Aidata/shared/ldm/copper-inversion-20261023",
+  "kernel": "6.8.0-139-generic",
+  "result": "228 passed in 99.72s (0:01:39)",
+  "require_peak": true,
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "source_sha256": {
+    "tasks/copper_inversion/core/__init__.py": "6d0f37c6dc85c6b307a2c1c14e26725e0b64d70f6b0afc51107a7dfba043c754",
+    "tasks/copper_inversion/core/candidate.py": "5256904da44f9cbbc0d8faca1d491f75e61de05a1c98dcb0a52b07d789538d9a",
+    "tasks/copper_inversion/core/data.py": "8bf488b16002cd70d9d86142c4214d4ea4a241d64c52322ff053ef87bd187e64",
+    "tasks/copper_inversion/core/dependencies.py": "4ee190167ab7df8df5349cf2d28717af5cb38222ed3bf42568d515803d517494",
+    "tasks/copper_inversion/core/evaluator.py": "0bb80ac10166161e7c0a420ef2d511dbe50fa2140c4da2723e0065de295b3e29",
+    "tasks/copper_inversion/core/execution.py": "8ccbc2d0c992fe8c593892fbb612481355bfd6b518dc24035d96e91936b54764",
+    "tasks/copper_inversion/core/feedback.py": "bcb623f5a8f3abaff5af994a5b5e8970485347879af717bf46891b772d15404f",
+    "tasks/copper_inversion/core/geometry.py": "8bdaae1dbeb6a812c532bd6924fd0c33774750872c9248ad7adde7db36791063",
+    "tasks/copper_inversion/core/harness.py": "65f03661ab134da77f84a18c02f163d4e6bece127dad56dbffe2107e1ea17f20",
+    "tasks/copper_inversion/core/harness_runtime.py": "1895b2063c1dbb57c7b68a8c67d155015924e1c439c3708acd7892e39c19851e",
+    "tasks/copper_inversion/core/interface_checks.py": "7c7136d523883ef70f3746a4ab4c9772c5c725411da08bd054c7a606f2558967",
+    "tasks/copper_inversion/core/mock.py": "762680d1f1a0537d312e0e84146f9ad97401983bc612b45867fd1e959841ab18",
+    "tasks/copper_inversion/core/objective.py": "86e2a2dc84433a91e2a5e74fb6dfb5d73099a2bded0bdc6652b206252306f425",
+    "tasks/copper_inversion/core/runner.py": "62f9c791c09d0a4fa39c6f20ccbe40ddb0df571eaec677075de38080fd91dae8",
+    "tasks/copper_inversion/core/scorer.py": "d79d8c900e33237c6adc32c0a3a3e826331ba65b96779871ecc3e5db5805b67d",
+    "tasks/copper_inversion/core/supervisor.py": "33c32c7d2d77d3c316bf4a15798fb64bcef14269ca993da4606d9bcc1b8efe6c",
+    "tasks/copper_inversion/core/surrogate.py": "ca399c14479c8b7c72e77c2f66a4fe515bf16a0da8442ed8594135d591aa266a",
+    "tasks/copper_inversion/core/task_spec.py": "38b9a572074d31c0c24662a2e88512188a92ad75cbd12bec1b3aa79a37543997",
+    "tasks/copper_inversion/core/workflow.py": "abe34a2b3928f67445978c879ee7133423041751aea80c9050af1e399a74b404",
+    "tasks/copper_inversion/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tasks/copper_inversion/tests/test_feedback.py": "a906c55fc4a09b1f5ced648ece866c6b7afad8aee5ea06120b8cdcc2cac9fdf0",
+    "tasks/copper_inversion/tests/test_isolation.py": "ee97e3a2c287fe27eb3880bc61e07399fb480f5157100d89f84b66ad7aaa76e5",
+    "tasks/copper_inversion/tests/test_procedure.py": "9eeaa62d33a8685c7349c3e8ca48f48a56d6d1999655fffcaef584ec9e90b987",
+    "tasks/copper_inversion/tests/test_recovery.py": "7cf2eea7f6574ecda82c6dead710442cf42a0908e2009d4313a77a061fec96d4",
+    "tasks/copper_inversion/tests/test_research.py": "59310a38287c2af4c2d5a16cd11229265dbbd7fc920822d46ae1085a2e842c0c",
+    "tasks/copper_inversion/tests/test_science.py": "09780f95b72ac5d55879da2084090da343c1df3422ddc42030f42586a419eaa5",
+    "tasks/copper_inversion/tests/test_submission.py": "adc1d15606de814c93cbb907c828d46d5e597b588711919120f413bcc7431289",
+    "tasks/copper_inversion/tests/test_supervisor.py": "414582c14dc4495dab575644dcd2ed868a13f088b15d4e89a4336c79e9af3cd6",
+    "tasks/copper_inversion/tests/test_surrogate.py": "30bd7882f27d877a25360ac3d121fa406d9acdab3188c813049b0ce1327fd61c"
+  },
+  "log_sha256": "5ee272d76bbff0bad6373a5c3200941f927fe835a973e803075f562896baa85e",
+  "allocation_test": {
+    "resource_usage": {
+      "benchmark_jobs": 2.0,
+      "scorer_cpu_seconds_observed": 0.060782,
+      "scorer_cpu_seconds_through_reap": 0.177057,
+      "scorer_peak_memory_bytes": 27951104.0,
+      "scorer_sampled_peak_memory_bytes": 7139328.0,
+      "scorer_wall_seconds": 0.43250107765197754,
+      "solver_cpu_seconds_observed": 0.059621,
+      "solver_cpu_seconds_through_reap": 0.232954,
+      "solver_peak_memory_bytes": 129662976.0,
+      "solver_sampled_peak_memory_bytes": 7208960.0,
+      "solver_wall_seconds": 0.48058199882507324
+    },
+    "workload_resources": {
+      "scorer": {
+        "cpu_seconds_through_reap": 0.177057,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 27951104,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      },
+      "solver": {
+        "cpu_seconds_through_reap": 0.232954,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 129662976,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    }
+  },
+  "offline_test": {
+    "exit_code": 137,
+    "reason": "timeout",
+    "resource_sampling": {
+      "complete_lifetime_measurement": false,
+      "cpu_seconds_observed": null,
+      "last_sample_unix": null,
+      "method": "host_cgroup_v2_polling",
+      "sampled_peak_memory_bytes": null,
+      "samples": 0,
+      "target_interval_seconds": 0.2
+    },
+    "workload_resources": {
+      "cpu_seconds_through_reap": 2.071925,
+      "exit_code": 137,
+      "oom_kill_count": 0,
+      "peak_memory_bytes": 128016384,
+      "schema_version": 1,
+      "scope": "container workload and supervisor through final descendant reap",
+      "workload_complete": true
+    }
+  },
+  "environment": "uv lock exported with hashes; mirror install enforced --require-hashes; no project lock changes",
+  "limits": [
+    "Peak covers the workload and trusted supervisor through final descendant reap, not later telemetry serialization.",
+    "Killed supervisor may leave unknown counters; no sampled value is promoted to kernel peak.",
+    "Primary kernel 5.15 lacks memory.peak; real-campaign dependency gate rejects it.",
+    "No new model-backed campaign is certified by these tests."
+  ]
+}

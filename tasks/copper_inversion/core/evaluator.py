@@ -70,6 +70,7 @@ class Evaluator:
         artifacts = {}
         resource_usage = {"solver_wall_seconds": r["wall_seconds"]}
         samples = {"solver": r["resource_sampling"]}
+        workloads = {"solver": r["workload_resources"]}
         if r["reason"] == "timeout":
             status = "timed_out"
             error = "solver timeout"
@@ -94,6 +95,7 @@ class Evaluator:
                 jobs += 1
                 resource_usage["scorer_wall_seconds"] = s["wall_seconds"]
                 samples["scorer"] = s["resource_sampling"]
+                workloads["scorer"] = s["workload_resources"]
                 if s["exit_code"] or s["oom"] or s["reason"]:
                     raise EvaluationPaused("independent scorer failed")
                 try:
@@ -125,6 +127,11 @@ class Evaluator:
             for name in ("cpu_seconds_observed", "sampled_peak_memory_bytes"):
                 if sampling[name] is not None:
                     resource_usage[f"{phase}_{name}"] = sampling[name]
+        for phase, workload in workloads.items():
+            if workload is not None:
+                for name in ("peak_memory_bytes", "cpu_seconds_through_reap"):
+                    if workload[name] is not None:
+                        resource_usage[f"{phase}_{name}"] = workload[name]
         result = EvaluationResult(
             candidate.candidate_id,
             status,
@@ -133,7 +140,7 @@ class Evaluator:
             resource_usage={"benchmark_jobs": jobs, **resource_usage},
             error=error,
             metadata={EVALUATION_ATTEMPT_RECEIPT_KEY: key, "seed": 47,
-                      "resource_sampling": samples},
+                      "resource_sampling": samples, "workload_resources": workloads},
         )
         atomic_json_write(receipt, result.to_dict())
         return result

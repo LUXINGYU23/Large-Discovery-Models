@@ -30,6 +30,10 @@ history.json contains every measured source and feedback. Successful evaluations
 model_slices: sampled central-plane sign maps with axis/index/physical coordinates,
 model digest and seed. These previews are not full-resolution geometry or scores.
 Resource diagnostics explicitly distinguish sampled memory/CPU from lifetime totals. Lower loss_total is better.
+When available, solver_peak_memory_bytes is the kernel peak including the worker,
+its descendants and trusted supervisor through final reap; solver_cpu_seconds_through_reap
+uses that same boundary. The worker runs as UID/GID 65534 without capabilities.
+These diagnostics never replace the independently recomputed geological loss.
 Valid weak scores are observations. Unmeasured/invalid is not a zero score. Refer to
 exact parent digests and explain what changed and why. Research resources and tests
 are read-only. Work in /workspace/candidates/0/solver.py; submit via submit_solver.

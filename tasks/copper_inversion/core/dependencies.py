@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import shutil
+from pathlib import Path
 from ldm_tts.registration.dependencies import plan_check_context, ok, fail, skip
 
 
@@ -24,4 +25,13 @@ def check_dependencies(plan, *, include_optional=True):
         checks.append(
             (ok if os.path.exists("/dev/kvm") else fail)(task, "kvm", "Pi requires KVM")
         )
+        try:
+            membership = Path("/proc/self/cgroup").read_text()
+            relative = next(line[3:] for line in membership.splitlines() if line.startswith("0::"))
+            peak = Path("/sys/fs/cgroup") / relative.lstrip("/") / "memory.peak"
+            available = peak.is_file()
+        except (OSError, StopIteration):
+            available = False
+        checks.append((ok if available else fail)(
+            task, "memory.peak", "Lifetime memory diagnostics require a non-root cgroup v2 memory.peak counter"))
     return checks

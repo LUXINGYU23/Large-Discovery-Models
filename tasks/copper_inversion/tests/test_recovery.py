@@ -150,6 +150,9 @@ def test_scorer_receipt_fault_is_infrastructure_pause(tmp_path, monkeypatch, cor
             if corruption == "missing":
                 receipt.unlink()
             else:
+                # Worker-owned files are not host-writable. Replace the file to
+                # inject storage corruption through the host-owned directory.
+                receipt.unlink()
                 receipt.write_text("{" if corruption == "json" else
                                    '{"status":"succeeded","metrics":{"loss_total":NaN}}')
         return root, result

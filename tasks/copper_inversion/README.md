@@ -156,3 +156,20 @@ This exercises the actual Pi submission controller and task parser, including
 rejection, reopening the same turn for correction, nested artifact paths, and
 immutable snapshots. It uses no model API and does not replace a real campaign
 check. Historical campaigns retain their previous submission contract identity.
+
+### Lifetime workload resource diagnostics
+
+Real campaigns require a cgroup v2 `memory.peak` counter. The primary server's
+5.15 kernel does not provide it; the authorized H20 server's 6.8 kernel does.
+Use `/Aidata/shared/ldm/` for code, environment, cache and active outputs there.
+The dependency gate fails explicitly when the counter is unavailable.
+
+A trusted PID 1 supervises the worker (UID/GID 65534, no capabilities).
+Only the supervisor retains SETUID/SETGID/KILL; it reaps all descendants and
+reads the kernel peak and CPU counters before signing a record with a per-job
+key unavailable to the worker. The host verifies this independently of
+candidate stdout. The peak includes the workload and supervisor through final
+reap, not later telemetry serialization. CPU uses the same explicit boundary.
+Missing counters remain unknown. The container deadline remains active during
+controller disconnection; host termination permits a bounded three-second
+finalization period. Sampled host telemetry is reported separately.
