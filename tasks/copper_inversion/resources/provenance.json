@@ -1,0 +1,20 @@
+{
+  "source": "copper_ldm_3d_skill_portable.zip",
+  "files": {
+    "cases/drillholes_3d/drillholes.txt": "d4cb3d5a5af409c2d939c3b590d064705263f11d4566cd8d5c2d776509aa34bf",
+    "cases/drillholes_3d/ind_active.txt": "61803511ba141af1b9d84eab45d0fd31a524aed3ad842ae6104b09a3c425324f",
+    "cases/drillholes_3d/initial_model.txt": "827aa25354b579be86f2b6d83fb506327b4538d6d0026fb94d9d496e39962072",
+    "cases/drillholes_3d/mesh.txt": "7229253f3e6edb4da1a9af4c5df7e385a570e614d0e950aeee2e47fe4394c7f0",
+    "cases/drillholes_outcrops_3d/drillholes.txt": "d4cb3d5a5af409c2d939c3b590d064705263f11d4566cd8d5c2d776509aa34bf",
+    "cases/drillholes_outcrops_3d/drillholes_coordinate.txt": "16b07b4b5558fc27bf97011285e31612d7f765c67f1ee39066dd040b9c3df527",
+    "cases/drillholes_outcrops_3d/ind_active.txt": "61803511ba141af1b9d84eab45d0fd31a524aed3ad842ae6104b09a3c425324f",
+    "cases/drillholes_outcrops_3d/initial_model.txt": "827aa25354b579be86f2b6d83fb506327b4538d6d0026fb94d9d496e39962072",
+    "cases/drillholes_outcrops_3d/mesh.txt": "7229253f3e6edb4da1a9af4c5df7e385a570e614d0e950aeee2e47fe4394c7f0",
+    "cases/drillholes_outcrops_3d/outcrops.txt": "1e37ac15112b327cef681d7718b37bdb5f65a3fbe2a5d10516fcc8e28ea195e7",
+    "cases/drillholes_sketch_2d/drillhole_vertical.txt": "dbc5c94613f7ec9782b4b6c3f7bf607f01b572a7f1673b6aa50bd9b6efc408b1",
+    "cases/drillholes_sketch_2d/initial_model.txt": "4e4a55c0b59e9c1d6bb42efe91a7221ca8648ffc10e2cafe2a113a6f28188079",
+    "cases/drillholes_sketch_2d/sketch.txt": "56ef53a0a8e97487fc591fc8fe719f07f518effe1d1ca73c36d44934d8c81878"
+  },
+  "license": "MIT (upstream code); supplied synthetic tutorial inputs",
+  "zip_sha256": "89ecc3024e9e2a695d99e9cf1554a6f63910254de4c2b6fd89abce30b9f13c34"
+}

@@ -1,0 +1,10 @@
+[project]
+name = "ldm-tts-copper-inversion"
+version = "0.1.0"
+description = "Agent-designed geological geometry inversion"
+requires-python = ">=3.10,<3.13"
+dependencies = ["numpy==1.26.4", "scipy==1.14.1", "scikit-fmm==2025.6.23", "discretize==0.11.3", "pyyaml==6.0.2"]
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+[tool.uv]
+package = false

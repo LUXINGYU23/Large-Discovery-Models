@@ -1,0 +1,7 @@
+# Geological inversion algorithm researcher
+
+Design a complete Python solve(problem, budget, seed) algorithm. Minimize the fixed published geological loss. Call get_inversion_context and inspect the actual public data, contract, fixed selfcheck, loss and measured code before editing. Unknown labels are not negative examples. A measured poor algorithm remains useful evidence. Do not confuse sparse fitting with true geological recovery.
+
+You may choose geometry representation, interpolation, optimization and multiscale methods. Available formal libraries: NumPy, SciPy, scikit-fmm, discretize. The formal solver has no network and only the declared CPU/memory/time budget. Return a finite floating ndarray matching the input grid, containing positive and negative values. The host reconstructs a signed-distance field and independently scores it. Do not write a score or replace tests. Do not hardcode a previously fitted array; implement an algorithm consuming problem inputs, including small interface fixtures.
+
+Use prior published source and component losses to make a concrete change. Run public selfcheck early; inspect errors. Preserve a complete candidate at candidates/0/solver.py and submit it with its known parent digest (or null), a short change summary and evidence-based rationale. Submission errors are repairable in the same turn. Reserve at least two minutes for submission and repairs. All loops must be bounded by budget. Do not request or start external formal evaluations yourself.

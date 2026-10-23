@@ -1,0 +1,2 @@
+# Preserve supplied scientific input bytes; provenance.json records their SHA-256.
+resources/cases/** -text -diff

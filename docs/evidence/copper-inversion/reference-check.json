@@ -1,0 +1,114 @@
+{
+  "reference_sha256": "395cb52e5fb62ca2bf7074256e7f73ba0b08b07d282d36078e2b092ed13beb68",
+  "cases": {
+    "drillholes_sketch_2d": {
+      "shape": [
+        70,
+        50
+      ],
+      "origin": [
+        0.0,
+        0.0
+      ],
+      "spacing": [
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "loss_drillhole": 288.24921244543003,
+        "loss_sketch": 4.970548305496495,
+        "loss_total": 293.2197607509265,
+        "research_utility": -293.2197607509265,
+        "positive_voxels": 131,
+        "label_mismatches": 17,
+        "contact_rmse": 10.13673154718478
+      },
+      "reference_comparison": [
+        {
+          "observation": "drillhole",
+          "upstream": 288.24921244543003,
+          "objective_v1": 288.24921244543003,
+          "contact_count": 2
+        },
+        {
+          "observation": "sketch",
+          "upstream": 4.970548305496495,
+          "objective_v1": 4.970548305496495
+        }
+      ]
+    },
+    "drillholes_3d": {
+      "shape": [
+        40,
+        50,
+        30
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        -25.0
+      ],
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "loss_drillhole": 514.0113798896817,
+        "loss_total": 514.0113798896817,
+        "research_utility": -514.0113798896817,
+        "positive_voxels": 1655,
+        "label_mismatches": 51,
+        "contact_rmse": 7.796582026974002
+      },
+      "reference_comparison": [
+        {
+          "observation": "drillhole",
+          "upstream": 514.0113798896816,
+          "objective_v1": 514.0113798896817,
+          "contact_count": 4
+        }
+      ]
+    },
+    "drillholes_outcrops_3d": {
+      "shape": [
+        40,
+        50,
+        30
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        -25.0
+      ],
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "loss_drillhole": 514.0113798896817,
+        "loss_outcrop": 546.76336393234,
+        "loss_total": 1060.7747438220217,
+        "research_utility": -1060.7747438220217,
+        "positive_voxels": 1655,
+        "label_mismatches": 938,
+        "contact_rmse": 6.336361692106846
+      },
+      "reference_comparison": [
+        {
+          "observation": "drillhole",
+          "upstream": 514.0113798896816,
+          "objective_v1": 514.0113798896817,
+          "contact_count": 4
+        },
+        {
+          "observation": "outcrop",
+          "upstream": 546.76336393234,
+          "objective_v1": 546.76336393234,
+          "contact_count": 26
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "task_id": "copper_inversion",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/LUXINGYU23/Large-Discovery-Models",
+    "source_commit": "37ebd33d",
+    "task_path": "tasks/copper_inversion/resources/provenance.json"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": false
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "loss_total",
+        "direction": "minimize"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "loss_total",
+        "direction": "minimize"
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "research_utility",
+        "direction": "maximize"
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "drillholes_sketch_2d",
+      "drillholes_3d",
+      "drillholes_outcrops_3d"
+    ],
+    "settings": {
+      "objective_version": "objective_v1",
+      "harness": "persistent Pi Responses; source-only candidate",
+      "mock": "deterministic protocol fake; no scientific claim",
+      "data_provenance": "resources/provenance.json",
+      "budget_kind": "task-defined engineering smoke, not official benchmark"
+    },
+    "per_candidate_limits": {
+      "cpu_count": 2,
+      "memory_mb": 4096,
+      "seconds_2d": 60,
+      "seconds_3d": 120
+    }
+  },
+  "budget": {
+    "external_evaluations": 4
+  },
+  "profiles": {
+    "harness_2d_smoke": {
+      "description": "Single researcher three-round 2D engineering run",
+      "budget": {
+        "external_evaluations": 4
+      },
+      "locked_args": {
+        "case-id": "drillholes_sketch_2d",
+        "iterations": 3,
+        "solver-seconds": 60,
+        "harness-seconds": 900
+      }
+    }
+  }
+}

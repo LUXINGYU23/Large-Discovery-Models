@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "copper_inversion",
+  "description": "Agent-designed geological body inversion algorithms with isolated scoring",
+  "dependency_checker": "tasks.copper_inversion.ldm_task.dependencies:check_dependencies"
+}

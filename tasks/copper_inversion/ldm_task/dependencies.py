@@ -1,0 +1,1 @@
+from tasks.copper_inversion.core.dependencies import check_dependencies

@@ -28,6 +28,10 @@ technical and operational contracts.
 
 ## Task Guides
 
+- [Copper inversion implementation and remote evidence](copper-inversion-implementation.md)
+- [Copper inversion implementation specification](copper-inversion-spec.md):
+  planned algorithm-discovery task, read-only admission checks, independent
+  scoring, and remote RSI qualification.
 - [nanoGPT](../tasks/nanogpt/README.md)
 - [Small molecule](../tasks/small_molecule/README.md)
 - [Antibody](../tasks/antibody/README.md)

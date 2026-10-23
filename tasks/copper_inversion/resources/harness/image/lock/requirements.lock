@@ -1,0 +1,4 @@
+numpy==1.26.4
+scipy==1.14.1
+scikit-fmm==2025.6.23
+discretize==0.11.3

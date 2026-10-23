@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-23",
+  "remote": "111.2.199.31:5320",
+  "test_result": "159 passed in 25.51s",
+  "command": "PYTHONPATH=$PWD TMPDIR=$PWD/tmp COPPER_TEST_IMAGE=ldm-copper-evaluator:20261023 tasks/copper_inversion/.venv/bin/python -m pytest tasks/copper_inversion/tests tests/test_campaign.py tests/test_ldm_engine.py tests/test_harness_client.py tests/test_harness_container.py tests/test_harness_guest_runtime.py --basetemp=$PWD/tmp/finaltests3 -q",
+  "raw_sha256": {
+    "final-tests3.log": "b7297e6e9fbd59db997869ee3a591748ccb2fc3734261d2f7d49123900839910",
+    "guest-smoke.log": "cfb95e7fb187f0843a9acbee8cb77388903e288924d6ab980802d14cc90d8204",
+    "reference-check.json": "3d09a8e3a29c509405f914e42ec0ccd05c955a1221733f78ae9bcfb816ab0a46",
+    "runs/real2d-v2/harness/preflight.json": "004395e1343b5b62b99d83cfd65901fd95ae8382893e07aab7667787c37d0fd0"
+  },
+  "preflight": {
+    "latency_seconds": 13.411925747990608,
+    "readonly_guest_probe": true,
+    "request_model": "gpt-5.6-luna",
+    "response_models": [
+      "gpt-5.6-luna"
+    ],
+    "status": "ok",
+    "usage": {
+      "artifactBytes": 111000,
+      "providerCalls": 3,
+      "toolCalls": {
+        "bash": 1,
+        "submit_readiness": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  }
+}

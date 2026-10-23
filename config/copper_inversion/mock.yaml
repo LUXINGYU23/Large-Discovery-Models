@@ -1,0 +1,8 @@
+name: copper_inversion_mock
+task: copper_inversion
+algorithm: persistent_agent_harness
+mode: mock
+args:
+  mock: true
+  iterations: 3
+  out-dir: runs/copper_mock

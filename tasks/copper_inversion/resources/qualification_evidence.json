@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "task_id": "copper_inversion",
+  "stage": "contract_verified",
+  "benchmark_commit": "37ebd33d",
+  "contract_profile": "harness_2d_smoke",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/copper_inversion/task.json",
+        "tasks/copper_inversion/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/copper_inversion/task.json",
+        "tasks/copper_inversion/experiment.json",
+        "tasks/copper_inversion/ldm_task/procedure.py"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/copper_inversion/mock.yaml",
+        "tasks/copper_inversion/tests/test_procedure.py",
+        "tasks/copper_inversion/resources/evidence/verification.json"
+      ]
+    },
+    "contract_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/copper_inversion/tests/test_submission.py",
+        "tasks/copper_inversion/tests/test_isolation.py",
+        "tasks/copper_inversion/tests/test_science.py",
+        "tasks/copper_inversion/resources/evidence/verification.json",
+        "docs/evidence/copper-inversion/reference-check.json"
+      ]
+    },
+    "seed_evaluated": {
+      "status": "pending",
+      "evidence": []
+    },
+    "tiny_campaign_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "campaign_qualified": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

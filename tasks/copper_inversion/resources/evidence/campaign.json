@@ -1,0 +1,544 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real2d-v2",
+  "framework_commit": "37ebd33d",
+  "scope": "2D single persistent researcher, baseline plus 3 algorithm rounds; engineering evidence, not official benchmark qualification",
+  "contract": {
+    "contract_profile": "harness_2d_smoke",
+    "contract_sha256": "295398a0f147d99e4945b15a515aede091fc6e5c640d49ba47efeb238c348785",
+    "created_at_unix": 1792731453.287356,
+    "run_id": "real2d-v2",
+    "schema_version": 1,
+    "task": "copper_inversion"
+  },
+  "implementation_sha256": "5a60d90d86d18caa5bb64a004f1f65b272795ca2d2b519059b88b7b59a9650dc",
+  "final_implementation_sha256": "84c9854dd7f260578e887783602deac767d1ac9c6122f7c10899e6f4dbf11a88",
+  "post_campaign_changes": [
+    "Mount only trusted core, excluding assets and task-local run directories",
+    "Pause on Docker CLI timeout/OS error",
+    "Replay durable preflight usage",
+    "Launch the resolved sidecar image digest"
+  ],
+  "model": "gpt-5.6-luna",
+  "images": {
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4"
+  },
+  "preflight": {
+    "latency_seconds": 13.411925747990608,
+    "readonly_guest_probe": true,
+    "request_model": "gpt-5.6-luna",
+    "response_models": [
+      "gpt-5.6-luna"
+    ],
+    "status": "ok",
+    "usage": {
+      "artifactBytes": 111000,
+      "providerCalls": 3,
+      "toolCalls": {
+        "bash": 1,
+        "submit_readiness": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  },
+  "observations": [
+    {
+      "round": 0,
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "source_path": "candidates/3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f/solver.py",
+      "status": "succeeded",
+      "metrics": {
+        "contact_rmse": 10.13673154718478,
+        "label_mismatches": 17.0,
+        "loss_drillhole": 288.24921244543003,
+        "loss_sketch": 4.970548305496495,
+        "loss_total": 293.2197607509265,
+        "positive_voxels": 131.0,
+        "research_utility": -293.2197607509265
+      },
+      "annotations": {}
+    },
+    {
+      "round": 1,
+      "source_sha256": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+      "source_path": "candidates/5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa/solver.py",
+      "status": "succeeded",
+      "metrics": {
+        "contact_rmse": 0.5,
+        "label_mismatches": 0.0,
+        "loss_drillhole": 3.806621245531335,
+        "loss_sketch": 0.14385750482142745,
+        "loss_total": 3.9504787503527625,
+        "positive_voxels": 482.0,
+        "research_utility": -3.9504787503527625
+      },
+      "annotations": {
+        "change_summary": "Replaced the initial-level-set passthrough with sketch translation search, exact post-reinitialization objective modeling, and bounded boundary refinement using observed labels.",
+        "parent_sha256": null,
+        "rationale": "The measured parent scored 293.22 by returning the weak initial field. The public sketch contains 485 interior cells and is translation-invariant under the published Procrustes loss, while the drillhole labels are displaced from the raw sketch. I now search feasible integer translations using skfmm distance and the published logistic/contact terms, retain several translation hypotheses because raster boundary edits are nonconvex, and perform a bounded one-cell boundary refinement near finite observations. The local objective reproduces the official Fortran-order sketch pairing and applies it after distance reinitialization. Public selfcheck passes; local official-objective score is 3.95 (loss_sketch 0.144, drillhole 3.81), versus parent 293.22."
+      }
+    },
+    {
+      "round": 2,
+      "source_sha256": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+      "source_path": "candidates/8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270/solver.py",
+      "status": "succeeded",
+      "metrics": {
+        "contact_rmse": 0.5,
+        "label_mismatches": 0.0,
+        "loss_drillhole": 3.710617574520831,
+        "loss_sketch": 0.08623906527892855,
+        "loss_total": 3.7968566397997594,
+        "positive_voxels": 484.0,
+        "research_utility": -3.7968566397997594
+      },
+      "annotations": {
+        "change_summary": "Added bounded two-pixel boundary moves after translation and one-pixel refinement to escape rasterization local minima while preserving the exact post-distance objective.",
+        "parent_sha256": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+        "rationale": "The prior measured candidate reached loss 3.9505 but its one-cell coordinate descent was locally trapped. Exhaustive local experiments on the public fixture showed improving paired boundary toggles, reaching 3.7969 after four bounded pair iterations. This change retains the prior translation and exact Fortran-order Procrustes modeling, then searches at most 130 nearby boundary cells in pairs for four iterations under the wall-time bound. The 3-D/no-sketch path remains conservative and input-driven. Public selfcheck passes; local official score is loss_drillhole 3.7106 plus loss_sketch 0.0862, total 3.7969."
+      }
+    },
+    {
+      "round": 3,
+      "source_sha256": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+      "source_path": "candidates/5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de/solver.py",
+      "status": "succeeded",
+      "metrics": {
+        "contact_rmse": 0.5,
+        "label_mismatches": 0.0,
+        "loss_drillhole": 3.6933990378850976,
+        "loss_sketch": 0.0404033078739402,
+        "loss_total": 3.7338023457590377,
+        "positive_voxels": 485.0,
+        "research_utility": -3.7338023457590377
+      },
+      "annotations": {
+        "change_summary": "Added physical-coordinate small-angle sketch rotations to the translation hypotheses and expanded bounded pair refinement, improving raster boundary alignment with measured labels.",
+        "parent_sha256": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+        "rationale": "The prior measured candidate reached 3.7969 using translation plus four pair moves. Public-data experiments showed a small rigid rotation of the sketch produced a better initial geometry because the drillhole cuts the body at a sloped raster boundary; eight pair-refinement passes then reached local loss 3.7338. The solver now searches six small physical-coordinate rotations in addition to translations, keeps the best hypotheses, and performs bounded pair moves under the time limit. It remains input-driven, preserves the conservative no-sketch/3D path, and public selfcheck passes. Local official components are drillhole 3.6934 and sketch 0.0404."
+      }
+    }
+  ],
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25349733,
+      "harness_tool_calls": 79,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 863.1457479558885,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.24950647354126,
+      "llm_requests": 66,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2175731658935547,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 71.78050518035889,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "interface_jobs": 24,
+      "outer_iterations": 4,
+      "scorer_jobs": 4,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "metadata": {
+      "cumulative_usage": {
+        "copper:job:05e129f528c0c1737eca67dad802ad5bca7d19d5fd64c767f8e58ae6586241c1": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.570976972579956
+        },
+        "copper:job:15f75481100cc4c8feb0d55f6d2fcc9f00aa016acd31fb18052cf53fb397c6fe": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.5360939502716064
+        },
+        "copper:job:24162961a69c69ea44728b17ab2fd4b5996b2cbf48b43ac68357df3d246906ae": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.5843150615692139
+        },
+        "copper:job:320bfb710f06df4f3a342de537c54d5dec4e601b76127921616c7064704a9114": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5083198547363281
+        },
+        "copper:job:5da602bab6fb954d80760137379b3d08c6083ed532b7483f783e9e8a1010c5dd": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5300414562225342
+        },
+        "copper:job:65f4d93e8486c8e15c79b1ee9554a5003898be1e438138d37df7ccd040de4711": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5347681045532227
+        },
+        "copper:job:6709fab3a5708b7957a68bc1dffb6845c1ef3419bffb38707481f3a79264f8b5": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 43.56305694580078
+        },
+        "copper:job:8491313aed679f5bcb189343375017b5a68c19ba7e0f4de47575a4f654b369be": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 0.5809566974639893
+        },
+        "copper:job:8d592854f615713d67811faa1946ade0ce3872c770e2a4fb86e7c9b4a2927abd": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 6.140029191970825
+        },
+        "copper:job:a76e87b838d5c9eaf94b5056dcc4797a706a98cf0db718eac8fdf89b9d3bc6a2": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5801558494567871
+        },
+        "copper:job:d1ba9da1cea18cef14853dfd4065e6935850dd607434b5a589b101c6df7711c9": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5217607021331787
+        },
+        "copper:job:d90f2adb0419539ca6efef3d7455d35a38e4a8c907d32fb0797d30137c3bf0f2": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5207490921020508
+        },
+        "copper:job:e4da0c8b842743476726b296acbafcb2134a129d130971925cb1051d6c806ea3": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5264120101928711
+        },
+        "copper:job:ed278f306c48d5c9a04ddac7ec53fd498496a20695fb54c32e8acc0d5bffebf9": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.5261871814727783
+        },
+        "copper:job:f3a310321645334f3c4cb801b61348cee88dca3fa01940c18d8462ad35788d88": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5272994041442871
+        },
+        "copper:job:fe1912a8e7b226e95fde29cdde203ab6980ff1e6638863c10ff7c336b5c7a9d8": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 21.49646234512329
+        },
+        "copper:preflight:usage": {
+          "harness_artifact_bytes": 111000,
+          "harness_tool_calls": 2,
+          "harness_validation_submissions": 1,
+          "llm_requests": 3
+        },
+        "copper:turn:round_1": {
+          "harness_turns": 1
+        },
+        "copper:turn:round_2": {
+          "harness_turns": 1
+        },
+        "copper:turn:round_3": {
+          "harness_turns": 1
+        },
+        "copper:usage:round_1": {
+          "harness_artifact_bytes": 11684890,
+          "harness_tool_calls": 47,
+          "harness_validation_submissions": 2,
+          "llm_requests": 38
+        },
+        "copper:usage:round_2": {
+          "harness_artifact_bytes": 6854666,
+          "harness_tool_calls": 17,
+          "harness_validation_submissions": 1,
+          "llm_requests": 14
+        },
+        "copper:usage:round_3": {
+          "harness_artifact_bytes": 6699177,
+          "harness_tool_calls": 13,
+          "harness_validation_submissions": 1,
+          "llm_requests": 11
+        },
+        "engine:evaluation_attempt:03b766be66c1f1c080f67c9229ce674a79de1519ed0f95a30697d56dc4b15651": {
+          "expensive_evaluation_attempts": 1,
+          "external_evaluations": 1,
+          "selected_candidates": 1
+        },
+        "engine:evaluation_attempt:29301ab5cae682e8c4fa96f74f0cc350d956ad859bb0ddf0b67ff0b82662399b": {
+          "expensive_evaluation_attempts": 1,
+          "external_evaluations": 1,
+          "selected_candidates": 1
+        },
+        "engine:evaluation_attempt:c989ec50c893c0531914bd006ccedcc043d4c42daae4457cd35419d51b482216": {
+          "expensive_evaluation_attempts": 1,
+          "external_evaluations": 1,
+          "selected_candidates": 1
+        },
+        "engine:evaluation_attempt:e9059394fe2c84e3666d66de75bc6cea4107726a9ac455e44a5fd6821a8f9e54": {
+          "expensive_evaluation_attempts": 1,
+          "external_evaluations": 1,
+          "selected_candidates": 1
+        },
+        "engine:evaluation_result:03b766be66c1f1c080f67c9229ce674a79de1519ed0f95a30697d56dc4b15651": {
+          "benchmark_jobs": 2.0,
+          "successful_evaluations": 1
+        },
+        "engine:evaluation_result:29301ab5cae682e8c4fa96f74f0cc350d956ad859bb0ddf0b67ff0b82662399b": {
+          "benchmark_jobs": 2.0,
+          "successful_evaluations": 1
+        },
+        "engine:evaluation_result:c989ec50c893c0531914bd006ccedcc043d4c42daae4457cd35419d51b482216": {
+          "benchmark_jobs": 2.0,
+          "successful_evaluations": 1
+        },
+        "engine:evaluation_result:e9059394fe2c84e3666d66de75bc6cea4107726a9ac455e44a5fd6821a8f9e54": {
+          "benchmark_jobs": 2.0,
+          "successful_evaluations": 1
+        },
+        "engine:proposal_attempt:round_1-submission-2": {
+          "proposal_attempts": 1
+        },
+        "engine:proposal_attempt:round_2-submission-1": {
+          "proposal_attempts": 1
+        },
+        "engine:proposal_attempt:round_3-submission-1": {
+          "proposal_attempts": 1
+        },
+        "engine:reservoir:0": {
+          "valid_search_candidates": 1
+        },
+        "engine:reservoir:1": {
+          "valid_search_candidates": 1
+        },
+        "engine:reservoir:2": {
+          "valid_search_candidates": 1
+        },
+        "engine:reservoir:3": {
+          "valid_search_candidates": 1
+        },
+        "engine:round:0": {
+          "outer_iterations": 1
+        },
+        "engine:round:1": {
+          "outer_iterations": 1
+        },
+        "engine:round:2": {
+          "outer_iterations": 1
+        },
+        "engine:round:3": {
+          "outer_iterations": 1
+        }
+      },
+      "run_id": "real2d-v2",
+      "task": "copper_inversion"
+    },
+    "remaining": {
+      "benchmark_jobs": 0,
+      "expensive_evaluation_attempts": 0,
+      "external_evaluations": 0,
+      "harness_artifact_bytes": null,
+      "harness_tool_calls": null,
+      "harness_turns": 0,
+      "harness_validation_submissions": null,
+      "harness_wall_time_seconds": null,
+      "interface_jobs": 16,
+      "interface_wall_seconds": null,
+      "llm_requests": null,
+      "outer_iterations": 0,
+      "proposal_attempts": null,
+      "scorer_jobs": 0,
+      "scorer_wall_seconds": null,
+      "selected_candidates": 0,
+      "solver_jobs": 0,
+      "solver_wall_seconds": null,
+      "successful_evaluations": 0,
+      "valid_search_candidates": 0
+    }
+  },
+  "resume": {
+    "counters_unchanged": true,
+    "before": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25349733,
+      "harness_tool_calls": 79,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 863.1457479558885,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.24950647354126,
+      "llm_requests": 66,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2175731658935547,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 71.78050518035889,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "after": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25349733,
+      "harness_tool_calls": 79,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 863.1457479558885,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.24950647354126,
+      "llm_requests": 66,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2175731658935547,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 71.78050518035889,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "final_executor_recheck_exact_match": true,
+  "raw_sha256": {
+    "runs/real2d-v2/config.json": "2fa44e1c51f541024f89683fecff47768d8b09547de536aa17b385de3dab2abc",
+    "runs/real2d-v2/experiment_contract.json": "457bb4cceadbfda1b9754d278506fdf173d96cf9dd657eff4e4aacefa5acc351",
+    "runs/real2d-v2/budget.json": "a292b9024fdcb5de846a44c0e2ed8f4dd2cc4ef51bb805fc108c1987fbe0f1b5",
+    "runs/real2d-v2/status.json": "e7e7dc69a186a3cdf0fc5296aef176ea4b86bdfa53d4ec1439ab09718885f545",
+    "runs/real2d-v2/checkpoint.json": "3600c211f2bb21b0801d41a413c5a7d324f060c8f6d1af088fedd96d7ea6332f",
+    "runs/real2d-v2/summary.json": "593dd6d3136dfe6bd5859a5cf765e46b2d83d992ad91918fdfaa336b0d0d92d8",
+    "runs/real2d-v2/events.jsonl": "e2422141d170c2da5bc8870dd3b3a68bbd40ae90d33cad1d942ee600b0e80644",
+    "runs/real2d-v2/trajectory.csv": "0aeb163fc28bf0a5e442b9ccc66e6fb3711703e49ce978da78e450811dc52cb3",
+    "runs/real2d-v2/best_solver.py": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+    "runs/real2d-v2/source-snapshot.tar.gz": "e21d5873fa41042adf6151a51cdbca02bf969ef7f53c4194d7544ca682b7f0fe",
+    "runs/real2d-v2/resume-check.json": "430290db025bf257947cd0d016415a06b6e02597c002407c14c1662787abade4",
+    "runs/real2d-v2/harness/preflight.json": "004395e1343b5b62b99d83cfd65901fd95ae8382893e07aab7667787c37d0fd0",
+    "runs/real2d-v2/harness/sessions/researcher/turns/round_1/input.json": "86d15811f8c39ee05372714c0b458713a1e41ff1bc0a11bf47745c4e79878720",
+    "runs/real2d-v2/harness/sessions/researcher/turns/round_2/input.json": "fd321087b30f91f583d9f5104adde919685713139b631cac45922a66c7c9d2df",
+    "runs/real2d-v2/harness/sessions/researcher/turns/round_3/input.json": "f54883e44f506e0227e3371f45197be474a14a89426e2589feb531e72e822089"
+  },
+  "final_recheck": {
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "implementation_sha256": "84c9854dd7f260578e887783602deac767d1ac9c6122f7c10899e6f4dbf11a88",
+    "results": [
+      {
+        "evaluation": {
+          "artifacts": {
+            "model": "evaluations/f5783ba54bd4d43f5b55877ca53f2aeff116f51fdb94cbeb130c1b7551855919/model/model.npy",
+            "score": "jobs/d7e1ba48d35998196bceb4ec55fb2cc1a468f00950ea9cbc16c777ffaa38ca7e/output/result.json"
+          },
+          "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "error": "",
+          "metadata": {
+            "ldm_evaluation_attempt_receipt": "f5783ba54bd4d43f5b55877ca53f2aeff116f51fdb94cbeb130c1b7551855919",
+            "seed": 47
+          },
+          "metrics": {
+            "contact_rmse": 10.13673154718478,
+            "label_mismatches": 17.0,
+            "loss_drillhole": 288.24921244543003,
+            "loss_sketch": 4.970548305496495,
+            "loss_total": 293.2197607509265,
+            "positive_voxels": 131.0,
+            "research_utility": -293.2197607509265
+          },
+          "resource_usage": {
+            "benchmark_jobs": 2.0
+          },
+          "status": "succeeded"
+        },
+        "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f"
+      },
+      {
+        "evaluation": {
+          "artifacts": {
+            "model": "evaluations/e986c0fcb3654c84fdcd370256311476d6465de36d0f63dbeb327923ff85368c/model/model.npy",
+            "score": "jobs/34fbaa5efb0da2872659ff7fe99f5c865683a8a323c4634e093b14aa8d327f12/output/result.json"
+          },
+          "candidate_id": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+          "error": "",
+          "metadata": {
+            "ldm_evaluation_attempt_receipt": "e986c0fcb3654c84fdcd370256311476d6465de36d0f63dbeb327923ff85368c",
+            "seed": 47
+          },
+          "metrics": {
+            "contact_rmse": 0.5,
+            "label_mismatches": 0.0,
+            "loss_drillhole": 3.6933990378850976,
+            "loss_sketch": 0.0404033078739402,
+            "loss_total": 3.7338023457590377,
+            "positive_voxels": 485.0,
+            "research_utility": -3.7338023457590377
+          },
+          "resource_usage": {
+            "benchmark_jobs": 2.0
+          },
+          "status": "succeeded"
+        },
+        "source_sha256": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de"
+      },
+      {
+        "evaluation": {
+          "artifacts": {
+            "model": "evaluations/fbfaa57c03315d640ee27ef37835ae06c08f84930a1cd8d73c74cae1bb0dbc87/model/model.npy",
+            "score": "jobs/223ac61f42b24cef5a11cf83ae044b3b7153657e09c1c9365e41e28c4c0f7bcc/output/result.json"
+          },
+          "candidate_id": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+          "error": "",
+          "metadata": {
+            "ldm_evaluation_attempt_receipt": "fbfaa57c03315d640ee27ef37835ae06c08f84930a1cd8d73c74cae1bb0dbc87",
+            "seed": 47
+          },
+          "metrics": {
+            "contact_rmse": 0.5,
+            "label_mismatches": 0.0,
+            "loss_drillhole": 3.806621245531335,
+            "loss_sketch": 0.14385750482142745,
+            "loss_total": 3.9504787503527625,
+            "positive_voxels": 482.0,
+            "research_utility": -3.9504787503527625
+          },
+          "resource_usage": {
+            "benchmark_jobs": 2.0
+          },
+          "status": "succeeded"
+        },
+        "source_sha256": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa"
+      },
+      {
+        "evaluation": {
+          "artifacts": {
+            "model": "evaluations/227480b9330eb0a7385d7cd9fa433dd0629d626e26a0a492b51573605a611bfb/model/model.npy",
+            "score": "jobs/ef2ef73a162a0908c124734daab92b206f4607b44fb2dd59f9921980ee7be903/output/result.json"
+          },
+          "candidate_id": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+          "error": "",
+          "metadata": {
+            "ldm_evaluation_attempt_receipt": "227480b9330eb0a7385d7cd9fa433dd0629d626e26a0a492b51573605a611bfb",
+            "seed": 47
+          },
+          "metrics": {
+            "contact_rmse": 0.5,
+            "label_mismatches": 0.0,
+            "loss_drillhole": 3.710617574520831,
+            "loss_sketch": 0.08623906527892855,
+            "loss_total": 3.7968566397997594,
+            "positive_voxels": 484.0,
+            "research_utility": -3.7968566397997594
+          },
+          "resource_usage": {
+            "benchmark_jobs": 2.0
+          },
+          "status": "succeeded"
+        },
+        "source_sha256": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270"
+      }
+    ]
+  },
+  "tests": {
+    "result": "162 passed in 27.79s",
+    "log": "hardening/final-regression2.log",
+    "sha256": "461823014e8d526f971443efd9352caf5d81b932debf384505289e0bec0a1775"
+  }
+}
