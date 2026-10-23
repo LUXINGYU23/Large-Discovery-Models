@@ -1,0 +1,444 @@
+{
+  "case": "drillholes_3d",
+  "method": "paper_mcmc",
+  "metrics": {
+    "air_fraction_of_positive": 0.0,
+    "air_positive_volume": 0.0,
+    "air_positive_voxels": 0,
+    "contact_rmse": 3.6949904285891932,
+    "label_mismatches": 47,
+    "loss_drillhole": 220.3399448391901,
+    "loss_total": 220.3399448391901,
+    "positive_volume": 3038.0,
+    "positive_voxels": 3038,
+    "research_utility": -220.3399448391901
+  },
+  "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2/drillholes_3d/paper_mcmc/model-47/model.npy",
+  "scorer_receipt": {
+    "container": "ldm-copper-00328b4f83-240295da9275fa30f033",
+    "container_id": "afb35ab012c3ca90663929f4840ed4f1efb3026de69e3c0093a24b723d626451",
+    "cpus": 1,
+    "exit_code": 0,
+    "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "key": "240295da9275fa30f033d58b08f8bfc5c27dd0a3676ade95a8e70598ea18505a",
+    "oom": false,
+    "reason": null,
+    "resource_sampling": {
+      "complete_lifetime_measurement": false,
+      "cpu_seconds_observed": 0.06884,
+      "last_sample_unix": 1792775874.111504,
+      "method": "host_cgroup_v2_polling",
+      "sampled_peak_memory_bytes": 7286784,
+      "samples": 1,
+      "target_interval_seconds": 0.2
+    },
+    "wall_seconds": 0.7845368385314941,
+    "workload_resources": {
+      "cpu_seconds_through_reap": 0.213127,
+      "exit_code": 0,
+      "oom_kill_count": 0,
+      "peak_memory_bytes": 30871552,
+      "schema_version": 1,
+      "scope": "container workload and supervisor through final descendant reap",
+      "workload_complete": true
+    }
+  },
+  "search": {
+    "best_raw_loss": 220.3399448391901,
+    "calls": 59,
+    "curve": [
+      {
+        "best_loss": 405.0795810830953,
+        "call": 1,
+        "elapsed_seconds": 0.029782261233776808,
+        "loss": 405.0795810830953
+      },
+      {
+        "best_loss": 405.0795810830953,
+        "call": 2,
+        "elapsed_seconds": 0.08425414795055985,
+        "loss": 412.5907040621351
+      },
+      {
+        "best_loss": 405.0795810830953,
+        "call": 3,
+        "elapsed_seconds": 1.9850424178875983,
+        "loss": 415.63383141582403
+      },
+      {
+        "best_loss": 364.23431614517165,
+        "call": 4,
+        "elapsed_seconds": 3.8826514901593328,
+        "loss": 364.23431614517165
+      },
+      {
+        "best_loss": 360.86871335842113,
+        "call": 5,
+        "elapsed_seconds": 5.874080373905599,
+        "loss": 360.86871335842113
+      },
+      {
+        "best_loss": 360.6804327071764,
+        "call": 6,
+        "elapsed_seconds": 7.853109110146761,
+        "loss": 360.6804327071764
+      },
+      {
+        "best_loss": 360.6804327071764,
+        "call": 7,
+        "elapsed_seconds": 9.834867141209543,
+        "loss": 360.8486726909324
+      },
+      {
+        "best_loss": 357.45286462593725,
+        "call": 8,
+        "elapsed_seconds": 11.680883490014821,
+        "loss": 357.45286462593725
+      },
+      {
+        "best_loss": 357.45286462593725,
+        "call": 9,
+        "elapsed_seconds": 13.642353958915919,
+        "loss": 359.73462973589267
+      },
+      {
+        "best_loss": 345.480755806507,
+        "call": 10,
+        "elapsed_seconds": 15.639922226313502,
+        "loss": 345.480755806507
+      },
+      {
+        "best_loss": 345.480755806507,
+        "call": 11,
+        "elapsed_seconds": 17.48255952214822,
+        "loss": 367.3712887543154
+      },
+      {
+        "best_loss": 338.74750632229967,
+        "call": 12,
+        "elapsed_seconds": 19.451442749239504,
+        "loss": 338.74750632229967
+      },
+      {
+        "best_loss": 338.74750632229967,
+        "call": 13,
+        "elapsed_seconds": 21.361166295129806,
+        "loss": 357.73386712088774
+      },
+      {
+        "best_loss": 338.74750632229967,
+        "call": 14,
+        "elapsed_seconds": 23.270248203072697,
+        "loss": 340.0607994560794
+      },
+      {
+        "best_loss": 338.74750632229967,
+        "call": 15,
+        "elapsed_seconds": 25.220826718956232,
+        "loss": 339.8419640227957
+      },
+      {
+        "best_loss": 322.1005051847829,
+        "call": 16,
+        "elapsed_seconds": 27.194811569992453,
+        "loss": 322.1005051847829
+      },
+      {
+        "best_loss": 322.1005051847829,
+        "call": 17,
+        "elapsed_seconds": 29.09962301608175,
+        "loss": 339.60093354753246
+      },
+      {
+        "best_loss": 322.1005051847829,
+        "call": 18,
+        "elapsed_seconds": 30.90242388797924,
+        "loss": 326.6844828241557
+      },
+      {
+        "best_loss": 315.7051306163429,
+        "call": 19,
+        "elapsed_seconds": 32.83764371694997,
+        "loss": 315.7051306163429
+      },
+      {
+        "best_loss": 286.2582837530318,
+        "call": 20,
+        "elapsed_seconds": 34.75536826113239,
+        "loss": 286.2582837530318
+      },
+      {
+        "best_loss": 286.2582837530318,
+        "call": 21,
+        "elapsed_seconds": 36.61467883596197,
+        "loss": 293.19958369934034
+      },
+      {
+        "best_loss": 281.0998072244598,
+        "call": 22,
+        "elapsed_seconds": 38.51086508017033,
+        "loss": 281.0998072244598
+      },
+      {
+        "best_loss": 281.0998072244598,
+        "call": 23,
+        "elapsed_seconds": 40.491164836101234,
+        "loss": 283.6774368888122
+      },
+      {
+        "best_loss": 281.0998072244598,
+        "call": 24,
+        "elapsed_seconds": 42.34847252909094,
+        "loss": 282.45512268923113
+      },
+      {
+        "best_loss": 275.34911322418924,
+        "call": 25,
+        "elapsed_seconds": 44.216493603307754,
+        "loss": 275.34911322418924
+      },
+      {
+        "best_loss": 275.34911322418924,
+        "call": 26,
+        "elapsed_seconds": 46.17028847197071,
+        "loss": 280.6497167670068
+      },
+      {
+        "best_loss": 265.55081825827915,
+        "call": 27,
+        "elapsed_seconds": 48.084368960000575,
+        "loss": 265.55081825827915
+      },
+      {
+        "best_loss": 265.55081825827915,
+        "call": 28,
+        "elapsed_seconds": 50.03879657294601,
+        "loss": 265.74521344612316
+      },
+      {
+        "best_loss": 265.55081825827915,
+        "call": 29,
+        "elapsed_seconds": 52.01107555720955,
+        "loss": 273.68701457148154
+      },
+      {
+        "best_loss": 257.38495751307505,
+        "call": 30,
+        "elapsed_seconds": 53.94822326814756,
+        "loss": 257.38495751307505
+      },
+      {
+        "best_loss": 257.38495751307505,
+        "call": 31,
+        "elapsed_seconds": 55.67386502912268,
+        "loss": 259.4257636998722
+      },
+      {
+        "best_loss": 250.57734155953295,
+        "call": 32,
+        "elapsed_seconds": 57.494924610015005,
+        "loss": 250.57734155953295
+      },
+      {
+        "best_loss": 250.57734155953295,
+        "call": 33,
+        "elapsed_seconds": 59.447978323325515,
+        "loss": 256.2447872053887
+      },
+      {
+        "best_loss": 250.183522873652,
+        "call": 34,
+        "elapsed_seconds": 61.412280777003616,
+        "loss": 250.183522873652
+      },
+      {
+        "best_loss": 250.183522873652,
+        "call": 35,
+        "elapsed_seconds": 63.29669864429161,
+        "loss": 251.88014257263436
+      },
+      {
+        "best_loss": 249.88418663346062,
+        "call": 36,
+        "elapsed_seconds": 65.25783874234185,
+        "loss": 249.88418663346062
+      },
+      {
+        "best_loss": 249.88418663346062,
+        "call": 37,
+        "elapsed_seconds": 67.13094576634467,
+        "loss": 257.62602354856006
+      },
+      {
+        "best_loss": 249.88418663346062,
+        "call": 38,
+        "elapsed_seconds": 68.95323972217739,
+        "loss": 250.7702326883205
+      },
+      {
+        "best_loss": 249.88418663346062,
+        "call": 39,
+        "elapsed_seconds": 70.92784557491541,
+        "loss": 259.03334047255106
+      },
+      {
+        "best_loss": 249.88418663346062,
+        "call": 40,
+        "elapsed_seconds": 72.8773136693053,
+        "loss": 252.60399434178834
+      },
+      {
+        "best_loss": 247.509975287948,
+        "call": 41,
+        "elapsed_seconds": 74.8342418433167,
+        "loss": 247.509975287948
+      },
+      {
+        "best_loss": 247.509975287948,
+        "call": 42,
+        "elapsed_seconds": 76.79443208221346,
+        "loss": 250.87254817205263
+      },
+      {
+        "best_loss": 247.509975287948,
+        "call": 43,
+        "elapsed_seconds": 78.652474260889,
+        "loss": 264.82922520834774
+      },
+      {
+        "best_loss": 245.69290713594842,
+        "call": 44,
+        "elapsed_seconds": 80.56605089595541,
+        "loss": 245.69290713594842
+      },
+      {
+        "best_loss": 245.69290713594842,
+        "call": 45,
+        "elapsed_seconds": 82.45149193610996,
+        "loss": 266.1631223451787
+      },
+      {
+        "best_loss": 245.69290713594842,
+        "call": 46,
+        "elapsed_seconds": 84.22769236331806,
+        "loss": 258.1728624324971
+      },
+      {
+        "best_loss": 245.69290713594842,
+        "call": 47,
+        "elapsed_seconds": 86.0248840181157,
+        "loss": 246.17289402297362
+      },
+      {
+        "best_loss": 240.34427529970839,
+        "call": 48,
+        "elapsed_seconds": 87.90059422515333,
+        "loss": 240.34427529970839
+      },
+      {
+        "best_loss": 240.34427529970839,
+        "call": 49,
+        "elapsed_seconds": 89.86322245933115,
+        "loss": 241.60334043746988
+      },
+      {
+        "best_loss": 240.34427529970839,
+        "call": 50,
+        "elapsed_seconds": 91.84377800114453,
+        "loss": 241.236019092908
+      },
+      {
+        "best_loss": 240.26171860221206,
+        "call": 51,
+        "elapsed_seconds": 93.78211480891332,
+        "loss": 240.26171860221206
+      },
+      {
+        "best_loss": 238.30165779864618,
+        "call": 52,
+        "elapsed_seconds": 95.8143777931109,
+        "loss": 238.30165779864618
+      },
+      {
+        "best_loss": 238.30165779864618,
+        "call": 53,
+        "elapsed_seconds": 97.80553995911032,
+        "loss": 239.70211802891896
+      },
+      {
+        "best_loss": 237.5785364080021,
+        "call": 54,
+        "elapsed_seconds": 99.75185803603381,
+        "loss": 237.5785364080021
+      },
+      {
+        "best_loss": 237.5785364080021,
+        "call": 55,
+        "elapsed_seconds": 101.72503800317645,
+        "loss": 238.42278426135843
+      },
+      {
+        "best_loss": 231.83794851622096,
+        "call": 56,
+        "elapsed_seconds": 103.69898909097537,
+        "loss": 231.83794851622096
+      },
+      {
+        "best_loss": 225.1904093117323,
+        "call": 57,
+        "elapsed_seconds": 105.58661337988451,
+        "loss": 225.1904093117323
+      },
+      {
+        "best_loss": 220.3399448391901,
+        "call": 58,
+        "elapsed_seconds": 107.57711126608774,
+        "loss": 220.3399448391901
+      },
+      {
+        "best_loss": 220.3399448391901,
+        "call": 59,
+        "elapsed_seconds": 109.50557959033176,
+        "loss": 227.5288540471062
+      }
+    ],
+    "elapsed_seconds": 111.45521414326504,
+    "invalid_proposals": 0,
+    "max_calls": 1000,
+    "method": "paper_mcmc",
+    "objective": "aligned",
+    "seed": 47,
+    "stop": "time_budget"
+  },
+  "seed": 47,
+  "solver_receipt": {
+    "container": "ldm-copper-07cc883908-3ba62df1b673d98b746d",
+    "container_id": "a46e84076c26d62de85478eebb7c1bd97931adfa03e2a30f413896b91e95f87a",
+    "cpus": 2,
+    "exit_code": 0,
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "key": "3ba62df1b673d98b746dec354f42de69cfdd44f54dcce5e380785e10f21321ff",
+    "oom": false,
+    "reason": null,
+    "resource_sampling": {
+      "complete_lifetime_measurement": false,
+      "cpu_seconds_observed": 112.473261,
+      "last_sample_unix": 1792775873.0609164,
+      "method": "host_cgroup_v2_polling",
+      "sampled_peak_memory_bytes": 131964928,
+      "samples": 508,
+      "target_interval_seconds": 0.2
+    },
+    "wall_seconds": 112.978196144104,
+    "workload_resources": {
+      "cpu_seconds_through_reap": 112.535267,
+      "exit_code": 0,
+      "oom_kill_count": 0,
+      "peak_memory_bytes": 131964928,
+      "schema_version": 1,
+      "scope": "container workload and supervisor through final descendant reap",
+      "workload_complete": true
+    }
+  },
+  "status": "succeeded"
+}

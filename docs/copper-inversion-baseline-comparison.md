@@ -83,3 +83,7 @@ H20 根目录：`/Aidata/shared/ldm/copper-baselines-20261024/`。
 后台 `watch.py`（初始 PID 3753195）会将已完成结果持续汇总到各轨道 `comparison.json`，将完成数/失败数写入根目录 `benchmark-status.json`；不触发模型调用或追加优化预算。
 
 基线源码归档：`/mnt/cephfs/xingyu/ldm/archive/copper-inversion/baseline-sources-20261024.tar.gz`，SHA256 `767bcc61b00c9b43f4a4399d45569bed2397b70c868ba4dc05c9da1172274217`。
+
+## 首批正式结果（未完成全矩阵）
+
+同资源轨道钻孔 seed47：原生 MCMC 与 package MCMC 均得到独立损失 **220.3399448391901**，各实际使用 **59 次目标调用**；墙钟分别 **112.98 / 113.16 秒**。两者采用同一随机流且早期接受决策一致，结果一致不是独立数据集证据。ACQ、露头 case、其余 seeds 及冻结 LDM 同环境复验还未出齐。可与历史 LDM 约 6.515 的损失作进展参考，**不得将该不完整矩阵宣称为最终公平比较或端到端胜出**。
