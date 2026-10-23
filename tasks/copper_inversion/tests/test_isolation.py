@@ -52,7 +52,16 @@ def test_real_seed_isolation_and_replay(tmp_path, case):
     "body",
     [
         'return np.full(problem["shape"],np.nan)',
+        'return np.full(problem["shape"],np.inf)',
         'return np.ones(problem["shape"])',
+        'return -np.ones(problem["shape"])',
+        'return np.zeros((2,3))',
+        'return problem["initial_level_set"].astype(complex)',
+        'return problem["initial_level_set"].tolist()',
+        'problem["initial_level_set"].setflags(write=True); problem["initial_level_set"][0,0] += 1; return problem["initial_level_set"].copy()',
+        'problem["observations"][0]["weight"] = 99; return problem["initial_level_set"].copy()',
+        'problem["observations"][0]["mask"].setflags(write=True); return problem["initial_level_set"].copy()',
+        'return np.ma.array(problem["initial_level_set"], mask=False)',
         "import os; os._exit(0)",
         'open("/input/problem.json","w").write("forged"); return problem["initial_level_set"]',
         'import os; os.symlink("/input/problem.npz","/output/model.npy"); os._exit(0)',
@@ -66,6 +75,13 @@ def test_rejects_bad_solver(tmp_path, body):
     payload = seal(tmp_path, source)
     with pytest.raises((ValueError, OSError)):
         InterfaceChecks(tmp_path, e, "drillholes_sketch_2d")(payload)
+
+
+def test_import_exit_cannot_pass_interface(tmp_path):
+    execution = Execution(tmp_path / "jobs", os.environ["COPPER_TEST_IMAGE"])
+    payload = seal(tmp_path, b"import os\nos._exit(0)\ndef solve(problem,budget,seed): pass\n")
+    with pytest.raises((ValueError, OSError)):
+        InterfaceChecks(tmp_path, execution, "drillholes_3d")(payload)
 
 
 def test_timeout_and_forged_score(tmp_path):

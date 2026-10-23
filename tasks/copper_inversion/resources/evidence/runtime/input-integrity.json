@@ -1,0 +1,13 @@
+{
+  "scope": "Final input-integrity and explicit malformed-output checks; entire task suite, real Docker enabled, require kernel peak",
+  "host": "120.133.37.228:10522",
+  "root": "/Aidata/shared/ldm/copper-final-audit-20261023",
+  "result": "93 passed in 95.53s (0:01:35)",
+  "implementation_sha256": "a71e2cb9f34bb1ce2561d29e23cc3e387a994f3891cfcac047c3957d4cd9ce5d",
+  "log_sha256": "75a2b073ff938e0370f9cd5f795f296c71e7dc53925c64ea7632a46f49fccf30",
+  "source_sha256": {
+    "tasks/copper_inversion/core/runner.py": "cc95df0e0cd213dd608e80233eabde0f14d2813612070daa124d9708dd7af35f",
+    "tasks/copper_inversion/tests/test_isolation.py": "ce1fd11852d262b881c963aa2cc24d023afe526be078b461f309f4e549b25396"
+  },
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062"
+}
