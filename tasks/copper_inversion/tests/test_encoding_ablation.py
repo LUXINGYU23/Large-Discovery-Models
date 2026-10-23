@@ -86,3 +86,41 @@ def test_public_instructions_use_turn_candidate_count():
         assert 'candidates_required' in text
         assert 'Submit exactly one candidate' not in text
         assert 'Submit exactly one entry' not in text
+
+
+def test_submission_repair_budget_scales_with_candidate_count():
+    from tasks.copper_inversion.core.harness import submission_contract
+    assert submission_contract(1).max_validation_attempts == 3
+    assert submission_contract(4).max_validation_attempts == 12
+
+
+def test_snapshot_error_identifies_actual_candidate(tmp_path):
+    import hashlib
+    from types import SimpleNamespace
+    from tasks.copper_inversion.core.harness import parse_snapshot, SolverSubmissionError, submission_error
+    rows, artifacts = [], []
+    for i in range(4):
+        body = f'def solve(p,b,s): return {i}\n'.encode()
+        (tmp_path/f'{i}.py').write_bytes(body)
+        rows.append(dict(artifact_path=f'candidates/{i}/solver.py', parent_sha256=None,
+                         change_summary='test', rationale='test'))
+        artifacts.append(SimpleNamespace(snapshot_path=f'{i}.py', relative_path=rows[-1]['artifact_path'],
+            path_pointer=f'/candidates/{i}/artifact_path', sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body)))
+    with pytest.raises(SolverSubmissionError) as caught:
+        parse_snapshot({'candidates':rows}, artifacts, tmp_path, {artifacts[2].sha256}, 4)
+    assert submission_error(caught.value).path == '/candidates/2/artifact_path'
+    assert 'already evaluated' in str(caught.value)
+
+
+def test_interface_error_reports_native_failure_without_supervisor_envelope(tmp_path):
+    from types import SimpleNamespace
+    from tasks.copper_inversion.core.interface_checks import InterfaceChecks
+    job = tmp_path/'job'
+    job.mkdir()
+    (job/'log.txt').write_text('COPPER_RESOURCE_V1 private-envelope\nstd::system_error: Resource temporarily unavailable\n')
+    execution = SimpleNamespace(run=lambda *a, **k: (job, dict(exit_code=134, oom=False, reason=None)))
+    with pytest.raises(ValueError) as caught:
+        InterfaceChecks(tmp_path, execution, 'drillholes_3d')({'sha256':'a'*64, 'source_path':'candidate/solver.py'})
+    assert 'Resource temporarily unavailable' in str(caught.value)
+    assert 'contacts=False' in str(caught.value)
+    assert 'private-envelope' not in str(caught.value)

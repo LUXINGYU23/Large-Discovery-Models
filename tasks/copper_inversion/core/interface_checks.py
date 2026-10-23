@@ -47,8 +47,12 @@ class InterfaceChecks:
                 source=(self.root / payload["source_path"]).parent,
             )
             if r["exit_code"] or r["oom"] or r["reason"]:
+                log = root / "log.txt"
+                diagnostic = "\n".join(line for line in log.read_text(errors="replace").splitlines()
+                    if not line.startswith("COPPER_RESOURCE_V1 "))[-1200:] if log.exists() else ""
                 raise ValueError(
-                    "interface execution failed: " + str(r["reason"] or r["exit_code"])
+                    f"interface fixture contacts={contacts} failed: {r['reason'] or r['exit_code']}. "
+                    f"Untrusted candidate output: {diagnostic}"
                 )
             field = read_model(root / "output/model.npy", p["shape"])
             signed_distance(field, p["shape"], p["spacing"])

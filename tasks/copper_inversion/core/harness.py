@@ -41,8 +41,18 @@ def submission_contract(count=1):
             "additionalProperties": False,
         },
         tuple(HarnessArtifactRule(f"/candidates/{i}/artifact_path", (".py",), MAX_SOURCE_BYTES) for i in range(count)),
-        max_validation_attempts=3,
+        max_validation_attempts=3 * count,
     )
+
+
+class SolverSubmissionError(ValueError):
+    def __init__(self, index, message):
+        self.path = f"/candidates/{index}/artifact_path"
+        super().__init__(f"candidate {index}: {message}")
+
+
+def submission_error(exc):
+    return HarnessSubmissionError(getattr(exc, "path", "/candidates"), "invalid_solver", str(exc))
 
 
 def parse_snapshot(submission, artifacts, artifact_root, known, count=1):
@@ -57,39 +67,42 @@ def parse_snapshot(submission, artifacts, artifact_root, known, count=1):
     root = Path(artifact_root).resolve()
     sources, seen = [], set()
     for i, row in enumerate(rows):
-        if not isinstance(row, dict) or set(row) != {
-            "artifact_path", "parent_sha256", "change_summary", "rationale",
-        }:
-            raise ValueError("invalid submission fields")
-        for name, maximum in (("change_summary", 1000), ("rationale", 2000)):
-            if not isinstance(row[name], str) or not 1 <= len(row[name]) <= maximum:
-                raise ValueError("invalid " + name)
-        pointer = f"/candidates/{i}/artifact_path"
-        if row["artifact_path"] != f"candidates/{i}/solver.py" or pointer not in by_pointer:
-            raise ValueError("snapshot path mismatch")
-        a = by_pointer[pointer]
-        relative = Path(a.snapshot_path)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise ValueError("snapshot path mismatch")
-        if any(root.joinpath(*relative.parts[:j]).is_symlink() for j in range(1, len(relative.parts) + 1)):
-            raise ValueError("snapshot symlink forbidden")
-        path = (root / relative).resolve()
-        if not path.is_relative_to(root) or a.relative_path != row["artifact_path"]:
-            raise ValueError("snapshot path mismatch")
-        source = path.read_bytes()
-        if len(source) != a.size_bytes or hashlib.sha256(source).hexdigest() != a.sha256:
-            raise ValueError("snapshot digest mismatch")
-        sha = validate_source(source)
-        if sha in known:
-            raise ValueError("source already evaluated; submit a changed algorithm")
-        if sha in seen:
-            raise ValueError("source duplicates another candidate in this submission")
-        if row["parent_sha256"] is not None and (
-            not isinstance(row["parent_sha256"], str) or row["parent_sha256"] not in known
-        ):
-            raise ValueError("unknown parent digest")
-        seen.add(sha)
-        sources.append(source)
+        try:
+            if not isinstance(row, dict) or set(row) != {
+                "artifact_path", "parent_sha256", "change_summary", "rationale",
+            }:
+                raise ValueError("invalid submission fields")
+            for name, maximum in (("change_summary", 1000), ("rationale", 2000)):
+                if not isinstance(row[name], str) or not 1 <= len(row[name]) <= maximum:
+                    raise ValueError("invalid " + name)
+            pointer = f"/candidates/{i}/artifact_path"
+            if row["artifact_path"] != f"candidates/{i}/solver.py" or pointer not in by_pointer:
+                raise ValueError("snapshot path mismatch")
+            a = by_pointer[pointer]
+            relative = Path(a.snapshot_path)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("snapshot path mismatch")
+            if any(root.joinpath(*relative.parts[:j]).is_symlink() for j in range(1, len(relative.parts) + 1)):
+                raise ValueError("snapshot symlink forbidden")
+            path = (root / relative).resolve()
+            if not path.is_relative_to(root) or a.relative_path != row["artifact_path"]:
+                raise ValueError("snapshot path mismatch")
+            source = path.read_bytes()
+            if len(source) != a.size_bytes or hashlib.sha256(source).hexdigest() != a.sha256:
+                raise ValueError("snapshot digest mismatch")
+            sha = validate_source(source)
+            if sha in known:
+                raise ValueError("source already evaluated; submit a changed algorithm")
+            if sha in seen:
+                raise ValueError("source duplicates another candidate in this submission")
+            if row["parent_sha256"] is not None and (
+                not isinstance(row["parent_sha256"], str) or row["parent_sha256"] not in known
+            ):
+                raise ValueError("unknown parent digest")
+            seen.add(sha)
+            sources.append(source)
+        except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
+            raise SolverSubmissionError(i, str(exc)) from exc
     return tuple(sources)
 
 
@@ -182,8 +195,11 @@ class Expander:
                     raise ValueError("source duplicates another branch in this batch; change the algorithm")
                 if s.profile_id in admitted and admitted[s.profile_id] != shas:
                     raise ValueError("accepted source changed during replay")
-                for payload in payloads:
-                    self.checks(payload)
+                for index, payload in enumerate(payloads):
+                    try:
+                        self.checks(payload)
+                    except (ValueError, OSError) as exc:
+                        raise SolverSubmissionError(index, str(exc)) from exc
                 receipt = self.artifact_root / "admissions" / (turn.input_digest + ".json")
                 record = {"input_digest": turn.input_digest, "profile_id": s.profile_id,
                           "sha256s": shas, "submission_digest": s.digest}
@@ -194,7 +210,7 @@ class Expander:
                 return HarnessSubmissionValidation("accept")
             except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
                 return HarnessSubmissionValidation("retry", (
-                    HarnessSubmissionError("/candidates/0/artifact_path", "invalid_solver", str(exc)),))
+                    submission_error(exc),))
 
         def validate_batch(requests):
             # Hold well-formed snapshots until every branch is present. Invalid
@@ -213,7 +229,7 @@ class Expander:
                     seen[request.profile_id] = shas
                 except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
                     errors[request.profile_id] = HarnessSubmissionValidation("retry", (
-                        HarnessSubmissionError("/candidates/0/artifact_path", "invalid_solver", str(exc)),))
+                        submission_error(exc),))
             if errors:
                 return errors
             if set(seen) != set(expected):
@@ -241,7 +257,7 @@ class Expander:
         proposals, attempts, sessions = [], [], []
         for result in sorted(results, key=lambda r: self.profiles.index(r.profile_id)):
             if result.submission_status != "accepted":
-                raise ValueError("research turn not accepted")
+                raise ValueError(f"research turn {result.turn_id} rejected: {result.validation_errors}")
             bodies = parse_snapshot(result.submission, result.submitted_artifacts, self.artifact_root, known, self.candidates_per_researcher)
             payloads = [seal(self.root, body) for body in bodies]
             if admitted.get(result.profile_id) != [p["sha256"] for p in payloads]:

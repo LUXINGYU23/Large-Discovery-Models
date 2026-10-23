@@ -21,6 +21,7 @@ from ldm_tts.harness.protocol import (
     HarnessPoolConfig,
     HarnessProviderAuthorizationRequest,
     HarnessSubmissionRequest,
+    HarnessSubmissionError,
     HarnessSubmissionValidation,
     HarnessTurn,
     HarnessTurnResult,
@@ -165,12 +166,23 @@ class HarnessClient:
         def validate_batch(requests):
             for request in requests:
                 check_request(request)
-            decisions = submission_batch_validator(requests)
+            rejected = [p for p, (status, _) in terminal_validations.items() if status == "rejected"]
+            decisions = ({} if rejected else submission_batch_validator(requests))
             pending = {request.profile_id: request for request in requests}
             if not isinstance(decisions, Mapping) or not set(decisions).issubset(pending):
                 raise HarnessError("batch validator answered an unknown pending profile")
-            return {profile: record_validation(pending[profile], decision)
-                    for profile, decision in decisions.items()}
+            recorded = {profile: record_validation(pending[profile], decision)
+                        for profile, decision in decisions.items()}
+            rejected = [p for p, (status, _) in terminal_validations.items() if status == "rejected"]
+            if rejected:
+                # A closed peer cannot reach the task's all-profile barrier.
+                # Close unanswered snapshots too, including later arrivals.
+                for profile, request in pending.items():
+                    if profile not in recorded:
+                        recorded[profile] = record_validation(request, HarnessSubmissionValidation(
+                            "reject_turn", (HarnessSubmissionError("/", "peer_rejected",
+                                "Research batch cannot complete; rejected peers: " + ", ".join(rejected)),)))
+            return recorded
 
         def authorize(request: HarnessProviderAuthorizationRequest) -> bool:
             if (request.campaign_id != self.config.campaign_id

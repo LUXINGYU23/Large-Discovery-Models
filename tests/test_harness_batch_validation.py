@@ -66,3 +66,35 @@ def test_commit_with_unresolved_snapshot_is_rejected(tmp_path):
         client._responses.put(json.dumps(value))
     with pytest.raises(HarnessError, match='unresolved'):
         client._request('run_turn', {'turns':[]}, 'turn_committed', submission_batch_validator=lambda r: {})
+
+
+@pytest.mark.parametrize('late_peer', [False, True])
+@pytest.mark.parametrize('exhausted', [False, True])
+def test_terminal_rejection_releases_batch_barrier(tmp_path, monkeypatch, late_peer, exhausted):
+    from ldm_tts.harness import HarnessTurn
+    client, _ = fixture(tmp_path)
+    turns = tuple(HarnessTurn(profile_id=p, turn_id='turn_'+p, round_index=1,
+        history_from_seq=0, history_to_seq=0, history_digest='a'*64, message='test') for p in ('a','b'))
+    from dataclasses import replace
+    client.config = replace(client.config, submission_contract=replace(client.config.submission_contract, max_validation_attempts=1))
+    calls = []
+    def validate(requests):
+        calls.append(1)
+        return {'a': HarnessSubmissionValidation('retry' if exhausted else 'reject_turn', (
+            HarnessSubmissionError('/','invalid','terminal'),))}
+    def request(*args, **kwargs):
+        callback = kwargs['submission_batch_validator']
+        a = client._parse_submission_request(submission('a'))
+        b = client._parse_submission_request(submission('b'))
+        if late_peer:
+            assert callback((a,))['a'].decision == 'reject_turn'
+            answer = callback((b,))
+        else:
+            answer = callback((a,b))
+        assert answer['b'].decision == 'reject_turn'
+        assert answer['b'].errors[0].code == 'peer_rejected'
+        raise HarnessError('test complete')
+    monkeypatch.setattr(client, '_request', request)
+    with pytest.raises(HarnessError, match='test complete'):
+        client.run_turn(turns, submission_batch_validator=validate)
+    assert len(calls) == 1
