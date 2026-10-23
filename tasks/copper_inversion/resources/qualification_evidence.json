@@ -38,7 +38,8 @@
         "tasks/copper_inversion/resources/evidence/verification.json",
         "docs/evidence/copper-inversion/reference-check.json",
         "tasks/copper_inversion/resources/evidence/runtime/input-integrity.json",
-        "tasks/copper_inversion/resources/evidence/runtime/supervisor.json"
+        "tasks/copper_inversion/resources/evidence/runtime/supervisor.json",
+        "tasks/copper_inversion/resources/evidence/runtime/final-acceptance.json"
       ]
     },
     "seed_evaluated": {

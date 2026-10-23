@@ -173,3 +173,16 @@ reap, not later telemetry serialization. CPU uses the same explicit boundary.
 Missing counters remain unknown. The container deadline remains active during
 controller disconnection; host termination permits a bounded three-second
 finalization period. Sampled host telemetry is reported separately.
+
+## Final engineering acceptance
+
+P0–P5 engineering delivery is verified. The final task suite has 98 passing
+remote tests; 28 frozen algorithms reproduce their independently scored losses
+under the final runner. Native single-agent campaigns and Coverage/GP campaigns
+retain their original source identities; the final input-integrity guard is
+covered by separate real re-evaluation, not relabelled model traces.
+
+See [final results](../../docs/copper-inversion-final-results.md) and the
+[requirement audit](../../docs/copper-inversion-final-audit.md). Registration
+remains `contract_verified` and the experiment remains `draft`: these engineering
+results do not establish official benchmark qualification or surrogate benefit.

@@ -1,0 +1,14 @@
+{
+  "scope": "Final source capsule includes bootstrap, shared Python runtime, task resources, tests, documentation evidence and Pi source; environments, caches and runtime outputs excluded",
+  "host": "120.133.37.228:10522",
+  "source_archive": "/mnt/cephfs/xingyu/ldm/archive/copper-inversion/final-source-20261023.tar.gz",
+  "source_archive_sha256": "eb44fd39f34087f4157157351f89d8cb6ed46ed82555953501ae6f6fb8a4601c",
+  "runtime_implementation_sha256": "a71e2cb9f34bb1ce2561d29e23cc3e387a994f3891cfcac047c3957d4cd9ce5d",
+  "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+  "guest_image": "ldm/copper-inversion-research:1d71efa7d6f5",
+  "registration_stage": "contract_verified",
+  "experiment_qualification": "draft",
+  "source_capsule_note": "This archive precedes only its own checksum/scan metadata; runtime code matches final replay. Docker/guest artifacts and protected provider credentials remain external prerequisites.",
+  "credential_scan": "tasks/copper_inversion/resources/evidence/runtime/final-archive-scan.json"
+}

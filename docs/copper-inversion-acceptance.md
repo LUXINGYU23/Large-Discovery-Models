@@ -1,47 +1,32 @@
 # Copper inversion spec 验收台账
 
-依据：[完整 spec](copper-inversion-spec.md)，工作分支 `codex/copper-inversion`。
-本台账区分已有证据、待补证据和未实现能力；只有全部必需项得到直接证据后才宣告完成。
+依据：[spec v1.2](copper-inversion-spec.md)，独立工作分支 `codex/copper-inversion`。
 
-## 已有证据与剩余验收
+**P0–P5 工程验收完成。** 每项要求的实现、测试、真实运行和适用限制见 [最终逐项审计](copper-inversion-final-audit.md)；数值及原始归档见 [最终结果](copper-inversion-final-results.md)。注册为 `contract_verified`，experiment 为 `draft`，不把工程闭环宣称为官方 benchmark 资格或 surrogate 效果证明。
 
-| spec 要求 | 当前实现/证据 | 状态与下一步 |
+| 要求 | 最终直接证据 | 结论 |
 | --- | --- | --- |
-| §1–3 / P0：取消旧 Monte Carlo 路径，独立数据、坐标、科学公式和来源 | `core/data.py`、`geometry.py`、`objective.py`，来源 manifest、`tests/test_science.py`，implementation 中科学对照 | 已有远程证据；最终回归重新覆盖 |
-| §4–6 / P1：封存代码、只读准入、无网络执行、独立评分 | `candidate.py`、`interface_checks.py`、`execution.py`、`evaluator.py`，`test_submission.py`、`test_isolation.py`、`test_recovery.py` | 隔离、子进程/OOM、评分回执损坏已验证；可信监督器生命周期资源记录通过 H20 228 项回归及两个 3D 真实三轮验证 |
-| §7 / P2：一个共享 runtime/engine、注册和 mock | `workflow.py`、`test_procedure.py`、注册 contract_verified | 当前实现两个单 agent 3D campaign 各三轮通过；见 Flash/low 重跑记录 |
-| §7 / P3：真实代码设计→评分→反馈→修改 | 2D baseline＋三轮记录；3D 两 case 的两种 provider 记录 | 已验证单 agent 路径；原生轨迹为研究记录，不宣称已转为 SFT |
-| §7.3、§8、§14 / P4：solver 后、scorer 后、evaluator 返回后、发布后 checkpoint 前恢复 | `tests/test_recovery.py` 在两个真实 3D case 注入四个中断点；[远程证据](../tasks/copper_inversion/resources/evidence/recovery/verification.json) | 已验证；每组恰好 8 个实际容器、2 次正式评估和 1 个研究 turn，恢复和完成态重放不增加 |
-| §7.2 / P5：Coverage 2+2 / independent / main_forks | `harness_runtime.open_search` 复用共享策略、协调器和 `MeasuredResearchExpander` | 已实现，三种策略远程 mock 通过；真实 Pi 三轮已完成，见 P5 结果记录 |
-| §7.2 / P5：四份源码整批准入、跨分支去重、部分屏障恢复 | `Expander` 按分支 artifact root 封存，持久准入回执保留源码归属，整批返回 sessions/lineage | 整批先语法/身份后接口执行已实现，远程 225 项回归覆盖屏障及恢复；旧 native fork 证据不覆盖新协议，当前版本 P5 tiny 已通过，仍须完整三轮 |
-| §7.2 / P5：代码编码、共享 GP、最小化 acquisition | `core/surrogate.py` 复用 `RBFGPSurrogate` 和 `make_acquisition`；[组件证据](../tasks/copper_inversion/resources/evidence/surrogate/verification.json) | 已接入 `ldm_harness` workflow；mock 验证三轮 12 份候选仅选中 3 份，连同基线共评分 4 份；真实三轮已完成，四次正式测量 |
-| §7.2、§14 / P5：utility 符号与历史归因 | 共享 wrapper 使用 `research_utility`；history 序列导出测量源码，分支采用继承 cursor | mock 覆盖负 utility、旧节点增量历史；真实归因已核对；末轮 credit 按共享语义待下一 step |
-| §8–10：版本化契约、预算、最佳代码及实际评分矿体 | 新增 `ldm_mock`、`ldm_3d_tiny`、`ldm_drillholes_3d`，P5 锁定 Coverage 和模型预算 | pool=4/select=1，正式 4 次、研究 turn 15 次；真实执行与完成态恢复已验证 |
-| §11–14：远程、注册 gates、完整产物和资格声明 | 现有远程归档与 evidence；qualification 为 contract_verified，experiment 为 draft | 最终验收需补 P4/P5 证据并保持工程结果与方法有效性分开 |
+| P0 数据、坐标、科学公式、来源 | provenance、原式对照、解析距离场、手写非对称 UBC fixture、真实 mask/接触计数 | 完成 |
+| P1 封存、只读准入、无网络 worker、独立 scorer | 非法类型/形状/NaN/Inf、输入修改、import 退出、伪造分数、链接和超时/OOM 故障测试 | 完成 |
+| P2 共享 runtime/engine、注册与 mock | 最终注册 gate、两种 mock 完整运行及完成态恢复 | 完成 |
+| P3 2D 持久单 agent RSI | 基线＋三轮真实源码和反馈轨迹；最终 runner 复评四份损失一致 | 完成 |
+| P4 两个 3D case | 当前 Flash/low 各三轮，一个持久 agent，全部独立评分与恢复核对 | 完成 |
+| P4 四处故障恢复 | 两个真实 3D case 在 solver/scorer/evaluator/publication 边界注入中断；无重复派发/计数/turn | 完成 |
+| P5 研究树及三种策略 | 共享 Coverage/independent/latest-main 测试，禁 measurement policy | 完成 |
+| P5 整批准入、重复拒绝与部分恢复 | 当前增量批量 validator；静态错误零接口执行；接受两份后故障恢复；原生 tiny 和三轮快照顺序 | 完成 |
+| P5 代码特征、GP/LCB 四选一 | 代码-only 256 维 AST，固定参数，无隐式 fallback；每轮四个 acquisition 逐项核对 | 完成 |
+| P5 历史与归因 | 当前第三轮旧节点 cursor 1→3，实际补两条权威测量；credit 与负 loss 一致 | 完成 |
+| 资源计量 | 可信 PID1 回收所有后代后读取/认证 memory.peak、CPU；离线 deadline、伪造 MAC 和短时峰值测试 | 完成 |
+| 物理诊断与切片 | 非单位 spacing、无 mask 不伪造空气指标；实际评分矿体派生切片；不改变 loss | 完成 |
+| 最终源码验证 | 98 项完整任务回归通过；此前相关共享回归 228 项通过；28 份算法最终复评 loss 差值均为 0 | 完成 |
+| 完整产物、来源身份、资格边界 | 原生轨迹、源码、独立结果、模型、预算、恢复、归档 SHA256；所有 compact evidence 入库 | 完成 |
 
-## P5 实施顺序
+## 关键记录
 
-1. 使用固定版本的代码特征，直接调用共享 RBF GP 与最小化 acquisition；增加方向、非有限值、冷启动和无标签泄漏测试。
-2. 将单会话提交适配器扩展为共享研究树可调用的分支适配器。每分支仍只提交一个 solver，保持原封存/准入/正式评分边界。
-3. 在唯一 runtime 内装配共享协调器和 `MeasuredResearchExpander`，基线 round 0，active round 从 1 开始；关闭 measurement policy。
-4. 远程 mock/故障注入覆盖策略、增量历史、去重和部分屏障恢复；通过后用官方 DeepSeek Flash / low 做真实四分支工程运行。
-5. 三轮共生成 12 个候选，但只正式评分 3 个选中候选及 1 个基线。记录全部准入和选点证据，不把未测候选的预测当成正式成绩。
+- [完整 P5 三轮](../tasks/copper_inversion/resources/evidence/research-tree/final-full.json)：15 turn、12 提案、26 接口 job、4 次正式评分，182 条官方 Flash/low 请求，恢复新增请求 0。
+- [最终 98 项回归](../tasks/copper_inversion/resources/evidence/runtime/final-acceptance.json)及[日志](../tasks/copper_inversion/resources/evidence/runtime/final-acceptance.log)。
+- [最终 28 份算法复评](../tasks/copper_inversion/resources/evidence/runtime/final-input-replay.json)：覆盖历史 2D、历史 P5、历史与最新两个单 agent 3D case、本次 P5。
+- [单 agent 最新比较](copper-inversion-flash-low-rerun.md)、[批量准入](copper-inversion-batch-admission.md)、[资源监督](copper-inversion-resource-accounting.md)、[输入完整性](copper-inversion-input-integrity.md)。
+- [注册资格适用性](copper-inversion-qualification-scope.md)：不新增官方认证、SFT、多 seed 或效果优势作为本 spec 的完成条件。
 
-本台账不新增 SFT 训练或官方 benchmark 认证要求；spec 要求保留轨迹收集边界，并明确工程验收不能证明 surrogate 有效性。
-
-## 2026-10-23 最终审计进展
-
-- [P5 真实三轮及恢复证据](copper-inversion-p5-results.md)：12 份准入候选、每轮四选一、共 4 次正式测量；232 条官方 Flash/low 请求，完成态恢复新增请求 0。
-- 独立远程 runtime 回归 217 项通过，覆盖控制器离线后容器内硬 deadline、宿主采样、已评分矿体切片、反馈历史和既有恢复路径。见 `resources/evidence/runtime/verification.json`。
-- [BGRSI 固定版本复核](evidence/copper-inversion/bgrsi-reference.json) 已记录 commit 与文件 blob 身份。
-- 物理面积/体积与空气占用已实现并通过远程 79 项任务测试；无 active_mask 时不虚构空气指标，修改诊断不改变 loss。见 [几何诊断证据](../tasks/copper_inversion/resources/evidence/runtime/geometry-diagnostics.json)。
-- 当前执行器对既有 2D 四份、两组单 agent 3D 八份和 P5 四份正式源码完成复评，16 次损失均与历史一致，结果重读不重跑。见 [复评记录](copper-inversion-geometry-diagnostics.md)。
-- 跨分支整批语法/身份检查先于全部接口执行已实现；共享客户端增量批量 validator 不改变原生协议，远程 225 项回归通过。见 [批量准入记录](copper-inversion-batch-admission.md)。当前冻结实现的一轮真实四分支 tiny 已验证；完整三轮仍待验收。
-- 完整工作负载峰值由可信 PID 1 在回收全部后代后读取内核 memory.peak，并认证回传；H20 上要求峰值存在的 228 项回归通过，控制器断连时仍可恢复记录。计数边界及限制见 [资源记录](copper-inversion-resource-accounting.md)。
-- 当前版本单 agent 两个 3D case 各三轮已完成；全量 101 次请求为官方 Flash/low，完成态恢复新增请求 0，见 [重跑报告](copper-inversion-flash-low-rerun.md)。
-- 未完成：当前版本 P5 三轮真实验收及最终逐项审计。注册资格适用性见 [资格边界](copper-inversion-qualification-scope.md)。
-- §4 提交契约已统一为严格 candidates 数组，每 researcher 恰好一项，artifact pointer 为 `/candidates/0/artifact_path`；旧扁平对象被拒绝。远程 220 项 Python 回归通过，另用真实 Pi SubmissionController 与 Python parser 验证拒绝、重开 turn 修复、封存和摘要。见 [契约证据](../tasks/copper_inversion/resources/evidence/runtime/array-submission.json)。该证据单独验证数组契约；整批屏障由后续批量准入证据覆盖，历史真实运行仍保留原契约身份。
-
-- 最终监督执行器在 H20 对历史 16 份源码完成复评，loss 差值全部为 0，可信峰值均存在，重复读取无新增执行；见 [最终复评](copper-inversion-geometry-diagnostics.md#最终监督执行器复评h20)。
-
-- 当前版本 P5 tiny 已完成：4 份准入源码、GP 四选一、2 次正式评分、72 条官方 Flash/low 请求；源码快照均先于分支接口派发，完成态恢复无新增请求。见 [真实屏障证据](copper-inversion-batch-admission.md#当前版本真实-tiny-验收)。
+P5 原生三轮在冻结源码上完成。其后 runner 增加输入核对和明确 masked 输出拒绝；没有修改活动实验或重标原轨迹。最终 runner 单独完成全部 28 份源码复评，[运行源码差异](../tasks/copper_inversion/resources/evidence/runtime/final-runtime-diff.json)与最终实现身份已保存。没有开放的必需工程验收项。

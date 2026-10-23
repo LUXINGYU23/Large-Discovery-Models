@@ -17,10 +17,11 @@
       "observed": "Canonical byte identity and artifact sealing; method executes in ephemeral copy of readonly submitted source."
     }
   },
-  "remaining_alignment": "Whole-pool static validation before interfaces is implemented and covered by remote batch-admission tests plus current-version native P5 tiny. Complete current-version three-round acceptance remains pending; historical native runs retain the previous protocol identity.",
+  "remaining_alignment": "No open whole-pool admission alignment item: remote static-rejection and partial-recovery tests plus native P5 tiny and three-round evidence verify the implemented boundary. Historical native runs retain their original identities.",
   "alignment_evidence": [
     "tasks/copper_inversion/resources/evidence/runtime/batch-admission.json",
     "docs/copper-inversion-batch-admission.md",
-    "tasks/copper_inversion/resources/evidence/research-tree/final-tiny.json"
+    "tasks/copper_inversion/resources/evidence/research-tree/final-tiny.json",
+    "tasks/copper_inversion/resources/evidence/research-tree/final-full.json"
   ]
 }

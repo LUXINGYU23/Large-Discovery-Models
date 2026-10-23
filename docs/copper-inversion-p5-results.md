@@ -34,3 +34,9 @@
 恢复源码时须同时解压 run 内 `source-snapshot.tar.gz` 和 `bootstrap-source.tar.gz`：前者遗漏根 pyproject.toml 与 tasks/__init__.py，后者补齐，原档未改写。新的独立测试目录还需 sidecar package.json/package-lock.json 用于版本一致性测试。
 
 后续 runtime 的 deadline、宿主 cgroup 采样与矿体反馈已在独立远程目录完成 [217 项回归](../tasks/copper_inversion/resources/evidence/runtime/verification.json)。完整 spec 尚需逐项审计；当前不能将各分支分别准入等同于跨分支整批先语法后执行，也不能把采样内存最大值称为生命周期峰值。
+
+## 最终协议的三轮验收
+
+上述记录保留旧实现身份。当前数组提交、全池静态准入和可信资源监督执行器的三轮运行已完成：`405.079581 → 6.521733 → 6.519578 → 6.519067`，15 个研究 turn、12 份提案、4 次正式评分、182 次官方 Flash/low 请求，完成态恢复新增请求 0。
+
+最后增加的 runner 输入核对在独立目录验证，并对本次四份实际评分算法及历史算法共 28 份复评，损失差值全部为 0。详细边界、归档与证据见 [最终结果](copper-inversion-final-results.md)。

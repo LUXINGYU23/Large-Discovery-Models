@@ -6,8 +6,14 @@ from types import SimpleNamespace
 import pytest
 
 from tasks.copper_inversion.core.harness import parse_snapshot
-from tasks.copper_inversion.core.candidate import Domain, seal
+from tasks.copper_inversion.core.candidate import Domain, seal, validate_source, MAX_SOURCE_BYTES
 from ldm_tts.contracts import RawProposal, CandidateRejection
+
+
+@pytest.mark.parametrize("source", [b"x = 1\n", b"def solve(:\n", b"\xff", b"#" * (MAX_SOURCE_BYTES + 1)])
+def test_source_entry_syntax_encoding_and_size(source):
+    with pytest.raises((ValueError, SyntaxError, UnicodeError)):
+        validate_source(source)
 
 
 def test_snapshot_contract(tmp_path):

@@ -40,3 +40,5 @@ H20 上 `p5-final-20261023/tiny` 使用当前数组提交、全池屏障和监�
 - 验收脚本使用原生 attempts 下的源码快照时间。最终 `submission.json` 在接受后写入，不可作为候选到达时间。
 
 [机器证据](../tasks/copper_inversion/resources/evidence/research-tree/final-tiny.json)包含源码身份、准入摘要、四个 acquisition 分数、两次正式结果、预算和源代码归档摘要。当前版本三轮 Coverage 与旧节点增量历史仍需另行验收，不能由一轮 tiny 推断。
+
+完整三轮已随后通过同样的原生边界核对：12 份提案、每轮四选一、26 个接口 job、4 次正式评分，旧节点增量历史与完成态恢复均验证。此前“仍需三轮”的文字描述 tiny 完成时的阶段状态；最终证据见 [三轮记录](../tasks/copper_inversion/resources/evidence/research-tree/final-full.json)和[最终审计](copper-inversion-final-audit.md)。

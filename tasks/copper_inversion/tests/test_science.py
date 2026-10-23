@@ -29,6 +29,53 @@ def test_actual_data(case):
         35 if case.endswith("2d") else 3600 if "outcrops" in case else 70
     )
     assert v["loss_total"] == pytest.approx(-v["research_utility"])
+    if not case.endswith("2d"):
+        assert p["shape"] == (40, 50, 30)
+        assert p["origin"] == [0.0, 0.0, -25.0]
+        assert p["axis_names"] == ["x", "y", "z"]
+        assert int(p["active_mask"].sum()) == 55517
+        assert int((~p["active_mask"]).sum()) == 4483
+        assert int((p["observations"][0]["values"] == 0.5).sum()) == 4
+
+
+def test_handwritten_ubc_coordinate_fixture(tmp_path, monkeypatch):
+    """UBC rows descend in z, then advance x, then y; no writer round-trip."""
+    import hashlib
+    import json
+    from tasks.copper_inversion.core import data
+
+    root = tmp_path / "cases" / "drillholes_3d"
+    root.mkdir(parents=True)
+    (root / "mesh.txt").write_text("2 3 4\n10 20 100\n2*2\n3*3\n4*5\n")
+    labels = np.full(24, np.nan)
+    labels[0], labels[7], labels[19] = 1.0, 0.5, 0.0
+    initial = np.zeros(24)
+    initial[0] = 1
+    active = np.ones(24)
+    active[7] = 0
+    for name, values in [("drillholes.txt", labels), ("initial_model.txt", initial),
+                         ("ind_active.txt", active)]:
+        np.savetxt(root / name, values)
+    files = {str(p.relative_to(tmp_path)): hashlib.sha256(p.read_bytes()).hexdigest()
+             for p in root.glob("*.txt")}
+    (tmp_path / "provenance.json").write_text(json.dumps({"files": files}))
+    monkeypatch.setattr(data, "RESOURCES", tmp_path)
+    problem = data.load_problem("drillholes_3d")
+    assert problem["shape"] == (2, 3, 4)
+    assert problem["origin"] == [10.0, 20.0, 80.0]
+    assert problem["spacing"] == [2.0, 3.0, 5.0]
+    observed = problem["observations"][0]
+    assert observed["mask"].sum() == 3
+    for index, label, coordinate in [((0, 0, 3), 1, [11, 21.5, 97.5]),
+                                     ((1, 0, 0), 0.5, [13, 21.5, 82.5]),
+                                     ((0, 2, 0), 0, [11, 27.5, 82.5])]:
+        assert observed["values"][index] == label
+        np.testing.assert_array_equal(np.array(problem["origin"]) +
+                                      (np.array(index) + 0.5) * problem["spacing"], coordinate)
+    assert problem["initial_level_set"][0, 0, 3] == 0.5
+    assert (problem["initial_level_set"] > 0).sum() == 1
+    assert not problem["active_mask"][1, 0, 0]
+    assert problem["active_mask"].sum() == 23
 
 
 @pytest.mark.parametrize("case", CASES)

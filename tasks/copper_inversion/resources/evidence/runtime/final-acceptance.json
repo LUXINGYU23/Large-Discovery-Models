@@ -1,0 +1,22 @@
+{
+  "scope": "Entire final copper task suite: fixed science, handwritten UBC coordinates, submission, input integrity, real isolated workers, independent scorer, recovery, resource attestation, mock research tree and GP",
+  "host": "120.133.37.228:10522",
+  "root": "/Aidata/shared/ldm/copper-final-audit-20261023",
+  "result": "98 passed in 93.77s (0:01:33)",
+  "implementation_sha256": "a71e2cb9f34bb1ce2561d29e23cc3e387a994f3891cfcac047c3957d4cd9ce5d",
+  "require_peak": true,
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "log_sha256": "54b7e8c62593118e84f5e4bd063fc313a0688e657e2af6f698c35a42a30e3a56",
+  "test_source_sha256": {
+    "tasks/copper_inversion/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tasks/copper_inversion/tests/test_feedback.py": "a906c55fc4a09b1f5ced648ece866c6b7afad8aee5ea06120b8cdcc2cac9fdf0",
+    "tasks/copper_inversion/tests/test_isolation.py": "ce1fd11852d262b881c963aa2cc24d023afe526be078b461f309f4e549b25396",
+    "tasks/copper_inversion/tests/test_procedure.py": "9eeaa62d33a8685c7349c3e8ca48f48a56d6d1999655fffcaef584ec9e90b987",
+    "tasks/copper_inversion/tests/test_recovery.py": "7cf2eea7f6574ecda82c6dead710442cf42a0908e2009d4313a77a061fec96d4",
+    "tasks/copper_inversion/tests/test_research.py": "59310a38287c2af4c2d5a16cd11229265dbbd7fc920822d46ae1085a2e842c0c",
+    "tasks/copper_inversion/tests/test_science.py": "c2fbbb3e9c7b3d5f738667e872604369e522e1d2a14881a81d5cdd5574083f5b",
+    "tasks/copper_inversion/tests/test_submission.py": "d36d98e3fafde2b9223be4aa7e71803d3cfe36ede9c10a536436085dcc190c5c",
+    "tasks/copper_inversion/tests/test_supervisor.py": "414582c14dc4495dab575644dcd2ed868a13f088b15d4e89a4336c79e9af3cd6",
+    "tasks/copper_inversion/tests/test_surrogate.py": "30bd7882f27d877a25360ac3d121fa406d9acdab3188c813049b0ce1327fd61c"
+  }
+}

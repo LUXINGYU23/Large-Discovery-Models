@@ -1,0 +1,2839 @@
+{
+  "scope": "Frozen historical and current campaign sources, final supervised executor, readonly interfaces and independent scoring; no model calls",
+  "implementation_sha256": "a71e2cb9f34bb1ce2561d29e23cc3e387a994f3891cfcac047c3957d4cd9ce5d",
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "runs": [
+    {
+      "case": "drillholes_3d",
+      "original": "/Aidata/shared/ldm/copper-inversion-20261023/runs/p5-final-20261023/full",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/full",
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "loss_drillhole": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "air_positive_voxels": 0.0,
+              "air_positive_volume": 0.0,
+              "air_fraction_of_positive": 0.0,
+              "loss_total": 405.0795810830953,
+              "research_utility": -405.0795810830953,
+              "positive_voxels": 1655.0,
+              "label_mismatches": 54.0,
+              "contact_rmse": 5.563958690902462
+            },
+            "artifacts": {
+              "model": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/model.npy",
+              "score": "jobs/eea6c2f12efb814970c2c62f99c25c4b66c1f8c2459358d31cf5231530b9850b/output/result.json",
+              "model_slices": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/slices.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "solver_wall_seconds": 0.47886109352111816,
+              "scorer_wall_seconds": 0.47505903244018555,
+              "solver_cpu_seconds_observed": 0.062165,
+              "solver_sampled_peak_memory_bytes": 7393280.0,
+              "scorer_cpu_seconds_observed": 0.061399,
+              "scorer_sampled_peak_memory_bytes": 7327744.0,
+              "solver_peak_memory_bytes": 30416896.0,
+              "solver_cpu_seconds_through_reap": 0.181378,
+              "scorer_peak_memory_bytes": 31490048.0,
+              "scorer_cpu_seconds_through_reap": 0.208657
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e",
+              "seed": 47,
+              "resource_sampling": {
+                "solver": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7393280,
+                  "cpu_seconds_observed": 0.062165,
+                  "last_sample_unix": 1792757623.967309,
+                  "complete_lifetime_measurement": false
+                },
+                "scorer": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7327744,
+                  "cpu_seconds_observed": 0.061399,
+                  "last_sample_unix": 1792757624.6483843,
+                  "complete_lifetime_measurement": false
+                }
+              },
+              "workload_resources": {
+                "solver": {
+                  "cpu_seconds_through_reap": 0.181378,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30416896,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.208657,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31490048,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.521732955144078,
+          "loss_delta": 0.0,
+          "source_sha256": "e9eb7939f5b12ab0aac6e0f5757bf3721f7c6fb5d77d2a6f18c5b439c2a66ef9",
+          "result": {
+            "candidate_id": "e9eb7939f5b12ab0aac6e0f5757bf3721f7c6fb5d77d2a6f18c5b439c2a66ef9",
+            "status": "succeeded",
+            "metrics": {
+              "loss_drillhole": 6.521732955144078,
+              "positive_volume": 27362.0,
+              "air_positive_voxels": 1988.0,
+              "air_positive_volume": 1988.0,
+              "air_fraction_of_positive": 0.07265550763833054,
+              "loss_total": 6.521732955144078,
+              "research_utility": -6.521732955144078,
+              "positive_voxels": 27362.0,
+              "label_mismatches": 0.0,
+              "contact_rmse": 0.2682262705376357
+            },
+            "artifacts": {
+              "model": "evaluations/774c4269cc68468132c03d04d8fb3f8b30dc61e155314bc22de2088c8f3c52c5/model/model.npy",
+              "score": "jobs/9ce0cc18cc07d9c1e95897b147a1723f80fd0231082718a9794fbc4c62272b34/output/result.json",
+              "model_slices": "evaluations/774c4269cc68468132c03d04d8fb3f8b30dc61e155314bc22de2088c8f3c52c5/model/slices.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "solver_wall_seconds": 0.5031909942626953,
+              "scorer_wall_seconds": 0.4706580638885498,
+              "solver_cpu_seconds_observed": 0.060694,
+              "solver_sampled_peak_memory_bytes": 7176192.0,
+              "scorer_cpu_seconds_observed": 0.062993,
+              "scorer_sampled_peak_memory_bytes": 7462912.0,
+              "solver_peak_memory_bytes": 43819008.0,
+              "solver_cpu_seconds_through_reap": 0.249953,
+              "scorer_peak_memory_bytes": 30941184.0,
+              "scorer_cpu_seconds_through_reap": 0.208261
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "774c4269cc68468132c03d04d8fb3f8b30dc61e155314bc22de2088c8f3c52c5",
+              "seed": 47,
+              "resource_sampling": {
+                "solver": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7176192,
+                  "cpu_seconds_observed": 0.060694,
+                  "last_sample_unix": 1792757626.7569199,
+                  "complete_lifetime_measurement": false
+                },
+                "scorer": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7462912,
+                  "cpu_seconds_observed": 0.062993,
+                  "last_sample_unix": 1792757627.4907618,
+                  "complete_lifetime_measurement": false
+                }
+              },
+              "workload_resources": {
+                "solver": {
+                  "cpu_seconds_through_reap": 0.249953,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 43819008,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.208261,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30941184,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.519578265222362,
+          "loss_delta": 0.0,
+          "source_sha256": "936760309910937203c2eb5d351a2f0297802709c5d76aa028cad38668241ecc",
+          "result": {
+            "candidate_id": "936760309910937203c2eb5d351a2f0297802709c5d76aa028cad38668241ecc",
+            "status": "succeeded",
+            "metrics": {
+              "loss_drillhole": 6.519578265222362,
+              "positive_volume": 27363.0,
+              "air_positive_voxels": 1988.0,
+              "air_positive_volume": 1988.0,
+              "air_fraction_of_positive": 0.07265285239191609,
+              "loss_total": 6.519578265222362,
+              "research_utility": -6.519578265222362,
+              "positive_voxels": 27363.0,
+              "label_mismatches": 0.0,
+              "contact_rmse": 0.2700321746580248
+            },
+            "artifacts": {
+              "model": "evaluations/b79ceafd96e81340a4fe3c256fa4b516690fe4a05fe8cac3c48f26b6bf0a3695/model/model.npy",
+              "score": "jobs/a9793e9ccfa78fa5830eb51c73d6796e89e4797bf15e03997ed31f6dd717c055/output/result.json",
+              "model_slices": "evaluations/b79ceafd96e81340a4fe3c256fa4b516690fe4a05fe8cac3c48f26b6bf0a3695/model/slices.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "solver_wall_seconds": 2.540726900100708,
+              "scorer_wall_seconds": 0.4556879997253418,
+              "solver_cpu_seconds_observed": 2.265113,
+              "solver_sampled_peak_memory_bytes": 60977152.0,
+              "scorer_cpu_seconds_observed": 0.058645,
+              "scorer_sampled_peak_memory_bytes": 7254016.0,
+              "solver_peak_memory_bytes": 63754240.0,
+              "solver_cpu_seconds_through_reap": 2.284113,
+              "scorer_peak_memory_bytes": 31457280.0,
+              "scorer_cpu_seconds_through_reap": 0.206925
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "b79ceafd96e81340a4fe3c256fa4b516690fe4a05fe8cac3c48f26b6bf0a3695",
+              "seed": 47,
+              "resource_sampling": {
+                "solver": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 11,
+                  "sampled_peak_memory_bytes": 60977152,
+                  "cpu_seconds_observed": 2.265113,
+                  "last_sample_unix": 1792757632.225603,
+                  "complete_lifetime_measurement": false
+                },
+                "scorer": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7254016,
+                  "cpu_seconds_observed": 0.058645,
+                  "last_sample_unix": 1792757632.8844867,
+                  "complete_lifetime_measurement": false
+                }
+              },
+              "workload_resources": {
+                "solver": {
+                  "cpu_seconds_through_reap": 2.284113,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 63754240,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.206925,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31457280,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.519066659986374,
+          "loss_delta": 0.0,
+          "source_sha256": "716f860d0dd7b6d593dafa3a62fc2fc5c58cbfdf081bd654d773ad6724c4f420",
+          "result": {
+            "candidate_id": "716f860d0dd7b6d593dafa3a62fc2fc5c58cbfdf081bd654d773ad6724c4f420",
+            "status": "succeeded",
+            "metrics": {
+              "loss_drillhole": 6.519066659986374,
+              "positive_volume": 25852.0,
+              "air_positive_voxels": 944.0,
+              "air_positive_volume": 944.0,
+              "air_fraction_of_positive": 0.03651555005415442,
+              "loss_total": 6.519066659986374,
+              "research_utility": -6.519066659986374,
+              "positive_voxels": 25852.0,
+              "label_mismatches": 0.0,
+              "contact_rmse": 0.2716973397720079
+            },
+            "artifacts": {
+              "model": "evaluations/c3fae33922666dc89eb22de63cb3accb303b1c7a69334bd5a6bc6795f60c4f39/model/model.npy",
+              "score": "jobs/4f5bf03cfa74d29847f2e30d35b2c64aa82bf0b0ed677766080b396ddbd4777d/output/result.json",
+              "model_slices": "evaluations/c3fae33922666dc89eb22de63cb3accb303b1c7a69334bd5a6bc6795f60c4f39/model/slices.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "solver_wall_seconds": 4.384291887283325,
+              "scorer_wall_seconds": 0.45338988304138184,
+              "solver_cpu_seconds_observed": 4.046041,
+              "solver_sampled_peak_memory_bytes": 40685568.0,
+              "scorer_cpu_seconds_observed": 0.062377,
+              "scorer_sampled_peak_memory_bytes": 7503872.0,
+              "solver_peak_memory_bytes": 40796160.0,
+              "solver_cpu_seconds_through_reap": 4.133047,
+              "scorer_peak_memory_bytes": 30781440.0,
+              "scorer_cpu_seconds_through_reap": 0.203638
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "c3fae33922666dc89eb22de63cb3accb303b1c7a69334bd5a6bc6795f60c4f39",
+              "seed": 47,
+              "resource_sampling": {
+                "solver": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 19,
+                  "sampled_peak_memory_bytes": 40685568,
+                  "cpu_seconds_observed": 4.046041,
+                  "last_sample_unix": 1792757638.924535,
+                  "complete_lifetime_measurement": false
+                },
+                "scorer": {
+                  "method": "host_cgroup_v2_polling",
+                  "target_interval_seconds": 0.2,
+                  "samples": 1,
+                  "sampled_peak_memory_bytes": 7503872,
+                  "cpu_seconds_observed": 0.062377,
+                  "last_sample_unix": 1792757639.600595,
+                  "complete_lifetime_measurement": false
+                }
+              },
+              "workload_resources": {
+                "solver": {
+                  "cpu_seconds_through_reap": 4.133047,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 40796160,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.203638,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30781440,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:8bec07c8bfb7180a12b13e3a6755b78f553b3a6f1bf5736d24f67f091e618e53": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.41898298263549805,
+          "interface_cpu_seconds_through_reap": 0.174589,
+          "interface_cpu_seconds_observed": 0.063328
+        },
+        "copper:job:79c78c92df866d89671a4b9608438bde309b8d406b0a7e4b055db55245310b79": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4283900260925293,
+          "interface_cpu_seconds_through_reap": 0.175421,
+          "interface_cpu_seconds_observed": 0.06317
+        },
+        "copper:job:9d9600c2681fb60f5fc0f6590c3830bf1a4ec5f164371e08733cf4d1350ef4b7": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 0.47886109352111816,
+          "solver_cpu_seconds_through_reap": 0.181378,
+          "solver_cpu_seconds_observed": 0.062165
+        },
+        "copper:job:eea6c2f12efb814970c2c62f99c25c4b66c1f8c2459358d31cf5231530b9850b": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.47505903244018555,
+          "scorer_cpu_seconds_through_reap": 0.208657,
+          "scorer_cpu_seconds_observed": 0.061399
+        },
+        "copper:job:d8786d90e05bc9e2685b8f7b91e1b3367dde2f5dbed76ff0d6fbc845afaa6d10": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.44147706031799316,
+          "interface_cpu_seconds_through_reap": 0.182308,
+          "interface_cpu_seconds_observed": 0.063027
+        },
+        "copper:job:776c97bcb8947b18fb26fbef67fe60a953a7d61a4e75202dc1f46430f4fb8440": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4288508892059326,
+          "interface_cpu_seconds_through_reap": 0.179729,
+          "interface_cpu_seconds_observed": 0.062412
+        },
+        "copper:job:8589ead4622d3338745c7bbd7600170a5df6af2ed82ad78365604f6518957e1e": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 0.5031909942626953,
+          "solver_cpu_seconds_through_reap": 0.249953,
+          "solver_cpu_seconds_observed": 0.060694
+        },
+        "copper:job:9ce0cc18cc07d9c1e95897b147a1723f80fd0231082718a9794fbc4c62272b34": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.4706580638885498,
+          "scorer_cpu_seconds_through_reap": 0.208261,
+          "scorer_cpu_seconds_observed": 0.062993
+        },
+        "copper:job:dee50fe1cf144c68d3db66266b10da122a2a13f142d949f4af21df362fdca1ec": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5424811840057373,
+          "interface_cpu_seconds_through_reap": 0.279996,
+          "interface_cpu_seconds_observed": 0.284932
+        },
+        "copper:job:d98fe4dd608764731349a6d8e33235b089e50b7e19ea6e8532869f9c85919a90": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5520908832550049,
+          "interface_cpu_seconds_through_reap": 0.293932,
+          "interface_cpu_seconds_observed": 0.28193
+        },
+        "copper:job:bb18d3b250eba2484d4abcc30245ad207ce17fca4c6d29029113c1a0d8435a46": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 2.540726900100708,
+          "solver_cpu_seconds_through_reap": 2.284113,
+          "solver_cpu_seconds_observed": 2.265113
+        },
+        "copper:job:a9793e9ccfa78fa5830eb51c73d6796e89e4797bf15e03997ed31f6dd717c055": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.4556879997253418,
+          "scorer_cpu_seconds_through_reap": 0.206925,
+          "scorer_cpu_seconds_observed": 0.058645
+        },
+        "copper:job:79551230db0ed6a92ea707117b9f5aae75b27f81475f86b17b081d0dc76061b9": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4322690963745117,
+          "interface_cpu_seconds_through_reap": 0.177538,
+          "interface_cpu_seconds_observed": 0.063305
+        },
+        "copper:job:443ef8c79fc2d957086cdf50cde3f8300e6ee82e60147b2b70d5bfb1cc62c558": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4444770812988281,
+          "interface_cpu_seconds_through_reap": 0.191916,
+          "interface_cpu_seconds_observed": 0.062683
+        },
+        "copper:job:b50e0227782758c2f2413846aefeb6330e0096eb8cfb4a248216a2efcc16a944": {
+          "solver_jobs": 1,
+          "solver_wall_seconds": 4.384291887283325,
+          "solver_cpu_seconds_through_reap": 4.133047,
+          "solver_cpu_seconds_observed": 4.046041
+        },
+        "copper:job:4f5bf03cfa74d29847f2e30d35b2c64aa82bf0b0ed677766080b396ddbd4777d": {
+          "scorer_jobs": 1,
+          "scorer_wall_seconds": 0.45338988304138184,
+          "scorer_cpu_seconds_through_reap": 0.203638,
+          "scorer_cpu_seconds_observed": 0.062377
+        }
+      }
+    },
+    {
+      "case": "drillholes_3d",
+      "original": "/Aidata/shared/ldm/copper-inversion-20261023/runs/flash-low-single-20261023/drillholes_3d",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/drillholes_3d",
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 5.563958690902462,
+              "label_mismatches": 54.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_total": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -405.0795810830953
+            },
+            "artifacts": {
+              "model": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/model.npy",
+              "model_slices": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/slices.json",
+              "score": "jobs/eea6c2f12efb814970c2c62f99c25c4b66c1f8c2459358d31cf5231530b9850b/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.06547,
+              "scorer_cpu_seconds_through_reap": 0.207761,
+              "scorer_peak_memory_bytes": 31404032.0,
+              "scorer_sampled_peak_memory_bytes": 8097792.0,
+              "scorer_wall_seconds": 0.5286540985107422,
+              "solver_cpu_seconds_observed": 0.062133,
+              "solver_cpu_seconds_through_reap": 0.181398,
+              "solver_peak_memory_bytes": 29954048.0,
+              "solver_sampled_peak_memory_bytes": 6856704.0,
+              "solver_wall_seconds": 0.4308199882507324
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06547,
+                  "last_sample_unix": 1792756714.5280135,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8097792,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062133,
+                  "last_sample_unix": 1792756713.773782,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6856704,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.207761,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31404032,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.181398,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 29954048,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.519106762029981,
+          "loss_delta": 0.0,
+          "source_sha256": "d1dc581cf650c942463a94de9d58ec653205543916abaf5eb17789e6d57eca2d",
+          "result": {
+            "candidate_id": "d1dc581cf650c942463a94de9d58ec653205543916abaf5eb17789e6d57eca2d",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.08053823904568565,
+              "air_positive_volume": 4483.0,
+              "air_positive_voxels": 4483.0,
+              "contact_rmse": 0.25959811603606514,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.519106762029981,
+              "loss_total": 6.519106762029981,
+              "positive_volume": 55663.0,
+              "positive_voxels": 55663.0,
+              "research_utility": -6.519106762029981
+            },
+            "artifacts": {
+              "model": "evaluations/7e5590261690a4b64afe2e6e24eb3bae8a364ab4fa6896a37f0aeed338e53418/model/model.npy",
+              "model_slices": "evaluations/7e5590261690a4b64afe2e6e24eb3bae8a364ab4fa6896a37f0aeed338e53418/model/slices.json",
+              "score": "jobs/54fca3a1fc692cc1948cdc1903874bf67160e34ed80794ca40a425a7daaebb7e/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.060476,
+              "scorer_cpu_seconds_through_reap": 0.206743,
+              "scorer_peak_memory_bytes": 31567872.0,
+              "scorer_sampled_peak_memory_bytes": 7098368.0,
+              "scorer_wall_seconds": 0.45986104011535645,
+              "solver_cpu_seconds_observed": 4.709704,
+              "solver_cpu_seconds_through_reap": 4.886706,
+              "solver_peak_memory_bytes": 84189184.0,
+              "solver_sampled_peak_memory_bytes": 74219520.0,
+              "solver_wall_seconds": 5.156278848648071
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "7e5590261690a4b64afe2e6e24eb3bae8a364ab4fa6896a37f0aeed338e53418",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.060476,
+                  "last_sample_unix": 1792756722.3782253,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7098368,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 4.709704,
+                  "last_sample_unix": 1792756721.6777508,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 74219520,
+                  "samples": 22,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.206743,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31567872,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 4.886706,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 84189184,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.517357100522649,
+          "loss_delta": 0.0,
+          "source_sha256": "af741daf0dab1d227c5c0e5706f85691c1e75e8a5b0ffc26b57e362591414821",
+          "result": {
+            "candidate_id": "af741daf0dab1d227c5c0e5706f85691c1e75e8a5b0ffc26b57e362591414821",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.08064109943876817,
+              "air_positive_volume": 4483.0,
+              "air_positive_voxels": 4483.0,
+              "contact_rmse": 0.26797885551612033,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.517357100522649,
+              "loss_total": 6.517357100522649,
+              "positive_volume": 55592.0,
+              "positive_voxels": 55592.0,
+              "research_utility": -6.517357100522649
+            },
+            "artifacts": {
+              "model": "evaluations/ace8252801d004641cb5a4ccb90f2f3bc316bfaa6c497fc3354e012e3c5bdcbf/model/model.npy",
+              "model_slices": "evaluations/ace8252801d004641cb5a4ccb90f2f3bc316bfaa6c497fc3354e012e3c5bdcbf/model/slices.json",
+              "score": "jobs/f9d8d99767c1fba385449b25c0dc79b629f3432ae6f132f387e99dd753cc349e/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.061125,
+              "scorer_cpu_seconds_through_reap": 0.207394,
+              "scorer_peak_memory_bytes": 30629888.0,
+              "scorer_sampled_peak_memory_bytes": 6881280.0,
+              "scorer_wall_seconds": 0.4630889892578125,
+              "solver_cpu_seconds_observed": 10.439295,
+              "solver_cpu_seconds_through_reap": 10.4883,
+              "solver_peak_memory_bytes": 88068096.0,
+              "solver_sampled_peak_memory_bytes": 83611648.0,
+              "solver_wall_seconds": 10.749553918838501
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "ace8252801d004641cb5a4ccb90f2f3bc316bfaa6c497fc3354e012e3c5bdcbf",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.061125,
+                  "last_sample_unix": 1792756736.0489867,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6881280,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 10.439295,
+                  "last_sample_unix": 1792756735.3652272,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 83611648,
+                  "samples": 48,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.207394,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30629888,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 10.4883,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 88068096,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.516471024967711,
+          "loss_delta": 0.0,
+          "source_sha256": "d5eb2fdf1cb0fcaa96ab3bb3083182964f2cfed2f7c447557802f86762a8055e",
+          "result": {
+            "candidate_id": "d5eb2fdf1cb0fcaa96ab3bb3083182964f2cfed2f7c447557802f86762a8055e",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.08063819836673022,
+              "air_positive_volume": 4483.0,
+              "air_positive_voxels": 4483.0,
+              "contact_rmse": 0.2689922660234048,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.516471024967711,
+              "loss_total": 6.516471024967711,
+              "positive_volume": 55594.0,
+              "positive_voxels": 55594.0,
+              "research_utility": -6.516471024967711
+            },
+            "artifacts": {
+              "model": "evaluations/ed915bc03f0bea73dfbf0fab4ca275fdf57d2ad794df976e2374d11ab4629430/model/model.npy",
+              "model_slices": "evaluations/ed915bc03f0bea73dfbf0fab4ca275fdf57d2ad794df976e2374d11ab4629430/model/slices.json",
+              "score": "jobs/80bfd3c629c4ff83c6e0759baf6eec437bdc6931bd153561e7b9c85497021866/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.062182,
+              "scorer_cpu_seconds_through_reap": 0.208415,
+              "scorer_peak_memory_bytes": 31211520.0,
+              "scorer_sampled_peak_memory_bytes": 7946240.0,
+              "scorer_wall_seconds": 0.45918989181518555,
+              "solver_cpu_seconds_observed": 12.889316,
+              "solver_cpu_seconds_through_reap": 12.898319,
+              "solver_peak_memory_bytes": 88649728.0,
+              "solver_sampled_peak_memory_bytes": 76771328.0,
+              "solver_wall_seconds": 13.158202886581421
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "ed915bc03f0bea73dfbf0fab4ca275fdf57d2ad794df976e2374d11ab4629430",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062182,
+                  "last_sample_unix": 1792756752.0454214,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7946240,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 12.889316,
+                  "last_sample_unix": 1792756751.3590655,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 76771328,
+                  "samples": 59,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.208415,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31211520,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 12.898319,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 88649728,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:8bec07c8bfb7180a12b13e3a6755b78f553b3a6f1bf5736d24f67f091e618e53": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.42772507667541504,
+          "interface_cpu_seconds_through_reap": 0.173891,
+          "interface_cpu_seconds_observed": 0.060713
+        },
+        "copper:job:79c78c92df866d89671a4b9608438bde309b8d406b0a7e4b055db55245310b79": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4582231044769287,
+          "interface_cpu_seconds_through_reap": 0.175668,
+          "interface_cpu_seconds_observed": 0.064413
+        },
+        "copper:job:27efcb9388f27faf5b2d2f44773f6a89d7cca0cb4d8b20f576d1f9bfa4069538": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5445311069488525,
+          "interface_cpu_seconds_through_reap": 0.298022,
+          "interface_cpu_seconds_observed": 0.28202
+        },
+        "copper:job:34e41f66e11d198cd22101c31f562332ed78127b66a7e9faeb39369490a678fd": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5603640079498291,
+          "interface_cpu_seconds_through_reap": 0.306045,
+          "interface_cpu_seconds_observed": 0.286042
+        },
+        "copper:job:14ab208aad1182afc23d623922df6212ec313622424d0cbd0b8a57f0807ab49b": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6515281200408936,
+          "interface_cpu_seconds_through_reap": 0.322699,
+          "interface_cpu_seconds_observed": 0.287697
+        },
+        "copper:job:d49d30e27f6e1eb6bab245f11aec42e22cdc7ecd7fc651a0a8c384aa7fd0a518": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5890851020812988,
+          "interface_cpu_seconds_through_reap": 0.327941,
+          "interface_cpu_seconds_observed": 0.286939
+        },
+        "copper:job:bbaab0484a81bf444152b37642d1bf08201ad1ad8ea4540a37416230012a6397": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5667629241943359,
+          "interface_cpu_seconds_through_reap": 0.313638,
+          "interface_cpu_seconds_observed": 0.281635
+        },
+        "copper:job:9aa5c232aee7f50ae56c4410edab96748ad628aa0a6bdfeda3d12aa1bfb28822": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.58815598487854,
+          "interface_cpu_seconds_through_reap": 0.332322,
+          "interface_cpu_seconds_observed": 0.281319
+        }
+      }
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "original": "/Aidata/shared/ldm/copper-inversion-20261023/runs/flash-low-single-20261023/drillholes_outcrops_3d",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/drillholes_outcrops_3d",
+      "observations": [
+        {
+          "previous_loss": 1248.8385761871953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 10.032113812425068,
+              "label_mismatches": 884.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_outcrop": 843.7589951040999,
+              "loss_total": 1248.8385761871953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -1248.8385761871953
+            },
+            "artifacts": {
+              "model": "evaluations/74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35/model/model.npy",
+              "model_slices": "evaluations/74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35/model/slices.json",
+              "score": "jobs/fb94a3467ddcf57ced8e1951500469319465ec223ddc586d8b392f79fd0ce3c6/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.062286,
+              "scorer_cpu_seconds_through_reap": 0.211519,
+              "scorer_peak_memory_bytes": 31875072.0,
+              "scorer_sampled_peak_memory_bytes": 7168000.0,
+              "scorer_wall_seconds": 0.46587181091308594,
+              "solver_cpu_seconds_observed": 0.059522,
+              "solver_cpu_seconds_through_reap": 0.182771,
+              "solver_peak_memory_bytes": 30777344.0,
+              "solver_sampled_peak_memory_bytes": 7061504.0,
+              "solver_wall_seconds": 0.44422101974487305
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062286,
+                  "last_sample_unix": 1792756754.8885841,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7168000,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.059522,
+                  "last_sample_unix": 1792756754.185213,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7061504,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.211519,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31875072,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.182771,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30777344,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 336.93581446680133,
+          "loss_delta": 0.0,
+          "source_sha256": "9db2614f721414ec9250f174037fa5a9fcfb596ecc67d1edcdb88fed47858957",
+          "result": {
+            "candidate_id": "9db2614f721414ec9250f174037fa5a9fcfb596ecc67d1edcdb88fed47858957",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.057984043150915834,
+              "air_positive_volume": 1032.0,
+              "air_positive_voxels": 1032.0,
+              "contact_rmse": 1.8882581220147696,
+              "label_mismatches": 1169.0,
+              "loss_drillhole": 64.72185891649076,
+              "loss_outcrop": 272.2139555503106,
+              "loss_total": 336.93581446680133,
+              "positive_volume": 17798.0,
+              "positive_voxels": 17798.0,
+              "research_utility": -336.93581446680133
+            },
+            "artifacts": {
+              "model": "evaluations/0eebfc6988a92308fca7aabb17dfdec726fddec51cc324a1bde2638d2984718b/model/model.npy",
+              "model_slices": "evaluations/0eebfc6988a92308fca7aabb17dfdec726fddec51cc324a1bde2638d2984718b/model/slices.json",
+              "score": "jobs/24a8ebf2b9a48e5f4591f992f840c05018b4300a4071159620e9ec902fdd220f/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.063694,
+              "scorer_cpu_seconds_through_reap": 0.209923,
+              "scorer_peak_memory_bytes": 31277056.0,
+              "scorer_sampled_peak_memory_bytes": 6725632.0,
+              "scorer_wall_seconds": 0.5023059844970703,
+              "solver_cpu_seconds_observed": 17.010044,
+              "solver_cpu_seconds_through_reap": 17.123056,
+              "solver_peak_memory_bytes": 585781248.0,
+              "solver_sampled_peak_memory_bytes": 581853184.0,
+              "solver_wall_seconds": 17.371861934661865
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "0eebfc6988a92308fca7aabb17dfdec726fddec51cc324a1bde2638d2984718b",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063694,
+                  "last_sample_unix": 1792756775.0525343,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6725632,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 17.010044,
+                  "last_sample_unix": 1792756774.3242476,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 581853184,
+                  "samples": 77,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.209923,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31277056,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 17.123056,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 585781248,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 226.69640373113614,
+          "loss_delta": 0.0,
+          "source_sha256": "276d0a8a8c0e5f6f75baddfaacdc487b24940ab9a61e25a6545730f9760ba3ba",
+          "result": {
+            "candidate_id": "276d0a8a8c0e5f6f75baddfaacdc487b24940ab9a61e25a6545730f9760ba3ba",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.06268852459016394,
+              "air_positive_volume": 1434.0,
+              "air_positive_voxels": 1434.0,
+              "contact_rmse": 1.1776007208474255,
+              "label_mismatches": 1040.0,
+              "loss_drillhole": 44.096113156943915,
+              "loss_outcrop": 182.60029057419223,
+              "loss_total": 226.69640373113614,
+              "positive_volume": 22875.0,
+              "positive_voxels": 22875.0,
+              "research_utility": -226.69640373113614
+            },
+            "artifacts": {
+              "model": "evaluations/e847bf96922402e24a0c8a7ad39c428a3b6e7d39b3c320c8b456c091817e31cc/model/model.npy",
+              "model_slices": "evaluations/e847bf96922402e24a0c8a7ad39c428a3b6e7d39b3c320c8b456c091817e31cc/model/slices.json",
+              "score": "jobs/98f72dadbdb299f2f3f7b43dcd5d7c86b8a4ba37a41e9baf4d60dec5cdd0ba82/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.063826,
+              "scorer_cpu_seconds_through_reap": 0.19907,
+              "scorer_peak_memory_bytes": 31150080.0,
+              "scorer_sampled_peak_memory_bytes": 7200768.0,
+              "scorer_wall_seconds": 0.45311999320983887,
+              "solver_cpu_seconds_observed": 17.73745,
+              "solver_cpu_seconds_through_reap": 17.851453,
+              "solver_peak_memory_bytes": 93515776.0,
+              "solver_sampled_peak_memory_bytes": 93515776.0,
+              "solver_wall_seconds": 18.11140513420105
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "e847bf96922402e24a0c8a7ad39c428a3b6e7d39b3c320c8b456c091817e31cc",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063826,
+                  "last_sample_unix": 1792756796.3456595,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7200768,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 17.73745,
+                  "last_sample_unix": 1792756795.6660376,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 93515776,
+                  "samples": 81,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.19907,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31150080,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 17.851453,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 93515776,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 36.169527329826465,
+          "loss_delta": 0.0,
+          "source_sha256": "3514675b41830e1e5342d2ade97ddc225b0b1821c19ab78b729d662e99371e6e",
+          "result": {
+            "candidate_id": "3514675b41830e1e5342d2ade97ddc225b0b1821c19ab78b729d662e99371e6e",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 1.0416910117347389,
+              "label_mismatches": 65.0,
+              "loss_drillhole": 8.571581766222208,
+              "loss_outcrop": 27.597945563604256,
+              "loss_total": 36.169527329826465,
+              "positive_volume": 5281.0,
+              "positive_voxels": 5281.0,
+              "research_utility": -36.169527329826465
+            },
+            "artifacts": {
+              "model": "evaluations/351e5086143ae8f748379eb005e57471bbeff24fb2b18128866a5df8883a9b8a/model/model.npy",
+              "model_slices": "evaluations/351e5086143ae8f748379eb005e57471bbeff24fb2b18128866a5df8883a9b8a/model/slices.json",
+              "score": "jobs/a73f5ba491aa281224be305fe066fcefc41171178c918afc66aaf8df4b0a4393/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.065637,
+              "scorer_cpu_seconds_through_reap": 0.210914,
+              "scorer_peak_memory_bytes": 31698944.0,
+              "scorer_sampled_peak_memory_bytes": 8024064.0,
+              "scorer_wall_seconds": 0.476330041885376,
+              "solver_cpu_seconds_observed": 10.696656,
+              "solver_cpu_seconds_through_reap": 10.768659,
+              "solver_peak_memory_bytes": 95817728.0,
+              "solver_sampled_peak_memory_bytes": 95817728.0,
+              "solver_wall_seconds": 11.014566898345947
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "351e5086143ae8f748379eb005e57471bbeff24fb2b18128866a5df8883a9b8a",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.065637,
+                  "last_sample_unix": 1792756810.176674,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8024064,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 10.696656,
+                  "last_sample_unix": 1792756809.4877806,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 95817728,
+                  "samples": 49,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.210914,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31698944,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 10.768659,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 95817728,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:ee86081fbf3e82a03e7273520f79f0ab3e8376217fe002ebce9e0485a0fa1ace": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.41695380210876465,
+          "interface_cpu_seconds_through_reap": 0.174747,
+          "interface_cpu_seconds_observed": 0.063481
+        },
+        "copper:job:29231c62863598245d2b22ee9f7fcf9f486acf341162afeb48512b90df85d9af": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4212801456451416,
+          "interface_cpu_seconds_through_reap": 0.172665,
+          "interface_cpu_seconds_observed": 0.063295
+        },
+        "copper:job:ea9f73ca08791db5130959450d9422ea17ed025439f9c1dcb3abcfafef95cb62": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5492691993713379,
+          "interface_cpu_seconds_through_reap": 0.297655,
+          "interface_cpu_seconds_observed": 0.285654
+        },
+        "copper:job:bfd33b38fb0714c32a6ed7a66148ec4542b33c792a09eab91c1ecd288884e920": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5354530811309814,
+          "interface_cpu_seconds_through_reap": 0.297482,
+          "interface_cpu_seconds_observed": 0.282481
+        },
+        "copper:job:8ac575e84166f23fe5dda31e7668652b4f295cc0d2914e9fb844905e8ef8508b": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.779303789138794,
+          "interface_cpu_seconds_through_reap": 0.528707,
+          "interface_cpu_seconds_observed": 0.503716
+        },
+        "copper:job:391458907bccf4050e62de14935b06162ff780cc05fc76b59584efb97da17f1e": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.7510449886322021,
+          "interface_cpu_seconds_through_reap": 0.502265,
+          "interface_cpu_seconds_observed": 0.503264
+        },
+        "copper:job:b415b0063bb14057f902cad319696aa6fa160c048b320f181c16094b178d5a9d": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6113419532775879,
+          "interface_cpu_seconds_through_reap": 0.348665,
+          "interface_cpu_seconds_observed": 0.283662
+        },
+        "copper:job:8e61bb42c2abf14fc4c562d2fe5e8088a1815a83eb3a9929661c93c5b4a3b932": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6241781711578369,
+          "interface_cpu_seconds_through_reap": 0.369247,
+          "interface_cpu_seconds_observed": 0.285241
+        }
+      }
+    },
+    {
+      "case": "drillholes_sketch_2d",
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real2d-v2",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/real2d-v2",
+      "observations": [
+        {
+          "previous_loss": 293.2197607509265,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "contact_rmse": 10.13673154718478,
+              "label_mismatches": 17.0,
+              "loss_drillhole": 288.24921244543003,
+              "loss_sketch": 4.970548305496495,
+              "loss_total": 293.2197607509265,
+              "positive_area": 131.0,
+              "positive_voxels": 131.0,
+              "research_utility": -293.2197607509265
+            },
+            "artifacts": {
+              "model": "evaluations/fdfab3234601cbab7cbacf77b66a99e75c6af1f3daa38d23cb8acc18a527ba8a/model/model.npy",
+              "model_slices": "evaluations/fdfab3234601cbab7cbacf77b66a99e75c6af1f3daa38d23cb8acc18a527ba8a/model/slices.json",
+              "score": "jobs/f21e232a4ca204836b63bf06cbfdd03530c5f51ee193d218e6bbfd400ec5ced3/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.062713,
+              "scorer_cpu_seconds_through_reap": 0.182041,
+              "scorer_peak_memory_bytes": 27934720.0,
+              "scorer_sampled_peak_memory_bytes": 7163904.0,
+              "scorer_wall_seconds": 0.43033909797668457,
+              "solver_cpu_seconds_observed": 0.060628,
+              "solver_cpu_seconds_through_reap": 0.17487,
+              "solver_peak_memory_bytes": 27131904.0,
+              "solver_sampled_peak_memory_bytes": 7045120.0,
+              "solver_wall_seconds": 0.4366590976715088
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "fdfab3234601cbab7cbacf77b66a99e75c6af1f3daa38d23cb8acc18a527ba8a",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062713,
+                  "last_sample_unix": 1792756415.9013689,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7163904,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.060628,
+                  "last_sample_unix": 1792756415.2209444,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7045120,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.182041,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 27934720,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.17487,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 27131904,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 3.9504787503527625,
+          "loss_delta": 0.0,
+          "source_sha256": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+          "result": {
+            "candidate_id": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+            "status": "succeeded",
+            "metrics": {
+              "contact_rmse": 0.5,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 3.806621245531335,
+              "loss_sketch": 0.14385750482142745,
+              "loss_total": 3.9504787503527625,
+              "positive_area": 482.0,
+              "positive_voxels": 482.0,
+              "research_utility": -3.9504787503527625
+            },
+            "artifacts": {
+              "model": "evaluations/fd1a091095aa2413d921469617506554f3d4bf7289d3d38d1232f52020dd88b9/model/model.npy",
+              "model_slices": "evaluations/fd1a091095aa2413d921469617506554f3d4bf7289d3d38d1232f52020dd88b9/model/slices.json",
+              "score": "jobs/2e0a75e14271482d18ea5e466b934fa3bf40e53090f92271588bb0fddd609092/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.063013,
+              "scorer_cpu_seconds_through_reap": 0.180341,
+              "scorer_peak_memory_bytes": 27594752.0,
+              "scorer_sampled_peak_memory_bytes": 7405568.0,
+              "scorer_wall_seconds": 0.4204521179199219,
+              "solver_cpu_seconds_observed": 6.236773,
+              "solver_cpu_seconds_through_reap": 6.409779,
+              "solver_peak_memory_bytes": 28192768.0,
+              "solver_sampled_peak_memory_bytes": 28164096.0,
+              "solver_wall_seconds": 6.664454936981201
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "fd1a091095aa2413d921469617506554f3d4bf7289d3d38d1232f52020dd88b9",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063013,
+                  "last_sample_unix": 1792756424.8778744,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7405568,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 6.236773,
+                  "last_sample_unix": 1792756424.1605105,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 28164096,
+                  "samples": 29,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.180341,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 27594752,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 6.409779,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 28192768,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 3.7968566397997594,
+          "loss_delta": 0.0,
+          "source_sha256": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+          "result": {
+            "candidate_id": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+            "status": "succeeded",
+            "metrics": {
+              "contact_rmse": 0.5,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 3.710617574520831,
+              "loss_sketch": 0.08623906527892855,
+              "loss_total": 3.7968566397997594,
+              "positive_area": 484.0,
+              "positive_voxels": 484.0,
+              "research_utility": -3.7968566397997594
+            },
+            "artifacts": {
+              "model": "evaluations/4c2efbb488ebc6e70ac2179d0bf695761070eba6a56da23d2078655ac472891c/model/model.npy",
+              "model_slices": "evaluations/4c2efbb488ebc6e70ac2179d0bf695761070eba6a56da23d2078655ac472891c/model/slices.json",
+              "score": "jobs/7f1fe32c833f46390dfd0b3f19cfcf134ff374fb355b92ac62ff0bd1b60bc25a/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.064542,
+              "scorer_cpu_seconds_through_reap": 0.180798,
+              "scorer_peak_memory_bytes": 27602944.0,
+              "scorer_sampled_peak_memory_bytes": 7344128.0,
+              "scorer_wall_seconds": 0.4337921142578125,
+              "solver_cpu_seconds_observed": 24.329407,
+              "solver_cpu_seconds_through_reap": 24.45441,
+              "solver_peak_memory_bytes": 28561408.0,
+              "solver_sampled_peak_memory_bytes": 28303360.0,
+              "solver_wall_seconds": 24.695680856704712
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "4c2efbb488ebc6e70ac2179d0bf695761070eba6a56da23d2078655ac472891c",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.064542,
+                  "last_sample_unix": 1792756451.885707,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7344128,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 24.329407,
+                  "last_sample_unix": 1792756451.2009683,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 28303360,
+                  "samples": 111,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.180798,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 27602944,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 24.45441,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 28561408,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 3.7338023457590377,
+          "loss_delta": 0.0,
+          "source_sha256": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+          "result": {
+            "candidate_id": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+            "status": "succeeded",
+            "metrics": {
+              "contact_rmse": 0.5,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 3.6933990378850976,
+              "loss_sketch": 0.0404033078739402,
+              "loss_total": 3.7338023457590377,
+              "positive_area": 485.0,
+              "positive_voxels": 485.0,
+              "research_utility": -3.7338023457590377
+            },
+            "artifacts": {
+              "model": "evaluations/6f1e2debea89f58a3979f6eab42e7172d2cb8c561421084154c74674dade18f6/model/model.npy",
+              "model_slices": "evaluations/6f1e2debea89f58a3979f6eab42e7172d2cb8c561421084154c74674dade18f6/model/slices.json",
+              "score": "jobs/45bb458efa2a746f189ed881aa3fa38e1a71cfa35c73b9e140dc25958e62ba15/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.059988,
+              "scorer_cpu_seconds_through_reap": 0.179249,
+              "scorer_peak_memory_bytes": 27471872.0,
+              "scorer_sampled_peak_memory_bytes": 6844416.0,
+              "scorer_wall_seconds": 0.4283928871154785,
+              "solver_cpu_seconds_observed": 48.167521,
+              "solver_cpu_seconds_through_reap": 48.179521,
+              "solver_peak_memory_bytes": 28545024.0,
+              "solver_sampled_peak_memory_bytes": 28213248.0,
+              "solver_wall_seconds": 48.42545986175537
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "6f1e2debea89f58a3979f6eab42e7172d2cb8c561421084154c74674dade18f6",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.059988,
+                  "last_sample_unix": 1792756502.7168372,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6844416,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 48.167521,
+                  "last_sample_unix": 1792756502.0412862,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 28213248,
+                  "samples": 219,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.179249,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 27471872,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 48.179521,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 28545024,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:2411111a05fe0cfa82ecb1a987abbc253c6aaa7158818e0572f13bed4362f14a": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43285107612609863,
+          "interface_cpu_seconds_through_reap": 0.177209,
+          "interface_cpu_seconds_observed": 0.063955
+        },
+        "copper:job:fb96bbe4eb907fa6e6292dfc64f9bebf919f9a5b6615f68b4184ce7aa4d3b57e": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43146300315856934,
+          "interface_cpu_seconds_through_reap": 0.177065,
+          "interface_cpu_seconds_observed": 0.062775
+        },
+        "copper:job:eb87024265f643a62645dd14ea2793adafb2f139a6f0967a2231b547a378806f": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4530620574951172,
+          "interface_cpu_seconds_through_reap": 0.186856,
+          "interface_cpu_seconds_observed": 0.059592
+        },
+        "copper:job:5d1752ae5b81c3d967656ab4536d2aabb6745712b69d1c921f4ee2cd714280e1": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43838000297546387,
+          "interface_cpu_seconds_through_reap": 0.186681,
+          "interface_cpu_seconds_observed": 0.062394
+        },
+        "copper:job:55a16aeb2ca59d1ba04260aa4221543c1def5c73fa405e6f40733972232ff5ca": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43842601776123047,
+          "interface_cpu_seconds_through_reap": 0.189749,
+          "interface_cpu_seconds_observed": 0.061502
+        },
+        "copper:job:8e7dcedf15500db1c3ea2a751116126d90a2ebbad833601489620efc95ce6909": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.42995500564575195,
+          "interface_cpu_seconds_through_reap": 0.18542,
+          "interface_cpu_seconds_observed": 0.06512
+        },
+        "copper:job:e75721d7adf22dd43220e9a2c557f79dce7f5b76827577c4e24bbe684f39997e": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4383509159088135,
+          "interface_cpu_seconds_through_reap": 0.189996,
+          "interface_cpu_seconds_observed": 0.061755
+        },
+        "copper:job:4dee5b086f6fbb588200e8e6536d505e951914b0adc2bbd92c0944b69203636b": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43853211402893066,
+          "interface_cpu_seconds_through_reap": 0.18725,
+          "interface_cpu_seconds_observed": 0.061947
+        }
+      }
+    },
+    {
+      "case": "drillholes_3d",
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/p5-full-v1",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/p5-full-v1",
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 5.563958690902462,
+              "label_mismatches": 54.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_total": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -405.0795810830953
+            },
+            "artifacts": {
+              "model": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/model.npy",
+              "model_slices": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/slices.json",
+              "score": "jobs/eea6c2f12efb814970c2c62f99c25c4b66c1f8c2459358d31cf5231530b9850b/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.059884,
+              "scorer_cpu_seconds_through_reap": 0.207211,
+              "scorer_peak_memory_bytes": 30781440.0,
+              "scorer_sampled_peak_memory_bytes": 7184384.0,
+              "scorer_wall_seconds": 0.461961030960083,
+              "solver_cpu_seconds_observed": 0.062569,
+              "solver_cpu_seconds_through_reap": 0.180821,
+              "solver_peak_memory_bytes": 30035968.0,
+              "solver_sampled_peak_memory_bytes": 7430144.0,
+              "solver_wall_seconds": 0.4217221736907959
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.059884,
+                  "last_sample_unix": 1792756505.6513119,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7184384,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062569,
+                  "last_sample_unix": 1792756504.966658,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7430144,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.207211,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30781440,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.180821,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30035968,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.522992427679737,
+          "loss_delta": 0.0,
+          "source_sha256": "f3874cabe5fae08cea4152c4ab02e007745f29a29aa2eda038ee66e4adbe00d6",
+          "result": {
+            "candidate_id": "f3874cabe5fae08cea4152c4ab02e007745f29a29aa2eda038ee66e4adbe00d6",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0761639058413252,
+              "air_positive_volume": 2184.0,
+              "air_positive_voxels": 2184.0,
+              "contact_rmse": 0.27003225994752894,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.522992427679737,
+              "loss_total": 6.522992427679737,
+              "positive_volume": 28675.0,
+              "positive_voxels": 28675.0,
+              "research_utility": -6.522992427679737
+            },
+            "artifacts": {
+              "model": "evaluations/b599165af6d86942670416e138150ec22ad4bf6170ade532a091d13c962048e5/model/model.npy",
+              "model_slices": "evaluations/b599165af6d86942670416e138150ec22ad4bf6170ade532a091d13c962048e5/model/slices.json",
+              "score": "jobs/3089d244b53782dc9011e09c074a4e5de7c6b07aeb33a1bfbb6099b8b1d8d1b6/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.062685,
+              "scorer_cpu_seconds_through_reap": 0.204941,
+              "scorer_peak_memory_bytes": 30801920.0,
+              "scorer_sampled_peak_memory_bytes": 7573504.0,
+              "scorer_wall_seconds": 0.46584510803222656,
+              "solver_cpu_seconds_observed": 0.282677,
+              "solver_cpu_seconds_through_reap": 0.291678,
+              "solver_peak_memory_bytes": 48635904.0,
+              "solver_sampled_peak_memory_bytes": 45428736.0,
+              "solver_wall_seconds": 0.5344529151916504
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "b599165af6d86942670416e138150ec22ad4bf6170ade532a091d13c962048e5",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062685,
+                  "last_sample_unix": 1792756509.0739238,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7573504,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.282677,
+                  "last_sample_unix": 1792756508.3765879,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 45428736,
+                  "samples": 2,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.204941,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30801920,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.291678,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 48635904,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.519173431804898,
+          "loss_delta": 0.0,
+          "source_sha256": "591a38b863774e365f0ef1c279c9abdc4071fdd0254ffada1a5befb063602263",
+          "result": {
+            "candidate_id": "591a38b863774e365f0ef1c279c9abdc4071fdd0254ffada1a5befb063602263",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.021845488679030606,
+              "air_positive_volume": 576.0,
+              "air_positive_voxels": 576.0,
+              "contact_rmse": 0.27069115884178857,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.519173431804898,
+              "loss_total": 6.519173431804898,
+              "positive_volume": 26367.0,
+              "positive_voxels": 26367.0,
+              "research_utility": -6.519173431804898
+            },
+            "artifacts": {
+              "model": "evaluations/8d93ce40aeed12801bac0818e0d4fd580ad4862586c8ef3dfcc6e37ccd7c6f67/model/model.npy",
+              "model_slices": "evaluations/8d93ce40aeed12801bac0818e0d4fd580ad4862586c8ef3dfcc6e37ccd7c6f67/model/slices.json",
+              "score": "jobs/841c02b243fa930c3c17c2f4e8269c1706ea3d4a93fc771f22bc10ff5565a2ab/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.060899,
+              "scorer_cpu_seconds_through_reap": 0.205124,
+              "scorer_peak_memory_bytes": 31027200.0,
+              "scorer_sampled_peak_memory_bytes": 6766592.0,
+              "scorer_wall_seconds": 0.4571051597595215,
+              "solver_cpu_seconds_observed": 0.28313,
+              "solver_cpu_seconds_through_reap": 0.306132,
+              "solver_peak_memory_bytes": 52531200.0,
+              "solver_sampled_peak_memory_bytes": 49758208.0,
+              "solver_wall_seconds": 0.5690739154815674
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "8d93ce40aeed12801bac0818e0d4fd580ad4862586c8ef3dfcc6e37ccd7c6f67",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.060899,
+                  "last_sample_unix": 1792756512.4697473,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6766592,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.28313,
+                  "last_sample_unix": 1792756511.7812626,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 49758208,
+                  "samples": 2,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.205124,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31027200,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.306132,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 52531200,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.516789436652854,
+          "loss_delta": 0.0,
+          "source_sha256": "b7e7227e26a59ffe64032d3eabfc7966913dcf9d28710c68034bc5de9d6f51e4",
+          "result": {
+            "candidate_id": "b7e7227e26a59ffe64032d3eabfc7966913dcf9d28710c68034bc5de9d6f51e4",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.07270872796153285,
+              "air_positive_volume": 1996.0,
+              "air_positive_voxels": 1996.0,
+              "contact_rmse": 0.2700323026831926,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.516789436652854,
+              "loss_total": 6.516789436652854,
+              "positive_volume": 27452.0,
+              "positive_voxels": 27452.0,
+              "research_utility": -6.516789436652854
+            },
+            "artifacts": {
+              "model": "evaluations/dd153cdbd82eeb7c5c09c28f2c40b658e5a80dbb376daebeac1aa52c2d1690ea/model/model.npy",
+              "model_slices": "evaluations/dd153cdbd82eeb7c5c09c28f2c40b658e5a80dbb376daebeac1aa52c2d1690ea/model/slices.json",
+              "score": "jobs/3e043a42364ada6b9992724cf477f4017000020c1a46b63cba33b51af9c62192/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.060707,
+              "scorer_cpu_seconds_through_reap": 0.208961,
+              "scorer_peak_memory_bytes": 31145984.0,
+              "scorer_sampled_peak_memory_bytes": 7139328.0,
+              "scorer_wall_seconds": 0.45087289810180664,
+              "solver_cpu_seconds_observed": 0.281216,
+              "solver_cpu_seconds_through_reap": 0.293218,
+              "solver_peak_memory_bytes": 50728960.0,
+              "solver_sampled_peak_memory_bytes": 46268416.0,
+              "solver_wall_seconds": 0.5563418865203857
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "dd153cdbd82eeb7c5c09c28f2c40b658e5a80dbb376daebeac1aa52c2d1690ea",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.060707,
+                  "last_sample_unix": 1792756515.9085214,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7139328,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.281216,
+                  "last_sample_unix": 1792756515.243092,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 46268416,
+                  "samples": 2,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.208961,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31145984,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.293218,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 50728960,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:8bec07c8bfb7180a12b13e3a6755b78f553b3a6f1bf5736d24f67f091e618e53": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.42104291915893555,
+          "interface_cpu_seconds_through_reap": 0.172147,
+          "interface_cpu_seconds_observed": 0.059851
+        },
+        "copper:job:79c78c92df866d89671a4b9608438bde309b8d406b0a7e4b055db55245310b79": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4162251949310303,
+          "interface_cpu_seconds_through_reap": 0.173882,
+          "interface_cpu_seconds_observed": 0.061613
+        },
+        "copper:job:c07653ce0574aa556aaa08edd6d55c7497b68064087008bdca64490896f7ea63": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5390090942382812,
+          "interface_cpu_seconds_through_reap": 0.282709,
+          "interface_cpu_seconds_observed": 0.282709
+        },
+        "copper:job:a4a04ea914d59d2ad08719ce7f6d8e4a961183c42210556c4de432671aefd11d": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5322239398956299,
+          "interface_cpu_seconds_through_reap": 0.27901,
+          "interface_cpu_seconds_observed": 0.285016
+        },
+        "copper:job:1f98078a4e7bc2c300d2b9a46ee686bf91a38612d5e4669da913b2bede92f20d": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5257251262664795,
+          "interface_cpu_seconds_through_reap": 0.28561,
+          "interface_cpu_seconds_observed": 0.28561
+        },
+        "copper:job:8ddb360e845bd1e436392ef0bb1b0ddf69c22005115f1dc3c890058275b8a756": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5245728492736816,
+          "interface_cpu_seconds_through_reap": 0.276885,
+          "interface_cpu_seconds_observed": 0.281885
+        },
+        "copper:job:a73b009865639b05966f7b7167bcf7794a123d29fbf1e60e6c2e408e173ed887": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5348320007324219,
+          "interface_cpu_seconds_through_reap": 0.281986,
+          "interface_cpu_seconds_observed": 0.285987
+        },
+        "copper:job:e2dbbaaa8ef090275173eac19ffa95c805d45ebccc60de21556bdb8d7906c8fa": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5333008766174316,
+          "interface_cpu_seconds_through_reap": 0.277458,
+          "interface_cpu_seconds_observed": 0.2855
+        }
+      }
+    },
+    {
+      "case": "drillholes_3d",
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-bounded-20261023/runs/deepseek-drillholes_3d-v2",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/deepseek-drillholes_3d-v2",
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 5.563958690902462,
+              "label_mismatches": 54.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_total": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -405.0795810830953
+            },
+            "artifacts": {
+              "model": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/model.npy",
+              "model_slices": "evaluations/4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e/model/slices.json",
+              "score": "jobs/eea6c2f12efb814970c2c62f99c25c4b66c1f8c2459358d31cf5231530b9850b/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.062181,
+              "scorer_cpu_seconds_through_reap": 0.20943,
+              "scorer_peak_memory_bytes": 31215616.0,
+              "scorer_sampled_peak_memory_bytes": 7294976.0,
+              "scorer_wall_seconds": 0.4528539180755615,
+              "solver_cpu_seconds_observed": 0.06123,
+              "solver_cpu_seconds_through_reap": 0.18058,
+              "solver_peak_memory_bytes": 30134272.0,
+              "solver_sampled_peak_memory_bytes": 6946816.0,
+              "solver_wall_seconds": 0.4388139247894287
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "4e970e949a814ae7a9df95206caa204ead2838615953c07e6e290ed885a4d72e",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.062181,
+                  "last_sample_unix": 1792756518.707489,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7294976,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06123,
+                  "last_sample_unix": 1792756518.0230205,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6946816,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.20943,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31215616,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.18058,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30134272,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.637265557216811,
+          "loss_delta": 0.0,
+          "source_sha256": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+          "result": {
+            "candidate_id": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.058702998058810844,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.2642271692660949,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.637265557216811,
+              "loss_total": 6.637265557216811,
+              "positive_volume": 27818.0,
+              "positive_voxels": 27818.0,
+              "research_utility": -6.637265557216811
+            },
+            "artifacts": {
+              "model": "evaluations/005ac5fac381e2234b6e7e9c09697f8c66ae4026aef1e029ffe61eaf02590a29/model/model.npy",
+              "model_slices": "evaluations/005ac5fac381e2234b6e7e9c09697f8c66ae4026aef1e029ffe61eaf02590a29/model/slices.json",
+              "score": "jobs/87806659fd3d515f163a7e3ed088ba264446429c66f60d3ce91bb682d607e088/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.06411,
+              "scorer_cpu_seconds_through_reap": 0.20536,
+              "scorer_peak_memory_bytes": 30908416.0,
+              "scorer_sampled_peak_memory_bytes": 7467008.0,
+              "scorer_wall_seconds": 0.4546840190887451,
+              "solver_cpu_seconds_observed": 28.555136,
+              "solver_cpu_seconds_through_reap": 28.580136,
+              "solver_peak_memory_bytes": 47898624.0,
+              "solver_sampled_peak_memory_bytes": 47640576.0,
+              "solver_wall_seconds": 28.832556009292603
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "005ac5fac381e2234b6e7e9c09697f8c66ae4026aef1e029ffe61eaf02590a29",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06411,
+                  "last_sample_unix": 1792756550.1648579,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7467008,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 28.555136,
+                  "last_sample_unix": 1792756549.486801,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 47640576,
+                  "samples": 130,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.20536,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30908416,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 28.580136,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 47898624,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.5170875600651454,
+          "loss_delta": 0.0,
+          "source_sha256": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+          "result": {
+            "candidate_id": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.05883200634074288,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.26964489638826217,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.5170875600651454,
+              "loss_total": 6.5170875600651454,
+              "positive_volume": 27757.0,
+              "positive_voxels": 27757.0,
+              "research_utility": -6.5170875600651454
+            },
+            "artifacts": {
+              "model": "evaluations/313056f1a08985592c07bf23816366f8d3d2c88b0520fcc19f09863e767494be/model/model.npy",
+              "model_slices": "evaluations/313056f1a08985592c07bf23816366f8d3d2c88b0520fcc19f09863e767494be/model/slices.json",
+              "score": "jobs/e41134be3906c8bfa0784506bb67f8775758b833f41755622491436a9ac25477/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.061756,
+              "scorer_cpu_seconds_through_reap": 0.206053,
+              "scorer_peak_memory_bytes": 30892032.0,
+              "scorer_sampled_peak_memory_bytes": 7430144.0,
+              "scorer_wall_seconds": 0.4610018730163574,
+              "solver_cpu_seconds_observed": 32.985602,
+              "solver_cpu_seconds_through_reap": 33.155598,
+              "solver_peak_memory_bytes": 48066560.0,
+              "solver_sampled_peak_memory_bytes": 47964160.0,
+              "solver_wall_seconds": 33.41870713233948
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "313056f1a08985592c07bf23816366f8d3d2c88b0520fcc19f09863e767494be",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.061756,
+                  "last_sample_unix": 1792756586.1282988,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7430144,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 32.985602,
+                  "last_sample_unix": 1792756585.4158514,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 47964160,
+                  "samples": 150,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.206053,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30892032,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 33.155598,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 48066560,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 6.51660412687052,
+          "loss_delta": 0.0,
+          "source_sha256": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3",
+          "result": {
+            "candidate_id": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.058834125954748524,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.26840740376024746,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.51660412687052,
+              "loss_total": 6.51660412687052,
+              "positive_volume": 27756.0,
+              "positive_voxels": 27756.0,
+              "research_utility": -6.51660412687052
+            },
+            "artifacts": {
+              "model": "evaluations/eda9cc57472a52a56f9da842fafdad6719941d47655d150321fb0f9f7dca89a2/model/model.npy",
+              "model_slices": "evaluations/eda9cc57472a52a56f9da842fafdad6719941d47655d150321fb0f9f7dca89a2/model/slices.json",
+              "score": "jobs/bfad774a0c8338b3f9459d94ab997819cec382bd5be55832b8706785ed0caf74/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.059819,
+              "scorer_cpu_seconds_through_reap": 0.207087,
+              "scorer_peak_memory_bytes": 30728192.0,
+              "scorer_sampled_peak_memory_bytes": 7069696.0,
+              "scorer_wall_seconds": 0.450268030166626,
+              "solver_cpu_seconds_observed": 37.647511,
+              "solver_cpu_seconds_through_reap": 37.803402,
+              "solver_peak_memory_bytes": 48173056.0,
+              "solver_sampled_peak_memory_bytes": 48107520.0,
+              "solver_wall_seconds": 38.04870915412903
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "eda9cc57472a52a56f9da842fafdad6719941d47655d150321fb0f9f7dca89a2",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.059819,
+                  "last_sample_unix": 1792756626.7611315,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7069696,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 37.647511,
+                  "last_sample_unix": 1792756626.0241964,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 48107520,
+                  "samples": 171,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.207087,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30728192,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 37.803402,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 48173056,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:8bec07c8bfb7180a12b13e3a6755b78f553b3a6f1bf5736d24f67f091e618e53": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4313929080963135,
+          "interface_cpu_seconds_through_reap": 0.175193,
+          "interface_cpu_seconds_observed": 0.060901
+        },
+        "copper:job:79c78c92df866d89671a4b9608438bde309b8d406b0a7e4b055db55245310b79": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.41855502128601074,
+          "interface_cpu_seconds_through_reap": 0.174848,
+          "interface_cpu_seconds_observed": 0.061545
+        },
+        "copper:job:0e24a48759e3a4de236b978540075175f4267a3b8a4f33aa16e4af1b91795792": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.43997812271118164,
+          "interface_cpu_seconds_through_reap": 0.182627,
+          "interface_cpu_seconds_observed": 0.062394
+        },
+        "copper:job:e2d6813564aa05d1b5b0b987e8fa1732a2773788303f2ede69d1846bbac60082": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6502420902252197,
+          "interface_cpu_seconds_through_reap": 0.398272,
+          "interface_cpu_seconds_observed": 0.286274
+        },
+        "copper:job:2f96f4aca2e2638963c16866fc98748ca8630137506c2fe11f9a4b1b269bac82": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.45540308952331543,
+          "interface_cpu_seconds_through_reap": 0.182521,
+          "interface_cpu_seconds_observed": 0.062287
+        },
+        "copper:job:b6b60eabda0bc8f04c140284e73b5086070d55181588f046eaf4b366b0efbac9": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6685030460357666,
+          "interface_cpu_seconds_through_reap": 0.4122,
+          "interface_cpu_seconds_observed": 0.280204
+        },
+        "copper:job:8fc8458422bd5ec23f30e888286a8bed5febf53ea9de89a17f9dabb1edada1f3": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4330470561981201,
+          "interface_cpu_seconds_through_reap": 0.183286,
+          "interface_cpu_seconds_observed": 0.063022
+        },
+        "copper:job:708ebd72c8171e86133fbd74eb07b1e8509af890fdd4ace2f2707ed6ffdf79c1": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.6696569919586182,
+          "interface_cpu_seconds_through_reap": 0.415444,
+          "interface_cpu_seconds_observed": 0.282645
+        }
+      }
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-budgeted-20261023/runs/deepseek-drillholes_outcrops_3d-v3",
+      "replay": "/Aidata/shared/ldm/copper-final-audit-20261023/runs/final-input-replay/deepseek-drillholes_outcrops_3d-v3",
+      "observations": [
+        {
+          "previous_loss": 1248.8385761871953,
+          "loss_delta": 0.0,
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+          "result": {
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 10.032113812425068,
+              "label_mismatches": 884.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_outcrop": 843.7589951040999,
+              "loss_total": 1248.8385761871953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -1248.8385761871953
+            },
+            "artifacts": {
+              "model": "evaluations/74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35/model/model.npy",
+              "model_slices": "evaluations/74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35/model/slices.json",
+              "score": "jobs/fb94a3467ddcf57ced8e1951500469319465ec223ddc586d8b392f79fd0ce3c6/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.061321,
+              "scorer_cpu_seconds_through_reap": 0.208577,
+              "scorer_peak_memory_bytes": 32002048.0,
+              "scorer_sampled_peak_memory_bytes": 7360512.0,
+              "scorer_wall_seconds": 0.4583160877227783,
+              "solver_cpu_seconds_observed": 0.061586,
+              "solver_cpu_seconds_through_reap": 0.1819,
+              "solver_peak_memory_bytes": 30691328.0,
+              "solver_sampled_peak_memory_bytes": 7311360.0,
+              "solver_wall_seconds": 0.4257230758666992
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "74f5fd1a530ae2f882717aaaaf0648915bda53835dd762618b92cc129980fd35",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.061321,
+                  "last_sample_unix": 1792756629.563759,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7360512,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.061586,
+                  "last_sample_unix": 1792756628.8875282,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7311360,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.208577,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 32002048,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 0.1819,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 30691328,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 129.95807053858255,
+          "loss_delta": 0.0,
+          "source_sha256": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+          "result": {
+            "candidate_id": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.03725735754539762,
+              "air_positive_volume": 238.0,
+              "air_positive_voxels": 238.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 28.54159361793223,
+              "loss_outcrop": 101.41647692065033,
+              "loss_total": 129.95807053858255,
+              "positive_volume": 6388.0,
+              "positive_voxels": 6388.0,
+              "research_utility": -129.95807053858255
+            },
+            "artifacts": {
+              "model": "evaluations/eb65fc6883b6761feebc04452ceaad262982e99d403a3a2cac42fd2ce11d72cf/model/model.npy",
+              "model_slices": "evaluations/eb65fc6883b6761feebc04452ceaad262982e99d403a3a2cac42fd2ce11d72cf/model/slices.json",
+              "score": "jobs/156b4ac3f8651b292e3c19033164008ff34c0cc0f17c08a6005560496745ee4e/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.059649,
+              "scorer_cpu_seconds_through_reap": 0.207322,
+              "scorer_peak_memory_bytes": 31420416.0,
+              "scorer_sampled_peak_memory_bytes": 7065600.0,
+              "scorer_wall_seconds": 0.45987892150878906,
+              "solver_cpu_seconds_observed": 1.388181,
+              "solver_cpu_seconds_through_reap": 1.453183,
+              "solver_peak_memory_bytes": 75022336.0,
+              "solver_sampled_peak_memory_bytes": 75022336.0,
+              "solver_wall_seconds": 1.7020809650421143
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "eb65fc6883b6761feebc04452ceaad262982e99d403a3a2cac42fd2ce11d72cf",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.059649,
+                  "last_sample_unix": 1792756633.6497302,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7065600,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 1.388181,
+                  "last_sample_unix": 1792756632.9648454,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 75022336,
+                  "samples": 7,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.207322,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31420416,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 1.453183,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 75022336,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 35.64507949884431,
+          "loss_delta": 0.0,
+          "source_sha256": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+          "result": {
+            "candidate_id": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 9.0,
+              "loss_drillhole": 8.186817884638135,
+              "loss_outcrop": 27.458261614206176,
+              "loss_total": 35.64507949884431,
+              "positive_volume": 5727.0,
+              "positive_voxels": 5727.0,
+              "research_utility": -35.64507949884431
+            },
+            "artifacts": {
+              "model": "evaluations/b9ee77d0fdddfb3e1762e5d83f66a8afbde9e804f7ecbbd09d214d18bbb5f054/model/model.npy",
+              "model_slices": "evaluations/b9ee77d0fdddfb3e1762e5d83f66a8afbde9e804f7ecbbd09d214d18bbb5f054/model/slices.json",
+              "score": "jobs/c41596580cabdaa84ec2b53eaaaaf7bbd94aada627dc71df2dc3184f3dd8fe09/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.065237,
+              "scorer_cpu_seconds_through_reap": 0.211497,
+              "scorer_peak_memory_bytes": 31244288.0,
+              "scorer_sampled_peak_memory_bytes": 7524352.0,
+              "scorer_wall_seconds": 0.4734189510345459,
+              "solver_cpu_seconds_observed": 2.047969,
+              "solver_cpu_seconds_through_reap": 2.164974,
+              "solver_peak_memory_bytes": 101818368.0,
+              "solver_sampled_peak_memory_bytes": 101818368.0,
+              "solver_wall_seconds": 2.4126930236816406
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "b9ee77d0fdddfb3e1762e5d83f66a8afbde9e804f7ecbbd09d214d18bbb5f054",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.065237,
+                  "last_sample_unix": 1792756638.4941618,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7524352,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 2.047969,
+                  "last_sample_unix": 1792756637.795535,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 101818368,
+                  "samples": 10,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.211497,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31244288,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 2.164974,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 101818368,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        },
+        {
+          "previous_loss": 35.59948797699014,
+          "loss_delta": 0.0,
+          "source_sha256": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2",
+          "result": {
+            "candidate_id": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2",
+            "status": "succeeded",
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 9.0,
+              "loss_drillhole": 8.118387492462013,
+              "loss_outcrop": 27.481100484528127,
+              "loss_total": 35.59948797699014,
+              "positive_volume": 5727.0,
+              "positive_voxels": 5727.0,
+              "research_utility": -35.59948797699014
+            },
+            "artifacts": {
+              "model": "evaluations/1193e93bbaf0a3e2b666677fd783fad1dcce4cfc5bae458d1dbcb15e9bb156bc/model/model.npy",
+              "model_slices": "evaluations/1193e93bbaf0a3e2b666677fd783fad1dcce4cfc5bae458d1dbcb15e9bb156bc/model/slices.json",
+              "score": "jobs/0e1fba99cea6fd05f8c7acf1fe83710580081b619516616ddb3adffb3865c566/output/result.json"
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.06154,
+              "scorer_cpu_seconds_through_reap": 0.210751,
+              "scorer_peak_memory_bytes": 31322112.0,
+              "scorer_sampled_peak_memory_bytes": 6905856.0,
+              "scorer_wall_seconds": 0.45862412452697754,
+              "solver_cpu_seconds_observed": 4.257626,
+              "solver_cpu_seconds_through_reap": 4.389629,
+              "solver_peak_memory_bytes": 142204928.0,
+              "solver_sampled_peak_memory_bytes": 141996032.0,
+              "solver_wall_seconds": 4.6422438621521
+            },
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "1193e93bbaf0a3e2b666677fd783fad1dcce4cfc5bae458d1dbcb15e9bb156bc",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06154,
+                  "last_sample_unix": 1792756645.5195878,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 6905856,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 4.257626,
+                  "last_sample_unix": 1792756644.8480942,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 141996032,
+                  "samples": 20,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47,
+              "workload_resources": {
+                "scorer": {
+                  "cpu_seconds_through_reap": 0.210751,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 31322112,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                },
+                "solver": {
+                  "cpu_seconds_through_reap": 4.389629,
+                  "exit_code": 0,
+                  "oom_kill_count": 0,
+                  "peak_memory_bytes": 142204928,
+                  "schema_version": 1,
+                  "scope": "container workload and supervisor through final descendant reap",
+                  "workload_complete": true
+                }
+              }
+            }
+          },
+          "repeat_read_no_new_usage": true
+        }
+      ],
+      "job_usage": {
+        "copper:job:ee86081fbf3e82a03e7273520f79f0ab3e8376217fe002ebce9e0485a0fa1ace": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.41423487663269043,
+          "interface_cpu_seconds_through_reap": 0.17366,
+          "interface_cpu_seconds_observed": 0.063393
+        },
+        "copper:job:29231c62863598245d2b22ee9f7fcf9f486acf341162afeb48512b90df85d9af": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.42099595069885254,
+          "interface_cpu_seconds_through_reap": 0.173966,
+          "interface_cpu_seconds_observed": 0.062688
+        },
+        "copper:job:5b66abf1d7a23cd01161f65b881e5c896f20e42b827722eaab9abbefc38f395f": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.4893620014190674,
+          "interface_cpu_seconds_through_reap": 0.242651,
+          "interface_cpu_seconds_observed": 0.061442
+        },
+        "copper:job:11fd6aa834217f48fd90c5eef6f528866458457821e83b0e60e1de638e19a790": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.48694300651550293,
+          "interface_cpu_seconds_through_reap": 0.242522,
+          "interface_cpu_seconds_observed": 0.061299
+        },
+        "copper:job:b6dd8e927eaf7e85e966f054333cd5f41e3840c304b3e7db2fe1fe5b81fa49b9": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5206899642944336,
+          "interface_cpu_seconds_through_reap": 0.260211,
+          "interface_cpu_seconds_observed": 0.062002
+        },
+        "copper:job:9d30d3712461d4dad0cd9c7568f882b52dc46008a7a5c2902dd1fac459d75d66": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5197479724884033,
+          "interface_cpu_seconds_through_reap": 0.26406,
+          "interface_cpu_seconds_observed": 0.060839
+        },
+        "copper:job:7e02ce1b39fb8fc2abd4c1040c75de4b6bfd93d94ee3a25388f6f923fb6ec1f2": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5180420875549316,
+          "interface_cpu_seconds_through_reap": 0.266332,
+          "interface_cpu_seconds_observed": 0.065122
+        },
+        "copper:job:05ea45190e487365f55253857d3bdaed8021fc0e3544df2fd023aeff39522884": {
+          "interface_jobs": 1,
+          "interface_wall_seconds": 0.5086140632629395,
+          "interface_cpu_seconds_through_reap": 0.263751,
+          "interface_cpu_seconds_observed": 0.062505
+        }
+      }
+    }
+  ],
+  "raw_archive": {
+    "host": "120.133.37.228:10522",
+    "path": "/mnt/cephfs/xingyu/ldm/archive/copper-inversion/final-input-replay-20261023.tar.gz",
+    "sha256": "184a75e0da58cba08e0a90894ba635d202707b8980c49012a43dcf7ef7c4b89d"
+  }
+}

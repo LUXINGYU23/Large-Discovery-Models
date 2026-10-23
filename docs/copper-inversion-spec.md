@@ -1,6 +1,6 @@
 # Copper Inversion：Agent 反演算法发现任务规格
 
-日期：2026-10-23。版本：1.2，已对齐 main PR #14。状态：第一阶段已完成远程 2D 与两个 3D case 单 agent 三轮闭环；P5 共享研究树和 GP 选点已实现并通过远程 mock，真实 native fork 三轮已完成，完整 spec 边界审计仍在进行。详见 [实现记录](copper-inversion-implementation.md) 和 [验收台账](copper-inversion-acceptance.md)。
+日期：2026-10-23。版本：1.2，已对齐 main PR #14。状态：P0–P5 工程交付与逐项验收完成；注册资格保持 contract_verified / draft，不宣称官方 benchmark 或方法优势。详见 [最终审计](copper-inversion-final-audit.md)、[最终结果](copper-inversion-final-results.md)和[验收台账](copper-inversion-acceptance.md)。
 
 本规格规定新增 `copper_inversion` 任务的科学问题、候选接口、可信执行边界和交付门槛。第一阶段完成持久 Agent 设计、提交、执行、读取反馈并修改反演算法的闭环；第二阶段在相同科学契约上接入 LDM surrogate/acquisition。各阶段独立记录证据，不能把注册成功、mock 运行或分数下降当成完整方法有效性证明。
 
@@ -240,9 +240,9 @@ tasks/copper_inversion/
   ldm_task/{__init__,procedure,dependencies}.py
   core/
     data.py, geometry.py, objective.py, candidate.py
-    interface_checks.py, execution.py, runner.py, scorer.py, evaluator.py
+    interface_checks.py, execution.py, supervisor.py, runner.py, scorer.py, evaluator.py
     harness.py, harness_runtime.py, task_spec.py, workflow.py
-    mock.py, dependencies.py, surrogate.py
+    mock.py, dependencies.py, surrogate.py, feedback.py
   resources/
     cases/<case_id>/                      # 原始必要数据、manifest
     selfcheck.py, TASK.md                 # 固定公开自检；fixture/schema 在可信 core 内
@@ -308,11 +308,11 @@ P3 验收不要求分数一定改进：必须能证明 agent 完成代码设计�
 4. 将本规格预算写成 runner-enforced profile；不存在的 CLI/config 不提前当作已可执行命令。
 5. 按第 7.3 节实现现有 evaluation_attempt_usage_key/consume_many 接点，补齐任务 solver/scorer 子回执；不得重新实现共享评估提交协议。
 
-以上事项由实现阶段检查解决，未完成时保留 draft 状态，不阻止开始 P0/P1。本规格没有启动任何远程实验，也不声明候选或系统已通过验收。
+以上事项由实现阶段检查解决，未完成时保留 draft 状态，不阻止开始 P0/P1。这是实施前检查清单；后续完成证据见最终审计。
 
 ## 14. v1.1 架构更新验收增量
 
-本轮只修订 spec，未执行候选或远程测试。实现时额外覆盖：
+v1.1 修订时尚未执行候选或远程测试。后续实现已按最终审计覆盖：
 
 - 唯一 runtime、启动失败清理、正式计数与子 job 计数不重复。
 - 在 evaluator 返回前后、结果发布后 checkpoint 前注入中断；参考现有 `tests/test_ldm_engine.py` / `tests/test_campaign.py` 的真实边界。
@@ -330,13 +330,13 @@ P3 验收不要求分数一定改进：必须能证明 agent 完成代码设计�
 已复用共享 Campaign/Engine/Harness 完成 baseline + 三轮独立算法设计；
 真实损失依次为 293.2197608、3.9504788、3.7968566、3.7338023。
 只读接口、独立评分、原式对照、恢复幂等性和最终执行器复评均已验证。
-最终远程回归 162 项通过。主循环源码快照随远程 run 归档；其后收窄容器代码挂载、
+第一阶段当时的远程回归 162 项通过。主循环源码快照随远程 run 归档；其后收窄容器代码挂载、
 补充 CLI 超时暂停、preflight 用量恢复和 sidecar digest 固定；最终执行器复评四个源码，
 损失与主运行逐项一致。
 
 资格阶段为 contract_verified，experiment 保持 draft：ZIP 来源有内容摘要，但尚未完成
 官方 benchmark 来源/预算认证；2D 闭环工程证据不自动升级为方法有效性证明。
-P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导随后已实现并完成旧版真实三轮；当前版本整批准入与监督执行器的最终 P5 真运行仍待验收，见验收台账。
+P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导随后已实现并完成旧版真实三轮；最终整批准入与监督执行器的 P5 三轮现已验收，最后的输入核对修复由 98 项任务回归和 28 份算法复评覆盖，见最终审计。
 
 后续所有真实调试和运行使用 DeepSeek 官方 `https://api.deepseek.com`、`deepseek-flash`（V4.1 Flash）、`low` 思考强度；API key 从远程受保护存储读取。已有旧模型实验保留原模型身份，切换后创建新运行目录。
 

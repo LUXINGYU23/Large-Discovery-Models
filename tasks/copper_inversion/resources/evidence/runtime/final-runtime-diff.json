@@ -1,0 +1,14 @@
+{
+  "frozen_campaign_root": "/Aidata/shared/ldm/copper-inversion-20261023",
+  "final_evaluator_root": "/Aidata/shared/ldm/copper-final-audit-20261023",
+  "changed_runtime_files": [
+    "core/runner.py"
+  ],
+  "before": {
+    "core/runner.py": "62f9c791c09d0a4fa39c6f20ccbe40ddb0df571eaec677075de38080fd91dae8"
+  },
+  "after": {
+    "core/runner.py": "cc95df0e0cd213dd608e80233eabde0f14d2813612070daa124d9708dd7af35f"
+  },
+  "scope": "Only input-integrity check and explicit masked-array rejection changed after frozen P5 launch; scientific objective, shared engine, Harness and task resources unchanged"
+}
