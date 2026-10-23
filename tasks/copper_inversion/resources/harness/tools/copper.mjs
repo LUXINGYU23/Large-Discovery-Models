@@ -1,6 +1,13 @@
 import {readFileSync,mkdirSync,cpSync} from 'node:fs';
 import {join} from 'node:path';
 export default function(pi) {
+  pi.on('tool_call', (event) => {
+    if (event.toolName !== 'bash') return;
+    const timeout = event.input.timeout;
+    if (!Number.isFinite(timeout) || timeout <= 0 || timeout > 60) {
+      return {block:true, reason:'Research bash commands require an explicit timeout positive and at most 60 seconds. Use read/write tools for file operations. Keep a complete candidate and submit before the turn deadline; formal solver evaluation retains its separate task budget.'};
+    }
+  });
   pi.registerTool({name:'get_inversion_context',label:'Read public inversion case and measured history',
     description:'Export public data, fixed read-only selfcheck, objective source, and authoritative evaluated algorithms into guest files. Read these files before designing solver.py. Includes all measured source code and losses.',
     parameters:{type:'object',properties:{},additionalProperties:false},

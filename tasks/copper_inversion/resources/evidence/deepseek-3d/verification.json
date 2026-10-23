@@ -1,0 +1,27 @@
+{
+  "scientific_and_execution_code_unchanged": true,
+  "python_tests": {
+    "result": "169 passed in 28.11s",
+    "log_sha256": "92302319a0c217869bb0fd2ce7f81f3260f1f1a961e573d24a00f5874d33e37f"
+  },
+  "node_policy_tests": {
+    "passed": 3,
+    "failed": 0,
+    "log_sha256": "ab97b12d74f44b5dcb79f73e6ebe6e650889507886bb5ccd7188bb8f739f13e1"
+  },
+  "archives": {
+    "deepseek-outcrops-completed.tar.gz": {
+      "sha256": "82fd2324b4ea0ad0696263080aa0ea1fec89f3d5865c390dd1b190e303f5aa7b",
+      "bytes": 6085225
+    },
+    "deepseek-prior-attempts.tar.gz": {
+      "sha256": "25794ad479f54d3992ccd918e739916661496b26250baf42c307e00ebb266339",
+      "bytes": 15348536
+    }
+  },
+  "campaign_implementation_sha256": "097e5a1baeeeff89e128c2c94b747e0078666ac5fbae253ebea9081f024de892",
+  "final_implementation_sha256": "3116b73a40dbc8c1db76f308064e8e601fabedfd99508997910f47136538eef6",
+  "post_campaign_changes": [
+    "Generalized the research-command rejection message to cover both 2D and 3D formal solver budgets; execution limits unchanged."
+  ]
+}

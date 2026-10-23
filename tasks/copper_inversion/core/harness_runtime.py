@@ -74,7 +74,7 @@ def open_client(args, root, problem, stack, account):
         context7_enabled=False,
         limits=HarnessLimits(
             wall_time_seconds=args.harness_seconds,
-            tool_call_budgets={"web_search": 0, "web_fetch": 0},
+            tool_call_budgets={"bash": 8, "web_search": 0, "web_fetch": 0},
         ),
     )
     _preflight(args, root, config, key, account)

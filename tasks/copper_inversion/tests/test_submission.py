@@ -84,3 +84,27 @@ def test_default_provider_is_official_deepseek_low():
     assert args.llm_url == "https://api.deepseek.com"
     assert args.llm_model == "deepseek-flash"
     assert args.thinking == "low"
+
+
+def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
+    from contextlib import ExitStack
+    from tasks.copper_inversion.core import harness_runtime as h
+    from tasks.copper_inversion.core.workflow import parse_args
+    from tasks.copper_inversion.core.data import load_problem
+
+    captured = []
+    class Client:
+        def __init__(self, *args, **kwargs):
+            captured.append(kwargs["config"])
+        def start(self):
+            pass
+        def close(self):
+            pass
+    monkeypatch.setenv("LLM_API_KEY", "test-only-key")
+    monkeypatch.setattr(h, "HarnessClient", Client)
+    monkeypatch.setattr(h, "_preflight", lambda *args: None)
+    with ExitStack() as stack:
+        h.open_client(parse_args([]), tmp_path, load_problem("drillholes_sketch_2d", fixture=True), stack, lambda *a, **k: None)
+    assert captured[0].limits.tool_call_budgets["bash"] == 8
+    assert captured[0].thinking == "low"
+    assert captured[0].force_first_tool_call is False

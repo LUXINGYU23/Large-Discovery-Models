@@ -177,3 +177,12 @@ DeepSeek 思考模式拒绝 `tool_choice=required`，因此复用 PiHarnessConfi
 最终按共享 workflow 的方式使用已解析 image digest 验证通过。
 详见 [3D 最终验证](../tasks/copper_inversion/resources/evidence/3d/verification.json)。
 此项验证是新端点连通与 Harness 工具链预检，尚未在 DeepSeek 下重跑三轮算法设计。
+
+
+## DeepSeek 官方端点三轮实跑
+
+两个 3D case 已使用 `deepseek-flash / low` 完成单 agent 三轮。钻孔最佳 6.516604，
+露头最佳 35.599488；成功运行分别为 18.08 和 9.08 分钟，计入失败尝试分别为 39.05 和 39.85 分钟。
+首次尝试出现研究超时，补充时间提示后钻孔完成；露头还需要复用共享工具预算限制研究 bash 次数，
+所以这是工程对照，不能把时间差异完全归因于模型。科学定义、只读接口和独立评分保持不变。
+详见 [完整对照报告](copper-inversion-deepseek-comparison.md)。

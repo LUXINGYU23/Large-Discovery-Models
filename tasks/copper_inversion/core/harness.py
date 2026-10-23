@@ -132,6 +132,7 @@ class Expander:
                 {
                     "instruction": "Read get_inversion_context, inspect measured feedback and improve the algorithm. Submit one complete solver.",
                     "round": request.round_idx,
+                    "research_wall_time_seconds": self.client.config.limits.wall_time_seconds,
                     "known_sources": sorted(known),
                 }
             ),

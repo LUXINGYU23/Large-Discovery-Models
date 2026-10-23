@@ -1,0 +1,292 @@
+{
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-bounded-20261023/runs/deepseek-drillholes_3d-v2",
+  "config": {
+    "case_id": "drillholes_3d",
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "harness_cache_dir": "/mnt/data1/Large-Discovery-Models/cache/gondolin",
+    "harness_seconds": 900,
+    "implementation_sha256": "8560e1566b21677702c58f75ac7c6dbdb6c8b9551b2a64bfa2d3b9f335b7d6c7",
+    "iterations": 3,
+    "llm_model": "deepseek-flash",
+    "llm_url": "https://api.deepseek.com",
+    "mock": false,
+    "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "solver_seconds": 120,
+    "thinking": "low"
+  },
+  "status": "completed",
+  "contract_profile": "harness_drillholes_3d",
+  "contract_sha256": "e0edf2c4ce82f7cbfacb7b650c29df927c91b7b169c65ba4bf6b168260fd8c2b",
+  "single_research_session": "01a16771-57a9-714f-a84f-e6ce6117209b",
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25374098,
+      "harness_tool_calls": 59,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 971.8020343184471,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.864121198654175,
+      "llm_requests": 60,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.1134870052337646,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 91.39759349822998,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "interface_jobs": 24,
+      "outer_iterations": 4,
+      "scorer_jobs": 4,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "timing": {
+    "campaign_wall_seconds": 1084.9498794078827,
+    "research_seconds": 971.8020343184471,
+    "solver_seconds_including_baseline": 91.39759349822998,
+    "preflight_seconds": 12.462554447352886
+  },
+  "observations": [
+    {
+      "solver_wall_seconds": 0.5289511680603027,
+      "round": 0,
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "source_path": "candidates/3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f/solver.py",
+      "annotations": {},
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/04b833b37b6c2bd020a16ec8f4296209bc640b29dd8a5e74d9ea0fe8b3f92a5b/model/model.npy",
+          "score": "jobs/c06e7bc0a8993c37d4b4acb847daa789e04605d0d1ada8d5a57532d184350b25/output/result.json"
+        },
+        "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "04b833b37b6c2bd020a16ec8f4296209bc640b29dd8a5e74d9ea0fe8b3f92a5b",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 5.563958690902462,
+          "label_mismatches": 54.0,
+          "loss_drillhole": 405.0795810830953,
+          "loss_total": 405.0795810830953,
+          "positive_voxels": 1655.0,
+          "research_utility": -405.0795810830953
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "cbb120b5f62c9a6a1c48952d4d09d2b38919715b83ddde1f6992151717bf77a7"
+    },
+    {
+      "solver_wall_seconds": 26.32838249206543,
+      "round": 1,
+      "source_sha256": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+      "source_path": "candidates/043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e/solver.py",
+      "annotations": {
+        "change_summary": "Replaced the initial-level-set passthrough with a drillhole-aware height-field solver: detect that labels are ordered above/below contacts, fit a Gaussian RBF + affine contact surface, then optimise its coefficients against the published objective (logistic labels, contact mean/variance, sketch when present) under a wall-time bound. Generic RBF correction of the initial field remains as a fallback for non-height-field, no-contact, and 2-D sketch fixtures.",
+        "parent_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "rationale": "Measured baseline returned the initial level set (loss_total 405.08, 54 sign mismatches, contact RMSE 5.56). Inspection showed all 70 drillhole labels lie on four vertical holes and are separated by exactly four 0.5 contacts, so a smooth single-valued contact surface (interior above) is the natural geometry. A Gaussian RBF + affine surface interpolates the contacts exactly; choosing the kernel width and a small 1-D vertical shift, then bounded Nelder-Mead refinement, reduced the public objective to 6.637 (0 label mismatches, contact RMSE 0.264, about 26 s of the 120 s budget). This is close to the analytic floor from four contact-logistic terms plus the nearest labelled cells. Public selfcheck and synthetic 2-D sketch / scattered-3-D fixtures also return finite fields with both signs."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/9f8eb085f3d59c4ea314be42dd3c13af469e32e7a1760e7d2e33cd89bdd73339/model/model.npy",
+          "score": "jobs/49830ce32f8894d776aa81e534b1d7565851569a6c6287d2b785d89d4661fbe6/output/result.json"
+        },
+        "candidate_id": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "9f8eb085f3d59c4ea314be42dd3c13af469e32e7a1760e7d2e33cd89bdd73339",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.2642271692660949,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.637265557216811,
+          "loss_total": 6.637265557216811,
+          "positive_voxels": 27818.0,
+          "research_utility": -6.637265557216811
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "488c941e52664adf86f6ce4b901c694d3b77efeceae51dbe05e083db26d567ea"
+    },
+    {
+      "solver_wall_seconds": 30.481849431991577,
+      "round": 2,
+      "source_sha256": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+      "source_path": "candidates/86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0/solver.py",
+      "annotations": {
+        "change_summary": "Added a bounded local-flattening post-process after the Gaussian-RBF height-field fit. Around each contact the zero surface is made locally horizontal on a small disk and blended smoothly back into the fitted surface; disk radius, blend width and per-contact plateau heights are selected against the published objective. This raises the Euclidean distance from the zero surface to the labelled cells immediately above/below each contact and lowers the logistic/contact terms.",
+        "parent_sha256": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+        "rationale": "Round-1 measured 6.6373 (0 mismatches, contact RMSE 0.264). Diagnostics showed the remaining loss is dominated by contact logistic terms and the first label cell above/below each contact: surface tilt reduced their distances (e.g. nearest below-cell distance 0.67 instead of ~1). Flattening a small disk around each contact makes those distances near-vertical while a loss-guided search chooses the disk geometry and plateau heights, including contact bias. Local score improved reproducibly to 6.5171 with 0 mismatches, contact RMSE 0.2696, and ~30 s runtime, well inside the 120 s budget; public selfcheck still passes."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/6eca72e6677e1d03a40161c5df76f6cf97981db3e780b10f354d1e05f85841d3/model/model.npy",
+          "score": "jobs/16772c7b3f642fb65a16793c296f04d527f09694b1043650957d412cfd460642/output/result.json"
+        },
+        "candidate_id": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "6eca72e6677e1d03a40161c5df76f6cf97981db3e780b10f354d1e05f85841d3",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.26964489638826217,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.5170875600651454,
+          "loss_total": 6.5170875600651454,
+          "positive_voxels": 27757.0,
+          "research_utility": -6.5170875600651454
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "bd1f121c0eb5410a67232e87ebc3edb3f0a14bd386f4e16a2ddc205615ed9350"
+    },
+    {
+      "solver_wall_seconds": 34.05841040611267,
+      "round": 3,
+      "source_sha256": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3",
+      "source_path": "candidates/7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3/solver.py",
+      "annotations": {
+        "change_summary": "Refined the flat-contact-patch stage with a bounded continuous Nelder-Mead polish of the patch heights followed by a fine robust coordinate search, using the exact published objective and the distance-transformed field. This removes grid-step artifacts in the earlier height selection.",
+        "parent_sha256": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+        "rationale": "Round-2 measured 6.51709. Diagnostics showed the nearest labelled cells above/below each contact already sit at their theoretical vertical distances, and an independent optimization of an ideal horizontal surface at each drillhole gives a floor of 6.51388 for this fixed objective (including contact mean/variance coupling). The added continuous plus fine coordinate polish of the flat-patch heights reduced the local score reproducibly to 6.5166 with 0 label mismatches and contact RMSE 0.268, about 34 s of the 120 s budget. Public selfcheck still passes; the remaining ~0.003 gap is due to the smooth transition geometry between the four contact patches."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/47ff84ea1a89fc6f6429a16914cdbee7d62ebc3d5f81a16e1fd9ee9f73c84a99/model/model.npy",
+          "score": "jobs/f5f4600ad228746a283c67657224a1753f9ad95dd32b2de06ac8953343300ee2/output/result.json"
+        },
+        "candidate_id": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "47ff84ea1a89fc6f6429a16914cdbee7d62ebc3d5f81a16e1fd9ee9f73c84a99",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.26840740376024746,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.51660412687052,
+          "loss_total": 6.51660412687052,
+          "positive_voxels": 27756.0,
+          "research_utility": -6.51660412687052
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "1839b8f588862db659ab0a0e70ff97bebd5d5ec045ec31706de21399c7b98f45"
+    }
+  ],
+  "best_loss": 6.51660412687052,
+  "provider_verification": {
+    "request_count": 60,
+    "all_model": "deepseek-flash",
+    "all_reasoning_effort": "low",
+    "response_models": [
+      "deepseek-flash"
+    ]
+  },
+  "preflight": {
+    "base_url": "https://api.deepseek.com",
+    "latency_seconds": 12.462554447352886,
+    "readonly_guest_probe": true,
+    "request_model": "deepseek-flash",
+    "response_models": [
+      "deepseek-flash"
+    ],
+    "status": "ok",
+    "thinking": "low",
+    "usage": {
+      "artifactBytes": 141047,
+      "providerCalls": 4,
+      "toolCalls": {
+        "bash": 2,
+        "submit_readiness": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  },
+  "resume_check": {
+    "counters_unchanged": true,
+    "new_model_requests": 0,
+    "before": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25374098,
+      "harness_tool_calls": 59,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 971.8020343184471,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.864121198654175,
+      "llm_requests": 60,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.1134870052337646,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 91.39759349822998,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "after": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25374098,
+      "harness_tool_calls": 59,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 971.8020343184471,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.864121198654175,
+      "llm_requests": 60,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.1134870052337646,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 91.39759349822998,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "artifact_sha256": {
+    "source-snapshot.tar.gz": "7d9f74fe96ffeed1706c970cf2da6633fd65d48bd7c3474f8cf219bea0054d4c",
+    "checkpoint.json": "b2c45747bdf44099b380d6f7c52e957bbca26d01f3a325ee1546cab946b890a3",
+    "budget.json": "5094e2dcf390ab744af69cebaafedcab27be2e45a607a6aeb4810ce8cfd908ba",
+    "result.json": "d0b2c6db7152fdb471fc054902892a481ed5e3cc84b8cf3854b6b6a5f252b4d1",
+    "trajectory.csv": "8335725c0b814858cc49856cd8790290424544aa17d3d53d5396ea18ff541a45",
+    "best_solver.py": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3"
+  }
+}

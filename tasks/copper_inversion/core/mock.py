@@ -16,6 +16,7 @@ class MockClient:
 
     def run_turn(self, turns, submission_validator, **kwargs):
         (turn,) = turns
+        assert json.loads(turn.message)["research_wall_time_seconds"] == self.config.limits.wall_time_seconds
         history = __import__("json").loads(
             (self.root / "public/history.json").read_text()
         )

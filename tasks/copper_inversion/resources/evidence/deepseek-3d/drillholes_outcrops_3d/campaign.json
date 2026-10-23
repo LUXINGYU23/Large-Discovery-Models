@@ -1,0 +1,297 @@
+{
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-budgeted-20261023/runs/deepseek-drillholes_outcrops_3d-v3",
+  "config": {
+    "case_id": "drillholes_outcrops_3d",
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "harness_cache_dir": "/mnt/data1/Large-Discovery-Models/cache/gondolin",
+    "harness_seconds": 900,
+    "implementation_sha256": "097e5a1baeeeff89e128c2c94b747e0078666ac5fbae253ebea9081f024de892",
+    "iterations": 3,
+    "llm_model": "deepseek-flash",
+    "llm_url": "https://api.deepseek.com",
+    "mock": false,
+    "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "solver_seconds": 120,
+    "thinking": "low"
+  },
+  "status": "completed",
+  "contract_profile": "harness_drillholes_outcrops_3d",
+  "contract_sha256": "e0edf2c4ce82f7cbfacb7b650c29df927c91b7b169c65ba4bf6b168260fd8c2b",
+  "single_research_session": "01a16781-ea59-7310-b8ae-70a4b3d65dec",
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 24761764,
+      "harness_tool_calls": 40,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 512.5022594183683,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.261200189590454,
+      "llm_requests": 43,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.069714307785034,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 8.753032207489014,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "interface_jobs": 24,
+      "outer_iterations": 4,
+      "scorer_jobs": 4,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "timing": {
+    "campaign_wall_seconds": 544.9973428249359,
+    "research_seconds": 512.5022594183683,
+    "solver_seconds_including_baseline": 8.753032207489014,
+    "preflight_seconds": 14.699070233851671
+  },
+  "observations": [
+    {
+      "solver_wall_seconds": 0.4874918460845947,
+      "round": 0,
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "source_path": "candidates/3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f/solver.py",
+      "annotations": {},
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/dfb72e68a3f4c337c5e3c96bf5a70b9ade39bc4057b29b0d27c1804303efe944/model/model.npy",
+          "score": "jobs/e10d3649190282bef679bc608bc3fe4dc36a9e52a8dbc65bb573baf8f022add8/output/result.json"
+        },
+        "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "dfb72e68a3f4c337c5e3c96bf5a70b9ade39bc4057b29b0d27c1804303efe944",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 10.032113812425068,
+          "label_mismatches": 884.0,
+          "loss_drillhole": 405.0795810830953,
+          "loss_outcrop": 843.7589951040999,
+          "loss_total": 1248.8385761871953,
+          "positive_voxels": 1655.0,
+          "research_utility": -1248.8385761871953
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "cbb120b5f62c9a6a1c48952d4d09d2b38919715b83ddde1f6992151717bf77a7"
+    },
+    {
+      "solver_wall_seconds": 1.7791461944580078,
+      "round": 1,
+      "source_sha256": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+      "source_path": "candidates/6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f/solver.py",
+      "annotations": {
+        "change_summary": "Replaced the initial-level-set copy with a graph-harmonic potential-field inversion: signed label sources (0/1/contact) are interpolated over the grid by a weighted Dirichlet energy plus a weak prior from the initial level set. A small bounded set of regularization strengths and exact-conditioning variants is solved, and the candidate minimizing the public objective proxy (reconstructed signed distance, logistic + contact + optional sketch) is returned. Includes a guaranteed sign-changing finite fallback.",
+        "parent_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "rationale": "The measured parent copied the weak initial geometry and scored loss_total 1248.84 with 884 label mismatches and contact RMSE 10.03. The public objective only constrains observed labels and contact positions through the zero isosurface, so I used potential-field interpolation to satisfy those constraints smoothly instead of relying on the initial blob. On the public 3D case the new solver runs in ~1.4 s, has 0 label mismatches, contact RMSE 0, and loss_total 129.96 (drillhole 28.54, outcrop 101.42), a large measured improvement. The internal candidate selection is data-driven and bounded by the provided wall-time budget, and the public selfcheck fixture passes."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/7e269bc41390f209eb0f99e9abe5a329c38873b15cf6c4825bba875c9bb6bc7c/model/model.npy",
+          "score": "jobs/adb6dc9336cfdd6bd798c57f78e8bc9376365dc8384ebd0b8983267203742952/output/result.json"
+        },
+        "candidate_id": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "7e269bc41390f209eb0f99e9abe5a329c38873b15cf6c4825bba875c9bb6bc7c",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.0,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 28.54159361793223,
+          "loss_outcrop": 101.41647692065033,
+          "loss_total": 129.95807053858255,
+          "positive_voxels": 6388.0,
+          "research_utility": -129.95807053858255
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "5661e9429d526f4df18e79d4464c166a140d519c1979fca96c0f35cfacf97df0"
+    },
+    {
+      "solver_wall_seconds": 2.277186870574951,
+      "round": 2,
+      "source_sha256": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+      "source_path": "candidates/7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644/solver.py",
+      "annotations": {
+        "change_summary": "Added two new candidate families to the bounded ensemble: (1) signed Euclidean-distance/Voronoi potentials from positive and negative labelled voxels, lightly Gaussian-smoothed with several widths and class-distance ratios, with contacts forced to zero; (2) Gaussian kernel-density potentials of the signed sources. The existing graph-harmonic candidates remain as robust fallbacks. Model selection still uses the fixed public-objective proxy, so the returned field is the best-scoring data-driven candidate within the wall-time budget.",
+        "parent_sha256": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+        "rationale": "Measured parent loss_total was 129.96 (drillhole 28.54, outcrop 101.42, 0 mismatches), with most residual cost coming from many observed labels lying only ~0.5-1 voxel from the harmonic zero surface. Experiments with distance-transform/Voronoi potentials showed much larger label margins: the best smoothed signed-distance candidate measured loss_total 35.65 with drillhole 8.19, outcrop 27.46, 9 mismatches and 5.7k positive voxels, versus 129.96 for the parent. Gaussian KDE candidates measured ~36.4-36.7. The submitted solver constructs those candidate families plus the harmonic fallbacks and selects by the exact public loss proxy, so it should retain the measured ~35.6 behavior on the public case while remaining a general data-driven algorithm. A unit/axis-shape bug in the initial candidate-generation patch was fixed before submission; the final code uses per-axis physical smoothing widths and preserves the finite sign-changing fallback."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/d40a6d49231228a23e813b60d775ab8de7ef3d3bc1d16940b9bcbae5b3cfe0de/model/model.npy",
+          "score": "jobs/9564cfa1e8ff1e4ea266af4716f770228af0cb78111a577a7f9c17482d1d6645/output/result.json"
+        },
+        "candidate_id": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "d40a6d49231228a23e813b60d775ab8de7ef3d3bc1d16940b9bcbae5b3cfe0de",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.0,
+          "label_mismatches": 9.0,
+          "loss_drillhole": 8.186817884638135,
+          "loss_outcrop": 27.458261614206176,
+          "loss_total": 35.64507949884431,
+          "positive_voxels": 5727.0,
+          "research_utility": -35.64507949884431
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "378076798bb2bb6145bec57650265bc13328e5c49ec911de80e2f0405c36977c"
+    },
+    {
+      "solver_wall_seconds": 4.20920729637146,
+      "round": 3,
+      "source_sha256": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2",
+      "source_path": "candidates/2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2/solver.py",
+      "annotations": {
+        "change_summary": "Kept the distance-transform, KDE and harmonic candidate families and added local Gaussian margin corrections: for the best smoothed signed-distance field, the solver reconstructs the signed-distance proxy, identifies observed labels still contributing non-negligible logistic cost, and adds sign-aligned Gaussian bumps over a small grid of thresholds, radii and amplitudes. Candidate selection remains the exact public-objective proxy within the wall-time budget.",
+        "parent_sha256": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+        "rationale": "Measured parent was loss_total 35.645 (drillhole 8.187, outcrop 27.458, 9 mismatches). Diagnostics showed the remaining gap was dominated by ~510 observed labels at distance 1-2 from contacts/opposite labels, where the smooth separating surface sat closer than necessary (~0.84 actual vs ~1.0 bound). A measured local-bump candidate improved to 35.606. The submitted solver adds a bounded family of such corrections and selects by the exact objective proxy. Public selfcheck passes; the measured public-case result is now loss_total 35.599 (drillhole 8.118, outcrop 27.481, 9 mismatches, 5727 positive voxels) in 3.8 s, slightly better than the parent. The gain is modest because the remaining cost is largely geometric: many labels have bound distances of only 1-2 voxels due to adjacent contacts/opposite labels."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/4709d4214e105c3cdb4a0073d604b8e23b9dd488e5d1c61a5d694b270f32e112/model/model.npy",
+          "score": "jobs/a93af41f7efb274beb13eb0a50ad50c063da614c2d2ad3b4878f7f0cf4c65830/output/result.json"
+        },
+        "candidate_id": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "4709d4214e105c3cdb4a0073d604b8e23b9dd488e5d1c61a5d694b270f32e112",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.0,
+          "label_mismatches": 9.0,
+          "loss_drillhole": 8.118387492462013,
+          "loss_outcrop": 27.481100484528127,
+          "loss_total": 35.59948797699014,
+          "positive_voxels": 5727.0,
+          "research_utility": -35.59948797699014
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "37181b7033d9bc2e4278326d43e1d0053959d1fa55f6161d505eb56eeec3e474"
+    }
+  ],
+  "best_loss": 35.59948797699014,
+  "provider_verification": {
+    "request_count": 43,
+    "all_model": "deepseek-flash",
+    "all_reasoning_effort": "low",
+    "response_models": [
+      "deepseek-flash"
+    ]
+  },
+  "preflight": {
+    "base_url": "https://api.deepseek.com",
+    "latency_seconds": 14.699070233851671,
+    "readonly_guest_probe": true,
+    "request_model": "deepseek-flash",
+    "response_models": [
+      "deepseek-flash"
+    ],
+    "status": "ok",
+    "thinking": "low",
+    "usage": {
+      "artifactBytes": 184582,
+      "providerCalls": 5,
+      "toolCalls": {
+        "bash": 3,
+        "submit_readiness": 1,
+        "write": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  },
+  "resume_check": {
+    "counters_unchanged": true,
+    "new_model_requests": 0,
+    "before": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 24761764,
+      "harness_tool_calls": 40,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 512.5022594183683,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.261200189590454,
+      "llm_requests": 43,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.069714307785034,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 8.753032207489014,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "after": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 24761764,
+      "harness_tool_calls": 40,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 512.5022594183683,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.261200189590454,
+      "llm_requests": 43,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.069714307785034,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 8.753032207489014,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "artifact_sha256": {
+    "source-snapshot.tar.gz": "40dac53d0e5fada6f5f90d39bc6b08141f75585bdad40b72ed48a8e59f2a88aa",
+    "checkpoint.json": "be80e986ff9219bbc9f84213ba019d415c84231d6c5ab69d63eb03aefa6e0949",
+    "budget.json": "a9ce6ff0f11bc516e49bfe011dd2ccfa00bc41cbae8ad6778ddcecf8bc48e809",
+    "result.json": "658093a542a4cf2247050cad7fd427643b3d375a0200cb39d36be37e1a436eeb",
+    "trajectory.csv": "1d8fae4ef56cab3c072aeb8d4c8860d31491e118ee4fcbbd8b5f519ab7a05768",
+    "best_solver.py": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2"
+  }
+}

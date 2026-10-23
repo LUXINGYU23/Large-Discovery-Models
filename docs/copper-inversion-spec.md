@@ -318,3 +318,12 @@ P3 验收不要求分数一定改进：必须能证明 agent 完成代码设计�
 P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导留在后续阶段。
 
 后续所有真实调试和运行使用 DeepSeek 官方 `https://api.deepseek.com`、`deepseek-flash`（V4.1 Flash）、`low` 思考强度；API key 从远程受保护存储读取。已有旧模型实验保留原模型身份，切换后创建新运行目录。
+
+
+### DeepSeek 研究预算落地
+
+真实运行暴露了长时间内部实验导致不提交的问题。后续任务向每轮消息显式传入
+`research_wall_time_seconds`，复用共享 Harness 的 `tool_call_budgets` 限制每轮 bash 为 8 次，
+任务 extension 要求每次研究 bash 显式 timeout 且不超过 60 秒。read/write 和提交不计入 bash 次数。
+这只约束研究阶段；solver 2 CPU / 4 GiB / 120 秒（3D）、只读接口与独立评分不变。
+旧运行保留原策略和源码快照，不跨实现身份强制恢复。对照中的提示与策略变化、失败开销必须单列。

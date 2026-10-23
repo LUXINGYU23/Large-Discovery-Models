@@ -66,6 +66,13 @@ uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py c
 uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/harness_drillholes_outcrops_3d.yaml
 ```
 
+The research turn receives its wall-time budget explicitly. To keep exploration
+bounded, it has at most 8 bash calls, each requiring an explicit timeout of at
+most 60 seconds. Use read/write tools for files and reserve calls for numerical
+experiments and selfcheck. Formal solver/scorer limits remain independent.
+The shared Harness policy owns call counts; a task extension rejects unbounded
+research commands. Completed historical runs retain their original policy.
+
 Each run has its own history and baseline plus three scored proposals. Do not
 override the locked 2D profile to run 3D.
 
@@ -81,3 +88,9 @@ and execution receipts, and independently scored model arrays. Failed candidates
 retain statuses without fabricated scores. The qualification stage is `contract_verified`; experiment qualification remains
 `draft`. Remote evidence, final-executor rechecks and the measured best source are
 in `resources/evidence/`. See `../../docs/copper-inversion-implementation.md`.
+
+Remote policy regression (using the existing Node runtime):
+
+```sh
+node --test tasks/copper_inversion/tests/test_research_budget.mjs
+```
