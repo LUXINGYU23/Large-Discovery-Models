@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "scope": "P5 surrogate/selector component and shared engine integration; no research-tree or model-run claim",
+  "remote_root": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023",
+  "implementation_sha256": "e494d758239b36581d1e6feeeffad71b1480962e5b67e2e891c0d02c70049ecd",
+  "regression_result": "200 passed in 79.89s (0:01:19)",
+  "log_sha256": "d8244dcc3c11699a68d2998478ea4ff5d7fa10481146f0c4858fe2fc3c259a3f",
+  "test_sha256": "30bd7882f27d877a25360ac3d121fa406d9acdab3188c813049b0ce1327fd61c",
+  "feature_version": "copper-ast-sha256-256-v1",
+  "dimension": 256,
+  "gp_parameters": {
+    "lengthscale": 1.5,
+    "noise": 0.0001,
+    "min_training_observations": 1,
+    "feature_scale_floor": 1.0,
+    "target_scale_floor": 1.0
+  },
+  "acquisition": {
+    "name": "lcb",
+    "minimize": [
+      true
+    ],
+    "beta": 1.0
+  },
+  "component_tests": 16,
+  "model_calls": 0,
+  "engine_fixture": {
+    "rounds": 4,
+    "initial_candidates": 1,
+    "research_pool_per_round": 4,
+    "selected_per_round": 1,
+    "evaluations": 4,
+    "completed_resume_new_evaluations": 0
+  }
+}

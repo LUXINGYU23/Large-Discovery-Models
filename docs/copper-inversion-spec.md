@@ -143,6 +143,16 @@ Agent 可读数据、loss 规范、固定 fixture 和测试，可对当前草稿
 
 第二阶段 `ldm_harness`：使用第 7.2 节共享研究树，同一接口生成多个代码候选，整批准入后选择有限数量评估。初始代码权重为均匀；代码重复频率不作为有效的概率估计承诺。编码只用代码，不含结果、理由或自报质量；编码维度、版本及核参数写入契约。代码 surrogate 效果另行比较，不能以工程连通证明有效。此阶段不引入 compiled policy/Guide 自我修改评分规则。
 
+第二阶段编码与选点的固定参数：`copper-ast-sha256-256-v1`，256 维；源码 AST 节点类型和
+标量字段使用 SHA-256 有符号计数后 L2 归一化，忽略注释和格式，不读取研究 metadata，
+也不 import 候选。哈希碰撞允许，源码身份仍使用完整字节 SHA-256。
+复用 `RBFGPSurrogate`：lengthscale=1.5、noise=1e-4、min_training_observations=1、
+feature_scale_floor=1.0、target_scale_floor=1.0。弱基线是首个真实训练样本；拒绝空历史、
+特征版本/维度错误、非有限数据或拟合失败，不使用共享 GP 的 prior/fallback 作为成功拟合。
+复用 `make_acquisition("lcb", minimize=(True,), beta=1.0)`；共享 acquisition 的分数越大越好，
+对应最大化 `-mean_loss + std_loss`，正式目标仍是最小化 `loss_total`。
+同分按源码 digest 升序确定选择，所有候选初始权重相同，不按分支重复次数加权。
+
 ### 7.1 当前框架复用清单
 
 | 已有实现 | 铜矿的使用方式 | 不再实现的内容 |

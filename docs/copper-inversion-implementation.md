@@ -204,3 +204,19 @@ DeepSeek 思考模式拒绝 `tool_choice=required`，因此复用 PiHarnessConfi
 
 [机器可读证据及每组预算](../tasks/copper_inversion/resources/evidence/recovery/verification.json)。
 P5 仍待实现；[验收台账](copper-inversion-acceptance.md) 保留剩余项。
+
+## P5 代码特征和选点层
+
+`core/surrogate.py` 已实现固定 256 维 AST 哈希编码和最小化 loss 的选点适配器，
+直接复用共享 `RBFGPSurrogate`、`make_acquisition`，没有引入新依赖或复制 GP 数学实现。
+编码前重新核验封存源码摘要，不执行源码，不读取评分、理由、父版本或分支 metadata。
+固定版本、尺度参数和 beta 见 spec §7。
+
+远程新增 16 项组件测试，包含单基线真实拟合、最小化方向、拟合异常、非有限数据、
+错误特征版本与维度、缺失候选特征，以及共享 engine 的 baseline＋三轮 pool=4/select=1。
+该集成测试验证总计只评估 4 个候选，保存每轮 4 项预测，完成态恢复不新增评估或扣预算。
+此测试的候选和分数为确定性 fixture，不宣称 surrogate 改善了反演效果。
+含原有远程 Docker/恢复回归共 **200 passed in 79.89s**。
+
+[组件证据](../tasks/copper_inversion/resources/evidence/surrogate/verification.json)。
+当前生产 workflow 仍为单 agent；共享研究树、四分支准入和真实 P5 运行尚待接入。
