@@ -40,8 +40,11 @@ node harnesses/pi/dist/smoke-task-guest.js --task copper_inversion --cache-dir "
 ```
 
 Build the Pi sidecar from current repository source following its README, tagged
-`ldm-pi-harness:copper-20261023`. Configure `LLM_BASE_URL`, `LLM_MODEL_NAME`, and
-`LLM_API_KEY` through protected environment variables (or `--api-key-file`).
+`ldm-pi-harness:copper-20261023`. All subsequent real runs use the official DeepSeek endpoint
+`https://api.deepseek.com`, model `deepseek-flash` (V4.1 Flash), thinking `low`;
+these values are locked in the real profiles. Supply `LLM_API_KEY` through a
+protected environment variable or `--api-key-file`. The existing remote key file
+is `/mnt/data1/Large-Discovery-Models/secrets/alphabench-t3/deepseek.key`.
 The provider must support the Responses API used by Pi. Never place credentials
 in committed YAML or logs.
 
@@ -55,9 +58,16 @@ configuration. Resume the same path with `--resume`; completed jobs are reused.
 Unknown dispatched containers pause for reconciliation instead of being retried.
 Resume requires the same implementation and image identities. After code changes,
 start a fresh run; archived runs retain their source snapshot for exact recovery.
-3D cases are available through `--case-id drillholes_outcrops_3d` or
-`drillholes_3d` (120s default via direct task entry). Do not override a locked 2D
-profile to run 3D; use a distinct profile/config.
+The two 3D cases each have a locked single-researcher, three-round profile,
+with 120s per solver and 900s per research turn:
+
+```sh
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/harness_drillholes_3d.yaml
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/harness_drillholes_outcrops_3d.yaml
+```
+
+Each run has its own history and baseline plus three scored proposals. Do not
+override the locked 2D profile to run 3D.
 
 Run integration tests only remotely:
 

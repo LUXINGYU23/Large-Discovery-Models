@@ -62,6 +62,8 @@ def open_client(args, root, problem, stack, account):
         model=args.llm_model or os.environ.get("LLM_MODEL_NAME", ""),
         guest_runtime=load_pi_guest_runtime("copper_inversion", resources / "image"),
         thinking=args.thinking,
+        # DeepSeek thinking mode rejects tool_choice=required.
+        force_first_tool_call=False,
         tool_extensions=(
             HarnessToolExtension(
                 Path("/resources/tools/copper.mjs"),
@@ -122,7 +124,6 @@ def _preflight(args, root, config, key, account):
             },
         ),
         tool_extensions=(),
-        thinking="off",
         limits=HarnessLimits(
             wall_time_seconds=120, tool_call_budgets={"web_search": 0, "web_fetch": 0}
         ),
@@ -176,6 +177,8 @@ def _preflight(args, root, config, key, account):
             {
                 "status": "ok",
                 "request_model": config.model,
+                "base_url": config.base_url,
+                "thinking": config.thinking,
                 "response_models": sorted(models),
                 "latency_seconds": time.monotonic() - started,
                 "wire_api": "Responses via Pi",

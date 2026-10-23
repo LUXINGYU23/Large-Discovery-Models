@@ -1,0 +1,14 @@
+name: copper_inversion_harness_drillholes_outcrops_3d
+task: copper_inversion
+algorithm: persistent_agent_harness
+mode: real
+contract_profile: harness_drillholes_outcrops_3d
+args:
+  case-id: drillholes_outcrops_3d
+  iterations: 3
+  out-dir: runs/copper_drillholes_outcrops_3d
+  solver-seconds: 120
+  harness-seconds: 900
+  llm-url: https://api.deepseek.com
+  llm-model: deepseek-flash
+  thinking: low

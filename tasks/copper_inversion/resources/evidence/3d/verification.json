@@ -1,0 +1,140 @@
+{
+  "implementation_sha256": "c9134a54631f99398380349e0f8044149dbca8de6ec69cf524631c1bb817f6f0",
+  "tests": {
+    "result": "168 passed in 27.92s",
+    "log_sha256": "f779bb7f45720e754030b2be8d21511f895d7369cb940c7f837e90b24c5ca304"
+  },
+  "frozen_model_rechecks": [
+    {
+      "case_id": "drillholes_sketch_2d",
+      "candidate": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+      "loss_total": 3.7968566397997594,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_sketch_2d",
+      "candidate": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+      "loss_total": 3.9504787503527625,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_sketch_2d",
+      "candidate": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+      "loss_total": 3.7338023457590377,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_sketch_2d",
+      "candidate": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "loss_total": 293.2197607509265,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_3d",
+      "candidate": "baa158f88f112621cf2c0272fbd2f90b6661afbccffd6fc9fa7db8846347d0fe",
+      "loss_total": 6.5181315964861275,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_3d",
+      "candidate": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "loss_total": 405.0795810830953,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_3d",
+      "candidate": "a36743a33afa7165348661515e8e296b88097d2527d9ec557137fe661a626cb6",
+      "loss_total": 6.526027002125944,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_3d",
+      "candidate": "99c125d48bdca55a63296ce4d9d597cf69bc84cd4d2b4a8fb670c2a126af28f8",
+      "loss_total": 6.5174455738034105,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_outcrops_3d",
+      "candidate": "d93ae281c2ee7fac28ef2c0c7afa27033099daaa34325d369fcda221c998bc6d",
+      "loss_total": 32.94827325599032,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_outcrops_3d",
+      "candidate": "5a4fbb2017f226d55d0f177fe0c4074f0459e1470363a2d6192cd331280b9103",
+      "loss_total": 33.048997665992985,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_outcrops_3d",
+      "candidate": "e8a57fcd6261450972b777dde0a47ca5258e383ee908fa5a2863da734957759f",
+      "loss_total": 33.00547838417327,
+      "metrics_exactly_unchanged": true
+    },
+    {
+      "case_id": "drillholes_outcrops_3d",
+      "candidate": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "loss_total": 1248.8385761871953,
+      "metrics_exactly_unchanged": true
+    }
+  ],
+  "deepseek": {
+    "preflight": {
+      "base_url": "https://api.deepseek.com",
+      "latency_seconds": 13.727092701941729,
+      "readonly_guest_probe": true,
+      "request_model": "deepseek-flash",
+      "response_models": [
+        "deepseek-flash"
+      ],
+      "status": "ok",
+      "thinking": "low",
+      "usage": {
+        "artifactBytes": 168706,
+        "providerCalls": 5,
+        "toolCalls": {
+          "bash": 3,
+          "submit_readiness": 1,
+          "write": 1
+        },
+        "validationSubmissions": 1
+      },
+      "wire_api": "Responses via Pi"
+    },
+    "requests": [
+      {
+        "request_file": "harness/preflight/sessions/preflight/turns/readiness/provider/readiness-provider-5.request.bin",
+        "model": "deepseek-flash",
+        "reasoning_effort": "low",
+        "tool_choice": null
+      },
+      {
+        "request_file": "harness/preflight/sessions/preflight/turns/readiness/provider/readiness-provider-3.request.bin",
+        "model": "deepseek-flash",
+        "reasoning_effort": "low",
+        "tool_choice": null
+      },
+      {
+        "request_file": "harness/preflight/sessions/preflight/turns/readiness/provider/readiness-provider-4.request.bin",
+        "model": "deepseek-flash",
+        "reasoning_effort": "low",
+        "tool_choice": null
+      },
+      {
+        "request_file": "harness/preflight/sessions/preflight/turns/readiness/provider/readiness-provider-1.request.bin",
+        "model": "deepseek-flash",
+        "reasoning_effort": "low",
+        "tool_choice": null
+      },
+      {
+        "request_file": "harness/preflight/sessions/preflight/turns/readiness/provider/readiness-provider-2.request.bin",
+        "model": "deepseek-flash",
+        "reasoning_effort": "low",
+        "tool_choice": null
+      }
+    ],
+    "research_sidecar_start": "ok",
+    "implementation_sha256": "c9134a54631f99398380349e0f8044149dbca8de6ec69cf524631c1bb817f6f0",
+    "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/deepseek-flash-low-preflight-v2"
+  }
+}

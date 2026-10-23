@@ -21,8 +21,8 @@ def test_actual_data(case):
     v = score(p, p["initial_level_set"])
     expected = {
         "drillholes_sketch_2d": 293.2197607509265,
-        "drillholes_3d": 514.0113798896817,
-        "drillholes_outcrops_3d": 1060.7747438220217,
+        "drillholes_3d": 405.0795810830953,
+        "drillholes_outcrops_3d": 1248.8385761871953,
     }
     assert v["loss_total"] == pytest.approx(expected[case], rel=1e-10)
     assert sum(np.isfinite(o["values"]).sum() for o in p["observations"]) == (
@@ -61,3 +61,23 @@ def test_bounded_npy(tmp_path):
     np.save(p, np.array([{}], dtype=object))
     with pytest.raises(ValueError):
         read_model(p, (1,))
+
+
+@pytest.mark.parametrize("shape", [(9, 8), (9, 8, 7)])
+def test_distance_storage_order_and_analytic_plane(shape):
+    expected = np.indices(shape, dtype=float)[0] - 3.25
+    for dtype in (np.float32, np.float64):
+        for order in ("C", "F"):
+            field = np.array(expected, dtype=dtype, order=order)
+            actual = signed_distance(field, shape, (1.0,) * len(shape))
+            np.testing.assert_allclose(actual, expected, atol=1e-12)
+            np.testing.assert_array_equal(actual > 0, field > 0)
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_actual_data_storage_order_invariance(case):
+    problem = load_problem(case)
+    field = problem["initial_level_set"]
+    assert score(problem, np.array(field, order="C")) == score(
+        problem, np.array(field, order="F")
+    )

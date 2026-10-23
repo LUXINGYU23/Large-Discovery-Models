@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "scope": "One persistent researcher, baseline plus three real algorithm-design rounds; engineering evidence, not an official benchmark",
+  "case_id": "drillholes_3d",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real-drillholes_3d-v2",
+  "base_commit": "eb20665f",
+  "config": {
+    "case_id": "drillholes_3d",
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "harness_cache_dir": "/mnt/data1/Large-Discovery-Models/cache/gondolin",
+    "harness_seconds": 900,
+    "implementation_sha256": "935efd8137710239ae45e2e9bff23cfa5ee1b9a7b14846679e8ab7bc07852aaa",
+    "iterations": 3,
+    "llm_model": "gpt-5.6-luna",
+    "llm_url": "https://sub2api.jp.justafish.top",
+    "mock": false,
+    "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "solver_seconds": 120,
+    "thinking": "high"
+  },
+  "contract_profile": "harness_drillholes_3d",
+  "contract_sha256": "461a00f17a9dbbb6b4fac19977e14fbef87116156db244d9621333e8ac701958",
+  "status": "completed",
+  "preflight": {
+    "latency_seconds": 14.474715426564217,
+    "readonly_guest_probe": true,
+    "request_model": "gpt-5.6-luna",
+    "response_models": [
+      "gpt-5.6-luna"
+    ],
+    "status": "ok",
+    "usage": {
+      "artifactBytes": 131281,
+      "providerCalls": 3,
+      "toolCalls": {
+        "bash": 1,
+        "submit_readiness": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  },
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 15707423,
+      "harness_tool_calls": 60,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 992.7556932121515,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.306936502456665,
+      "llm_requests": 53,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2088253498077393,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.1445717811584473,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "interface_jobs": 24,
+      "outer_iterations": 4,
+      "scorer_jobs": 4,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "resume_check": {
+    "counters_unchanged": true,
+    "new_model_requests": 0,
+    "before": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 15707423,
+      "harness_tool_calls": 60,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 992.7556932121515,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.306936502456665,
+      "llm_requests": 53,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2088253498077393,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.1445717811584473,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "after": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 15707423,
+      "harness_tool_calls": 60,
+      "harness_turns": 3,
+      "harness_validation_submissions": 4,
+      "harness_wall_time_seconds": 992.7556932121515,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.306936502456665,
+      "llm_requests": 53,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.2088253498077393,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.1445717811584473,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "observations": [
+    {
+      "round": 0,
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "source_path": "candidates/3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f/solver.py",
+      "annotations": {},
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/a1bce4bf51565e5d310513f99085717631917783f5ae4faf240954a112be0cd8/model/model.npy",
+          "score": "jobs/cb48f02102dafea816bb040de1dbe29b9ec048dfa855dd9fd799e9d584160808/output/result.json"
+        },
+        "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "a1bce4bf51565e5d310513f99085717631917783f5ae4faf240954a112be0cd8",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 5.563958690902462,
+          "label_mismatches": 54.0,
+          "loss_drillhole": 405.0795810830953,
+          "loss_total": 405.0795810830953,
+          "positive_voxels": 1655.0,
+          "research_utility": -405.0795810830953
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "cbb120b5f62c9a6a1c48952d4d09d2b38919715b83ddde1f6992151717bf77a7"
+    },
+    {
+      "round": 1,
+      "source_sha256": "a36743a33afa7165348661515e8e296b88097d2527d9ec557137fe661a626cb6",
+      "source_path": "candidates/a36743a33afa7165348661515e8e296b88097d2527d9ec557137fe661a626cb6/solver.py",
+      "annotations": {
+        "change_summary": "Replaced the initial-level-set passthrough with a data-driven sparse-interface reconstruction: fit a physical affine graph through contacts (or inferred binary crossings), add local Gaussian corrections, and retain robust 2-D/fallback handling.",
+        "parent_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "rationale": "The measured parent scored 405.08 with 54 drillhole mismatches and contact RMSE 5.56. The public data contain four contacts and monotone positive segments along each hole. A graph surface over horizontal coordinates exactly respects the observed crossing trend, while local corrections keep the reconstructed distance nearly vertical near holes; a local public run scores 6.526 total with zero mismatches and contact RMSE 0.272. The implementation consumes observations and spacing/origin, handles inferred crossings and small fixtures, and was verified with the public selfcheck."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/1f08c3ff8acb49dfcbd072b3ab88fe14625abd7f65cc99555509234bb21ff39b/model/model.npy",
+          "score": "jobs/736705c4cc70f737ce336a2718dc53738054928a68ef4a80f7d0913e0ace4366/output/result.json"
+        },
+        "candidate_id": "a36743a33afa7165348661515e8e296b88097d2527d9ec557137fe661a626cb6",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "1f08c3ff8acb49dfcbd072b3ab88fe14625abd7f65cc99555509234bb21ff39b",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.2716021090750372,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.526027002125944,
+          "loss_total": 6.526027002125944,
+          "positive_voxels": 25777.0,
+          "research_utility": -6.526027002125944
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "c3b0e875a763c105c2281c8fd0fdab8029f4b2d3f48fabe039eac8b27c9b08d6"
+    },
+    {
+      "round": 2,
+      "source_sha256": "baa158f88f112621cf2c0272fbd2f90b6661afbccffd6fc9fa7db8846347d0fe",
+      "source_path": "candidates/baa158f88f112621cf2c0272fbd2f90b6661afbccffd6fc9fa7db8846347d0fe/solver.py",
+      "annotations": {
+        "change_summary": "Added a measured-data trend regularization and retuned the local surface model: shrink the 3-D transverse affine slope, shift the broad interface slightly toward the dominant positive side, and use tighter Gaussian corrections with a small positive contact offset.",
+        "parent_sha256": "a36743a33afa7165348661515e8e296b88097d2527d9ec557137fe661a626cb6",
+        "rationale": "Round 1 reduced loss from 405.08 to 6.526 with zero mismatches. Inspecting the published drillhole distribution showed 51 positive versus 15 negative labels; the broad affine trend was also overreacting to the isolated fourth hole in the transverse direction. Regularizing that slope and shifting the broad trend by 0.5 vertical cell better preserves distance along the labelled columns. Public selfcheck passes, and the public objective recomputation improves to loss 6.51813 with zero mismatches and contact RMSE 0.270."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/d5b087522287bd4f59f4dabf1fdcace76ad214e5021e5a09106270d6afcb215d/model/model.npy",
+          "score": "jobs/a98d1920d4e0305ec9f2cb09a1cb09c24fc62a82eb2be9a3f6e4c2e2b7f9e93d/output/result.json"
+        },
+        "candidate_id": "baa158f88f112621cf2c0272fbd2f90b6661afbccffd6fc9fa7db8846347d0fe",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "d5b087522287bd4f59f4dabf1fdcace76ad214e5021e5a09106270d6afcb215d",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.269689251774592,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.5181315964861275,
+          "loss_total": 6.5181315964861275,
+          "positive_voxels": 26403.0,
+          "research_utility": -6.5181315964861275
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "53901fbc160db57c718137332825ff5b53311eb25629de1019c9b56d484a84ad"
+    },
+    {
+      "round": 3,
+      "source_sha256": "99c125d48bdca55a63296ce4d9d597cf69bc84cd4d2b4a8fb670c2a126af28f8",
+      "source_path": "candidates/99c125d48bdca55a63296ce4d9d597cf69bc84cd4d2b4a8fb670c2a126af28f8/solver.py",
+      "annotations": {
+        "change_summary": "Made local interface corrections observation-layout aware: crossings now receive adaptive Gaussian radii based on nearest physical crossing distance, while preserving the regularized affine trend and contact offset.",
+        "parent_sha256": "baa158f88f112621cf2c0272fbd2f90b6661afbccffd6fc9fa7db8846347d0fe",
+        "rationale": "The previous solver scored 6.51813 with zero mismatches. Its fixed correction radius treated the close C/D crossing pair and the isolated A/B crossings identically, unnecessarily coupling their surface transitions. The new bounded adaptive radius broadens corrections only for crossings farther from their nearest neighbor, using physical spacing and observed geometry rather than a fitted array. Public selfcheck passes; local objective improves to 6.51745, with zero mismatches and contact RMSE 0.269."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/fe0488c26f1d38eea137537867c423332c903bbd9e89377259f5f8287d67cc48/model/model.npy",
+          "score": "jobs/b7f233a8ff225973f6a27bdf80b1e9a2ba4ebcf80015eaf2554a60cb672da62c/output/result.json"
+        },
+        "candidate_id": "99c125d48bdca55a63296ce4d9d597cf69bc84cd4d2b4a8fb670c2a126af28f8",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "fe0488c26f1d38eea137537867c423332c903bbd9e89377259f5f8287d67cc48",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.2688440093523704,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 6.5174455738034105,
+          "loss_total": 6.5174455738034105,
+          "positive_voxels": 26405.0,
+          "research_utility": -6.5174455738034105
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "ca7ca3bfc09c85885417d8d1bb8b9f544d26bcb973c91971df475b6a3b1e79fb"
+    }
+  ],
+  "artifact_sha256": {
+    "source-snapshot.tar.gz": "fdc7167c3c228b4f0bb6f56b1a343ad103d049a1e408a5b1b6102a2fdc193ef7",
+    "checkpoint.json": "a47a4ec29aed1adbb38036830c728a1aa36ad6c2e9b870230f1e81ffb6b64b5a",
+    "budget.json": "7e4da428c4106604ec20aeccac14266e26f7ad1570608e9056aa35e6235d1f43",
+    "result.json": "42ec619bfbcf2dd6c2c3dd5e1cc86020736c3de6a8c6000657c57afd27e5bcf1",
+    "trajectory.csv": "0cfa69d90a731a36261c785ae44fcc05be9dc346d8809dde81bbb01bf85a1cd0",
+    "best_solver.py": "99c125d48bdca55a63296ce4d9d597cf69bc84cd4d2b4a8fb670c2a126af28f8"
+  },
+  "tests": {
+    "result": "167 passed in 27.68s",
+    "log_sha256": "5805bb64b669c229a164287cf4b844716c84579fff67b8f4e549320a4a2c4a29"
+  },
+  "superseded_attempt": {
+    "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real-drillholes_3d-v1",
+    "reason": "Stopped during first research turn to fix scikit-fmm Fortran-order distance reconstruction; not counted as a completed three-round campaign"
+  }
+}

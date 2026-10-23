@@ -9,3 +9,6 @@ args:
   out-dir: runs/copper_2d
   solver-seconds: 60
   harness-seconds: 900
+  llm-url: https://api.deepseek.com
+  llm-model: deepseek-flash
+  thinking: low

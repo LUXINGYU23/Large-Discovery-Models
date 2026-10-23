@@ -43,8 +43,11 @@ NPY 文件。进程退出后才复制并冻结矿体文件，评分容器只读�
 | 初始几何 | loss_total |
 | --- | ---: |
 | 2D 钻孔 + 草图 | 293.2197607509265 |
-| 3D 钻孔 | 514.0113798896817 |
-| 3D 钻孔 + 露头 | 1060.7747438220217 |
+| 3D 钻孔 | 405.0795810830953 |
+| 3D 钻孔 + 露头 | 1248.8385761871953 |
+
+3D 基线已按下述内存顺序修复更正；旧 reference-check.json 保留为历史记录，
+其中 3D 距离重建结果已失效，不能作为当前评分基准。二值 loss 公式本身未改变。
 
 这些是合成教学案例的几何拟合损失，不是铜品位、储量或真实矿体恢复精度。
 
@@ -68,7 +71,7 @@ CPU 评分使用 2 CPU/4 GiB/60s（2D），接口检查使用 1 CPU/2 GiB/30s。
 
 具体远程测试、真实闭环和恢复的最终证据记录在本目录的 evidence 子目录。
 任务保持 `qualification: draft`；这些是工程验收，自定义预算不声明为官方 benchmark。
-3D 已完成数据加载、原式对照和基线隔离评估；3D agent 搜索与 surrogate 引导阶段另行验收。
+两个 3D case 已完成单 agent 三轮真实算法设计和恢复验收，见文末；surrogate 引导阶段另行验收。
 
 
 ## 实测闭环结果
@@ -97,4 +100,80 @@ CPU 评分使用 2 CPU/4 GiB/60s（2D），接口检查使用 1 CPU/2 GiB/30s。
 镜像保留容器处理，验收结束后移除保留容器；重新运行前应按 README 确认或重建镜像。
 
 本次资格推进到 `contract_verified`，并保留 experiment 的 `draft` 状态。
-3D agent 搜索、Coverage 2+2、GP/acquisition、SFT 转换和正式 benchmark 认证未包含在本次验收中。
+上述 2D 验收未包含 3D agent 搜索；3D 的后续实测见下文。Coverage 2+2、GP/acquisition、SFT 转换和正式 benchmark 认证仍未包含。
+
+
+## 3D 距离重建修正（2026-10-23）
+
+首次真实 3D campaign 暴露了旧 reference 与 solver 基线的差异。远程最小复现表明，
+锁定的 scikit-fmm 2025.6.23 对 Fortran-strided 输入会错误解释 3D 网格：
+9×8×7 的解析平面 `phi=x-3.25` 出现 248 个符号错误、最大距离误差 5.6273。
+相同数据的 C-contiguous 输入误差仅 3.55e-15。UBC reader 输出的物理轴顺序正确，
+问题发生在距离重建库的输入存储处理。
+
+`geometry.signed_distance` 现在先统一为 C-contiguous float64，再调用锁定版本的库。
+没有改变坐标轴、观测、loss 公式或权重。新增解析平面（2D/3D、float32/float64、C/F）
+及三个实际 case 的存储顺序一致性测试；远程回归 **167 passed**。
+修复后的两个 3D 基线为 405.0795811 和 1248.8385762。
+旧 reference-check.json 中的 3D 数值仅保留为历史记录，其几何结果已被此次修复取代。
+
+证据：[geometry-order-check.json](evidence/copper-inversion/geometry-order-check.json)。
+上次 2D 四个冻结矿体使用新代码重评分逐项不变，见
+[2d-geometry-fix-recheck.json](evidence/copper-inversion/2d-geometry-fix-recheck.json)。
+两个 `real-*-v1` 试跑在第一研究轮中停止，保留 `ABORTED.md`；完整三轮从 `real-*-v2`
+新目录开始，不跨实现版本恢复。运行前封存源码快照，运行中不修改评分代码。
+
+新增 `harness_drillholes_3d`、`harness_drillholes_outcrops_3d` 两个锁定 profile：
+各自一个持久 researcher，基线加三轮设计，seed 47；solver 2 CPU、4 GiB、120 秒，
+每研究轮 900 秒。使用与 2D 相同的 gpt-5.6-luna / Pi Responses / high 配置。
+两个 campaign 可并行，但不共享候选、反馈或 researcher 会话。
+
+
+## 两个 3D case 的完整三轮结果
+
+本节结果使用切换要求到达前已启动的 `gpt-5.6-luna / high` 运行；
+两组均已完整结束，不能重标为 DeepSeek 结果。两个 case 共用钻孔，不能当作两个独立泛化样本。
+
+| case | 基线 | 第 1 轮 | 第 2 轮 | 第 3 轮（最佳） | 降幅 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 3D 钻孔 | 405.079581 | 6.526027 | 6.518132 | 6.517446 | 98.39% |
+| 3D 钻孔＋露头 | 1248.838576 | 33.048998 | 33.005478 | 32.948273 | 97.36% |
+
+钻孔算法依次演进：接触点拟合仿射曲面＋局部高斯修正 → 趋势正则化与接触偏移调整 →
+按观测间距自适应局部修正半径。最终内部／外部标签误判为 0，接触点 RMSE 为 0.268844，
+正体素 26405。原始体积只有 1655，说明稀疏钻孔约束允许非常不同的未观测几何。
+
+钻孔＋露头算法依次演进：双尺度高斯观测插值＋最近正负观测距离修正 → 各向异性平滑 →
+保符号幂变换，改进体素内零交叉位置。最终损失分项为钻孔 7.591369、露头 25.356904；
+标签误判 34，接触点 RMSE 为 1.001730，正体素 6776。agent 早期自检曾声称全部标签保留，
+但正式独立评分并非零误判，本报告以独立评分为准。
+
+最后两轮的改进均较小；这是三轮已测到的最佳值，不能称为全局最优或真实矿体恢复精度。
+两组各有 4 次成功正式评估、8 个只读接口 job、4 个 solver、4 个独立 scorer；
+researcher turn 均为 3。模型请求分别为 53 和 71（含预检），研究耗时分别约 993 秒和 1043 秒。
+完整恢复后全部计数逐项不变，新增模型请求为 0。
+
+结果、源码摘要、每轮分项、预算、预检、恢复证据和远程产物路径：
+
+- [钻孔 campaign](../tasks/copper_inversion/resources/evidence/3d/drillholes_3d/campaign.json)，[最佳算法](../tasks/copper_inversion/resources/evidence/3d/drillholes_3d/best_solver.py)
+- [钻孔＋露头 campaign](../tasks/copper_inversion/resources/evidence/3d/drillholes_outcrops_3d/campaign.json)，[最佳算法](../tasks/copper_inversion/resources/evidence/3d/drillholes_outcrops_3d/best_solver.py)
+
+## 后续运行默认值
+
+按用户新要求，任务 CLI 默认值和三个真实 YAML/profile 均切换为
+`https://api.deepseek.com`、`deepseek-flash`（V4.1 Flash）、`low`。
+[官方模型说明](https://api-docs.deepseek.com/news/news260910/)与
+[思考强度文档](https://api-docs.deepseek.com/guides/thinking_mode/)。
+凭证仅从远程受保护文件读取；任务 AGENTS.md 已记录后续运行规则。
+预检现在使用与研究相同的思考强度，避免只验证非思考模式。
+DeepSeek 思考模式拒绝 `tool_choice=required`，因此复用 PiHarnessConfig 的
+`force_first_tool_call=False`；仍要求实际工具执行和合法提交，不放宽源码／接口校验。
+历史运行已保存源码快照；切换模型或实现必须使用新目录。
+
+最终远程验证：**168 passed**；三个 case 的共 12 个历史冻结矿体在最终实现下重评分，
+全部分项精确不变。DeepSeek 官方真实 Pi 预检通过，5 次请求逐条核对
+`model=deepseek-flash`、`reasoning.effort=low`，只读 guest 校验及 researcher 启动成功。
+首次预检的强制 tool choice 400 和一次镜像 tag 清理引起的启动失败均保留在远程记录；
+最终按共享 workflow 的方式使用已解析 image digest 验证通过。
+详见 [3D 最终验证](../tasks/copper_inversion/resources/evidence/3d/verification.json)。
+此项验证是新端点连通与 Harness 工具链预检，尚未在 DeepSeek 下重跑三轮算法设计。

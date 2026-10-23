@@ -36,10 +36,10 @@ def parse_args(argv=None):
         default=Path("/mnt/data1/Large-Discovery-Models/cache/gondolin"),
     )
     p.add_argument("--harness-seconds", type=int, default=900)
-    p.add_argument("--llm-url", default=None)
-    p.add_argument("--llm-model", default=None)
+    p.add_argument("--llm-url", default="https://api.deepseek.com")
+    p.add_argument("--llm-model", default="deepseek-flash")
     p.add_argument("--api-key-file", type=Path, default=None)
-    p.add_argument("--thinking", default="high")
+    p.add_argument("--thinking", default="low")
     a = p.parse_args(argv)
     if a.iterations < 0 or a.harness_seconds < 1:
         p.error("invalid budget")

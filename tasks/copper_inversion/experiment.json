@@ -65,7 +65,40 @@
         "case-id": "drillholes_sketch_2d",
         "iterations": 3,
         "solver-seconds": 60,
-        "harness-seconds": 900
+        "harness-seconds": 900,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "harness_drillholes_3d": {
+      "description": "Single researcher three-round drillholes_3d engineering run",
+      "budget": {
+        "external_evaluations": 4
+      },
+      "locked_args": {
+        "case-id": "drillholes_3d",
+        "iterations": 3,
+        "solver-seconds": 120,
+        "harness-seconds": 900,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "harness_drillholes_outcrops_3d": {
+      "description": "Single researcher three-round drillholes_outcrops_3d engineering run",
+      "budget": {
+        "external_evaluations": 4
+      },
+      "locked_args": {
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 3,
+        "solver-seconds": 120,
+        "harness-seconds": 900,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
       }
     }
   }

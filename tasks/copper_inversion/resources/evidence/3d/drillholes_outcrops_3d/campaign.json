@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "scope": "One persistent researcher, baseline plus three real algorithm-design rounds; engineering evidence, not an official benchmark",
+  "case_id": "drillholes_outcrops_3d",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real-drillholes_outcrops_3d-v2",
+  "base_commit": "eb20665f",
+  "config": {
+    "case_id": "drillholes_outcrops_3d",
+    "evaluator_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "harness_cache_dir": "/mnt/data1/Large-Discovery-Models/cache/gondolin",
+    "harness_seconds": 900,
+    "implementation_sha256": "935efd8137710239ae45e2e9bff23cfa5ee1b9a7b14846679e8ab7bc07852aaa",
+    "iterations": 3,
+    "llm_model": "gpt-5.6-luna",
+    "llm_url": "https://sub2api.jp.justafish.top",
+    "mock": false,
+    "sidecar_image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "solver_seconds": 120,
+    "thinking": "high"
+  },
+  "contract_profile": "harness_drillholes_outcrops_3d",
+  "contract_sha256": "461a00f17a9dbbb6b4fac19977e14fbef87116156db244d9621333e8ac701958",
+  "status": "completed",
+  "preflight": {
+    "latency_seconds": 13.344498358666897,
+    "readonly_guest_probe": true,
+    "request_model": "gpt-5.6-luna",
+    "response_models": [
+      "gpt-5.6-luna"
+    ],
+    "status": "ok",
+    "usage": {
+      "artifactBytes": 82279,
+      "providerCalls": 3,
+      "toolCalls": {
+        "bash": 1,
+        "submit_readiness": 1,
+        "write": 1
+      },
+      "validationSubmissions": 1
+    },
+    "wire_api": "Responses via Pi"
+  },
+  "budget": {
+    "counters": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25898320,
+      "harness_tool_calls": 76,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 1043.0122780166566,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.380979061126709,
+      "llm_requests": 71,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.144186019897461,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.205043077468872,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "limits": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_turns": 3,
+      "interface_jobs": 24,
+      "outer_iterations": 4,
+      "scorer_jobs": 4,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "resume_check": {
+    "counters_unchanged": true,
+    "new_model_requests": 0,
+    "before": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25898320,
+      "harness_tool_calls": 76,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 1043.0122780166566,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.380979061126709,
+      "llm_requests": 71,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.144186019897461,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.205043077468872,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    },
+    "after": {
+      "benchmark_jobs": 8,
+      "expensive_evaluation_attempts": 4,
+      "external_evaluations": 4,
+      "harness_artifact_bytes": 25898320,
+      "harness_tool_calls": 76,
+      "harness_turns": 3,
+      "harness_validation_submissions": 5,
+      "harness_wall_time_seconds": 1043.0122780166566,
+      "interface_jobs": 8,
+      "interface_wall_seconds": 4.380979061126709,
+      "llm_requests": 71,
+      "outer_iterations": 4,
+      "proposal_attempts": 3,
+      "scorer_jobs": 4,
+      "scorer_wall_seconds": 2.144186019897461,
+      "selected_candidates": 4,
+      "solver_jobs": 4,
+      "solver_wall_seconds": 2.205043077468872,
+      "successful_evaluations": 4,
+      "valid_search_candidates": 4
+    }
+  },
+  "observations": [
+    {
+      "round": 0,
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+      "source_path": "candidates/3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f/solver.py",
+      "annotations": {},
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/227fca3d3f7bbfe9618bb0d2decfad01a2f7764d2bffde0d44f70afcfb8fa303/model/model.npy",
+          "score": "jobs/e435ff7573d63cf67ce6dde3e9a2a74d4f70d9e5446e648893214f3063db2b1f/output/result.json"
+        },
+        "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "227fca3d3f7bbfe9618bb0d2decfad01a2f7764d2bffde0d44f70afcfb8fa303",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 10.032113812425068,
+          "label_mismatches": 884.0,
+          "loss_drillhole": 405.0795810830953,
+          "loss_outcrop": 843.7589951040999,
+          "loss_total": 1248.8385761871953,
+          "positive_voxels": 1655.0,
+          "research_utility": -1248.8385761871953
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "cbb120b5f62c9a6a1c48952d4d09d2b38919715b83ddde1f6992151717bf77a7"
+    },
+    {
+      "round": 1,
+      "source_sha256": "5a4fbb2017f226d55d0f177fe0c4074f0459e1470363a2d6192cd331280b9103",
+      "source_path": "candidates/5a4fbb2017f226d55d0f177fe0c4074f0459e1470363a2d6192cd331280b9103/solver.py",
+      "annotations": {
+        "change_summary": "Replace the initial-level-set passthrough with observation-driven multiscale signed evidence: weighted Gaussian label interpolation plus a nearest-seed correction, weak contact handling, sketch blending for 2D, and bounded fallbacks.",
+        "parent_sha256": null,
+        "rationale": "The measured parent was only the initial level set (loss_total 1248.84, 884 mismatches). I inspected the public arrays: drillhole and outcrop labels form sparse positive/negative constraints with contacts, while the initial field is a poor ellipsoidal prior. Local objective experiments showed nearest signed evidence reduced loss to about 36.3, Gaussian-smoothed label evidence to about 33.7, and a two-scale (1.3/2.2 cell) blend with a small nearest-seed correction and weak contact pseudo-labels to 33.05, with all finite hard labels retained and the interface selfcheck passing. The solver consumes arbitrary problem inputs and includes 2D/sketch and tiny-fixture fallbacks rather than embedding target arrays."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/6045d24f450b51c9ea687ba5ae2b64cec52ae47ef28efb5ace1fdbcb90eeae64/model/model.npy",
+          "score": "jobs/451b299092827b3ee422f36d1c930fc7e01ae98dac54c2d7b952aae8901c7535/output/result.json"
+        },
+        "candidate_id": "5a4fbb2017f226d55d0f177fe0c4074f0459e1470363a2d6192cd331280b9103",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "6045d24f450b51c9ea687ba5ae2b64cec52ae47ef28efb5ace1fdbcb90eeae64",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.9783940665105604,
+          "label_mismatches": 35.0,
+          "loss_drillhole": 7.593281296076488,
+          "loss_outcrop": 25.455716369916495,
+          "loss_total": 33.048997665992985,
+          "positive_voxels": 6277.0,
+          "research_utility": -33.048997665992985
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "5c6865c48df5acf4cb779ecc60371ae28ded11b9daee9d065c8604349c68f334"
+    },
+    {
+      "round": 2,
+      "source_sha256": "e8a57fcd6261450972b777dde0a47ca5258e383ee908fa5a2863da734957759f",
+      "source_path": "candidates/e8a57fcd6261450972b777dde0a47ca5258e383ee908fa5a2863da734957759f/solver.py",
+      "annotations": {
+        "change_summary": "Refine the multiscale interpolant with anisotropic 3D smoothing: a narrower z scale preserves the layered outcrop cap while broader x/y smoothing stabilizes sparse drillholes; tune the nearest-seed correction accordingly.",
+        "parent_sha256": "5a4fbb2017f226d55d0f177fe0c4074f0459e1470363a2d6192cd331280b9103",
+        "rationale": "The previous measured solver reached loss_total 33.049 (down from 1248.84). I reran the public objective against the actual arrays and searched bounded smoothing scales. The outcrop observations are concentrated in horizontal z layers, so isotropic smoothing blurred the cap. An anisotropic blend using radii (1.3,1.3,1.4) and (2.6,2.6,1.8), plus a 0.035 nearest-label correction, reduced local loss to 33.005 (drillhole 7.586, outcrop 25.419). The public selfcheck still passes, and the solver remains input-driven with generic 2D/sketch and fixture fallbacks."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/2c1f8ddd9e7de409854d663d2515f99b49664ddc9035c0db1dc8ad44bb8d9f3f/model/model.npy",
+          "score": "jobs/99f7b20425fbef544ce5b5dea80f0ed11cb694911f673598995c67b2d0c50da0/output/result.json"
+        },
+        "candidate_id": "e8a57fcd6261450972b777dde0a47ca5258e383ee908fa5a2863da734957759f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "2c1f8ddd9e7de409854d663d2515f99b49664ddc9035c0db1dc8ad44bb8d9f3f",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.9965049564224013,
+          "label_mismatches": 34.0,
+          "loss_drillhole": 7.586283599848015,
+          "loss_outcrop": 25.41919478432526,
+          "loss_total": 33.00547838417327,
+          "positive_voxels": 6768.0,
+          "research_utility": -33.00547838417327
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "c21300e0fb631fed56a2d7eff3c13eb91afb93f4083b5fc9090065fa915c0485"
+    },
+    {
+      "round": 3,
+      "source_sha256": "d93ae281c2ee7fac28ef2c0c7afa27033099daaa34325d369fcda221c998bc6d",
+      "source_path": "candidates/d93ae281c2ee7fac28ef2c0c7afa27033099daaa34325d369fcda221c998bc6d/solver.py",
+      "annotations": {
+        "change_summary": "Tune the anisotropic multiscale field and apply a mild sign-preserving power transform to improve the sub-cell interface reconstructed by skfmm without changing classifications.",
+        "parent_sha256": "e8a57fcd6261450972b777dde0a47ca5258e383ee908fa5a2863da734957759f",
+        "rationale": "The previous measured solver reached loss_total 33.005. Using the same public observations, I locally optimized the anisotropic blend and nearest correction, then tested monotone sign-preserving transforms because the host reinitializes the field and the zero crossing is sub-cell sensitive. The updated blend (0.475 narrow component, 0.04 nearest correction) followed by exponent 1.22 reduced local loss to 32.948 (drillhole 7.591, outcrop 25.357). It preserves both signs, passes the public selfcheck, and remains fully input-driven with generic 2D/sketch fallbacks."
+      },
+      "evaluation": {
+        "artifacts": {
+          "model": "evaluations/ccb6aca3e2d44740b8dd8683693ebb6ca39ffdb61cd7fb6d1ad1d329ff1a193d/model/model.npy",
+          "score": "jobs/fddf0221f59151d10bd7f64abebce2b6dc759abe583a49d765cd340f4e9de73f/output/result.json"
+        },
+        "candidate_id": "d93ae281c2ee7fac28ef2c0c7afa27033099daaa34325d369fcda221c998bc6d",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "ccb6aca3e2d44740b8dd8683693ebb6ca39ffdb61cd7fb6d1ad1d329ff1a193d",
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 1.0017303798140675,
+          "label_mismatches": 34.0,
+          "loss_drillhole": 7.591369123066621,
+          "loss_outcrop": 25.356904132923702,
+          "loss_total": 32.94827325599032,
+          "positive_voxels": 6776.0,
+          "research_utility": -32.94827325599032
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0
+        },
+        "status": "succeeded"
+      },
+      "model_sha256": "e882a2a49bc97e348f7493b6e99e87d7e05733811a51e2b7ff559a97495c50a3"
+    }
+  ],
+  "artifact_sha256": {
+    "source-snapshot.tar.gz": "fdc7167c3c228b4f0bb6f56b1a343ad103d049a1e408a5b1b6102a2fdc193ef7",
+    "checkpoint.json": "e75be587f05ab663eee06ca32139d04ab8eef01ea33306240da897b020ab6cf7",
+    "budget.json": "f464cea75b6d9b2c3fa06f940e1a6eb73afcab7c2f6b12939c44172e9da645e2",
+    "result.json": "e7d58c841babb4aae679681782317eb264d03f98d1d7c2fcb849fcd466b889e8",
+    "trajectory.csv": "415fbadcd0f8e811e856b6e01fdd319c9028a3639ff45a09c53cf9409cfac1c9",
+    "best_solver.py": "d93ae281c2ee7fac28ef2c0c7afa27033099daaa34325d369fcda221c998bc6d"
+  },
+  "tests": {
+    "result": "167 passed in 27.68s",
+    "log_sha256": "5805bb64b669c229a164287cf4b844716c84579fff67b8f4e549320a4a2c4a29"
+  },
+  "superseded_attempt": {
+    "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real-drillholes_outcrops_3d-v1",
+    "reason": "Stopped during first research turn to fix scikit-fmm Fortran-order distance reconstruction; not counted as a completed three-round campaign"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "scope": "Storage-order bug reproduction and canonical geometry regression; executed remotely",
+  "implementation_sha256": "935efd8137710239ae45e2e9bff23cfa5ee1b9a7b14846679e8ab7bc07852aaa",
+  "plane": {
+    "C": {
+      "raw_max_error": 3.552713678800501e-15,
+      "raw_sign_mismatches": 0,
+      "fixed_max_error": 3.552713678800501e-15
+    },
+    "F": {
+      "raw_max_error": 5.627271742464734,
+      "raw_sign_mismatches": 248,
+      "fixed_max_error": 3.552713678800501e-15
+    }
+  },
+  "cases": {
+    "drillholes_sketch_2d": {
+      "C_F_scores_equal": true,
+      "metrics": {
+        "loss_drillhole": 288.24921244543003,
+        "loss_sketch": 4.970548305496495,
+        "loss_total": 293.2197607509265,
+        "research_utility": -293.2197607509265,
+        "positive_voxels": 131,
+        "label_mismatches": 17,
+        "contact_rmse": 10.13673154718478
+      }
+    },
+    "drillholes_3d": {
+      "C_F_scores_equal": true,
+      "metrics": {
+        "loss_drillhole": 405.0795810830953,
+        "loss_total": 405.0795810830953,
+        "research_utility": -405.0795810830953,
+        "positive_voxels": 1655,
+        "label_mismatches": 54,
+        "contact_rmse": 5.563958690902462
+      }
+    },
+    "drillholes_outcrops_3d": {
+      "C_F_scores_equal": true,
+      "metrics": {
+        "loss_drillhole": 405.0795810830953,
+        "loss_outcrop": 843.7589951040999,
+        "loss_total": 1248.8385761871953,
+        "research_utility": -1248.8385761871953,
+        "positive_voxels": 1655,
+        "label_mismatches": 884,
+        "contact_rmse": 10.032113812425068
+      }
+    }
+  },
+  "regression": {
+    "result": "167 passed in 27.68s",
+    "log_sha256": "5805bb64b669c229a164287cf4b844716c84579fff67b8f4e549320a4a2c4a29"
+  }
+}

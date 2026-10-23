@@ -46,7 +46,9 @@ def signed_distance(field, shape, spacing):
         )
     if not (np.any(field > 0) and np.any(field < 0)):
         raise ValueError("model must contain interior and exterior")
-    phi = skfmm.distance(field, dx=tuple(spacing))
+    # scikit-fmm 2025.6.23 misreads Fortran-strided 3D inputs.
+    # Canonicalize storage without changing physical axes or geometry.
+    phi = skfmm.distance(np.ascontiguousarray(field, dtype=np.float64), dx=tuple(spacing))
     if np.ma.isMaskedArray(phi) or not np.isfinite(phi).all():
         raise ValueError("invalid reconstructed distance")
     return phi

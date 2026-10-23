@@ -37,7 +37,7 @@ LDM 的 Candidate 是反演算法源码，矿体是其执行产物。Agent 可�
 
 一个 campaign 固定一个 case。两个 3D case 共用钻孔，不作为独立泛化样本；不同 case 不混合原始 loss 排名。
 
-输入约定：0 表示外部、1 表示内部、0.5 表示接触点，NaN 表示未观测。加载器显式输出观测 mask，禁止把缺失值转换为负标签。内部数组使用物理轴顺序：2D 为 x/z，3D 为 x/y/z；磁盘内存排列不等于物理轴方向。原 UBC 文件坐标原点、z 方向和 Fortran reshape 必须通过固定坐标 fixture 验证，不能只复制旧 runner 的 reshape 注释。
+输入约定：0 表示外部、1 表示内部、0.5 表示接触点，NaN 表示未观测。加载器显式输出观测 mask，禁止把缺失值转换为负标签。内部数组使用物理轴顺序：2D 为 x/z，3D 为 x/y/z；磁盘内存排列不等于物理轴方向。距离重建前统一为 C-contiguous float64，防止 scikit-fmm 对 Fortran-strided 3D 输入的错误解释；固定解析平面和实际 case 的 C/F 一致性测试必须通过。原 UBC 文件坐标原点、z 方向和 Fortran reshape 必须通过固定坐标 fixture 验证，不能只复制旧 runner 的 reshape 注释。
 
 原 3D `ind_active` 有 55517 个有效单元和 4483 个空气单元。`objective_v1` 保留旧评分使用的完整网格，地形 mask 作为公开元数据和诊断，不新增裁剪或空气体素惩罚。若后续要求地形成为硬约束，创建新 objective 版本，重新评估全部候选。
 
@@ -315,4 +315,6 @@ P3 验收不要求分数一定改进：必须能证明 agent 完成代码设计�
 
 资格阶段为 contract_verified，experiment 保持 draft：ZIP 来源有内容摘要，但尚未完成
 官方 benchmark 来源/预算认证；2D 闭环工程证据不自动升级为方法有效性证明。
-P4 中的 3D agent 搜索和 P5 的 surrogate 引导留在后续阶段。
+P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复（详见 implementation 文档）。P5 的 surrogate 引导留在后续阶段。
+
+后续所有真实调试和运行使用 DeepSeek 官方 `https://api.deepseek.com`、`deepseek-flash`（V4.1 Flash）、`low` 思考强度；API key 从远程受保护存储读取。已有旧模型实验保留原模型身份，切换后创建新运行目录。

@@ -75,3 +75,12 @@ def test_preflight_receipt_replays_usage_without_provider(tmp_path):
     _preflight(None, tmp_path, None, '', lambda counts, **kw: calls.append((counts, kw)))
     assert calls[0][0]['llm_requests'] == 3
     assert calls[0][1]['usage_key'] == 'copper:preflight:usage'
+
+
+def test_default_provider_is_official_deepseek_low():
+    from tasks.copper_inversion.core.workflow import parse_args
+
+    args = parse_args([])
+    assert args.llm_url == "https://api.deepseek.com"
+    assert args.llm_model == "deepseek-flash"
+    assert args.thinking == "low"
