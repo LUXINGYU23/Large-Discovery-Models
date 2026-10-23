@@ -1,0 +1,737 @@
+{
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "implementation_sha256": "369ea6dd35291bfb0d48f435022fd3a0bd902e2cfae2ba8350962e6340ab8627",
+  "runs": [
+    {
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4/model/model.npy",
+              "model_slices": "evaluations/82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4/model/slices.json",
+              "score": "jobs/bc1f5a27a6314de252540f72e56a17d733bae3206a84498f7f2161c1ec979ce3/output/result.json"
+            },
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063719,
+                  "last_sample_unix": 1792751511.2168965,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7507968,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.064174,
+                  "last_sample_unix": 1792751510.5823421,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7983104,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 5.563958690902462,
+              "label_mismatches": 54.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_total": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -405.0795810830953
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.063719,
+              "scorer_sampled_peak_memory_bytes": 7507968.0,
+              "scorer_wall_seconds": 0.3929290771484375,
+              "solver_cpu_seconds_observed": 0.064174,
+              "solver_sampled_peak_memory_bytes": 7983104.0,
+              "solver_wall_seconds": 0.367156982421875
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f"
+        },
+        {
+          "previous_loss": 6.522992427679737,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/2edcb8abffd7c143bae2d0d5395b70ebed3ec0dbc063d41f4ee4e82be4cd1384/model/model.npy",
+              "model_slices": "evaluations/2edcb8abffd7c143bae2d0d5395b70ebed3ec0dbc063d41f4ee4e82be4cd1384/model/slices.json",
+              "score": "jobs/be4bc7b5370a56afd60c1ee30a4841fba96286199439d849ed12003460013389/output/result.json"
+            },
+            "candidate_id": "f3874cabe5fae08cea4152c4ab02e007745f29a29aa2eda038ee66e4adbe00d6",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "2edcb8abffd7c143bae2d0d5395b70ebed3ec0dbc063d41f4ee4e82be4cd1384",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.065815,
+                  "last_sample_unix": 1792751513.8570306,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7540736,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063682,
+                  "last_sample_unix": 1792751513.1682806,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7667712,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0761639058413252,
+              "air_positive_volume": 2184.0,
+              "air_positive_voxels": 2184.0,
+              "contact_rmse": 0.27003225994752894,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.522992427679737,
+              "loss_total": 6.522992427679737,
+              "positive_volume": 28675.0,
+              "positive_voxels": 28675.0,
+              "research_utility": -6.522992427679737
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.065815,
+              "scorer_sampled_peak_memory_bytes": 7540736.0,
+              "scorer_wall_seconds": 0.39923810958862305,
+              "solver_cpu_seconds_observed": 0.063682,
+              "solver_sampled_peak_memory_bytes": 7667712.0,
+              "solver_wall_seconds": 0.46065211296081543
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "f3874cabe5fae08cea4152c4ab02e007745f29a29aa2eda038ee66e4adbe00d6"
+        },
+        {
+          "previous_loss": 6.519173431804898,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/62dcd970600c970be90b75fe54a75288145d3ddc392e85af837f0eda40909593/model/model.npy",
+              "model_slices": "evaluations/62dcd970600c970be90b75fe54a75288145d3ddc392e85af837f0eda40909593/model/slices.json",
+              "score": "jobs/fa301a4ef5e75f280d673368e75a79875e51dc5d4848db9b55f3a9bee00de081/output/result.json"
+            },
+            "candidate_id": "591a38b863774e365f0ef1c279c9abdc4071fdd0254ffada1a5befb063602263",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "62dcd970600c970be90b75fe54a75288145d3ddc392e85af837f0eda40909593",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.063982,
+                  "last_sample_unix": 1792751516.7421758,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7499776,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.288738,
+                  "last_sample_unix": 1792751516.0990295,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8093696,
+                  "samples": 2,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.021845488679030606,
+              "air_positive_volume": 576.0,
+              "air_positive_voxels": 576.0,
+              "contact_rmse": 0.27069115884178857,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.519173431804898,
+              "loss_total": 6.519173431804898,
+              "positive_volume": 26367.0,
+              "positive_voxels": 26367.0,
+              "research_utility": -6.519173431804898
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.063982,
+              "scorer_sampled_peak_memory_bytes": 7499776.0,
+              "scorer_wall_seconds": 0.39795899391174316,
+              "solver_cpu_seconds_observed": 0.288738,
+              "solver_sampled_peak_memory_bytes": 8093696.0,
+              "solver_wall_seconds": 0.4995548725128174
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "591a38b863774e365f0ef1c279c9abdc4071fdd0254ffada1a5befb063602263"
+        },
+        {
+          "previous_loss": 6.516789436652854,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/8d094ed9a67ab7c6e05857ebc32ed8f82cd00162929955de09d5229944bad5a9/model/model.npy",
+              "model_slices": "evaluations/8d094ed9a67ab7c6e05857ebc32ed8f82cd00162929955de09d5229944bad5a9/model/slices.json",
+              "score": "jobs/c8f4fef5e1a212600ae411448a8e3436468e45e3e1287ae3c963b051f05961fd/output/result.json"
+            },
+            "candidate_id": "b7e7227e26a59ffe64032d3eabfc7966913dcf9d28710c68034bc5de9d6f51e4",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "8d094ed9a67ab7c6e05857ebc32ed8f82cd00162929955de09d5229944bad5a9",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.067904,
+                  "last_sample_unix": 1792751519.4516466,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8597504,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.066851,
+                  "last_sample_unix": 1792751518.7676613,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7974912,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.07270872796153285,
+              "air_positive_volume": 1996.0,
+              "air_positive_voxels": 1996.0,
+              "contact_rmse": 0.2700323026831926,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.516789436652854,
+              "loss_total": 6.516789436652854,
+              "positive_volume": 27452.0,
+              "positive_voxels": 27452.0,
+              "research_utility": -6.516789436652854
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.067904,
+              "scorer_sampled_peak_memory_bytes": 8597504.0,
+              "scorer_wall_seconds": 0.4018888473510742,
+              "solver_cpu_seconds_observed": 0.066851,
+              "solver_sampled_peak_memory_bytes": 7974912.0,
+              "solver_wall_seconds": 0.47314906120300293
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "b7e7227e26a59ffe64032d3eabfc7966913dcf9d28710c68034bc5de9d6f51e4"
+        }
+      ],
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/p5-full-v1",
+      "replay": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023/runs/diagnostics-replay-v1/p5-full-v1"
+    },
+    {
+      "observations": [
+        {
+          "previous_loss": 405.0795810830953,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4/model/model.npy",
+              "model_slices": "evaluations/82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4/model/slices.json",
+              "score": "jobs/bc1f5a27a6314de252540f72e56a17d733bae3206a84498f7f2161c1ec979ce3/output/result.json"
+            },
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "82ce293174b3b5d1ce893f42f88a2185b93c6657da4e015dd7415dac85ac10b4",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06317,
+                  "last_sample_unix": 1792751522.0690093,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7688192,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.06258,
+                  "last_sample_unix": 1792751521.4256227,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7606272,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 5.563958690902462,
+              "label_mismatches": 54.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_total": 405.0795810830953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -405.0795810830953
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.06317,
+              "scorer_sampled_peak_memory_bytes": 7688192.0,
+              "scorer_wall_seconds": 0.3997361660003662,
+              "solver_cpu_seconds_observed": 0.06258,
+              "solver_sampled_peak_memory_bytes": 7606272.0,
+              "solver_wall_seconds": 0.3473188877105713
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f"
+        },
+        {
+          "previous_loss": 6.637265557216811,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/d7d0c1ac61536ff8e65daaaf8cd4a06f5304f658c4546ef6389715b42d970208/model/model.npy",
+              "model_slices": "evaluations/d7d0c1ac61536ff8e65daaaf8cd4a06f5304f658c4546ef6389715b42d970208/model/slices.json",
+              "score": "jobs/4c164bce1b7c50592a72074da52080118bea2599d60358247d1779b19f77bfea/output/result.json"
+            },
+            "candidate_id": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "d7d0c1ac61536ff8e65daaaf8cd4a06f5304f658c4546ef6389715b42d970208",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.061073,
+                  "last_sample_unix": 1792751551.3348854,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7794688,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 26.518844,
+                  "last_sample_unix": 1792751550.7428117,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 40693760,
+                  "samples": 121,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.058702998058810844,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.2642271692660949,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.637265557216811,
+              "loss_total": 6.637265557216811,
+              "positive_volume": 27818.0,
+              "positive_voxels": 27818.0,
+              "research_utility": -6.637265557216811
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.061073,
+              "scorer_sampled_peak_memory_bytes": 7794688.0,
+              "scorer_wall_seconds": 0.34729790687561035,
+              "solver_cpu_seconds_observed": 26.518844,
+              "solver_sampled_peak_memory_bytes": 40693760.0,
+              "solver_wall_seconds": 26.857563972473145
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "043a8bb65cce42fb0b50a4a5159fb6342d36cf01eb8cf9993483a2007ba0482e"
+        },
+        {
+          "previous_loss": 6.5170875600651454,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/d6b0644d80cee65098e0b69f47c0c8017100944c5adc56807e6177a2601ba2f5/model/model.npy",
+              "model_slices": "evaluations/d6b0644d80cee65098e0b69f47c0c8017100944c5adc56807e6177a2601ba2f5/model/slices.json",
+              "score": "jobs/2284068b13e9d1fdff3cb62286adaaf70d3d3a85918828a6005ef93920877d73/output/result.json"
+            },
+            "candidate_id": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "d6b0644d80cee65098e0b69f47c0c8017100944c5adc56807e6177a2601ba2f5",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.070309,
+                  "last_sample_unix": 1792751584.887055,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8400896,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 30.765417,
+                  "last_sample_unix": 1792751584.2401745,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 41291776,
+                  "samples": 140,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.05883200634074288,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.26964489638826217,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.5170875600651454,
+              "loss_total": 6.5170875600651454,
+              "positive_volume": 27757.0,
+              "positive_voxels": 27757.0,
+              "research_utility": -6.5170875600651454
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.070309,
+              "scorer_sampled_peak_memory_bytes": 8400896.0,
+              "scorer_wall_seconds": 0.3934760093688965,
+              "solver_cpu_seconds_observed": 30.765417,
+              "solver_sampled_peak_memory_bytes": 41291776.0,
+              "solver_wall_seconds": 31.010917901992798
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "86b38a00b734dbedb8b41906be7fb6581784437e6f6c7caa82d6b79a3c802cd0"
+        },
+        {
+          "previous_loss": 6.51660412687052,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/744345e90cf0795a8041d71a9ce5a8e3db94adf596823bc76b57488ae6f41268/model/model.npy",
+              "model_slices": "evaluations/744345e90cf0795a8041d71a9ce5a8e3db94adf596823bc76b57488ae6f41268/model/slices.json",
+              "score": "jobs/fb233732d66dfe33d95a8d2bfda43b0c327b0c9a54010390f312cf3b89d630a2/output/result.json"
+            },
+            "candidate_id": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "744345e90cf0795a8041d71a9ce5a8e3db94adf596823bc76b57488ae6f41268",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.067995,
+                  "last_sample_unix": 1792751623.6204348,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7655424,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 35.985822,
+                  "last_sample_unix": 1792751622.9743905,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 41394176,
+                  "samples": 164,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.058834125954748524,
+              "air_positive_volume": 1633.0,
+              "air_positive_voxels": 1633.0,
+              "contact_rmse": 0.26840740376024746,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 6.51660412687052,
+              "loss_total": 6.51660412687052,
+              "positive_volume": 27756.0,
+              "positive_voxels": 27756.0,
+              "research_utility": -6.51660412687052
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.067995,
+              "scorer_sampled_peak_memory_bytes": 7655424.0,
+              "scorer_wall_seconds": 0.4012930393218994,
+              "solver_cpu_seconds_observed": 35.985822,
+              "solver_sampled_peak_memory_bytes": 41394176.0,
+              "solver_wall_seconds": 36.2134370803833
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "7781cdaa29390949ef1f0db2f7c9e234e596c2b2fc8d82350495177c5b74c2f3"
+        }
+      ],
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-bounded-20261023/runs/deepseek-drillholes_3d-v2",
+      "replay": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023/runs/diagnostics-replay-v1/deepseek-drillholes_3d-v2"
+    },
+    {
+      "observations": [
+        {
+          "previous_loss": 1248.8385761871953,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/2d8505c4ab81055b0d12d38b1b74c69d15b1bbb0140f50cde9559cbddce4eed4/model/model.npy",
+              "model_slices": "evaluations/2d8505c4ab81055b0d12d38b1b74c69d15b1bbb0140f50cde9559cbddce4eed4/model/slices.json",
+              "score": "jobs/e0a754d803ed5fbdbd49199bf8ec96d5f46eacae13dd90a28976b5627d57729f/output/result.json"
+            },
+            "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "2d8505c4ab81055b0d12d38b1b74c69d15b1bbb0140f50cde9559cbddce4eed4",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.065289,
+                  "last_sample_unix": 1792751626.3505023,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7757824,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.066505,
+                  "last_sample_unix": 1792751625.6255448,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 7774208,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 10.032113812425068,
+              "label_mismatches": 884.0,
+              "loss_drillhole": 405.0795810830953,
+              "loss_outcrop": 843.7589951040999,
+              "loss_total": 1248.8385761871953,
+              "positive_volume": 1655.0,
+              "positive_voxels": 1655.0,
+              "research_utility": -1248.8385761871953
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.065289,
+              "scorer_sampled_peak_memory_bytes": 7757824.0,
+              "scorer_wall_seconds": 0.47159886360168457,
+              "solver_cpu_seconds_observed": 0.066505,
+              "solver_sampled_peak_memory_bytes": 7774208.0,
+              "solver_wall_seconds": 0.3736870288848877
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f"
+        },
+        {
+          "previous_loss": 129.95807053858255,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/e76b2a44fd156b47757ba50321579511910f95f09913cea71ae679278d98932e/model/model.npy",
+              "model_slices": "evaluations/e76b2a44fd156b47757ba50321579511910f95f09913cea71ae679278d98932e/model/slices.json",
+              "score": "jobs/dd39dd08a4323924408bcd0a9821286c208615f260d83e8e93638387d00cd890/output/result.json"
+            },
+            "candidate_id": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "e76b2a44fd156b47757ba50321579511910f95f09913cea71ae679278d98932e",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.068309,
+                  "last_sample_unix": 1792751630.3794446,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8228864,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 1.391755,
+                  "last_sample_unix": 1792751629.731787,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 68456448,
+                  "samples": 7,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.03725735754539762,
+              "air_positive_volume": 238.0,
+              "air_positive_voxels": 238.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 0.0,
+              "loss_drillhole": 28.54159361793223,
+              "loss_outcrop": 101.41647692065033,
+              "loss_total": 129.95807053858255,
+              "positive_volume": 6388.0,
+              "positive_voxels": 6388.0,
+              "research_utility": -129.95807053858255
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.068309,
+              "scorer_sampled_peak_memory_bytes": 8228864.0,
+              "scorer_wall_seconds": 0.4057149887084961,
+              "solver_cpu_seconds_observed": 1.391755,
+              "solver_sampled_peak_memory_bytes": 68456448.0,
+              "solver_wall_seconds": 1.622870922088623
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "6607f803188c3d820a206de67778376be410a6dedcffd12a73b81e2808adaf0f"
+        },
+        {
+          "previous_loss": 35.64507949884431,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/845ac9e41557d18b4461c0051317befc35c559d6d96980d74eaf4e7cded5f499/model/model.npy",
+              "model_slices": "evaluations/845ac9e41557d18b4461c0051317befc35c559d6d96980d74eaf4e7cded5f499/model/slices.json",
+              "score": "jobs/30dffc3f8da8669631c5ea0eaf363970e2cdaa4b97a002a789e2a0b6f7f86422/output/result.json"
+            },
+            "candidate_id": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "845ac9e41557d18b4461c0051317befc35c559d6d96980d74eaf4e7cded5f499",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.064765,
+                  "last_sample_unix": 1792751635.001107,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8077312,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 2.046789,
+                  "last_sample_unix": 1792751634.3544886,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 95014912,
+                  "samples": 10,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 9.0,
+              "loss_drillhole": 8.186817884638135,
+              "loss_outcrop": 27.458261614206176,
+              "loss_total": 35.64507949884431,
+              "positive_volume": 5727.0,
+              "positive_voxels": 5727.0,
+              "research_utility": -35.64507949884431
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.064765,
+              "scorer_sampled_peak_memory_bytes": 8077312.0,
+              "scorer_wall_seconds": 0.4015998840332031,
+              "solver_cpu_seconds_observed": 2.046789,
+              "solver_sampled_peak_memory_bytes": 95014912.0,
+              "solver_wall_seconds": 2.3079957962036133
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "7825db166df9f576fd1f2b9a9e8d4162ce4ff56f52306a0c59607b812b046644"
+        },
+        {
+          "previous_loss": 35.59948797699014,
+          "result": {
+            "artifacts": {
+              "model": "evaluations/c7d2cae95d5e545667f97c3850be68d1c8f04ad7d3e736e741614ab61b76de65/model/model.npy",
+              "model_slices": "evaluations/c7d2cae95d5e545667f97c3850be68d1c8f04ad7d3e736e741614ab61b76de65/model/slices.json",
+              "score": "jobs/124b70a4fcbee80744c26d3b5cbf9824c68ab89c6f132d92c17c96d57c483988/output/result.json"
+            },
+            "candidate_id": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2",
+            "error": "",
+            "metadata": {
+              "ldm_evaluation_attempt_receipt": "c7d2cae95d5e545667f97c3850be68d1c8f04ad7d3e736e741614ab61b76de65",
+              "resource_sampling": {
+                "scorer": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 0.068449,
+                  "last_sample_unix": 1792751641.7677786,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 8192000,
+                  "samples": 1,
+                  "target_interval_seconds": 0.2
+                },
+                "solver": {
+                  "complete_lifetime_measurement": false,
+                  "cpu_seconds_observed": 4.036911,
+                  "last_sample_unix": 1792751641.0294487,
+                  "method": "host_cgroup_v2_polling",
+                  "sampled_peak_memory_bytes": 135380992,
+                  "samples": 19,
+                  "target_interval_seconds": 0.2
+                }
+              },
+              "seed": 47
+            },
+            "metrics": {
+              "air_fraction_of_positive": 0.0,
+              "air_positive_volume": 0.0,
+              "air_positive_voxels": 0.0,
+              "contact_rmse": 0.0,
+              "label_mismatches": 9.0,
+              "loss_drillhole": 8.118387492462013,
+              "loss_outcrop": 27.481100484528127,
+              "loss_total": 35.59948797699014,
+              "positive_volume": 5727.0,
+              "positive_voxels": 5727.0,
+              "research_utility": -35.59948797699014
+            },
+            "resource_usage": {
+              "benchmark_jobs": 2.0,
+              "scorer_cpu_seconds_observed": 0.068449,
+              "scorer_sampled_peak_memory_bytes": 8192000.0,
+              "scorer_wall_seconds": 0.4208221435546875,
+              "solver_cpu_seconds_observed": 4.036911,
+              "solver_sampled_peak_memory_bytes": 135380992.0,
+              "solver_wall_seconds": 4.4296910762786865
+            },
+            "status": "succeeded"
+          },
+          "source_sha256": "2d92ecf99c3816aa403c4dd4fe3620052a033238cd79617eec5cc14ec50532c2"
+        }
+      ],
+      "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-deepseek-budgeted-20261023/runs/deepseek-drillholes_outcrops_3d-v3",
+      "replay": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023/runs/diagnostics-replay-v1/deepseek-drillholes_outcrops_3d-v3"
+    }
+  ],
+  "scope": "Frozen sources through new readonly interfaces and independent scorer; no new model requests"
+}

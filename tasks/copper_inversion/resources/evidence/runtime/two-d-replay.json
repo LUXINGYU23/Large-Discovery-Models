@@ -1,0 +1,237 @@
+{
+  "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "implementation_sha256": "369ea6dd35291bfb0d48f435022fd3a0bd902e2cfae2ba8350962e6340ab8627",
+  "observations": [
+    {
+      "previous_loss": 293.2197607509265,
+      "result": {
+        "artifacts": {
+          "model": "evaluations/cff86c5e395690918253699aa0a35a51260d91184aed274d0de9dc4218e640a9/model/model.npy",
+          "model_slices": "evaluations/cff86c5e395690918253699aa0a35a51260d91184aed274d0de9dc4218e640a9/model/slices.json",
+          "score": "jobs/8ac4408a5d0c1f7f7c529a0e9732b6359ba27f9b67686bc11ce54789e6ec330f/output/result.json"
+        },
+        "candidate_id": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "cff86c5e395690918253699aa0a35a51260d91184aed274d0de9dc4218e640a9",
+          "resource_sampling": {
+            "scorer": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 0.063858,
+              "last_sample_unix": 1792751681.5188978,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 7598080,
+              "samples": 1,
+              "target_interval_seconds": 0.2
+            },
+            "solver": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 0.076596,
+              "last_sample_unix": 1792751680.8818913,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 8372224,
+              "samples": 1,
+              "target_interval_seconds": 0.2
+            }
+          },
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 10.13673154718478,
+          "label_mismatches": 17.0,
+          "loss_drillhole": 288.24921244543003,
+          "loss_sketch": 4.970548305496495,
+          "loss_total": 293.2197607509265,
+          "positive_area": 131.0,
+          "positive_voxels": 131.0,
+          "research_utility": -293.2197607509265
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0,
+          "scorer_cpu_seconds_observed": 0.063858,
+          "scorer_sampled_peak_memory_bytes": 7598080.0,
+          "scorer_wall_seconds": 0.3675520420074463,
+          "solver_cpu_seconds_observed": 0.076596,
+          "solver_sampled_peak_memory_bytes": 8372224.0,
+          "solver_wall_seconds": 0.37268495559692383
+        },
+        "status": "succeeded"
+      },
+      "source_sha256": "3d1f8f7eda036b454b01466f33520daad3c565bcc42da35799840863a818c44f"
+    },
+    {
+      "previous_loss": 3.9504787503527625,
+      "result": {
+        "artifacts": {
+          "model": "evaluations/c69cd5529e67429e1c7919569a710c6d50bfddb82401e5d674bf089c2e0c4925/model/model.npy",
+          "model_slices": "evaluations/c69cd5529e67429e1c7919569a710c6d50bfddb82401e5d674bf089c2e0c4925/model/slices.json",
+          "score": "jobs/9cd95a769353a57f150e0f0796c5e8923ab8bc61482445ba458400e73712899e/output/result.json"
+        },
+        "candidate_id": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "c69cd5529e67429e1c7919569a710c6d50bfddb82401e5d674bf089c2e0c4925",
+          "resource_sampling": {
+            "scorer": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 0.065749,
+              "last_sample_unix": 1792751689.8544981,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 7938048,
+              "samples": 1,
+              "target_interval_seconds": 0.2
+            },
+            "solver": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 5.802694,
+              "last_sample_unix": 1792751689.2101123,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 21331968,
+              "samples": 27,
+              "target_interval_seconds": 0.2
+            }
+          },
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.5,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 3.806621245531335,
+          "loss_sketch": 0.14385750482142745,
+          "loss_total": 3.9504787503527625,
+          "positive_area": 482.0,
+          "positive_voxels": 482.0,
+          "research_utility": -3.9504787503527625
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0,
+          "scorer_cpu_seconds_observed": 0.065749,
+          "scorer_sampled_peak_memory_bytes": 7938048.0,
+          "scorer_wall_seconds": 0.37580418586730957,
+          "solver_cpu_seconds_observed": 5.802694,
+          "solver_sampled_peak_memory_bytes": 21331968.0,
+          "solver_wall_seconds": 6.175451993942261
+        },
+        "status": "succeeded"
+      },
+      "source_sha256": "5c0dc65e2b2fa67f1bae4f529b421759414cd33bd0c22f712914bca60cac14fa"
+    },
+    {
+      "previous_loss": 3.7968566397997594,
+      "result": {
+        "artifacts": {
+          "model": "evaluations/dc9c1f394ddc6ddc0de3bb3cb7383185ce7040e71a543096004ffccb5f24f4f2/model/model.npy",
+          "model_slices": "evaluations/dc9c1f394ddc6ddc0de3bb3cb7383185ce7040e71a543096004ffccb5f24f4f2/model/slices.json",
+          "score": "jobs/a9059f47f18cc64a7dc6d0f34eb613fd873b91584475743435bc0f351fbea695/output/result.json"
+        },
+        "candidate_id": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "dc9c1f394ddc6ddc0de3bb3cb7383185ce7040e71a543096004ffccb5f24f4f2",
+          "resource_sampling": {
+            "scorer": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 0.068458,
+              "last_sample_unix": 1792751715.144203,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 7778304,
+              "samples": 1,
+              "target_interval_seconds": 0.2
+            },
+            "solver": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 22.788509,
+              "last_sample_unix": 1792751714.5052493,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 21475328,
+              "samples": 104,
+              "target_interval_seconds": 0.2
+            }
+          },
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.5,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 3.710617574520831,
+          "loss_sketch": 0.08623906527892855,
+          "loss_total": 3.7968566397997594,
+          "positive_area": 484.0,
+          "positive_voxels": 484.0,
+          "research_utility": -3.7968566397997594
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0,
+          "scorer_cpu_seconds_observed": 0.068458,
+          "scorer_sampled_peak_memory_bytes": 7778304.0,
+          "scorer_wall_seconds": 0.3789231777191162,
+          "solver_cpu_seconds_observed": 22.788509,
+          "solver_sampled_peak_memory_bytes": 21475328.0,
+          "solver_wall_seconds": 22.992522954940796
+        },
+        "status": "succeeded"
+      },
+      "source_sha256": "8fd8937866681d6929eb4efd037ebe90685dcaf683d6f0931b3e4805caf07270"
+    },
+    {
+      "previous_loss": 3.7338023457590377,
+      "result": {
+        "artifacts": {
+          "model": "evaluations/82c764ce1df3dd21e72463c276d79d5e684347f4457bc7db83228ba9943bc809/model/model.npy",
+          "model_slices": "evaluations/82c764ce1df3dd21e72463c276d79d5e684347f4457bc7db83228ba9943bc809/model/slices.json",
+          "score": "jobs/9a27f42d2145d99e68ce069fc36ebf90639d48397d15d61dad16aace03389e61/output/result.json"
+        },
+        "candidate_id": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de",
+        "error": "",
+        "metadata": {
+          "ldm_evaluation_attempt_receipt": "82c764ce1df3dd21e72463c276d79d5e684347f4457bc7db83228ba9943bc809",
+          "resource_sampling": {
+            "scorer": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 0.064266,
+              "last_sample_unix": 1792751765.721618,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 8278016,
+              "samples": 1,
+              "target_interval_seconds": 0.2
+            },
+            "solver": {
+              "complete_lifetime_measurement": false,
+              "cpu_seconds_observed": 48.058025,
+              "last_sample_unix": 1792751765.0699546,
+              "method": "host_cgroup_v2_polling",
+              "sampled_peak_memory_bytes": 21557248,
+              "samples": 219,
+              "target_interval_seconds": 0.2
+            }
+          },
+          "seed": 47
+        },
+        "metrics": {
+          "contact_rmse": 0.5,
+          "label_mismatches": 0.0,
+          "loss_drillhole": 3.6933990378850976,
+          "loss_sketch": 0.0404033078739402,
+          "loss_total": 3.7338023457590377,
+          "positive_area": 485.0,
+          "positive_voxels": 485.0,
+          "research_utility": -3.7338023457590377
+        },
+        "resource_usage": {
+          "benchmark_jobs": 2.0,
+          "scorer_cpu_seconds_observed": 0.064266,
+          "scorer_sampled_peak_memory_bytes": 8278016.0,
+          "scorer_wall_seconds": 0.37029099464416504,
+          "solver_cpu_seconds_observed": 48.058025,
+          "solver_sampled_peak_memory_bytes": 21557248.0,
+          "solver_wall_seconds": 48.3289110660553
+        },
+        "status": "succeeded"
+      },
+      "source_sha256": "5b810c25cb55276088db58cd73b9fc0bc38eaada554533931956680ee84a10de"
+    }
+  ],
+  "original": "/mnt/data1/Large-Discovery-Models/worktrees/copper-inversion-20261023/runs/real2d-v2",
+  "replay": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023/runs/diagnostics-replay-2d-v1",
+  "scope": "Four frozen 2D sources; real readonly interfaces, solver and independent scorer, replay does not rerun"
+}

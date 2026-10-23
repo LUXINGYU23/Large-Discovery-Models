@@ -72,11 +72,22 @@ def score(problem, field):
         + int(np.sum((phi[o["values"] == 1] <= 0)))
         for o in problem["observations"]
     )
+    interior = phi > 0
+    cell_measure = float(np.prod(problem["spacing"]))
+    measure_name = "area" if phi.ndim == 2 else "volume"
+    diagnostics = {f"positive_{measure_name}": int(interior.sum()) * cell_measure}
+    active = problem["active_mask"]
+    if active is not None:
+        air_count = int(np.count_nonzero(interior & ~active))
+        diagnostics.update({"air_positive_voxels": air_count,
+                            f"air_positive_{measure_name}": air_count * cell_measure,
+                            "air_fraction_of_positive": air_count / int(interior.sum())})
     return {
         **parts,
+        **diagnostics,
         "loss_total": total,
         "research_utility": -total,
-        "positive_voxels": int((phi > 0).sum()),
+        "positive_voxels": int(interior.sum()),
         "label_mismatches": mismatch,
         "contact_rmse": float(np.sqrt(np.mean(contacts**2))) if contacts.size else 0.0,
     }

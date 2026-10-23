@@ -29,6 +29,30 @@
       {
         "name": "research_utility",
         "direction": "maximize"
+      },
+      {
+        "name": "air_positive_voxels",
+        "direction": "minimize"
+      },
+      {
+        "name": "air_positive_area",
+        "direction": "minimize"
+      },
+      {
+        "name": "air_positive_volume",
+        "direction": "minimize"
+      },
+      {
+        "name": "air_fraction_of_positive",
+        "direction": "minimize"
+      },
+      {
+        "name": "label_mismatches",
+        "direction": "minimize"
+      },
+      {
+        "name": "contact_rmse",
+        "direction": "minimize"
       }
     ]
   },
@@ -43,7 +67,8 @@
       "harness": "persistent Pi Responses; source-only candidate",
       "mock": "deterministic protocol fake; no scientific claim",
       "data_provenance": "resources/provenance.json",
-      "budget_kind": "task-defined engineering smoke, not official benchmark"
+      "budget_kind": "task-defined engineering smoke, not official benchmark",
+      "geometry_diagnostics": "Positive voxel count and physical area (2D) or volume (3D) have no preferred direction. Air occupancy is reported only with active_mask, with fraction denominator equal to all positive cells. None changes loss_total."
     },
     "per_candidate_limits": {
       "cpu_count": 2,

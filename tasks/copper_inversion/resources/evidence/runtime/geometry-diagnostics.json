@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scope": "Remote physical geometry diagnostics and task integration regression",
+  "result": "79 passed in 77.56s (0:01:17)",
+  "log_sha256": "86c5f1316f32eaac4aea799a7e1f76c880db569cb4cf2a4db08fc242e0710954",
+  "remote_root": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023",
+  "registration": "contract_verified passed; experiment remains draft",
+  "runner_dry_run": "ldm_drillholes_3d passed, contract digest 581880f9e3800d91d68e5a67c1d71a23eea0ba03320bd7b6fd5fdc27b74c9386",
+  "source_sha256": {
+    "tasks/copper_inversion/core/objective.py": "86e2a2dc84433a91e2a5e74fb6dfb5d73099a2bded0bdc6652b206252306f425",
+    "tasks/copper_inversion/tests/test_science.py": "09780f95b72ac5d55879da2084090da343c1df3422ddc42030f42586a419eaa5",
+    "tasks/copper_inversion/experiment.json": "b10ddc93293ae0db1c6886052d112512484ac5c07d9834a6bd03a2433e2893e6"
+  }
+}

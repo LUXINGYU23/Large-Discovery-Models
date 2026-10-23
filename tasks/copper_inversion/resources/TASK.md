@@ -33,3 +33,10 @@ Resource diagnostics explicitly distinguish sampled memory/CPU from lifetime tot
 Valid weak scores are observations. Unmeasured/invalid is not a zero score. Refer to
 exact parent digests and explain what changed and why. Research resources and tests
 are read-only. Work in /workspace/candidates/0/solver.py; submit via submit_solver.
+
+Geometry diagnostics: positive_area (2D) or positive_volume (3D) equals positive
+cell count times the product of physical grid spacing; this is a voxel estimate.
+Where active_mask exists, air_positive_voxels and air_positive_area/volume count
+positive cells outside it; air_fraction_of_positive uses all positive cells as
+the denominator. Missing active_mask means air diagnostics are unavailable and
+omitted, never assumed zero. These diagnostics do not change loss_total.

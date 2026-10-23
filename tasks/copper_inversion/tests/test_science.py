@@ -81,3 +81,24 @@ def test_actual_data_storage_order_invariance(case):
     assert score(problem, np.array(field, order="C")) == score(
         problem, np.array(field, order="F")
     )
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_physical_measure_and_air_diagnostics_do_not_change_loss(case):
+    p = load_problem(case, fixture=True)
+    p["spacing"] = [2.0, 3.0] if len(p["shape"]) == 2 else [2.0, 3.0, 4.0]
+    f = p["initial_level_set"]
+    before = score(p, f)
+    measure = "area" if f.ndim == 2 else "volume"
+    assert before[f"positive_{measure}"] == np.count_nonzero(f > 0) * np.prod(p["spacing"])
+    assert "air_positive_voxels" not in before  # No mask means unknown, not zero.
+    p["active_mask"] = np.ones(p["shape"], dtype=bool)
+    p["active_mask"][0:p["shape"][0] // 2] = False
+    after = score(p, f)
+    air_count = np.count_nonzero((f > 0) & ~p["active_mask"])
+    assert 0 < air_count < np.count_nonzero(f > 0)
+    assert after["air_positive_voxels"] == air_count
+    assert after[f"air_positive_{measure}"] == air_count * np.prod(p["spacing"])
+    assert after["air_fraction_of_positive"] == air_count / np.count_nonzero(f > 0)
+    assert after["loss_total"] == before["loss_total"]
+    assert after["research_utility"] == before["research_utility"]

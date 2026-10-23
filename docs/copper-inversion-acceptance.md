@@ -34,5 +34,7 @@
 - [P5 真实三轮及恢复证据](copper-inversion-p5-results.md)：12 份准入候选、每轮四选一、共 4 次正式测量；232 条官方 Flash/low 请求，完成态恢复新增请求 0。
 - 独立远程 runtime 回归 217 项通过，覆盖控制器离线后容器内硬 deadline、宿主采样、已评分矿体切片、反馈历史和既有恢复路径。见 `resources/evidence/runtime/verification.json`。
 - [BGRSI 固定版本复核](evidence/copper-inversion/bgrsi-reference.json) 已记录 commit 与文件 blob 身份。
-- 未完成：跨分支整批语法/身份检查先于全部接口执行；完整生命周期峰值内存；spec 的物理体积和空气占用诊断；最终版本正式候选复评及注册资格适用性审计。现有实现仅给 positive_voxels，不能代替全部诊断。
+- 物理面积/体积与空气占用已实现并通过远程 79 项任务测试；无 active_mask 时不虚构空气指标，修改诊断不改变 loss。见 [几何诊断证据](../tasks/copper_inversion/resources/evidence/runtime/geometry-diagnostics.json)。
+- 当前执行器对既有 2D 四份、两组单 agent 3D 八份和 P5 四份正式源码完成复评，16 次损失均与历史一致，结果重读不重跑。见 [复评记录](copper-inversion-geometry-diagnostics.md)。
+- 未完成：跨分支整批语法/身份检查先于全部接口执行；完整生命周期峰值内存；最终版本完整复评及注册资格适用性审计。
 - 当前单源码提交对象与 spec §4 的 candidates 数组描述也有差异，需要统一契约后再验收，不能用现有测试通过替代。
