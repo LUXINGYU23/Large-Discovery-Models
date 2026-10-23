@@ -16,17 +16,20 @@ function python(code, value) {
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
-const contract = python('import json; from tasks.copper_inversion.core.harness import submission_contract; print(json.dumps(submission_contract().to_dict()))');
+const contract = python('import json; from tasks.copper_inversion.core.harness import submission_contract; print(json.dumps(submission_contract(4).to_dict()))');
 
 test('array candidate snapshots cross the real Pi controller and Python parser', async () => {
   const root = await mkdtemp(join(tmpdir(), 'copper-array-'));
   try {
     const workspace = join(root, 'workspace');
     const turnRoot = join(root, 'turn');
-    await mkdir(join(workspace, 'candidates/0'), { recursive: true });
+    for (let i=0;i<4;i++) {
+      await mkdir(join(workspace, `candidates/${i}`), { recursive: true });
+      await writeFile(join(workspace, `candidates/${i}/solver.py`), `def solve(p,b,s): return p + ${i}\n`);
+    }
     const source = join(workspace, 'candidates/0/solver.py');
-    const payload = { candidates: [{ artifact_path: 'candidates/0/solver.py', parent_sha256: null,
-      change_summary: 'fixture', rationale: 'native contract integration' }] };
+    const payload = { candidates: Array.from({length:4}, (_,i) => ({ artifact_path: `candidates/${i}/solver.py`, parent_sha256: null,
+      change_summary: 'fixture', rationale: 'native contract integration' })) };
     const config = { artifactRoot: root, submissionContract: contract, forceFirstToolCall: false };
     const validate = async request => python(`
 import json,sys
@@ -35,7 +38,7 @@ from tasks.copper_inversion.core.harness import parse_snapshot
 v=json.load(sys.stdin); r=v['request']
 a=[SimpleNamespace(path_pointer=x['pathPointer'],relative_path=x['relativePath'],snapshot_path=x['snapshotPath'],sha256=x['sha256'],size_bytes=x['sizeBytes']) for x in r['artifacts']]
 try:
- parse_snapshot(r['submission'],a,v['root'],set())
+ parse_snapshot(r['submission'],a,v['root'],set(),4)
  result={'decision':'accept','errors':[]}
 except ValueError as e:
  result={'decision':'retry','errors':[{'path':'/candidates/0/artifact_path','code':'invalid_solver','message':str(e)}]}
@@ -55,6 +58,7 @@ print(json.dumps(result))
     await recovered.tool().execute('good', payload);
     assert.equal(persisted.submissionId, 'round_1-submission-2');
     assert.equal(persisted.submissionStatus, 'accepted');
+    assert.equal(persisted.submittedArtifacts.length, 4);
     assert.equal(persisted.submittedArtifacts[0].pathPointer, '/candidates/0/artifact_path');
     await writeFile(source, '# changed after submission\n');
     assert.equal(await readFile(join(root, persisted.submittedArtifacts[0].snapshotPath), 'utf8'), body);

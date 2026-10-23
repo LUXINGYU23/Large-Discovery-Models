@@ -27,6 +27,11 @@ def parse_args(argv=None):
     p.add_argument("--resume", action="store_true")
     p.add_argument("--search-method", choices=("harness", "ldm_harness"), default="harness")
     p.add_argument("--harness-research-strategy-config", type=Path)
+    p.add_argument("--encoding", choices=("ast", "qwen", "fusion"), default="ast")
+    p.add_argument("--embedding-model-path", type=Path)
+    p.add_argument("--embedding-device", default="cuda:0")
+    p.add_argument("--candidates-per-researcher", type=int, default=1)
+    p.add_argument("--evaluations-per-round", type=int, default=1)
     p.add_argument("--case-id", choices=CASES, default=CASES[0])
     p.add_argument("--iterations", type=int, default=3)
     p.add_argument("--out-dir", type=Path, default=Path("runs/copper"))
@@ -44,6 +49,13 @@ def parse_args(argv=None):
     p.add_argument("--api-key-file", type=Path, default=None)
     p.add_argument("--thinking", default="low")
     a = p.parse_args(argv)
+    researchers = 4 if a.search_method == "ldm_harness" else 1
+    if a.candidates_per_researcher < 1 or not 1 <= a.evaluations_per_round <= researchers * a.candidates_per_researcher:
+        p.error("invalid proposal/evaluation batch")
+    if a.search_method == "harness" and (a.candidates_per_researcher != 1 or a.evaluations_per_round != 1 or a.encoding != "ast"):
+        p.error("batch and embedding options require ldm_harness")
+    if a.encoding != "ast" and a.embedding_model_path is None:
+        p.error("Qwen/fusion requires a frozen local embedding model path")
     if a.iterations < 0 or a.harness_seconds < 1:
         p.error("invalid budget")
     if a.solver_seconds is None:
@@ -86,19 +98,21 @@ def main(argv=None):
         ).stdout.strip()
     researchers = 4 if args.search_method == "ldm_harness" else 1
     main_turns = args.iterations if args._research_strategy.requires_main else 0
+    evaluations = 1 + args.iterations * args.evaluations_per_round
+    proposals = researchers * args.candidates_per_researcher
     budget = CampaignBudget(
         rounds=args.iterations + 1,
-        reservoir_size=researchers,
-        batch_size=1,
-        target_observations=args.iterations + 1,
-        max_evaluation_attempts=args.iterations + 1,
+        reservoir_size=proposals,
+        batch_size=args.evaluations_per_round,
+        target_observations=evaluations,
+        max_evaluation_attempts=evaluations,
         extra_limits={
-            "benchmark_jobs": 2 * (args.iterations + 1),
+            "benchmark_jobs": 2 * evaluations,
             "harness_turns": researchers * args.iterations + main_turns,
             "main_research_turns": main_turns,
-            "interface_jobs": 6 * (researchers * args.iterations + 1),
-            "solver_jobs": args.iterations + 1,
-            "scorer_jobs": args.iterations + 1,
+            "interface_jobs": 6 * (proposals * args.iterations + 1),
+            "solver_jobs": evaluations,
+            "scorer_jobs": evaluations,
         },
     )
     from ldm_tts.registration.experiment import load_active_experiment_contract
@@ -162,8 +176,8 @@ def main(argv=None):
                 candidate_domain=Domain(root),
                 evaluator=evaluator,
                 runtime=runtime,
-                surrogate_encoder=CodeEncoder(root) if guided else None,
-                selector=LossSelector() if guided else None,
+                surrogate_encoder=CodeEncoder(root, args.encoding, args.embedding_model_path, args.embedding_device) if guided else None,
+                selector=LossSelector(args.encoding) if guided else None,
             )
             outcome = engine.run(budget.engine_config(), state=state)
             if args._research_strategy.requires_main and args.iterations:
@@ -207,7 +221,7 @@ def main(argv=None):
                     }
                 )
             )
-            return 0 if len(observations) == args.iterations + 1 and successful else 1
+            return 0 if len(observations) == evaluations and successful else 1
     except HarnessError as exc:
         runtime.pause("paused_harness", phase="harness", message=str(exc))
         raise

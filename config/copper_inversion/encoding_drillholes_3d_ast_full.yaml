@@ -1,0 +1,22 @@
+{
+  "name": "copper_encoding_drillholes_3d_ast_full",
+  "task": "copper_inversion",
+  "algorithm": "surrogate_guided_harness",
+  "mode": "real",
+  "contract_profile": "encoding_drillholes_3d_ast_full",
+  "args": {
+    "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+    "search-method": "ldm_harness",
+    "case-id": "drillholes_3d",
+    "iterations": 20,
+    "candidates-per-researcher": 4,
+    "evaluations-per-round": 4,
+    "encoding": "ast",
+    "solver-seconds": 120,
+    "harness-seconds": 1200,
+    "llm-url": "https://api.deepseek.com",
+    "llm-model": "deepseek-flash",
+    "thinking": "low",
+    "out-dir": "runs/copper_encoding_drillholes_3d_ast_full"
+  }
+}

@@ -348,3 +348,21 @@ P4 中的两个 3D case 已完成单 agent 三轮算法设计与完成态恢复�
 任务 extension 要求每次研究 bash 显式 timeout 且不超过 60 秒。read/write 和提交不计入 bash 次数。
 这只约束研究阶段；solver 2 CPU / 4 GiB / 120 秒（3D）、只读接口与独立评分不变。
 旧运行保留原策略和源码快照，不跨实现身份强制恢复。对照中的提示与策略变化、失败开销必须单列。
+
+## 2026-10-23 extension: code representation ablation
+
+The implementation now supports AST-only, frozen Qwen3-Embedding-0.6B-only,
+and equal block-normalized fusion. See [encoding experiment design](copper-inversion-encoding-ablation.md)
+for the exact normalization, version, model, run matrix and comparison boundary.
+This supersedes the fixed 256D-only restriction for newly identified campaigns.
+The engine, research coordinator, loss, interface tests, independent scorer and
+resource isolation remain shared with the accepted implementation.
+
+Submission cardinality is now an explicit contract: each researcher emits N
+standalone files at candidates/0/solver.py ... candidates/N-1/solver.py. The global
+static barrier covers all files from all researchers before any interface work.
+Receipts preserve the ordered list of source digests. An invalid or duplicate
+member rejects its submission; a partial pool is never published. New 20-round
+profiles use N=4 and select four of sixteen, with 81 total formal evaluations.
+Historic profiles retain N=1/select-one budgets but require a new run under the
+new implementation identity. No compatibility resume or old trace relabeling.

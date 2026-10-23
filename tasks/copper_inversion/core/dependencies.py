@@ -14,6 +14,12 @@ def check_dependencies(plan, *, include_optional=True):
                 task, name, "Python dependency availability"
             )
         )
+    if args.get("encoding", "ast") != "ast":
+        for name in ("sentence_transformers", "torch", "transformers"):
+            checks.append((ok if importlib.util.find_spec(name) else fail)(task, name, "Encoding dependency"))
+        model = Path(args.get("embedding-model-path", ""))
+        checks.append((ok if (model / "provenance.json").is_file() and (model / "model.safetensors").is_file() else fail)(
+            task, "embedding model", "Frozen local Qwen model and provenance required"))
     if mode == "mock" or args.get("mock"):
         checks.append(skip(task, "docker/provider", "Mock is service-free"))
     else:

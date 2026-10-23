@@ -162,6 +162,246 @@
         "thinking": "low",
         "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json"
       }
+    },
+    "encoding_drillholes_3d_ast_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "ast",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_3d_ast_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "ast",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_3d_qwen_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "qwen",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_3d_qwen_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "qwen",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_3d_fusion_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "fusion",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_3d_fusion_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "fusion",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_ast_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "ast",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_ast_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "ast",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_qwen_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "qwen",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_qwen_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "qwen",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_fusion_tiny": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 5
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 1,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "fusion",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
+    },
+    "encoding_drillholes_outcrops_3d_fusion_full": {
+      "description": "Code encoding ablation: Coverage 2+2, sixteen algorithms, select four; seed 47",
+      "budget": {
+        "external_evaluations": 81
+      },
+      "locked_args": {
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json",
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_outcrops_3d",
+        "iterations": 20,
+        "candidates-per-researcher": 4,
+        "evaluations-per-round": 4,
+        "encoding": "fusion",
+        "solver-seconds": 120,
+        "harness-seconds": 1200,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low"
+      }
     }
   }
 }

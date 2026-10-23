@@ -88,7 +88,8 @@ def test_partial_barrier_replays_accepted_peers(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("fault", ["duplicate", "syntax"])
-def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monkeypatch, fault):
+@pytest.mark.parametrize("count", [1, 4])
+def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monkeypatch, fault, count):
     original = MockClient.run_turn
     rejected, checked = [], []
     from tasks.copper_inversion.core.harness import Expander
@@ -119,7 +120,7 @@ def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monke
                 (self.root / "invalid-syntax.py").write_bytes(body)
                 artifact = replace(second.artifacts[0], snapshot_path="invalid-syntax.py",
                                    sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body))
-                duplicate = replace(second, artifacts=(artifact,), submission_digest=None)
+                duplicate = replace(second, artifacts=(artifact, *second.artifacts[1:]), submission_digest=None)
             decisions = batch((first, duplicate, *rest))
             assert decisions[second.profile_id].decision == "retry"
             assert not checked
@@ -132,7 +133,7 @@ def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monke
 
     monkeypatch.setattr(MockClient, "run_turn", run)
     assert main(["--mock", "--search-method", "ldm_harness", "--iterations", "1",
-                 "--out-dir", str(tmp_path / "run")]) == 0
+                 "--out-dir", str(tmp_path / "run"), "--candidates-per-researcher", str(count)]) == 0
     assert len(rejected) == 1
 
 

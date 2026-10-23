@@ -36,7 +36,7 @@ def test_snapshot_contract(tmp_path):
         rationale="test",
     )
     submission = {"candidates": [submission]}
-    assert parse_snapshot(submission, (artifact,), tmp_path, set()) == source
+    assert parse_snapshot(submission, (artifact,), tmp_path, set()) == (source,)
     row = submission["candidates"][0]
     for malformed in [row, {}, {"candidates": []}, {"candidates": [row, row]},
                       {"candidates": row}, {"candidates": [None]},
@@ -46,7 +46,7 @@ def test_snapshot_contract(tmp_path):
                       {"candidates": [{**row, "parent_sha256": []}]}]:
         with pytest.raises(ValueError):
             parse_snapshot(malformed, (artifact,), tmp_path, set())
-    with pytest.raises(ValueError, match="one solver"):
+    with pytest.raises(ValueError, match="exactly 1 solver"):
         parse_snapshot(submission, (artifact, artifact), tmp_path, set())
     old_pointer = artifact.path_pointer
     artifact.path_pointer = "/artifact_path"

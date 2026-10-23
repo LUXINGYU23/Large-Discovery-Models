@@ -71,7 +71,7 @@ def create_client(args, campaign_root, problem, *, artifact_root=None, profiles=
         task_id="copper_inversion",
         case_id=args.case_id,
         seed=47,
-        submission_contract=contract or submission_contract(),
+        submission_contract=contract or submission_contract(args.candidates_per_researcher),
         base_url=args.llm_url or os.environ.get("LLM_BASE_URL", ""),
         model=args.llm_model or os.environ.get("LLM_MODEL_NAME", ""),
         guest_runtime=load_pi_guest_runtime("copper_inversion", resources / "image"),
@@ -130,13 +130,14 @@ def open_search(args, root, problem, stack, checks, runtime):
                               fork_sources=sources)
         return create_client(args, root, problem, artifact_root=artifact_root,
                              profiles=main_research_profile(artifact_root, profiles[0]) if main else profiles,
-                             contract=research_contract() if main else submission_contract(),
+                             contract=research_contract() if main else submission_contract(args.candidates_per_researcher),
                              fork_sources=sources)
 
     def adapter(client, artifact_root, cursors=None):
         return Expander(root, client, checks, runtime.consume_many, artifact_root=artifact_root,
                         profiles=identities, inherited_history_counts=cursors,
-                        selection_mode="acquisition" if args.search_method == "ldm_harness" else "reservoir_order")
+                        selection_mode="acquisition" if args.search_method == "ldm_harness" else "reservoir_order",
+                        candidates_per_researcher=args.candidates_per_researcher)
 
     if not args._research_strategy.requires_main:
         if args.mock:

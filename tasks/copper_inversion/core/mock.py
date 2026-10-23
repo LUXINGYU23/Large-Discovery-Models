@@ -57,17 +57,19 @@ class MockClient:
                 data, artifacts = {"brief": "Mock research brief; no scientific claim"}, ()
             else:
                 assert json.loads(turn.message)["research_wall_time_seconds"] == self.config.limits.wall_time_seconds
-                relative = f"mock/{turn.profile_id}/{turn.turn_id}/solver.py"
-                path = self.root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                source = path.read_bytes() if path.exists() else self._source(turn)
-                path.write_bytes(source)
-                artifacts = (HarnessSubmittedArtifact(
-                    path_pointer="/candidates/0/artifact_path", relative_path="candidates/0/solver.py",
-                    snapshot_path=relative, sha256=hashlib.sha256(source).hexdigest(), size_bytes=len(source)),)
-                data = dict(artifact_path="candidates/0/solver.py", parent_sha256=history[-1]["candidate_id"],
-                            change_summary="Mock geometry shift", rationale="Protocol fixture, not scientific research")
-                data = {"candidates": [data]}
+                rows, artifacts = [], []
+                for i in range(json.loads(turn.message)["candidates_required"]):
+                    relative = f"mock/{turn.profile_id}/{turn.turn_id}/{i}/solver.py"
+                    path = self.root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    source = path.read_bytes() if path.exists() else self._source(turn) + f"# candidate {i}\n".encode()
+                    path.write_bytes(source)
+                    artifacts.append(HarnessSubmittedArtifact(
+                        path_pointer=f"/candidates/{i}/artifact_path", relative_path=f"candidates/{i}/solver.py",
+                        snapshot_path=relative, sha256=hashlib.sha256(source).hexdigest(), size_bytes=len(source)))
+                    rows.append(dict(artifact_path=f"candidates/{i}/solver.py", parent_sha256=history[-1]["candidate_id"],
+                                     change_summary="Mock geometry shift", rationale="Protocol fixture, not scientific research"))
+                data, artifacts = {"candidates": rows}, tuple(artifacts)
             submission = HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, data, artifacts)
             pending.append(submission)
             staged.append((turn, receipt, session_root, workspace, cursor_path, cursor, history, submission, data, artifacts))

@@ -1,9 +1,9 @@
 # Copper inversion algorithm discovery
 
 Implementation of [the specification](../../docs/copper-inversion-spec.md).
-One persistent Pi researcher proposes complete `solver.py` programs. The shared
+Persistent Pi researchers propose complete `solver.py` programs. The shared
 LDMEngine owns admission, rounds, budgets, checkpoints and result publication.
-This first stage is independent Harness search, without GP or a research tree.
+The `harness` path is single-agent search; `ldm_harness` uses the shared research tree and GP selection.
 There is no inherited MCMC/controller/comparison runner.
 
 A solver maps public geological data to a floating level-set grid. The host runs
@@ -79,7 +79,7 @@ override the locked 2D profile to run 3D.
 ## Surrogate-guided research tree
 
 `--search-method ldm_harness` uses the shared Coverage 2+2 coordinator and four
-proposal identities. Each branch submits one distinct sealed source. All four
+proposal identities. The original three-round profiles use one distinct sealed source per branch. All four
 must pass admission before the reservoir is published; the shared engine selects
 only one for formal solver/scorer execution. A baseline plus three research rounds
 therefore uses four formal evaluations, twelve proposals, and at most fifteen
@@ -139,9 +139,9 @@ node --test tasks/copper_inversion/tests/test_research_budget.mjs
 
 ### Native submission contract integration (remote only)
 
-The task submits a strict `candidates` array with one source per researcher.
+The task submits a strict `candidates` array with a contract-locked source count per researcher.
 The artifact pointer is `/candidates/0/artifact_path`; flat submissions are rejected.
-Four researchers still contribute four distinct sources to the LDM pool.
+The original profiles contribute four sources; the encoding ablation contributes sixteen.
 
 After building the existing Pi sidecar, run this on the remote server from the
 repository root, using its Node 24 runtime and the prepared task environment:
@@ -186,3 +186,26 @@ See [final results](../../docs/copper-inversion-final-results.md) and the
 [requirement audit](../../docs/copper-inversion-final-audit.md). Registration
 remains `contract_verified` and the experiment remains `draft`: these engineering
 results do not establish official benchmark qualification or surrogate benefit.
+
+## Twenty-round code encoding ablation
+
+See [the frozen experiment design](../../docs/copper-inversion-encoding-ablation.md).
+New `encoding_<case>_<ast|qwen|fusion>_<tiny|full>.yaml` profiles use shared
+Coverage 2+2, four standalone solvers per researcher, sixteen admitted proposals
+and four formal evaluations per round. The full profiles lock twenty rounds
+(81 evaluations); tiny profiles lock one round (5 evaluations). All use seed 47,
+official Flash/low and the unchanged read-only interface/independent scorer.
+
+The task supports `--encoding ast|qwen|fusion`, `--embedding-model-path`,
+`--embedding-device`, `--candidates-per-researcher` and `--evaluations-per-round`.
+Install the task's locked `embedding` extra on the remote host for Qwen/fusion.
+The existing AST single-candidate profiles keep their stated budgets. New source
+identities require new runs, including those profiles; historical archives are
+never resumed under the new encoder.
+
+The canonical code and all evaluated/proposed representation records are saved
+under `encodings/`; shared selection events contain all predictions and selected
+IDs. Unselected programs are not assigned measured losses. The experiment runner
+`experiments/encoding_ablation.py` receives credentials only on stdin and gates
+full launch on six verified tiny runs. `experiments/report_encoding.py` reads
+progress without changing a campaign.

@@ -34,10 +34,10 @@ def describe_ldm_task(args):
             ResponseSpaceSpec(
                 name="solver_artifact",
                 output_kind="json",
-                description="One sealed Python artifact, parent and research rationale",
+                description="Array of sealed Python algorithms, parents and research rationales",
             ),
         ),
-        acquisition=LossSelector().describe() if guided else AcquisitionSpec(
+        acquisition=LossSelector(args.encoding).describe() if guided else AcquisitionSpec(
             name="reservoir_order",
             objective_names=("loss_total",),
             score_direction="minimize",
@@ -57,7 +57,7 @@ def describe_ldm_task(args):
             candidate_validator="Code snapshot + read-only interface fixtures",
             deduplication_key="SHA256 of UTF-8 source bytes",
         ),
-        surrogate=CodeEncoder(args.out_dir).describe() if guided else SurrogateSpaceSpec(
+        surrogate=CodeEncoder(args.out_dir, args.encoding).describe() if guided else SurrogateSpaceSpec(
             kind="none",
             representation="Single-agent first stage",
             dimension_policy="none",
