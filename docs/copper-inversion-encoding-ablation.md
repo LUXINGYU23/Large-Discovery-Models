@@ -67,3 +67,43 @@ each preflight's actual submissions, model/effort, GP selection and independent
 scores may all six new 20-round campaigns launch. Preserve source identity and all
 failed attempts; never change implementation in an active campaign or force-resume
 under a different identity. Archive final runs under the authorized Ceph archive.
+
+## Native preflight verification
+
+The corrected runtime (`874aaa53b77f79888e3d902710f667d167ae6eb0254817d02ba64cca8376d90b`)
+passed 107 remote tests and all twelve configuration gates. The earlier preparation
+run was stopped because public TASK.md still specified one candidate; its source,
+partial traces and cancellation record are retained under the first experiment root.
+The corrected preflights use a fresh root and do not borrow those observations.
+
+All six corrected one-round native preflights passed: 16 accepted proposals,
+34 read-only interface jobs, 5 successful formal solver/scorer evaluations per run.
+The actual provider requests are official DeepSeek Flash / low. Completed resumes
+change neither usage counters nor the set of raw provider request files. Offline
+exports contain sixteen rows with exactly four measured labels per run; the other
+twelve are explicitly unmeasured. Records carry case, encoding, run ID and round.
+
+| Case | Encoding | One-round best loss | Wall minutes | Encoding seconds, including load |
+|---|---|---:|---:|---:|
+| Drillholes | AST | 6.52299067 | 9.78 | 0.15 |
+| Drillholes | Qwen | 6.71872930 | 11.63 | 14.58 |
+| Drillholes | Fusion | 6.51672856 | 12.04 | 13.39 |
+| Drillholes + outcrops | AST | 44.51293705 | 16.84 | 0.22 |
+| Drillholes + outcrops | Qwen | 35.46628320 | 6.94 | 11.40 |
+| Drillholes + outcrops | Fusion | 33.25783585 | 10.87 | 13.06 |
+
+These are readiness results, not twenty-round conclusions. No weights, GP settings
+or proposal budgets are tuned using these measurements. Formal runs start with
+fresh histories. Wall time is process launch through initial process completion,
+including readiness/research/encoding/evaluation and excluding audit/resume/export.
+
+Evidence: [six native preflights](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/tiny-verification.json),
+[107 remote tests](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/frozen-tests.log),
+[offline export](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/offline-export.json).
+
+Active experiment root: `/Aidata/shared/ldm/copper-encoding-ablation-v2-20261023`.
+`full/` holds six independent twenty-round runs. The supervisor writes per-run PID,
+status, return code and timing under `status/`, and verifies all completed campaigns.
+After the stage finishes it exports `offline-samples.jsonl`, `comparison-curve.csv`,
+`offline-export.json` and `encoding-comparison.md`. A failed stage remains labelled
+failed; it is not promoted to a successful twenty-round comparison.

@@ -1,0 +1,6 @@
+{
+  "commit": "dd4b3d8e",
+  "runtime_identity": "874aaa53b77f79888e3d902710f667d167ae6eb0254817d02ba64cca8376d90b",
+  "environment": "/Aidata/shared/ldm/copper-encoding-ablation-20261023/source/tasks/copper_inversion/.venv",
+  "gates": "all twelve configs passed"
+}
