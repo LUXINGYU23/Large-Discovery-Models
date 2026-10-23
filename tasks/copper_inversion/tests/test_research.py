@@ -51,7 +51,8 @@ def test_four_branch_workflow_and_completed_resume(tmp_path, strategy):
 def test_partial_barrier_replays_accepted_peers(tmp_path, monkeypatch):
     root = tmp_path / "run"
     args = ["--mock", "--search-method", "ldm_harness", "--iterations", "3", "--out-dir", str(root)]
-    original = MockClient.run_turn
+    from tasks.copper_inversion.core.harness import Expander
+    original_init = Expander.__init__
     interrupted = False
     generated = []
     source = MockClient._source
@@ -60,20 +61,24 @@ def test_partial_barrier_replays_accepted_peers(tmp_path, monkeypatch):
         generated.append((str(self.root), turn.profile_id, turn.turn_id))
         return source(self, turn)
 
-    def run(self, turns, **kwargs):
-        nonlocal interrupted
-        if len(turns) == 4 and not interrupted:
-            interrupted = True
-            accepted = original(self, turns[:2], **kwargs)
-            raise HarnessError("injected partial barrier", turn_usage={r.profile_id: r.usage for r in accepted})
-        return original(self, turns, **kwargs)
+    def init(self, root, client, checks, account, **kwargs):
+        calls = 0
+        def wrapped(payload):
+            nonlocal calls, interrupted
+            calls += 1
+            if calls == 3 and not interrupted:
+                interrupted = True
+                raise HarnessError("injected partial barrier")
+            return checks(payload)
+        original_init(self, root, client, wrapped, account, **kwargs)
 
-    monkeypatch.setattr(MockClient, "run_turn", run)
+    monkeypatch.setattr(Expander, "__init__", init)
     monkeypatch.setattr(MockClient, "_source", record_source)
     with pytest.raises(HarnessError, match="partial barrier"):
         main(args)
     assert load(root / "budget.json")["counters"]["external_evaluations"] == 1
     assert not list((root / "harness/branches").glob("*/panel.json"))
+    assert len(list((root / "harness/branches/round_0001/admissions").glob("*.json"))) == 2
     plan = (root / "harness/branches/round_0001/fork-plan.json").read_bytes()
     assert main([*args, "--resume"]) == 0
     assert len(generated) == len(set(generated)) == 12
@@ -82,20 +87,48 @@ def test_partial_barrier_replays_accepted_peers(tmp_path, monkeypatch):
     assert counters["harness_turns"] == 15 and counters["llm_requests"] == 15
 
 
-def test_cross_branch_duplicate_is_rejected_before_batch_publication(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fault", ["duplicate", "syntax"])
+def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monkeypatch, fault):
     original = MockClient.run_turn
-    rejected = []
+    rejected, checked = [], []
+    from tasks.copper_inversion.core.harness import Expander
+    original_init = Expander.__init__
+    def init(self, root, client, checks, account, **kwargs):
+        def counted(payload):
+            checked.append(payload["sha256"])
+            return checks(payload)
+        original_init(self, root, client, counted, account, **kwargs)
+    monkeypatch.setattr(Expander, "__init__", init)
 
-    def run(self, turns, submission_validator, **kwargs):
+    def run(self, turns, submission_validator=None, **kwargs):
         if len(turns) != 4:
             return original(self, turns, submission_validator=submission_validator, **kwargs)
-        first = original(self, turns[:1], submission_validator=submission_validator, **kwargs)
-        proposal = first[0]
-        result = submission_validator(HarnessSubmissionRequest(
-            turns[1].profile_id, turns[1].turn_id, 1, proposal.submission, proposal.submitted_artifacts))
-        assert result.decision == "retry" and "duplicates" in result.errors[0].message
-        rejected.append(result)
-        return first + original(self, turns[1:], submission_validator=submission_validator, **kwargs)
+        batch = kwargs.pop("submission_batch_validator")
+        def inspect(requests):
+            if len(requests) < 4:
+                assert batch(requests) == {}
+                assert not checked
+                assert not list((self.root / "admissions").glob("*.json"))
+                return {}
+            first, second, *rest = requests
+            duplicate = replace(second, submission=first.submission, artifacts=first.artifacts,
+                                submission_digest=None)
+            if fault == "syntax":
+                import hashlib
+                body = b"def solve(:\n"
+                (self.root / "invalid-syntax.py").write_bytes(body)
+                artifact = replace(second.artifacts[0], snapshot_path="invalid-syntax.py",
+                                   sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body))
+                duplicate = replace(second, artifacts=(artifact,), submission_digest=None)
+            decisions = batch((first, duplicate, *rest))
+            assert decisions[second.profile_id].decision == "retry"
+            assert not checked
+            if fault == "duplicate":
+                assert "duplicates" in decisions[second.profile_id].errors[0].message
+            assert not list((self.root / "admissions").glob("*.json"))
+            rejected.append(decisions)
+            return batch(requests)
+        return original(self, turns, submission_batch_validator=inspect, **kwargs)
 
     monkeypatch.setattr(MockClient, "run_turn", run)
     assert main(["--mock", "--search-method", "ldm_harness", "--iterations", "1",

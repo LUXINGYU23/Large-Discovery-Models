@@ -190,11 +190,36 @@ class Expander:
                 return HarnessSubmissionValidation("retry", (
                     HarnessSubmissionError("/candidates/0/artifact_path", "invalid_solver", str(exc)),))
 
+        def validate_batch(requests):
+            # Hold well-formed snapshots until every branch is present. Invalid
+            # peers may repair in the same turn without spending interface jobs.
+            errors, seen = {}, dict(admitted)
+            for request in requests:
+                try:
+                    if request.profile_id not in expected or request.turn_id != expected[request.profile_id].turn_id:
+                        raise ValueError("submission does not match requested turn")
+                    body = parse_snapshot(request.submission, request.artifacts, self.artifact_root, known)
+                    sha = hashlib.sha256(body).hexdigest()
+                    if any(owner != request.profile_id and value == sha for owner, value in seen.items()):
+                        raise ValueError("source duplicates another branch in this batch; change the algorithm")
+                    if request.profile_id in admitted and admitted[request.profile_id] != sha:
+                        raise ValueError("accepted source changed during replay")
+                    seen[request.profile_id] = sha
+                except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
+                    errors[request.profile_id] = HarnessSubmissionValidation("retry", (
+                        HarnessSubmissionError("/candidates/0/artifact_path", "invalid_solver", str(exc)),))
+            if errors:
+                return errors
+            if set(seen) != set(expected):
+                return {}
+            return {request.profile_id: validate(request) for request in requests}
+
         for turn in turns:
             self.account({"harness_turns": 1}, usage_key="copper:turn:" + turn.input_digest)
         started, usage = time.monotonic(), {}
         try:
-            results = self.client.run_turn(tuple(turns), submission_validator=validate,
+            results = self.client.run_turn(tuple(turns),
+                **({"submission_batch_validator": validate_batch} if len(turns) > 1 else {"submission_validator": validate}),
                 recovery_timeout_seconds=2 * self.client.config.limits.wall_time_seconds)
             usage = {r.profile_id: r.usage for r in results}
         except HarnessError as exc:

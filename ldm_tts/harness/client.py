@@ -27,6 +27,7 @@ from ldm_tts.harness.protocol import (
 )
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
+SubmissionBatchValidator = Callable[[tuple[HarnessSubmissionRequest, ...]], Mapping[str, HarnessSubmissionValidation]]
 ProviderAuthorizer = Callable[[HarnessProviderAuthorizationRequest], bool]
 
 
@@ -108,10 +109,21 @@ class HarnessClient:
         self,
         turns: Sequence[HarnessTurn],
         *,
-        submission_validator: SubmissionValidator,
+        submission_validator: SubmissionValidator | None = None,
+        submission_batch_validator: SubmissionBatchValidator | None = None,
         provider_authorizer: ProviderAuthorizer | None = None,
         recovery_timeout_seconds: float = 0,
     ) -> tuple[HarnessTurnResult, ...]:
+        """Run native turns with per-submission or incremental batch validation.
+
+        A batch validator sees every currently unanswered snapshot and returns
+        decisions keyed by profile. Omitted profiles remain pending while peer
+        submissions and provider authorization events continue to be handled.
+        The task owns durable admission receipts for replayed peers; this client
+        owns wire routing, attempt limits, and native commit verification.
+        """
+        if (submission_validator is None) == (submission_batch_validator is None):
+            raise ValueError("provide exactly one submission validation mode")
         if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
             raise ValueError("harness recovery timeout must be finite and non-negative")
         recovery_deadline = time.monotonic() + recovery_timeout_seconds
@@ -123,14 +135,17 @@ class HarnessClient:
         terminal_validations: dict[str, tuple[str, str]] = {}
         validation_submissions: dict[str, int] = {}
 
-        def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
+        def check_request(request: HarnessSubmissionRequest) -> None:
             turn = expected.get(request.profile_id)
             if turn is None or request.turn_id != turn.turn_id:
                 raise HarnessError(
                     "harness submission validation request does not match the turn batch"
                 )
             validation_submissions[request.profile_id] = request.attempt_index
-            validation = submission_validator(request)
+
+        def record_validation(request, validation):
+            if not isinstance(validation, HarnessSubmissionValidation):
+                raise HarnessError("submission validator returned an invalid result")
             maximum = self.config.submission_contract.max_validation_attempts
             if (
                 validation.decision == "retry"
@@ -142,6 +157,20 @@ class HarnessClient:
                 status = "accepted" if validation.decision == "accept" else "rejected"
                 terminal_validations[request.profile_id] = (status, request.digest)
             return validation
+
+        def validate(request: HarnessSubmissionRequest) -> HarnessSubmissionValidation:
+            check_request(request)
+            return record_validation(request, submission_validator(request))
+
+        def validate_batch(requests):
+            for request in requests:
+                check_request(request)
+            decisions = submission_batch_validator(requests)
+            pending = {request.profile_id: request for request in requests}
+            if not isinstance(decisions, Mapping) or not set(decisions).issubset(pending):
+                raise HarnessError("batch validator answered an unknown pending profile")
+            return {profile: record_validation(pending[profile], decision)
+                    for profile, decision in decisions.items()}
 
         def authorize(request: HarnessProviderAuthorizationRequest) -> bool:
             if (request.campaign_id != self.config.campaign_id
@@ -166,7 +195,8 @@ class HarnessClient:
                     "run_turn",
                     {"turns": [turn.to_dict() for turn in turns]},
                     "turn_committed",
-                    submission_validator=validate,
+                    submission_validator=validate if submission_validator is not None else None,
+                    submission_batch_validator=validate_batch if submission_batch_validator is not None else None,
                     provider_authorizer=authorize,
                 )
                 break
@@ -271,6 +301,7 @@ class HarnessClient:
         *,
         timeout_seconds: float | None = None,
         submission_validator: SubmissionValidator | None = None,
+        submission_batch_validator: SubmissionBatchValidator | None = None,
         provider_authorizer: ProviderAuthorizer | None = None,
     ) -> dict[str, Any]:
         frame = self._frame(self._next_request_id(), frame_type, fields)
@@ -282,6 +313,7 @@ class HarnessClient:
         self._send_frame(frame)
         timeout = self.response_timeout_seconds if timeout_seconds is None else timeout_seconds
         deadline = time.monotonic() + timeout
+        pending = {}
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -318,14 +350,26 @@ class HarnessClient:
                 continue
             if response.get("type") != "submission_validation_requested":
                 break
-            if submission_validator is None:
+            if submission_validator is None and submission_batch_validator is None:
                 _terminate(process)
                 raise HarnessError("harness requested submission validation outside run_turn")
             try:
-                self._answer_submission_validation(response, submission_validator)
+                if submission_batch_validator is None:
+                    self._answer_submission_validation(response, submission_validator)
+                else:
+                    request = self._parse_submission_request(response)
+                    if request.profile_id in pending:
+                        raise HarnessError("profile has two pending submissions")
+                    pending[request.profile_id] = (response, request)
+                    decisions = submission_batch_validator(tuple(item[1] for item in pending.values()))
+                    for profile, decision in decisions.items():
+                        response_frame, request = pending.pop(profile)
+                        self._send_submission_validation(response_frame, request, decision)
             except BaseException:
                 _terminate(process)
                 raise
+        if pending and response.get("type") != "error":
+            raise HarnessError("harness committed with unresolved submission validations")
         if response.get("type") == "error":
             responses.assert_response_keys(response, {"type", "requestId", "protocolVersion", "campaignId", "error"})
             error = response.get("error")
@@ -389,6 +433,10 @@ class HarnessClient:
         response: dict[str, Any],
         validator: SubmissionValidator,
     ) -> None:
+        request = self._parse_submission_request(response)
+        self._send_submission_validation(response, request, validator(request))
+
+    def _parse_submission_request(self, response):
         responses.assert_response_keys(response, {
             "type", "requestId", "protocolVersion", "campaignId", "validationId",
             "profileId", "turnId", "attemptIndex", "submission", "artifacts",
@@ -413,13 +461,15 @@ class HarnessClient:
             artifacts=artifacts,
             submission_digest=submission_digest,
         )
-        validation = validator(request)
+        return request
+
+    def _send_submission_validation(self, response, request, validation):
         if not isinstance(validation, HarnessSubmissionValidation):
             raise HarnessError("submission validator returned an invalid result")
         self._send_frame({
             **self._frame(response["requestId"], "submission_validation_result"),
             "validationId": responses.required_string(response["validationId"], "validationId"),
-            "submissionDigest": submission_digest,
+            "submissionDigest": request.digest,
             **validation.to_dict(),
         })
 

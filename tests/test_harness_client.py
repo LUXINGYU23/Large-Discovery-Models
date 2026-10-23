@@ -215,9 +215,11 @@ def test_submitted_artifact_requires_safe_digest_bound_paths() -> None:
         )
 
 
+@pytest.mark.parametrize("batch_validation", [False, True])
 def test_persistent_harness_client_runs_one_profile_batch(
     tmp_path: Path,
     monkeypatch,
+    batch_validation,
 ) -> None:
     fixture = Path(__file__).parent / "fixtures" / "fake_harness_sidecar.py"
     config = HarnessPoolConfig(
@@ -255,7 +257,9 @@ def test_persistent_harness_client_runs_one_profile_batch(
     with client:
         result = client.run_turn(
             (turn,),
-            submission_validator=lambda _request: HarnessSubmissionValidation(),
+            **({"submission_batch_validator": lambda requests: {
+                r.profile_id: HarnessSubmissionValidation() for r in requests}}
+               if batch_validation else {"submission_validator": lambda request: HarnessSubmissionValidation()}),
         )
 
     assert result[0].session_id == "session-chemist"

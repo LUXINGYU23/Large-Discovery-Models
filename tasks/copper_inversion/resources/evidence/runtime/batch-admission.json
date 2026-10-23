@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "scope": "Incremental shared submission validation plus task whole-pool static-before-interface admission",
+  "remote_root": "/mnt/data1/Large-Discovery-Models/worktrees/copper-final-runtime-20261023",
+  "results": {
+    "batch-admission-final.log": "225 passed in 88.78s (0:01:28)",
+    "batch-admission-targeted.log": "10 passed in 0.96s"
+  },
+  "files_sha256": {
+    "ldm_tts/harness/client.py": "5178a474843752ac985b0f92c520e8c0e0ce0f47b776e87bbe81b98f31cea9b4",
+    "tasks/copper_inversion/core/harness.py": "65f03661ab134da77f84a18c02f163d4e6bece127dad56dbffe2107e1ea17f20",
+    "tasks/copper_inversion/core/mock.py": "762680d1f1a0537d312e0e84146f9ad97401983bc612b45867fd1e959841ab18",
+    "tasks/copper_inversion/tests/test_research.py": "59310a38287c2af4c2d5a16cd11229265dbbd7fc920822d46ae1085a2e842c0c",
+    "tests/test_harness_client.py": "b98cb8d4c105ac45d265a06b8aee9a9c35ee7a47e265d2c396597f211ee29a56",
+    "tests/test_harness_batch_validation.py": "a665fe39e59115200e0d593d0bc749451ffa7f87f06d299baba89d1478e6686d"
+  },
+  "log_sha256": {
+    "batch-admission-final.log": "d51e081db43c24e49f191dcb464d6233f156a3a6b2a33ec77d13e3c24de0edae",
+    "batch-admission-targeted.log": "a145c9bf6617819590a8f8e379e09e30c53fcd25e4e6c312e6732fb838307b13"
+  },
+  "verified": [
+    "No interface calls before all four static-valid distinct sources are present",
+    "Malformed syntax or duplicate rejects only the offending pending profile",
+    "Interruption before third interface leaves exactly two admission receipts and no panel",
+    "Resume preserves fork plan and source snapshots",
+    "Pending submissions can be withheld, repaired, and answered using existing wire messages",
+    "Unresolved pending validation cannot produce a committed turn",
+    "Real Python client and process protocol fixture exercise batch callback and validation accounting"
+  ],
+  "limitations": [
+    "Task research tests use deterministic fake researchers, not a provider.",
+    "New model-backed multi-branch campaign remains required; prior P5 campaign used earlier admission implementation."
+  ]
+}

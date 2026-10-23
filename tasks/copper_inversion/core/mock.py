@@ -29,8 +29,9 @@ class MockClient:
         return ("def solve(problem, budget, seed):\n"
                 f"    return problem['initial_level_set'].copy() + {offset!r}\n").encode()
 
-    def run_turn(self, turns, submission_validator, **kwargs):
-        results = []
+    def run_turn(self, turns, submission_validator=None, submission_batch_validator=None, **kwargs):
+        results, staged, pending = [], [], []
+        decisions = {}
         for turn in turns:
             receipt = self.root / "mock-turns" / (turn.input_digest + ".json")
             if receipt.exists():
@@ -56,10 +57,10 @@ class MockClient:
                 data, artifacts = {"brief": "Mock research brief; no scientific claim"}, ()
             else:
                 assert json.loads(turn.message)["research_wall_time_seconds"] == self.config.limits.wall_time_seconds
-                source = self._source(turn)
                 relative = f"mock/{turn.profile_id}/{turn.turn_id}/solver.py"
                 path = self.root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
+                source = path.read_bytes() if path.exists() else self._source(turn)
                 path.write_bytes(source)
                 artifacts = (HarnessSubmittedArtifact(
                     path_pointer="/candidates/0/artifact_path", relative_path="candidates/0/solver.py",
@@ -68,9 +69,17 @@ class MockClient:
                             change_summary="Mock geometry shift", rationale="Protocol fixture, not scientific research")
                 data = {"candidates": [data]}
             submission = HarnessSubmissionRequest(turn.profile_id, turn.turn_id, 1, data, artifacts)
-            validation = submission_validator(submission)
-            if validation.decision != "accept":
-                raise ValueError(validation.errors)
+            pending.append(submission)
+            staged.append((turn, receipt, session_root, workspace, cursor_path, cursor, history, submission, data, artifacts))
+            if submission_batch_validator is None:
+                decisions[turn.profile_id] = submission_validator(submission)
+            else:
+                answered = submission_batch_validator(tuple(r for r in pending if r.profile_id not in decisions))
+                decisions.update(answered)
+        for turn, receipt, session_root, workspace, cursor_path, cursor, history, submission, data, artifacts in staged:
+            validation = decisions.get(turn.profile_id)
+            if validation is None or validation.decision != "accept":
+                raise ValueError("mock submission barrier not accepted")
             session = session_root / "session.jsonl"
             with session.open("a") as handle:
                 handle.write(json.dumps({"mock": True, "turn": turn.turn_id, "digest": turn.input_digest}) + "\n")

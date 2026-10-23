@@ -36,5 +36,6 @@
 - [BGRSI 固定版本复核](evidence/copper-inversion/bgrsi-reference.json) 已记录 commit 与文件 blob 身份。
 - 物理面积/体积与空气占用已实现并通过远程 79 项任务测试；无 active_mask 时不虚构空气指标，修改诊断不改变 loss。见 [几何诊断证据](../tasks/copper_inversion/resources/evidence/runtime/geometry-diagnostics.json)。
 - 当前执行器对既有 2D 四份、两组单 agent 3D 八份和 P5 四份正式源码完成复评，16 次损失均与历史一致，结果重读不重跑。见 [复评记录](copper-inversion-geometry-diagnostics.md)。
-- 未完成：跨分支整批语法/身份检查先于全部接口执行；完整生命周期峰值内存；最终版本完整复评及注册资格适用性审计。
+- 跨分支整批语法/身份检查先于全部接口执行已实现；共享客户端增量批量 validator 不改变原生协议，远程 225 项回归通过。见 [批量准入记录](copper-inversion-batch-admission.md)。真实多分支运行尚须使用新冻结实现另行验证。
+- 未完成：完整生命周期峰值内存；最终版本真实端到端验收、完整复评及注册资格适用性审计。
 - §4 提交契约已统一为严格 candidates 数组，每 researcher 恰好一项，artifact pointer 为 `/candidates/0/artifact_path`；旧扁平对象被拒绝。远程 220 项 Python 回归通过，另用真实 Pi SubmissionController 与 Python parser 验证拒绝、重开 turn 修复、封存和摘要。见 [契约证据](../tasks/copper_inversion/resources/evidence/runtime/array-submission.json)。这不代表跨分支整批语法优先屏障已完成，也未把历史真实运行改标为新契约。
