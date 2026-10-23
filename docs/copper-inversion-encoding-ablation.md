@@ -107,3 +107,19 @@ status, return code and timing under `status/`, and verifies all completed campa
 After the stage finishes it exports `offline-samples.jsonl`, `comparison-curve.csv`,
 `offline-export.json` and `encoding-comparison.md`. A failed stage remains labelled
 failed; it is not promoted to a successful twenty-round comparison.
+
+### Full launch
+
+All six formal campaigns started concurrently on 2026-10-23 at 21:57:26 Asia/Shanghai.
+The 21:59 check verified six live processes, the locked 20-round / 16-proposal /
+4-evaluation configuration, official Flash/low, successful fresh readiness probes,
+and exactly one initial observation in each campaign. Supervisor PID: 927593.
+This is launch evidence, not a completed twenty-round result.
+
+- [Launch verification](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/full-launch-verification.json)
+- [Formal source identity](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/full-source-verification.json)
+- [Archive credential scan and SHA256](../tasks/copper_inversion/resources/evidence/encoding-ablation-20261023/v2/archive-scan.json)
+
+Canonical source archive: `/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-git-da1785ce-20261023.tar.gz`.
+Complete six-preflight archive: `/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-native-preflights-v2-20261023.tar.gz`.
+Both were scanned for the protected provider credential with zero matches.

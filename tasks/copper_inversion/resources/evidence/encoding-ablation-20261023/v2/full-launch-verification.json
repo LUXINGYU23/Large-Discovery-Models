@@ -1,0 +1,54 @@
+{
+  "checked_at": "2026-10-23T21:59:12.669406+08:00",
+  "runs": [
+    {
+      "name": "drillholes_3d_ast",
+      "pid": 927600,
+      "status": "running",
+      "started_at": 1792763846.2226253,
+      "observations": 1,
+      "preflight": true
+    },
+    {
+      "name": "drillholes_3d_fusion",
+      "pid": 927603,
+      "status": "running",
+      "started_at": 1792763846.2231975,
+      "observations": 1,
+      "preflight": true
+    },
+    {
+      "name": "drillholes_3d_qwen",
+      "pid": 927601,
+      "status": "running",
+      "started_at": 1792763846.2229345,
+      "observations": 1,
+      "preflight": true
+    },
+    {
+      "name": "drillholes_outcrops_3d_ast",
+      "pid": 927606,
+      "status": "running",
+      "started_at": 1792763846.223705,
+      "observations": 1,
+      "preflight": true
+    },
+    {
+      "name": "drillholes_outcrops_3d_fusion",
+      "pid": 927608,
+      "status": "running",
+      "started_at": 1792763846.2246265,
+      "observations": 1,
+      "preflight": true
+    },
+    {
+      "name": "drillholes_outcrops_3d_qwen",
+      "pid": 927607,
+      "status": "running",
+      "started_at": 1792763846.224235,
+      "observations": 1,
+      "preflight": true
+    }
+  ],
+  "stage": "twenty-round campaigns running; no final comparison yet"
+}

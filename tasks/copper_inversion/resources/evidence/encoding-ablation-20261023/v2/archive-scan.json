@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "archives": [
+    {
+      "archive": "/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-git-da1785ce-20261023.tar.gz",
+      "files_scanned": 327,
+      "matches": [],
+      "sha256": "8765b5266a850066f4f7ef144ab9c72132459e83c031fcc545bc7df94f8470f0"
+    },
+    {
+      "archive": "/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-native-preflights-v2-20261023.tar.gz",
+      "files_scanned": 5244,
+      "matches": [],
+      "sha256": "e17260a731fbd39a3f3a623f40688cc21dbb5eeedef91bda3513fdd23a3f7c4b"
+    }
+  ]
+}
