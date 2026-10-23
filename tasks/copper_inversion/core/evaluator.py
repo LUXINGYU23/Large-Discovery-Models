@@ -77,6 +77,10 @@ class Evaluator:
                 sha = freeze_model(
                     job / "output/model.npy", root / "model", self.problem["shape"]
                 )
+            except (ValueError, OSError) as exc:
+                status = "invalid"
+                error = str(exc)
+            else:
                 score_root, s = self.execution.run(
                     {"evaluation": key, "model": sha},
                     phase="scorer",
@@ -87,7 +91,18 @@ class Evaluator:
                 jobs += 1
                 if s["exit_code"] or s["oom"] or s["reason"]:
                     raise EvaluationPaused("independent scorer failed")
-                outcome = json.loads((score_root / "output/result.json").read_text())
+                try:
+                    outcome = json.loads((score_root / "output/result.json").read_text())
+                    if not isinstance(outcome, dict) or outcome.get("status") not in {"succeeded", "invalid"}:
+                        raise ValueError("invalid scorer result schema")
+                    if outcome["status"] == "succeeded":
+                        import math
+
+                        loss = outcome["metrics"]["loss_total"]
+                        if isinstance(loss, bool) or not isinstance(loss, (int, float)) or not math.isfinite(loss):
+                            raise ValueError("invalid scorer loss")
+                except (ValueError, OSError, KeyError, TypeError) as exc:
+                    raise EvaluationPaused("independent scorer receipt unavailable or invalid") from exc
                 status = outcome["status"]
                 metrics = outcome.get("metrics", {})
                 error = outcome.get("error", "")
@@ -97,9 +112,6 @@ class Evaluator:
                         (score_root / "output/result.json").relative_to(self.root)
                     ),
                 }
-            except (ValueError, OSError) as exc:
-                status = "invalid"
-                error = str(exc)
         result = EvaluationResult(
             candidate.candidate_id,
             status,

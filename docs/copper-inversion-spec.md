@@ -1,6 +1,6 @@
 # Copper Inversion：Agent 反演算法发现任务规格
 
-日期：2026-10-23。版本：1.1，已对齐 main PR #14。状态：第一阶段已实现并完成远程 2D 单 agent 三轮闭环；验收详情见 [实现记录](copper-inversion-implementation.md)。后续 surrogate/GP 阶段未实现。
+日期：2026-10-23。版本：1.1，已对齐 main PR #14。状态：第一阶段已实现并完成远程 2D 与两个 3D case 单 agent 三轮闭环；验收详情见 [实现记录](copper-inversion-implementation.md)。后续 surrogate/GP 阶段未实现；逐项进展见 [验收台账](copper-inversion-acceptance.md)。
 
 本规格规定新增 `copper_inversion` 任务的科学问题、候选接口、可信执行边界和交付门槛。第一阶段完成持久 Agent 设计、提交、执行、读取反馈并修改反演算法的闭环；第二阶段在相同科学契约上接入 LDM surrogate/acquisition。各阶段独立记录证据，不能把注册成功、mock 运行或分数下降当成完整方法有效性证明。
 
@@ -14,7 +14,7 @@ LDM 的 Candidate 是反演算法源码，矿体是其执行产物。Agent 可�
 
 用户要求取消原包的 Monte Carlo 流程。新任务不得导入或调用原 MCMC 链、Metropolis 接受规则、GaussianField 驱动、LLM 参数 controller、ridge surrogate、ACQ/rescue 或 comparison/API runner。不保留旧算法兼容入口。Agent 自主编写的搜索算法不受原方法限制；本规格不额外禁止随机算法。
 
-本次先完成 spec。后续实现和调试按第 12 节推进。本机只做开发、文档和静态检查，实际测试、候选运行、模型调用和实验放到远程。
+实现和调试按第 12 节推进。本机只做开发、文档和静态检查，实际测试、候选运行、模型调用和实验放到远程。
 
 ## 2. 来源与参考边界
 

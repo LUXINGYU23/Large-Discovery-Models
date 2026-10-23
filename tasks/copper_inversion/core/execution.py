@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import time
 import shutil
+from datetime import datetime
 from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.contracts.evaluation import EvaluationPaused
 from .geometry import read_model, MAX_MODEL_BYTES
@@ -93,6 +94,7 @@ class Execution:
         if receipt.exists():
             result = json.loads(receipt.read_text())
             self._account(key, result, phase)
+            docker("rm", name, check=False)
             return root, result
         if job.exists():
             record = json.loads(job.read_text())
@@ -183,7 +185,7 @@ class Execution:
         elif not record["started"]:
             raise EvaluationPaused("container state differs from pre-dispatch receipt")
         deadline = record["start_time"] + timeout
-        reason = None
+        reason = record.get("stop_reason")
         while True:
             state = json.loads(docker("inspect", name).stdout)[0]["State"]
             if not state["Running"]:
@@ -204,6 +206,10 @@ class Execution:
                     break
             if time.time() > deadline or count > 32 or size > 4 * 1024 * 1024:
                 reason = "timeout" if time.time() > deadline else "output_limit"
+                # Persist the controller's decision before killing: a restart must
+                # retain the timeout classification even if no receipt was written.
+                record["stop_reason"] = reason
+                atomic_json_write(job, record)
                 docker("kill", name, check=False)
                 break
             time.sleep(0.2)
@@ -216,7 +222,12 @@ class Execution:
             "exit_code": state["ExitCode"],
             "oom": state["OOMKilled"],
             "reason": reason,
-            "wall_seconds": max(0, time.time() - record["start_time"]),
+            # Docker's terminal timestamps exclude controller downtime on replay.
+            "wall_seconds": max(
+                0,
+                datetime.fromisoformat(state["FinishedAt"].replace("Z", "+00:00")).timestamp()
+                - datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00")).timestamp(),
+            ),
             "container": name,
             "key": key,
             "image": self.image,

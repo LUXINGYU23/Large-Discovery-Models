@@ -186,3 +186,21 @@ DeepSeek 思考模式拒绝 `tool_choice=required`，因此复用 PiHarnessConfi
 首次尝试出现研究超时，补充时间提示后钻孔完成；露头还需要复用共享工具预算限制研究 bash 次数，
 所以这是工程对照，不能把时间差异完全归因于模型。科学定义、只读接口和独立评分保持不变。
 详见 [完整对照报告](copper-inversion-deepseek-comparison.md)。
+
+## P4 阶段恢复验收
+
+远程新增 15 项故障注入检查，最终任务与共享生命周期回归 **184 passed in 83.96s**。
+对两个实际 3D case，分别在 solver 完成、scorer 完成、evaluator 返回前、
+正式结果发布后但 checkpoint 写入前中断，再从同一目录恢复。
+研究端使用协议 mock，准入、solver 和 scorer 均为真实 Docker；本组没有模型调用。
+每个 campaign 仍恰好 4 个接口 job、2 个 solver、2 个 scorer、2 次正式评估及 1 个研究 turn。
+最后再恢复完成态，所有计数保持不变。
+
+修复了三个恢复边界：控制器超时终止原因先持久化再 kill；耗时取 Docker 实际起止时间，
+不计控制器离线时间；terminal receipt 已存在时继续清理遗留容器。
+独立评分文件缺失、损坏或 loss 非有限改为 infrastructure 暂停，不能误标为候选 invalid。
+另外验证了 OOM、超时子进程回收、终态回执写入前中断和计账前中断。
+科学公式、候选预算与评分方向没有改变。
+
+[机器可读证据及每组预算](../tasks/copper_inversion/resources/evidence/recovery/verification.json)。
+P5 仍待实现；[验收台账](copper-inversion-acceptance.md) 保留剩余项。
