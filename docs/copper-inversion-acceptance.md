@@ -39,5 +39,7 @@
 - 跨分支整批语法/身份检查先于全部接口执行已实现；共享客户端增量批量 validator 不改变原生协议，远程 225 项回归通过。见 [批量准入记录](copper-inversion-batch-admission.md)。真实多分支运行尚须使用新冻结实现另行验证。
 - 完整工作负载峰值由可信 PID 1 在回收全部后代后读取内核 memory.peak，并认证回传；H20 上要求峰值存在的 228 项回归通过，控制器断连时仍可恢复记录。计数边界及限制见 [资源记录](copper-inversion-resource-accounting.md)。
 - 当前版本单 agent 两个 3D case 各三轮已完成；全量 101 次请求为官方 Flash/low，完成态恢复新增请求 0，见 [重跑报告](copper-inversion-flash-low-rerun.md)。
-- 未完成：当前版本 P5 真实端到端验收、完整复评及最终逐项审计。注册资格适用性见 [资格边界](copper-inversion-qualification-scope.md)。
+- 未完成：当前版本 P5 真实端到端验收及最终逐项审计。注册资格适用性见 [资格边界](copper-inversion-qualification-scope.md)。
 - §4 提交契约已统一为严格 candidates 数组，每 researcher 恰好一项，artifact pointer 为 `/candidates/0/artifact_path`；旧扁平对象被拒绝。远程 220 项 Python 回归通过，另用真实 Pi SubmissionController 与 Python parser 验证拒绝、重开 turn 修复、封存和摘要。见 [契约证据](../tasks/copper_inversion/resources/evidence/runtime/array-submission.json)。该证据单独验证数组契约；整批屏障由后续批量准入证据覆盖，历史真实运行仍保留原契约身份。
+
+- 最终监督执行器在 H20 对历史 16 份源码完成复评，loss 差值全部为 0，可信峰值均存在，重复读取无新增执行；见 [最终复评](copper-inversion-geometry-diagnostics.md#最终监督执行器复评h20)。

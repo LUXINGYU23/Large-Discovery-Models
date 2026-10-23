@@ -33,3 +33,16 @@
 这些证据覆盖当前评分与执行实现，不替代尚未完成的整批准入顺序、提交契约及生命周期峰值内存验收。
 
 2D 完整归档 `diagnostics-replay-2d-v1.tar.gz` SHA-256：`7634fa4582e8d25d1c33d8bac197d2b5fa03eefba294c5e14276b3caed1bdc2d`，同样保存于远程 runs 和本地忽略归档目录。
+
+## 最终监督执行器复评（H20）
+
+在当前可信 PID 1 执行器上重新执行上述全部 16 份历史源码：2D 四份、P5 四份、两个单 agent 3D case 各四份。全部通过两个只读接口输入、正式 solver 和独立 scorer；与历史 loss 的差值均为 0（断言容差 1e-10）。每次正式结果均具有完整工作负载资源记录及正的内核峰值；重复读取结果不增加执行用量。
+
+这次没有调用模型，也没有改变历史候选。运行目录为 H20 `/Aidata/shared/ldm/copper-inversion-20261023/runs/final-replay-20261023`。
+
+- [完整机器证据](../tasks/copper_inversion/resources/evidence/runtime/final-supervised-replay.json)
+- [执行日志](../tasks/copper_inversion/resources/evidence/runtime/final-supervised-replay.log)
+- 完整归档：`/mnt/cephfs/xingyu/ldm/archive/copper-inversion/final-replay-20261023.tar.gz`
+- SHA256：`76daa200c97368a38b9dbec6cfaa0d1d003375ca8d698a1f8422802833a5b358`
+
+前面的 `369ea6dd…` 证据对应旧采样执行器；本节证据记录最终监督执行器身份，二者没有混用。P5 新批量提交协议的原生运行属于单独验收项。
