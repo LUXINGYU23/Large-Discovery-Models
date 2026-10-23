@@ -1,0 +1,86 @@
+{
+  "captured_at": 1792767248.9508677,
+  "controller": {
+    "pid": 1542794,
+    "started_at": 1792767065.9463732,
+    "previous": "/Aidata/shared/ldm/copper-encoding-ablation-v2-20261023",
+    "status": "running",
+    "stage": "tiny",
+    "stage_pid": 1545107
+  },
+  "runs": [
+    {
+      "run": "drillholes_3d_ast",
+      "pid": 1545112,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    },
+    {
+      "run": "drillholes_3d_fusion",
+      "pid": 1545115,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    },
+    {
+      "run": "drillholes_3d_qwen",
+      "pid": 1545113,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    },
+    {
+      "run": "drillholes_outcrops_3d_ast",
+      "pid": 1545119,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    },
+    {
+      "run": "drillholes_outcrops_3d_fusion",
+      "pid": 1545120,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    },
+    {
+      "run": "drillholes_outcrops_3d_qwen",
+      "pid": 1545118,
+      "alive": true,
+      "status": "running",
+      "observations": 1,
+      "model": "deepseek-flash",
+      "thinking": "low",
+      "url": "https://api.deepseek.com",
+      "implementation_sha256": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+      "endpoint_preflight": true
+    }
+  ],
+  "old_supervisor_alive": false
+}

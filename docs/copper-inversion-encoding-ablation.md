@@ -123,3 +123,11 @@ This is launch evidence, not a completed twenty-round result.
 Canonical source archive: `/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-git-da1785ce-20261023.tar.gz`.
 Complete six-preflight archive: `/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-native-preflights-v2-20261023.tar.gz`.
 Both were scanned for the protected provider credential with zero matches.
+
+## 2026-10-23 runtime diagnosis and versioned restart
+
+The first full campaigns exposed candidate repair and terminal-peer barrier failures.
+See [matched-budget progress and repair report](copper-inversion-encoding-progress-20261023.md)
+for the preserved v2 results, exact causes, remote tests and v3 restart state.
+The old full campaigns are historical; do not treat their stale supervisor `running`
+field as liveness. Use the restart receipt and actual process status.

@@ -1,0 +1,8 @@
+{
+  "commit": "c5a04718",
+  "runtime_identity": "6c17bf369c4c9c676878812fe13b508890241b9f814822120d62edf60a57d1d5",
+  "archive": "/mnt/cephfs/xingyu/ldm/archive/copper-inversion/encoding-repair-c5a04718-20261023.tar.gz",
+  "archive_sha256": "cc340b9af15f60cbf5c644564c20027e5d5a92d07314bdb9aca33c5791cfd9d7",
+  "tests": "145 passed + 17 focused regressions passed",
+  "config_gates": 12
+}

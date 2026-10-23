@@ -1,0 +1,451 @@
+{
+  "captured_at": "2026-10-23T14:51:06.077762+00:00",
+  "root": "/Aidata/shared/ldm/copper-encoding-ablation-v2-20261023",
+  "runs": [
+    {
+      "run": "drillholes_3d_ast",
+      "pid_alive": true,
+      "process_status": "running",
+      "campaign_status": "running",
+      "observations": 21,
+      "successful": 21,
+      "round_counts": {
+        "0": 1,
+        "1": 4,
+        "2": 4,
+        "3": 4,
+        "4": 4,
+        "5": 4
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 405.0795810830953,
+          "elapsed_seconds": 18.1018283367157
+        },
+        {
+          "round": 1,
+          "evaluations": 5,
+          "best_loss": 6.523782361167847,
+          "elapsed_seconds": 515.8680009841919
+        },
+        {
+          "round": 2,
+          "evaluations": 9,
+          "best_loss": 6.521003090634322,
+          "elapsed_seconds": 1246.060194015503
+        },
+        {
+          "round": 3,
+          "evaluations": 13,
+          "best_loss": 6.520863059946788,
+          "elapsed_seconds": 1825.3555192947388
+        },
+        {
+          "round": 4,
+          "evaluations": 17,
+          "best_loss": 6.520863059946788,
+          "elapsed_seconds": 2507.4804351329803
+        },
+        {
+          "round": 5,
+          "evaluations": 21,
+          "best_loss": 6.518914036083722,
+          "elapsed_seconds": 3083.2135927677155
+        }
+      ],
+      "rejected_turns": [],
+      "encoding_seconds": 1.280806228518486,
+      "counters": {
+        "benchmark_jobs": 42,
+        "expensive_evaluation_attempts": 21,
+        "external_evaluations": 21,
+        "harness_artifact_bytes": 302269236,
+        "harness_tool_calls": 346,
+        "harness_turns": 26,
+        "harness_validation_submissions": 33,
+        "harness_wall_time_seconds": 2859.2037068218924,
+        "interface_cpu_seconds_observed": 21.756217999999997,
+        "interface_cpu_seconds_through_reap": 35.78780300000001,
+        "interface_jobs": 160,
+        "interface_wall_seconds": 76.31461834907532,
+        "llm_requests": 357,
+        "main_research_turns": 6,
+        "outer_iterations": 7,
+        "proposal_attempts": 20,
+        "scorer_cpu_seconds_observed": 1.3088190000000002,
+        "scorer_cpu_seconds_through_reap": 4.349515,
+        "scorer_jobs": 21,
+        "scorer_wall_seconds": 9.87824273109436,
+        "selected_candidates": 21,
+        "solver_cpu_seconds_observed": 141.0143,
+        "solver_cpu_seconds_through_reap": 143.217517,
+        "solver_jobs": 21,
+        "solver_wall_seconds": 148.6996419429779,
+        "successful_evaluations": 21,
+        "valid_search_candidates": 81
+      }
+    },
+    {
+      "run": "drillholes_3d_fusion",
+      "pid_alive": true,
+      "process_status": "running",
+      "campaign_status": "running",
+      "observations": 17,
+      "successful": 17,
+      "round_counts": {
+        "0": 1,
+        "1": 4,
+        "2": 4,
+        "3": 4,
+        "4": 4
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 405.0795810830953,
+          "elapsed_seconds": 26.332771062850952
+        },
+        {
+          "round": 1,
+          "evaluations": 5,
+          "best_loss": 6.530941956201145,
+          "elapsed_seconds": 741.6506869792938
+        },
+        {
+          "round": 2,
+          "evaluations": 9,
+          "best_loss": 6.523612219664043,
+          "elapsed_seconds": 1333.2442178726196
+        },
+        {
+          "round": 3,
+          "evaluations": 13,
+          "best_loss": 6.522995502850812,
+          "elapsed_seconds": 2168.6832509040833
+        },
+        {
+          "round": 4,
+          "evaluations": 17,
+          "best_loss": 6.516138265978267,
+          "elapsed_seconds": 2817.35130238533
+        }
+      ],
+      "rejected_turns": [],
+      "encoding_seconds": 22.28350208932534,
+      "counters": {
+        "benchmark_jobs": 34,
+        "expensive_evaluation_attempts": 17,
+        "external_evaluations": 17,
+        "harness_artifact_bytes": 237614087,
+        "harness_tool_calls": 336,
+        "harness_turns": 25,
+        "harness_validation_submissions": 25,
+        "harness_wall_time_seconds": 2579.5404016305692,
+        "interface_cpu_seconds_observed": 18.595776000000004,
+        "interface_cpu_seconds_through_reap": 30.173285999999997,
+        "interface_jobs": 130,
+        "interface_wall_seconds": 63.63517904281616,
+        "llm_requests": 349,
+        "main_research_turns": 5,
+        "outer_iterations": 6,
+        "proposal_attempts": 16,
+        "scorer_cpu_seconds_observed": 1.0616720000000002,
+        "scorer_cpu_seconds_through_reap": 3.507872,
+        "scorer_jobs": 17,
+        "scorer_wall_seconds": 7.883894205093384,
+        "selected_candidates": 17,
+        "solver_cpu_seconds_observed": 265.185837,
+        "solver_cpu_seconds_through_reap": 266.65684400000004,
+        "solver_jobs": 17,
+        "solver_wall_seconds": 271.0924463272095,
+        "successful_evaluations": 17,
+        "valid_search_candidates": 65
+      }
+    },
+    {
+      "run": "drillholes_3d_qwen",
+      "pid_alive": false,
+      "process_status": "failed",
+      "campaign_status": "failed",
+      "observations": 1,
+      "successful": 1,
+      "round_counts": {
+        "0": 1
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 405.0795810830953,
+          "elapsed_seconds": 27.533238649368286
+        }
+      ],
+      "rejected_turns": [
+        {
+          "turn": "researcher_1_round_1",
+          "errors": [
+            {
+              "path": "/candidates/0/artifact_path",
+              "code": "invalid_solver",
+              "message": "interface execution failed: 134",
+              "hint": ""
+            }
+          ]
+        }
+      ],
+      "encoding_seconds": 8.361032028216869,
+      "counters": {
+        "benchmark_jobs": 2,
+        "expensive_evaluation_attempts": 1,
+        "external_evaluations": 1,
+        "harness_artifact_bytes": 99254415,
+        "harness_tool_calls": 107,
+        "harness_turns": 5,
+        "harness_validation_submissions": 9,
+        "harness_wall_time_seconds": 1118.1197691825218,
+        "interface_cpu_seconds_observed": 5.881779,
+        "interface_cpu_seconds_through_reap": 9.407720000000001,
+        "interface_jobs": 37,
+        "interface_wall_seconds": 19.449655771255493,
+        "llm_requests": 109,
+        "main_research_turns": 1,
+        "outer_iterations": 2,
+        "scorer_cpu_seconds_observed": 0.062054,
+        "scorer_cpu_seconds_through_reap": 0.208318,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.4591338634490967,
+        "selected_candidates": 1,
+        "solver_cpu_seconds_observed": 0.067366,
+        "solver_cpu_seconds_through_reap": 0.185609,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.48543286323547363,
+        "successful_evaluations": 1,
+        "valid_search_candidates": 1
+      }
+    },
+    {
+      "run": "drillholes_outcrops_3d_ast",
+      "pid_alive": true,
+      "process_status": "running",
+      "campaign_status": "running",
+      "observations": 9,
+      "successful": 9,
+      "round_counts": {
+        "0": 1,
+        "1": 4,
+        "2": 4
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 1248.8385761871953,
+          "elapsed_seconds": 17.7301344871521
+        },
+        {
+          "round": 1,
+          "evaluations": 5,
+          "best_loss": 33.10494804253673,
+          "elapsed_seconds": 841.3181788921356
+        },
+        {
+          "round": 2,
+          "evaluations": 9,
+          "best_loss": 33.08289996813391,
+          "elapsed_seconds": 1889.6402444839478
+        }
+      ],
+      "rejected_turns": [
+        {
+          "turn": "researcher_2_round_3",
+          "errors": [
+            {
+              "path": "/candidates/0/artifact_path",
+              "code": "invalid_solver",
+              "message": "snapshot path mismatch",
+              "hint": ""
+            }
+          ]
+        }
+      ],
+      "encoding_seconds": 0.3466812209226191,
+      "counters": {
+        "benchmark_jobs": 18,
+        "expensive_evaluation_attempts": 9,
+        "external_evaluations": 9,
+        "harness_artifact_bytes": 86918005,
+        "harness_tool_calls": 162,
+        "harness_turns": 15,
+        "harness_validation_submissions": 12,
+        "harness_wall_time_seconds": 1515.922303037718,
+        "interface_cpu_seconds_observed": 19.788439999999998,
+        "interface_cpu_seconds_through_reap": 25.496673,
+        "interface_jobs": 66,
+        "interface_wall_seconds": 42.58199858665466,
+        "llm_requests": 145,
+        "main_research_turns": 3,
+        "outer_iterations": 4,
+        "proposal_attempts": 8,
+        "scorer_cpu_seconds_observed": 0.5542130000000001,
+        "scorer_cpu_seconds_through_reap": 1.882988,
+        "scorer_jobs": 9,
+        "scorer_wall_seconds": 4.215519905090332,
+        "selected_candidates": 9,
+        "solver_cpu_seconds_observed": 464.42736,
+        "solver_cpu_seconds_through_reap": 465.45839599999994,
+        "solver_jobs": 9,
+        "solver_wall_seconds": 467.79950070381165,
+        "successful_evaluations": 9,
+        "valid_search_candidates": 33
+      }
+    },
+    {
+      "run": "drillholes_outcrops_3d_fusion",
+      "pid_alive": false,
+      "process_status": "failed",
+      "campaign_status": "paused_harness",
+      "observations": 5,
+      "successful": 5,
+      "round_counts": {
+        "0": 1,
+        "1": 4
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 1248.8385761871953,
+          "elapsed_seconds": 27.306429862976074
+        },
+        {
+          "round": 1,
+          "evaluations": 5,
+          "best_loss": 35.20188259161132,
+          "elapsed_seconds": 981.7159707546234
+        }
+      ],
+      "rejected_turns": [
+        {
+          "turn": "researcher_2_round_2",
+          "errors": [
+            {
+              "path": "/candidates/0/artifact_path",
+              "code": "invalid_solver",
+              "message": "source already evaluated; submit a changed algorithm",
+              "hint": ""
+            }
+          ]
+        }
+      ],
+      "encoding_seconds": 12.548742986284196,
+      "counters": {
+        "benchmark_jobs": 10,
+        "expensive_evaluation_attempts": 5,
+        "external_evaluations": 5,
+        "harness_artifact_bytes": 80718392,
+        "harness_tool_calls": 145,
+        "harness_turns": 10,
+        "harness_validation_submissions": 15,
+        "harness_wall_time_seconds": 2001.7180814547464,
+        "interface_cpu_seconds_observed": 13.671218999999999,
+        "interface_cpu_seconds_through_reap": 16.664705,
+        "interface_jobs": 34,
+        "interface_wall_seconds": 25.690292596817017,
+        "llm_requests": 149,
+        "main_research_turns": 2,
+        "outer_iterations": 3,
+        "proposal_attempts": 4,
+        "scorer_cpu_seconds_observed": 0.308504,
+        "scorer_cpu_seconds_through_reap": 1.038541,
+        "scorer_jobs": 5,
+        "scorer_wall_seconds": 2.386467933654785,
+        "selected_candidates": 5,
+        "solver_cpu_seconds_observed": 336.658993,
+        "solver_cpu_seconds_through_reap": 336.967558,
+        "solver_jobs": 5,
+        "solver_wall_seconds": 338.43722343444824,
+        "successful_evaluations": 5,
+        "valid_search_candidates": 17
+      }
+    },
+    {
+      "run": "drillholes_outcrops_3d_qwen",
+      "pid_alive": true,
+      "process_status": "running",
+      "campaign_status": "running",
+      "observations": 9,
+      "successful": 9,
+      "round_counts": {
+        "0": 1,
+        "1": 4,
+        "2": 4
+      },
+      "curve": [
+        {
+          "round": 0,
+          "evaluations": 1,
+          "best_loss": 1248.8385761871953,
+          "elapsed_seconds": 26.299845218658447
+        },
+        {
+          "round": 1,
+          "evaluations": 5,
+          "best_loss": 42.5739954261713,
+          "elapsed_seconds": 1102.9290866851807
+        },
+        {
+          "round": 2,
+          "evaluations": 9,
+          "best_loss": 36.78864315097697,
+          "elapsed_seconds": 2137.79736995697
+        }
+      ],
+      "rejected_turns": [
+        {
+          "turn": "researcher_1_round_3",
+          "errors": [
+            {
+              "path": "/candidates/0/artifact_path",
+              "code": "invalid_solver",
+              "message": "snapshot path mismatch",
+              "hint": ""
+            }
+          ]
+        }
+      ],
+      "encoding_seconds": 20.540151853580028,
+      "counters": {
+        "benchmark_jobs": 18,
+        "expensive_evaluation_attempts": 9,
+        "external_evaluations": 9,
+        "harness_artifact_bytes": 147931623,
+        "harness_tool_calls": 189,
+        "harness_turns": 15,
+        "harness_validation_submissions": 13,
+        "harness_wall_time_seconds": 2107.4157725023106,
+        "interface_cpu_seconds_observed": 110.565046,
+        "interface_cpu_seconds_through_reap": 114.12229000000002,
+        "interface_jobs": 66,
+        "interface_wall_seconds": 131.2026982307434,
+        "llm_requests": 199,
+        "main_research_turns": 3,
+        "outer_iterations": 4,
+        "proposal_attempts": 8,
+        "scorer_cpu_seconds_observed": 0.5628780000000001,
+        "scorer_cpu_seconds_through_reap": 1.873443,
+        "scorer_jobs": 9,
+        "scorer_wall_seconds": 4.219212055206299,
+        "selected_candidates": 9,
+        "solver_cpu_seconds_observed": 392.629027,
+        "solver_cpu_seconds_through_reap": 393.79528799999997,
+        "solver_jobs": 9,
+        "solver_wall_seconds": 396.1792359352112,
+        "successful_evaluations": 9,
+        "valid_search_candidates": 33
+      }
+    }
+  ]
+}
