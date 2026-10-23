@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "mismatches": [],
+  "commit": "627dad261d6aa7bce189a95ec9779bd927b4b1bc",
+  "files": 248,
+  "runtime_identity": "1b9daba17312fb08d981b4d07c5dd341fcd7e9df14f3ba1f3d5fd1d015c4f0f2",
+  "python": "3.11.16",
+  "packages": {
+    "numpy": "1.26.4",
+    "scipy": "1.14.1",
+    "torch": "2.6.0",
+    "transformers": "4.57.6",
+    "sentence-transformers": "5.1.2",
+    "scikit-fmm": "2025.6.23",
+    "discretize": "0.11.3"
+  }
+}

@@ -77,3 +77,12 @@ def test_sixteen_proposals_four_selected_and_resume(tmp_path):
     before=json.loads((root/'budget.json').read_text())['counters']
     assert main(args+['--resume'])==0
     assert json.loads((root/'budget.json').read_text())['counters']==before
+
+
+def test_public_instructions_use_turn_candidate_count():
+    from tasks.copper_inversion.core.data import RESOURCES
+    for name in ('TASK.md', 'harness/profiles/researcher/AGENTS.md', 'harness/tools/copper.mjs'):
+        text=(RESOURCES/name).read_text()
+        assert 'candidates_required' in text
+        assert 'Submit exactly one candidate' not in text
+        assert 'Submit exactly one entry' not in text

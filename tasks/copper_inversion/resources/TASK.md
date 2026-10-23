@@ -36,11 +36,13 @@ uses that same boundary. The worker runs as UID/GID 65534 without capabilities.
 These diagnostics never replace the independently recomputed geological loss.
 Valid weak scores are observations. Unmeasured/invalid is not a zero score. Refer to
 exact parent digests and explain what changed and why. Research resources and tests
-are read-only. Work in /workspace/candidates/0/solver.py; submit via submit_solver.
-The submission is {"candidates": [{"artifact_path": "candidates/0/solver.py",
+are read-only. Write standalone files /workspace/candidates/<index>/solver.py and submit via submit_solver.
+Each submission has this structure (one entry illustrated): {"candidates": [{"artifact_path": "candidates/0/solver.py",
 "parent_sha256": null, "change_summary": "...", "rationale": "..."}]}.
-Submit exactly one candidate per researcher; use a measured source digest instead
-of null when improving that source. The flat object format is not accepted.
+Submit exactly candidates_required entries, as specified by the current turn, with
+indices 0 through candidates_required-1. Run selfcheck on every file. Use a measured
+source digest instead of null when improving that source. Each file must stand
+alone and cannot import sibling candidates. The flat object format is not accepted.
 
 Geometry diagnostics: positive_area (2D) or positive_volume (3D) equals positive
 cell count times the product of physical grid spacing; this is a voxel estimate.

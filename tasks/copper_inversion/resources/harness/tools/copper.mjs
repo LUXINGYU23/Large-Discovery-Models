@@ -16,7 +16,7 @@ export default function(pi) {
       cpSync('/artifacts/public',dest,{recursive:true});
       const history=JSON.parse(readFileSync('/artifacts/public/history.json','utf8'));
       const value={directory:'/workspace/.ldm-resources/copper',history_count:history.length,
-        instructions:'Read TASK.md, history.json and objective.py. Load arrays from problem.npz and metadata from problem.json. Run python selfcheck.py /workspace/candidates/0/solver.py from the exported directory. Frozen tests are public; controller independently checks the final snapshot.'};
+        instructions:'Read TASK.md, history.json and objective.py. Load arrays from problem.npz and metadata from problem.json. Run python selfcheck.py /workspace/candidates/0/solver.py from the exported directory, repeating for every required candidate index. The turn specifies candidates_required. Frozen tests are public; controller independently checks the final snapshot.'};
       return {content:[{type:'text',text:JSON.stringify(value)}],details:value};
     }});
 }

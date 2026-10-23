@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+  "results": {
+    "ast": {
+      "dimension": 256,
+      "norm": 1.0,
+      "seconds": 0.0010727392509579659,
+      "version": "copper-normalized-ast256-v2"
+    },
+    "qwen": {
+      "dimension": 1024,
+      "norm": 1.0,
+      "seconds": 10.214353341143578,
+      "version": "copper-python-ast-unparse-v1-qwen-97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3-v1"
+    },
+    "fusion": {
+      "dimension": 1280,
+      "norm": 0.9999999999999999,
+      "seconds": 3.7615588223561645,
+      "version": "copper-python-ast-unparse-v1-fusion-97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3-v1"
+    }
+  }
+}

@@ -118,11 +118,13 @@ def main():
             evidence=audit_run(run,1 if a.stage=='tiny' else 20)
             # Verify completed recovery on the identical source/config, without new calls.
             counters=read(run/'budget.json')['counters']
+            request_files={str(p) for p in run.rglob('*.request.bin')}
             with (base/a.stage/f'{name}-resume.log').open('w') as stream:
                 recovered=subprocess.run(cmd+['--set','args.resume=true'],cwd=source,env=env,stdout=stream,stderr=subprocess.STDOUT)
             assert recovered.returncode==0
             assert read(run/'budget.json')['counters']==counters
-            evidence['completed_resume']='unchanged counters'
+            assert {str(p) for p in run.rglob('*.request.bin')}==request_files
+            evidence['completed_resume']='unchanged counters and request files'
             record['verification']='passed'
             save(status,record)
             return {'name':name,**record,'evidence':evidence}
@@ -136,6 +138,7 @@ def main():
     save(base/f'{a.stage}-verification.json',{'status':'passed' if passed else 'failed','runs':results,'finished_at':time.time()})
     save(base/f'{a.stage}-supervisor.json',{'pid':os.getpid(),'status':'completed' if passed else 'failed',
          'started_at':started,'finished_at':time.time(),'stage':a.stage})
+    subprocess.run([python, str(source/'tasks/copper_inversion/experiments/export_encoding.py'), str(base)], check=True)
     return 0 if passed else 1
 
 if __name__=='__main__':raise SystemExit(main())
