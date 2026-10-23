@@ -12,6 +12,9 @@ from ldm_tts.contracts import (
 
 
 def describe_ldm_task(args):
+    from .surrogate import CodeEncoder, LossSelector
+
+    guided = args.search_method == "ldm_harness"
     return LDMTaskSpec(
         task="copper_inversion",
         candidate_domain=CandidateDomainSpec(
@@ -34,7 +37,7 @@ def describe_ldm_task(args):
                 description="One sealed Python artifact, parent and research rationale",
             ),
         ),
-        acquisition=AcquisitionSpec(
+        acquisition=LossSelector().describe() if guided else AcquisitionSpec(
             name="reservoir_order",
             objective_names=("loss_total",),
             score_direction="minimize",
@@ -54,16 +57,17 @@ def describe_ldm_task(args):
             candidate_validator="Code snapshot + read-only interface fixtures",
             deduplication_key="SHA256 of UTF-8 source bytes",
         ),
-        surrogate=SurrogateSpaceSpec(
+        surrogate=CodeEncoder(args.out_dir).describe() if guided else SurrogateSpaceSpec(
             kind="none",
             representation="Single-agent first stage",
             dimension_policy="none",
         ),
-        proposal_search=ProposalSearchSpec(name="single_turn"),
+        proposal_search=ProposalSearchSpec(name="shared_research_tree" if args._research_strategy.requires_main else "persistent_sessions"),
         metadata={
             "case_id": args.case_id,
             "mock": args.mock,
-            "research_strategy": "independent",
+            "research_strategy": args.harness_research_strategy_identity,
+            "search_method": args.search_method,
             "objective_version": "objective_v1",
         },
     )

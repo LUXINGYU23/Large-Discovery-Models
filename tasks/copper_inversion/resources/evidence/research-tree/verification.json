@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "scope": "P5 shared tree adapter and mocked native turns; real native fork pending",
+  "implementation_sha256": "96dcceea84ce6c29e192b3c06c0a7883d4b00540fd10e8d982716620f37c393f",
+  "regression_result": "212 passed in 80.55s (0:01:20)",
+  "log_sha256": "6a12bedc015c236282d9ada15af7338df986326ad862e8b41783373baf75e12e",
+  "test_source_sha256": "ea7b1bfe8d4ce6888f4dbf88ab2890c0e6f4a2267a821dde8b71205734e013ea",
+  "strategies": [
+    "coverage",
+    "latest",
+    "independent"
+  ],
+  "verified": [
+    "baseline plus 3 rounds: 13 sources, 4 formal fixture evaluations",
+    "Coverage and latest: 15 turns including 3 main; independent: 12",
+    "partial barrier preserves fork plan and replays accepted peers",
+    "cross-branch source duplicate rejected before batch publication",
+    "old-node history cursor catches up from inherited prefix",
+    "single-agent rejects fork config; all methods reject measurement policy"
+  ],
+  "broader_adapter_attempt": {
+    "result": "3 failed, 228 passed",
+    "failures": "synthonbench package missing (1 test); alphabench zss missing (2 tests)",
+    "log_sha256": "14d2a845ca9c1f78210e70ccfcc77ce15e7f18b3bb3f92aa7ea20f227bf1b568"
+  }
+}

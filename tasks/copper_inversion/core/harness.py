@@ -14,7 +14,8 @@ from ldm_tts.harness import (
     HarnessSubmissionError,
     HarnessError,
 )
-from ldm_tts.harness.research_runtime import usage_counts
+from ldm_tts.harness.research_runtime import usage_counts, proposal_turn_summary
+from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness.protocol import canonical_sha256
 from ldm_tts.transport import ProposalResponse
 from ldm_tts.engine.expansion import attach_proposal_attempt_receipt
@@ -75,104 +76,134 @@ def parse_snapshot(submission, artifacts, artifact_root, known):
     return source
 
 
+def serialize_history(root, observations):
+    return [
+        {"candidate_id": o.canonical_key, "round_index": o.round_idx,
+         "status": o.evaluation.status, "metrics": o.metrics,
+         "research_utility": o.metrics.get("research_utility") if o.evaluation.succeeded else None,
+         "error": o.evaluation.error,
+         "source": (Path(root) / o.candidate.payload["source_path"]).read_text(),
+         "annotations": o.candidate.metadata}
+        for o in observations
+    ]
+
+
+def write_history(root, artifact_root, observations):
+    history = serialize_history(root, observations)
+    atomic_json_write(Path(artifact_root) / "public/history.json", history)
+    atomic_json_write(Path(artifact_root) / "measured_history/observations.json", history)
+    return history
+
+
 class Expander:
-    def __init__(self, root, client, checks, account):
+    def __init__(self, root, client, checks, account, *, artifact_root=None,
+                 profiles=("researcher",), inherited_history_counts=None,
+                 selection_mode="reservoir_order"):
         self.root = Path(root)
-        self.client = client
-        self.checks = checks
-        self.account = account
+        self.artifact_root = Path(artifact_root) if artifact_root is not None else self.root / "harness"
+        self.client, self.checks, self.account = client, checks, account
+        self.profiles = tuple(profiles)
+        if not self.profiles or len(set(self.profiles)) != len(self.profiles):
+            raise ValueError("distinct researcher identities required")
+        self.inherited_history_counts = inherited_history_counts
+        self.selection_mode = selection_mode
 
     def expand(self, request):
-        history = []
-        for o in request.observations:
-            history.append(
-                {
-                    "candidate_id": o.canonical_key,
-                    "round_index": o.round_idx,
-                    "status": o.evaluation.status,
-                    "metrics": o.metrics,
-                    "error": o.evaluation.error,
-                    "source": (
-                        self.root / o.candidate.payload["source_path"]
-                    ).read_text(),
-                    "annotations": o.candidate.metadata,
-                }
-            )
-        public = self.root / "harness/public"
-        public.mkdir(parents=True, exist_ok=True)
-        (public / "history.json").write_text(json.dumps(history, allow_nan=False))
+        if request.reservoir_size != len(self.profiles):
+            raise ValueError("one solver per configured researcher is required")
+        history = write_history(self.root, self.artifact_root, request.observations)
         known = {o.canonical_key for o in request.observations}
+        turns = []
+        for profile in self.profiles:
+            cursor = (self.inherited_history_counts[profile]
+                      if self.inherited_history_counts is not None else max(0, len(history) - 1))
+            if not 0 <= cursor <= len(history):
+                raise ValueError("invalid inherited history cursor")
+            turns.append(HarnessTurn(
+                profile_id=profile, turn_id=f"{profile}_round_{request.round_idx}",
+                round_index=request.round_idx, history_from_seq=cursor,
+                history_to_seq=len(history), history_digest=canonical_sha256(history[cursor:]),
+                message=json.dumps({
+                    "instruction": "Read get_inversion_context, inspect measured feedback and improve the algorithm. Submit one complete solver. Only selected candidates are scored; an unmeasured proposal is not a failure.",
+                    "round": request.round_idx, "profile_id": profile,
+                    "research_wall_time_seconds": self.client.config.limits.wall_time_seconds,
+                    "known_sources": sorted(known),
+                    "new_measurements": history[cursor:],
+                }),
+            ))
+        expected = {t.profile_id: t for t in turns}
+        # Admission receipts reserve distinct sources before acknowledging acceptance.
+        # They survive a partial native Harness barrier; they do not publish a reservoir.
+        admitted = {}
+        for turn in turns:
+            receipt = self.artifact_root / "admissions" / (turn.input_digest + ".json")
+            if receipt.exists():
+                record = json.loads(receipt.read_text())
+                if record["input_digest"] != turn.input_digest or record["profile_id"] != turn.profile_id:
+                    raise ValueError("admission receipt identity changed")
+                if record["sha256"] in admitted.values():
+                    raise ValueError("duplicate admitted source in batch")
+                admitted[turn.profile_id] = record["sha256"]
 
         def validate(s):
             try:
-                body = parse_snapshot(
-                    s.submission, s.artifacts, self.root / "harness", known
-                )
+                turn = expected[s.profile_id]
+                if s.turn_id != turn.turn_id:
+                    raise ValueError("submission does not match requested turn")
+                body = parse_snapshot(s.submission, s.artifacts, self.artifact_root, known)
                 payload = seal(self.root, body)
+                sha = payload["sha256"]
+                if any(owner != s.profile_id and value == sha for owner, value in admitted.items()):
+                    raise ValueError("source duplicates another branch in this batch; change the algorithm")
+                if s.profile_id in admitted and admitted[s.profile_id] != sha:
+                    raise ValueError("accepted source changed during replay")
                 self.checks(payload)
+                receipt = self.artifact_root / "admissions" / (turn.input_digest + ".json")
+                record = {"input_digest": turn.input_digest, "profile_id": s.profile_id,
+                          "sha256": sha, "submission_digest": s.digest}
+                if receipt.exists() and json.loads(receipt.read_text()) != record:
+                    raise ValueError("accepted submission changed during replay")
+                atomic_json_write(receipt, record)
+                admitted[s.profile_id] = sha
                 return HarnessSubmissionValidation("accept")
             except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
-                return HarnessSubmissionValidation(
-                    "retry",
-                    (
-                        HarnessSubmissionError(
-                            "/artifact_path", "invalid_solver", str(exc)
-                        ),
-                    ),
-                )
+                return HarnessSubmissionValidation("retry", (
+                    HarnessSubmissionError("/artifact_path", "invalid_solver", str(exc)),))
 
-        turn = HarnessTurn(
-            profile_id="researcher",
-            turn_id=f"round_{request.round_idx}",
-            round_index=request.round_idx,
-            history_from_seq=max(0, len(history) - 1),
-            history_to_seq=len(history),
-            history_digest=canonical_sha256(history[-1:]),
-            message=json.dumps(
-                {
-                    "instruction": "Read get_inversion_context, inspect measured feedback and improve the algorithm. Submit one complete solver.",
-                    "round": request.round_idx,
-                    "research_wall_time_seconds": self.client.config.limits.wall_time_seconds,
-                    "known_sources": sorted(known),
-                }
-            ),
-        )
-        self.account({"harness_turns": 1}, usage_key="copper:turn:" + turn.turn_id)
-        started = time.monotonic()
-        usage = {}
+        for turn in turns:
+            self.account({"harness_turns": 1}, usage_key="copper:turn:" + turn.input_digest)
+        started, usage = time.monotonic(), {}
         try:
-            (result,) = self.client.run_turn(
-                (turn,),
-                submission_validator=validate,
-                recovery_timeout_seconds=2
-                * self.client.config.limits.wall_time_seconds,
-            )
-            usage = result.usage
+            results = self.client.run_turn(tuple(turns), submission_validator=validate,
+                recovery_timeout_seconds=2 * self.client.config.limits.wall_time_seconds)
+            usage = {r.profile_id: r.usage for r in results}
         except HarnessError as exc:
-            usage = exc.turn_usage.get("researcher", {})
+            usage = exc.turn_usage
             raise
         finally:
-            self.account(usage_counts(usage), usage_key="copper:usage:" + turn.turn_id)
+            for turn in turns:
+                self.account(usage_counts(usage.get(turn.profile_id, {})),
+                             usage_key="copper:usage:" + turn.input_digest)
             self.account({"harness_wall_time_seconds": time.monotonic() - started})
-        if result.submission_status != "accepted":
-            raise ValueError("research turn not accepted")
-        # Revalidate immutable bytes on replay; admission jobs reuse durable receipts.
-        body = parse_snapshot(
-            result.submission, result.submitted_artifacts, self.root / "harness", known
-        )
-        payload = seal(self.root, body)
-        self.checks(payload)
-        proposal = RawProposal(
-            payload,
-            "persistent_harness",
-            metadata={
-                k: result.submission[k]
-                for k in ("parent_sha256", "change_summary", "rationale")
-            },
-        )
-        attempt = attach_proposal_attempt_receipt(
-            ProposalResponse(text="accepted solver", metadata={}), result.submission_id
-        )
-        return ExpansionResult(
-            proposals=(proposal,), attempts=(attempt,), selection_mode="reservoir_order"
-        )
+        if len(results) != len(turns) or {r.profile_id for r in results} != set(expected):
+            raise ValueError("incomplete researcher batch")
+        proposals, attempts, sessions = [], [], []
+        for result in sorted(results, key=lambda r: self.profiles.index(r.profile_id)):
+            if result.submission_status != "accepted":
+                raise ValueError("research turn not accepted")
+            body = parse_snapshot(result.submission, result.submitted_artifacts, self.artifact_root, known)
+            payload = seal(self.root, body)
+            if admitted.get(result.profile_id) != payload["sha256"]:
+                raise ValueError("native turn has no matching controller admission")
+            self.checks(payload)
+            lineage = {"profile_id": result.profile_id, "session_id": result.session_id,
+                       "turn_id": result.turn_id, "submission_id": result.submission_id}
+            proposals.append(RawProposal(payload, "persistent_harness", metadata={
+                **{k: result.submission[k] for k in ("parent_sha256", "change_summary", "rationale")},
+                "harness_lineage": lineage,
+            }))
+            attempts.append(attach_proposal_attempt_receipt(
+                ProposalResponse(text="accepted solver", metadata={}), result.submission_id))
+            sessions.append(proposal_turn_summary(result, 1))
+        return ExpansionResult(proposals=tuple(proposals), attempts=tuple(attempts),
+                               selection_mode=self.selection_mode, metadata={"sessions": sessions})

@@ -220,3 +220,26 @@ P5 仍待实现；[验收台账](copper-inversion-acceptance.md) 保留剩余项
 
 [组件证据](../tasks/copper_inversion/resources/evidence/surrogate/verification.json)。
 当前生产 workflow 仍为单 agent；共享研究树、四分支准入和真实 P5 运行尚待接入。
+
+## P5 共享研究树装配
+
+新增 `--search-method ldm_harness`，在同一个 Campaign runtime 内复用
+`configure_research_strategy`、`ResearchCoordinator`、`MeasuredResearchExpander`，
+将四分支候选池交给共享 engine 和已有代码 GP/LCB。默认 Coverage 2+2；
+independent 和 latest-main 使用相同适配器，单 agent 模式拒绝 fork 配置，所有模式拒绝 measurement policy。
+
+每分支仍提交一份源码，使用既有 Harness artifact snapshot 和只读接口。
+任务准入回执记录 turn identity、submission digest 和源码归属，在跨分支重复时要求修复，
+在部分原生 turn 已接受时保留归属。只有全部分支返回后才发布 reservoir。
+继承的 history cursor 从共享 fork source 传入，旧节点收到全部缺失的已测源码与反馈。
+研究树使用 `research_utility=-loss_total`，正式选点与评分仍最小化 loss。
+
+新增远程 mock 验收覆盖三种策略、三轮 12 份提案仅评分 3 份、主干额外计账、
+重复源码拒绝、部分屏障恢复不重跑已接受分支、旧节点历史补全和完成态恢复。
+铜矿及共享生命周期/研究策略回归 **212 passed in 80.55s**，Node 边界检查 3 项通过。
+扩大到其他任务 adapter 的一次回归为 228 passed、3 failed：synthonbench 缺少其官方包，
+alphabench 两项缺少 zss；这些依赖不属于铜矿任务且共享代码未修改，原失败日志摘要保留在证据中。
+
+[研究树组件证据](../tasks/copper_inversion/resources/evidence/research-tree/verification.json)。
+已新增锁定的 `ldm_3d_tiny` 和 `ldm_drillholes_3d` profile；真实 native fork 验收单独记录，
+不能用 mock 或依赖检查代替。

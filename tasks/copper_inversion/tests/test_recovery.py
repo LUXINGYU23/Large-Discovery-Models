@@ -82,7 +82,7 @@ def test_campaign_recovers_without_reexecution(tmp_path, monkeypatch, case, boun
     assert interrupted
     assert main([*args, "--resume"]) == 0
     counters = json.loads((tmp_path / "budget.json").read_text())["counters"]
-    assert turns == ["round_1"]
+    assert turns == ["researcher_round_1"]
     assert len(starts) == len(set(starts)) == 8  # four interface + two solver + two scorer
     for name, count in {"interface_jobs": 4, "solver_jobs": 2, "scorer_jobs": 2,
                         "benchmark_jobs": 4, "harness_turns": 1,
@@ -91,7 +91,7 @@ def test_campaign_recovers_without_reexecution(tmp_path, monkeypatch, case, boun
         assert counters[name] == count, (name, counters)
     assert main([*args, "--resume"]) == 0
     assert json.loads((tmp_path / "budget.json").read_text())["counters"] == counters
-    assert len(starts) == 8 and turns == ["round_1"]
+    assert len(starts) == 8 and turns == ["researcher_round_1"]
 
 
 def test_timeout_before_receipt_preserves_reason_and_runtime(tmp_path, monkeypatch):

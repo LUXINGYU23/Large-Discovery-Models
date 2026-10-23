@@ -95,6 +95,7 @@ def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
     captured = []
     class Client:
         def __init__(self, *args, **kwargs):
+            self.config = kwargs["config"]
             captured.append(kwargs["config"])
         def start(self):
             pass

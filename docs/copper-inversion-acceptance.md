@@ -12,11 +12,11 @@
 | §7 / P2：一个共享 runtime/engine、注册和 mock | `workflow.py`、`test_procedure.py`、注册 contract_verified | 已有远程证据；P5 改造后需回归单 agent 路径 |
 | §7 / P3：真实代码设计→评分→反馈→修改 | 2D baseline＋三轮记录；3D 两 case 的两种 provider 记录 | 已验证单 agent 路径；原生轨迹为研究记录，不宣称已转为 SFT |
 | §7.3、§8、§14 / P4：solver 后、scorer 后、evaluator 返回后、发布后 checkpoint 前恢复 | `tests/test_recovery.py` 在两个真实 3D case 注入四个中断点；[远程证据](../tasks/copper_inversion/resources/evidence/recovery/verification.json) | 已验证；每组恰好 8 个实际容器、2 次正式评估和 1 个研究 turn，恢复和完成态重放不增加 |
-| §7.2 / P5：Coverage 2+2 / independent / main_forks | 共享 `configure_research_strategy`、`ResearchCoordinator`、`MeasuredResearchExpander` 已存在，铜矿尚未接入 | 未实现；复用共享协调器，不新增任务调度状态机 |
-| §7.2 / P5：四份源码整批准入、跨分支去重、部分屏障恢复 | 当前 `Expander` 仅单持久会话、一份源码 | 未实现；适配 branch artifact root、session metadata 和 inherited history cursor |
-| §7.2 / P5：代码编码、共享 GP、最小化 acquisition | `core/surrogate.py` 复用 `RBFGPSurrogate` 和 `make_acquisition`；[组件证据](../tasks/copper_inversion/resources/evidence/surrogate/verification.json) | 组件及共享 engine 集成已验证；256 维版本固定，基线单样本拟合，异常显式失败。尚待接入四分支生产 workflow |
-| §7.2、§14 / P5：utility 符号与历史归因 | `objective.py` 成功结果含 `research_utility=-loss_total` | 需接入共享树并验证失败/未测项不归因、旧节点补全历史及末轮 credit 语义 |
-| §8–10：版本化契约、预算、最佳代码及实际评分矿体 | 已有 task/experiment/config，输出含模型路径和冻结文件 | P5 需新增明确 pool=4/select=1、baseline＋3轮 profile，记录主干额外 turn 预算 |
+| §7.2 / P5：Coverage 2+2 / independent / main_forks | `harness_runtime.open_search` 复用共享策略、协调器和 `MeasuredResearchExpander` | 已实现，三种策略远程 mock 通过；真实 Pi 验证待完成 |
+| §7.2 / P5：四份源码整批准入、跨分支去重、部分屏障恢复 | `Expander` 按分支 artifact root 封存，持久准入回执保留源码归属，整批返回 sessions/lineage | 远程验证重复拒绝、部分屏障恢复不重跑已接受分支；真实 native fork 待验证 |
+| §7.2 / P5：代码编码、共享 GP、最小化 acquisition | `core/surrogate.py` 复用 `RBFGPSurrogate` 和 `make_acquisition`；[组件证据](../tasks/copper_inversion/resources/evidence/surrogate/verification.json) | 已接入 `ldm_harness` workflow；mock 验证三轮 12 份候选仅选中 3 份，连同基线共评分 4 份；真实运行待完成 |
+| §7.2、§14 / P5：utility 符号与历史归因 | 共享 wrapper 使用 `research_utility`；history 序列导出测量源码，分支采用继承 cursor | mock 覆盖负 utility、旧节点增量历史；真实归因与末轮 credit 产物还需核对 |
+| §8–10：版本化契约、预算、最佳代码及实际评分矿体 | 新增 `ldm_mock`、`ldm_3d_tiny`、`ldm_drillholes_3d`，P5 锁定 Coverage 和模型预算 | pool=4/select=1，正式 4 次、研究 turn 15 次；待真实执行验收 |
 | §11–14：远程、注册 gates、完整产物和资格声明 | 现有远程归档与 evidence；qualification 为 contract_verified，experiment 为 draft | 最终验收需补 P4/P5 证据并保持工程结果与方法有效性分开 |
 
 ## P5 实施顺序

@@ -1,0 +1,9 @@
+name: copper_inversion_ldm_mock
+task: copper_inversion
+algorithm: surrogate_guided_harness
+mode: mock
+args:
+  mock: true
+  search-method: ldm_harness
+  iterations: 3
+  out-dir: runs/copper_ldm_mock

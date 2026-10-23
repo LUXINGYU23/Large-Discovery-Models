@@ -1,0 +1,16 @@
+name: copper_inversion_ldm_3d_tiny
+task: copper_inversion
+algorithm: surrogate_guided_harness
+mode: real
+contract_profile: ldm_3d_tiny
+args:
+  harness-research-strategy-config: tasks/copper_inversion/resources/harness/research_coverage.json
+  search-method: ldm_harness
+  case-id: drillholes_3d
+  iterations: 1
+  solver-seconds: 120
+  harness-seconds: 900
+  llm-url: https://api.deepseek.com
+  llm-model: deepseek-flash
+  thinking: low
+  out-dir: runs/copper_ldm_3d_tiny

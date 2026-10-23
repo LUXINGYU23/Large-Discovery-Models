@@ -68,7 +68,8 @@
         "harness-seconds": 900,
         "llm-url": "https://api.deepseek.com",
         "llm-model": "deepseek-flash",
-        "thinking": "low"
+        "thinking": "low",
+        "search-method": "harness"
       }
     },
     "harness_drillholes_3d": {
@@ -83,7 +84,8 @@
         "harness-seconds": 900,
         "llm-url": "https://api.deepseek.com",
         "llm-model": "deepseek-flash",
-        "thinking": "low"
+        "thinking": "low",
+        "search-method": "harness"
       }
     },
     "harness_drillholes_outcrops_3d": {
@@ -98,7 +100,42 @@
         "harness-seconds": 900,
         "llm-url": "https://api.deepseek.com",
         "llm-model": "deepseek-flash",
-        "thinking": "low"
+        "thinking": "low",
+        "search-method": "harness"
+      }
+    },
+    "ldm_3d_tiny": {
+      "description": "Coverage 2+2 code reservoir 4 / select 1; baseline plus 1 research rounds",
+      "budget": {
+        "external_evaluations": 2
+      },
+      "locked_args": {
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 1,
+        "solver-seconds": 120,
+        "harness-seconds": 900,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low",
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json"
+      }
+    },
+    "ldm_drillholes_3d": {
+      "description": "Coverage 2+2 code reservoir 4 / select 1; baseline plus 3 research rounds",
+      "budget": {
+        "external_evaluations": 4
+      },
+      "locked_args": {
+        "search-method": "ldm_harness",
+        "case-id": "drillholes_3d",
+        "iterations": 3,
+        "solver-seconds": 120,
+        "harness-seconds": 900,
+        "llm-url": "https://api.deepseek.com",
+        "llm-model": "deepseek-flash",
+        "thinking": "low",
+        "harness-research-strategy-config": "tasks/copper_inversion/resources/harness/research_coverage.json"
       }
     }
   }

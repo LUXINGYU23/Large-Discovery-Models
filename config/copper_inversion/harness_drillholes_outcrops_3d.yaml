@@ -4,6 +4,7 @@ algorithm: persistent_agent_harness
 mode: real
 contract_profile: harness_drillholes_outcrops_3d
 args:
+  search-method: harness
   case-id: drillholes_outcrops_3d
   iterations: 3
   out-dir: runs/copper_drillholes_outcrops_3d

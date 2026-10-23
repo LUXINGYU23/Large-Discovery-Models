@@ -17,6 +17,7 @@ from .data import CASES, load_problem, RESOURCES
 from .candidate import seal, Domain
 from .harness import Expander
 from .task_spec import describe_ldm_task
+from ldm_tts.harness.research_strategy import configure_research_strategy
 
 
 def parse_args(argv=None):
@@ -24,6 +25,8 @@ def parse_args(argv=None):
     p.add_argument("--mock", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--resume", action="store_true")
+    p.add_argument("--search-method", choices=("harness", "ldm_harness"), default="harness")
+    p.add_argument("--harness-research-strategy-config", type=Path)
     p.add_argument("--case-id", choices=CASES, default=CASES[0])
     p.add_argument("--iterations", type=int, default=3)
     p.add_argument("--out-dir", type=Path, default=Path("runs/copper"))
@@ -46,6 +49,7 @@ def parse_args(argv=None):
     a.solver_seconds = a.solver_seconds or (60 if a.case_id.endswith("2d") else 120)
     if a.solver_seconds < 1:
         p.error("invalid solver seconds")
+    configure_research_strategy(a, enabled=a.search_method == "ldm_harness", measurement_supported=False)
     return a
 
 
@@ -62,7 +66,7 @@ def main(argv=None):
     config = {
         k: str(v) if isinstance(v, Path) else v
         for k, v in vars(args).items()
-        if k not in ("resume", "out_dir", "api_key_file", "dry_run")
+        if not k.startswith("_") and k not in ("resume", "out_dir", "api_key_file", "dry_run")
     }
     config.update(
         implementation_sha256=source_identity(),
@@ -79,16 +83,19 @@ def main(argv=None):
         config["sidecar_image"] = docker(
             "image", "inspect", args.sidecar_image, "--format", "{{.Id}}"
         ).stdout.strip()
+    researchers = 4 if args.search_method == "ldm_harness" else 1
+    main_turns = args.iterations if args._research_strategy.requires_main else 0
     budget = CampaignBudget(
         rounds=args.iterations + 1,
-        reservoir_size=1,
+        reservoir_size=researchers,
         batch_size=1,
         target_observations=args.iterations + 1,
         max_evaluation_attempts=args.iterations + 1,
         extra_limits={
             "benchmark_jobs": 2 * (args.iterations + 1),
-            "harness_turns": args.iterations,
-            "interface_jobs": 6 * (args.iterations + 1),
+            "harness_turns": researchers * args.iterations + main_turns,
+            "main_research_turns": main_turns,
+            "interface_jobs": 6 * (researchers * args.iterations + 1),
             "solver_jobs": args.iterations + 1,
             "scorer_jobs": args.iterations + 1,
         },
@@ -110,16 +117,14 @@ def main(argv=None):
         with ExitStack() as stack:
             problem = load_problem(args.case_id, fixture=args.mock)
             if args.mock:
-                from .mock import MockClient, MockEvaluator
+                from .mock import MockEvaluator
 
-                client = MockClient(root / "harness")
                 checks = lambda payload: True
                 evaluator = MockEvaluator()
             else:
                 from .execution import Execution
                 from .interface_checks import InterfaceChecks
                 from .evaluator import Evaluator
-                from .harness_runtime import open_client
 
                 execution = Execution(
                     root / "jobs", config["evaluator_image"], runtime.consume_many
@@ -127,7 +132,8 @@ def main(argv=None):
                 checks = InterfaceChecks(root, execution, args.case_id)
                 evaluator = Evaluator(root, execution, problem, args.solver_seconds)
                 args.sidecar_image = config["sidecar_image"]
-                client = open_client(args, root, problem, stack, runtime.consume_many)
+            from .harness_runtime import open_search
+            search = open_search(args, root, problem, stack, checks, runtime)
             seed = seal(root, (RESOURCES / "seeds/solver.py").read_bytes())
 
             def initialize(_):
@@ -139,7 +145,7 @@ def main(argv=None):
 
             expander = InitialRoundReservoirExpander(
                 initializer=CallableReservoirExpander(initialize),
-                search_expander=Expander(root, client, checks, runtime.consume_many),
+                search_expander=search,
                 initial_reservoir_size=1,
             )
             state = LDMEngineState()
@@ -147,14 +153,21 @@ def main(argv=None):
                 checkpoint = runtime.load_checkpoint()
                 if checkpoint is not None:
                     state = LDMEngineState.from_checkpoint(checkpoint)
+            from .surrogate import CodeEncoder, LossSelector
+            guided = args.search_method == "ldm_harness"
             engine = LDMEngine(
                 task_spec=spec,
                 expander=expander,
                 candidate_domain=Domain(root),
                 evaluator=evaluator,
                 runtime=runtime,
+                surrogate_encoder=CodeEncoder(root) if guided else None,
+                selector=LossSelector() if guided else None,
             )
             outcome = engine.run(budget.engine_config(), state=state)
+            if args._research_strategy.requires_main and args.iterations:
+                from ldm_tts.harness.research_runtime import write_fork_provenance
+                write_fork_provenance(root / "harness", compiled_policy=False)
             observations = outcome.state.observations
             successful = [o for o in observations if o.evaluation.succeeded]
             best = min(successful, key=lambda o: o.metrics["loss_total"], default=None)

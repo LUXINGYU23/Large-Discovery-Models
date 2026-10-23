@@ -76,6 +76,48 @@ research commands. Completed historical runs retain their original policy.
 Each run has its own history and baseline plus three scored proposals. Do not
 override the locked 2D profile to run 3D.
 
+## Surrogate-guided research tree
+
+`--search-method ldm_harness` uses the shared Coverage 2+2 coordinator and four
+proposal identities. Each branch submits one distinct sealed source. All four
+must pass admission before the reservoir is published; the shared engine selects
+only one for formal solver/scorer execution. A baseline plus three research rounds
+therefore uses four formal evaluations, twelve proposals, and at most fifteen
+research turns (three main turns and twelve branch turns).
+
+The code-only AST encoder has 256 fixed features. The shared RBF GP fits measured
+`loss_total`, including the single baseline, and shared LCB selects for minimum
+loss. The research tree receives `research_utility=-loss_total`; unmeasured sources
+receive no invented score. A numerical/feature error stops selection explicitly.
+These are engineering capabilities; surrogate effectiveness requires a separate
+controlled comparison.
+
+Run the service-free tree fixture, then the one-round real profile before the
+three-round profile. Use the task interpreter and remote server for all commands:
+
+```sh
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/ldm_mock.yaml
+uv run --locked --project tasks/copper_inversion python scripts/check_task_dependencies.py config/copper_inversion/ldm_3d_tiny.yaml
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/ldm_3d_tiny.yaml --dry-run
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/ldm_3d_tiny.yaml
+uv run --locked --project tasks/copper_inversion python scripts/run_ldm_tts.py config/copper_inversion/ldm_drillholes_3d.yaml
+```
+
+These profiles lock Coverage, official DeepSeek Flash / low, and execution budgets.
+The normal runtime readiness probe uses the actual Pi Responses protocol. For an
+unqualified strategy diagnostic, clear `contract_profile` explicitly and supply
+`--harness-research-strategy-config` with shared JSON (`independent` or
+`main_forks` with `fork_policy.name=latest`). Such a run is outside the named
+Coverage profile. Single-agent `harness` rejects fork strategies. Measurement
+coverage policies are unsupported and rejected in both modes.
+
+Partial submission recovery retains controller admissions and replays accepted
+native turns. It must preserve the research plan and source identities; do not
+delete receipts or switch strategy to continue an existing run. The shared tree
+stores panels, immutable parent snapshots and provenance under `harness/`.
+The last round's measurements remain in the campaign checkpoint; there is no
+extra, unbudgeted turn just to refresh tree credit.
+
 Run integration tests only remotely:
 
 ```sh
