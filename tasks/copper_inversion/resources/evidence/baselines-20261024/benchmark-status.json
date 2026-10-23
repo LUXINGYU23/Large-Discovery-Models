@@ -1,0 +1,19 @@
+{
+  "updated_at": 1792775843.6954572,
+  "batches": {
+    "matched-120s-v2": {
+      "process_alive": true,
+      "finished_results": 0,
+      "successful": 0,
+      "failures": [],
+      "state": "running"
+    },
+    "paper-1000-v2": {
+      "process_alive": true,
+      "finished_results": 0,
+      "successful": 0,
+      "failures": [],
+      "state": "running"
+    }
+  }
+}

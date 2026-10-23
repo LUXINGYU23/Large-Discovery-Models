@@ -1,0 +1,53 @@
+{
+  "time": 1792775834.3523993,
+  "runs": [
+    {
+      "run": "drillholes_3d_ast",
+      "complete_rounds": 12,
+      "observations": 49,
+      "failed": 0,
+      "best": 6.51447320076144,
+      "status": "running"
+    },
+    {
+      "run": "drillholes_3d_fusion",
+      "complete_rounds": 10,
+      "observations": 44,
+      "failed": 0,
+      "best": 6.515042091419521,
+      "status": "running"
+    },
+    {
+      "run": "drillholes_3d_qwen",
+      "complete_rounds": 9,
+      "observations": 38,
+      "failed": 0,
+      "best": 6.515151611368437,
+      "status": "running"
+    },
+    {
+      "run": "drillholes_outcrops_3d_ast",
+      "complete_rounds": 8,
+      "observations": 33,
+      "failed": 1,
+      "best": 32.96434184495235,
+      "status": "running"
+    },
+    {
+      "run": "drillholes_outcrops_3d_fusion",
+      "complete_rounds": 8,
+      "observations": 33,
+      "failed": 0,
+      "best": 33.01689952424444,
+      "status": "running"
+    },
+    {
+      "run": "drillholes_outcrops_3d_qwen",
+      "complete_rounds": 7,
+      "observations": 29,
+      "failed": 0,
+      "best": 32.43411512133546,
+      "status": "running"
+    }
+  ]
+}

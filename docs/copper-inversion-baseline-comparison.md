@@ -79,3 +79,7 @@ H20 根目录：`/Aidata/shared/ldm/copper-baselines-20261024/`。
 完整结果未出齐之前，不能给出 LDM 优于这三个基线的最终结论。
 
 初次基线启动 `matched-120s` / `paper-1000` 因原 sampler 的无零等值面边界错误而停止，不能作为完成实验。当前有效轨道使用带 `-v2` 后缀的目录。
+
+后台 `watch.py`（初始 PID 3753195）会将已完成结果持续汇总到各轨道 `comparison.json`，将完成数/失败数写入根目录 `benchmark-status.json`；不触发模型调用或追加优化预算。
+
+基线源码归档：`/mnt/cephfs/xingyu/ldm/archive/copper-inversion/baseline-sources-20261024.tar.gz`，SHA256 `767bcc61b00c9b43f4a4399d45569bed2397b70c868ba4dc05c9da1172274217`。
