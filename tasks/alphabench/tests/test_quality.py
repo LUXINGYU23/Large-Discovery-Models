@@ -12,7 +12,7 @@ from tasks.alphabench.core.receipts import Receipts
 
 
 def quality_fixture(root):
-    protocol = T3Protocol()
+    protocol = T3Protocol(method="llm")
     runtime = CampaignRuntime.open(root, task="alphabench", budget_limits={"quality_checks": 0})
     gateway = OracleGateway(protocol, runtime, mock=True)
     candidate = FactorDomain().admit(RawProposal({"expression": "Mean($close,5)"}, "model"))
@@ -73,7 +73,7 @@ def test_quality_refuses_a_receipt_from_a_different_interval(tmp_path):
     ("qlib", "qlib_code_filter_v1", "Abs(" * 6 + "$close" + ")" * 6, "qlib_dynamic_success_rate", 0, 1),
 ])
 def test_source_checks_do_not_become_unmeasured_paper_success(tmp_path, backend, profile, expression, rate, paper_rate, paper_coverage):
-    protocol = T3Protocol(backend=backend, filter_profile=profile)
+    protocol = T3Protocol(method="llm", backend=backend, filter_profile=profile)
     runtime = CampaignRuntime.open(tmp_path, task="alphabench")
     gateway = OracleGateway(protocol, runtime, mock=True)
     candidate = FactorDomain(backend, protocol.grammar_depth).admit(RawProposal({"expression": expression}, "model"))

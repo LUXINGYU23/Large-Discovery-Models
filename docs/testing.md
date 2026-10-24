@@ -44,7 +44,7 @@ npm --prefix harnesses/pi test
 npm --prefix harnesses/pi run typecheck -- --noUnusedLocals --noUnusedParameters
 ```
 
-`tests/test_research_task_adapters.py` exercises task factories and default 2+2
+`tests/test_research_task_adapters.py` exercises task factories and default main-history 1+3
 trees with synthetic Harness responses. Shared engine tests cover single and
 batch result persistence, unknown-result pauses, failure replenishment and
 completed replay. Task recovery tests verify receipt and checkpoint fault

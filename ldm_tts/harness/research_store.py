@@ -12,7 +12,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness import canonical_sha256, directory_sha256, file_sha256
 from ldm_tts.harness.pi import PiForkSource
 from ldm_tts.harness.research_tree import (
-    ArchivePolicy, ForkAssignment, ForkContext, ForkPolicy, ResearchNode, ResearchOutcome,
+    ArchivePolicy, ForkAssignment, ForkContext, ForkPolicy, ResearchNode, ResearchOutcome, MainHistoryForks,
 )
 
 @dataclass(frozen=True)
@@ -175,6 +175,10 @@ class ResearchTree:
                 round_index=round_index, profile_id=a.profile_id, purpose=a.purpose,
                 parent=nodes[a.parent_id], incumbent=plan["incumbent"], proposal_keys=tuple(sorted(keys)),
             )))
+            if isinstance(self.fork_policy, MainHistoryForks):
+                parent = replacements.get(a.parent_id, nodes[a.parent_id])
+                replacements[a.parent_id] = replace(parent, expansions=parent.expansions + 1, last_expanded=round_index)
+                continue  # Only main snapshots are selectable; retain evidence, not child snapshots.
             if a.purpose == "main":
                 continue
             parent = replacements.get(a.parent_id, nodes[a.parent_id])

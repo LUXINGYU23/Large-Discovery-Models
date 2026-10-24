@@ -5,6 +5,7 @@ mode: real
 description: Our LDM method on the official buchwald_hartwig oracle with 20 evaluations.
 contract_profile: ldm_official_20
 args:
+  search-method: ldm
   proposal-mode: openai
   dataset-id: buchwald_hartwig
   iterations: 20

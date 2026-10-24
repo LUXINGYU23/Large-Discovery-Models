@@ -12,7 +12,7 @@ technical and operational contracts.
   coverage thresholds.
 - [Fixed-budget pilot evaluation](pilot-evaluation.md): reusable LDM, BO,
   direct-LLM, and Harness comparison matrices and task onboarding.
-- [Shared Pi research trees](research-search-architecture.md): six task adapters, default 2+2, strategy configuration, budgets, provenance and recovery.
+- [Shared Pi research trees](research-search-architecture.md): six task adapters, default main-history 1+3, strategy configuration, budgets, provenance and recovery.
 - [Research Harness integration](research-harness.md): persistent Agent
   proposal and compiled-policy sessions, optional Pi extensions, task
   validation, resources, traces, and qualification.

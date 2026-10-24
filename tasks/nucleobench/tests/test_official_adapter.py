@@ -693,7 +693,7 @@ def test_official_driver_preserves_raw_outputs_and_finishes_once(
 
 
 def test_wall_time_resume_preserves_spent_budget_and_excludes_downtime(tmp_path: Path, monkeypatch) -> None:
-    parse_args([
+    parse_args(["--search-method", "ldm",
         "--execution-profile", "official_benchmark", "--termination-kind", "wall_time",
         "--initialization-mode", "official_start", "--max-seconds", "28800",
         "--resume-from", str(tmp_path),

@@ -1,6 +1,6 @@
 # NucleoBench Quick Start
 
-LDM Harness defaults to **CoverageForks 2+2**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
+LDM Harness defaults to **MainHistoryForks 1+3**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
 
 Run every command from the repository root. Real source, data, model, cache,
 trace, and run directories should be outside the clone.

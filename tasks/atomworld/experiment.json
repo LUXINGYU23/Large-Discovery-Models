@@ -72,14 +72,14 @@
       "proposal_modes": {
         "mock": "deterministic; no endpoint preflight",
         "real": "Explicit Responses or Chat Completions with matched reasoning controls; preflight required",
-        "harness": "Sample-isolated 2+2 Pi research trees with four proposal branches; Responses provider; task-local submission repair",
+        "harness": "Sample-isolated 1+3 Pi research trees with four proposal branches; Responses provider; task-local submission repair",
         "harness_public_audit": "Independent compiled public-audit prior; no objective history or fitted GP",
         "ldm": "Direct measured-feedback reservoir; empirical q0, fixed residual RBF GP/UCB and Gumbel sampling",
-        "ldm_harness": "2+2 research-tree reservoir with the same measured-feedback LDM selector",
+        "ldm_harness": "1+3 research-tree reservoir with the same measured-feedback LDM selector",
         "ldm_harness_compiled": "Independent policy session compiles prior_mean@1 and ldm_weights@1 on actual measured history; fixed GP/UCB and sampling"
       },
       "collection_modes": {
-        "cif": "Accepted parseable CIF output \u2192 canonical ldm-2.0 IR",
+        "cif": "Accepted parseable CIF output → canonical ldm-2.0 IR",
         "operations": "Raw plans/tool records only; no CIF model-output collection"
       },
       "harness_feedback": "Sample-isolated research; measured-feedback LDM additionally exposes only past scalar correctness. Never mount judge artifacts, targets or cross-question answers.",
@@ -108,7 +108,8 @@
         "attempts-per-sample": 1,
         "llm-max-tokens": 8192,
         "llm-temperature": 0.0,
-        "proposal-format": "cif"
+        "proposal-format": "cif",
+        "search-method": "llm"
       }
     },
     "extended_reasoning": {
@@ -120,7 +121,8 @@
         "attempts-per-sample": 4,
         "llm-max-tokens": 8192,
         "llm-temperature": 0.0,
-        "proposal-format": "cif"
+        "proposal-format": "cif",
+        "search-method": "llm"
       }
     },
     "extended_operations": {
@@ -132,7 +134,8 @@
         "attempts-per-sample": 4,
         "llm-max-tokens": 8192,
         "llm-temperature": 0.0,
-        "proposal-format": "operations"
+        "proposal-format": "operations",
+        "search-method": "llm"
       }
     }
   }

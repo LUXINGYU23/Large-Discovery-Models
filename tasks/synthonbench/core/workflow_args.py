@@ -59,6 +59,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     _add_runtime_arguments(parser)
     parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    if args.proposal_mode is None:
+        args.proposal_mode = "none" if args.search_method in PERSISTENT_HARNESS_METHODS else "callable"
     try:
         configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
     except ValueError as exc:
@@ -111,7 +113,7 @@ def _add_benchmark_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--proposal-samples", type=int, default=DEFAULT_PROPOSAL_SAMPLES)
-    parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
+    parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm_harness_compiled")
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--bo-pool-size", type=int, default=DEFAULT_BO_POOL_SIZE)
     parser.add_argument("--bo-search-samples", type=int, default=DEFAULT_BO_SEARCH_SAMPLES)
@@ -135,7 +137,7 @@ def _add_ldm_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_provider_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
+    parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"))
     parser.add_argument("--llm-url")
     parser.add_argument("--llm-model-name")
     parser.add_argument("--api-key")

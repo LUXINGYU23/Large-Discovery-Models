@@ -17,6 +17,8 @@ from ldm_tts.harness import (
     HarnessError, HarnessSubmissionContract, HarnessSubmissionValidation, HarnessSubmittedArtifact,
     HarnessTurn, HarnessTurnResult, canonical_sha256, file_sha256,
 )
+from ldm_tts.harness.research_instructions import MAIN_INSTRUCTIONS, branch_instructions, control_instructions
+from ldm_tts.harness.research_tree import MainHistoryForks
 from ldm_tts.harness.research_store import ResearchMeasurement, ResearchTree, snapshot_fork
 
 
@@ -33,20 +35,7 @@ def main_research_profile(root, template):
     """Share task tools and skills, with one task-neutral coordinator instruction."""
     path = Path(root) / "main-research.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "# Main researcher\n\n"
-        "Maintain the common research state for this task. Read the task contract through its tools. "
-        "Use only feedback supplied by the host and public task resources. Never seek hidden labels, "
-        "private evaluator inputs, benchmark answers or credentials.\n\n"
-        "Reconcile earlier hypotheses with available measurements. An unmeasured proposal is not "
-        "a failure. Keep alternative explanations in research.md and preserve useful scripts. "
-        "Side branches inherit this state and create the candidate submissions. Your submission is "
-        "a concise research brief through submit_research, not a candidate batch.\n\n"
-        "Every script and search loop must have finite bounds. Check feasibility before sampling; "
-        "use a bounded construction when constraints may be impossible. Reserve time for submission. "
-        "Do not run external evaluations or increase the host budgets.\n",
-        encoding="utf-8",
-    )
+    path.write_text(MAIN_INSTRUCTIONS, encoding="utf-8")
     return (replace(template, profile_id="main_research", agents_path=Path("/artifacts/main-research.md"),
                     agents_sha256=file_sha256(path)),)
 
@@ -192,9 +181,15 @@ class ResearchCoordinator:
         source = snapshot_fork(session, workspace, round_root / "fork-source", len(history))
         plan = self.tree.prepare(round_index, self.profiles, history, measurements)
         sources = self.tree.materialize(plan)
-        return {"root": round_root, "plan": plan, "sources": sources, "source": source,
+        prepared = {"root": round_root, "plan": plan, "sources": sources, "source": source,
                 "main_turn_id": turn.turn_id, "brief": result.submission["brief"],
                 "history_count": len(history), "history_digest": canonical_sha256(history)}
+        role_instructions = branch_instructions if isinstance(self.tree.fork_policy, MainHistoryForks) else control_instructions
+        options = {} if isinstance(self.tree.fork_policy, MainHistoryForks) else {"fork_policy": self.tree.fork_policy.identity()["name"]}
+        prepared["branch_instructions"] = {a["profile_id"]: role_instructions(
+            i % 4, a, prepared, **options, history_tool=message.get("history_access", "get_measured_history"))
+            for i, a in enumerate(plan["assignments"])}
+        return prepared
 
     def commit(self, prepared, sessions, proposal_keys, *, proposals):
         self.tree.commit(prepared["plan"], sessions, proposal_keys)
@@ -248,8 +243,10 @@ class MeasuredResearchExpander:
             forbidden_query_terms=tuple(sorted({key for o in request.observations
                                                for key in (o.candidate_id, o.canonical_key)})))
         with self.branch_client(prepared["root"], prepared["sources"]) as client:
-            expanded = self.branch_expander(client, prepared["root"],
-                {p: source.history_cursor for p, source in prepared["sources"].items()}).expand(request)
+            expander = self.branch_expander(client, prepared["root"],
+                {p: source.history_cursor for p, source in prepared["sources"].items()})
+            expander.branch_instructions = prepared["branch_instructions"]
+            expanded = expander.expand(request)
         assignments = {a["profile_id"]: a for a in prepared["plan"]["assignments"]}
         expanded = replace(expanded, proposals=tuple(replace(p, metadata={
             **p.metadata, "research_fork": assignments[p.metadata["harness_lineage"]["profile_id"]],

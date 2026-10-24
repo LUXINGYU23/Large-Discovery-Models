@@ -1,7 +1,16 @@
 # ReaSyn Science Benchmark for LDM
 
-The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
-one older-main restart and one archived-side continuation. The main research
+New Pi research runs default to `ldm_harness_compiled` with a persistent main
+researcher and **1 latest-main + 3 dynamically selected main-history forks**.
+Branches inherit conversation/workspace history, reconcile the same latest
+authorized feedback, and receive refinement, alternative, reconsideration and
+challenge roles. Domain tools, skills and evaluation rules remain task-specific.
+See [shared research architecture](../../docs/research-search-architecture.md).
+Explicit baseline methods and named baseline profiles retain their own protocols.
+
+
+The default LDM Harness strategy is **MainHistoryForks 1+3**: one latest-main fork
+and three dynamically selected main-history forks. The main research
 turn is additional to the four proposal turns; candidate and evaluation budgets
 remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
 for history, accounting and recovery. Use `--harness-research-strategy-config`
@@ -35,7 +44,7 @@ per-turn lifetime in the shared coordinator and proposal adapter.
 
 Completed resumes bypass provider preflight and Pi startup. Active resumes keep
 the existing recovery allowance, sampling seed span, scientific identity checks
-and usage counters. Moving these responsibilities does not change 2+2 selection,
+and usage counters. Moving these responsibilities does not change 1+3 selection,
 projection quotas, oracle limits or the report schema.
 
 The shared engine's evaluation executor owns attempt reservation, result
@@ -280,7 +289,7 @@ requests. Pure BO draws from a supplied score-blind SMILES pool
 it makes no proposal-provider requests. Real BO never substitutes the mock
 molecular fixture for an external candidate space.
 
-LDM Harness methods default to the shared 2+2 tree: one main researcher and four proposal branches per minibatch.
+LDM Harness methods default to the shared main-history 1+3 tree: one main researcher and four proposal branches per minibatch.
 `harness` uses accepted candidates in submission order; its shipped configs
 request exactly the evaluation batch from one persistent session.
 `ldm_harness` samples the empirical proposal distribution tilted by GP/UCB. `ldm_harness_compiled` additionally runs a separate persistent

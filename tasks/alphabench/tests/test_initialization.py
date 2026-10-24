@@ -29,7 +29,7 @@ def test_import_records_duplicates_rejections_and_changed_sources(tmp_path):
     path.write_text('\n'.join(json.dumps(item) for item in [
         {"expression": "$close", "metrics": {"ic": 999}}, {"expression": " $close "},
         {"expression": "Ref($close,-1)"}, {"missing_expression": True}, {"expression": "$volume"}]))
-    assert main(["--mock", "--init-mode", "import_pool", "--import-pool", str(path), "--out-dir", str(run)]) == 0
+    assert main(["--method", "llm", "--mock", "--init-mode", "import_pool", "--import-pool", str(path), "--out-dir", str(run)]) == 0
     manifest = json.loads((run / "initialization/seed_manifest.json").read_text())
     assert [row["status"] for row in manifest["admissions"]] == ["admitted", "duplicate", "rejected", "rejected", "admitted"]
     assert len(manifest["observations"]) == 2
@@ -40,15 +40,15 @@ def test_import_records_duplicates_rejections_and_changed_sources(tmp_path):
     assert report["initialization"]["source_dispositions"] == {"admitted": 2, "duplicate": 1, "rejected": 2}
     path.write_text('{"expression":"$open"}')
     with pytest.raises(ValueError, match="source changed"):
-        main(["--mock", "--protocol-file", str(run / "protocol.json"), "--resume-run", str(run), "--import-pool", str(path)])
+        main(["--method", "llm", "--mock", "--protocol-file", str(run / "protocol.json"), "--resume-run", str(run), "--import-pool", str(path)])
 
 
 def test_empty_initialization_uses_no_model_or_evaluation_budget(tmp_path):
-    protocol = replace(T3Protocol(), cold_seed_count=0,
-                       budgets={**T3Protocol().budgets, "initialization_evaluations": 0})
+    protocol = replace(T3Protocol(method="llm"), cold_seed_count=0,
+                       budgets={**T3Protocol(method="llm").budgets, "initialization_evaluations": 0})
     path, run = tmp_path / "protocol.json", tmp_path / "run"
     path.write_text(json.dumps(protocol.to_dict()))
-    assert main(["--mock", "--protocol-file", str(path), "--out-dir", str(run)]) == 0
+    assert main(["--method", "llm", "--mock", "--protocol-file", str(path), "--out-dir", str(run)]) == 0
     report = json.loads((run / "result.json").read_text())
     assert report["initialization"]["seed_count"] == 0
     counters = report["initialization"]["budget"]["counters"]
@@ -73,11 +73,11 @@ def test_initialization_pause_resumes_frozen_source_before_search_exists(tmp_pat
         return result
     monkeypatch.setattr(OracleGateway, "evaluate", pause_once)
     monkeypatch.setattr(OracleGateway, "_send", failed_seed)
-    assert main(["--mock", "--init-mode", "file", "--seed-file", str(source), "--out-dir", str(run)]) == 2
+    assert main(["--method", "llm", "--mock", "--init-mode", "file", "--seed-file", str(source), "--out-dir", str(run)]) == 2
     assert not (run / "campaign.json").exists()
     assert json.loads((run / "initialization/status.json").read_text())["status"].startswith("paused_")
     source.unlink()
-    args = ["--mock", "--protocol-file", str(run / "protocol.json"), "--resume-run", str(run)]
+    args = ["--method", "llm", "--mock", "--protocol-file", str(run / "protocol.json"), "--resume-run", str(run)]
     assert main(args) == 0
     manifest = json.loads((run / "initialization/seed_manifest.json").read_text())
     assert len(manifest["observations"]) == 3
@@ -90,11 +90,11 @@ def test_initialization_pause_resumes_frozen_source_before_search_exists(tmp_pat
 
 def test_distinct_runs_have_distinct_physical_initialization_requests(tmp_path):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=1).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=1).to_dict()))
     identities = []
     for parent in ("first", "second"):
         run = tmp_path / parent / "same-name"
-        assert main(["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]) == 0
+        assert main(["--method", "llm", "--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]) == 0
         identities.append({json.loads(path.read_text())["request"]["request_id"]
                            for path in (run / "initialization/private/oracle").glob("*.json")})
     assert all(identities) and identities[0].isdisjoint(identities[1])
@@ -105,6 +105,6 @@ def test_cold_generation_pause_is_durable_before_engine_starts(tmp_path, monkeyp
         raise EvaluationPaused("provider unavailable", status="paused_provider")
     monkeypatch.setattr(Generator, "request", unavailable)
     run = tmp_path / "run"
-    assert main(["--mock", "--out-dir", str(run)]) == 2
+    assert main(["--method", "llm", "--mock", "--out-dir", str(run)]) == 2
     assert json.loads((run / "initialization/status.json").read_text())["status"] == "paused_provider"
     assert not (run / "initialization/seed_manifest.json").exists()

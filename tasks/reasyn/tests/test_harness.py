@@ -44,7 +44,7 @@ class Sink:
 
 
 def args():
-    options = parse_args(["--mock", "--benchmark", "tdc", "--evaluations-per-round", "2"])
+    options = parse_args(["--search-method", "auto", "--mock", "--benchmark", "tdc", "--evaluations-per-round", "2"])
     options.proposal_mode = "harness"
     return options
 
@@ -218,7 +218,7 @@ def test_reconstruction_policy_exposes_prior_and_effective_query_weights():
                                  alpha=1, eta=1, seed=0)
     assert set(adapter.capability_contract().enabled_capabilities) == {"prior_mean@1", "ldm_weights@1"}
     for alpha in ("0", "0.5", "2", "10"):
-        assert parse_args(["--mock", "--benchmark", "reconstruction", "--acquisition-alpha", alpha]).acquisition_alpha == float(alpha)
+        assert parse_args(["--search-method", "auto", "--mock", "--benchmark", "reconstruction", "--acquisition-alpha", alpha]).acquisition_alpha == float(alpha)
 
 
 def test_partial_session_recovery_replays_frozen_inputs_and_cumulative_usage(tmp_path):

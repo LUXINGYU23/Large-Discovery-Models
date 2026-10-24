@@ -1,6 +1,6 @@
 # Iron Mind: First Run Guide
 
-LDM Harness defaults to **CoverageForks 2+2**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
+LDM Harness defaults to **MainHistoryForks 1+3**. Use `--harness-research-strategy-config` with `config/research_strategies/` to select another strategy; see the [shared tree guide](../../docs/research-search-architecture.md) for configuration, budgets and recovery.
 
 This guide starts from a clean checkout and verifies the task in the same
 order used for a reproducible release: local mock campaign, official data
@@ -150,7 +150,7 @@ Use `--set args.harness-mcp-config=/absolute/path/to/mcp.yaml` for allowlisted
 MCP tools. Per-tool turn limits are configured with `harness-tool-budget` in a
 runner YAML; see `docs/research-harness.md` for the schema and defaults.
 
-Harness defaults use a main researcher and four 2+2 branches from one comprehensive
+Harness defaults use a main researcher and four main-history 1+3 branches from one comprehensive
 researcher template, each submitting 16 distinct conditions in an annotated
 `candidates.json`. Cross-session agreement still contributes to `q0`.
 Candidate sessions expose experimental-design, scientific-critical-thinking,

@@ -159,6 +159,7 @@ class HarnessExpander:
         with self.branch_client(prepared["root"], prepared["sources"]) as client:
             branch = HarnessExpander(client, self.protocol, self.gateway, prepared["root"],
                                      tools=self.tools, collection=self.collection)
+            branch.branch_instructions = prepared["branch_instructions"]
             branch.inherited_history_counts = {p: s.history_cursor for p, s in prepared["sources"].items()}
             result = branch._expand(request, snapshot)
         assignments = {a["profile_id"]: a for a in prepared["plan"]["assignments"]}
@@ -203,6 +204,7 @@ class HarnessExpander:
                     "objective": self.protocol.objective, "candidate_count": count,
                     "history_delta": delta, "history_digest": history_digest,
                     "evaluated_count": len(history), "filter_profile": self.protocol.filter_profile,
+                    **({"research_branch": self.branch_instructions[profile.profile_id]} if self.inherited_history_counts is not None else {}),
                     **({"research_snapshot": snapshot} if snapshot else {})}, sort_keys=True),
                 forbidden_query_terms=tuple(sorted({item.candidate_id for item in request.observations})),
             ))

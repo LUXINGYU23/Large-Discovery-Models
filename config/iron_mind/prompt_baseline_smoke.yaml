@@ -5,6 +5,7 @@ mode: real
 description: One real LDM evaluation with the frozen legacy Iron Mind prompt.
 contract_profile: ldm_prompt_baseline_smoke
 args:
+  search-method: ldm
   proposal-mode: openai
   dataset-id: reductive_amination
   iterations: 1

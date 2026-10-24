@@ -13,7 +13,7 @@ from ldm_tts.harness import POLICY_CAPABILITIES, parse_tool_call_budgets
 from ldm_tts.harness.container import resolve_container_user
 from ldm_tts.harness.pi import DEFAULT_NETWORK_TOOL_BUDGETS
 from ldm_tts.harness.research_strategy import configure_research_strategy
-from ldm_tts.harness.research_tree import CoverageForks
+from ldm_tts.harness.research_tree import CoverageForks, MainHistoryForks
 from ldm_tts.transport.openai import WIRE_APIS
 from tasks.nucleobench.core import harness_runtime, provider as provider_config
 from tasks.nucleobench.core.cases import get_case
@@ -60,7 +60,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--initialization-mode", choices=INITIALIZATION_MODES, default="shared_start"
     )
     parser.add_argument(
-        "--search-method", choices=tuple(sorted(SEARCH_METHODS)), default="ldm"
+        "--search-method", choices=tuple(sorted(SEARCH_METHODS)), default="ldm_harness_compiled"
     )
     parser.add_argument("--proposal-mode", choices=("none", "openai"))
     parser.add_argument("--iterations", type=int)
@@ -68,6 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--reservoir-size", type=int, default=4)
     parser.add_argument("--evaluations-per-round", type=int, default=1)
     parser.add_argument("--oracle-batch-size", type=int)
+    parser.add_argument("--oracle-socket", type=Path, help="Host-only serialized official oracle socket")
     parser.add_argument("--proposal-samples", type=int)
     parser.add_argument("--bo-pool-size", type=int)
     parser.add_argument("--proposal-candidates-per-request", type=int)
@@ -119,6 +120,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--harness-wall-time-seconds", type=int, default=1800)
     parser.add_argument("--harness-tool-budget", action="append", metavar="NAME=COUNT")
     parser.add_argument("--harness-surrogate-query", action="store_true")
+    parser.add_argument("--harness-research-roles", action="store_true",
+                        help="Apply aligned comprehensive roles to independent or forked researchers")
+    parser.add_argument("--harness-blank-slate", action="store_true",
+                        help="Use only task/submission instructions for the single-session Harness")
     parser.add_argument(
         "--policy-capability",
         action="append",
@@ -204,10 +209,17 @@ def _apply_derived_args(args: argparse.Namespace) -> None:
 
 def _validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     strategy = args._research_strategy
+    if args.harness_blank_slate and args.search_method != "harness":
+        parser.error("--harness-blank-slate requires the single-session harness method")
     if strategy.measurement_policy is not None and (
         args.mock or args.search_method not in {"ldm", *PARALLEL_HARNESS_METHODS}
     ):
         parser.error("measurement coverage requires real acquisition-tilted selection")
+    if (args.harness_research_roles or isinstance(strategy.fork_policy, MainHistoryForks)) and (
+        len(harness_runtime.proposal_profiles(args)) != 4
+        or args.harness_profile != ["comprehensive_research"] * 4
+    ):
+        parser.error("main_history_1plus3 / research roles require four comprehensive_research profiles")
     if isinstance(strategy.fork_policy, CoverageForks) and len(harness_runtime.proposal_profiles(args)) < 3:
         parser.error("coverage forks require at least three research profiles")
     if args.harness_main_research and (

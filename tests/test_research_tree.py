@@ -82,3 +82,24 @@ def test_strategy_configurations_and_custom_factories(monkeypatch):
         load_research_strategy({"name": "independent", "fork_policy": {"name": "latest"}})
     with pytest.raises(ValueError):
         load_research_strategy({"name": "main_forks", "fork_policy": {"name": "typo"}})
+
+
+def test_main_history_forks_credit_only_measured_gain_and_never_children():
+    from ldm_tts.harness.research_tree import MainHistoryForks, ResearchOutcome
+    mains = tuple(node(i) for i in range(1, 6))
+    child = replace(node(2), node_id="branch_2", best_score=9999)
+    evidence = ResearchOutcome(2, "b", "restart", mains[1], 10, ("x",), 1, 20, "x")
+    unknown = ResearchOutcome(3, "b", "restart", mains[2], 10, ("y",))
+    context = ForkContext(5, ("a", "b", "c", "d"), mains, (child,), (evidence, unknown))
+    assignments = MainHistoryForks().plan(context)
+    assert [a.parent_id for a in assignments] == ["main_5", "main_2", "main_1", "main_3"]
+    assert len({a.parent_id for a in assignments}) == 4
+    assert [a.purpose for a in assignments] == ["main", "restart", "restart", "restart"]
+    assert MainHistoryForks().plan(context) == assignments
+    # Losses do not rank unknowns as failures; fallback is coverage.
+    context = replace(context, outcomes=(replace(evidence, best_score=9), unknown))
+    assert MainHistoryForks().plan(context)[1].parent_id == "main_1"
+    bootstrap = MainHistoryForks().plan(replace(context, main_nodes=mains[:1], outcomes=()))
+    assert {a.parent_id for a in bootstrap} == {"main_1"}
+    with pytest.raises(ValueError):
+        MainHistoryForks().plan(replace(context, profile_ids=("a", "b", "c")))

@@ -5,6 +5,7 @@ mode: real
 description: Official 10,000-call 1M Glide ligand-efficiency campaign with batch-16 LDM selection.
 contract_profile: glide_1m_budget10000_batch16
 args:
+  search-method: ldm
   proposal-mode: openai
   scale: 1M
   target: kif11

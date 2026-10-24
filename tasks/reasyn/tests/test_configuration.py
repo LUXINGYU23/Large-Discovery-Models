@@ -86,7 +86,7 @@ def test_harness_dependencies_check_runtime_resources_and_mcp(tmp_path, monkeypa
 
 
 def test_mock_worker_check_is_lightweight_but_mock_harness_keeps_provider_boundary(monkeypatch):
-    light = _checks(["--mock"], monkeypatch)
+    light = _checks(["--search-method", "auto", "--mock"], monkeypatch)
     assert set(light) == {"mock"}
     harness = _checks(["--mock", "--search-method", "harness"], monkeypatch)
     assert harness["proposal_endpoint"].status == "fail"

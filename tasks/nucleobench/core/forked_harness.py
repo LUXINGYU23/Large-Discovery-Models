@@ -8,14 +8,10 @@ from dataclasses import replace
 from ldm_tts.harness.research_runtime import ResearchCoordinator
 from ldm_tts.harness.research_store import ResearchMeasurement
 from tasks.nucleobench.core.candidate import prepare_candidate_payload
-from tasks.nucleobench.core.harness import NucleoBenchHarnessExpander, _forbidden_query_terms, _history_delta, _profile
+from tasks.nucleobench.core.harness import NucleoBenchHarnessExpander, _forbidden_query_terms, _history_delta
 from tasks.nucleobench.core.research import (
     serialize_measured_observations, summarize_measured_observations, write_measured_history,
 )
-
-
-def main_research_profile():
-    return (_profile("main_research"),)
 
 
 class ForkedResearchExpander:
@@ -39,10 +35,12 @@ class ForkedResearchExpander:
             message={"new_measurements": summarize_measured_observations(
                 serialize_measured_observations(_history_delta(request, 1), context))},
         )
+        instructions = prepared["branch_instructions"]
         with self.branch_client(prepared["root"], prepared["sources"]) as client:
             expanded = NucleoBenchHarnessExpander(
                 client, artifact_root=prepared["root"],
                 inherited_history_counts={p: s.history_cursor for p, s in prepared["sources"].items()},
+                branch_instructions=instructions,
                 **self.options,
             ).expand(request)
         assignments = {a["profile_id"]: a for a in prepared["plan"]["assignments"]}

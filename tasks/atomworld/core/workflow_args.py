@@ -34,7 +34,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--search-method",
         choices=("llm", "harness", "harness_public_audit", *LDM_METHODS),
-        default="llm",
+        default="ldm_harness_compiled",
     )
     parser.add_argument(
         "--iterations",

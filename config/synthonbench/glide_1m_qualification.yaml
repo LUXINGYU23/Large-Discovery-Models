@@ -5,6 +5,7 @@ mode: real
 description: One LDM-selected qualification query against the official 1M Glide ligand-efficiency score table.
 contract_profile: glide_1m_qualification
 args:
+  search-method: ldm
   proposal-mode: openai
   scale: 1M
   target: kif11

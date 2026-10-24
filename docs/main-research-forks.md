@@ -21,7 +21,7 @@ For example, add this to the existing real campaign command:
 --harness-research-strategy-config config/research_strategies/coverage_2plus2.json
 ```
 
-New LDM Harness campaigns default to 2+2. See the [shared runtime and task boundaries](research-search-architecture.md) for all six task adapters, budgets and recovery. The first three configurations keep
+New LDM Harness campaigns default to main-history 1+3. See the [shared runtime and task boundaries](research-search-architecture.md) for all six task adapters, budgets and recovery. The first three configurations keep
 candidate admission, global empirical q0, GP/acquisition, compiled policy and
 true-evaluation selection unchanged. Measurement coverage is enabled only by the
 fourth configuration or an explicit custom measurement policy.

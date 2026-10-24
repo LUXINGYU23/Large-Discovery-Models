@@ -2,7 +2,7 @@ from tasks.alphabench.ldm_task.procedure import main
 
 
 def test_mock_procedure(tmp_path, capsys) -> None:
-    assert main([
+    assert main(["--method", "llm",
         "--mock",
         "--iterations",
         "1",

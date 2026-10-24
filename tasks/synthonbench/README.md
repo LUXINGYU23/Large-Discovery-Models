@@ -1,7 +1,16 @@
 # SynthonBench LDM Task
 
-The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
-one older-main restart and one archived-side continuation. The main research
+New Pi research runs default to `ldm_harness_compiled` with a persistent main
+researcher and **1 latest-main + 3 dynamically selected main-history forks**.
+Branches inherit conversation/workspace history, reconcile the same latest
+authorized feedback, and receive refinement, alternative, reconsideration and
+challenge roles. Domain tools, skills and evaluation rules remain task-specific.
+See [shared research architecture](../../docs/research-search-architecture.md).
+Explicit baseline methods and named baseline profiles retain their own protocols.
+
+
+The default LDM Harness strategy is **MainHistoryForks 1+3**: one latest-main fork
+and three dynamically selected main-history forks. The main research
 turn is additional to the four proposal turns; candidate and evaluation budgets
 remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
 for history, accounting and recovery. Use `--harness-research-strategy-config`
@@ -228,7 +237,7 @@ registration rules are in the
 [Research Harness integration guide](../../docs/research-harness.md).
 
 The `ldm_harness` method changes only candidate generation. A persistent main
-researcher supplies four proposal branches through the shared 2+2 tree policy.
+researcher supplies four proposal branches through the shared main-history 1+3 tree policy.
 Branches use the task-owned `comprehensive_research/AGENTS.md`. Each combines target SAR, reaction
 feasibility, scaffold coverage, and property analysis in its own workspace and
 transcript. It autonomously selects reaction types and searches the read-only

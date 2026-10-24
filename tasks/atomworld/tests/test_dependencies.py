@@ -8,7 +8,7 @@ def by_name(checks):
 def test_mock_direct_dependency_check_does_not_require_provider():
     checks = by_name(
         dependencies.check_dependencies(
-            {"task": "atomworld", "mode": "mock", "argv": ["--mock"]}
+            {"task": "atomworld", "mode": "mock", "argv": ["--search-method", "llm", "--mock"]}
         )
     )
 

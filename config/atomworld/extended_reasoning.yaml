@@ -4,6 +4,7 @@ algorithm: target_blind_refinement
 mode: real
 contract_profile: extended_reasoning
 args:
+  search-method: llm
   data-dir: ${ATOMWORLD_DATA_ROOT}
   proposal-format: cif
   attempts-per-sample: 4

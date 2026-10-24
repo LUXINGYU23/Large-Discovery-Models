@@ -83,7 +83,7 @@ def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, monkey
         pytest.skip("Oracle service process requires POSIX fcntl")
     from tasks.alphabench.core.oracle_service import OracleService
     monkeypatch.setattr("tasks.alphabench.core.oracle_service.oracle_environment_digest",
-                        lambda config: T3Protocol().environment_digest)
+                        lambda config: T3Protocol(method="llm").environment_digest)
 
     root = tmp_path / "market"
     root.mkdir()
@@ -122,17 +122,17 @@ def test_real_run_rejects_changed_data_file_before_creating_run(tmp_path, monkey
         manifest_path = tmp_path / f"assay_{market}.json"
         altered = root / "prices.parquet"
     manifest_path.write_text(json.dumps(manifest))
-    protocol = T3Protocol(backend=backend, market=market, data_digest=data.digest(manifest),
+    protocol = T3Protocol(method="llm", backend=backend, market=market, data_digest=data.digest(manifest),
                           data_policy=data_policy)
     if qualification == "blocked":
-        assert protocol.identity != T3Protocol(backend=backend, market=market,
+        assert protocol.identity != T3Protocol(method="llm", backend=backend, market=market,
                                                data_digest=protocol.data_digest).identity
     protocol_path = tmp_path / "protocol.json"
     protocol_path.write_text(json.dumps(protocol.to_dict()))
     assert data.verify_data_manifest(manifest_path, protocol) == manifest
     if qualification == "blocked":
         with pytest.raises(ValueError, match="qualification is incomplete"):
-            data.verify_data_manifest(manifest_path, T3Protocol(
+            data.verify_data_manifest(manifest_path, T3Protocol(method="llm",
                 backend=backend, market=market, data_digest=protocol.data_digest))
     config = {"backend": backend, "market": market, "data_digest": protocol.data_digest,
               "environment_digest": protocol.environment_digest, "data_manifest": str(manifest_path)}

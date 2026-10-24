@@ -125,6 +125,46 @@ class CoverageForks:
         return tuple(assignments[p] for p in profiles)
 
 
+class MainHistoryForks:
+    """One recent main fork and three evidence/coverage-selected main ancestors.
+
+    Credit is measured improvement over the decision-time incumbent, never proposal
+    frequency or selection count. Unknown outcomes stay unknown. Earlier siblings
+    reserve their parents within a round; reuse only when history is too short.
+    """
+
+    def identity(self) -> dict:
+        return {"name": "main_history_1plus3", "version": 1,
+                "side_rules": ["measured_gain", "least_expanded", "temporal_coverage"]}
+
+    def plan(self, context: ForkContext) -> tuple[ForkAssignment, ...]:
+        if len(context.profile_ids) != 4 or not context.main_nodes:
+            raise ValueError("main_history_1plus3 requires exactly four profiles and a main node")
+        latest = context.main_nodes[-1]
+        selected = [latest]
+        older = context.main_nodes[:-1] or context.main_nodes
+        gains = {}
+        for outcome in context.outcomes:
+            if outcome.best_score is not None and outcome.incumbent is not None:
+                gains.setdefault(outcome.parent.node_id, []).append(outcome.best_score - outcome.incumbent)
+        def coverage(n):
+            return (n.expansions, n.last_expanded, n.round_index, n.node_id)
+        for rule in ("gain", "coverage", "temporal"):
+            available = [n for n in older if n.node_id not in {p.node_id for p in selected}] or list(older)
+            if rule == "gain":
+                positive = [n for n in available if max(gains.get(n.node_id, [0])) > 0]
+                parent = min(positive, key=lambda n: (-max(gains[n.node_id]), *coverage(n))) if positive else min(available, key=coverage)
+            elif rule == "coverage":
+                parent = min(available, key=coverage)
+            else:
+                parent = min(available, key=lambda n: (
+                    -min(abs(n.round_index - p.round_index) for p in selected), *coverage(n)))
+            selected.append(parent)
+        return tuple(ForkAssignment(profile, parent.node_id, "main" if i == 0 else "restart",
+                                     "main" if i == 0 else f"explore_{context.round_index:04d}_{profile}")
+                     for i, (profile, parent) in enumerate(zip(context.profile_ids, selected)))
+
+
 @dataclass(frozen=True)
 class DiverseArchive:
     """Bound leaves, merge overlapping proposal sets, retain an untested direction.

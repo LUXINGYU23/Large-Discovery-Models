@@ -16,6 +16,7 @@
     "iterations": 4,
     "num-cycles": 3,
     "reservoir-size": 1,
+    "search-method": "baseline",
     "proposal-mode": "baseline"
   }
 }

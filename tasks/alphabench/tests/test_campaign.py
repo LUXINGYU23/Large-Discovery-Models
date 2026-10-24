@@ -18,7 +18,7 @@ def test_initialized_campaign_resume_has_no_new_calls_or_cost(method, tmp_path, 
     monkeypatch.setenv("LDM_DATA_COLLECTION_DIR", str(tmp_path / "collection"))
     run = tmp_path / method
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), method=method, cold_seed_count=3).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), method=method, cold_seed_count=3).to_dict()))
     arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
     assert main(arguments) == 0
     checkpoint = json.loads((run / "checkpoint.json").read_text(encoding="utf-8"))
@@ -68,7 +68,7 @@ def test_initialized_campaign_resume_has_no_new_calls_or_cost(method, tmp_path, 
 
 def test_completed_resume_rejects_corrupt_report_without_dispatch(tmp_path):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=0).to_dict()))
     run = tmp_path / "run"
     arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
     assert main(arguments) == 0
@@ -81,7 +81,7 @@ def test_completed_resume_rejects_corrupt_report_without_dispatch(tmp_path):
 
 def test_completed_resume_rejects_changed_budget_ledger(tmp_path):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=0).to_dict()))
     run = tmp_path / "run"
     arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
     assert main(arguments) == 0
@@ -96,7 +96,7 @@ def test_completed_resume_rejects_changed_budget_ledger(tmp_path):
 @pytest.mark.parametrize("exit_point,exit_code", [("before_finish", 77), ("before_status", 78)])
 def test_report_publication_resumes_after_process_exit_without_new_model_calls(tmp_path, exit_point, exit_code):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=0).to_dict()))
     run = tmp_path / "run"
     arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
     code = (
@@ -132,7 +132,7 @@ def test_report_publication_resumes_after_process_exit_without_new_model_calls(t
 
 def test_collection_export_failure_does_not_publish_completed_status(tmp_path, monkeypatch):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=0).to_dict()))
     run = tmp_path / "run"
     arguments = ["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]
     original_export = AcceptedActions.export
@@ -164,7 +164,7 @@ def test_real_run_requires_data_and_frozen_protocol(tmp_path):
 
 
 def test_shared_search_reports_partial_when_rounds_end_before_attempt_target(tmp_path):
-    protocol = replace(T3Protocol(), cold_seed_count=0, rounds=1, evaluations=4, batch_size=2)
+    protocol = replace(T3Protocol(method="llm"), cold_seed_count=0, rounds=1, evaluations=4, batch_size=2)
     path = tmp_path / "protocol.json"
     path.write_text(json.dumps(protocol.to_dict()))
     run = tmp_path / "run"
@@ -188,7 +188,7 @@ def test_frozen_validation_ranking_is_independent_of_search_objective(metric, wi
             result["metrics"].update(ic=index, rank_ic=-index, icir=-abs(index-1), rank_icir=-abs(index-2))
         return result
     monkeypatch.setattr(gateway, "mock_oracle", response)
-    protocol = replace(T3Protocol(), cold_seed_count=0, validation_metric=metric, factor_select_n=1)
+    protocol = replace(T3Protocol(method="llm"), cold_seed_count=0, validation_metric=metric, factor_select_n=1)
     path = tmp_path / "protocol.json"
     path.write_text(json.dumps(protocol.to_dict()))
     run = tmp_path / "run"

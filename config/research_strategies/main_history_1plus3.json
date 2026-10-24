@@ -1,0 +1,5 @@
+{
+  "name": "main_forks",
+  "fork_policy": {"name": "main_history_1plus3"},
+  "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5}
+}

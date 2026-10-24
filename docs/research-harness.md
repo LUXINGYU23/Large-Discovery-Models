@@ -6,12 +6,12 @@ submission. It is available through three search methods:
 
 | Method | Candidate generation | Selection before evaluation |
 | --- | --- | --- |
-| `ldm_harness` | Four task-defined branches submit an over-sampled reservoir; default parents follow 2+2. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
+| `ldm_harness` | Four task-defined branches submit an over-sampled reservoir; default parents follow main-history 1+3. | The task estimates empirical `q0`, fits its surrogate, and applies the fixed LDM acquisition policy. |
 | `ldm_harness_compiled` | The same proposal sessions build the reservoir, while one independent persistent policy Agent submits a complete Python policy artifact. | The task validates and executes the artifact, uses its prior mean in the residual GP, and applies its round-specific `alpha` and `eta`. |
 | `harness` | One task-defined persistent Agent submits exactly the evaluation minibatch. | None. Every accepted candidate is evaluated in stable submission order. |
 
 Iron Mind, SynthonBench, NucleoBench, AtomWorld, ReaSyn, and AlphaBench are the current
-task-local integrations. Their LDM Harness methods default to [shared 2+2 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions and latest-main 4fork remain explicit strategies. The shared Harness does not know their candidate
+task-local integrations. Their LDM Harness methods default to [shared main-history 1+3 research trees](research-search-architecture.md): one persistent main researcher and four proposal branches per active step. Independent sessions and latest-main 4fork remain explicit strategies. The shared Harness does not know their candidate
 identity, legal search space, duplicate policy, surrogate, or evaluator.
 
 ## Architecture

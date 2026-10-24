@@ -127,7 +127,7 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 				assert.match(await readFile(join(root, "history-events.jsonl"), "utf8"), /compaction_committed/);
 			}
 			assert.equal(requests.length, mode === "transient" ? 2 : 1, "no fallback or research dispatch on failed compaction");
-			assert.equal((requests[0]!.reasoning as { effort: string }).effort, "low");
+			assert.equal((requests[0]!.reasoning as { effort: string }).effort, "high");
 			assert.equal(requests[0]!.max_output_tokens, 32768);
 			assert.notEqual(requests[0]!.tool_choice, "required");
 			assert.equal(session.thinkingLevel, "max", "research reasoning must remain unchanged");
@@ -149,3 +149,26 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 		}
 	});
 }
+
+
+test("output-limit continuation requires compaction and remains bounded across restarts", async () => {
+ const root = await mkdtemp(join(tmpdir(), "ldm-output-limit-"));
+ try {
+  const manager = SessionManager.create(root, join(root, "sessions"));
+  manager.appendMessage({ role: "user", content: "research", timestamp: Date.now() });
+  let compactions = 0;
+  for (let i = 0; i < 2; i++) {
+   const history = new HistoryController();
+   await history.begin(root, manager);
+   await history.continueTurn("length", async () => {
+    manager.appendCompaction("Preserved research", manager.getLeafId()!, 100);
+    compactions++;
+   });
+  }
+  const exhausted = new HistoryController();
+  await exhausted.begin(root, manager);
+  await assert.rejects(exhausted.continueTurn("length", async () => { compactions++; }), HistoryRecoveryError);
+  assert.equal(compactions, 2);
+  await assert.rejects(new HistoryController().begin(root, manager), HistoryRecoveryError);
+ } finally { await rm(root, { recursive: true, force: true }); }
+});

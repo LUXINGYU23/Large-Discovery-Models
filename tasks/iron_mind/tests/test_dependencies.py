@@ -171,7 +171,7 @@ def test_mock_dependencies_validate_only_tracked_mock_assets(
     checks = check_task_dependencies(
         {
             "task": "iron_mind",
-            "argv": ["--mock"],
+            "argv": ["--search-method", "ldm", "--mock"],
             "cwd": str(data_root),
             "mode": "mock",
         },

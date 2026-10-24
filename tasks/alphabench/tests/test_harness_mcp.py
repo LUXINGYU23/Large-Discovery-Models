@@ -18,7 +18,7 @@ from tasks.alphabench.core.protocol import T3Protocol
 def test_mcp_sidecar_calls_host_tools_without_guest_data_access(tmp_path):
     image = os.environ["ALPHABENCH_T3_SIDECAR_IMAGE"]
     protocol = T3Protocol(method="ldm_harness", harness_surrogate_query=True,
-        budgets={**T3Protocol().budgets, "surrogate_queries": 400})
+        budgets={**T3Protocol(method="llm").budgets, "surrogate_queries": 400})
     runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={
         "dynamic_checks": 1, "oracle_job_slots": 2, "surrogate_queries": 1})
     gateway = OracleGateway(protocol, runtime, mock=True)

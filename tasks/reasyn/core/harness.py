@@ -159,7 +159,8 @@ class HarnessTargetSource:
             atomic_json_write(root / "measured_history.json", {"observations": history})
             with self.branch_client(root, prepared["sources"]) as client:
                 turns = self._turns(batch_root, request_digest, meta, history, selected, counts,
-                    cursors={p: s.history_cursor for p, s in prepared["sources"].items()})
+                    cursors={p: s.history_cursor for p, s in prepared["sources"].items()},
+                    branch_instructions=prepared["branch_instructions"])
                 return self._run_batch(client, root, turns, selected, counts, prepared,
                                        response_path, request_digest, history)
         turns = self._turns(batch_root, request_digest, meta, history, selected, counts)
@@ -250,7 +251,7 @@ class HarnessTargetSource:
                 "history_to_seq": len(history), "history_prefix_sha256": canonical_sha256(history),
             })
 
-    def _turns(self, batch_root, request_digest, meta, history, selected, counts, *, cursors=None):
+    def _turns(self, batch_root, request_digest, meta, history, selected, counts, *, cursors=None, branch_instructions=None):
         path = batch_root / "input.json"
         if path.exists():
             saved = json.loads(path.read_text())
@@ -280,6 +281,7 @@ class HarnessTargetSource:
                        for row in delta[-8:]]
             feedback = list(meta.get("rejection_feedback", []))
             payload = {
+                **({"research_branch": branch_instructions[profile.profile_id]} if branch_instructions else {}),
                 "task": "reasyn", "benchmark": self.args.benchmark,
                 "goal": {"original_target": self.target} if self.target else {"oracle": self.args.oracle},
                 "message_type": "campaign_bootstrap" if cursor == 0 else "history_delta",

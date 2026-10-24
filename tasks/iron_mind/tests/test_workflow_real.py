@@ -82,7 +82,7 @@ def test_real_mode_connects_pinned_data_endpoint_and_shared_engine(
 
 def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
     args = parse_args(
-        [
+        ["--search-method", "ldm",
             "--proposal-mode",
             "openai",
             "--dataset-id",
@@ -98,7 +98,7 @@ def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
 
 def test_proposal_oversampling_must_exceed_the_bo_pool() -> None:
     args = parse_args(
-        ["--mock", "--proposal-samples", "4", "--bo-pool-size", "4"]
+        ["--search-method", "ldm", "--mock", "--proposal-samples", "4", "--bo-pool-size", "4"]
     )
 
     with pytest.raises(SystemExit, match="must exceed"):
@@ -107,7 +107,7 @@ def test_proposal_oversampling_must_exceed_the_bo_pool() -> None:
 
 def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
     args = parse_args(
-        [
+        ["--search-method", "ldm",
             "--mock",
             "--proposal-mode",
             "callable",
@@ -175,7 +175,7 @@ def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:
 
 
 def test_default_request_body_disables_optional_thinking() -> None:
-    assert parse_args([]).llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
+    assert parse_args(["--search-method", "ldm", ]).llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
 
 
 def _install_real_fakes(monkeypatch, table, calls: dict[str, object]) -> None:
@@ -202,7 +202,7 @@ def _activate_smoke_profile(monkeypatch) -> None:
 
 
 def _real_args(tmp_path: Path, data_root: Path) -> list[str]:
-    return [
+    return ["--search-method", "ldm",
         "--proposal-mode",
         "openai",
         "--dataset-id",

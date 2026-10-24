@@ -58,7 +58,7 @@ def test_actual_qlib_nan_filter_and_paper_finite_time_boundaries(tmp_path, sourc
         array[:count] = value
         arrays[field] = array
     write_market(tmp_path, days, {"S00": arrays})
-    protocol = T3Protocol(filter_profile="qlib_code_filter_v1")
+    protocol = T3Protocol(method="llm", filter_profile="qlib_code_filter_v1")
     request = {"protocol": protocol.to_dict(), "operation": "check", "start": str(days[0].date()),
                "end": str(days[-1].date()), "fast": True}
     config = {"upstream_root": str(source), "data_root": str(tmp_path)}
@@ -87,7 +87,7 @@ def test_qlib_executes_unary_factor_negation_without_changing_candidate_identity
     expression = "(-((((2*$close)-$high)-$low)/$open))"
     assert parse_expression(expression).canonical.startswith("(-")
     assert parse_expression(expression, qlib_execution=True).canonical.startswith("Mul(-1,")
-    request = {"protocol": T3Protocol().to_dict(), "operation": "check", "expression": expression,
+    request = {"protocol": T3Protocol(method="llm").to_dict(), "operation": "check", "expression": expression,
                "start": str(days[0].date()), "end": str(days[-1].date()), "fast": True}
     config = {"upstream_root": str(source), "data_root": str(tmp_path)}
     actual = qlib_evaluate(request, config)
@@ -100,7 +100,7 @@ def test_qlib_scalar_operator_failure_is_an_invalid_expression(tmp_path, source)
     days = pd.bdate_range("2020-01-01", periods=24)
     values = np.linspace(10, 20, 24).astype(np.float32)
     write_market(tmp_path, days, {"S00": {"high": values, "low": values * .9}})
-    request = {"protocol": T3Protocol().to_dict(), "operation": "check",
+    request = {"protocol": T3Protocol(method="llm").to_dict(), "operation": "check",
                "expression": "Div(IdxMax($high,5),Add(5,1e-12))",
                "start": str(days[0].date()), "end": str(days[-1].date()), "fast": True}
     with pytest.raises(ValueError, match="Qlib rejected the factor expression"):
@@ -113,7 +113,7 @@ def test_qlib_endpoint_and_forward_labels_follow_the_selected_profile(tmp_path, 
     t, stock = np.arange(45)[:, None], np.arange(12)[None, :]
     close = (20 + stock + .03 * t + np.sin(t * .7 + stock)).astype(np.float32)
     write_market(tmp_path, days, {f"S{i:02d}": {"close": close[:, i]} for i in range(12)})
-    protocol = T3Protocol(profile=profile, forward_n=3)
+    protocol = T3Protocol(method="llm", profile=profile, forward_n=3)
     request = {"protocol": protocol.to_dict(), "operation": "evaluate", "expression": "Mean($close,3)",
                "start": str(days[20].date()), "end": str(days[30].date()), "fast": True}
     config = {"upstream_root": str(source), "data_root": str(tmp_path)}
@@ -149,7 +149,7 @@ def test_full_qlib_portfolio_uses_the_same_retained_interval(tmp_path, source, p
     members = list(stocks)
     stocks["SH000300"] = {"close": (100 + np.arange(45)).astype(np.float32)}
     write_market(tmp_path, days, stocks, members)
-    protocol = T3Protocol(profile=profile, forward_n=2, stock_topk=3, stock_n_drop=1)
+    protocol = T3Protocol(method="llm", profile=profile, forward_n=2, stock_topk=3, stock_n_drop=1)
     request = {"protocol": protocol.to_dict(), "operation": "evaluate", "expression": "Mean($close,3)",
                "start": str(days[20].date()), "end": str(days[30].date()), "fast": False}
     result = qlib_evaluate(request, {"upstream_root": str(source), "data_root": str(tmp_path), "benchmark": "SH000300"})
@@ -189,7 +189,7 @@ def test_oracle_refuses_mutated_upstream_scoring_source_before_a_worker_permit(t
     config = {"backend": "qlib", "market": "csi300", "data_root": str(data_root),
               "benchmark": "SH000300", "upstream_root": str(upstream)}
     environment_digest = oracle_environment_digest(config)
-    protocol = T3Protocol(data_digest=digest(manifest), environment_digest=environment_digest)
+    protocol = T3Protocol(method="llm", data_digest=digest(manifest), environment_digest=environment_digest)
     config.update(data_digest=protocol.data_digest, environment_digest=environment_digest,
                   data_manifest=str(manifest_path))
     config_path = tmp_path / "config.json"

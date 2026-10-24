@@ -99,7 +99,7 @@ def test_dry_run_describes_the_selected_case(capsys) -> None:
         "nucleotide_mutation_patch"
     )
     assert payload["ldm_task_spec"]["response_spaces"][0]["name"] == (
-        "mutation_patch_batch_json"
+        "harness_candidate_file"
     )
     assert payload["execution"] == {
         "active_optimization_rounds": 1,
@@ -299,7 +299,7 @@ def test_bo_dry_run_does_not_require_or_read_provider_credentials(capsys) -> Non
 
     assert (
         main(
-            [
+            ["--search-method", "ldm",
                 "--mock",
                 "--case-id",
                 "mock_dna",
@@ -409,7 +409,7 @@ def test_mock_campaign_writes_the_complete_shared_engine_artifacts(
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     assert (
         main(
-            [
+            ["--search-method", "ldm",
                 "--mock",
                 "--case-id",
                 "mock_dna",

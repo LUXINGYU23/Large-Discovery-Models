@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
 import test from "node:test";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -165,7 +166,7 @@ test("compaction failures are terminal even when their text contains a retryable
 	} finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("an unresolved length stop never receives another submission nudge", async () => {
+test("failed native compaction of a length stop never receives another submission nudge", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-history-length-"));
 	try {
 		const history = new HistoryController();
@@ -173,7 +174,7 @@ test("an unresolved length stop never receives another submission nudge", async 
 		let calls = 0;
 		const context = {
 			history, config: { submissionContract: { toolName: "submit_candidates" } },
-			session: { messages: [{ role: "assistant", stopReason: "length" }], prompt: async () => { calls += 1; } },
+			session: { messages: [{ role: "assistant", stopReason: "length", timestamp: Date.now() }], prompt: async () => { calls += 1; }, compact: async () => { throw new Error("summary failed"); } },
 			submissions: { submission: undefined },
 		};
 		const prototype = PersistentProfileSession.prototype as unknown as {
@@ -182,4 +183,24 @@ test("an unresolved length stop never receives another submission nudge", async 
 		await assert.rejects(prototype.promptWithTimeout.call(context, "research", { wallTimeSeconds: 2 }), HistoryRecoveryError);
 		assert.equal(calls, 1);
 	} finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+test("a length stop after successful native compaction gets one bounded continuation", async () => {
+ const root = await mkdtemp(join(tmpdir(), "ldm-compacted-length-"));
+ try {
+  const manager = SessionManager.create(root, join(root,"sessions"));
+  const timestamp = Date.now()-1000;
+  manager.appendMessage({role:"user",content:"research",timestamp});
+  manager.appendCompaction("Preserved work", manager.getLeafId()!, 100);
+  const history = new HistoryController();await history.begin(root,manager);
+  let calls=0;const submissions:{submission:unknown}={submission:undefined};
+  const context={history,config:{submissionContract:{toolName:"submit_candidates"}},submissions,
+   session:{messages:[{role:"assistant",stopReason:"length",timestamp}],
+    compact:async()=>{throw new Error("Must reuse completed native compaction");},
+    prompt:async(message:string)=>{calls++;if(calls===2){assert.match(message,/output-token budget/);submissions.submission={accepted:true};}}}};
+  const prototype=PersistentProfileSession.prototype as unknown as {promptWithTimeout(message:string,limits:{wallTimeSeconds:number}):Promise<void>};
+  await prototype.promptWithTimeout.call(context,"research",{wallTimeSeconds:2});
+  assert.equal(calls,2);assert.equal(JSON.parse(await readFile(join(root,"history-recovery.json"),"utf8")).continuations,1);
+ } finally {await rm(root,{recursive:true,force:true});}
 });

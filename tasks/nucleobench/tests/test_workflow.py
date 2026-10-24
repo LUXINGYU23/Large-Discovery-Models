@@ -44,7 +44,7 @@ def real_workflow(tmp_path, monkeypatch):
         (output / "results.parquet").write_bytes(b"fixture result")
         (output / "SUCCESS.txt").write_text("SUCCESS")
 
-    def load_official(_source, _prepared, runtime):
+    def load_official(_source, _prepared, runtime, *, oracle_socket=None):
         state.model_loads += 1
         model = RecordingSequenceModel(
             lambda sequences: [-sum(index + 1 for index, base in enumerate(sequence) if base != "A")

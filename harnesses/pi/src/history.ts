@@ -7,7 +7,7 @@ import { atomicJson } from "./trace.js";
 export const HISTORY_POLICY = {
 	compaction: { enabled: true, reserveTokens: 65_536, keepRecentTokens: 20_000 },
 	summaryReserveTokens: 40_960,
-	summaryThinking: "low" as const,
+	summaryThinking: "high" as const,
 	summaryTimeoutMs: 180_000,
 	summaryRetry: { enabled: true, maxRetries: 1, baseDelayMs: 1_000 },
 	maxContinuations: 2,
@@ -57,18 +57,37 @@ export class HistoryController {
 		}
 	}
 
-	async continueTurn(stopReason: string | undefined): Promise<void> {
+	async continueTurn(stopReason: string | undefined, recoverLength?: () => Promise<void>): Promise<void> {
 		this.assertReady();
-		if (stopReason === "length") {
-			await this.fail("History recovery failed: truncated response remained after native Pi recovery; refusing another continuation.");
-		} else if (this.state.continuations >= HISTORY_POLICY.maxContinuations) {
+		if (this.state.continuations >= HISTORY_POLICY.maxContinuations) {
 			await this.fail("Submission recovery exhausted: no accepted submission after two continuation prompts.");
+			this.assertReady();
+		}
+		if (stopReason === "length") {
+			if (!recoverLength) {
+				await this.fail("Truncated output requires successful native compaction before continuation.");
+				this.assertReady();
+			}
+			// Charge before recovery so a restart cannot grant another attempt.
+			this.state.continuations += 1;
+			await this.save();
+			try {
+				await recoverLength!();
+				this.assertReady();
+			} catch (error) {
+				await this.fail(`Truncated-output compaction failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.assertReady();
+			}
 		} else {
 			this.state.continuations += 1;
 			await this.save();
-			await this.record({ type: "continuation", attempt: this.state.continuations, stopReason });
 		}
-		this.assertReady();
+		await this.record({ type: "continuation", attempt: this.state.continuations, stopReason });
+	}
+
+	compactedAfter(timestamp: number): boolean {
+		const entry = this.manager?.getBranch().findLast((entry) => entry.type === "compaction");
+		return !!entry && new Date(entry.timestamp).getTime() >= timestamp;
 	}
 
 	createExtension(proxyApiKey: string): ExtensionFactory {

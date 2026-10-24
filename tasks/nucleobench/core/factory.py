@@ -30,7 +30,7 @@ from tasks.nucleobench.core.hamming_gp import (
     NucleotideHammingEncoder,
 )
 from tasks.nucleobench.core.harness import (
-    DIRECT_HARNESS_PROFILE_ID,
+    DIRECT_HARNESS_PROFILE_ID, BLANK_HARNESS_PROFILE_ID,
     NucleoBenchHarnessExpander,
 )
 from tasks.nucleobench.core.proposals import (
@@ -108,6 +108,7 @@ def build_proposal_expander(
     harness_session_profiles: Sequence[HarnessProfile] = (),
     harness_candidates_per_session: int | None = None,
     harness_unique_candidates: bool = False,
+    research_roles: bool = False,
     campaign_id: str = "",
     first_active_round: int = 1,
     max_workers: int = DEFAULT_PROPOSAL_MAX_WORKERS,
@@ -128,13 +129,14 @@ def build_proposal_expander(
         if (
             search_method == "harness"
             and tuple(profile.profile_id for profile in harness_session_profiles)
-            != (DIRECT_HARNESS_PROFILE_ID,)
+            not in ((DIRECT_HARNESS_PROFILE_ID,), (BLANK_HARNESS_PROFILE_ID,))
         ):
-            raise ValueError("Direct Harness requires the direct_research profile")
+            raise ValueError("Direct Harness requires one direct_research or blank_slate profile")
         return NucleoBenchHarnessExpander(
             harness_client,
             NucleoBenchCandidateDomain(context),
             profiles=harness_session_profiles,
+            research_roles=research_roles,
             artifact_root=harness_artifact_root,
             candidates_per_profile=(
                 evaluations_per_round

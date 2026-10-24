@@ -19,7 +19,7 @@ REPO_ROOT = TASK_ROOT.parents[1]
 
 
 def test_task_spec_declares_four_independent_sixteen_candidate_requests() -> None:
-    spec = describe_ldm_task(parse_args([
+    spec = describe_ldm_task(parse_args(["--search-method", "ldm",
         "--mock", "--initialization-mode", "shared_random",
     ]))
 
@@ -95,7 +95,7 @@ def test_direct_harness_factory_does_not_build_a_surrogate(monkeypatch) -> None:
 
 
 def test_proposal_defaults_disable_thinking() -> None:
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "ldm", "--mock"])
 
     assert args.llm_extra_body_json == '{"thinking":{"type":"disabled"}}'
     assert args.llm_max_tokens == 2048
@@ -163,7 +163,7 @@ def test_bo_task_spec_uses_the_configured_task_local_search_breadth() -> None:
 def test_mock_campaign_uses_official_example_task(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
-    assert main([
+    assert main(["--search-method", "ldm",
         "--mock",
         "--iterations", "2",
         "--proposal-samples", "8",

@@ -58,7 +58,7 @@ def test_source_configs_keep_their_actual_defaults_and_seed_semantics(source, co
     assert all("algorithm." + key in resolved["parameter_sources"] for key in algorithm)
     assert resolved["execution_ready"] is False
     assert digest({key: value for key, value in resolved.items() if key != "digest"}) == resolved["digest"]
-    protocol = T3Protocol(profile=resolved["profile"])
+    protocol = T3Protocol(method="llm", profile=resolved["profile"])
     assert protocol.end_inclusive
     for phase in ("search", "validation", "test"):
         if effective[phase] is None:

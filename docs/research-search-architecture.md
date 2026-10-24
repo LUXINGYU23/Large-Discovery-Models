@@ -1,8 +1,41 @@
 # Shared Pi research trees
 
+## Default across Pi tasks
+
+NucleoBench, AlphaBench, AtomWorld, Iron Mind, ReaSyn and SynthonBench now
+select `ldm_harness_compiled` by default. Explicit method selections still select
+the corresponding baseline or ablation. Tasks using the older proposal interface
+are outside this change.
+
+The default research strategy is `main_history_1plus3`: one persistent main
+coordinator creates a short research brief, then four proposal branches inherit
+native conversation and workspace snapshots. The first branches from the latest
+main node; the three side branches select main-history nodes by measured gain,
+least expansion and temporal coverage. On bootstrap they may share a parent.
+Every branch receives the same latest authorized history and a delta relative
+to its inherited cursor. Old notes never replace current evidence. For blind
+AtomWorld, public drafts are not correctness observations; selection cannot invent
+hidden labels or gains.
+
+Shared instructions live in `ldm_tts/harness/research_instructions.py`. The four
+priorities are main refinement, competitive alternative, reconsideration and
+challenge. All own the complete task, including critical review. They record
+contrary evidence, an open alternative and a discriminating comparison in existing
+notes, without extending submission schemas. The coordinator delegates new
+investigations instead of doing long serial searches. Scripts must have bounded
+inner loops and preserve valid partial work after a timeout.
+
+Task tools, skills, validity constraints, feedback visibility, acquisition
+coefficients and evaluation budgets remain task-owned. The new default adds no
+extra oracle calls. Policy is enabled by the compiled method; `ldm_harness` remains
+an explicit no-policy comparison. A change in prompts or strategy creates a new
+campaign identity; existing frozen experiments must not be resumed under the new
+configuration.
+
+
 This is the implemented research runtime used by NucleoBench, Iron Mind,
 SynthonBench, ReaSyn, AtomWorld and AlphaBench. New LDM Harness campaigns default
-to **CoverageForks 2+2**. It selects research history; task candidate generation,
+to **MainHistoryForks 1+3**. It selects research history; task candidate generation,
 empirical q0, surrogate fitting, selection and evaluation remain task-owned.
 There is no second campaign engine and no LLM call inside a fork policy.
 
@@ -19,7 +52,8 @@ followed by four parallel proposal branches:
 
 | Config in `config/research_strategies/` | Proposal branches |
 | --- | --- |
-| `coverage_2plus2.json` (default) | 2 latest-main forks + 1 older-main restart + 1 archived-lineage continuation |
+| `main_history_1plus3.json` (default) | 1 latest-main + 3 dynamically selected main-history forks |
+| `coverage_2plus2.json` | 2 latest-main forks + 1 older-main restart + 1 archived-lineage continuation |
 | `main_forks.json` | 4 forks of the latest main node |
 | `independent.json` | 4 independent persistent sessions; no main researcher |
 

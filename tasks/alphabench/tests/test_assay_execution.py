@@ -28,7 +28,7 @@ from tasks.alphabench.core.grammar import REGISTRY
 def test_source_lint_runs_without_market_assets_and_retains_native_diagnostics():
     from assay.engine.diagnostics import lint
 
-    protocol = T3Protocol(backend="assay", market="nasdaq100", filter_profile="assay_code_filter_v1")
+    protocol = T3Protocol(method="llm", backend="assay", market="nasdaq100", filter_profile="assay_code_filter_v1")
     request = {"protocol": protocol.to_dict(), "operation": "check"}
     for expression, valid in [("ts_mean(close,5)", True), ("Mean($close,5)", True), ("close", False), ("1", False)]:
         result = assay_evaluate(request | {"expression": expression}, {})
@@ -76,7 +76,7 @@ def snapshot(tmp_path):
         universe="NASDAQ100", benchmark="custom", benchmark_symbol="TEST_INDEX", rebalance_type="daily", min_rebalance_interval=1,
         execution_price="next_open", signal_transform="rank", weight_method="signal_prop", max_single_weight=.3,
         slippage_model="zero", save_position_log=True).to_dict()
-    protocol = T3Protocol(backend="assay", market="nasdaq100", data_digest=digest(manifest), environment_digest=oracle_environment_digest({"backend": "assay"}),
+    protocol = T3Protocol(method="llm", backend="assay", market="nasdaq100", data_digest=digest(manifest), environment_digest=oracle_environment_digest({"backend": "assay"}),
                           assay_portfolio=portfolio)
     request = {"request_id": "a"*64, "protocol": protocol.to_dict(), "operation": "evaluate", "expression": "ts_mean(close,5)",
                "start": str(days[20]), "end": str(days[-1] + dt.timedelta(days=1)), "fast": True, "job_permits": 2}
@@ -583,7 +583,7 @@ def test_oracle_rejects_task_scoring_source_change_before_dispatch_and_in_worker
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest))
     environment_digest = oracle_environment_digest({"backend": "assay"})
-    protocol = T3Protocol(backend="assay", market="nasdaq100",
+    protocol = T3Protocol(method="llm", backend="assay", market="nasdaq100",
                           data_digest=digest(manifest), environment_digest=environment_digest)
     config = {"backend": "assay", "market": "nasdaq100", "data_digest": digest(manifest),
               "environment_digest": environment_digest, "data_manifest": str(manifest_path)}

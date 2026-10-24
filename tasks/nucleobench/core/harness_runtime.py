@@ -17,7 +17,7 @@ from ldm_tts.harness import (
     HarnessSubmissionContract, parse_tool_call_budgets, policy_submission_contract,
 )
 from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
-from ldm_tts.harness.research_runtime import research_contract
+from ldm_tts.harness.research_runtime import research_contract, main_research_profile
 from ldm_tts.harness.pi import PiForkSource, PiHarnessConfig, policy_mcp_server
 from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.harness.ucb_diagnostics import DIAGNOSTICS_PATH
@@ -27,10 +27,10 @@ from tasks.nucleobench.core.constants import (
 from tasks.nucleobench.core.benchmark_clock import BenchmarkClock
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.factory import build_proposal_expander
-from tasks.nucleobench.core.forked_harness import ForkedResearchExpander, main_research_profile
+from tasks.nucleobench.core.forked_harness import ForkedResearchExpander
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.harness import (
-    DIRECT_HARNESS_PROFILE_ID, HARNESS_FORBIDDEN_PATTERNS, HARNESS_SKILL_IDS,
+    HARNESS_FORBIDDEN_PATTERNS, HARNESS_SKILL_IDS,
     direct_harness_profile, harness_guest_runtime,
     harness_profiles, harness_submission_contract, harness_tool_extensions,
     write_harness_sequence_context,
@@ -63,7 +63,7 @@ def open_proposals(
         return ForkedResearchExpander(
             root=runtime.run_dir / "harness",
             main_client=lambda: create_client(
-                args, runtime, provider, prepared, main_research_profile(), mcp,
+                args, runtime, provider, prepared, main_research_profile(runtime.run_dir / "harness/main", profiles[0]), mcp,
                 artifact_root=runtime.run_dir / "harness/main", contract=research_contract(),
             ),
             branch_client=lambda root, source: create_client(
@@ -88,6 +88,7 @@ def open_proposals(
         harness_session_profiles=profiles,
         harness_candidates_per_session=args.harness_candidates_per_session,
         harness_unique_candidates=args.harness_unique_candidates,
+        research_roles=args.harness_research_roles,
         campaign_id=runtime.run_id, first_active_round=1,
         account=runtime.consume_many, benchmark_clock=benchmark_clock,
         surrogate_query_config=gp_config if args.harness_surrogate_query else None,
@@ -247,7 +248,7 @@ def proposal_profiles(args: argparse.Namespace):
     if args.search_method in PARALLEL_HARNESS_METHODS:
         return harness_profiles(args.harness_profile)
     if args.search_method == "harness":
-        return direct_harness_profile()
+        return direct_harness_profile(blank_slate=args.harness_blank_slate)
     return ()
 
 
@@ -266,10 +267,10 @@ def describe(args: argparse.Namespace) -> dict[str, Any] | None:
     profiles = (
         args.harness_profile
         if args.search_method in PARALLEL_HARNESS_METHODS
-        else (DIRECT_HARNESS_PROFILE_ID,)
+        else tuple(profile.profile_id for profile in proposal_profiles(args))
     )
     description = {
-        "research_mode": "open_research",
+        "research_mode": "blank_slate" if args.harness_blank_slate else "open_research",
         "image": args.harness_sidecar_image,
         "profile_ids": [profile.profile_id for profile in proposal_profiles(args)],
         "profile_roles": list(profiles),

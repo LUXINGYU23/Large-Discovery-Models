@@ -34,7 +34,7 @@ def metered_gateway(tmp_path, monkeypatch, **limits):
         assert get_ident() == owner, "only the Host thread may mutate the ledger"
         return consume_groups(*args, **kwargs)
     monkeypatch.setattr(runtime, "consume_groups", checked_groups)
-    return OracleGateway(T3Protocol(), runtime, mock=True)
+    return OracleGateway(T3Protocol(method="llm"), runtime, mock=True)
 
 
 def test_preflight_freezes_oracle_config_across_same_run(tmp_path, monkeypatch):

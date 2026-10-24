@@ -562,9 +562,16 @@ export class PersistentProfileSession {
 				if (lastMessage?.role === "assistant" && lastMessage.stopReason === "error" && !interrupted) {
 					throw new Error(`provider response failed: ${lastMessage.errorMessage ?? "unknown provider error"}`);
 				}
-				await this.history.continueTurn(lastMessage?.role === "assistant" ? lastMessage.stopReason : undefined);
+				const truncated = lastMessage?.role === "assistant" && lastMessage.stopReason === "length";
+				await this.history.continueTurn(lastMessage?.role === "assistant" ? lastMessage.stopReason : undefined,
+					truncated ? async () => {
+						if (!this.history.compactedAfter(lastMessage.timestamp)) await session.compact();
+					} : undefined);
 				await session.prompt(
-					interrupted
+					truncated
+						? "Your previous response exhausted its output-token budget before a submission was accepted. "
+							+ `History has been compacted. Continue the same task in short, concrete tool steps, use saved workspace artifacts, and call ${this.config.submissionContract.toolName} when ready.`
+						: interrupted
 						? "The previous provider stream ended before your submission was accepted. "
 							+ `Continue from your existing work, use tools to complete or repair it, and call ${this.config.submissionContract.toolName} when ready.`
 						: `No submission has been accepted. Address any validation errors, use the available tools as needed, and call ${this.config.submissionContract.toolName} with the complete result.`,

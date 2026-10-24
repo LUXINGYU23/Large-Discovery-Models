@@ -308,7 +308,8 @@ class AtomWorldHarnessExpander:
                         raise ValueError("Inherited history cursor is outside sample history")
                     delta = [{k: v for k, v in row.items() if k != "generated_output"} for row in history[cursor:]]
                     digest = canonical_sha256(delta)
-                    branch_message = json.dumps({**message_payload, "new_public_drafts": delta, "history_from_seq": cursor})
+                    branch_message = json.dumps({**message_payload, "new_public_drafts": delta, "history_from_seq": cursor,
+                        "research_branch": prepared["branch_instructions"][profile.profile_id]})
                 turns.append(HarnessTurn(
                     profile.profile_id,
                     f"revision_{attempt:04d}_{canonical_sha256([profile.profile_id, branch_message])[:20]}",
