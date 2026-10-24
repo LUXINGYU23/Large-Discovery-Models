@@ -16,7 +16,7 @@ TASK_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_describe_ldm_task_uses_the_default_configured_reservoir() -> None:
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "ldm", "--mock"])
 
     task_spec = describe_ldm_task(args)
     contract = load_experiment_contract(TASK_ROOT / "experiment.json")
@@ -84,7 +84,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
 
     code = main(
-        [
+        ["--search-method", "ldm",
             "--mock",
             "--proposal-mode",
             "callable",
@@ -153,7 +153,7 @@ def test_mock_campaign_runs_one_shared_engine_round(
 
 
 def test_describe_ldm_task_separates_proposal_samples_from_the_bo_pool() -> None:
-    args = parse_args(["--mock", "--proposal-samples", "7", "--bo-pool-size", "3"])
+    args = parse_args(["--search-method", "ldm", "--mock", "--proposal-samples", "7", "--bo-pool-size", "3"])
 
     task_spec = describe_ldm_task(args)
 

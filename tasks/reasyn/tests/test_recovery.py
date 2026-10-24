@@ -18,7 +18,7 @@ def test_endpoint_failure_resumes_original_round_and_scientific_budget(tmp_path,
             return ProposalResponse(text=json.dumps({"candidates": [{"target_smiles": "CCO"}]}))
     monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", Client)
     root = tmp_path / "run"
-    argv = ["--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
+    argv = ["--search-method", "auto", "--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
         "--llm-model", "fixture", "--iterations", "2", "--reservoir-size", "1", "--out-dir", str(root)]
     assert workflow.main(argv) == 2
     assert workflow.main(argv + ["--resume-from", str(root)]) == 0
@@ -40,7 +40,7 @@ def test_recovery_allowance_is_bounded(tmp_path, monkeypatch):
         def propose(self, request): raise EndpointRequestError("fixture interruption")
     monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", Client)
     root = tmp_path / "run"
-    argv = ["--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
+    argv = ["--search-method", "auto", "--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
         "--llm-model", "fixture", "--iterations", "2", "--reservoir-size", "1",
         "--recovery-attempts", "1", "--out-dir", str(root)]
     assert workflow.main(argv) == 2
@@ -69,7 +69,7 @@ def test_completed_resume_does_not_recontact_an_offline_provider(tmp_path, monke
 
     monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", Client)
     root = tmp_path / "completed"
-    argv = ["--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
+    argv = ["--search-method", "auto", "--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
         "--llm-model", "fixture", "--iterations", "1", "--reservoir-size", "1", "--out-dir", str(root)]
     assert workflow.main(argv) == 0
     assert workflow.main(argv + ["--resume-from", str(root)]) == 0
@@ -97,7 +97,7 @@ def test_paired_initialization_and_pilot_aliases(tmp_path, benchmark):
 
 
 def test_original_baseline_does_not_need_a_bo_pool(tmp_path):
-    assert workflow.main(["--mock", "--proposal-mode", "baseline", "--iterations", "2",
+    assert workflow.main(["--search-method", "auto", "--mock", "--proposal-mode", "baseline", "--iterations", "2",
         "--reservoir-size", "1", "--out-dir", str(tmp_path / "baseline")]) == 0
 
 
@@ -123,7 +123,7 @@ def test_tdc_projection_interruption_resumes_only_pending_occurrences(tmp_path, 
 
     monkeypatch.setattr(workflow, "Projector", InterruptingProjector)
     root = tmp_path / "projection-resume"
-    argv = ["--mock", "--benchmark", "tdc", "--iterations", "1",
+    argv = ["--search-method", "auto", "--mock", "--benchmark", "tdc", "--iterations", "1",
         "--reservoir-size", "2", "--evaluations-per-round", "2", "--out-dir", str(root)]
     assert workflow.main(argv) == 2
     assert json.loads((root / "status.json").read_text())["status"] == "paused_projection_interrupted"
@@ -167,7 +167,7 @@ def test_reconstruction_preparation_resumes_same_selection_without_spending_tria
     monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", Client)
     monkeypatch.setattr(workflow, "Projector", InterruptingProjector)
     root = tmp_path / "reconstruction-resume"
-    argv = ["--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
+    argv = ["--search-method", "auto", "--mock", "--proposal-mode", "openai", "--llm-url", "http://fixture.invalid/v1",
         "--llm-model", "fixture", "--iterations", "1", "--reservoir-size", "2",
         "--evaluations-per-round", "2", "--out-dir", str(root)]
     assert workflow.main(argv) == 2
@@ -223,7 +223,7 @@ def test_completed_reconstruction_trials_resume_without_duplicate_scientific_cha
     monkeypatch.setattr(ReconstructionEvaluator, "evaluate", after_evaluation)
     monkeypatch.setattr(CampaignRuntime, "checkpoint", before_checkpoint)
     root = tmp_path / "reconstruction"
-    argv = ["--mock", "--benchmark", "reconstruction", "--iterations", "2",
+    argv = ["--search-method", "auto", "--mock", "--benchmark", "reconstruction", "--iterations", "2",
             "--reservoir-size", str(batch_size), "--evaluations-per-round", str(batch_size), "--out-dir", str(root)]
     with pytest.raises(error_type):
         workflow.main(argv)

@@ -233,3 +233,26 @@ for (const [thinking, effort] of [["off", "none"], ["high", "high"]] as const) {
 		}
 	});
 }
+
+
+test("null output limit omits SDK caps for research and native summaries", async () => {
+ const captured: Record<string, unknown>[] = [];
+ const upstream = createServer(async (req, res) => {
+  let body = ""; for await (const part of req) body += part.toString();
+  captured.push(JSON.parse(body));res.end("ok");
+ });
+ await new Promise<void>(resolve => upstream.listen(0, "127.0.0.1", resolve));
+ const addr = upstream.address();assert(addr && typeof addr !== "string");
+ const root = await mkdtemp(join(tmpdir(), "ldm-no-output-cap-"));
+ const proxy = new ProviderProxy(`http://127.0.0.1:${addr.port}`, "fixture", "campaign", {max_output_tokens:null,reasoning:{effort:"max"}});
+ try {
+  await proxy.start();await proxy.beginTurn("research", "s", "t", root, async () => true);
+  for (const suffix of ["/responses", "/compaction/responses"]) {
+   const response = await fetch(proxy.baseUrl("research") + suffix, {method:"POST",body:JSON.stringify({max_output_tokens:32768,reasoning:{effort:"medium"}})});
+   await response.text();assert.equal(response.status,200);
+  }
+  assert(captured.every(p => !("max_output_tokens" in p)));
+  assert.deepEqual(captured.map(p => p.reasoning),[{effort:"max"},{effort:"medium"}]);
+  for (let i=1;i<=2;i++) assert(!("max_output_tokens" in JSON.parse(await readFile(join(root,"provider",`t-provider-${i}.request.bin`),"utf8"))));
+ } finally {await proxy.endTurn("research");await proxy.close();await new Promise<void>(resolve => upstream.close(()=>resolve()));}
+});

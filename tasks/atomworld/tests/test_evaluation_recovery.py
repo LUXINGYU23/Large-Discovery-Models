@@ -118,6 +118,6 @@ def test_incomplete_schedule_cli_returns_nonzero(tmp_path, monkeypatch):
     from ldm_tts.engine.expansion import ExpansionResult
     tmp_path = tmp_path / "run"
     monkeypatch.setattr(workflow.BlindRefinementExpander, "expand", lambda *args: ExpansionResult(proposals=(RawProposal({}, "test"),)))
-    assert workflow.main(["--mock", "--iterations", "2", "--out-dir", str(tmp_path)]) == 1
+    assert workflow.main(["--search-method", "llm", "--mock", "--iterations", "2", "--out-dir", str(tmp_path)]) == 1
     assert not json.loads((tmp_path / "result.json").read_text())["schedule_completed"]
     assert json.loads((tmp_path / "status.json").read_text())["status"] == "stopped"

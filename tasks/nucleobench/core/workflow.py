@@ -398,7 +398,7 @@ def _run_real(
                 except HarnessError as exc:
                     return _pause_endpoint(runtime, args, payload, str(exc))
 
-            official = load_official_case(args.source_dir, prepared, runtime)
+            official = load_official_case(args.source_dir, prepared, runtime, oracle_socket=args.oracle_socket)
             evaluator = NucleoBenchEvaluator(
                 prepared.context, official.model, batch_size=args.oracle_batch_size
             )
@@ -675,6 +675,8 @@ def _oracle_manifest(
             "model_artifact_sha256": file_digest(prepared.model_artifact),
             "model_init_args": prepared.model_init_args,
             "inference_batch_size": args.oracle_batch_size,
+            "execution": "queued" if args.oracle_socket else "in_process",
+            "socket": str(args.oracle_socket) if args.oracle_socket else None,
         },
         "official_runner": {
             "proposals_per_round": OFFICIAL_PROPOSALS_PER_ROUND,

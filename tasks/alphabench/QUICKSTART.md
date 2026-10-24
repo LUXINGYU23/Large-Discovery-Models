@@ -1,6 +1,6 @@
 # AlphaBench T3 快速开始
 
-LDM Harness 默认使用 **CoverageForks 2+2**，共四个提案分支，每轮另计一次主研究。协议中的 `research_strategy_config` 或 `--harness-research-strategy-config` 可选其他策略；预算和恢复约束见[共享树搜索文档](../../docs/research-search-architecture.md)。
+LDM Harness 默认使用 **MainHistoryForks 1+3**，共四个提案分支，每轮另计一次主研究。协议中的 `research_strategy_config` 或 `--harness-research-strategy-config` 可选其他策略；预算和恢复约束见[共享树搜索文档](../../docs/research-search-architecture.md)。
 
 从仓库根运行。数值计算和运行产物放在服务器的 `/mnt/data1/`；数据获取、固定来源与资格限制见 [DATA.md](DATA.md)。当前任务合同仍是 draft，mock 成功和部分 CSI300 实验都不代表完整 T3 资格。
 

@@ -5,6 +5,7 @@ mode: real
 description: One real LDM evaluation against an official Iron Mind dataset adapter.
 contract_profile: ldm_official_smoke
 args:
+  search-method: ldm
   proposal-mode: openai
   dataset-id: reductive_amination
   iterations: 1

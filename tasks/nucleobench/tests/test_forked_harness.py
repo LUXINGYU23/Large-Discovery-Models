@@ -8,7 +8,7 @@ import pytest
 
 from ldm_tts.engine.expansion import ExpansionRequest
 from ldm_tts.harness import HarnessError
-from ldm_tts.harness.research_tree import CoverageForks, DiverseArchive, LatestMainForks
+from ldm_tts.harness.research_tree import CoverageForks, DiverseArchive, LatestMainForks, MainHistoryForks
 from ldm_tts.harness.research_strategy import ResearchStrategy
 from tasks.nucleobench.core.candidate import NucleoBenchCandidateDomain
 from tasks.nucleobench.core.forked_harness import ForkedResearchExpander
@@ -147,7 +147,8 @@ def test_tree_declaration_is_accepted_by_pilot_reporting(tmp_path):
         _mark_completed({}, SimpleNamespace(output_root=tmp_path.parent), SimpleNamespace(run_dir=tmp_path))
 
 
-def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path):
+@pytest.mark.parametrize("history_only,research_roles", [(False, False), (True, False), (False, True)])
+def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path, history_only, research_roles):
     profiles = harness_profiles()
     seen, fail = [], [False]
 
@@ -188,7 +189,7 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path):
         return Branch(root, {p.profile_id: [[payload]] for p in profiles})
 
     expander = ForkedResearchExpander(main_client=Main, root=tmp_path, branch_client=branches,
-        strategy=ResearchStrategy(CoverageForks()), expander_options={
+        strategy=ResearchStrategy(MainHistoryForks() if history_only else CoverageForks()), expander_options={
             "domain": NucleoBenchCandidateDomain(MOCK_CONTEXT), "profiles": profiles,
             "candidates_per_profile": 1, "campaign_id": "test", "first_active_round": 1,
             "attach_empirical_q0": True, "allow_repeated_occurrences": True,
@@ -214,8 +215,33 @@ def test_forks_resume_fixed_plan_and_continue_child_history(tmp_path):
         plan = json.loads((root / "fork-plan.json").read_text())
         assert len(plan["outcomes"]) == 4 * (r - 1)
         assert all(o["best_score"] == 1 and o["measured_count"] == 1 for o in plan["outcomes"])
-        assert sum(a["purpose"] == "main" for a in plan["assignments"]) == 2
-        if r > 1:
+        assert sum(a["purpose"] == "main" for a in plan["assignments"]) == (1 if history_only else 2)
+        if history_only:
+            assert not plan["archive"]
+            for a in plan["assignments"]:
+                assert a["parent_id"].startswith("main_")
+                parent_round = int(a["parent_id"].split("_")[1])
+                fork = root / "fork-sources" / a["profile_id"]
+                assert (fork / "workspace/research.md").read_text() == f"main direction {parent_round}"
+                assert (fork / "session.jsonl").read_text() == f"main session {parent_round}"
+            evidence_ids = set()
+            for turn in seen[-1][1]:
+                payload = json.loads(turn.message.split("\n\n", 1)[1])
+                shared = payload["research_branch"]["shared_evidence"]
+                assert shared["history_count"] == len(observations)
+                evidence_ids.add(shared["history_digest"])
+                assert len(payload["new_measured_observations"]) == len(observations) - turn.history_from_seq
+            assert len(evidence_ids) == 1
+            tree = json.loads((root / "tree.json").read_text())
+            assert sum(n["expansions"] for n in tree["main_nodes"]) == r * 4
+        if research_roles:
+            for index, turn in enumerate(seen[-1][1]):
+                payload = json.loads(turn.message.split("\n\n", 1)[1])
+                instruction = payload["research_branch"]
+                assert instruction["shared_evidence"]["history_count"] == len(observations)
+                assert instruction["node_selection_rule"].startswith("coverage:")
+                assert "archived branch" in instruction["requirements"][0]
+        if r > 1 and not history_only:
             continuations = [a for a in plan["assignments"] if a["purpose"] == "continue"]
             assert len(continuations) == 1
             assert len({a["lineage_id"] for a in continuations}) == len(continuations)
@@ -399,3 +425,18 @@ def test_three_continuations_preserve_each_lineage_snapshot_and_feedback(tmp_pat
     following = prepare_tree(tree, ExpansionRequest(3, 4, observations=(*observations, *new_observations)), profiles)
     assert len(following["outcomes"]) == 4
     assert all(o["best_score"] == 1 and o["measured_count"] == 1 for o in following["outcomes"])
+
+
+def test_main_history_configuration_requires_four_comprehensive_profiles(tmp_path):
+    path = tmp_path / 'history.json'
+    path.write_text(json.dumps({'name': 'main_forks', 'fork_policy': {'name': 'main_history_1plus3'}}))
+    argv = ['--search-method', 'ldm_harness_compiled', '--iterations', '4',
+            '--harness-research-strategy-config', str(path)]
+    with pytest.raises(SystemExit):
+        parse_args(argv + ["--harness-profile", "target_biology"] * 4)
+    args = parse_args(argv + ['--harness-profile', 'comprehensive_research'] * 4)
+    assert isinstance(args._research_strategy.fork_policy, MainHistoryForks)
+    assert (args.alpha, args.eta, args.acquisition_beta) == (2.0, .25, 1.0)
+    assert not args.harness_surrogate_query
+    budget = campaign_budget(args, None)
+    assert budget['main_research_turns'] == 3 and budget['proposal_attempts'] == 12

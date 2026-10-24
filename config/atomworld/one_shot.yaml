@@ -4,6 +4,7 @@ algorithm: direct_reasoning
 mode: real
 contract_profile: one_shot
 args:
+  search-method: llm
   data-dir: ${ATOMWORLD_DATA_ROOT}
   proposal-format: cif
   attempts-per-sample: 1

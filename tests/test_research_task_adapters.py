@@ -50,6 +50,13 @@ class NativeFixture:
             if turn.profile_id == "main_research":
                 submission, artifacts = {"brief": "Keep measured and unmeasured alternatives distinct."}, ()
             else:
+                if self.root.parent.name == "branches":
+                    message = turn.message[turn.message.index("{"):]
+                    role = json.loads(message)["research_branch"]
+                    assert role["role"] in {"main", "competitive_alternative", "reconsider", "challenge"}
+                    assert role["shared_evidence"]["history_count"] == turn.history_to_seq
+                    assert role["parent_node"].startswith("main_")
+                    assert "authorized history" in role["requirements"][1]
                 filename, body, extra = self.payload(self.root, turn)
                 path = session / "turns" / turn.turn_id / filename
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,10 +93,10 @@ def check_tree(root, steps):
         plan = json.loads((path / "fork-plan.json").read_text())
         assignments = plan["assignments"]
         assert len(assignments) == 4
-        assert [a["purpose"] for a in assignments].count("main") == 2
+        assert [a["purpose"] for a in assignments].count("main") == 1
         assert (path / "tree.json").is_file() and (path / "panel.json").is_file()
         if step > 1:
-            assert [a["purpose"] for a in assignments].count("continue") == 1
+            assert [a["purpose"] for a in assignments].count("restart") == 3
         for source in (path / "fork-sources").iterdir():
             manifest = json.loads((source / "snapshot.json").read_text())
             assert manifest["sessionSha256"] == file_sha256(source / "session.jsonl")

@@ -27,7 +27,7 @@ def _row(request, index):
 def test_batch_timeout_scales_with_pending_serial_targets_and_preserves_progress(
     tmp_path, monkeypatch
 ):
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "auto", "--mock"])
     args.mock = False
     projector = Projector(args, tmp_path)
     # Chemistry is orthogonal to testing the subprocess boundary here.
@@ -64,7 +64,7 @@ def test_batch_timeout_scales_with_pending_serial_targets_and_preserves_progress
 
 
 def test_interrupted_request_cannot_be_overwritten_with_another_seed(tmp_path, monkeypatch):
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "auto", "--mock"])
     args.mock = False
     projector = Projector(args, tmp_path)
     monkeypatch.setattr(
@@ -77,13 +77,13 @@ def test_interrupted_request_cannot_be_overwritten_with_another_seed(tmp_path, m
 
 
 def test_mock_projects_repeated_query_occurrences_independently(tmp_path):
-    projector = Projector(parse_args(["--mock"]), tmp_path)
+    projector = Projector(parse_args(["--search-method", "auto", "--mock"]), tmp_path)
     rows, _ = projector.project(["CCO", "CCO"], sampling_seed=10, identity="repeated")
     assert [(row["target_index"], row["sampling_seed"]) for row in rows] == [(0, 10), (1, 11)]
 
 
 def test_incomplete_success_is_resumable_and_never_returns_a_short_batch(tmp_path, monkeypatch):
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "auto", "--mock"])
     args.mock = False
     projector = Projector(args, tmp_path)
 
@@ -104,7 +104,7 @@ def test_reconstruction_receipt_binds_target_query_seed_configuration_and_comple
     from tasks.reasyn.core.candidate import ReaSynDomain
     from tasks.reasyn.core.evaluator import ReconstructionEvaluator
 
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "auto", "--mock"])
     projector = Projector(args, tmp_path)
     charged = []
     projector.before_project = charged.append

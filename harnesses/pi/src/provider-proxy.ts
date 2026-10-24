@@ -152,11 +152,14 @@ export class ProviderProxy {
 			active.requestCount += 1;
 			const requestId = `${active.turnId}-provider-${active.requestCount}`;
 			let body = await this.readRequest(request);
-			// Research overrides must not change native summary reasoning or output limits.
-			if (!compaction && request.method === "POST" && segments.join("/") === "responses" && Object.keys(this.requestBody).length) {
+			// Research overrides do not change native summary reasoning. A null output
+			// limit explicitly delegates both research and summary limits to the provider.
+			if (request.method === "POST" && segments.join("/") === "responses") {
 				const payload = JSON.parse(body.toString("utf8"));
 				if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("provider request must be an object");
-				body = Buffer.from(JSON.stringify({ ...payload, ...this.requestBody }));
+				if (!compaction) Object.assign(payload, this.requestBody);
+				if (this.requestBody.max_output_tokens === null) delete payload.max_output_tokens;
+				body = Buffer.from(JSON.stringify(payload));
 			}
 			const capturedRequest = this.redactor.buffer(body);
 			const target = joinTargetUrl(this.targetBaseUrl, segments.join("/"), incoming.search);

@@ -62,7 +62,7 @@ def observed(window, score, *, status="succeeded"):
 @pytest.mark.parametrize("backend", ["qlib", "assay"])
 def test_host_tools_expose_public_contract_and_frozen_gp_without_private_labels(tmp_path, backend):
     protocol = T3Protocol(method="ldm_harness", backend=backend, harness_surrogate_query=True,
-        budgets={**T3Protocol().budgets, "surrogate_queries": 400})
+        budgets={**T3Protocol(method="llm").budgets, "surrogate_queries": 400})
     runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={
         "dynamic_checks": 2, "oracle_job_slots": 4, "benchmark_jobs": 2,
         "surrogate_queries": 2})
@@ -127,7 +127,7 @@ def test_direct_harness_does_not_offer_gp_query_and_rejects_changed_snapshot(tmp
 def test_pi_runtime_exposes_only_the_frozen_research_variant(tmp_path, monkeypatch, method, query, count):
     monkeypatch.setenv("ALPHABENCH_RUNTIME_ROOT", tempfile.gettempdir())
     protocol = T3Protocol(method=method, harness_surrogate_query=query,
-        budgets={**T3Protocol().budgets, **({"surrogate_queries": 400} if query else {})})
+        budgets={**T3Protocol(method="llm").budgets, **({"surrogate_queries": 400} if query else {})})
     runtime = CampaignRuntime.open(tmp_path / "run", task="alphabench", budget_limits={})
     gateway = OracleGateway(protocol, runtime, mock=True)
     client, tools, _ = harness_runtime.build_harness(protocol, gateway, AcceptedActions(runtime.run_dir),

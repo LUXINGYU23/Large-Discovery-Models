@@ -89,7 +89,7 @@ def _real_checks(
 def _provider_checks(
     task: str, args: Mapping[str, Any], env: Mapping[str, str]
 ) -> list[DependencyCheck]:
-    if arg_value(dict(args), "search-method", default="ldm") == "bo":
+    if arg_value(dict(args), "search-method", default="ldm_harness_compiled") == "bo":
         return [ok(task, "proposal provider", "Pure BO does not use a model endpoint.")]
     checks = check_llm_settings(
         task,
@@ -104,7 +104,7 @@ def _provider_checks(
         required=True,
     )
     if (
-        arg_value(dict(args), "search-method", default="ldm")
+        arg_value(dict(args), "search-method", default="ldm_harness_compiled")
         not in PERSISTENT_HARNESS_METHODS
     ):
         return checks
