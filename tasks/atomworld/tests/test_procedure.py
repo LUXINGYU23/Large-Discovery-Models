@@ -30,7 +30,7 @@ def test_shared_campaign_collection_and_last_answer(tmp_path, monkeypatch):
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     result = run(
         parse_args(
-            ["--mock", "--attempts-per-sample", "4", "--out-dir", str(tmp_path / "run")]
+            ["--search-method", "llm", "--mock", "--attempts-per-sample", "4", "--out-dir", str(tmp_path / "run")]
         )
     )
     folder = result.runtime.run_dir
@@ -131,14 +131,14 @@ def test_invalid_cif_is_scored_but_invalid_record_rejected():
 
 def test_parser_rejects_invalid_budgets_and_extra_body():
     with pytest.raises(SystemExit):
-        parse_args(["--mock", "--attempts-per-sample", "0"])
+        parse_args(["--search-method", "llm", "--mock", "--attempts-per-sample", "0"])
     with pytest.raises(SystemExit):
-        parse_args(["--mock", "--llm-extra-body-json", "[]"])
+        parse_args(["--search-method", "llm", "--mock", "--llm-extra-body-json", "[]"])
 
 
 def test_resume_never_repeats_calls(tmp_path):
     args = parse_args(
-        ["--mock", "--attempts-per-sample", "2", "--out-dir", str(tmp_path)]
+        ["--search-method", "llm", "--mock", "--attempts-per-sample", "2", "--out-dir", str(tmp_path)]
     )
     first = run(args)
     args.out_dir = first.runtime.run_dir
@@ -226,7 +226,7 @@ def test_final_answer_is_not_best_or_last_valid(tmp_path):
     sid = data["public"][0]["sample_id"]
     responses = iter([data["mock_outputs"][sid][1], "I cannot produce a CIF"])
     args = parse_args(
-        [
+        ["--search-method", "llm",
             "--mock",
             "--attempts-per-sample",
             "2",
@@ -262,7 +262,7 @@ def test_official_judge_failure_is_not_reported_as_wrong_answer(tmp_path, monkey
         lambda _upstream: failing_official,
     )
     args = parse_args(
-        [
+        ["--search-method", "llm",
             "--data-dir",
             str(tmp_path / "data"),
             "--attempts-per-sample",
@@ -315,7 +315,7 @@ def test_operations_real_tool_and_official_judge(tmp_path):
     data_dir = tmp_path / "data"
     prepare_dataset(source, data_dir, actions=("move_atom_action",))
     args = parse_args(
-        [
+        ["--search-method", "llm",
             "--data-dir",
             str(data_dir),
             "--proposal-format",
@@ -370,7 +370,7 @@ def test_endpoint_failure_pauses_and_resumes_with_fixed_answer_budget(tmp_path):
     data_dir = tmp_path / "data"
     prepare_dataset(source, data_dir, actions=("move_atom_action",))
     args = parse_args(
-        [
+        ["--search-method", "llm",
             "--data-dir",
             str(data_dir),
             "--attempts-per-sample",

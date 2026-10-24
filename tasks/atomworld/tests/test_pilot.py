@@ -139,7 +139,7 @@ def test_registered_submission_adapter_audits_real_campaign_receipts(tmp_path):
     from ldm_tts.pilot_evaluation.reporting import _read_trajectory, _observations
     from ldm_tts.pilot_evaluation.submission_reporting import submission_trajectory as normalized
 
-    result = run(parse_args(["--mock", "--iterations", "3", "--limit", "1", "--out-dir", str(tmp_path / "run")]))
+    result = run(parse_args(["--search-method", "llm", "--mock", "--iterations", "3", "--limit", "1", "--out-dir", str(tmp_path / "run")]))
     root = result.runtime.run_dir
     records = _read_trajectory(root / "trajectory.csv")
     config = spec()

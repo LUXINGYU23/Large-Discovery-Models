@@ -21,7 +21,7 @@ from tasks.atomworld.core.methods import HARNESS_METHODS
 def check_dependencies(plan, *, include_optional=True):
     task, args, env, cwd, mode = plan_check_context(plan)
     mock = bool(args.get("mock") or mode == "mock")
-    harness = args.get("search-method", "llm") in HARNESS_METHODS
+    harness = args.get("search-method", "ldm_harness_compiled") in HARNESS_METHODS
     if mock:
         checks = [
             ok(

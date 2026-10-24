@@ -48,20 +48,14 @@ from tasks.nucleobench.core.research import serialize_measured_observations, sum
 from tasks.nucleobench.core.hamming_gp import HammingGPUCBConfig
 from tasks.nucleobench.core.surrogate_query import write_surrogate_snapshot
 
-HARNESS_PROFILE_IDS = (
-    "target_biology",
-    "regulatory_grammar",
-    "sequence_landscape",
-    "evidence_critic",
-)
-AVAILABLE_HARNESS_PROFILE_IDS = HARNESS_PROFILE_IDS + (
-    "off_target_selectivity",
-    "sequence_composition",
-    "module_recombination",
-    "alternative_programs",
-    "comprehensive_research",
+HARNESS_PROFILE_IDS = ("comprehensive_research",) * 4
+AVAILABLE_HARNESS_PROFILE_IDS = (
+    "comprehensive_research", "target_biology", "regulatory_grammar",
+    "sequence_landscape", "evidence_critic", "off_target_selectivity",
+    "sequence_composition", "module_recombination", "alternative_programs",
 )
 DIRECT_HARNESS_PROFILE_ID = "direct_research"
+BLANK_HARNESS_PROFILE_ID = "blank_slate"
 HARNESS_SKILL_IDS = (
     "biopython",
     "experimental-design",
@@ -163,8 +157,8 @@ def harness_profiles(
     return tuple(profiles)
 
 
-def direct_harness_profile() -> tuple[HarnessProfile, ...]:
-    return (_profile(DIRECT_HARNESS_PROFILE_ID),)
+def direct_harness_profile(*, blank_slate: bool = False) -> tuple[HarnessProfile, ...]:
+    return (_profile(BLANK_HARNESS_PROFILE_ID if blank_slate else DIRECT_HARNESS_PROFILE_ID),)
 
 
 def _profile(profile_id: str, *, session_id: str | None = None) -> HarnessProfile:
@@ -221,6 +215,8 @@ class NucleoBenchHarnessExpander:
         benchmark_clock: BenchmarkClock | None = None,
         surrogate_query_config: HammingGPUCBConfig | None = None,
         inherited_history_counts: Mapping[str, int] | None = None,
+        branch_instructions: Mapping[str, dict] | None = None,
+        research_roles: bool = False,
     ) -> None:
         if not profiles:
             raise ValueError("NucleoBench harness requires at least one profile")
@@ -243,6 +239,8 @@ class NucleoBenchHarnessExpander:
         self.account = account
         self.benchmark_clock = benchmark_clock
         self.surrogate_query_config = surrogate_query_config
+        self.branch_instructions = branch_instructions or {}
+        self.research_roles = research_roles
         self.inherited_history_counts = inherited_history_counts
         if inherited_history_counts is not None and (
             set(inherited_history_counts) != {p.profile_id for p in self.profiles}
@@ -347,6 +345,13 @@ class NucleoBenchHarnessExpander:
         benchmark_time = (
             None if self.benchmark_clock is None else self.benchmark_clock.snapshot()
         )
+        instructions = dict(self.branch_instructions)
+        if self.research_roles:
+            from ldm_tts.harness.research_instructions import control_instructions
+            full_history = serialize_measured_observations(request.observations, self.domain.context)
+            prepared = {"history_count": history_to_seq, "history_digest": canonical_sha256(full_history)}
+            instructions = {p.profile_id: control_instructions(i, {"parent_id": None}, prepared, independent=True)
+                            for i, p in enumerate(self.profiles)}
         turns = []
         for profile in self.profiles:
             profile_from = (default_cursor if self.inherited_history_counts is None
@@ -388,6 +393,8 @@ class NucleoBenchHarnessExpander:
                     benchmark_time=benchmark_time,
                     surrogate_query=surrogate_query,
                     forked=self.inherited_history_counts is not None,
+                    blank_slate=profile.profile_id == BLANK_HARNESS_PROFILE_ID,
+                    branch_instructions=instructions.get(profile.profile_id),
                 ),
                 forbidden_query_terms=forbidden_query_terms,
             ))
@@ -549,6 +556,8 @@ def _turn_message(
     benchmark_time: dict[str, float | int] | None = None,
     surrogate_query: dict[str, object] | None = None,
     forked: bool = False,
+    blank_slate: bool = False,
+    branch_instructions: dict | None = None,
 ) -> str:
     payload = {
         "message_type": "campaign_bootstrap" if initial else "history_delta",
@@ -643,6 +652,21 @@ def _turn_message(
             "On rejection, edit only the reported file entries, recheck the complete batch, and submit the same file path again. Do not retranscribe candidates in tool arguments.",
         ],
     }
+    if branch_instructions is not None:
+        payload["research_branch"] = branch_instructions
+    if blank_slate:
+        payload["measurement_feedback"] = (
+            "Submitted distinct candidates are directly evaluated. Only official measured utilities "
+            "are objective measurements; annotations are pre-evaluation notes."
+        )
+        payload["time_budget"] = {"hard_wall_time_minutes": 30}
+        payload["constraints"] = [
+            "Use zero-based editable positions; replacement bases must differ from the paired start. Preserve sequence length.",
+            "Submit the requested number of distinct sequences, excluding all previously measured sequences.",
+            "Do not access evaluator models, weights, hidden scores, benchmark-only assets or other campaigns.",
+            "Each candidate requires concise English change_summary and rationale strings. Optional comparison_candidate_ids must refer to measured candidates.",
+            "Use /workspace or relative sandbox paths. The complete submitted file is validated; repair rejected entries and resubmit.",
+        ]
     if benchmark_time is not None:
         payload["benchmark_time"] = benchmark_time
     if surrogate_query is not None:
@@ -669,6 +693,8 @@ def _turn_message(
             "Earlier submissions belong to ancestors; your terminal tool is submit_candidates. "
             "Other current-round branches are isolated; do not infer their proposals."
         )
+    if blank_slate:
+        return "Submit the requested candidate batch for this task.\n\n" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return (
         ("Begin this round's role-specific research fork. Use your " if forked else
          "Continue your persistent sequence-design research role. Use your ")

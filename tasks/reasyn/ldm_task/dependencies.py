@@ -123,7 +123,7 @@ def check_dependencies(plan, *, include_optional=True):
 
 def _provider_checks(task, args, env, cwd):
     checks = []
-    method = args.get("search-method", "auto")
+    method = args.get("search-method", "ldm_harness_compiled")
     proposal = args.get("proposal-mode", "auto")
     harness = method in HARNESS_METHODS or proposal == "harness"
     needs_pool = (method == "bo" and proposal != "baseline") or (

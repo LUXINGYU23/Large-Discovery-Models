@@ -1,7 +1,16 @@
 # NucleoBench LDM Task
 
-The default LDM Harness strategy is **CoverageForks 2+2**: two latest-main forks,
-one older-main restart and one archived-side continuation. The main research
+New Pi research runs default to `ldm_harness_compiled` with a persistent main
+researcher and **1 latest-main + 3 dynamically selected main-history forks**.
+Branches inherit conversation/workspace history, reconcile the same latest
+authorized feedback, and receive refinement, alternative, reconsideration and
+challenge roles. Domain tools, skills and evaluation rules remain task-specific.
+See [shared research architecture](../../docs/research-search-architecture.md).
+Explicit baseline methods and named baseline profiles retain their own protocols.
+
+
+The default LDM Harness strategy is **MainHistoryForks 1+3**: one latest-main fork
+and three dynamically selected main-history forks. The main research
 turn is additional to the four proposal turns; candidate and evaluation budgets
 remain task-owned. See the [shared tree guide](../../docs/research-search-architecture.md)
 for history, accounting and recovery. Use `--harness-research-strategy-config`
@@ -93,7 +102,7 @@ official execution.
 | Method | Candidate generation | Selection before official evaluation |
 | --- | --- | --- |
 | `ldm` | Four independent model requests, each returning one `B`-candidate minibatch. | Empirical `q0`, task-local Hamming GP-UCB, and LDM acquisition tilt. |
-| `ldm_harness` | A main researcher and four proposal branches under the default 2+2 tree, each submitting `B` validated occurrences. | The same `q0 + GP-UCB + LDM` path as direct LDM. |
+| `ldm_harness` | A main researcher and four proposal branches under the default main-history 1+3 tree, each submitting `B` validated occurrences. | The same `q0 + GP-UCB + LDM` path as direct LDM. |
 | `ldm_harness_compiled` | The same proposal Agents plus one independent policy Agent. | The policy may set the GP prior mean and round-specific `alpha`/`eta`; all other optimization components stay fixed. |
 | `bo` | Task-local score-blind mutation search. | Hamming GP-UCB without a model proposal distribution. |
 | `llm` | `B` independent one-candidate model requests. | No surrogate; evaluate the accepted candidates directly. |

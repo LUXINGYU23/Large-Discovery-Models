@@ -50,6 +50,13 @@ class NativeFixture:
             if turn.profile_id == "main_research":
                 submission, artifacts = {"brief": "Keep measured and unmeasured alternatives distinct."}, ()
             else:
+                if self.root.parent.name == "branches":
+                    message = turn.message[turn.message.index("{"):]
+                    role = json.loads(message)["research_branch"]
+                    assert role["role"] in {"main", "competitive_alternative", "reconsider", "challenge"}
+                    assert role["shared_evidence"]["history_count"] == turn.history_to_seq
+                    assert role["parent_node"].startswith("main_")
+                    assert "authorized history" in role["requirements"][1]
                 filename, body, extra = self.payload(self.root, turn)
                 path = session / "turns" / turn.turn_id / filename
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,10 +93,10 @@ def check_tree(root, steps):
         plan = json.loads((path / "fork-plan.json").read_text())
         assignments = plan["assignments"]
         assert len(assignments) == 4
-        assert [a["purpose"] for a in assignments].count("main") == 2
+        assert [a["purpose"] for a in assignments].count("main") == 1
         assert (path / "tree.json").is_file() and (path / "panel.json").is_file()
         if step > 1:
-            assert [a["purpose"] for a in assignments].count("continue") == 1
+            assert [a["purpose"] for a in assignments].count("restart") == 3
         for source in (path / "fork-sources").iterdir():
             manifest = json.loads((source / "snapshot.json").read_text())
             assert manifest["sessionSha256"] == file_sha256(source / "session.jsonl")
@@ -138,6 +145,7 @@ def test_measured_task_suite_keeps_going_after_failure(tmp_path, monkeypatch, ca
         table = workflow._load_table(args)
         candidates = [{"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)} for row in table.rows]
     else:
+        pytest.importorskip("synthonbench", reason="Install task dependencies for the official example-space test")
         from itertools import product
         from tasks.synthonbench.core.space_order import ordered_reactions, ordered_positions, ordered_synthon_ids
         benchmark = workflow._load_benchmark(args)
@@ -401,6 +409,7 @@ def test_reasyn_tree_workflow_and_completed_resume_preserve_budget(tmp_path, mon
 
 @pytest.mark.parametrize("interrupt", [False, True])
 def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch, interrupt):
+    pytest.importorskip("zss", reason="AlphaBench reporting requires its task dependencies")
     from tasks.alphabench.core import harness_runtime
     from tasks.alphabench.core.protocol import T3Protocol
     from tasks.alphabench.ldm_task.procedure import main

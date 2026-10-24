@@ -24,7 +24,7 @@ def digest(value):
 class T3Protocol:
     backend: str = "qlib"
     market: str = "csi300"
-    method: str = "llm"
+    method: str = "ldm_harness_compiled"
     profile: str = "ldm_matched_v1"
     filter_profile: str = "paper_filter_v1"
     init_mode: str = "cold"

@@ -470,11 +470,11 @@ def test_defaults_load_independent_template_sessions_and_skills():
     assert spec.proposal_search.parameters["profile_count"] == 4
     assert spec.proposal_search.parameters["candidates_per_session"] == 16
     assert "web_search=8" in args.harness_tool_budget
-    without_context7 = parse_args(["--mock", "--no-harness-context7"])
+    without_context7 = parse_args(["--search-method", "ldm", "--mock", "--no-harness-context7"])
     assert all(
         "query-docs" not in value for value in without_context7.harness_tool_budget
     )
-    invalid = parse_args(["--mock", "--harness-tool-budget", "submit_candidates=1"])
+    invalid = parse_args(["--search-method", "ldm", "--mock", "--harness-tool-budget", "submit_candidates=1"])
     with pytest.raises(SystemExit, match="submit_candidates"):
         validate_args(invalid)
 

@@ -169,6 +169,7 @@ def load_official_case(
     source_dir: Path,
     prepared: PreparedCase,
     runtime: CampaignRuntime,
+    *, oracle_socket: Path | None = None,
 ) -> OfficialAPI:
     source_dir = Path(source_dir).resolve()
     require_clean_revision(source_dir, UPSTREAM_COMMIT)
@@ -179,7 +180,12 @@ def load_official_case(
     docker_entrypoint = _official_module(source_dir, "docker_entrypoint")
     argparse_lib = _official_module(source_dir, "nucleobench.common.argparse_lib")
     case = prepared.context.case
-    if case.model_family == "malinois":
+    if oracle_socket is not None:
+        from tasks.nucleobench.core.oracles.queued import QueuedOracle, oracle_identity
+        campaign = json.loads((runtime.run_dir / "campaign.json").read_text())
+        namespace = f"{runtime.run_dir.resolve()}:{campaign['created_at_unix']}"
+        model = QueuedOracle(oracle_socket, namespace, oracle_identity(prepared))
+    elif case.model_family == "malinois":
         torch = importlib.import_module("torch")
         if torch.cuda.is_available():
             raise RuntimeError(

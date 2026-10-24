@@ -32,7 +32,6 @@ from tasks.nucleobench.core.factory import build_proposal_expander, build_surrog
 from tasks.nucleobench.core.harness import (
     AVAILABLE_HARNESS_PROFILE_IDS,
     DIRECT_HARNESS_PROFILE_ID,
-    HARNESS_PROFILE_IDS,
     HARNESS_SKILL_IDS,
     HARNESS_TOOL_NAMES,
     NucleoBenchHarnessExpander,
@@ -53,6 +52,8 @@ from tasks.nucleobench.core.provider import ProviderSettings
 from tasks.nucleobench.core.workflow import describe_ldm_task, main
 from tasks.nucleobench.core.workflow_args import parse_args
 
+
+HARNESS_PROFILE_IDS = tuple(p.profile_id for p in harness_profiles())
 
 class FakeHarnessClient:
     def __init__(self, artifact_root, attempts_by_profile: dict[str, list[list[dict]]]) -> None:
@@ -125,6 +126,7 @@ class FakeHarnessClient:
 def test_eight_session_sampling_decouples_occurrences_pool_and_evaluations(tmp_path, unique_count, distinct_sessions):
     argv = [
         "--search-method", "ldm_harness_compiled",
+        "--harness-research-strategy-config", "config/research_strategies/independent.json",
         "--evaluations-per-round", "128",
         "--harness-candidates-per-session", "32",
         "--proposal-samples", "256", "--bo-pool-size", "176",

@@ -36,7 +36,7 @@ def check_task_dependencies(plan: dict[str, Any], *, include_optional: bool = Tr
     if mode == "mock" or bool(args.get("mock")):
         return checks
     checks.extend(_prepared_data_checks(task, args))
-    if arg_value(args, "search-method", default="ldm") == "bo":
+    if arg_value(args, "search-method", default="ldm_harness_compiled") == "bo":
         checks.append(ok(task, "proposal provider", "Pure BO does not use a model endpoint."))
     else:
         checks.extend(_provider_checks(task, args, env))
@@ -84,7 +84,7 @@ def _provider_checks(task: str, args: dict[str, Any], env: dict[str, str]) -> li
         required=True,
     )
     if (
-        arg_value(args, "search-method", default="ldm")
+        arg_value(args, "search-method", default="ldm_harness_compiled")
         not in PERSISTENT_HARNESS_METHODS
     ):
         return checks

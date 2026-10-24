@@ -248,7 +248,7 @@ def test_journal_replay_after_receipt_interruption_counts_turn_once(tmp_path, mo
 
 def test_cif_submission_verifies_immutable_snapshot(tmp_path):
     from tasks.atomworld.core.harness import validate_answer
-    client = ResearchClient(parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock"]), tmp_path, fixture()["public"][0])
+    client = ResearchClient(parse_args(["--search-method", "llm", "--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock"]), tmp_path, fixture()["public"][0])
     artifact = client.artifact(SimpleNamespace(turn_id="test"), 1, extract_cif(client.outputs[0]))
     request = HarnessSubmissionRequest("geometry_research", "test", 1,
         {"artifact_path": "answer.cif", "rationale": "Public geometry"}, (artifact,))
@@ -583,7 +583,7 @@ def test_pilot_launch_and_resume_cli(tmp_path):
         and args.attempts_per_sample == 4
         and args.out_dir == tmp_path / "child"
     )
-    resumed = parse_args(["--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--resume-from", str(tmp_path / "child")])
+    resumed = parse_args(["--search-method", "llm", "--harness-research-strategy-config", "config/research_strategies/independent.json", "--harness-profile", "geometry_research", "structure_audit", "--mock", "--resume-from", str(tmp_path / "child")])
     assert resumed.resume and resumed.out_dir == tmp_path / "child"
 
 

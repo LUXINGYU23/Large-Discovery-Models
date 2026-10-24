@@ -11,7 +11,7 @@ from tasks.alphabench.ldm_task.procedure import main
 
 
 def make_source(tmp_path):
-    protocol = replace(T3Protocol(), cold_seed_count=3)
+    protocol = replace(T3Protocol(method="llm"), cold_seed_count=3)
     path, run = tmp_path / "protocol.json", tmp_path / "source"
     path.write_text(json.dumps(protocol.to_dict()))
     assert main(["--mock", "--protocol-file", str(path), "--out-dir", str(run)]) == 0

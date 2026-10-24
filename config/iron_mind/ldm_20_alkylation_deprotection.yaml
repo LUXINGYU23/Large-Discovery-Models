@@ -5,6 +5,7 @@ mode: real
 description: Our LDM method on the official alkylation_deprotection oracle with 20 evaluations.
 contract_profile: ldm_official_20
 args:
+  search-method: ldm
   proposal-mode: openai
   dataset-id: alkylation_deprotection
   iterations: 20

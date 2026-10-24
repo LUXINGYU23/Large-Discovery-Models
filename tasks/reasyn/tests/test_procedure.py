@@ -29,7 +29,7 @@ from tasks.reasyn.core.surrogate import MoleculeEncoder
 def test_mock_shared_campaign_collection_and_resume(tmp_path, monkeypatch, benchmark):
     monkeypatch.setenv("LDM_DATA_COLLECTION_ENABLED", "1")
     out = tmp_path / benchmark
-    argv = [
+    argv = ["--search-method", "auto",
         "--mock",
         "--benchmark",
         benchmark,
@@ -251,7 +251,7 @@ def test_tdc_cached_oracle_resume_does_not_double_charge_evaluation(tmp_path, mo
 
     monkeypatch.setattr(CampaignRuntime, "checkpoint", flaky_checkpoint)
     root = tmp_path / "tdc-cache-replay"
-    argv = [
+    argv = ["--search-method", "auto",
         "--mock",
         "--benchmark",
         "tdc",
@@ -296,7 +296,7 @@ def test_resume_keeps_original_recovery_seed_span_when_iterations_extend(tmp_pat
         "iterations": 1,
         "proposal_recovery_seed_span": 12345,
     }))
-    args = parse_args(["--mock", "--iterations", "5"])
+    args = parse_args(["--search-method", "auto", "--mock", "--iterations", "5"])
     assert workflow._proposal_recovery_seed_span(args, run, resume=True) == 12345
 
     (run / "config.json").write_text(json.dumps({"iterations": 2}))
@@ -352,7 +352,7 @@ def test_completed_resume_preserves_preflight_count_and_keeps_credentials_privat
     monkeypatch.setenv("LLM_BASE_URL", "http://localhost:1234/v1")
     monkeypatch.setenv("LLM_MODEL_NAME", "fixture")
     monkeypatch.setenv("LLM_API_KEY", "must-not-appear-in-artifacts")
-    argv = [
+    argv = ["--search-method", "auto",
         "--mock",
         "--proposal-mode",
         "openai",
@@ -395,7 +395,7 @@ def test_malformed_model_action_recovery_uses_fresh_batches(tmp_path, monkeypatc
             )
 
     monkeypatch.setattr(workflow, "OpenAICompatibleProposalClient", Client)
-    argv = [
+    argv = ["--search-method", "auto",
         "--mock",
         "--proposal-mode",
         "openai",
@@ -592,7 +592,7 @@ def test_policy_start_failure_closes_both_clients_without_spending_search_budget
 def test_cached_projection_rechecks_boundary(tmp_path):
     from tasks.reasyn.core.projector import Projector
 
-    args = parse_args(["--mock"])
+    args = parse_args(["--search-method", "auto", "--mock"])
     projector = Projector(args, tmp_path)
     rows, artifact = projector.project(["CCO"], sampling_seed=0, identity="query")
     output = tmp_path / artifact

@@ -13,7 +13,7 @@ from tasks.alphabench.rebuild_report import rebuild
 @pytest.mark.parametrize("point", ["search", "validation", "test", "quality_set_frozen"])
 def test_process_death_after_durable_receipt_reuses_paid_work(tmp_path, point, method):
     protocol = tmp_path / "protocol.json"
-    frozen = replace(T3Protocol(), method=method, cold_seed_count=0, rounds=1,
+    frozen = replace(T3Protocol(method="llm"), method=method, cold_seed_count=0, rounds=1,
         evaluations=2, batch_size=2, factor_select_n=2).to_dict()
     protocol.write_text(json.dumps(frozen))
     script = r'''
@@ -155,7 +155,7 @@ assert receipts.execute("one", {"value": 1}, authorize=lambda: count("authorize"
 def test_validation_budget_exhaustion_pauses_without_losing_paid_receipts(tmp_path, phase):
     from tasks.alphabench.ldm_task.procedure import main
 
-    base = T3Protocol()
+    base = T3Protocol(method="llm")
     protocol = replace(base, cold_seed_count=2 if phase == "initialization" else 0,
         rounds=1, evaluations=2, batch_size=2,
         budgets={**base.budgets, "validation_evaluations": 1})

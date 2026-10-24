@@ -17,14 +17,14 @@ from tasks.alphabench.core.selection import FactorEncoder
 
 
 @pytest.mark.parametrize("method", ["ldm_harness", "ldm_harness_compiled"])
-def test_published_harness_pilots_load_with_coverage_tree_budgets(method):
+def test_published_harness_pilots_load_with_main_history_tree_budgets(method):
     from ldm_tts.harness.research_strategy import load_research_strategy
     from tasks.alphabench.core.protocol import T3Protocol
 
     path = Path(__file__).resolve().parents[1] / "resources/protocols" / f"partial_csi300_{method}_pilot.json"
     protocol = T3Protocol(**json.loads(path.read_text()))
     strategy = load_research_strategy(protocol.research_strategy_config)
-    assert strategy.requires_main and strategy.fork_policy.identity()["name"] == "coverage"
+    assert strategy.requires_main and strategy.fork_policy.identity()["name"] == "main_history_1plus3"
     assert protocol.sessions == 4
     assert protocol.budgets["harness_turns"] == protocol.rounds * (protocol.sessions + 1) == 10
     assert protocol.budgets["proposal_attempts"] >= protocol.rounds * protocol.sessions

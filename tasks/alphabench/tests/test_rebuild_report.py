@@ -12,7 +12,7 @@ from tasks.alphabench.rebuild_report import rebuild
 
 def test_offline_rebuild_recreates_report_after_result_is_removed(tmp_path):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=1).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=1).to_dict()))
     run = tmp_path / "run"
     assert main(["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]) == 0
     expected = (run / "result.json").read_bytes()
@@ -32,7 +32,7 @@ def test_offline_rebuild_recreates_report_after_result_is_removed(tmp_path):
 
 def test_offline_rebuild_rejects_modified_oracle_receipt(tmp_path):
     protocol = tmp_path / "protocol.json"
-    protocol.write_text(json.dumps(replace(T3Protocol(), cold_seed_count=0).to_dict()))
+    protocol.write_text(json.dumps(replace(T3Protocol(method="llm"), cold_seed_count=0).to_dict()))
     run = tmp_path / "run"
     assert main(["--mock", "--protocol-file", str(protocol), "--out-dir", str(run)]) == 0
     receipt_path = next(path for path in (run / "private/oracle").glob("*.json")
@@ -48,7 +48,7 @@ def test_offline_rebuild_preserves_incomplete_quality_coverage(tmp_path, monkeyp
     monkeypatch.setattr(workflow, "mock_response", lambda request, native_count=None: json.dumps({
         "candidates": [{"name": "first", "expression": "Mean($close,5)"},
                        {"name": "tail", "expression": "Mean($close,8)"}]}))
-    base = T3Protocol()
+    base = T3Protocol(method="llm")
     protocol = tmp_path / "protocol.json"
     protocol.write_text(json.dumps(replace(base, cold_seed_count=0, rounds=1, evaluations=1,
         batch_size=1, budgets={**base.budgets, "quality_checks": 0}).to_dict()))
@@ -81,7 +81,7 @@ def test_offline_rebuild_preserves_verified_partial_data_audit(tmp_path):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest))
     manifest_path.with_suffix(".files.json").write_text(json.dumps(files))
-    protocol = replace(T3Protocol(), cold_seed_count=0, data_digest=digest(manifest),
+    protocol = replace(T3Protocol(method="llm"), cold_seed_count=0, data_digest=digest(manifest),
                        data_policy="partial_comparison")
     assert verify_data_manifest(manifest_path, protocol) == manifest
     protocol_path = tmp_path / "protocol.json"

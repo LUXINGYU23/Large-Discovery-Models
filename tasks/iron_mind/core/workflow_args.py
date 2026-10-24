@@ -42,8 +42,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(description="Run the Iron Mind LDM task.")
     parser.add_argument("--mock", action="store_true")
-    parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"), default="callable")
-    parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm")
+    parser.add_argument("--proposal-mode", choices=("callable", "none", "openai"))
+    parser.add_argument("--search-method", choices=SEARCH_METHODS, default="ldm_harness_compiled")
     parser.add_argument("--initialization-mode", choices=INITIALIZATION_MODES, default="none")
     parser.add_argument("--dataset-id", default="buchwald_hartwig")
     parser.add_argument("--iterations", type=int, default=1)
@@ -119,6 +119,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--policy-max-submission-attempts", type=int)
     parser.add_argument("--harness-research-strategy-config", type=Path)
     args = parser.parse_args(argv)
+    if args.proposal_mode is None:
+        args.proposal_mode = "none" if args.search_method in PERSISTENT_HARNESS_METHODS else "callable"
     try:
         configure_research_strategy(args, enabled=args.search_method in PARALLEL_HARNESS_METHODS)
     except ValueError as exc:

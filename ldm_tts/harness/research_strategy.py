@@ -10,12 +10,12 @@ from typing import Any
 
 from ldm_tts.optimization.measurement import MeasurementPolicy
 from ldm_tts.harness.research_tree import (
-    ArchivePolicy, CoverageForks, DiverseArchive, ForkPolicy, LatestMainForks,
+    ArchivePolicy, CoverageForks, DiverseArchive, ForkPolicy, LatestMainForks, MainHistoryForks,
 )
 
 
 DEFAULT_RESEARCH_STRATEGY = {
-    "name": "main_forks", "fork_policy": {"name": "coverage"},
+    "name": "main_forks", "fork_policy": {"name": "main_history_1plus3"},
     "archive_policy": {"name": "diverse", "capacity": 3, "overlap_threshold": 0.5},
 }
 
@@ -116,6 +116,8 @@ def load_research_strategy(config: dict[str, Any]) -> ResearchStrategy:
         policy = LatestMainForks()
     elif fork == {"name": "coverage"}:
         policy = CoverageForks()
+    elif fork == {"name": "main_history_1plus3"}:
+        policy = MainHistoryForks()
     else:
         raise ValueError("unknown fork policy configuration")
     if "factory" in archive:

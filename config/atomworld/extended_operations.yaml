@@ -4,6 +4,7 @@ algorithm: bounded_geometry_tool_refinement
 mode: real
 contract_profile: extended_operations
 args:
+  search-method: llm
   data-dir: ${ATOMWORLD_DATA_ROOT}
   proposal-format: operations
   attempts-per-sample: 4

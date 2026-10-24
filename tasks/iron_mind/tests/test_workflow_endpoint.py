@@ -186,7 +186,7 @@ def _endpoint_args(
     *,
     prompt_policy: str = "portfolio_v1",
 ) -> list[str]:
-    return [
+    return ["--search-method", "ldm",
         "--mock",
         "--proposal-mode",
         "openai",

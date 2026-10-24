@@ -32,7 +32,7 @@ def parse_args(argv=None):
     )
     p.add_argument("--iterations", type=int, default=2)
     p.add_argument("--reservoir-size", "--proposal-samples", dest="reservoir_size", type=int, default=4)
-    p.add_argument("--search-method", choices=("auto", "baseline", "ldm", "bo", "llm", "harness", "ldm_harness", "ldm_harness_compiled"), default="auto")
+    p.add_argument("--search-method", choices=("auto", "baseline", "ldm", "bo", "llm", "harness", "ldm_harness", "ldm_harness_compiled"), default="ldm_harness_compiled")
     p.add_argument("--proposal-batch-size", type=int, default=2)
     p.add_argument("--bo-pool-size", type=int)
     p.add_argument("--bo-targets-file", type=Path, default=os.environ.get("REASYN_BO_TARGETS"))
