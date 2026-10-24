@@ -137,7 +137,7 @@
         "llm-temperature": 0.7,
         "prompt-policy": "direct_v1",
         "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}",
-        "search-method": "ldm"
+        "search-method": "llm"
       }
     },
     "pilot_evaluation_extended": {
@@ -190,7 +190,7 @@
         "llm-temperature": 0.7,
         "prompt-policy": "direct_v1",
         "llm-extra-body-json": "{{\"reasoning_effort\":\"max\"}}",
-        "search-method": "ldm"
+        "search-method": "llm"
       }
     },
     "pilot_evaluation_ldm_harness": {

@@ -145,6 +145,7 @@ def test_measured_task_suite_keeps_going_after_failure(tmp_path, monkeypatch, ca
         table = workflow._load_table(args)
         candidates = [{"dataset_id": table.schema.dataset_id, "conditions": dict(row.conditions)} for row in table.rows]
     else:
+        pytest.importorskip("synthonbench", reason="Install task dependencies for the official example-space test")
         from itertools import product
         from tasks.synthonbench.core.space_order import ordered_reactions, ordered_positions, ordered_synthon_ids
         benchmark = workflow._load_benchmark(args)
@@ -408,6 +409,7 @@ def test_reasyn_tree_workflow_and_completed_resume_preserve_budget(tmp_path, mon
 
 @pytest.mark.parametrize("interrupt", [False, True])
 def test_alphabench_tree_workflow_includes_main_usage_and_initialization(tmp_path, monkeypatch, interrupt):
+    pytest.importorskip("zss", reason="AlphaBench reporting requires its task dependencies")
     from tasks.alphabench.core import harness_runtime
     from tasks.alphabench.core.protocol import T3Protocol
     from tasks.alphabench.ldm_task.procedure import main
