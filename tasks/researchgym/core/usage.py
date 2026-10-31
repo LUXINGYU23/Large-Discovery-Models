@@ -84,6 +84,8 @@ def account_tokens(runtime, pricing: ApiPricing, prefix: str, tokens: dict[str, 
         runtime.consume_many({f"{prefix}_usage_unknown": 1}, usage_key=usage_key)
         return
     amounts = {f"{prefix}_input_tokens": tokens["input_tokens"], f"{prefix}_output_tokens": tokens["output_tokens"]}
+    if tokens.get("unknown_calls", 0):
+        amounts[f"{prefix}_usage_unknown"] = tokens["unknown_calls"]
     cost = pricing.cost(tokens)
     if cost is not None:
         amounts["api_cost_usd"] = cost
@@ -94,24 +96,31 @@ def harness_turn_tokens(artifact_root: Path, turn_id: str) -> dict[str, float] |
     """Sum provider-reported tokens for one turn from the sidecar's redacted captures."""
     totals = {"input_tokens": 0.0, "output_tokens": 0.0}
     exchanges = 0
+    unknown = 0
     for index in Path(artifact_root).rglob("provider_index.jsonl"):
         for line in index.read_text().splitlines():
             record = json.loads(line)
             if record.get("turnId") != turn_id:
                 continue
             if record.get("type") == "provider_transport_error":
-                return None
+                unknown += 1
+                continue
             if record.get("type") != "provider_exchange":
                 continue
             exchanges += 1
-            tokens = _response_tokens(index.parent / record["response"]["artifact"])
+            tokens = provider_response_tokens(index.parent / record["response"]["artifact"])
             if tokens is None:
-                return None
+                unknown += 1
+                continue
             totals = {name: totals[name] + tokens[name] for name in totals}
-    return totals if exchanges else None
+    if not exchanges and not unknown:
+        return None
+    if unknown:
+        totals["unknown_calls"] = float(unknown)
+    return totals
 
 
-def _response_tokens(path: Path) -> dict[str, float] | None:
+def provider_response_tokens(path: Path) -> dict[str, float] | None:
     if not path.is_file():
         return None
     text = path.read_bytes().decode("utf-8", errors="replace")

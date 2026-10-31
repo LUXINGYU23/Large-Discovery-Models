@@ -39,6 +39,11 @@ def test_validator_enforces_count_distinctness_and_measured_exclusion_only():
     rows, errors = validate_rows([{**row(3), "comparison_candidate_ids": ["rg-unknown"]}], case=CASE, count=1,
                                  measured_keys=set(), measured_ids={"rg-known"})
     assert errors[0]["code"] == "unknown_comparison_candidate"
+    for malformed in ({"id": "rg-known"}, ["rg-known"]):
+        rows, errors = validate_rows([{**row(3), "comparison_candidate_ids": [malformed]}], case=CASE, count=1,
+                                     measured_keys=set(), measured_ids={"rg-known"})
+        assert not rows and errors[0]["path"] == "/candidates/0/comparison_candidate_ids/0"
+        assert errors[0]["code"] == "invalid_comparison_candidate_id"
     # A program proposed earlier but never evaluated is not excluded.
     rows, errors = validate_rows([row(2), row(3)], case=CASE, count=2, measured_keys=measured, measured_ids=set())
     assert not errors and len(rows) == 2

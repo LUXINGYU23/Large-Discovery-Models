@@ -8,9 +8,9 @@ from typing import Any
 from ldm_tts.contracts import Candidate, CandidateRejection, RawProposal, SurrogateSpaceSpec
 from ldm_tts.optimization.records import SurrogateVector
 
-from .cases import CaseSpec
+from .cases import CaseSpec, program_rules
 
-FEATURE_VERSION = "rg_program_ast_family_v2"
+FEATURE_VERSION = "rg_program_ast_family_v3"
 # Method families are read from called functions and attributes. Together with
 # six AST size statistics they describe what a program does, never who it is:
 # no content hash, candidate identity, or proposal frequency enters the vector.
@@ -29,7 +29,8 @@ FEATURE_GROUPS = {"program_size": (0, len(SIZE_FEATURES)), "method_families": (l
 
 
 def program_features(program: str, *, max_chars: int) -> tuple[float, ...]:
-    tree = ast.parse(program)
+    rules = program_rules()
+    tree = rules._strip_docstrings(ast.parse(program))
     nodes = list(ast.walk(tree))
 
     def count(*types):
@@ -48,7 +49,9 @@ def program_features(program: str, *, max_chars: int) -> tuple[float, ...]:
     numeric = sum(isinstance(n, ast.Constant) and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)
                   for n in nodes)
     return (
-        min(len(program) / float(max_chars), 1.0),
+        # Identity discards whitespace, comments and docstrings. Features must
+        # use the same semantic AST or equivalent candidates get different GP inputs.
+        min(len(repr(rules._stable_ast(tree))) / float(max_chars), 1.0),
         min(count(ast.FunctionDef, ast.AsyncFunctionDef) / 10.0, 1.0),
         min(count(ast.For, ast.While) / 10.0, 1.0),
         min(count(ast.If) / 10.0, 1.0),

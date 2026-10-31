@@ -102,6 +102,8 @@ for line in sys.stdin:
             "submissionContract": json.loads(frame["submissionContractJson"])}))
         response = {"type": "initialized", **common, "profiles": PROFILES, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
+        assert len(frame["turns"]) == len(PROFILES)
+        assert {item["profileId"] for item in frame["turns"]} == set(PROFILES)
         trace(ROOT / "fixture_requests.jsonl", {"turns": frame["turns"]})
         results, interrupted = [], False
         for item in frame["turns"]:
@@ -137,7 +139,7 @@ for line in sys.stdin:
                     rows = [{"program": program(base + i), "change_summary": f"fixture variant {base + i}",
                              "rationale": f"fixture independent hypothesis {item['profileId']}"} for i in range(count)]
                     exhausted = MODE == "exhaust" or (MODE == "exhaust_second" and PROFILES.index(item["profileId"]) == 1)
-                    if (attempt == 1 and MODE != "valid") or exhausted:
+                    if rows and ((attempt == 1 and MODE != "valid") or exhausted):
                         rows[0] = {**rows[0], "program": "def unrelated():\n    return 1\n"}
                     body, filename = json.dumps({"candidates": rows}), "candidates.json"
                     submission = {"artifact_path": filename}

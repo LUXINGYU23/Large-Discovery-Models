@@ -22,12 +22,19 @@ args:
   case-python: ${RESEARCHGYM_CASE_PYTHON}
   devices: ${RESEARCHGYM_DEVICES}
   min-free-mib: 20000
-  campaign-hours: 0
+  campaign-hours: 24
+  api-budget-usd: 20.0
+  # DeepSeek-v4-Flash prices from the configured LiteLLM model catalog.
+  # Billing cached input at the full input rate is deliberately conservative.
+  llm-input-usd-per-mtok: 1.0
+  llm-output-usd-per-mtok: 2.0
+  harness-provider-reserve-usd: 1.0
   llm-wire-api: responses
   llm-reasoning: high
   llm-max-tokens: 16384
   recovery-attempts: 3
   harness-sidecar-image: ldm-pi-harness:latest
+  harness-cache-dir: ${RESEARCHGYM_HARNESS_CACHE_DIR}
   harness-wall-time-seconds: 1800
   harness-response-timeout: 2400
   harness-tool-budget:
