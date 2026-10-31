@@ -1,11 +1,14 @@
 """Evaluator lifecycle: process-tree timeouts, durable receipts, and coverage."""
 
 import copy
+import csv
 import hashlib
 import json
+import math
 import os
 import shlex
 import signal
+import shutil
 import subprocess
 import sys
 import time
@@ -237,6 +240,53 @@ def pinned_checkout(case, destination):
     destination.mkdir()
     subprocess.run(["tar", "-x", "-C", str(destination)], input=archive, check=True)
     return destination
+
+
+def test_pinned_tse_grader_keeps_method_identity_and_ten_cell_aggregates(tmp_path):
+    """Diagnostic CSVs exercise the actual pinned grader, not a model result."""
+    case = load_case("time_series_explanation")
+    upstream = pinned_checkout(case, tmp_path / "upstream")
+    task = upstream / case.raw["upstream_task"]
+    source_md = task / "task_description.md"
+    source_digest = hashlib.sha256(source_md.read_bytes()).hexdigest()
+    datasets = ("PAM", "Boiler", "Epilepsy", "Wafer", "Freezer")
+    logs = tmp_path / "diagnostic-logs"
+    for dataset_index, dataset in enumerate(datasets):
+        for fold in range(5):
+            path = logs / dataset.lower() / f"your_method_fold{fold}.csv"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                for baseline, offset in (("Average", 0), ("Zeros", 0.1)):
+                    row = [""] * 10
+                    row[2], row[3], row[4] = baseline, "0.1", "ldm"
+                    row[9] = str(0.5 + dataset_index * 0.01 + fold * 0.001 + offset)
+                    writer.writerow(row)
+    for method in ("llm", "ldm", "harness", "ldm_harness", "ldm_harness_compiled"):
+        copied_md = tmp_path / f"{method}.md"
+        summary_path = tmp_path / f"{method}.json"
+        shutil.copyfile(source_md, copied_md)
+        subprocess.run([sys.executable, str(task / "grading/grade.py"), "--logs", str(logs),
+                        "--json-out", str(summary_path), "--md", str(copied_md), "--method", method,
+                        "--table", "real", "--real-explainer", "ldm"],
+                       cwd=task, capture_output=True, text=True, check=True)
+        summary = json.loads(summary_path.read_text())
+        assert summary["method"] == method and len(summary["real"]) == 5
+        cells = [(dataset, baseline, summary["real"][dataset][baseline])
+                 for dataset in datasets for baseline in ("Average", "Zeros")]
+        assert len(cells) == 10
+        for dataset, baseline, aggregate in cells:
+            expected = 0.502 + datasets.index(dataset) * 0.01 + (0.1 if baseline == "Zeros" else 0)
+            assert aggregate["count"] == 5 and math.isclose(aggregate["mean"], expected, abs_tol=1e-10)
+        rows = [line for line in copied_md.read_text().splitlines() if line.startswith(f"| {method} |")]
+        assert len(rows) == 1 and rows[0].count("|") == 12
+    no_markdown_summary = tmp_path / "ldm-no-markdown.json"
+    subprocess.run([sys.executable, str(task / "grading/grade.py"), "--logs", str(logs),
+                    "--json-out", str(no_markdown_summary), "--method", "ldm", "--table", "real",
+                    "--real-explainer", "ldm", "--no-markdown"],
+                   cwd=task, capture_output=True, text=True, check=True)
+    assert json.loads(no_markdown_summary.read_text()) == json.loads((tmp_path / "ldm.json").read_text())
+    assert hashlib.sha256(source_md.read_bytes()).hexdigest() == source_digest
 
 
 @pytest.mark.parametrize("case_id", ["time_series_explanation", "continual_learning", "cross_modal_retrieval",

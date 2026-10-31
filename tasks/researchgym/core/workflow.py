@@ -307,6 +307,11 @@ def _evaluator_env():
     return {k: v for k, v in os.environ.items() if not SECRET_ENV.search(k)}
 
 
+def _account_policy_turn_usage(runtime, amounts):
+    """Controller owns turn/tool counts; request authorizations own provider counts."""
+    runtime.consume_many({key: value for key, value in amounts.items() if key != "policy_provider_requests"})
+
+
 def _proposal_facts(args):
     sessions = args.harness_sessions if args.proposal_mode == "harness" else None
     occurrences = args.proposal_samples if args.search_method in LDM_METHODS else args.evaluations_per_round
@@ -497,8 +502,7 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
                 client=policy_client, adapter=adapter, root=run_dir / "policy_harness",
                 # Per-request authorizations own this counter; the controller's
                 # cumulative turn usage must not count the same calls again.
-                account=lambda amounts: runtime.consume_many({
-                    key: value for key, value in amounts.items() if key != "policy_provider_requests"}),
+                account=lambda amounts: _account_policy_turn_usage(runtime, amounts),
                 executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
                                               resolve_container_user(args.harness_container_user, args.harness_docker_host)),
                 recovery_budget=lambda: min(args.harness_wall_time_seconds * 2, clock.remaining()),
