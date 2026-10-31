@@ -21,8 +21,9 @@ Build the release image from the repository root:
 docker build -t ldm-pi-harness:latest harnesses/pi
 ```
 
-Each image build resolves the current SoL-Pi `main` revision and installs its
-exact tested Pi package versions. The resolved pair is recorded in
+Each image build uses the reviewed `package-lock.json` SoL-Pi revision and Pi
+package versions. Updating that pair requires an explicit lockfile change and
+validation; builds do not silently follow SoL-Pi `main`. The locked pair is recorded in
 `/app/sol-pi-version.json`; session manifests also record package versions,
 the SoL-Pi source URL, and the effective lockfile digest. Pin the resulting
 image digest for an entire experiment and its resumes.
