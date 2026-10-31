@@ -88,8 +88,18 @@ environment variables, manifests, or session files. Do not invoke the sidecar
 manually for normal experiments.
 
 The sidecar declares its package SemVer at startup; the client binds every
-subsequent JSONL request and response to that release and one campaign. Turn
-inputs include a monotonic history range and digest;
+subsequent JSONL request and response to that release and one campaign. The
+Python client requires Pi sidecar protocol 0.2.0 when a caller supplies a hard
+provider budget through the task-neutral `provider_authorizer` callback on
+`HarnessClient.run_turn`. The proxy sends a
+`provider_authorization_requested` frame containing the profile, turn, unique
+provider request ID and request digest. It opens the upstream connection only
+after the Host answers `provider_authorization_result` with `authorized=true`.
+A denial returns 403 without forwarding. Per-turn request traces preserve the
+next ID across recovery; authorization markers distinguish approved requests
+from denied attempts in `providerCalls`.
+
+Turn inputs include a monotonic history range and digest;
 the sidecar advances each persistent session only after an atomic turn commit.
 Committed turns are idempotent and partial turns recover from their saved
 submission, artifact descriptors, and measured usage.

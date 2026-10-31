@@ -1,85 +1,13 @@
 import os
-import pickle
-from typing import Any, Optional
 
 import numpy as np
-
-
-def spearman(pred, target) -> float:
-    """Compute the spearman correlation coefficient between prediction and target"""
-    from scipy import stats
-    coef_val, p_val = stats.spearmanr(pred, target)
-    return coef_val
-
-
-def pearson(pred, target) -> float:
-    from scipy import stats
-    coef_val, p_val = stats.pearsonr(pred, target)
-    return coef_val
-
-
-def negative_log_likelihood(pred, pred_std, target) -> float:
-    """Compute the negative log-likelihood on the validation dataset"""
-    from scipy.stats import norm
-    n = pred.shape[0]
-    res = 0.
-    for i in range(n):
-        res += (
-            np.log(norm.pdf(target[i], pred[i], pred_std[i])).sum()
-        )
-    return -res
-
-
-def get_dim_info(n_categories):
-    dim_info = []
-    offset = 0
-    for i, cat in enumerate(n_categories):
-        dim_info.append(list(range(offset, offset + cat)))
-        offset += cat
-    return dim_info
-
-
-def save_w_pickle(obj: Any, path: str, filename: Optional[str] = None) -> None:
-    """ Save object obj in file exp_path/filename.pkl """
-    if filename is None:
-        filename = os.path.basename(path)
-        path = os.path.dirname(path)
-    if len(filename) < 4 or filename[-4:] != '.pkl':
-        filename += '.pkl'
-    with open(os.path.join(path, filename), 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-
-def load_w_pickle(path: str, filename: Optional[str] = None) -> Any:
-    """ Load object from file exp_path/filename.pkl """
-    if filename is None:
-        filename = os.path.basename(path)
-        path = os.path.dirname(path)
-    if len(filename) < 4 or filename[-4:] != '.pkl':
-        filename += '.pkl'
-    with open(os.path.join(path, filename), 'rb') as f:
-        try:
-            return pickle.load(f)
-        except EOFError as e:
-            print(path, filename)
-            raise
-
-
-import yaml
-
-
-def get_config(config):
-    with open(config, 'r') as f:
-        return yaml.safe_load(f)
+import torch
 
 
 def batch_iterator(data1, step=8):
     size = len(data1)
     for i in range(0, size, step):
         yield data1[i:min(i + step, size)]
-
-
-import torch
 
 
 class BERTFeatures:
@@ -103,56 +31,6 @@ class BERTFeatures:
             attention_mask1 = torch.tensor(ids1['attention_mask']).to(inp_device)
             reprsn1 = self.model.to(inp_device)(input_ids=input_ids1, attention_mask=attention_mask1)[0]
         return reprsn1.mean(1)
-
-
-def update_table_of_candidates(
-        original_table: np.ndarray,
-        observed_candidates: np.ndarray, check_candidates_in_table: bool,
-        table_of_candidate_embeddings: Optional[np.ndarray]
-) -> tuple[np.ndarray, Optional[np.ndarray]]:
-    """ Update the table of candidates, removing the newly observed candidates from the table
-
-    Args:
-        original_table: table of candidates before observation
-        observed_candidates: new observed points
-        check_candidates_in_table: whether the observed candidates should be in the original_table or not
-        table_of_candidate_embeddings: if not None, the embeddings of the candidates should be used to build the
-            surrogate model
-    Returns:
-          Updated original_table and embeddings
-    """
-    if observed_candidates.ndim == 1:
-        observed_candidates = observed_candidates.reshape(1, -1)
-    for candidate in observed_candidates:
-        filtr = np.all(original_table == candidate.reshape(1, -1), axis=1)
-        if not np.any(filtr) and check_candidates_in_table:
-            raise RuntimeError(f"New point {candidate} is not in the table of candidates.")
-        original_table = original_table[~filtr]
-        if table_of_candidate_embeddings is not None:
-            table_of_candidate_embeddings = table_of_candidate_embeddings[~filtr]
-    return original_table, table_of_candidate_embeddings
-
-
-def update_table_of_candidates_array(original_table: np.ndarray, observed_candidates: np.ndarray,
-                                     check_candidates_in_table: bool) -> np.ndarray:
-    """ Update the table of candidates, removing the newly observed candidates from the table
-
-    Args:
-        original_table: table of candidates before observation
-        observed_candidates: new observed points
-        check_candidates_in_table: whether the observed candidates should be in the original_table or not
-
-    Returns:
-          Updated table
-    """
-    if observed_candidates.ndim == 1:
-        observed_candidates = observed_candidates.reshape(1, -1)
-    for candidate in observed_candidates:
-        filtr = np.all(original_table == candidate.reshape(1, -1), axis=1)
-        if not np.any(filtr) and check_candidates_in_table:
-            raise RuntimeError(f"New point {candidate} is not in the table of candidates.")
-        original_table = original_table[~filtr]
-    return original_table
 
 
 if __name__ == '__main__':

@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 import json
 from typing import Sequence
 
-from tasks.small_molecule.core.acquisition import pareto_front
+from ldm_tts.optimization.acquisition import pareto_front
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
 from tasks.small_molecule.core.ldm_tilted_case2.m1_context import build_m1_molecule_context
 

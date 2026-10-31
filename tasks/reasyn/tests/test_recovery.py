@@ -186,7 +186,7 @@ def test_reconstruction_preparation_resumes_same_selection_without_spending_tria
     selections = [event["payload"]["selected_candidate_ids"]
         for event in map(json.loads, (root / "events.jsonl").read_text().splitlines())
         if event["event_type"] == "candidates_selected"]
-    assert len(selections) == 2 and selections[0] == selections[1]
+    assert len(selections) == 1 and len(selections[0]) == 2
 
 
 @pytest.mark.parametrize("interrupt_round", [0, 1])

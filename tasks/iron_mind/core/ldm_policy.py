@@ -7,7 +7,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-MAD_SCALE = 1.4826
+from tasks.iron_mind.resources.harness.policy_diagnostics import (
+    robust_z_values,
+    softmax_logits,
+    tilt_log_weights,
+)
+
 DEFAULT_Z_CLIP = 5.0
 DEFAULT_ALPHA = 2.0
 DEFAULT_ETA = 0.25
@@ -57,13 +62,7 @@ def robust_z(
     arr = _finite_vector(values, "acquisition scores")
     if arr.size == 0:
         return arr
-    median = float(np.median(arr))
-    scale = MAD_SCALE * float(np.median(np.abs(arr - median)))
-    if scale <= eps:
-        scale = float(np.std(arr))
-    if scale <= eps:
-        return np.zeros_like(arr)
-    return np.clip((arr - median) / (scale + eps), -clip, clip)
+    return robust_z_values(arr, clip, eps)
 
 
 def tilted_logits(
@@ -76,7 +75,7 @@ def tilted_logits(
     normalized = robust_z(acquisition, clip=config.z_clip)
     if base.shape != normalized.shape:
         raise ValueError("base measure and acquisition score shapes must match")
-    return config.alpha * np.log(base + config.eps) + config.eta * normalized
+    return tilt_log_weights(base, normalized, config.alpha, config.eta, config.eps)
 
 
 def tilted_probabilities(
@@ -125,8 +124,7 @@ def softmax_probabilities(logits: np.ndarray) -> np.ndarray:
     values = _finite_vector(logits, "tilted logits")
     if values.size == 0:
         return values
-    exponentials = np.exp(values - float(np.max(values)))
-    return exponentials / float(exponentials.sum())
+    return softmax_logits(values)
 
 
 def _finite_vector(values: np.ndarray, label: str) -> np.ndarray:

@@ -232,6 +232,25 @@ def test_budget_snapshot_includes_zero_counters_and_normalizes_integral_floats()
     }
 
 
+def test_batch_reservation_is_atomic_and_individual_receipts_replay(tmp_path: Path) -> None:
+    path = tmp_path / "budget.json"
+    ledger = BudgetLedger(limits={"evaluations": 3, "workers": 6}, path=path)
+    ledger.consume_many({"evaluations": 1, "workers": 2}, usage_key="previous")
+    before = path.read_bytes()
+    with pytest.raises(BudgetExceededError):
+        ledger.consume_groups({"a": {"evaluations": 1, "workers": 2},
+                               "b": {"evaluations": 1, "workers": 3}})
+    assert path.read_bytes() == before
+    assert ledger.metadata["cumulative_usage"] == {"previous": {"evaluations": 1, "workers": 2}}
+    assert ledger.counters == {"evaluations": 1, "workers": 2}
+    ledger.consume_groups({key: {"evaluations": 1, "workers": 2} for key in ("a", "b")})
+    restored = BudgetLedger.load(path)
+    for key in ("a", "b"):
+        restored.consume_many({"workers": 2}, usage_key=key)
+    assert restored.counters == {"evaluations": 3, "workers": 6}
+    assert restored.metadata["cumulative_usage"]["a"] == {"evaluations": 1, "workers": 2}
+
+
 def test_campaign_status_embeds_current_budget(tmp_path: Path) -> None:
     ledger = BudgetLedger(limits={"outer_iterations": 3})
     ledger.consume("outer_iterations")

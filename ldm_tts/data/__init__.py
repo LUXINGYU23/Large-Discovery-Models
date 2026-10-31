@@ -19,8 +19,6 @@ from ldm_tts.data.ir import (
     make_complete_design_ir,
     make_parameter_edit_ir,
     normalize_task_id,
-    smallmol_ir_from_prompt_response,
-    smallmol_irs_from_round_record,
     validate_ir_record,
 )
 from ldm_tts.data.rendering import (
@@ -47,7 +45,5 @@ __all__ = [
     "read_jsonl",
     "render_prose",
     "render_record",
-    "smallmol_ir_from_prompt_response",
-    "smallmol_irs_from_round_record",
     "validate_ir_record",
 ]

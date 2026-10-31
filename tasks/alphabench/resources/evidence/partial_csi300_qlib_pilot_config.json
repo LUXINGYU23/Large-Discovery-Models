@@ -1,0 +1,10 @@
+{
+  "backend": "qlib",
+  "market": "csi300",
+  "data_digest": "865ab5d5359d83febbcdbff5eb1c54e563ba8776e7d73c998f76e2b36269ea38",
+  "environment_digest": "88e0cd036976c2b7c94a8b59c97d4e1f6c3de2ece92e06f4f92126632147403b",
+  "data_manifest": "/mnt/data1/Large-Discovery-Models/data/alphabench/manifests/qlib_csi300.json",
+  "data_root": "/mnt/data1/Large-Discovery-Models/data/alphabench/qlib/cn-2026-09-22",
+  "benchmark": "sh000300",
+  "upstream_root": "/mnt/data1/Large-Discovery-Models/data/alphabench/AlphaBench"
+}

@@ -22,9 +22,6 @@ class SurrogateVector:
         return asdict(self)
 
 
-FeatureVector = SurrogateVector
-
-
 @dataclass(frozen=True)
 class BOObservation:
     """One evaluated candidate and its objective values."""
@@ -171,9 +168,6 @@ class SurrogateEncoder(Protocol):
 
     def encode(self, candidate: Any) -> SurrogateVector:
         ...
-
-
-FeatureEncoder = SurrogateEncoder
 
 
 class AcquisitionSelector(Protocol):

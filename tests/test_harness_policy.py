@@ -97,8 +97,9 @@ class FakeHarnessClient:
         self.turns = []
         self.validation_errors: list[str] = []
 
-    def run_turn(self, turns, *, submission_validator, recovery_timeout_seconds=0):
+    def run_turn(self, turns, *, submission_validator, provider_authorizer=None, recovery_timeout_seconds=0):
         self.recovery_timeout_seconds = recovery_timeout_seconds
+        self.provider_authorizer = provider_authorizer
         turn = turns[0]
         self.turns.append(turn)
         attempts = self.scripted_turns[self.calls]
@@ -200,6 +201,20 @@ def test_policy_uses_the_current_task_recovery_budget(tmp_path):
     result = controller.resolve(_round(1))
     assert result.metadata["status"] == "accepted"
     assert client.recovery_timeout_seconds == 87.0
+
+
+def test_policy_forwards_host_provider_authorization(tmp_path):
+    controller, client, _ = _controller(tmp_path, [[({"action": "disable"}, "")]])
+    authorize = lambda request: True
+    controller.provider_authorizer = authorize
+    controller.resolve(_round(1))
+    assert client.provider_authorizer is authorize
+
+
+def test_policy_accepts_explicit_initialization_history_before_round_zero():
+    first = _round(1)
+    initial = replace(first, round_index=0, history_rounds=(-1,))
+    assert initial.history_rounds == (-1,)
 
 
 def test_policy_advances_with_unchanged_training_history_and_resumes(tmp_path):

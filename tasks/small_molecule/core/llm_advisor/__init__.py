@@ -1,27 +1,4 @@
-"""LLM advisor public re-exports kept for the LDM-TTS loop.
-
-The legacy advisor/orchestrator/parser stack has been removed from this
-repository. This package initializer now exposes only the block dataclasses,
-client implementations, and environment configuration used by the current
-test-time-search workflow.
-"""
-
-from tasks.small_molecule.core.llm_advisor.blocks import (
-    AnalogueVerdict,
-    AnalogBlock,
-    GeneratorHint,
-    LLMBlock,
-    NoopBlock,
-    PHASE_A_ACTIONS_ALLOWED,
-    PHASE_A_REVIEW_ANALOGS_ALLOWED,
-    PHASE_B_SUGGESTIONS_ALLOWED,
-    ProposeBlock,
-    RejectBlock,
-    RejectReason,
-    ReviewAnalogsBlock,
-    ReviewBOBlock,
-    block_from_dict,
-)
+"""LLM client and configuration used by the small-molecule workflow."""
 from tasks.small_molecule.core.llm_advisor.config import (
     DEFAULT_LLM_MODEL,
     LLM_API_KEY,
@@ -48,19 +25,4 @@ __all__ = [
     "LLMClient",
     "MockLLMClient",
     "OpenAIChatClient",
-    # blocks
-    "AnalogueVerdict",
-    "GeneratorHint",
-    "RejectReason",
-    "ReviewBOBlock",
-    "ProposeBlock",
-    "RejectBlock",
-    "AnalogBlock",
-    "ReviewAnalogsBlock",
-    "NoopBlock",
-    "LLMBlock",
-    "PHASE_A_ACTIONS_ALLOWED",
-    "PHASE_A_REVIEW_ANALOGS_ALLOWED",
-    "PHASE_B_SUGGESTIONS_ALLOWED",
-    "block_from_dict",
 ]

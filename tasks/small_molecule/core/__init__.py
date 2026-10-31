@@ -25,50 +25,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "VinaScorerConfig": ("tasks.small_molecule.core.objective_vina", "VinaScorerConfig"),
     "as_rng": ("tasks.small_molecule.core.rng", "as_rng"),
     "as_scorer_tuple": ("tasks.small_molecule.core.scorer", "as_scorer_tuple"),
-    "chebyshev_scalarize": ("tasks.small_molecule.core.acquisition", "chebyshev_scalarize"),
-    "confidence_bound": ("tasks.small_molecule.core.acquisition", "confidence_bound"),
-    "dominates": ("tasks.small_molecule.core.acquisition", "dominates"),
-    "expected_hypervolume_improvement": (
-        "tasks.small_molecule.core.acquisition",
-        "expected_hypervolume_improvement",
-    ),
-    "expected_improvement": ("tasks.small_molecule.core.acquisition", "expected_improvement"),
     "generate_analogs": ("tasks.small_molecule.core.analog", "generate_analogs"),
-    "hypervolume": ("tasks.small_molecule.core.acquisition", "hypervolume"),
-    "pareto_front": ("tasks.small_molecule.core.acquisition", "pareto_front"),
-    "probability_of_improvement": ("tasks.small_molecule.core.acquisition", "probability_of_improvement"),
     "register_ref": ("tasks.small_molecule.core.scorer", "register_ref"),
     "resolve_ref_point": ("tasks.small_molecule.core.scorer", "resolve_ref_point"),
-    "sample_simplex_weights": ("tasks.small_molecule.core.acquisition", "sample_simplex_weights"),
 }
 
-__all__ = [
-    "DEFAULT_REF",
-    "GPConfig",
-    "GPSurrogate",
-    "NNScorer",
-    "NNScorerConfig",
-    "RNG",
-    "ReasynConfig",
-    "Scorer",
-    "Scorers",
-    "VinaScorer",
-    "VinaScorerConfig",
-    "as_rng",
-    "as_scorer_tuple",
-    "chebyshev_scalarize",
-    "confidence_bound",
-    "dominates",
-    "expected_hypervolume_improvement",
-    "expected_improvement",
-    "generate_analogs",
-    "hypervolume",
-    "pareto_front",
-    "probability_of_improvement",
-    "register_ref",
-    "resolve_ref_point",
-    "sample_simplex_weights",
-]
+__all__ = list(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:

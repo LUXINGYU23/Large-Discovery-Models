@@ -1,0 +1,323 @@
+{
+  "artifact_hashes": {
+    "budget.json": "c35aa3cc81cadc5df82aed88bc4fee502e4a0376427458d262bc68b0c3044730",
+    "checkpoint.json": "31abeefbd39378b0312c4a9dceb5a9874b63f187e492c187c1ff27d6924dfe5f",
+    "events.jsonl": "84134dd6e02b34fe4b879646c4f55bb05bab001eebb34b0767db1bab5904af9f",
+    "result.json": "7c926095e3f4b9e652452d27ad885f786e40ec3f7a9aa50ba3865982947d4a94",
+    "selection_frozen.json": "45142931f824efc2dcefcab7183ad45bd7c28fc9282aa2aa032689da04ab83d8",
+    "summary.json": "7c926095e3f4b9e652452d27ad885f786e40ec3f7a9aa50ba3865982947d4a94",
+    "trajectory.csv": "a36b0fc43c7d2fad821a1bd0d20c3a86e49ddfe1558d24e3ca0f1f1f717a0796"
+  },
+  "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+  "budget": {
+    "counters": {
+      "analysis_jobs": 1,
+      "benchmark_jobs": 45,
+      "dynamic_checks": 8,
+      "expensive_evaluation_attempts": 2,
+      "external_evaluations": 2,
+      "harness_turns": 0,
+      "initialization_evaluations": 0,
+      "lint_checks": 0,
+      "model_requests": 2,
+      "model_tokens": 0,
+      "oracle_job_slots": 288,
+      "outer_iterations": 1,
+      "policy_turns": 0,
+      "proposal_attempts": 2,
+      "quality_checks": 0,
+      "selected_candidates": 2,
+      "successful_evaluations": 2,
+      "test_evaluations": 32,
+      "valid_search_candidates": 8,
+      "validation_evaluations": 2
+    },
+    "limits": {
+      "analysis_jobs": 4,
+      "benchmark_jobs": 2000,
+      "dynamic_checks": 400,
+      "expensive_evaluation_attempts": 2,
+      "external_evaluations": 2,
+      "harness_turns": 20,
+      "initialization_evaluations": 160,
+      "lint_checks": 400,
+      "model_requests": 120,
+      "oracle_job_slots": 2000,
+      "outer_iterations": 1,
+      "policy_turns": 4,
+      "proposal_attempts": 100,
+      "quality_checks": 400,
+      "selected_candidates": 2,
+      "successful_evaluations": 2,
+      "test_evaluations": 50,
+      "valid_search_candidates": 8,
+      "validation_evaluations": 164
+    }
+  },
+  "collections": [
+    {
+      "count": 1,
+      "files": {
+        "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+        "ldm_ir.jsonl": "b193a247f2633bd6fb9be5e46e4e7c469ab882739094890a929c62b7931f4a8e",
+        "ldm_sft.jsonl": "5167a27005846934795fbdde806d140f72a18edd55eef7dd394022b871650e0d",
+        "manifest.json": "d080890e335fad2950b28a308346367a10fd3924f3dda168c5aec9336a47f727"
+      },
+      "generation": "a903b24f84eefff073606ae11be72a14a165c575af1ca7162667fda6aba35f3d",
+      "pointer": "initialization/ldm_data/alphabench/5cc5e23df16ef3e032568f87df032e9fff99260228c7ce48a6f4b82df88747c4/current.json",
+      "rows": {
+        "ldm_ir.jsonl": 1,
+        "ldm_sft.jsonl": 1
+      }
+    },
+    {
+      "count": 2,
+      "files": {
+        "dataset_info.json": "20cee72cb93f3c177996dd775e65aef8a8296eedbfe1967bd6c5f25287844d2c",
+        "ldm_ir.jsonl": "851cd0bbe0de6fb148aaac1d4aa4c689860f3a2e3f91191190331aa3f96cdec2",
+        "ldm_sft.jsonl": "bd642d0d614a4ce57419b529999c3e43ae598cd6a0e7b03dd4e323a44bb8b9da",
+        "manifest.json": "9ba157b684f413c1973bd180e94da92d08ef1dc30aaa884cafb7bc1e1cbeb4d5"
+      },
+      "generation": "292f16eca519fd9f5299de7e81dc0a6717c8ddc675313331d9b0ca763431adea",
+      "pointer": "ldm_data/alphabench/a959f45455cec966ab4613f063d5db1febdee13ca40c0b73592a2dfffa5d88ac/current.json",
+      "rows": {
+        "ldm_ir.jsonl": 2,
+        "ldm_sft.jsonl": 2
+      }
+    }
+  ],
+  "complete_t3": false,
+  "completed_replay": {
+    "command_output": "{\"task\": \"alphabench\", \"run_dir\": \"/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_10\", \"status\": \"completed\", \"replayed\": true}",
+    "files": 187,
+    "same_artifact_hashes": true
+  },
+  "executed_at": "2026-09-22T22:26:35.821744+00:00",
+  "host": "designated remote server",
+  "including_initialization": {
+    "attempts": 32,
+    "gain": 1.0,
+    "generation_cost": {
+      "attempts_per_step": [
+        1,
+        1,
+        1
+      ],
+      "failed_steps": 0,
+      "interrupted_steps": 0,
+      "mean": 1.0,
+      "step_count": 3,
+      "total_attempts": 3,
+      "unit": "model attempts per logical generation step"
+    },
+    "initialization_cost_basis": "current_run",
+    "run_success": true,
+    "strict_comparison": ">",
+    "successful_measurements": 32,
+    "threshold": 0.03,
+    "threshold_discovery_evaluations": 1
+  },
+  "initialization": {
+    "budget": {
+      "counters": {
+        "analysis_jobs": 0,
+        "benchmark_jobs": 90,
+        "dynamic_checks": 30,
+        "expensive_evaluation_attempts": 30,
+        "external_evaluations": 30,
+        "harness_turns": 0,
+        "initialization_evaluations": 30,
+        "lint_checks": 0,
+        "model_requests": 1,
+        "model_tokens": 0,
+        "oracle_job_slots": 180,
+        "outer_iterations": 1,
+        "policy_turns": 0,
+        "proposal_attempts": 1,
+        "quality_checks": 0,
+        "selected_candidates": 30,
+        "successful_evaluations": 30,
+        "test_evaluations": 0,
+        "valid_search_candidates": 30,
+        "validation_evaluations": 30
+      },
+      "limits": {
+        "analysis_jobs": 4,
+        "benchmark_jobs": 2000,
+        "dynamic_checks": 400,
+        "expensive_evaluation_attempts": 160,
+        "external_evaluations": 160,
+        "harness_turns": 20,
+        "initialization_evaluations": 160,
+        "lint_checks": 400,
+        "model_requests": 120,
+        "oracle_job_slots": 2000,
+        "outer_iterations": 1,
+        "policy_turns": 4,
+        "proposal_attempts": 100,
+        "quality_checks": 400,
+        "selected_candidates": 160,
+        "successful_evaluations": 160,
+        "test_evaluations": 50,
+        "valid_search_candidates": 160,
+        "validation_evaluations": 164
+      }
+    },
+    "generation_cost": {
+      "attempts_per_step": [
+        1
+      ],
+      "failed_steps": 0,
+      "interrupted_steps": 0,
+      "mean": 1.0,
+      "step_count": 1,
+      "total_attempts": 1,
+      "unit": "model attempts per logical generation step"
+    },
+    "public_information_digest": "f286435639b2e30eef2ee8a68adcb8353e548fcd00498c8c6081be5e3214c56d",
+    "seed_count": 30,
+    "source_digest": "6dcf8056cf373132f2f0742fd15f39f371c12d62561221f9b172a8c8793a529f",
+    "source_dispositions": {
+      "admitted": 30
+    },
+    "source_records": 30
+  },
+  "kind": "synthetic_development_gate",
+  "profile": "mock_ldm",
+  "protocol_digest": "28efbdd05a41505abed3d9158ea5b57de596c120f61b645d76cc62ce4d76a264",
+  "qualification": "mock_verified",
+  "quality_audit": {
+    "accepted_occurrences": 8,
+    "audited": 8,
+    "check_kind": "dynamic",
+    "complete": true,
+    "coverage": 1.0,
+    "domain": "all raw occurrences from search model responses; excludes initialization",
+    "filter_profile": "paper_filter_v1",
+    "paper_coverage": 1.0,
+    "paper_dynamic_success_rate": 1.0,
+    "paper_unavailable_reason": null,
+    "qlib_dynamic_success_rate": 1.0,
+    "raw_occurrences": 8,
+    "rows": [
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "4bb6de53c39ac93a4ee64cbc1af6a640df90cd23d941f88db937354f1b850fee",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 0,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "2367a98a647f7b3a16d54cdf951aec05fa377b743eee723da0ccaffa460462a5",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 1,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "b829365531df39b4478b6a2daf9e9446bc2b0fbc19423891fa8e88dd223c3bdd",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 2,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "93d7a7c82c9ef0965ff93bacdfca3fffa9b50d26b31ca53ffe627cb987428d7b",
+        "generation": "93bbd8bae1e3937e2fdbd09b1e6069446d4c51f340a6a8cfc0198c9bbb05d72b",
+        "index": 3,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "94fae9f0d3d8fee76c05213147b1b28b9b335664634f9743d51f680db102c5ea",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 0,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "0c39507e3d97019fff01e4202fc817c2fa4579d5ecff15b544cb889d33eef1a2",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 1,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "7517cb6c12ebff38eabca042a5fb95cab589057bd1f906ea1ae5de5f2c0a40d4",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 2,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      },
+      {
+        "attempt": 0,
+        "backend_valid": true,
+        "candidate_id": "b700f61198a65f9815155d05a6dac4c49ee1330d1071fc264ef7793d54486613",
+        "generation": "e5212e90b81d9e67a01f797976c4298761f83e2ffb3a621aed506e6cad7fdbf2",
+        "index": 3,
+        "original_status": "accepted",
+        "paper_static_valid": true,
+        "paper_valid": true,
+        "static_valid": true
+      }
+    ],
+    "static_success_rate": 1.0,
+    "unavailable_reason": null,
+    "unique_admitted": 8,
+    "unique_checked": 8,
+    "unique_valid": 8
+  },
+  "root": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation",
+  "run_dir": "/mnt/data1/Large-Discovery-Models/worktrees/alphabench-t3-implementation/tasks/alphabench/runs/mock_10",
+  "search": {
+    "attempts": 2,
+    "gain": 0.36666666666666664,
+    "generation_cost": {
+      "attempts_per_step": [
+        1,
+        1
+      ],
+      "failed_steps": 0,
+      "interrupted_steps": 0,
+      "mean": 1.0,
+      "step_count": 2,
+      "total_attempts": 2,
+      "unit": "model attempts per logical generation step"
+    },
+    "run_success": false,
+    "strict_comparison": ">",
+    "successful_measurements": 2,
+    "threshold": 0.03,
+    "threshold_discovery_evaluations": null
+  },
+  "status": "completed",
+  "test_factors": 32
+}

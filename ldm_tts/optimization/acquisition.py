@@ -11,7 +11,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from math import erf
-from typing import Any, Protocol, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -19,26 +19,6 @@ import numpy as np
 SINGLE_OBJECTIVE_ACQUISITIONS = frozenset({"mean", "ei", "lcb", "ucb"})
 MULTI_OBJECTIVE_ACQUISITIONS = frozenset({"mean", "ehvi"})
 SUPPORTED_ACQUISITIONS = SINGLE_OBJECTIVE_ACQUISITIONS | MULTI_OBJECTIVE_ACQUISITIONS
-
-
-class AcquisitionFunction(Protocol):
-    """Common interface implemented by posterior acquisition modules."""
-
-    @property
-    def name(self) -> str:
-        ...
-
-    def score(
-        self,
-        mean: Any,
-        std: Any,
-        *,
-        best: float | Any | None = None,
-        pareto_points: Sequence[Sequence[float]] = (),
-        ref_point: Sequence[float] | None = None,
-        rng: Any = None,
-    ) -> Any:
-        """Return larger-is-better scores for a posterior candidate reservoir."""
 
 
 @dataclass(frozen=True)
@@ -238,17 +218,14 @@ def confidence_bound(
     *,
     kind: str | None = None,
     beta: float | None = None,
-    kappa: float | None = None,
     minimize: bool = True,
 ) -> Any:
     """LCB or UCB score for one objective; larger is always better.
 
-    ``kappa`` is retained as a compatibility alias for ``beta``. When ``kind``
-    is omitted, the optimistic bound is selected: LCB for minimization and UCB
-    for maximization.
+    When ``kind`` is omitted, use LCB for minimization and UCB for maximization.
     """
 
-    exploration = float(beta if beta is not None else (kappa if kappa is not None else 1.0))
+    exploration = float(1.0 if beta is None else beta)
     if exploration < 0:
         raise ValueError(f"beta must be non-negative, got {exploration}")
     resolved_kind = (kind or ("lcb" if minimize else "ucb")).strip().lower()
@@ -256,31 +233,6 @@ def confidence_bound(
         raise ValueError("confidence-bound kind must be 'lcb' or 'ucb'")
     bound = mean - exploration * std if resolved_kind == "lcb" else mean + exploration * std
     return -bound if minimize else bound
-
-
-def probability_of_improvement(
-    mean: Any,
-    std: Any,
-    best: float,
-    *,
-    xi: float = 0.01,
-    minimize: bool = True,
-) -> np.ndarray:
-    """Probability of improvement compatibility helper."""
-
-    mu = np.asarray(mean, dtype=float)
-    sigma = np.asarray(std, dtype=float)
-    mu, sigma = np.broadcast_arrays(mu, sigma)
-    out = np.zeros_like(mu, dtype=float)
-    finite = np.isfinite(mu) & np.isfinite(sigma) & (sigma > 0)
-    if np.any(finite):
-        z = (
-            (float(best) - mu[finite] - xi) / sigma[finite]
-            if minimize
-            else (mu[finite] - float(best) - xi) / sigma[finite]
-        )
-        out[finite] = _normal_cdf(z)
-    return out
 
 
 def dominates(a: Sequence[float], b: Sequence[float], minimize: Sequence[bool]) -> bool:
@@ -470,7 +422,6 @@ def _numpy_generator(rng: Any) -> np.random.Generator:
 
 __all__ = [
     "AcquisitionConfig",
-    "AcquisitionFunction",
     "MULTI_OBJECTIVE_ACQUISITIONS",
     "PosteriorAcquisition",
     "SINGLE_OBJECTIVE_ACQUISITIONS",
@@ -484,6 +435,5 @@ __all__ = [
     "make_acquisition",
     "pareto_front",
     "posterior_mean_score",
-    "probability_of_improvement",
     "sample_simplex_weights",
 ]

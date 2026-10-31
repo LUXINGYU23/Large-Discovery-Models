@@ -298,7 +298,7 @@ def compute_hypervolume(
     minimize: tuple[bool, bool],
 ) -> float:
     try:
-        from tasks.small_molecule.core.acquisition import hypervolume
+        from ldm_tts.optimization.acquisition import hypervolume
 
         return float(hypervolume(points, ref_point, minimize=minimize))
     except Exception:

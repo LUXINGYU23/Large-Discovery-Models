@@ -93,7 +93,7 @@ def test_real_mode_requires_an_external_data_root(tmp_path: Path) -> None:
     )
 
     with pytest.raises(SystemExit, match="--data-dir"):
-        workflow._validate_args(args)
+        workflow.validate_args(args)
 
 
 def test_proposal_oversampling_must_exceed_the_bo_pool() -> None:
@@ -102,7 +102,7 @@ def test_proposal_oversampling_must_exceed_the_bo_pool() -> None:
     )
 
     with pytest.raises(SystemExit, match="must exceed"):
-        workflow._validate_args(args)
+        workflow.validate_args(args)
 
 
 def test_parse_args_accepts_public_operational_flags(tmp_path: Path) -> None:

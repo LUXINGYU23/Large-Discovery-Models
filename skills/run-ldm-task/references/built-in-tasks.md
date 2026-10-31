@@ -37,9 +37,7 @@ historical trajectory files from engine events:
 - `antibody`: `results.csv`, `llm_acq_decisions.jsonl`, and legacy summary
   fields merged into `summary.json`.
 
-Resume goes through the engine checkpoint (`checkpoint.json`); `small_molecule`
-additionally accepts a legacy `history.json`/`rounds.jsonl` directory when no
-campaign manifest exists.
+Resume goes through the engine checkpoint (`checkpoint.json`) in the campaign directory.
 
 When a config selects `contract_profile`, do not override locked budget or
 method arguments. Use a checked-in smoke profile, or follow a task README that

@@ -18,7 +18,6 @@ from tasks.antibody.core.ldm_light.ldm_acq import (
     seqs_to_indices,
     valid_seq,
 )
-from tasks.antibody.core.ldm_light.selection import select_by_acquisition
 
 
 def _history_payload(rows: list[dict[str, Any]], top_k: int) -> dict[str, Any]:
@@ -337,50 +336,3 @@ def score_direct_candidates(
         })
         scored.append(item)
     return scored
-
-
-def select_direct_with_acquisition(
-    *,
-    llm: Any,
-    rng: random.Random,
-    acquisition_rng: np.random.Generator,
-    antigen: str,
-    seq_len: int,
-    observed: set[str],
-    rows: list[dict[str, Any]],
-    antigen_context: dict[str, Any] | None,
-    batch_size: int,
-    reduction: str,
-    args: Any,
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    generated, generation = propose_direct_batch(
-        llm=llm,
-        rng=rng,
-        antigen=antigen,
-        seq_len=seq_len,
-        n=int(args.gen_m),
-        observed=observed,
-        rows=rows,
-        antigen_context=antigen_context,
-        args=args,
-        independent=True,
-    )
-    scored = score_direct_candidates(generated, rows, args=args)
-    selected_indices, probabilities = select_by_acquisition(
-        [candidate["acquisition_score"] for candidate in scored],
-        batch_size=batch_size,
-        reduction=reduction,
-        eta=float(args.softmax_eta),
-        rng=acquisition_rng,
-    )
-    selected = [scored[index] for index in selected_indices]
-    return selected, {
-        "source": f"direct_{reduction}",
-        "generation": generation,
-        "reduction": reduction,
-        "softmax_eta": float(args.softmax_eta),
-        "candidates": scored,
-        "selected_indices": selected_indices,
-        "selection_probabilities": probabilities,
-        "selected_candidates": selected,
-    }

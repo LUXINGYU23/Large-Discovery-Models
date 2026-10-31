@@ -25,18 +25,6 @@ def aa_to_idx(aa: str) -> int:
     return AA_TO_IDX[aa.upper()]
 
 
-def random_sequence(rng=None, seq_len: int = SEQ_LEN) -> "list[int]":
-    """Sample a uniformly random sequence as a list of AA indices.
-
-    Used by reject sampling and ``Not.__iter__``. CDR constraints are NOT
-    enforced here — :func:`sample_within_search_dsl` adds them.
-    """
-    import numpy as np
-
-    rng = rng if rng is not None else np.random.default_rng()
-    return [int(rng.integers(0, 20)) for _ in range(seq_len)]
-
-
 def hamming(a: "list[int]", b: "list[int]") -> int:
     """Hamming distance between two integer-encoded sequences."""
     if len(a) != len(b):

@@ -1,38 +1,4 @@
-"""Vina-backed single-point Scorer for the LDM-TTS small-molecule loop.
-
-The single public class :class:`VinaScorer` is **callable**:
-
-    scorer = VinaScorer(VinaScorerConfig(vina_bin="../bin/vina", cache_dir=...))
-    scores = scorer(smiles_list)    # list[float], i-th output is i-th SMILES
-
-The i-th output is the Vina score of the i-th SMILES, or ``float("nan")``
-on any docking failure (prep failure, dock binary error, unparseable
-score). The BO loop's existing ``_safe_score`` helper converts non-finite
-floats to ``None`` and excludes them from the GP fit, so failed entries
-are silently dropped from the surrogate's training set while the SMILES
-is still recorded in the history log.
-
-No aggregation, no best-of-batch, no analog generation; those concerns
-live in the LDM-TTS search loop and ``tasks.small_molecule.core.analog``.
-
-For users who need the rich per-compound record (pose path, status,
-compound_id, cache hit flag), :func:`vina_dock_one` and
-:func:`vina_dock_batch` remain importable as a public, lower-level
-interface that returns ``list[DockingResult]`` directly.
-
-Public surface (re-exported from :mod:`tasks.small_molecule.core.__init__`):
-
-- :class:`VinaScorerConfig`
-- :class:`VinaScorer`
-- :data:`Scorer` -- type alias for the canonical
-  ``Callable[[Sequence[str]], Sequence[float]]`` interface, defined in
-  :mod:`tasks.small_molecule.core.scorer` and re-exported here for backward compatibility
-
-Everything else (``vina_dock_one`` / ``vina_dock_batch`` /
-``_resolve_vina_bin`` / receptor helpers) is importable via
-``tasks.small_molecule.core.objective_vina.<name>`` but is intentionally not part of the
-canonical public surface.
-"""
+"""AutoDock Vina scoring for small-molecule campaigns."""
 
 from __future__ import annotations
 
@@ -65,14 +31,12 @@ from tasks.small_molecule.core.docking import (
     work_dir_for_receptor,
 )
 
-from tasks.small_molecule.core.scorer import Scorer  # re-exported in __all__ below
 
 LOGGER = logging.getLogger(__name__)
 VINA_PREFLIGHT_TIMEOUT_SECONDS = 10
 
 
 __all__ = [
-    "Scorer",
     "VinaScorerConfig",
     "VinaScorer",
 ]

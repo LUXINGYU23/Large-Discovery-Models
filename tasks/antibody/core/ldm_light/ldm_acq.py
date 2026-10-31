@@ -904,41 +904,6 @@ def describe_ldm_task(
     )
 
 
-def append_results(
-    rows: list[dict[str, Any]],
-    values: np.ndarray,
-    seqs: list[str],
-    llm_scores: list[float | None],
-    acquisition_scores: list[float | None],
-    elapsed_s: float,
-    source: str,
-    acquisition_used: bool,
-    start_idx: int,
-) -> tuple[int, float, str]:
-    best_value = min((row["BestValue"] for row in rows), default=float("inf"))
-    best_seq = rows[-1]["BestProtein"] if rows else ""
-    idx = start_idx
-    for seq, llm_score, acq_score, value in zip(seqs, llm_scores, acquisition_scores, values):
-        value = float(value)
-        if value < best_value:
-            best_value = value
-            best_seq = seq
-        rows.append({
-            "Index": idx,
-            "LastValue": value,
-            "BestValue": best_value,
-            "LLMScore": llm_score,
-            "AcquisitionScore": acq_score,
-            "Time": elapsed_s,
-            "LastProtein": seq,
-            "BestProtein": best_seq,
-            "Source": source,
-            "AcquisitionUsed": bool(acquisition_used),
-        })
-        idx += 1
-    return idx, best_value, best_seq
-
-
 def collect_direct_sequence_action(
     sink: DataCollectionSink,
     *,

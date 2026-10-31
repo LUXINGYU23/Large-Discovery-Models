@@ -14,9 +14,9 @@ from ldm_tts.data import (
     make_complete_design_ir,
     make_parameter_edit_ir,
     render_record,
-    smallmol_ir_from_prompt_response,
     validate_ir_record,
 )
+from tasks.small_molecule.core.data_ir import smallmol_ir_from_prompt_response
 
 
 def _example_ir():

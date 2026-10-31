@@ -188,7 +188,7 @@ def preflight_openai_chat(
     timeout_seconds: float = 30.0,
     extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Probe one minimal chat response while preserving the legacy artifact."""
+    """Probe one minimal chat response."""
 
     started = time.monotonic()
     content = request_openai_chat(

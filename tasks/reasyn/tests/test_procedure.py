@@ -265,8 +265,11 @@ def test_tdc_cached_oracle_resume_does_not_double_charge_evaluation(tmp_path, mo
     ]
     with pytest.raises(RuntimeError, match="fixture stopped after oracle receipt"):
         workflow.main(argv)
-    assert not (root / "checkpoint.json").exists()
-    before = json.loads((root / "budget.json").read_text())["counters"]
+    checkpoint = json.loads((root / "checkpoint.json").read_text())
+    assert checkpoint["state"]["observations"] == []
+    budget = json.loads((root / "budget.json").read_text())
+    assert budget["metadata"]["engine_active_selection"]["entries"][0]["result"]["status"] == "succeeded"
+    before = budget["counters"]
     assert before["oracle_calls"] == 1
     assert before["external_evaluations"] == 1
     assert before["expensive_evaluation_attempts"] == 1

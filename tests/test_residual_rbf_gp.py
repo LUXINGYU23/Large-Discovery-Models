@@ -28,7 +28,7 @@ def test_residual_gp_matches_frozen_linear_operator_and_single_measurement():
             assert projection["std"][i] == pytest.approx(before.scalar_std)
 
 
-def test_legacy_sparse_gp_and_invalid_residual_priors():
+def test_sparse_gp_and_invalid_residual_priors():
     history = [BOObservation.scalar("a", 1, [0, 1])]
     assert RBFGPSurrogate(history).fit_status == "fallback"
     for prior in ([], [np.nan], [0, 1]):
@@ -45,7 +45,7 @@ def test_zero_prior_is_equivalent_to_omitted_under_same_configuration(n, setting
     baseline = RBFGPSurrogate(history, **settings)
     zero = RBFGPSurrogate(history, residual_prior_mean=np.zeros(n), **settings)
     assert zero.fit_status == baseline.fit_status
-    assert zero.predict([0.15]) == baseline.predict([0.15])
+    assert zero.predict_record("q", [0.15]) == baseline.predict_record("q", [0.15])
     if baseline.ready:
         np.testing.assert_array_equal(zero.x_std, baseline.x_std)
         assert zero.y_std == baseline.y_std

@@ -14,7 +14,8 @@ from importlib.metadata import version
 profiles: list[str] = []
 committed = {}
 turn_requests = 0
-print(json.dumps({"type": "ready", "protocolVersion": version("large-discovery-models")}), flush=True)
+policy_disable = os.environ.get("HARNESS_TEST_SUBMISSION") == "policy_disable"
+print(json.dumps({"type": "ready", "protocolVersion": os.environ.get("HARNESS_TEST_RELEASE") or version("large-discovery-models")}), flush=True)
 
 
 def submission_record(submission, artifacts) -> tuple[str, str]:
@@ -74,8 +75,32 @@ for line in sys.stdin:
                     assert previous["inputDigest"] == item["inputDigest"]
                     turns.append({**previous, "replayed": True})
                     continue
+            if os.environ.get("HARNESS_TEST_PROVIDER_AUTH"):
+                provider_request_id = f"{item['turnId']}-provider-1"
+                request_digest = hashlib.sha256(b"provider request").hexdigest()
+                authorization_id = f"{item['turnId']}-authorization-1"
+                print(json.dumps({
+                    "type": "provider_authorization_requested",
+                    **common,
+                    "authorizationId": authorization_id,
+                    "profileId": "unexpected" if os.environ.get("HARNESS_TEST_PROVIDER_AUTH_BAD_IDENTITY") else item["profileId"],
+                    "turnId": item["turnId"],
+                    "providerRequestId": provider_request_id,
+                    "requestDigest": request_digest,
+                }), flush=True)
+                authorization = json.loads(next(sys.stdin))
+                assert authorization["type"] == "provider_authorization_result"
+                assert authorization["authorizationId"] == authorization_id
+                assert authorization["providerRequestId"] == provider_request_id
+                assert authorization["requestDigest"] == request_digest
+                if not authorization["authorized"]:
+                    print(json.dumps({"type": "error", **common, "error": {
+                        "code": "provider_authorization_denied", "message": "provider authorization denied",
+                    }}), flush=True)
+                    sys.exit(0)
             attempt_index = 0
-            submission = {"candidates": [{"value": item["profileId"]}]}
+            submission = ({"action": "disable"} if policy_disable
+                          else {"candidates": [{"value": item["profileId"]}]})
             artifacts = []
             decision = {"decision": "accept", "errors": []}
             while not os.environ.get("HARNESS_TEST_SKIP_VALIDATION"):
@@ -99,7 +124,8 @@ for line in sys.stdin:
                 decision = validation
                 if decision["decision"] != "retry":
                     break
-                submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
+                if not policy_disable:
+                    submission = {"candidates": [{"value": f"{item['profileId']}-{attempt_index + 1}"}]}
             submission_json, digest = submission_record(submission, artifacts)
             if os.environ.get("HARNESS_TEST_CHANGE_AFTER_VALIDATION"):
                 submission = {"candidates": [{"value": "changed"}]}

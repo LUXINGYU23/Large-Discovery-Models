@@ -278,7 +278,7 @@ export class SubmissionController {
 				}
 				this.providerRequests += 1;
 				if (this.value) return payload;
-				if (this.providerRequests > 1) return payload;
+			if (this.providerRequests > 1 || this.config.forceFirstToolCall === false) return payload;
 				return {
 					...payload,
 					tool_choice: "required",
@@ -592,11 +592,7 @@ export class PersistentProfileSession {
 		return skillDirectories;
 	}
 
-	async runTurn(
-		input: SessionTurnInput,
-		validate: SubmissionValidator,
-		authorize: ProviderAuthorizer = async () => true,
-	): Promise<CommittedTurn> {
+	async runTurn(input: SessionTurnInput, validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const turnRoot = join(this.profileRoot, "turns", input.turnId);
 		const commitPath = join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json");
@@ -978,11 +974,7 @@ export class PiSessionPool {
 		});
 	}
 
-	async runTurns(
-		inputs: SessionTurnInput[],
-		validate: SubmissionValidator,
-		authorize: ProviderAuthorizer = async () => true,
-	): Promise<CommittedTurn[]> {
+	async runTurns(inputs: SessionTurnInput[], validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn[]> {
 		const expected = new Set(this.sessions.keys());
 		if (inputs.length !== expected.size || new Set(inputs.map((input) => input.profileId)).size !== inputs.length) {
 			throw new Error("run_turn must contain exactly one input for every profile");

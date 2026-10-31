@@ -157,14 +157,10 @@ class HarnessClient:
             return validation
 
         def authorize(request: HarnessProviderAuthorizationRequest) -> bool:
-            if (
-                request.campaign_id != self.config.campaign_id
-                or request.profile_id not in expected
-                or request.turn_id != expected[request.profile_id].turn_id
-            ):
-                raise HarnessError(
-                    "harness provider authorization request does not match the turn batch"
-                )
+            if (request.campaign_id != self.config.campaign_id
+                    or request.profile_id not in expected
+                    or request.turn_id != expected[request.profile_id].turn_id):
+                raise HarnessError("harness provider authorization request does not match the turn batch")
             decision = True if provider_authorizer is None else provider_authorizer(request)
             if type(decision) is not bool:
                 raise HarnessError("harness provider authorizer must return a boolean")

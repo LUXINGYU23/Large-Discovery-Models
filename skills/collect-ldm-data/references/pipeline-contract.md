@@ -49,7 +49,7 @@ action must appear in `request.allowed_actions`.
 
 | Task | Runtime status | Mapping |
 | --- | --- | --- |
-| Small molecule | Implemented for accepted direct-LLM attempts in `tasks/small_molecule/core/ldm_tilted_case2/trace.py`. | `smallmol`, `complete_design`, `propose`. |
+| Small molecule | Implemented for accepted direct-LLM attempts in `tasks/small_molecule/core/engine_adapters.py`. | `smallmol`, `complete_design`, `propose`. |
 | nanoGPT | Implemented in `tasks/nanogpt/core/workflow.py` for validated operation edits and expansion-schema actions. | `nanogpt`, `parameter_edits`, `propose`, `expand_design_space`, or `add_new_parameter`. |
 | Antibody | Implemented in `tasks/antibody/core/ldm_light/ldm_acq.py` for validated direct LLM sequence actions; fallback and policy-DSL decisions are rejected. | `protein`, `complete_design`, `propose`; sequence rows use `reasoning_available:false`. |
 | SynthonBench Harness | Native sessions and redacted provider transport are retained under the run's Harness artifact root. No `ldm-2.0` converter is implemented. | Raw multi-turn research trace only; do not register as SFT data. |

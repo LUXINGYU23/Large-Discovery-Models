@@ -491,7 +491,6 @@ def _finish_campaign(
     return 0 if result.summary["successful_evaluation_count"] else 1
 
 
-_validate_args = validate_args
 
 
 def _run_payload(

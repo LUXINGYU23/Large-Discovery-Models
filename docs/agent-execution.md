@@ -238,7 +238,7 @@ minutes. A 20-attempt warm-up plus 100 outer iterations can take many hours.
 
 ## 9. Resume And Recovery
 
-- Small molecule supports `args.resume=true` and `args.resume-from=<run-dir-or-artifact>`.
+- Small molecule supports `args.resume=true` and `args.resume-from=<campaign-dir>`.
 - nanoGPT supports `args.resume-from=<run-dir-or-summary>` and restores state counters, buffers, schema, and iteration numbering.
 - Antibody writes per-evaluation artifacts but does not have the same general resume contract. Preserve the run directory and relaunch only with a documented recovery plan.
 - Never delete or overwrite a partial run while diagnosing it.

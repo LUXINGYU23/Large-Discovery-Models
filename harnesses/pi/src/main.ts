@@ -285,10 +285,10 @@ for await (const line of lines) {
 				code: errorCode(error),
 				message: redactor.text((error as Error).message),
 				...(error instanceof TurnExecutionError ? { turnUsage: error.turnUsage } : {}),
-		};
-		validations.rejectAll(error as Error);
-		authorizations.rejectAll(error as Error);
-		respondTo(frame, "error", {
+			};
+			validations.rejectAll(error as Error);
+			authorizations.rejectAll(error as Error);
+			respondTo(frame, "error", {
 				error: failure,
 			});
 		}

@@ -30,7 +30,7 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, secret, "campaign-1");
 	try {
 		await proxy.start();
-		await proxy.beginTurn("target_sar", "session-1", "turn_1", root);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, async () => true);
 		const response = await fetch(`${proxy.baseUrl("target_sar")}/responses`, {
 			method: "POST",
 			headers: { authorization: "Bearer sidecar-proxy-token", "content-type": "application/json" },
@@ -59,7 +59,7 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 		assert.equal(index.response.chunks, 4);
 		assert.equal(index.response.headers["set-cookie"], "[REDACTED]");
 
-		await proxy.beginTurn("target_sar", "session-1", "turn_1", root);
+		await proxy.beginTurn("target_sar", "session-1", "turn_1", root, async () => true);
 		const recovered = await fetch(proxy.baseUrl("target_sar") + "/responses", {
 			method: "POST",
 			body: "{}",
@@ -162,7 +162,7 @@ test("provider proxy applies and traces the declared generation settings", async
 	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "unit-test-token", "campaign", settings);
 	try {
 		await proxy.start();
-		await proxy.beginTurn("research", "session", "turn", root);
+		await proxy.beginTurn("research", "session", "turn", root, async () => true);
 		const response = await fetch(proxy.baseUrl("research") + "/responses", {
 			method: "POST", body: JSON.stringify({ model: "fixture", input: [], temperature: 1, tool_choice: "required" }),
 		});
@@ -198,7 +198,7 @@ for (const [thinking, effort] of [["off", "none"], ["high", "high"]] as const) {
 		});
 		try {
 			await proxy.start();
-			await proxy.beginTurn("research", "session", "turn", root);
+			await proxy.beginTurn("research", "session", "turn", root, async () => true);
 			const stream = streamSimple({
 				id: "fixture", name: "fixture", api: "openai-responses", provider: "ldm-harness-research",
 				baseUrl: proxy.baseUrl("research"), reasoning: true, thinkingLevelMap: { off: "none", high: "high" },

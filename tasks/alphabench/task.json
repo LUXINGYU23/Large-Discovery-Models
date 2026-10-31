@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "alphabench",
+  "description": "Complete AlphaBench T3 factor search and evaluation",
+  "dependency_checker": "tasks.alphabench.ldm_task.dependencies:check_dependencies"
+}

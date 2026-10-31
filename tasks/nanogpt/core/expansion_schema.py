@@ -144,12 +144,6 @@ def operation_representation_version(schema: OperationSchema) -> str:
     return f"operation_schema:{schema.version}"
 
 
-def operation_feature_version(schema: OperationSchema) -> str:
-    """Compatibility alias for :func:`operation_representation_version`."""
-
-    return operation_representation_version(schema)
-
-
 def operation_schema_signature(schema: OperationSchema) -> str:
     return hashlib.sha1(
         json.dumps(operation_schema_to_json(schema), sort_keys=True).encode("utf-8")
@@ -217,12 +211,6 @@ def initial_operation_parameter_names(full_schema: OperationSchema, spec: str) -
     if not selected:
         raise ValueError("--initial-expansion-parameters did not select any schema parameters.")
     return selected
-
-
-def initial_operation_feature_names(full_schema: OperationSchema, spec: str) -> list[str]:
-    """Compatibility alias for :func:`initial_operation_parameter_names`."""
-
-    return initial_operation_parameter_names(full_schema, spec)
 
 
 def normalize_operation_parameter(parameter: OperationParameter) -> OperationParameter:
@@ -310,12 +298,6 @@ def operation_representation_dimension(schema: OperationSchema) -> int:
         total += len(parameter.choices) if parameter.kind == "choice" else 1
         total += 1
     return total
-
-
-def operation_feature_dim(schema: OperationSchema) -> int:
-    """Compatibility alias for :func:`operation_representation_dimension`."""
-
-    return operation_representation_dimension(schema)
 
 
 def normalize_operation_numeric(value: float, parameter: OperationParameter) -> float:

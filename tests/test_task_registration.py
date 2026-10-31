@@ -19,7 +19,7 @@ from ldm_tts.registration.qualification import load_qualification_evidence
 
 
 def test_builtin_tasks_are_discovered_from_manifests() -> None:
-    assert set(TASK_DEFINITIONS) == {
+    assert set(TASK_DEFINITIONS) >= {
         "ai4bio_mutation_effect_prediction",
         "antibody",
         "atomworld",

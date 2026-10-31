@@ -196,16 +196,6 @@ campaign files. Pilot reporting requires at least one successful evaluation per
 round; a round in which every candidate fails is reported by the pilot tool as
 incomplete rather than scored.
 
-### Main-table artifacts
-
-For every completed time-series candidate, the upstream grader writes its
-real-data Table 1 into `evaluations/<candidate>/grader_description.md`. The
-row is labelled `LDM` and is rendered from the same 10 cells and five-fold
-aggregates checked for scoring. This is a copy of the pinned task description;
-the source checkout is never edited. It is a Table 1 row only: the synthetic
-Switch-Feature and State tables remain unreported, so the campaign still
-declares `official_protocol: false`.
-
 ## Data collection
 
 Direct methods append accepted submissions as `ldm-2.0` complete-design rows
@@ -221,3 +211,59 @@ not training rows.
 `tiny_campaign_verified` (real sidecar capability smoke and one real tiny run
 per method). Historical results from the earlier stand-alone package are not
 evidence for this implementation.
+
+## Table 3 agent protocol (separate from this four-case adapter)
+
+The program-search adapter above is intentionally **not** eligible for
+ResearchGym Table 3.  Table 3 is a five-task agent benchmark, where a single
+agent edits and executes an entire task workspace.  Its immutable protocol is
+implemented in `table3_protocol.py`:
+
+| Profile | Per-task agent budget | Seeds | Tasks |
+| --- | --- | --- | --- |
+| `table3` | $10 API, 12 wall-clock hours | 0, 1, 2 | CL, MDT, CMR, TIM, IRB |
+| `scaffold_comparison` | $20 API, 24 wall-clock hours | 0, 1, 2 | CL, MDT, CMR, TIM, IRB |
+
+`scripts/ldm_code_agent.py` is the corresponding LDM code-writing harness. It
+uses an OpenAI-compatible endpoint through an explicit JSON action protocol
+(`read`, `write`, `bash`, `submit`) and gives the model the complete workspace,
+not merely a method slot. API credentials are removed from all child command
+environments. It refuses to start a budgeted run until the deployment supplies
+an auditable provider price card and conservative per-call reserve; an unknown
+model price is never treated as $0.
+
+`table3_report.py` accepts only 15 completed, budget-compliant agent receipts,
+each with a hash of an official task-grade summary.  It reports the
+three-run sample mean±standard-deviation (`ddof=1`) and selects `Best@3` as a *single* trajectory using
+the task's primary score; it never combines column-wise maxima.  The launcher
+must write an immutable manifest before a provider call.  A restricted run
+without the optional external-search services is marked as such in that
+manifest and must not be described as an unrestricted paper reproduction.
+
+Create the manifest and an exact 15-job plan before any model call.  The CMR
+row is deliberately required at this point rather than selected after scores
+are visible:
+
+```bash
+python tasks/researchgym/scripts/prepare_table3_campaign.py \
+  --campaign-dir /runs/rg-table3 --profile table3 \
+  --model "$LLM_MODEL_NAME" --cmr-primary-row qgs_blip_base
+```
+
+The command does not call a provider or start an experiment.  With eight
+independent GPUs its plan is two waves: 24 hours maximum for the 12-hour
+profile (180 GPU-hours), and 48 hours for the 24-hour comparison profile (360
+GPU-hours).  The respective hard API caps are $150 and $300.
+
+The released CMR grader's `qgs_clip_base` and `qgs_blip_base` rows do **not**
+reproduce the paper's published I2TR values.  They may be used only for a
+clearly labelled alternative protocol.  A report is hard-blocked as a strict
+Table 3 result until `--cmr-table3-contract` points to a hash-addressed,
+author-provided primary-source description of the CMR row/aggregation.
+
+`scripts/normalize_table3_grade.py` is the only route from an agent trajectory
+to a Table 3 receipt. It parses the pinned task graders' JSON schemas: CIFAR100
+N=10 (CL), the mean of SOFC/MatScholar test F1 (MDT), a manifest-fixed CMR QGS
+row, PAM CPD (TIM), and Hopper-v2 Return (IRB). Where an official grader ran
+but a primary cell is missing, the emitted zero remains explicitly marked
+incomplete; no self-reported metric can fill it.

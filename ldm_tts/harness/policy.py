@@ -162,8 +162,8 @@ class PolicyRoundInput:
             raise ValueError("policy history identifiers, rounds and measurements must align with numeric history")
         if any(not isinstance(value, str) or not value.strip() for value in ids):
             raise ValueError("policy history candidate IDs must be non-empty strings")
-        if any(isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < self.round_index for value in rounds):
-            raise ValueError("policy history rounds must be integers preceding the current round")
+        if any(isinstance(value, bool) or not isinstance(value, int) or not -1 <= value < self.round_index for value in rounds):
+            raise ValueError("policy history rounds must be initialization or preceding search rounds")
         if any(left > right for left, right in zip(rounds, rounds[1:])):
             raise ValueError("policy history must be chronological")
         research = _json_mapping(self.research_snapshot, "research_snapshot")

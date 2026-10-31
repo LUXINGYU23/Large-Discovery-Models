@@ -6,13 +6,9 @@ Scope: this workflow stops after collecting a batch of
 {compound, full SMILES, measured activity} records and docking them. It does
 not include an AI activity-prediction model.
 
-The main Step 1 challenge is Markush extraction:
-  The core scaffold is drawn once in the PDF with R attachment points, while
-  the R groups are listed row by row in the SAR table. Whole-image OCSR is not
-  enough; the workflow must identify the scaffold and its attachment points,
-  identify each R fragment row by row, stitch fragments back onto the scaffold
-  with RDKit, and parse the activity columns at the same time. OCSR is fragile
-  on complex scaffolds, so a manual review gate sits between Step 1 and Step 2.
+Step 1 reads PDF text and tables, extracts formula and activity evidence,
+resolves SMILES through chemical databases, and flags ambiguous records for
+review before docking.
 
 Step 2 is implemented as a local AutoDock Vina workflow: RDKit generates 3D
 ligands, Meeko converts ligands to PDBQT, the 8UN5 co-crystal ligand defines
@@ -63,23 +59,6 @@ socket.setdefaulttimeout(DEFAULT_API_TIMEOUT + 15)
 # STEP 1 -- Extract Markush structures and activity data from PDFs
 # ═══════════════════════════════════════════════════════════════════════════
 
-class MarkushScaffold(BaseModel):
-    """Core scaffold, with attachment points marked as dummy atoms [*]."""
-    core_smiles: str                  # Contains one or more [*]; e.g. "...c1ccc([*:1])cc1..."
-    r_labels: list[str]               # ["R"] or ["R1","R2"], corresponding to [*:n]
-    ocsr_confidence: float            # OCSR confidence
-    needs_review: bool = True         # Complex scaffolds require manual review by default
-
-
-class RGroupEntry(BaseModel):
-    """One SAR-table row: one compound's R substituent and its activity."""
-    compound_id: str                  # e.g. "37"
-    r_label: str                      # "R" (corresponds to a scaffold attachment point)
-    fragment_smiles: str              # Fragment containing a [*] attachment point
-    ocsr_confidence: float
-    raw_activity: str                 # Raw table text, e.g. "0.34 (15x)"
-
-
 class ExtractedCompound(BaseModel):
     """Final assembled and parsed record produced by Step 1."""
     compound_id: str
@@ -106,9 +85,7 @@ class ExtractedCompound(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-for _model in (MarkushScaffold, RGroupEntry, ExtractedCompound):
-    if hasattr(_model, "model_rebuild"):
-        _model.model_rebuild(_types_namespace=globals())
+ExtractedCompound.model_rebuild(_types_namespace=globals())
 
 
 def read_json(path: Path) -> Any:
@@ -1168,11 +1145,6 @@ def normalize_formula_with_reason(
     return format_formula(counts), "neutral_formula"
 
 
-def normalize_formula(raw_formula: str, formula_kind: str) -> str:
-    formula, _reason = normalize_formula_with_reason(raw_formula, formula_kind)
-    return formula
-
-
 def formula_from_smiles(smiles: Any) -> str:
     text = str(smiles or "").strip()
     if not text:
@@ -1234,26 +1206,6 @@ def parse_selectivity_fold(value_text: Any) -> Optional[float]:
     if re.search(r"\bselectivit(?:y|ies)\b", text, flags=re.IGNORECASE):
         return parse_activity_numeric(text)
     return None
-
-
-def parse_activity(raw_activity: str) -> tuple[Optional[float], Optional[float]]:
-    """
-    Parse activity text into structured numeric values.
-
-    Example: "0.34 (15x)" -> (0.34 nM, 15.0-fold). The regex handling covers
-    units (nM/µM), inequalities (>, <), ranges, and missing values.
-    """
-    text = str(raw_activity or "")
-    value = parse_activity_numeric(text)
-    unit = "nM"
-    lowered = text.lower().replace("μ", "u").replace("µ", "u")
-    if "um" in lowered or "micromolar" in lowered:
-        unit = "uM"
-    elif "mm" in lowered or "millimolar" in lowered:
-        unit = "mM"
-    elif "%" in lowered:
-        value = None
-    return normalize_activity_to_nM(value, unit), parse_selectivity_fold(text)
 
 
 def activity_record_score(
@@ -2300,33 +2252,6 @@ def row_to_extracted_compound(row: dict[str, Any], source_ref: str) -> Extracted
         ),
         warnings=warnings,
     )
-
-
-def locate_regions(pdf: object) -> tuple[list[bytes], list[object]]:
-    """
-    ROI-location interface for the legacy OCSR Markush path.
-
-    The current workflow no longer depends on image OCSR. build_dataset() goes
-    directly through PDF text, LLM table extraction, and
-    formula -> BindingDB/PubChem/ChEMBL -> SMILES. This interface is retained
-    so MolScribe/DECIMER can be connected later.
-    """
-    return [], []
-
-
-def extract_scaffold(scaffold_image: bytes) -> MarkushScaffold:
-    """Legacy image-OCSR interface; not called by the current end-to-end path."""
-    raise NotImplementedError("Image OCSR scaffold extraction is not wired in this text/API workflow.")
-
-
-def extract_rgroup_table(table_region: object) -> list[RGroupEntry]:
-    """Legacy R-group table OCSR interface; not called by the current path."""
-    raise NotImplementedError("Image OCSR R-group extraction is not wired in this text/API workflow.")
-
-
-def assemble_molecule(scaffold: MarkushScaffold, entry: RGroupEntry) -> Optional[str]:
-    """Legacy RDKit Markush assembly interface; not called by the current path."""
-    raise NotImplementedError("RDKit Markush assembly is not wired in this text/API workflow.")
 
 
 def extract_markush_dataset(

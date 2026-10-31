@@ -86,7 +86,7 @@ export class ProviderProxy {
 		sessionId: string,
 		turnId: string,
 		turnRoot: string,
-		authorize: ProviderAuthorizer = async () => true,
+		authorize: ProviderAuthorizer,
 	): Promise<void> {
 		if (this.activeTurns.has(profileId)) throw new Error(`profile already has an active turn: ${profileId}`);
 		const recovered = await existingTrace(turnRoot, turnId);

@@ -1,0 +1,13 @@
+name: alphabench_mock
+task: alphabench
+algorithm: ldm
+mode: mock
+contract_profile: mock_ldm
+description: Synthetic full-lifecycle LDM check; execute on the designated remote server.
+env:
+  LDM_DATA_COLLECTION_ENABLED: "1"
+args:
+  mock: true
+  method: ldm
+  iterations: 1
+  evaluations: 2

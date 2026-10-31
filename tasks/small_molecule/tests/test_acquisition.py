@@ -1,4 +1,4 @@
-"""Tests for :mod:`tasks.small_molecule.core.acquisition`."""
+"""Tests for shared acquisition behavior used by the small-molecule task."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from tasks.small_molecule.core.acquisition import (  # noqa: E402
+from ldm_tts.optimization.acquisition import (  # noqa: E402
     chebyshev_scalarize,
     confidence_bound,
     dominates,
@@ -21,7 +21,6 @@ from tasks.small_molecule.core.acquisition import (  # noqa: E402
     expected_improvement,
     hypervolume,
     pareto_front,
-    probability_of_improvement,
     sample_simplex_weights,
 )
 from tasks.small_molecule.core.rng import RNG  # noqa: E402
@@ -54,26 +53,17 @@ class ExpectedImprovementTests(unittest.TestCase):
         np.testing.assert_array_equal(ei, np.zeros(2))
 
 
-class ProbabilityOfImprovementTests(unittest.TestCase):
-    def test_basic_minimize(self) -> None:
-        mu = np.array([0.0, -1.0])
-        sigma = np.array([1.0, 1.0])
-        pi = probability_of_improvement(mu, sigma, best=0.0, xi=0.0, minimize=True)
-        self.assertAlmostEqual(pi[0], 0.5, places=4)
-        self.assertGreater(pi[1], 0.5)
-
-
 class ConfidenceBoundTests(unittest.TestCase):
     def test_ucb_minimize(self) -> None:
         mu = np.array([0.0, 1.0])
         sigma = np.array([1.0, 1.0])
-        cb = confidence_bound(mu, sigma, kappa=2.0, minimize=False)
+        cb = confidence_bound(mu, sigma, beta=2.0, minimize=False)
         np.testing.assert_array_equal(cb, mu + 2.0 * sigma)
 
     def test_lcb_minimize(self) -> None:
         mu = np.array([0.0, 1.0])
         sigma = np.array([1.0, 1.0])
-        cb = confidence_bound(mu, sigma, kappa=2.0, minimize=True)
+        cb = confidence_bound(mu, sigma, beta=2.0, minimize=True)
         np.testing.assert_array_equal(cb, 2.0 * sigma - mu)
 
 

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "task_id": "alphabench",
+  "stage": "mock_verified",
+  "benchmark_commit": "31bb94bbb7744177c51c9d011e07c31e3092b93e",
+  "contract_profile": "mock_ldm",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/alphabench/task.json",
+        "tasks/alphabench/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/alphabench/task.json",
+        "tasks/alphabench/experiment.json",
+        "tasks/alphabench/ldm_task/procedure.py"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/alphabench/mock.yaml",
+        "tasks/alphabench/resources/evidence/mock_verified.json"
+      ]
+    },
+    "contract_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "seed_evaluated": {
+      "status": "pending",
+      "evidence": []
+    },
+    "tiny_campaign_verified": {
+      "status": "pending",
+      "evidence": []
+    },
+    "campaign_qualified": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

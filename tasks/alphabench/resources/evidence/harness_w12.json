@@ -1,0 +1,52 @@
+{
+  "qualification": "development_smoke_only",
+  "complete_t3": false,
+  "provider": {
+    "model": "deepseek-flash",
+    "wire_api": "responses",
+    "reasoning_effort": "max"
+  },
+  "sidecar_image_sha256": "02413811b312c9398a35e1b3306f7522afc1b2cfb52c64e60c5d01b6faf45afa",
+  "guest_image": "ldm/alphabench-t3-research:3e1352d034c7",
+  "runs": [
+    {
+      "method": "harness",
+      "variant": "direct",
+      "rounds": 2,
+      "search_observations": 2,
+      "host_authorized_model_requests": 16,
+      "committed_turns": 2,
+      "accepted_actions": 2,
+      "dynamic_checks": 5,
+      "harness_manifest_sha256": "e6eaaef4eb30b0d830e9837995ee128c22940fc5ccc40eb77da660f3c3bc89ba",
+      "result_sha256": "535896b41e063c986f85eb7186587a33d48389da7fe33cbfc3f576901a4cfe05",
+      "remote_run": "/mnt/data1/Large-Discovery-Models/tmp/alphabench-direct-harness-verified-20260923"
+    },
+    {
+      "method": "ldm_harness",
+      "variant": "gp_query",
+      "rounds": 2,
+      "search_observations": 2,
+      "host_authorized_model_requests": 31,
+      "committed_turns": 4,
+      "accepted_actions": 4,
+      "surrogate_queries": 17,
+      "dynamic_checks": 16,
+      "harness_manifest_sha256": "c5876aaa2e583b28a5b6f9adc50c9d60643e926e02b0992ec0d688d5a66b6979",
+      "result_sha256": "7fbd8def958fc12b3b66d64f6dcfb44fc453c0327c392b645d1871e092c203a6",
+      "remote_run": "/mnt/data1/Large-Discovery-Models/tmp/alphabench-ldm-harness-smoke-20260923"
+    }
+  ],
+  "checks": {
+    "task_tests": "274 passed, 2 backend-environment skips, 4 previously covered long cases deselected",
+    "shared_harness_tests": "33 passed",
+    "pi_tests": "37 passed with Node 24",
+    "actual_guest": "filesystem isolation, read-only resources, and denied external request verified",
+    "actual_mcp": "stdio MCP to Host socket verified"
+  },
+  "remaining": [
+    "real qualified market data and backend execution",
+    "no-query LDM Harness full-flow evidence",
+    "compiled policy method and full method-market qualification matrix"
+  ]
+}

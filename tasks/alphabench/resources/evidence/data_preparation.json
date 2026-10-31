@@ -1,0 +1,320 @@
+{
+  "baostock": {
+    "additional_suspensions": 774,
+    "audit_sha256": "eac6b519a5d2f356e408088b9aff615183dba917077d85d8b87098ae3931bda7",
+    "plan_sha256": "48c20c825a2560081d7fbbbc8459bd624a179f79afa65d4960d08db6fe20db33",
+    "raw_responses": 232,
+    "source": {
+      "capture": "2026-09-23",
+      "client_version": "0.9.4",
+      "documentation": "https://pypi.org/project/baostock/0.9.4/",
+      "endpoint": "public-api.baostock.com:10030",
+      "versioning": "Live service has no immutable historical snapshot API; retain timestamped, hashed responses for offline reproduction."
+    },
+    "unresolved_reason_counts": {
+      "membership_at_or_after_reported_delisting": 329,
+      "membership_before_archive_instrument_interval": 493,
+      "missing_archive_price_on_reported_trading_day": 570,
+      "no_status_evidence": 2
+    }
+  },
+  "cn_membership_probe": {
+    "audit_sha256": "09faf44f57e3820996950cd80286c56a83f93f63fa6ac9ad990a6f23e2fe90fb",
+    "bundle_sha256": "be00b8939a3921125d6ed19299007222bbb2b3925e7d4f6fdfdbb272cd189ef5",
+    "conflicts": {"csi300": 5, "csi500": 8},
+    "incomplete_snapshots": 0,
+    "qualification": "evidence_only",
+    "raw_files": 23,
+    "snapshots": 22
+  },
+  "checked_at_utc": "2026-09-23T12:47:10+00:00",
+  "cn_all_instruments_sha256": "0520db301d5db6d5a0d39b8b33aa2b5579f5d11f7e782c546618074c6c9d7b5c",
+  "cn": {
+    "csi1000": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "d824fb05e498bf4170796284ace83f10ed6f054f3f1e97df0ab0cf5ee49dce5d",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "7fbcd803ec66f82b011a15d330e102eccb28568ea997242f5c96ab46a51f6145",
+      "gap_symbols": 6,
+      "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 11
+        },
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 6
+        }
+      ],
+      "qualification": "blocked",
+      "suspension_sources": [
+        {
+          "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+          "last_date": "2023-06-09",
+          "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension",
+          "response_hashes_digest": "c7504a0c06a3fdd003d821e84ac9bfe7b1db20327595f5679f9fd4ccc25ded1d",
+          "table": "bao_a_stock_eod_info",
+          "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master"
+        },
+        {
+          "capture": "2026-09-23",
+          "client_version": "0.9.4",
+          "documentation": "https://pypi.org/project/baostock/0.9.4/",
+          "endpoint": "public-api.baostock.com:10030",
+          "plan_sha256": "48c20c825a2560081d7fbbbc8459bd624a179f79afa65d4960d08db6fe20db33",
+          "response_hashes_digest": "ec7ec9710499cf3f1a55f7f926640e54dcefa93f42f82e15de19a9aff84a3f5c",
+          "versioning": "Live service has no immutable historical snapshot API; retain timestamped, hashed responses for offline reproduction."
+        }
+      ],
+      "symbols": 2803,
+      "universe_sha256": "49ee71e7606724feb8bf628c3f2c72459ea2c49c916e48599d866fca16f7eb26",
+      "unresolved_sessions": 259
+    },
+    "csi300": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "d0627b1a55ce3c8ad73fb8ec2eaa5a0f593df16588a21b1deb92afbe46ebe81a",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "8a39bd4599bb6cfb14a3b38e684eb2313bff98eb29ec7b9c9594f30822fe2723",
+      "gap_symbols": 4,
+      "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 5
+        },
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 4
+        }
+      ],
+      "qualification": "blocked",
+      "suspension_sources": [
+        {
+          "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+          "last_date": "2023-06-09",
+          "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension",
+          "response_hashes_digest": "c7504a0c06a3fdd003d821e84ac9bfe7b1db20327595f5679f9fd4ccc25ded1d",
+          "table": "bao_a_stock_eod_info",
+          "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master"
+        },
+        {
+          "capture": "2026-09-23",
+          "client_version": "0.9.4",
+          "documentation": "https://pypi.org/project/baostock/0.9.4/",
+          "endpoint": "public-api.baostock.com:10030",
+          "plan_sha256": "48c20c825a2560081d7fbbbc8459bd624a179f79afa65d4960d08db6fe20db33",
+          "response_hashes_digest": "ec7ec9710499cf3f1a55f7f926640e54dcefa93f42f82e15de19a9aff84a3f5c",
+          "versioning": "Live service has no immutable historical snapshot API; retain timestamped, hashed responses for offline reproduction."
+        }
+      ],
+      "symbols": 949,
+      "universe_sha256": "a96252039fe59df24b49df0c4653daa56c71ab1e3ed99fe965d804c0a8ea8313",
+      "unresolved_sessions": 107
+    },
+    "csi500": {
+      "archive_sha256": "7a5e563f8f3bd696f8455e42a1eb36b07ac1272a7d0c43db5f0c099755c820a3",
+      "audit_sha256": "9f5ca31d3cfab13dd4e1c921b4bd5eb9f95f0245d08721dd8db66fde868df0e9",
+      "calendar_sha256": "33062057dfd7dda0bb4c4c366a6193a8a1b77152b0046aa963000f76119a3f1d",
+      "files_sha256": "caa215ced4297bddac04edfd1ff8f5f3e29ca035c40b93aea20e1da209dc869a",
+      "gap_symbols": 6,
+      "issues": [
+        {
+          "code": "membership_outside_archive_instrument_interval",
+          "intervals": 8
+        },
+        {
+          "code": "unresolved_price_gaps",
+          "symbols": 6
+        }
+      ],
+      "qualification": "blocked",
+      "suspension_sources": [
+        {
+          "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+          "last_date": "2023-06-09",
+          "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension",
+          "response_hashes_digest": "c7504a0c06a3fdd003d821e84ac9bfe7b1db20327595f5679f9fd4ccc25ded1d",
+          "table": "bao_a_stock_eod_info",
+          "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master"
+        },
+        {
+          "capture": "2026-09-23",
+          "client_version": "0.9.4",
+          "documentation": "https://pypi.org/project/baostock/0.9.4/",
+          "endpoint": "public-api.baostock.com:10030",
+          "plan_sha256": "48c20c825a2560081d7fbbbc8459bd624a179f79afa65d4960d08db6fe20db33",
+          "response_hashes_digest": "ec7ec9710499cf3f1a55f7f926640e54dcefa93f42f82e15de19a9aff84a3f5c",
+          "versioning": "Live service has no immutable historical snapshot API; retain timestamped, hashed responses for offline reproduction."
+        }
+      ],
+      "symbols": 1802,
+      "universe_sha256": "1f764b1ef470794a4d708dd6f68ab58c61ce12246244c00dc34427b30a30600e",
+      "unresolved_sessions": 1028
+    }
+  },
+  "complete_t3_data": false,
+  "comparison_data_policy": "partial_comparison",
+  "corroborated_suspension_rows": 127975,
+  "network": {
+    "acquisition": "local computer",
+    "server_install_and_audit": "offline"
+  },
+  "offline_transfer": {
+    "files": 10069,
+    "sha256": "b20140d6954440fb2f9951d99ef78f14e0203781934b5b5b3397fdaddd766962",
+    "verified_install": true
+  },
+  "queried_status_rows": 128195,
+  "raw_query_responses": 3745,
+  "remaining_assets": [
+    "unresolved CN prices and historical membership conflicts",
+    "US historical prices and security lineage",
+    "historical industry groups",
+    "US VWAP and actual index benchmarks",
+    "corporate-action knowledge dates and completeness"
+  ],
+  "suspension_source": {
+    "commit": "d9digdvvk5spruculluv4ujhen2350ut",
+    "last_date": "2023-06-09",
+    "meaning": "tradestatus=0 corroborates a non-trading session; absent rows never establish suspension",
+    "table": "bao_a_stock_eod_info",
+    "url": "https://www.dolthub.com/api/v1alpha1/chenditc/investment_data/master"
+  },
+  "us": {
+    "nasdaq100": {
+      "action_rows": {
+        "dividend": 18345,
+        "split": 112
+      },
+      "audit_sha256": "7fe7022fd47a9bc4a379d394a2d2fb878db767c4eba20dfc101b9ad1dda58b1f",
+      "calendar_digest": "0bc99d957e3bdaf9894637a4404b4843e35d82b378425dd694b0998c3ca73ea4",
+      "issues": [
+        {
+          "code": "invalid_ohlcv",
+          "rows": 825
+        },
+        {
+          "code": "prices_outside_exchange_sessions",
+          "rows": 10
+        },
+        {
+          "code": "missing_security_metadata",
+          "symbols": 34
+        },
+        {
+          "code": "missing_vwap"
+        },
+        {
+          "code": "missing_actual_index_benchmarks"
+        },
+        {
+          "code": "unverified_security_lineage"
+        },
+        {
+          "code": "unverified_corporate_action_completeness_and_knowledge_dates"
+        },
+        {
+          "code": "missing_historical_industry_classification"
+        },
+        {
+          "code": "unresolved_price_gaps",
+          "sessions": 13605,
+          "symbols": 95
+        }
+      ],
+      "membership_digest": "ecefb6c062327d772299385258f186687b76b19df7bcbab6934f7039d1d269be",
+      "pages": 3100,
+      "plan_sha256": "af52075a0fd33aad2ab5f478140b14b58270a3f8bb7a76383c5787500f00c297",
+      "price_rows": 1609180,
+      "qualification": "blocked",
+      "response_hashes_digest": "9ec399d1019ebc07a6074764e2c012458e1c4c823821b03e5c07fa61b9e0c0b4",
+      "source": {
+        "benchmarks": {
+          "nasdaq100": "NASDAQ100",
+          "sp500": "SP500"
+        },
+        "commit": "s156r5d03kp2mlt6a8pbai703vtrldc4",
+        "membership_resources": [
+          "sp500-historical.json",
+          "n100-ticker-changes-{year}.yaml"
+        ],
+        "price_basis": "unadjusted OHLCV; independent dividend and split events",
+        "qualification": "Each SQL response is pinned with AS OF and hashed. Missing historic symbols, index benchmarks, security lineage or corporate actions block qualification.",
+        "tables": [
+          "ohlcv",
+          "dividend",
+          "split",
+          "symbol"
+        ],
+        "url": "https://www.dolthub.com/api/v1alpha1/post-no-preference/stocks/master"
+      }
+    },
+    "sp500": {
+      "action_rows": {
+        "dividend": 18345,
+        "split": 112
+      },
+      "audit_sha256": "3bafe9edf4813cb6fbd80821792bff1e0efe1421a6c9d18263e7be8ac2d3c175",
+      "calendar_digest": "0bc99d957e3bdaf9894637a4404b4843e35d82b378425dd694b0998c3ca73ea4",
+      "issues": [
+        {
+          "code": "invalid_ohlcv",
+          "rows": 825
+        },
+        {
+          "code": "prices_outside_exchange_sessions",
+          "rows": 10
+        },
+        {
+          "code": "missing_security_metadata",
+          "symbols": 34
+        },
+        {
+          "code": "missing_vwap"
+        },
+        {
+          "code": "missing_actual_index_benchmarks"
+        },
+        {
+          "code": "unverified_security_lineage"
+        },
+        {
+          "code": "unverified_corporate_action_completeness_and_knowledge_dates"
+        },
+        {
+          "code": "missing_historical_industry_classification"
+        },
+        {
+          "code": "unresolved_price_gaps",
+          "sessions": 59717,
+          "symbols": 441
+        }
+      ],
+      "membership_digest": "06c2f86db13006e0d267601171d903a0a9cc27dba84cdf205a68996a1215bcc8",
+      "pages": 3100,
+      "plan_sha256": "af52075a0fd33aad2ab5f478140b14b58270a3f8bb7a76383c5787500f00c297",
+      "price_rows": 1609180,
+      "qualification": "blocked",
+      "response_hashes_digest": "9ec399d1019ebc07a6074764e2c012458e1c4c823821b03e5c07fa61b9e0c0b4",
+      "source": {
+        "benchmarks": {
+          "nasdaq100": "NASDAQ100",
+          "sp500": "SP500"
+        },
+        "commit": "s156r5d03kp2mlt6a8pbai703vtrldc4",
+        "membership_resources": [
+          "sp500-historical.json",
+          "n100-ticker-changes-{year}.yaml"
+        ],
+        "price_basis": "unadjusted OHLCV; independent dividend and split events",
+        "qualification": "Each SQL response is pinned with AS OF and hashed. Missing historic symbols, index benchmarks, security lineage or corporate actions block qualification.",
+        "tables": [
+          "ohlcv",
+          "dividend",
+          "split",
+          "symbol"
+        ],
+        "url": "https://www.dolthub.com/api/v1alpha1/post-no-preference/stocks/master"
+      }
+    }
+  }
+}

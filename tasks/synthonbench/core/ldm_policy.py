@@ -7,12 +7,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from tasks.synthonbench.resources.harness.policy_diagnostics import (
+    robust_z_values,
+    softmax_logits,
+    tilt_log_weights,
+)
 from tasks.synthonbench.core.constants import (
     DEFAULT_ACQUISITION_ALPHA,
     DEFAULT_ACQUISITION_ETA,
 )
 
-MAD_SCALE = 1.4826
 DEFAULT_Z_CLIP = 5.0
 EPSILON = 1.0e-12
 
@@ -50,13 +54,7 @@ def robust_z(values: np.ndarray, *, clip: float = DEFAULT_Z_CLIP) -> np.ndarray:
     array = _finite_vector(values, "acquisition values")
     if not len(array):
         return array
-    median = float(np.median(array))
-    scale = MAD_SCALE * float(np.median(np.abs(array - median)))
-    if scale <= EPSILON:
-        scale = float(np.std(array))
-    if scale <= EPSILON:
-        return np.zeros_like(array)
-    return np.clip((array - median) / (scale + EPSILON), -clip, clip)
+    return robust_z_values(array, clip)
 
 
 def tilted_logits(q0: np.ndarray, acquisition: np.ndarray, *, config: AcquisitionTiltConfig) -> np.ndarray:
@@ -64,7 +62,7 @@ def tilted_logits(q0: np.ndarray, acquisition: np.ndarray, *, config: Acquisitio
     normalized = robust_z(acquisition, clip=config.z_clip)
     if base.shape != normalized.shape:
         raise ValueError("q0 and acquisition shapes must match")
-    return config.alpha * np.log(base + EPSILON) + config.eta * normalized
+    return tilt_log_weights(base, normalized, config.alpha, config.eta, EPSILON)
 
 
 def gumbel_top_k(probabilities: np.ndarray, count: int, rng: np.random.Generator) -> list[int]:
@@ -91,8 +89,7 @@ def softmax_probabilities(logits: np.ndarray) -> np.ndarray:
     values = _finite_vector(logits, "tilted logits")
     if not len(values):
         return values
-    exponentials = np.exp(values - float(np.max(values)))
-    return exponentials / float(exponentials.sum())
+    return softmax_logits(values)
 
 
 def probability_entropy(probabilities: np.ndarray) -> float:
