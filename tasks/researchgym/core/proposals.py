@@ -68,10 +68,20 @@ def validate_rows(rows: Any, *, case: CaseSpec, count: int, measured_keys: set[s
                                          f"{field} must be a nonempty string of at most {limit} characters",
                                          "Write a short research note."))
         comparisons = row.get("comparison_candidate_ids", [])
-        if not isinstance(comparisons, list) or any(c not in measured_ids for c in comparisons):
-            row_errors.append(_error(f"{pointer}/comparison_candidate_ids", "unknown_comparison_candidate",
-                                     "comparison_candidate_ids must name measured candidates",
+        if not isinstance(comparisons, list):
+            row_errors.append(_error(f"{pointer}/comparison_candidate_ids", "invalid_comparison_candidate_ids",
+                                     "comparison_candidate_ids must be an array of strings",
                                      "Use candidate IDs returned by the measured history."))
+        else:
+            for comparison_index, candidate_id in enumerate(comparisons):
+                if not isinstance(candidate_id, str):
+                    row_errors.append(_error(f"{pointer}/comparison_candidate_ids/{comparison_index}",
+                                             "invalid_comparison_candidate_id", "candidate ID must be a string",
+                                             "Use an ID returned by the measured history."))
+                elif candidate_id not in measured_ids:
+                    row_errors.append(_error(f"{pointer}/comparison_candidate_ids/{comparison_index}",
+                                             "unknown_comparison_candidate", "candidate ID is not measured",
+                                             "Use an ID returned by the measured history."))
         for problem in case.check_program(row["program"]):
             row_errors.append(_error(f"{pointer}/program", problem["code"], problem["message"], problem["hint"]))
         if not row_errors:

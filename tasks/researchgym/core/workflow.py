@@ -307,6 +307,11 @@ def _evaluator_env():
     return {k: v for k, v in os.environ.items() if not SECRET_ENV.search(k)}
 
 
+def _account_policy_turn_usage(runtime, amounts):
+    """Controller owns turn/tool counts; request authorizations own provider counts."""
+    runtime.consume_many({key: value for key, value in amounts.items() if key != "policy_provider_requests"})
+
+
 def _proposal_facts(args):
     sessions = args.harness_sessions if args.proposal_mode == "harness" else None
     occurrences = args.proposal_samples if args.search_method in LDM_METHODS else args.evaluations_per_round
@@ -385,7 +390,8 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
         evaluator = ResearchGymEvaluator(
             case=case, upstream=upstream, run_dir=run_dir, python=args.case_python, devices=args.devices,
             min_free_mib=args.min_free_mib, evaluation_timeout=args.evaluation_timeout,
-            grader_timeout=args.grader_timeout, clock=clock, port_base=args.port_base, base_env=_evaluator_env())
+            grader_timeout=args.grader_timeout, clock=clock, port_base=args.port_base,
+            base_env=_evaluator_env(), search_method=args.search_method)
     sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     harness_clients, holder = [], {}
     if args.proposal_mode == "harness":
@@ -493,14 +499,18 @@ def run(args, case, spec, contract, profile, run_dir, *, resume):
             )
             selector.policy_adapter = adapter
             selector.policy_controller = PolicyResearchController(
-                client=policy_client, adapter=adapter, root=run_dir / "policy_harness", account=runtime.consume_many,
+                client=policy_client, adapter=adapter, root=run_dir / "policy_harness",
+                # Per-request authorizations own this counter; the controller's
+                # cumulative turn usage must not count the same calls again.
+                account=lambda amounts: _account_policy_turn_usage(runtime, amounts),
                 executor=DockerPolicyExecutor(args.policy_runner_image, args.harness_docker_host,
                                               resolve_container_user(args.harness_container_user, args.harness_docker_host)),
                 recovery_budget=lambda: min(args.harness_wall_time_seconds * 2, clock.remaining()),
                 provider_authorizer=policy_meter.authorize)
             selector.policy_hooks = (
                 lambda: pricing.check(runtime),
-                lambda: (account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy"),
+                lambda: (account_pool_tokens(runtime, pricing, run_dir / "policy_harness", "policy")
+                         if pricing.budget_usd is None else None,
                          policy_meter.settle_captured_turns()))
 
     status, code = "completed", 0

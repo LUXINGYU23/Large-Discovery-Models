@@ -16,7 +16,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 
 from .cases import CaseSpec, render
 from .clock import CampaignClock, WallClockExhausted
-from .execution import JobCommand, ProcessTreeRunner, free_devices
+from .execution import JobCommand, ProcessTreeRunner, free_devices, reap_recorded_groups
 from .grading import CoverageError, score_summary
 from .source import UpstreamCase, modified_files
 
@@ -41,6 +41,9 @@ class _ReceiptMixin:
         if (root / "result.json").exists():
             return EvaluationResult(**json.loads((root / "result.json").read_text()))
         if (root / "started.json").exists():
+            unreaped = reap_recorded_groups(root / "job_logs") + reap_recorded_groups(root)
+            if unreaped:
+                raise RuntimeError(f"cannot safely resume: evaluator groups remain alive: {unreaped}")
             # A previous process launched this paid attempt and died before a
             # terminal record. Re-running would repeat an expensive evaluation.
             return self._finish(candidate, EvaluationResult(
@@ -65,12 +68,14 @@ class ResearchGymEvaluator(_ReceiptMixin):
     def __init__(self, *, case: CaseSpec, upstream: UpstreamCase, run_dir: Path, python: str,
                  devices: tuple[str, ...], min_free_mib: int, evaluation_timeout: float,
                  grader_timeout: float, clock: CampaignClock, port_base: int = 29600,
-                 grace_seconds: float = 15.0, base_env: dict[str, str] | None = None) -> None:
+                 grace_seconds: float = 15.0, base_env: dict[str, str] | None = None,
+                 search_method: str = "ldm") -> None:
         self.case, self.upstream, self.run_dir = case, upstream, Path(run_dir)
         self.python, self.devices, self.min_free_mib = python, tuple(devices), min_free_mib
         self.evaluation_timeout, self.grader_timeout = evaluation_timeout, grader_timeout
         self.clock, self.port_base = clock, port_base
         self.grace_seconds, self.base_env = grace_seconds, base_env
+        self.search_method = search_method
         self.active_devices = self.devices
 
     def prepare_evaluations(self, candidates) -> None:
@@ -117,6 +122,8 @@ class ResearchGymEvaluator(_ReceiptMixin):
         for record, job in zip(job_records, jobs, strict=True):
             record["missing_outputs"] = [p for p in job["expected_outputs"] if not (workspace / p).is_file()
                                          or (workspace / p).stat().st_size == 0]
+            if record["status"] != "succeeded" or record["missing_outputs"]:
+                record["error_excerpt"] = _log_excerpt(Path(record["log"]))
             record["log"] = _relative(record["log"], self.run_dir)
         atomic_json_write(root / "jobs.json", {"build": {k: v for k, v in build.items() if k != "file_digests"},
                                                 "jobs": job_records})
@@ -130,7 +137,8 @@ class ResearchGymEvaluator(_ReceiptMixin):
             return self._finish(candidate, EvaluationResult(
                 candidate.candidate_id, "timed_out" if timed_out else "failed",
                 error=f"{len(failed)}/{len(job_records)} case jobs failed or produced no output: "
-                      + ", ".join(f"{r['job_id']}={r['status']}" for r in failed[:6]),
+                      + ", ".join(f"{r['job_id']}={r['status']}" for r in failed[:6])
+                      + ("; " + failed[0]["error_excerpt"][:300] if failed[0].get("error_excerpt") else ""),
                 artifacts=artifacts, resource_usage=usage, metadata=metadata))
         # Evaluator, grader, generated configs, and the candidate itself must be
         # byte-identical to what was installed before the official grader reads outputs.
@@ -142,7 +150,8 @@ class ResearchGymEvaluator(_ReceiptMixin):
                 artifacts=artifacts, resource_usage=usage, metadata={**metadata, "tampered_files": tampered[:50]}))
         summary_path = root / "grade_summary.json"
         grader_binding = {"python": self.python, "slot": SLOT, "summary": str(summary_path),
-                          "scratch_markdown": str(root / "grader_description.md")}
+                          "scratch_markdown": str(root / "grader_description.md"),
+                          "method": self.search_method}
         source = self.case.raw["grader"].get("scratch_markdown_source")
         if source:
             shutil.copy(workspace / source, root / "grader_description.md")
@@ -172,6 +181,7 @@ class ResearchGymEvaluator(_ReceiptMixin):
 
     def _metadata(self, build: dict[str, Any]) -> dict[str, Any]:
         return {"evaluator": "researchgym_official_grader", **self.case.protocol,
+                "search_method": self.search_method,
                 "source_commit": self.upstream.commit, "source_tree_sha256": self.upstream.pinned["tree_sha256"],
                 "candidate_sha256": build["candidate_sha256"], "devices": list(self.active_devices)}
 
@@ -206,3 +216,16 @@ def _relative(path, root: Path) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return str(path)
+
+
+def _log_excerpt(path: Path) -> str:
+    """Bounded candidate-owned failure evidence for detailed history queries."""
+    if not path.is_file():
+        return ""
+    with path.open("rb") as handle:
+        handle.seek(max(0, path.stat().st_size - 16_384))
+        tail = handle.read().decode("utf-8", errors="replace")
+    lines = [line.strip() for line in tail.splitlines() if line.strip()]
+    diagnostic = [line for line in lines if any(word in line.lower() for word in
+                  ("error", "exception", "traceback", "shape", "out of memory", "assert"))]
+    return " | ".join((diagnostic or lines)[-4:])[-1200:]

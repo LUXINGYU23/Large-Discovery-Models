@@ -196,6 +196,14 @@ campaign files. Pilot reporting requires at least one successful evaluation per
 round; a round in which every candidate fails is reported by the pilot tool as
 incomplete rather than scored.
 
+For a completed time-series candidate, the pinned grader writes the real-data
+Table 1 row into the evaluation's copied `grader_description.md` and records
+the same aggregates in `grade_summary.json`. The row uses the campaign's
+actual `search_method` (`llm`, `ldm`, `harness`, `ldm_harness`, or
+`ldm_harness_compiled`), not the fixed injection-slot name. This covers only
+the five real datasets; the synthetic tables and the separate five-task
+Table 3 agent protocol are not implied by this row.
+
 ## Data collection
 
 Direct methods append accepted submissions as `ldm-2.0` complete-design rows

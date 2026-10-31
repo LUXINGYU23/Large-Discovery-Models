@@ -108,6 +108,26 @@ test("a failed parallel turn drains other sessions before recovery", async () =>
 	assert.deepEqual(await pool.runTurns(inputs, validate, authorize), [{ sessionId: "a" }, committed]);
 });
 
+test("Pi session pool rejects a resumed subset before dispatch", async () => {
+	const pool = new PiSessionPool({ baseUrl: "https://example.test", campaignId: "test" } as never, "test");
+	const sessions = (pool as unknown as { sessions: Map<string, { runTurn: () => Promise<unknown> }> }).sessions;
+	let dispatched = 0;
+	for (const profileId of ["a", "b"]) {
+		sessions.set(profileId, { runTurn: async () => { dispatched += 1; return { profileId }; } });
+	}
+	await assert.rejects(
+		pool.runTurns([{ profileId: "b" }] as never, async () => ({} as never), async () => true),
+		/run_turn must contain exactly one input for every profile/,
+	);
+	assert.equal(dispatched, 0);
+	assert.deepEqual(
+		await pool.runTurns([{ profileId: "a" }, { profileId: "b" }] as never,
+			async () => ({} as never), async () => true),
+		[{ profileId: "a" }, { profileId: "b" }],
+	);
+	assert.equal(dispatched, 2);
+});
+
 test("partial-turn continuation keeps history and classifies execution failures", async () => {
 	const root = await mkdtemp(join(tmpdir(), "ldm-failed-turn-"));
 	try {

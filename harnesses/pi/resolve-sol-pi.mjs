@@ -1,6 +1,27 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
+if (process.argv[2] === "--locked") {
+    const manifest = JSON.parse(await readFile("package.json", "utf8"));
+    const lock = JSON.parse(await readFile("package-lock.json", "utf8"));
+    const source = lock.packages?.["node_modules/sol-pi"]?.resolved;
+    const revision = source?.match(/\/([a-f0-9]{40})$/)?.[1];
+    const version = lock.packages?.["node_modules/sol-pi"]?.version;
+    const piVersion = lock.packages?.["node_modules/@earendil-works/pi-coding-agent"]?.version;
+    if (!revision || manifest.dependencies?.["sol-pi"] !== source || !version || !/^\d+\.\d+\.\d+$/.test(piVersion)) {
+        throw new Error("SoL-Pi package and lockfile must pin the same exact source and Pi version");
+    }
+    for (const name of ["pi-agent-core", "pi-ai", "pi-coding-agent", "pi-tui"]) {
+        const declared = manifest.dependencies?.[`@earendil-works/${name}`];
+        const locked = lock.packages?.[`node_modules/@earendil-works/${name}`]?.version;
+        if (declared !== piVersion || locked !== piVersion) {
+            throw new Error(`SoL-Pi/Pi lockfile version mismatch for ${name}`);
+        }
+    }
+    await writeFile("sol-pi-version.json", JSON.stringify({ revision, version, piVersion, source }, null, 2) + "\n");
+    process.exit(0);
+}
+
 const revision = JSON.parse(await readFile(process.argv[2], "utf8")).sha;
 if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error("Invalid SoL-Pi revision");
 const response = await fetch(`https://raw.githubusercontent.com/NVlabs/SoL-Pi/${revision}/package.json`);

@@ -7,9 +7,11 @@ use the workspace or devices. Jobs are scheduled onto an explicit device list.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -73,6 +75,45 @@ def terminate_group(process: subprocess.Popen, *, grace_seconds: float) -> bool:
     return process.returncode is not None and not _group_alive(pgid)
 
 
+def _process_start_ticks(pid: int) -> str | None:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+
+def reap_recorded_groups(log_dir: Path, *, grace_seconds: float = 15.0) -> list[int]:
+    """Reap only groups whose live leader still matches our recorded PID identity."""
+    receipt = Path(log_dir) / "processes.jsonl"
+    if not receipt.is_file():
+        return []
+    unreaped = []
+    for line in receipt.read_text().splitlines():
+        record = json.loads(line)
+        pid, ticks = record["pid"], record["start_ticks"]
+        if ticks is None or _process_start_ticks(pid) != ticks:
+            continue  # Do not signal a recycled PID or an unverifiable process.
+        try:
+            group_id = os.getpgid(pid)
+        except ProcessLookupError:
+            continue
+        if group_id != pid:
+            continue
+        for sig, wait in ((signal.SIGTERM, grace_seconds), (signal.SIGKILL, grace_seconds)):
+            try:
+                os.killpg(pid, sig)
+            except ProcessLookupError:
+                break
+            deadline = time.monotonic() + wait
+            while time.monotonic() < deadline and _group_alive(pid):
+                time.sleep(POLL_SECONDS)
+            if not _group_alive(pid):
+                break
+        if _group_alive(pid):
+            unreaped.append(pid)
+    return unreaped
+
+
 class ProcessTreeRunner:
     def __init__(self, *, devices: tuple[str, ...] = (), max_parallel: int | None = None,
                  grace_seconds: float = 15.0, base_env: dict[str, str] | None = None) -> None:
@@ -89,6 +130,12 @@ class ProcessTreeRunner:
         running: list[_Running] = []
         outcomes: dict[str, JobOutcome] = {}
         free = list(self.devices) if self.devices else [None] * self.max_parallel
+        previous_sigterm = None
+        if threading.current_thread() is threading.main_thread():
+            previous_sigterm = signal.getsignal(signal.SIGTERM)
+            def interrupt_on_sigterm(signum, frame):
+                raise KeyboardInterrupt("evaluator received SIGTERM")
+            signal.signal(signal.SIGTERM, interrupt_on_sigterm)
         try:
             while pending or running:
                 while pending and free and len(running) < self.max_parallel and time.monotonic() < deadline:
@@ -132,6 +179,9 @@ class ProcessTreeRunner:
                     item.job.job_id, "interrupted", item.process.returncode, item.device,
                     str(item.log), time.monotonic() - item.started, clean)
             raise
+        finally:
+            if previous_sigterm is not None:
+                signal.signal(signal.SIGTERM, previous_sigterm)
         return [outcomes[job.job_id] for job in jobs]
 
     def _start(self, job: JobCommand, device: str | None, cwd: Path, log_dir: Path) -> _Running:
@@ -144,6 +194,16 @@ class ProcessTreeRunner:
             list(job.argv), cwd=str(cwd), env=env, stdout=handle, stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL, start_new_session=True,
         )
+        try:
+            with (log_dir / "processes.jsonl").open("a", encoding="utf-8") as receipt:
+                receipt.write(json.dumps({"job_id": job.job_id, "pid": process.pid,
+                                          "start_ticks": _process_start_ticks(process.pid)}) + "\n")
+                receipt.flush()
+                os.fsync(receipt.fileno())
+        except BaseException:
+            terminate_group(process, grace_seconds=self.grace_seconds)
+            handle.close()
+            raise
         return _Running(job, process, device, log, handle)
 
 

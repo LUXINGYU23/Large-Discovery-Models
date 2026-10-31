@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -223,8 +224,12 @@ class WorkspaceTools:
                 return self._list(action)
             if tool == "read":
                 return self._read(action)
+            if tool == "search":
+                return self._search(action)
             if tool == "write":
                 return self._write(action)
+            if tool == "replace":
+                return self._replace(action)
             if tool == "bash":
                 return self._bash(action)
             if tool == "submit":
@@ -254,6 +259,24 @@ class WorkspaceTools:
         return {"tool": "read", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
                 "offset": offset, "content": data[offset:offset + limit], "truncated": offset + limit < len(data)}
 
+    def _search(self, action: Mapping[str, Any]) -> dict[str, Any]:
+        """Find exact text in one file, returning line numbers and read offsets."""
+        target = _safe_relative(self.workspace, action.get("path"))
+        query = action.get("query")
+        if not target.is_file() or not isinstance(query, str) or not 1 <= len(query) <= 200:
+            raise AgentError("search needs an existing file and a 1–200 character query")
+        if target.stat().st_size > 2_000_000:
+            raise AgentError("search file exceeds 2 MB")
+        matches, offset = [], 0
+        for number, line in enumerate(target.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True), 1):
+            if query.lower() in line.lower():
+                matches.append({"line": number, "offset": offset, "text": line.strip()[:350]})
+                if len(matches) >= 30:
+                    break
+            offset += len(line)
+        return {"tool": "search", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
+                "query": query, "matches": matches}
+
     def _write(self, action: Mapping[str, Any]) -> dict[str, Any]:
         target = _safe_relative(self.workspace, action.get("path"))
         content = action.get("content")
@@ -265,6 +288,21 @@ class WorkspaceTools:
         target.write_text(content, encoding="utf-8")
         return {"tool": "write", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
                 "bytes": len(content.encode("utf-8")), "sha256": _sha256(target)}
+
+    def _replace(self, action: Mapping[str, Any]) -> dict[str, Any]:
+        """Edit one exact source span without re-emitting a large complete file."""
+        target = _safe_relative(self.workspace, action.get("path"))
+        old, new = action.get("old"), action.get("new")
+        if not target.is_file() or not isinstance(old, str) or not old or not isinstance(new, str):
+            raise AgentError("replace needs an existing file and non-empty old/new string fields")
+        if len(old) > 100_000 or len(new) > 100_000:
+            raise AgentError("replace span exceeds 100 KB")
+        source = target.read_text(encoding="utf-8")
+        if source.count(old) != 1:
+            raise AgentError("replace old span must occur exactly once; read the file and use a precise snippet")
+        target.write_text(source.replace(old, new, 1), encoding="utf-8")
+        return {"tool": "replace", "ok": True, "path": target.relative_to(self.workspace).as_posix(),
+                "sha256": _sha256(target)}
 
     def _bash(self, action: Mapping[str, Any]) -> dict[str, Any]:
         command = action.get("command")
@@ -338,13 +376,16 @@ class ChatCompletionsClient:
             raise AgentError(f"provider returned HTTP {exc.code}") from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise AgentError(f"provider request failed: {type(exc).__name__}") from exc
-        choices = data.get("choices") or []
-        message = choices[0].get("message", {}) if choices and isinstance(choices[0], Mapping) else {}
-        content = message.get("content") if isinstance(message, Mapping) else None
-        if not isinstance(content, str) or not content.strip():
-            raise AgentError("provider response had no assistant content")
-        usage = data.get("usage")
+        # A successful HTTP response may still have empty assistant content.
+        # It is a paid call, so record usage before validating the content.
+        usage = data.get("usage") if isinstance(data, Mapping) else None
         if not isinstance(usage, Mapping):
+            self.total_cost += self.pricing.call_reserve_usd
+            self.usage_events.append({
+                "at": _now(), "usage": None, "unknown_usage": True,
+                "cost_usd": self.pricing.call_reserve_usd,
+                "cumulative_cost_usd": self.total_cost,
+            })
             raise AgentError("provider response omitted token usage; refusing unaccounted model call")
         cost = self.pricing.cost(usage)
         self.total_cost += cost
@@ -352,6 +393,11 @@ class ChatCompletionsClient:
         self.usage_events.append(event)
         if self.total_cost > self.budget_usd + 1e-9:
             raise BudgetExhausted(f"provider response exceeded the strict ${self.budget_usd:.2f} cap")
+        choices = data.get("choices") or []
+        message = choices[0].get("message", {}) if choices and isinstance(choices[0], Mapping) else {}
+        content = message.get("content") if isinstance(message, Mapping) else None
+        if not isinstance(content, str) or not content.strip():
+            raise AgentError("provider response had no assistant content")
         return content
 
 
@@ -367,7 +413,9 @@ On every turn respond with exactly one JSON object:
 Each action must be one of:
 {"tool":"list","path":"."}
 {"tool":"read","path":"relative/file.py","offset":0,"limit":12000}
+{"tool":"search","path":"relative/file.py","query":"function or keyword"}
 {"tool":"write","path":"relative/file.py","content":"complete file content"}
+{"tool":"replace","path":"relative/file.py","old":"exact existing snippet","new":"replacement code"}
 {"tool":"bash","command":"command executed in the task workspace","timeout_seconds":600}
 {"tool":"submit","summary":"what changed, commands run, and official-grade file"}
 
@@ -375,7 +423,20 @@ Use relative paths.  Work incrementally, read before overwriting, and use bash
 for tests/training/grading.  A submit action ends the trajectory; submit only
 after you have invoked the official grader and inspected its result.  JSON
 strings must escape literal newlines as \\n, and emit no more than 16 actions in
-one response."""
+one response.
+
+Work toward a scored result, not an exhaustive repository survey.  Search a
+large file for a function or keyword instead of reading it in tiny sequential
+chunks; search returns character offsets you can pass to read.  In your
+first 10 turns, inspect the task entry point and grader, then choose a method
+and WRITE its code with write or replace.  Use replace for a small edit to a
+large existing file.  If you keep reading or listing after
+turn 10 without writing a candidate, the trajectory will be stopped as invalid.
+Run a small smoke test by turn 20, a complete evaluation
+by turn 35, and the official grader as soon as an evaluation log exists.  Do
+not repeatedly read files already inspected.  If an existing candidate or
+checkpoint is in the workspace, build on it.  Every tool action consumes the
+limited API and wall-clock budget."""
 
 
 def _task_prompt(task_id: str, workspace: Path, seed: int, profile_name: str) -> str:
@@ -388,6 +449,9 @@ def _task_prompt(task_id: str, workspace: Path, seed: int, profile_name: str) ->
     return (
         f"Task={task.display_name} ({task_id}); independent seed={seed}; profile={profile_name}.\n"
         f"Official Table 3 metrics: {', '.join(task.metrics)}. Primary selection: {task.primary_note}.\n"
+        "The independent trajectory seed is not necessarily the task's pretrained-model or data seed. "
+        "Inspect available checkpoint filenames and use the benchmark's actual required seed; "
+        "never rename or fabricate missing checkpoints.\n"
         f"Workspace: {workspace}.\n{runtime}\nTask description (possibly truncated):\n{_clip(text, 24_000)}"
     )
 
@@ -441,6 +505,15 @@ def _compact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     return messages[:2] + messages[-6:]
 
 
+def _code_snapshot(workspace: Path) -> dict[str, str]:
+    """Evidence that the agent changed source, regardless of edit tool."""
+    result = {}
+    for path in workspace.rglob("*"):
+        if path.is_file() and path.suffix in {".py", ".sh"}:
+            result[path.relative_to(workspace).as_posix()] = _sha256(path)
+    return result
+
+
 def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
               manifest: Mapping[str, Any], output_dir: Path, client: ChatCompletionsClient,
               max_turns: int, prior_receipt: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -468,18 +541,67 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
     transcript: list[dict[str, Any]] = []
     messages = [{"role": "system", "content": _system_prompt()},
                 {"role": "user", "content": _task_prompt(task_id, workspace, seed, profile_name)}]
-    status, submitted = "time_exhausted", None
+    status, submitted = "turn_exhausted", None
     consecutive_invalid_actions = 0
+    candidate_written = False
+    initial_code = _code_snapshot(workspace)
+    active_action: dict[str, str] | None = None
+    checkpoint_lock = threading.Lock()
+    heartbeat_stop = threading.Event()
+
+    def checkpoint() -> None:
+        # Persist progress while a trajectory is still running.  A launcher
+        # crash must not hide paid calls or leave monitoring dependent on a
+        # final receipt that has not yet been written.
+        with checkpoint_lock:
+            progress = {
+                "status": "running", "task_id": task_id, "seed": seed,
+                "candidate_written": candidate_written, "active_action": active_action,
+                "turns_completed": len(transcript), "api_calls": len(client.usage_events),
+                "api_cost_usd": client.total_cost,
+                "wall_clock_hours": prior_wall_clock_hours + (time.monotonic() - started_monotonic) / 3600.0,
+                "at": _now(),
+            }
+            tmp = output_dir / "progress.json.tmp"
+            tmp.write_text(json.dumps(progress, sort_keys=True) + "\n", encoding="utf-8")
+            tmp.replace(output_dir / "progress.json")
+
+    def heartbeat() -> None:
+        while not heartbeat_stop.wait(30.0):
+            checkpoint()
+
+    checkpoint()
+    heartbeat_thread = threading.Thread(target=heartbeat, name="researchgym-agent-progress", daemon=True)
+    heartbeat_thread.start()
     for turn in range(max_turns):
+        if turn >= 24 and not candidate_written:
+            status = "no_candidate"
+            break
         if time.monotonic() >= deadline:
+            status = "time_exhausted"
             break
         try:
             response = ""
-            response = client.complete(_compact_messages(messages))
+            request_messages = _compact_messages(messages)
+            urgency = (" No source code has changed. Your next response MUST include a write or replace "
+                       "action editing a .py or .sh method. A simple runnable baseline is better than more "
+                       "inspection; you can revise it after a smoke test."
+                       if turn >= 10 and not candidate_written else "")
+            request_messages.append({
+                "role": "user",
+                "content": (
+                    f"Progress: turn {turn + 1}/{max_turns}; API spent "
+                    f"${client.total_cost:.4f}/${profile.api_budget_usd:.2f}. "
+                    "Prioritize writing, evaluating, and grading a concrete method now." + urgency
+                ),
+            })
+            response = client.complete(request_messages)
+            checkpoint()
             analysis, actions = parse_actions(response)
         except BudgetExhausted as exc:
             status = "budget_exhausted"
             transcript.append({"turn": turn, "at": _now(), "error": str(exc)})
+            checkpoint()
             break
         except AgentError as exc:
             # A provider can occasionally return a nearly-valid action object
@@ -495,6 +617,7 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
                 "response_sha256": hashlib.sha256(response.encode()).hexdigest()
                 if "response" in locals() else None,
             })
+            checkpoint()
             if consecutive_invalid_actions >= 3:
                 status = "agent_error"
                 break
@@ -509,14 +632,26 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             continue
         consecutive_invalid_actions = 0
         observations = []
-        for action in actions:
-            observation = tools.execute(action)
-            observations.append(observation)
-            if observation.get("tool") == "submit" and observation.get("ok"):
-                submitted = observation
-                break
+        if turn >= 16 and not candidate_written and not any(
+                action.get("tool") in {"write", "replace"} for action in actions):
+            observations.append({"tool": "source_change_guard", "ok": False,
+                                 "error": "Inspection-only turn refused: edit a .py or .sh source file now."})
+        else:
+            for action in actions:
+                active_action = {"tool": str(action.get("tool", ""))}
+                if isinstance(action.get("path"), str):
+                    active_action["path"] = action["path"][:300]
+                checkpoint()
+                observation = tools.execute(action)
+                active_action = None
+                observations.append(observation)
+                if observation.get("tool") == "submit" and observation.get("ok"):
+                    submitted = observation
+                    break
         transcript.append({"turn": turn, "at": _now(), "analysis": analysis, "actions": actions,
                            "observations": observations, "response_sha256": hashlib.sha256(response.encode()).hexdigest()})
+        candidate_written = candidate_written or _code_snapshot(workspace) != initial_code
+        checkpoint()
         # Keep the response only as a digest in transcript; complete action
         # requests and tool results are enough to reproduce the workspace edits.
         messages.append({"role": "assistant", "content": json.dumps({"analysis": analysis, "actions": actions})})
@@ -525,6 +660,8 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             status = "submitted"
             break
     elapsed = time.monotonic() - started_monotonic
+    heartbeat_stop.set()
+    heartbeat_thread.join(timeout=1)
     (output_dir / "transcript.json").write_text(json.dumps(transcript, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (output_dir / "usage.json").write_text(json.dumps(client.usage_events, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     receipt = {
@@ -557,6 +694,14 @@ def run_agent(*, task_id: str, workspace: Path, seed: int, profile_name: str,
             "usage_sha256": prior_receipt.get("usage_sha256"),
         }
     (output_dir / "agent_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (output_dir / "progress.json").write_text(
+        json.dumps({"status": status, "task_id": task_id, "seed": seed,
+                    "candidate_written": candidate_written, "active_action": None,
+                    "turns_completed": len(transcript), "api_calls": receipt["api_calls"],
+                    "api_cost_usd": receipt["api_cost_usd"],
+                    "wall_clock_hours": receipt["wall_clock_hours"], "at": _now()}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return receipt
 
 
@@ -570,7 +715,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--api-url", default=os.environ.get("LLM_API_URL") or os.environ.get("LLM_BASE_URL", ""))
     parser.add_argument("--model", default=os.environ.get("LLM_MODEL_NAME", ""))
-    parser.add_argument("--max-turns", type=int, default=120)
+    parser.add_argument("--max-turns", type=int, default=240)
     parser.add_argument("--request-timeout", type=int, default=180)
     parser.add_argument("--prior-agent-receipt", type=Path,
                         help="Failed predecessor receipt; its cost and elapsed time remain charged to this seed.")

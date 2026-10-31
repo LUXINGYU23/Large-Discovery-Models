@@ -4,9 +4,9 @@ ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY resolve-sol-pi.mjs ./
-# ADD revalidates this remote revision on each build; the image records its exact pair.
-ADD https://api.github.com/repos/NVlabs/SoL-Pi/commits/main /tmp/sol-pi-head.json
-RUN node resolve-sol-pi.mjs /tmp/sol-pi-head.json ${NPM_REGISTRY}
+# Release images must use the reviewed lockfile. Updating SoL-Pi is an
+# explicit source change, not a floating dependency in every image build.
+RUN node resolve-sol-pi.mjs --locked
 RUN npm ci --registry=${NPM_REGISTRY}
 
 FROM dependencies AS build

@@ -1,9 +1,11 @@
 import json
+import io
 
 import pytest
 
 from tasks.researchgym.scripts.ldm_code_agent import (
     AgentError,
+    ChatCompletionsClient,
     MAX_ACTIONS_PER_TURN,
     Pricing,
     WorkspaceTools,
@@ -49,6 +51,12 @@ def test_workspace_tools_keep_file_paths_inside_workspace(tmp_path):
     assert not external["ok"] and "network-capable" in external["error"]
     pretrained = tools.execute({"tool": "bash", "command": "python -c 'import timm; timm.create_model(\"vit\", pretrained=True)'"})
     assert not pretrained["ok"] and "network-capable" in pretrained["error"]
+    edited = tools.execute({"tool": "replace", "path": "nested/method.py", "old": "42", "new": "7"})
+    assert not edited["ok"] and (tmp_path / "nested/method.py").read_text() == "x = 1\n"
+    edited = tools.execute({"tool": "replace", "path": "nested/method.py", "old": "x = 1", "new": "x = 7"})
+    assert edited["ok"] and (tmp_path / "nested/method.py").read_text() == "x = 7\n"
+    found = tools.execute({"tool": "search", "path": "nested/method.py", "query": "x ="})
+    assert found["matches"] == [{"line": 1, "offset": 0, "text": "x = 7"}]
 
 
 def test_pricing_handles_cached_input_and_reasoning_without_double_counting():
@@ -58,6 +66,35 @@ def test_pricing_handles_cached_input_and_reasoning_without_double_counting():
              "completion_tokens_details": {"reasoning_tokens": 200}}
     # 600*2 + 400*.5 + max(300, 200)*4 = 2600 token-dollars / 1M
     assert pricing.cost(usage) == pytest.approx(0.0026)
+
+
+@pytest.mark.parametrize("response,expected_cost,unknown", [
+    ({"choices": [{"message": {"content": ""}}],
+      "usage": {"prompt_tokens": 1000, "completion_tokens": 100}}, 0.0011, False),
+    ({"choices": [{"message": {"content": ""}}]}, 0.1, True),
+])
+def test_empty_provider_reply_still_charges_call(monkeypatch, response, expected_cost, unknown):
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            self.close()
+
+    monkeypatch.setattr(
+        "tasks.researchgym.scripts.ldm_code_agent.urllib.request.urlopen",
+        lambda *_args, **_kwargs: FakeResponse(json.dumps(response).encode()),
+    )
+    client = ChatCompletionsClient(
+        api_url="https://provider.example/v1/chat/completions", api_key="test",
+        model="test", pricing=Pricing(1.0, 1.0, 1.0, 0.1),
+        budget_usd=10.0, request_timeout=1,
+    )
+    with pytest.raises(AgentError, match="no assistant content|omitted token usage"):
+        client.complete([{"role": "user", "content": "hello"}])
+    assert client.total_cost == pytest.approx(expected_cost)
+    assert len(client.usage_events) == 1
+    assert client.usage_events[0].get("unknown_usage", False) is unknown
 
 
 class _FakeClient:
@@ -87,6 +124,48 @@ def test_agent_owns_workspace_and_leaves_auditable_transcript(tmp_path):
     transcript = json.loads((tmp_path / "run" / "transcript.json").read_text())
     assert transcript[0]["actions"][0]["tool"] == "write"
     assert transcript[0]["observations"][1]["tool"] == "bash"
+    progress = json.loads((tmp_path / "run" / "progress.json").read_text())
+    assert progress["status"] == "submitted" and progress["turns_completed"] == 1
+
+
+def test_turn_limit_is_distinct_from_wall_clock_limit(tmp_path):
+    class _InspectOnlyClient:
+        total_cost = 0.01
+        usage_events = [{"cost_usd": 0.01}]
+
+        def complete(self, messages):
+            return '{"actions":[{"tool":"list","path":"."}]}'
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
+    receipt = run_agent(task_id="continual_learning", workspace=workspace, seed=0,
+                        profile_name="table3", manifest=manifest, output_dir=tmp_path / "run",
+                        client=_InspectOnlyClient(), max_turns=2)
+    assert receipt["status"] == "turn_exhausted"
+    assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 2
+
+
+def test_inspection_only_trajectory_stops_before_spending_all_240_turns(tmp_path):
+    class _InspectOnlyClient:
+        total_cost = 0.01
+        usage_events = [{"cost_usd": 0.01}]
+
+        def complete(self, messages):
+            return '{"actions":[{"tool":"list","path":"."}]}'
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manifest = protocol_manifest("table3", model="provider/model", harness="LDM-CodeAgent",
+                                 cmr_primary_row="qgs_blip_base")
+    receipt = run_agent(task_id="continual_learning", workspace=workspace, seed=0,
+                        profile_name="table3", manifest=manifest, output_dir=tmp_path / "run",
+                        client=_InspectOnlyClient(), max_turns=240)
+    assert receipt["status"] == "no_candidate"
+    assert json.loads((tmp_path / "run" / "progress.json").read_text())["turns_completed"] == 24
+    transcript = json.loads((tmp_path / "run" / "transcript.json").read_text())
+    assert transcript[16]["observations"][0]["tool"] == "source_change_guard"
 
 
 class _FormattingThenSubmitClient:

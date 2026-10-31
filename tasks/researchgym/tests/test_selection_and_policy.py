@@ -166,7 +166,8 @@ def test_compiled_policy_repairs_in_session_and_changes_mean_and_weights(tmp_pat
         meter = ProviderAuthorizationLedger(root=root, runtime=runtime, pricing=ApiPricing(),
                                             campaign_id="fixture-campaign", usage_prefix="policy", reserve_usd=None)
         controller = PolicyResearchController(client=client, adapter=adapter(), executor=AuthoredFixtureExecutor(),
-                                              root=root, provider_authorizer=meter.authorize)
+                                              root=root, provider_authorizer=meter.authorize,
+                                              account=lambda amounts: workflow._account_policy_turn_usage(runtime, amounts))
         candidates, representations = pool()
         compiled = selector(policy_controller=controller, policy_adapter=controller.adapter)
         compiled.fit(history())
@@ -183,4 +184,5 @@ def test_compiled_policy_repairs_in_session_and_changes_mean_and_weights(tmp_pat
     assert decisions == ["retry", "accept"]
     assert len((root / "fixture_requests.jsonl").read_text().splitlines()) == 1
     assert runtime.budget.counters["policy_provider_requests"] == 2
+    assert runtime.budget.counters["policy_harness_turns"] == 1
     assert {json.loads(path.read_text())["status"] for path in (root / "provider_authorizations").glob("*.json")} == {"reconciled"}
