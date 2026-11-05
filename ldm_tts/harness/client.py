@@ -12,6 +12,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ldm_tts.harness import responses
@@ -326,16 +327,9 @@ class HarnessClient:
         timeout = self.response_timeout_seconds if timeout_seconds is None else timeout_seconds
         deadline = time.monotonic() + timeout
         pending = {}
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                _terminate(process)
-                raise self._process_error("harness sidecar response timed out")
-            try:
-                line = self._responses.get(timeout=remaining)
-            except queue.Empty as exc:
-                _terminate(process)
-                raise self._process_error("harness sidecar response timed out") from exc
+        deferred = deque()
+
+        def parse_response(line):
             if line is None:
                 _terminate(process)
                 raise self._process_error("harness sidecar output closed")
@@ -345,17 +339,56 @@ class HarnessClient:
                 raise HarnessError("harness sidecar returned invalid JSON") from exc
             if not isinstance(response, dict) or response.get("requestId") != frame["requestId"]:
                 raise HarnessError("harness sidecar response requestId mismatch")
-            if (
-                response.get("protocolVersion") != self._protocol_version
-                or response.get("campaignId") != self.config.campaign_id
-            ):
+            if (response.get("protocolVersion") != self._protocol_version
+                    or response.get("campaignId") != self.config.campaign_id):
                 raise HarnessError("harness sidecar response protocol identity mismatch")
+            return response
+
+        def authorize(response):
+            if provider_authorizer is None:
+                raise HarnessError("harness requested provider authorization outside run_turn")
+            self._answer_provider_authorization(response, provider_authorizer)
+
+        def validate_without_blocking_provider(callback):
+            # Admission may run isolated solver jobs. Keep provider authorization
+            # responsive while preserving serial submission/budget decisions.
+            # Join the worker before returning/raising: no admission writer may
+            # outlive this request and race a resumed turn.
+            nonlocal deadline
+            validation_started = time.monotonic()
+            validation_deadline = validation_started + timeout
+            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="harness-validation") as pool:
+                future = pool.submit(callback)
+                while not future.done():
+                    remaining = validation_deadline - time.monotonic()
+                    if remaining <= 0:
+                        _terminate(process)
+                        raise self._process_error("harness submission validation timed out")
+                    try:
+                        response = parse_response(self._responses.get(timeout=min(.05, remaining)))
+                    except queue.Empty:
+                        continue
+                    if response.get("type") == "provider_authorization_requested":
+                        authorize(response)
+                    else:
+                        deferred.append(response)
+                result = future.result()
+                deadline += time.monotonic() - validation_started
+                return result
+
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _terminate(process)
+                raise self._process_error("harness sidecar response timed out")
+            try:
+                response = deferred.popleft() if deferred else parse_response(self._responses.get(timeout=remaining))
+            except queue.Empty as exc:
+                _terminate(process)
+                raise self._process_error("harness sidecar response timed out") from exc
             if response.get("type") == "provider_authorization_requested":
-                if provider_authorizer is None:
-                    _terminate(process)
-                    raise HarnessError("harness requested provider authorization outside run_turn")
                 try:
-                    self._answer_provider_authorization(response, provider_authorizer)
+                    authorize(response)
                 except BaseException:
                     _terminate(process)
                     raise
@@ -367,13 +400,16 @@ class HarnessClient:
                 raise HarnessError("harness requested submission validation outside run_turn")
             try:
                 if submission_batch_validator is None:
-                    self._answer_submission_validation(response, submission_validator)
+                    request = self._parse_submission_request(response)
+                    decision = validate_without_blocking_provider(lambda: submission_validator(request))
+                    self._send_submission_validation(response, request, decision)
                 else:
                     request = self._parse_submission_request(response)
                     if request.profile_id in pending:
                         raise HarnessError("profile has two pending submissions")
                     pending[request.profile_id] = (response, request)
-                    decisions = submission_batch_validator(tuple(item[1] for item in pending.values()))
+                    requests = tuple(item[1] for item in pending.values())
+                    decisions = validate_without_blocking_provider(lambda: submission_batch_validator(requests))
                     for profile, decision in decisions.items():
                         response_frame, request = pending.pop(profile)
                         self._send_submission_validation(response_frame, request, decision)
@@ -439,14 +475,6 @@ class HarnessClient:
             "requestDigest": request.request_digest,
             "authorized": authorizer(request),
         })
-
-    def _answer_submission_validation(
-        self,
-        response: dict[str, Any],
-        validator: SubmissionValidator,
-    ) -> None:
-        request = self._parse_submission_request(response)
-        self._send_submission_validation(response, request, validator(request))
 
     def _parse_submission_request(self, response):
         responses.assert_response_keys(response, {

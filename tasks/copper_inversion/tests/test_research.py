@@ -89,7 +89,7 @@ def test_partial_barrier_replays_accepted_peers(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("fault", ["duplicate", "syntax"])
 @pytest.mark.parametrize("count", [1, 4])
-def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monkeypatch, fault, count):
+def test_valid_peer_admitted_before_late_invalid_peer(tmp_path, monkeypatch, fault, count):
     original = MockClient.run_turn
     rejected, checked = [], []
     from tasks.copper_inversion.core.harness import Expander
@@ -105,29 +105,35 @@ def test_cross_branch_invalid_source_prevents_all_interface_jobs(tmp_path, monke
         if len(turns) != 4:
             return original(self, turns, submission_validator=submission_validator, **kwargs)
         batch = kwargs.pop("submission_batch_validator")
+        first_request = None
         def inspect(requests):
-            if len(requests) < 4:
-                assert batch(requests) == {}
-                assert not checked
-                assert not list((self.root / "admissions").glob("*.json"))
-                return {}
-            first, second, *rest = requests
-            duplicate = replace(second, submission=first.submission, artifacts=first.artifacts,
-                                submission_digest=None)
-            if fault == "syntax":
-                import hashlib
-                body = b"def solve(:\n"
-                (self.root / "invalid-syntax.py").write_bytes(body)
-                artifact = replace(second.artifacts[0], snapshot_path="invalid-syntax.py",
-                                   sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body))
-                duplicate = replace(second, artifacts=(artifact, *second.artifacts[1:]), submission_digest=None)
-            decisions = batch((first, duplicate, *rest))
-            assert decisions[second.profile_id].decision == "retry"
-            assert not checked
-            if fault == "duplicate":
-                assert "duplicates" in decisions[second.profile_id].errors[0].message
-            assert not list((self.root / "admissions").glob("*.json"))
-            rejected.append(decisions)
+            nonlocal first_request
+            assert len(requests) == 1  # No peer is held at a task-owned barrier.
+            request = requests[0]
+            if first_request is None:
+                first_request = request
+                decision = batch(requests)
+                assert decision[request.profile_id].decision == "accept"
+                assert len(checked) == count
+                assert len(list((self.root / "admissions").glob("*.json"))) == 1
+                return decision
+            if not rejected:
+                duplicate = replace(request, submission=first_request.submission,
+                                    artifacts=first_request.artifacts, submission_digest=None)
+                if fault == "syntax":
+                    import hashlib
+                    body = b"def solve(:\n"
+                    (self.root / "invalid-syntax.py").write_bytes(body)
+                    artifact = replace(request.artifacts[0], snapshot_path="invalid-syntax.py",
+                                       sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body))
+                    duplicate = replace(request, artifacts=(artifact, *request.artifacts[1:]), submission_digest=None)
+                checked_before = len(checked)
+                decisions = batch((duplicate,))
+                assert decisions[request.profile_id].decision == "retry"
+                assert len(checked) == checked_before
+                if fault == "duplicate":
+                    assert "duplicates" in decisions[request.profile_id].errors[0].message
+                rejected.append(decisions)
             return batch(requests)
         return original(self, turns, submission_batch_validator=inspect, **kwargs)
 

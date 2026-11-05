@@ -124,7 +124,7 @@ def test_explicit_zero_solver_budget_is_rejected():
 def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
     from contextlib import ExitStack
     from tasks.copper_inversion.core import harness_runtime as h
-    from tasks.copper_inversion.core.workflow import parse_args
+    from tasks.copper_inversion.v2.workflow import parse_args
     from tasks.copper_inversion.core.data import load_problem
 
     captured = []
@@ -139,9 +139,15 @@ def test_research_uses_shared_bash_budget(tmp_path, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-only-key")
     monkeypatch.setattr(h, "HarnessClient", Client)
     monkeypatch.setattr(h, "_preflight", lambda *args: None)
+    args=parse_args(['--public-catalog','/unused','--evaluation-socket','/unused',
+        '--evaluation-contract','a'*64,'--evaluation-service-uid','991',
+        '--out-dir',str(tmp_path),'--embedding-model-path','/unused',
+        '--harness-cache-dir',str(tmp_path/'cache')])
+    args.case_id='interface-budget-check'
     with ExitStack() as stack:
-        h.open_client(parse_args(["--harness-cache-dir", str(tmp_path / "cache")]), tmp_path,
+        h.open_client(args, tmp_path,
                       load_problem("drillholes_sketch_2d", fixture=True), stack, lambda *a, **k: None)
     assert captured[0].limits.tool_call_budgets["bash"] == 8
     assert captured[0].thinking == "low"
     assert captured[0].force_first_tool_call is False
+    assert captured[0].seed == 42

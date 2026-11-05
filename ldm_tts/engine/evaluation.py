@@ -276,7 +276,7 @@ def evaluation_budget_stop_reason(
 ) -> str | None:
     if _remaining_evaluation_attempts(runtime, state, config) == 0:
         return "evaluation_attempt_budget"
-    for name in ("selected_candidates", "external_evaluations", "expensive_evaluation_attempts"):
+    for name in ("selected_candidates", "external_evaluations", "expensive_evaluation_attempts", "algorithm_feedback_slots"):
         remaining = runtime.budget.remaining(name)
         if remaining is not None and remaining < 1:
             return "external_evaluation_budget"
@@ -286,6 +286,6 @@ def evaluation_budget_stop_reason(
 def remaining_fresh_attempts(runtime, state, config):
     limits = [_remaining_evaluation_attempts(runtime, state, config)]
     limits.extend(runtime.budget.remaining(name) for name in
-                  ("selected_candidates", "external_evaluations", "expensive_evaluation_attempts"))
+                  ("selected_candidates", "external_evaluations", "expensive_evaluation_attempts", "algorithm_feedback_slots"))
     finite = [max(0, int(value)) for value in limits if value is not None]
     return min(finite) if finite else None

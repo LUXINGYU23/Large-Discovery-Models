@@ -1,0 +1,23 @@
+{
+  "name": "copper_v2_fusion_pilot",
+  "task": "copper_inversion",
+  "algorithm": "surrogate_guided_harness",
+  "mode": "real",
+  "contract_profile": "fusion_pilot",
+  "args": {
+    "iterations": 1,
+    "candidates-per-researcher": 2,
+    "evaluations-per-round": 4,
+    "solver-seconds": 10,
+    "harness-seconds": 900,
+    "out-dir": "runs/copper_v2_fusion_pilot",
+    "embedding-model-path": "/Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614",
+    "embedding-device": "cuda:0",
+    "harness-cache-dir": "/Aidata/shared/ldm/cache/gondolin",
+    "sidecar-image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "public-catalog": "/Aidata/shared/ldm/copper-v2-development/public-training-integration-r1/catalog.json",
+    "evaluation-socket": "/Aidata/shared/ldm/copper-v2-rpc-r2/evaluator.sock",
+    "evaluation-contract": "08e241637cf7937fdc5def432941529be69d2982a0dc19a717ee3abc55ffa5a8",
+    "evaluation-service-uid": 991
+  }
+}

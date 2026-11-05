@@ -8,20 +8,19 @@ from ldm_tts.registration.dependencies import plan_check_context, ok, fail, skip
 def check_dependencies(plan, *, include_optional=True):
     task, args, env, cwd, mode = plan_check_context(plan)
     checks = []
-    for name in ("numpy", "scipy", "skfmm", "discretize"):
+    for name in ("numpy", "scipy", "skfmm", "sentence_transformers", "torch", "transformers"):
         checks.append(
             (ok if importlib.util.find_spec(name) else fail)(
                 task, name, "Python dependency availability"
             )
         )
-    if args.get("encoding", "ast") != "ast":
-        for name in ("sentence_transformers", "torch", "transformers"):
-            checks.append((ok if importlib.util.find_spec(name) else fail)(task, name, "Encoding dependency"))
-        model = Path(args.get("embedding-model-path", ""))
-        checks.append((ok if (model / "provenance.json").is_file() and (model / "model.safetensors").is_file() else fail)(
-            task, "embedding model", "Frozen local Qwen model and provenance required"))
+    model = Path(args.get("embedding-model-path", ""))
+    checks.append((ok if (model / "provenance.json").is_file() and (model / "model.safetensors").is_file() else fail)(
+        task, "embedding model", "Fusion always requires frozen local Qwen model and provenance"))
+    manifest = Path(args.get("public-catalog", ""))
+    checks.append((ok if manifest.is_file() else fail)(task,"public training catalog","Public-only v2 training catalog required"))
     if mode == "mock" or args.get("mock"):
-        checks.append(skip(task, "docker/provider", "Mock is service-free"))
+        checks.append(fail(task, "mode", "v2 has no production mock evaluation mode"))
     else:
         checks.append(
             (ok if shutil.which("docker") else fail)(

@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import threading
 import shutil
 import secrets
 from datetime import datetime
@@ -48,7 +49,7 @@ def source_identity():
     return digest(
         {
             str(p.relative_to(TASK)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for folder in ("core", "resources")
+            for folder in ("core", "v2", "resources")
             for p in sorted((TASK / folder).rglob("*"))
             if p.is_file()
             and "__pycache__" not in p.parts
@@ -104,6 +105,7 @@ class Execution:
             "image", "inspect", image, "--format", "{{.Id}}"
         ).stdout.strip()
         self.account = account
+        self._account_lock = threading.Lock()
 
     def run(
         self,
@@ -116,10 +118,23 @@ class Execution:
         memory_mb=2048,
         source=None,
         model=None,
+        science_module="core",
+        truth=None,
     ):
+        if science_module not in {"core", "v2"}:
+            raise ValueError("unknown scientific contract")
+        if truth is not None and (phase != "scorer" or science_module != "v2" or source is not None):
+            raise ValueError("hidden truth is restricted to the independent v2 scorer")
+        if phase == "scorer" and source is not None:
+            raise ValueError("independent scorer cannot mount candidate source")
+        truth_digest = None
+        if truth is not None:
+            truth_digest = hashlib.sha256((Path(truth) / "truth.npy").read_bytes()).hexdigest()
         key = digest(
             {
                 "identity": identity,
+                "science_module": science_module,
+                "truth_digest": truth_digest,
                 "phase": phase,
                 "image": self.image,
                 "timeout": timeout,
@@ -147,6 +162,8 @@ class Execution:
             result = json.loads(receipt.read_text())
             self._account(key, result, phase)
             docker("rm", name, check=False)
+            if result.get('reason') == 'supervisor_timeout':
+                raise EvaluationPaused('container supervisor exceeded infrastructure grace; reconcile recorded job')
             return root, result
         if job.exists():
             record = json.loads(job.read_text())
@@ -215,8 +232,11 @@ class Execution:
             mounts = [
                 (inputs, "/input", True),
                 (TASK / "core", "/code/tasks/copper_inversion/core", True),
+                (TASK / "v2", "/code/tasks/copper_inversion/v2", True),
                 (out, "/output", False),
             ]
+            if truth is not None:
+                mounts.append((truth, "/truth", True))
             if source:
                 mounts.append((source, "/submitted", True))
             if model:
@@ -233,7 +253,7 @@ class Execution:
                 "-m",
                 "tasks.copper_inversion.core.supervisor",
                 str(timeout),
-                "tasks.copper_inversion.core."
+                f"tasks.copper_inversion.{science_module}."
                 + ("scorer" if phase == "scorer" else "runner"),
             ]
             docker(*command)
@@ -250,7 +270,13 @@ class Execution:
             raise EvaluationPaused("container state differs from pre-dispatch receipt")
         # Workload timeout remains inside the container; allow only a bounded
         # finalization interval for descendant reap and authenticated counters.
-        deadline = record["start_time"] + timeout + 3
+        # Docker admission/boot and PID-1 finalization are infrastructure time.
+        # The worker's independent coreutils deadline still enforces exactly
+        # `timeout`, even if this controller disappears. Do not shorten it
+        # because docker start was queued on a busy daemon.
+        state = json.loads(docker("inspect", name).stdout)[0]["State"]
+        container_started = datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00")).timestamp()
+        deadline = container_started + timeout + 30
         reason = record.get("stop_reason")
         while True:
             state = json.loads(docker("inspect", name).stdout)[0]["State"]
@@ -273,7 +299,7 @@ class Execution:
                 if count > 32 or size > 4 * 1024 * 1024:
                     break
             if time.time() > deadline or count > 32 or size > 4 * 1024 * 1024:
-                reason = "timeout" if time.time() > deadline else "output_limit"
+                reason = "supervisor_timeout" if time.time() > deadline else "output_limit"
                 # Persist the controller's decision before killing: a restart must
                 # retain the timeout classification even if no receipt was written.
                 record["stop_reason"] = reason
@@ -327,9 +353,15 @@ class Execution:
         atomic_json_write(receipt, result)
         self._account(key, result, phase)
         docker("rm", name, check=False)
+        if reason == 'supervisor_timeout':
+            raise EvaluationPaused('container supervisor exceeded infrastructure grace; reconcile recorded job')
         return root, result
 
     def _account(self, key, result, phase):
+        with self._account_lock:
+            self._record_account(key, result, phase)
+
+    def _record_account(self, key, result, phase):
         if self.account:
             counts = {f"{phase}_jobs": 1, f"{phase}_wall_seconds": result["wall_seconds"]}
             sampling = result["resource_sampling"]

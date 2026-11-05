@@ -11,6 +11,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import time
 
 PREFIX = "COPPER_RESOURCE_V1 "
 
@@ -21,6 +22,8 @@ def main():
     key = os.environ["COPPER_RESOURCE_KEY"]
     env = {k: v for k, v in os.environ.items() if k != "COPPER_RESOURCE_KEY"}
     seconds, module = sys.argv[1:]
+    started = time.monotonic()
+    env['COPPER_WORKLOAD_DEADLINE_MONOTONIC'] = str(started + float(seconds))
     worker = subprocess.Popen(
         ["timeout", "--signal=KILL", seconds, sys.executable, "-m", module],
         env=env, user=65534, group=65534, extra_groups=[], start_new_session=True,
@@ -49,6 +52,8 @@ def main():
         "cpu_seconds_through_reap": int(cpu["usage_usec"]) / 1e6,
         "oom_kill_count": int(events.get("oom_kill", 0)),
         "exit_code": code if code >= 0 else 128 - code,
+        "worker_elapsed_seconds": time.monotonic() - started,
+        "worker_budget_seconds": float(seconds),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     mac = hmac.new(bytes.fromhex(key), encoded.encode(), hashlib.sha256).hexdigest()

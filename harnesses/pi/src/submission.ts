@@ -24,6 +24,12 @@ export interface TerminalSubmission {
 export class SubmissionController {
 	private readonly parameters: TUnsafe<Record<string, unknown>>;
 	private providerRequests = 0;
+	private validationStarted: number | undefined;
+	private validationElapsed = 0;
+
+	get validationWaitMilliseconds(): number {
+		return this.validationElapsed + (this.validationStarted === undefined ? 0 : performance.now() - this.validationStarted);
+	}
 	private attemptIndex = 0;
 	private profileId = "";
 	private turnId = "";
@@ -52,6 +58,8 @@ export class SubmissionController {
 		this.turnId = turnId;
 		this.turnRoot = turnRoot;
 		this.providerRequests = 0;
+		this.validationStarted = undefined;
+		this.validationElapsed = 0;
 		this.attemptIndex = 0;
 		try {
 			for (const name of await readdir(join(turnRoot, "attempts"))) {
@@ -122,6 +130,7 @@ export class SubmissionController {
 				}
 				const submissionJson = canonicalJson({ artifacts, submission });
 				const submissionDigest = sha256(submissionJson);
+				this.validationStarted = performance.now();
 				const decision = await this.validate({
 					profileId: this.profileId,
 					turnId: this.turnId,
@@ -130,6 +139,9 @@ export class SubmissionController {
 					artifacts,
 					submissionJson,
 					submissionDigest,
+				}).finally(() => {
+					this.validationElapsed += performance.now() - this.validationStarted!;
+					this.validationStarted = undefined;
 				});
 				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
 					throw new Error("submission validator returned an inconsistent decision");

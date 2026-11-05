@@ -122,7 +122,7 @@ test("wall-time cancellation drains the current prompt without starting another 
 			abortCompaction: () => { compactionAborted = true; release(); },
 			abort: async () => { aborted = true; await pending; },
 		},
-		submissions: { submission: undefined },
+		submissions: { submission: undefined, validationWaitMilliseconds: 0 },
 	};
 	const prototype = PersistentProfileSession.prototype as unknown as {
 		promptWithTimeout(message: string, limits: { wallTimeSeconds: number }): Promise<void>;
@@ -175,7 +175,7 @@ test("failed native compaction of a length stop never receives another submissio
 		const context = {
 			history, config: { submissionContract: { toolName: "submit_candidates" } },
 			session: { messages: [{ role: "assistant", stopReason: "length", timestamp: Date.now() }], prompt: async () => { calls += 1; }, compact: async () => { throw new Error("summary failed"); } },
-			submissions: { submission: undefined },
+			submissions: { submission: undefined, validationWaitMilliseconds: 0 },
 		};
 		const prototype = PersistentProfileSession.prototype as unknown as {
 			promptWithTimeout(message: string, limits: { wallTimeSeconds: number }): Promise<void>;
@@ -194,7 +194,7 @@ test("a length stop after successful native compaction gets one bounded continua
   manager.appendMessage({role:"user",content:"research",timestamp});
   manager.appendCompaction("Preserved work", manager.getLeafId()!, 100);
   const history = new HistoryController();await history.begin(root,manager);
-  let calls=0;const submissions:{submission:unknown}={submission:undefined};
+  let calls=0;const submissions:{submission:unknown;validationWaitMilliseconds:number}={submission:undefined,validationWaitMilliseconds:0};
   const context={history,config:{submissionContract:{toolName:"submit_candidates"}},submissions,
    session:{messages:[{role:"assistant",stopReason:"length",timestamp}],
     compact:async()=>{throw new Error("Must reuse completed native compaction");},
@@ -203,4 +203,19 @@ test("a length stop after successful native compaction gets one bounded continua
   await prototype.promptWithTimeout.call(context,"research",{wallTimeSeconds:2});
   assert.equal(calls,2);assert.equal(JSON.parse(await readFile(join(root,"history-recovery.json"),"utf8")).continuations,1);
  } finally {await rm(root,{recursive:true,force:true});}
+});
+
+
+test("host validation wait does not consume research deadline", async () => {
+ let started: number | undefined; let elapsed=0;
+ const submissions={submission:undefined as unknown,
+  get validationWaitMilliseconds(){return elapsed+(started===undefined?0:performance.now()-started);}};
+ const context={history:{assertReady:()=>{},fail:async()=>{}},submissions,
+  session:{messages:[],prompt:async()=>{
+   started=performance.now();await new Promise(resolve=>setTimeout(resolve,120));
+   elapsed+=performance.now()-started;started=undefined;submissions.submission={accepted:true};
+  },abort:async()=>{throw new Error("validation must not abort research");},abortCompaction:()=>{}}};
+ const prototype=PersistentProfileSession.prototype as unknown as {promptWithTimeout(message:string,limits:{wallTimeSeconds:number}):Promise<void>};
+ await prototype.promptWithTimeout.call(context,"research",{wallTimeSeconds:.03});
+ assert.ok(submissions.submission);assert.ok(elapsed>=100);
 });

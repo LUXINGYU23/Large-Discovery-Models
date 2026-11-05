@@ -24,6 +24,7 @@ upstream.loss_function_binary = finite_binary_loss
 METHOD = 'paper_mcmc'
 MAX_CALLS = 1000
 OBJECTIVE = 'aligned'
+ACQ_WARMUP = 30
 
 
 class BudgetStop(Exception):
@@ -56,6 +57,13 @@ def solve(problem, budget, seed):
             invalid_proposals += 1
             return phi.copy()
     upstream.level_set_perturbation = bounded_perturbation
+    acquisition_decisions = 0
+    original_predict = portable.OnlineBayesianRidge.predict
+    def counted_predict(surrogate, features):
+        nonlocal acquisition_decisions
+        acquisition_decisions += 1
+        return original_predict(surrogate, features)
+    portable.OnlineBayesianRidge.predict = counted_predict
     original = objective.loss_computation
     best, best_phi = float('inf'), initial.copy()
     rows = []
@@ -88,10 +96,10 @@ def solve(problem, budget, seed):
                 temperature=20 if 'outcrops' in problem['case_id'] else 3)
         else:
             portable.load_case = lambda: (centers, initial, objective)
-            portable.run_method(METHOD, MAX_CALLS-1, seed, batch=4, warmup=30, beta=.75)
+            portable.run_method(METHOD, MAX_CALLS-1, seed, batch=4, warmup=ACQ_WARMUP, beta=.75)
     except BudgetStop:
         stopped = 'time_budget' if time.monotonic() >= deadline else 'call_budget'
     Path('/output/search.json').write_text(json.dumps(dict(method=METHOD, objective=OBJECTIVE, seed=seed,
-        calls=len(rows), max_calls=MAX_CALLS, invalid_proposals=invalid_proposals, stop=stopped, elapsed_seconds=time.monotonic()-started,
+        calls=len(rows), max_calls=MAX_CALLS, acq_warmup=ACQ_WARMUP, acquisition_decisions=acquisition_decisions, invalid_proposals=invalid_proposals, stop=stopped, elapsed_seconds=time.monotonic()-started,
         best_raw_loss=best, curve=rows)))
     return np.ascontiguousarray(best_phi)

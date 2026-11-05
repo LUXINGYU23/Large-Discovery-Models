@@ -56,6 +56,7 @@ class BudgetLedger:
     counters: dict[str, int | float] = field(default_factory=dict)
     path: Path | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    _lock: Any = field(default_factory=threading.RLock, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.limits = _validated_numbers(self.limits, "limits")
@@ -87,6 +88,10 @@ class BudgetLedger:
         self, groups: Mapping[str | None, Mapping[str, int | float]]
     ) -> dict[str, int | float]:
         """Reserve a whole batch atomically, retaining each operation's replay key."""
+        with self._lock:
+            return self._consume_groups(groups)
+
+    def _consume_groups(self, groups):
 
         usage = dict(self.metadata.get("cumulative_usage", {}))
         updates: dict[str, int | float] = {}
@@ -124,6 +129,10 @@ class BudgetLedger:
         return max(0, limit - self.counters.get(name, 0))
 
     def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return self._snapshot()
+
+    def _snapshot(self) -> dict[str, Any]:
         names = sorted(set(self.limits) | set(self.counters))
         limits = {
             name: _serialized_number(value)
@@ -148,8 +157,9 @@ class BudgetLedger:
         }
 
     def write(self) -> None:
-        if self.path is not None:
-            atomic_json_write(self.path, self.snapshot())
+        with self._lock:
+            if self.path is not None:
+                atomic_json_write(self.path, self.snapshot())
 
 
 @dataclass

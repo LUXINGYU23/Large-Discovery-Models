@@ -215,6 +215,14 @@ class LDMEngine:
                     continue
 
                 active.empty_reservoir_rounds = 0
+                # Admission can consume scientific feedback on rejected inputs.
+                # Re-read the cap after expansion, before selecting a fresh batch.
+                remaining_attempts = remaining_fresh_attempts(self.runtime, active, config)
+                exhausted = evaluation_budget_stop_reason(self.runtime, active, config)
+                if exhausted is not None:
+                    stop_reason = exhausted
+                    self.runtime.checkpoint(active.to_checkpoint())
+                    break
                 selection_count = effective
                 if config.replace_failed_evaluations:
                     selection_count = (

@@ -581,11 +581,21 @@ export class PersistentProfileSession {
 			}
 		};
 		let timer: NodeJS.Timeout | undefined;
+		const started = performance.now();
+		const initialValidationWait = this.submissions.validationWaitMilliseconds;
 		const timeout = new Promise<never>((_resolve, reject) => {
-			timer = setTimeout(() => {
-				expired = true;
-				reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`));
-			}, limits.wallTimeSeconds * 1000);
+			const check = () => {
+				// Host admission cannot generate research tokens or edit candidates.
+				// Its queue/container time belongs to validation, not agent thinking.
+				// The host request still has its own bounded infrastructure timeout.
+				const validationWait = this.submissions.validationWaitMilliseconds - initialValidationWait;
+				const remaining = limits.wallTimeSeconds * 1000 - (performance.now() - started - validationWait);
+				if (remaining <= 0) {
+					expired = true;
+					reject(new Error(`session wall-time limit reached: ${limits.wallTimeSeconds}s`));
+				} else timer = setTimeout(check, Math.min(100, remaining));
+			};
+			check();
 		});
 		const pending = run();
 		try {

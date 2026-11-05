@@ -66,3 +66,10 @@ TTS/
 /tasks/alphabench/environments/assay/source
 
 .deepseek-api-key.dpapi
+
+# Runtime researcher instructions are part of the copper v2 task.
+!tasks/copper_inversion/resources/v2/AGENTS.md
+
+# Duplicate offline bundles; the unpacked reports remain version controlled.
+/docs/copper-technical-report.zip
+/docs/copper-seed42-final-20261031/copper-seed42-offline-package.zip

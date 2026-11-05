@@ -15,6 +15,7 @@ from ldm_tts.harness import (
     HarnessTurn,
     HarnessSubmissionValidation,
     HarnessError,
+    HarnessNetworkPolicy,
 )
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.harness.container import pi_sidecar_command
@@ -40,8 +41,8 @@ def prepare_public(root, problem):
         atomic_json_write(public / "history.json", [])
 
 
-def researcher_profiles(parallel=False):
-    profile = RESOURCES / "harness/profiles/researcher/AGENTS.md"
+def researcher_profiles(parallel=False, *, resources=None):
+    profile = (Path(resources) if resources is not None else RESOURCES / "harness") / "profiles/researcher/AGENTS.md"
     return tuple(HarnessProfile(name, Path("/resources/profiles/researcher/AGENTS.md"),
                                 agents_sha256=file_sha256(profile))
                  for name in (("researcher_1", "researcher_2", "researcher_3", "researcher_4")
@@ -60,17 +61,17 @@ def api_key(args):
 def create_client(args, campaign_root, problem, *, artifact_root=None, profiles=None,
                   contract=None, fork_sources=None):
     root = Path(artifact_root) if artifact_root is not None else Path(campaign_root) / "harness"
-    prepare_public(root, problem)
-    resources = RESOURCES / "harness"
+    getattr(args, "_prepare_public", prepare_public)(root, problem)
+    resources = getattr(args, "_resources", RESOURCES / "harness")
     tool = resources / "tools/copper.mjs"
     config = PiHarnessConfig(
         artifact_root=Path("/artifacts"),
-        profiles=profiles or researcher_profiles(args.search_method == "ldm_harness"),
+        profiles=profiles or researcher_profiles(args.search_method == "ldm_harness", resources=resources),
         fork_sources=fork_sources or {},
         campaign_id=Path(campaign_root).name,
         task_id="copper_inversion",
         case_id=args.case_id,
-        seed=47,
+        seed=args.seed,
         submission_contract=contract or submission_contract(args.candidates_per_researcher),
         base_url=args.llm_url or os.environ.get("LLM_BASE_URL", ""),
         model=args.llm_model or os.environ.get("LLM_MODEL_NAME", ""),
@@ -86,6 +87,9 @@ def create_client(args, campaign_root, problem, *, artifact_root=None, profiles=
             ),
         ),
         context7_enabled=False,
+        # Model calls use the trusted provider proxy. Research shell/network
+        # tools need no egress: all inputs and scientific dependencies are local.
+        network_policy=HarnessNetworkPolicy(denied_hosts=("*",)),
         limits=HarnessLimits(
             wall_time_seconds=args.harness_seconds,
             tool_call_budgets={"bash": 8, "web_search": 0, "web_fetch": 0},
@@ -119,13 +123,13 @@ def open_search(args, root, problem, stack, checks, runtime):
         ResearchCoordinator, MeasuredResearchExpander, main_research_profile, research_contract,
     )
 
-    profiles = researcher_profiles(args.search_method == "ldm_harness")
+    profiles = researcher_profiles(args.search_method == "ldm_harness", resources=getattr(args, "_resources", None))
     identities = tuple(p.profile_id for p in profiles)
     harness_root = Path(root) / "harness"
 
     def client_at(artifact_root, *, main=False, sources=None):
         if args.mock:
-            prepare_public(artifact_root, problem)
+            getattr(args, "_prepare_public", prepare_public)(artifact_root, problem)
             return MockClient(artifact_root, profiles=("main_research",) if main else identities,
                               fork_sources=sources)
         return create_client(args, root, problem, artifact_root=artifact_root,
@@ -169,7 +173,7 @@ def _preflight(args, root, config, key, account):
         return
     probe_root = root / "preflight"
     probe_root.mkdir(exist_ok=True)
-    resources = RESOURCES / "harness"
+    resources = getattr(args, "_resources", RESOURCES / "harness")
     profile = resources / "profiles/researcher/PROBE.md"
     probe = replace(
         config,

@@ -154,12 +154,16 @@ class Expander:
                       if self.inherited_history_counts is not None else json.loads(cursor_file.read_text()) if cursor_file.exists() else 0)
             if not 0 <= cursor <= len(history):
                 raise ValueError("invalid inherited history cursor")
+            role = getattr(self, "branch_instructions", {}).get(profile)
+            if role is not None:
+                role = {**role, "shared_evidence": {**role["shared_evidence"], "tool": "get_inversion_context"}}
             turns.append(HarnessTurn(
                 profile_id=profile, turn_id=f"{profile}_round_{request.round_idx}",
                 round_index=request.round_idx, history_from_seq=cursor,
                 history_to_seq=len(history), history_digest=canonical_sha256(history[cursor:]),
                 message=json.dumps({
                     "instruction": "Read get_inversion_context, inspect measured feedback and improve the algorithm. Submit the requested number of distinct complete solvers. Only selected candidates are scored; an unmeasured proposal is not a failure.",
+                    "research_branch": role,
                     "round": request.round_idx, "profile_id": profile,
                     "candidates_required": self.candidates_per_researcher,
                     "research_wall_time_seconds": self.client.config.limits.wall_time_seconds,
@@ -213,27 +217,11 @@ class Expander:
                     submission_error(exc),))
 
         def validate_batch(requests):
-            # Hold well-formed snapshots until every branch is present. Invalid
-            # peers may repair in the same turn without spending interface jobs.
-            errors, seen = {}, dict(admitted)
-            for request in requests:
-                try:
-                    if request.profile_id not in expected or request.turn_id != expected[request.profile_id].turn_id:
-                        raise ValueError("submission does not match requested turn")
-                    bodies = parse_snapshot(request.submission, request.artifacts, self.artifact_root, known, self.candidates_per_researcher)
-                    shas = [hashlib.sha256(body).hexdigest() for body in bodies]
-                    if any(owner != request.profile_id and set(values) & set(shas) for owner, values in seen.items()):
-                        raise ValueError("source duplicates another branch in this batch; change the algorithm")
-                    if request.profile_id in admitted and admitted[request.profile_id] != shas:
-                        raise ValueError("accepted source changed during replay")
-                    seen[request.profile_id] = shas
-                except (ValueError, OSError, SyntaxError, UnicodeError) as exc:
-                    errors[request.profile_id] = HarnessSubmissionValidation("retry", (
-                        submission_error(exc),))
-            if errors:
-                return errors
-            if set(seen) != set(expected):
-                return {}
+            # A valid peer must not wait for every other provider to submit.
+            # Durable per-profile admission still enforces cross-profile source
+            # uniqueness; the reservoir is published only after run_turn ends.
+            # Holding snapshots here deadlocks a peer whose sibling has failed
+            # before submission, because the sidecar awaits all turn outcomes.
             return {request.profile_id: validate(request) for request in requests}
 
         for turn in turns:

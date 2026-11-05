@@ -68,6 +68,41 @@ def test_commit_with_unresolved_snapshot_is_rejected(tmp_path):
         client._request('run_turn', {'turns':[]}, 'turn_committed', submission_batch_validator=lambda r: {})
 
 
+def test_slow_validation_does_not_starve_provider_authorization(tmp_path, monkeypatch):
+    import threading
+    client, sent = fixture(tmp_path)
+    authorized = threading.Event()
+    finished = threading.Event()
+    def authorize(response, callback):
+        assert not finished.is_set()
+        authorized.set()
+    monkeypatch.setattr(client, '_answer_provider_authorization', authorize)
+    def validate(requests):
+        assert authorized.wait(2), 'provider request blocked behind admission'
+        finished.set()
+        return {r.profile_id: HarnessSubmissionValidation() for r in requests}
+    for response in [submission('a'), frame('provider_authorization_requested'), frame('turn_committed', turns=[])]:
+        client._responses.put(json.dumps(response))
+    client._request('run_turn', {'turns':[]}, 'turn_committed', submission_batch_validator=validate,
+                    provider_authorizer=lambda _: True)
+    assert finished.is_set() and sent[-1]['decision']=='accept'
+
+
+def test_concurrent_budget_reservations_keep_cap_and_replay(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from ldm_tts.engine.run_store import BudgetLedger, BudgetExceededError
+    ledger=BudgetLedger(limits={'slots':32},path=tmp_path/'budget.json')
+    def reserve(i):
+        try:ledger.consume_many({'slots':1},usage_key=f'source:{i%48}')
+        except BudgetExceededError:return False
+        return True
+    with ThreadPoolExecutor(max_workers=16) as pool:list(pool.map(reserve,range(192)))
+    saved=BudgetLedger.load(ledger.path)
+    assert saved.counters['slots']==32
+    assert len(saved.metadata['cumulative_usage'])==32
+    assert saved.snapshot()==ledger.snapshot()
+
+
 @pytest.mark.parametrize('late_peer', [False, True])
 @pytest.mark.parametrize('exhausted', [False, True])
 def test_terminal_rejection_releases_batch_barrier(tmp_path, monkeypatch, late_peer, exhausted):
@@ -98,3 +133,21 @@ def test_terminal_rejection_releases_batch_barrier(tmp_path, monkeypatch, late_p
     with pytest.raises(HarnessError, match='test complete'):
         client.run_turn(turns, submission_batch_validator=validate)
     assert len(calls) == 1
+
+
+def test_host_validation_has_independent_timeout(tmp_path):
+    import threading
+    import time
+    client, sent = fixture(tmp_path)
+    def peer():
+        time.sleep(.08)
+        client._responses.put(json.dumps(submission('a')))
+    worker=threading.Thread(target=peer);worker.start()
+    def validate(request):
+        time.sleep(.08)
+        client._responses.put(json.dumps(frame('turn_committed', turns=[])))
+        return HarnessSubmissionValidation('accept')
+    client._request('run_turn', {'turns':[]}, 'turn_committed', timeout_seconds=.13,
+                    submission_validator=validate)
+    worker.join()
+    assert sent[-1]['decision']=='accept'
