@@ -1,0 +1,193 @@
+{
+  "status": "completed",
+  "observations": 5,
+  "best_iou": 0.07914851786607512,
+  "controller_counters": {
+    "algorithm_feedback_slots": 5,
+    "benchmark_jobs": 0,
+    "expensive_evaluation_attempts": 5,
+    "external_evaluations": 5,
+    "harness_artifact_bytes": 46647572,
+    "harness_tool_calls": 80,
+    "harness_turns": 5,
+    "harness_validation_submissions": 7,
+    "harness_wall_time_seconds": 497.5870644841343,
+    "interface_cpu_seconds_observed": 16.388704,
+    "interface_cpu_seconds_through_reap": 23.18402100000001,
+    "interface_jobs": 54,
+    "interface_wall_seconds": 37.29973387718201,
+    "llm_requests": 79,
+    "main_research_turns": 1,
+    "outer_iterations": 2,
+    "proposal_attempts": 4,
+    "selected_candidates": 5,
+    "successful_evaluations": 5,
+    "valid_search_candidates": 9
+  },
+  "private_counters": {
+    "algorithm_feedback_slots": 5,
+    "interface_cpu_seconds_observed": 8.530926,
+    "interface_cpu_seconds_through_reap": 12.259626999999998,
+    "interface_jobs": 30,
+    "interface_wall_seconds": 20.083073616027832,
+    "scorer_cpu_seconds_observed": 2.6229150000000003,
+    "scorer_cpu_seconds_through_reap": 2.8000610000000004,
+    "scorer_jobs": 10,
+    "scorer_wall_seconds": 5.400623798370361,
+    "solver_cpu_seconds_observed": 37.567803999999995,
+    "solver_cpu_seconds_through_reap": 38.644932999999995,
+    "solver_jobs": 10,
+    "solver_wall_seconds": 41.23895072937012
+  },
+  "scores": [
+    {
+      "source": "d277f01dfa0b57fea083e443dfb390c4d5399508179945d5eebd6c2fa377eefa",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9937007874015749,
+        "mean_iou": 0.006299212598425197,
+        "mean_solver_wall_seconds": 8.388527989387512,
+        "parent_count": 1.0,
+        "research_utility": 0.006299212598425197,
+        "solve_count": 2.0
+      }
+    },
+    {
+      "source": "126a1645acd5405a4d3368b45c8961eafe42259395776295c056fa672d16c8bd",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9668967681204895,
+        "mean_iou": 0.03310323187951051,
+        "mean_solver_wall_seconds": 6.2202595472335815,
+        "parent_count": 1.0,
+        "research_utility": 0.03310323187951051,
+        "solve_count": 2.0
+      }
+    },
+    {
+      "source": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.930179448881962,
+        "mean_iou": 0.06982055111803796,
+        "mean_solver_wall_seconds": 0.5325609445571899,
+        "parent_count": 1.0,
+        "research_utility": 0.06982055111803796,
+        "solve_count": 2.0
+      }
+    },
+    {
+      "source": "8f8f937a1558181fe062a3c5b87cacf6460e6930f1c4fa16dbde697d28369d85",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.92761365151511,
+        "mean_iou": 0.07238634848489,
+        "mean_solver_wall_seconds": 3.6942484378814697,
+        "parent_count": 1.0,
+        "research_utility": 0.07238634848489,
+        "solve_count": 2.0
+      }
+    },
+    {
+      "source": "d93c51d491f7abe616869962aaf832e104f23bf1da445b21b2a2efb2cd7852ae",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9208514821339249,
+        "mean_iou": 0.07914851786607512,
+        "mean_solver_wall_seconds": 1.7838784456253052,
+        "parent_count": 1.0,
+        "research_utility": 0.07914851786607512,
+        "solve_count": 2.0
+      }
+    }
+  ],
+  "scope": "one-parent two-pack development integration; old frozen guest network policy; not formal qualification",
+  "fusion_encoding_audit": [
+    {
+      "source": "d277f01dfa0b57fea083e443dfb390c4d5399508179945d5eebd6c2fa377eefa",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999994,
+        0.49999999999999994
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999994,
+        0.5000000000000001
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "50aa7ea18cb21c15ddd667100c03e4c2a42deca7b2be9f2299ad8a356dc0a59f",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.5000000000000001,
+        0.4999999999999999
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "126a1645acd5405a4d3368b45c8961eafe42259395776295c056fa672d16c8bd",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999983,
+        0.5
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "be170059ae7ed8b19588a16ffe2146c7de1660215c1fd82858e5b5c4c0fd30c6",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999994,
+        0.4999999999999999
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "d93c51d491f7abe616869962aaf832e104f23bf1da445b21b2a2efb2cd7852ae",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.4999999999999999,
+        0.49999999999999994
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "8f8f937a1558181fe062a3c5b87cacf6460e6930f1c4fa16dbde697d28369d85",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999994,
+        0.5000000000000001
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "d2af1aabd4b56bc26143b0e361e031e68a5eea526a131cfecd483b196b1ee9f4",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.5,
+        0.5000000000000001
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    },
+    {
+      "source": "a844056b1b16508b4c30181d2166a201a0c15797ac2154d82fabf8b5967a9150",
+      "dimension": 1280,
+      "block_squared_norms": [
+        0.49999999999999983,
+        0.49999999999999994
+      ],
+      "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+    }
+  ]
+}

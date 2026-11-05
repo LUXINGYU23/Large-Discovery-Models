@@ -1,0 +1,119 @@
+{
+  "time": 1793175560.7558305,
+  "gate": {
+    "stage": "passed_pending_recovery_controller",
+    "time": 1793174515.6263447,
+    "frozen": {
+      "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/fair_queue_20261028.py": "9604467d6e959357c8d21563513048d3a572dcbf5549ebff666f47e21702d382",
+      "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/runtime_fair_20261028.py": "5c6ab01fce88ea0aaf6b2ea99856e23a93f8732660a59e81c1619ea79e193133",
+      "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/qualify_fair_20261028.py": "d4cf7b8e917a6c2a79dcba8e1c43ccaa8ef3f9add318c639a2a3f4ac4f5b97c8",
+      "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/test_fair_queue_20261028.py": "b6cb8e257f6ba9eca1217b1e83454bccfba9a9bc382dd805d7855aa40ea9cb2f"
+    }
+  },
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793175556.5614588,
+    "supervisor_pid": 355698,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "deployment": {
+    "supervisor_pid": 355698,
+    "pids": {
+      "mcmc-42": 2549690,
+      "acq-42": 2549691,
+      "mcmc-43": 2549692,
+      "acq-43": 2549693,
+      "mcmc-3407": 2549694,
+      "acq-3407": 2549695
+    },
+    "service_pids": {
+      "mcmc-42": 2547100,
+      "acq-42": 2547149,
+      "mcmc-43": 2547202,
+      "acq-43": 2547261,
+      "mcmc-3407": 2547316,
+      "acq-3407": 2547379
+    },
+    "epoch": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "history_files": 687532,
+    "policy": "/Aidata/shared/ldm/copper-measurement-study-20261027-r4-baselines/scheduling-policy32-fair-20261028.json",
+    "queue": "/Aidata/shared/ldm/copper-measurement-study-20261027-r4-baselines/queue32-fair-20261028"
+  },
+  "gate_command": null,
+  "handoff_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261028.py ",
+  "audit_command": null,
+  "recover-fair-20261028.log": "",
+  "fair-resume-audit.log": "{\"time\": 1793174712.596514, \"rows\": [{\"name\": \"mcmc-42\", \"cases\": 6200, \"new_cases\": 2, \"charged\": 145, \"complete\": 129}, {\"name\": \"acq-42\", \"cases\": 6294, \"new_cases\": 2, \"charged\": 145, \"complete\": 129}, {\"name\": \"mcmc-43\", \"cases\": 6192, \"new_cases\": 1, \"charged\": 145, \"complete\": 129}, {\"name\": \"acq-43\", \"cases\": 6240, \"new_cases\": 7, \"charged\": 145, \"complete\": 129}, {\"name\": \"mcmc-3407\", \"cases\": 6585, \"new_cases\": 2, \"charged\": 145, \"complete\": 129}, {\"name\": \"acq-3407\", \"cases\": 6515, \"new_cases\": 1, \"charged\": 145, \"complete\": 129}], \"historical_result_source_files_unchanged\": 165660, \"budget_originals_preserved\": 12, \"known_failures\": 10, \"new_failures\": 0, \"all_groups_new_cases\": true, \"mcmc43_tail_completed\": true, \"manifests_unchanged\": true}\n",
+  "fair-resume-audit.json": {
+    "time": 1793174712.596514,
+    "rows": [
+      {
+        "name": "mcmc-42",
+        "cases": 6200,
+        "new_cases": 2,
+        "charged": 145,
+        "complete": 129
+      },
+      {
+        "name": "acq-42",
+        "cases": 6294,
+        "new_cases": 2,
+        "charged": 145,
+        "complete": 129
+      },
+      {
+        "name": "mcmc-43",
+        "cases": 6192,
+        "new_cases": 1,
+        "charged": 145,
+        "complete": 129
+      },
+      {
+        "name": "acq-43",
+        "cases": 6240,
+        "new_cases": 7,
+        "charged": 145,
+        "complete": 129
+      },
+      {
+        "name": "mcmc-3407",
+        "cases": 6585,
+        "new_cases": 2,
+        "charged": 145,
+        "complete": 129
+      },
+      {
+        "name": "acq-3407",
+        "cases": 6515,
+        "new_cases": 1,
+        "charged": 145,
+        "complete": 129
+      }
+    ],
+    "historical_result_source_files_unchanged": 165660,
+    "budget_originals_preserved": 12,
+    "known_failures": 10,
+    "new_failures": 0,
+    "all_groups_new_cases": true,
+    "mcmc43_tail_completed": true,
+    "manifests_unchanged": true
+  },
+  "recovery-fair-20261028/history-verified-before-resume.json": {
+    "files": 687532,
+    "time": 1793174671.5340843
+  },
+  "qualification": {
+    "status": "passed",
+    "jobs": 1308,
+    "peak_active": 32,
+    "failures": 0
+  }
+}

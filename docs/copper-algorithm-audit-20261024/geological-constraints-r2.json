@@ -1,0 +1,191 @@
+{
+  "status": "passed",
+  "policy": "synthetic-volume-connectivity-1",
+  "calibration_scope": "independent_development",
+  "used_evaluation_truth": false,
+  "parents": [
+    {
+      "family": "folded",
+      "seed": 2540192433,
+      "geometry_sha256": "bcb30378711c2eeb2fc97d98058f43018585ef75435303054b25c1970b10d4b1",
+      "volume_fraction": 0.26834822210544756,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "folded",
+      "seed": 3650501183,
+      "geometry_sha256": "2ca0f9430db239032fbf97b6f47b73f3aa451619c786f0d92f36f732c91722d7",
+      "volume_fraction": 0.25683549977588527,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "lens",
+      "seed": 1625138824,
+      "geometry_sha256": "4307ea79ad8fd8471176a89669953ecd2671cacad3828de226eaeb2fa2f326aa",
+      "volume_fraction": 0.07354740952269946,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "lens",
+      "seed": 4234764802,
+      "geometry_sha256": "4361e0b7ce3ca310ed5e88e2460044fb6730b87a55ce08f7ff4db012b9a47a22",
+      "volume_fraction": 0.05903424559392463,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "multiple",
+      "seed": 2059122708,
+      "geometry_sha256": "e79dcacda276521bbd5944b285578dc3729647283b35b8972b90f7f056dc7364",
+      "volume_fraction": 0.032965936861004436,
+      "components": 2,
+      "passed": true
+    },
+    {
+      "family": "multiple",
+      "seed": 1564801663,
+      "geometry_sha256": "7e18fbb4a08fbd6ef2fa8c2db22f87ee111365373bd6e45754c6a73489e60588",
+      "volume_fraction": 0.03267298306057996,
+      "components": 2,
+      "passed": true
+    },
+    {
+      "family": "faulted",
+      "seed": 1346786600,
+      "geometry_sha256": "e7372fd590ae2e453edcfa9e45216f04acaa6b27066417d150e97d35b44cf418",
+      "volume_fraction": 0.2669990933816863,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "faulted",
+      "seed": 1025860912,
+      "geometry_sha256": "78d3724701a04c56a400001bccb9ac8b22a353345683ae893bcd965434f212f7",
+      "volume_fraction": 0.27310020174848687,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 1572553005,
+      "geometry_sha256": "1fff3891e91a9a19826155c761b439a051647814fd79af45b50acd386c9fad06",
+      "volume_fraction": 0.07026307026307026,
+      "components": 1,
+      "passed": true
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 579465176,
+      "geometry_sha256": "d3b2b0ac6df07af27d5f736479ea43e69426e28a5dd9f5bd9aaa1dc648d1c993",
+      "volume_fraction": 0.042208002068386014,
+      "components": 1,
+      "passed": true
+    }
+  ],
+  "numerical_checks": [
+    {
+      "fixture": 0,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 0,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 0,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 1,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 2,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 3,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 3,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 3,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 4,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 4,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 4,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 5,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 5,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 5,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    }
+  ],
+  "limitations": [
+    "Fixed synthetic population assumptions; not field-geology validation",
+    "No fitted area or fragment penalty",
+    "At most four connected bodies; 2-65% of feasible domain; same public policy for all methods"
+  ]
+}

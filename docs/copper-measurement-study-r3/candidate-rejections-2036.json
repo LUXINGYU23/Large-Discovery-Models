@@ -1,0 +1,144 @@
+[
+  {
+    "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-42/harness/branches/round_0011/sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/validation.json",
+    "sha256": "fc28a98af46e875dc92899823096406ea07e5428a370a6351ed572a9c0c090d6",
+    "time": 1792930121.765812,
+    "errors": [
+      {
+        "path": "/candidates/5/artifact_path",
+        "code": "invalid_solver",
+        "message": "candidate 5: public interface public-interface-2 failed: 1",
+        "hint": ""
+      }
+    ],
+    "artifacts": [
+      {
+        "pathPointer": "/candidates/0/artifact_path",
+        "relativePath": "candidates/0/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-00.py",
+        "sha256": "9cfdfeefed76c7cac7aab5907f19ae13b3ff4d064e685c2d72abeba9afe7f7d4",
+        "sizeBytes": 17111
+      },
+      {
+        "pathPointer": "/candidates/1/artifact_path",
+        "relativePath": "candidates/1/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-01.py",
+        "sha256": "fec890095f372bb79bb4b13a5aff484e2e74c9d201f06fd0888154a33a767f38",
+        "sizeBytes": 17112
+      },
+      {
+        "pathPointer": "/candidates/2/artifact_path",
+        "relativePath": "candidates/2/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-02.py",
+        "sha256": "3380f1c2b20bf4ac56deeaa76b6f13e394a2e4942bb56957876b3ce64cfc82f1",
+        "sizeBytes": 17124
+      },
+      {
+        "pathPointer": "/candidates/3/artifact_path",
+        "relativePath": "candidates/3/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-03.py",
+        "sha256": "44e3397d873649f34bfac165e0909d44abaedd499de29e1d6ca9eb40380bde22",
+        "sizeBytes": 17113
+      },
+      {
+        "pathPointer": "/candidates/4/artifact_path",
+        "relativePath": "candidates/4/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-04.py",
+        "sha256": "6f4a61808b536b1562344a453b441ec28a4881e0136e86b2a616d9c93cee6367",
+        "sizeBytes": 17113
+      },
+      {
+        "pathPointer": "/candidates/5/artifact_path",
+        "relativePath": "candidates/5/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-05.py",
+        "sha256": "dacffa762f151024236c38a836cb39b2bea54f326b5b97fd3a4ecdcaf8d941bb",
+        "sizeBytes": 17110
+      },
+      {
+        "pathPointer": "/candidates/6/artifact_path",
+        "relativePath": "candidates/6/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-06.py",
+        "sha256": "63e114a1abe2665eb347911b378df29b7659a4ccd942c499d76b357d677499f2",
+        "sizeBytes": 17049
+      },
+      {
+        "pathPointer": "/candidates/7/artifact_path",
+        "relativePath": "candidates/7/solver.py",
+        "snapshotPath": "sessions/researcher_3/turns/researcher_3_round_11/attempts/0001/artifacts/artifact-07.py",
+        "sha256": "09d327217914952252653e0db6509171e664575fb8c8cde312ac94eb4be29e73",
+        "sizeBytes": 17109
+      }
+    ]
+  },
+  {
+    "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-42/harness/branches/round_0011/sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/validation.json",
+    "sha256": "a1ae02b711b053a5334fcffe42210e3bde0708b3a9eb00559f16833202b7777e",
+    "time": 1792930315.6228628,
+    "errors": [
+      {
+        "path": "/candidates/0/artifact_path",
+        "code": "invalid_solver",
+        "message": "candidate 0: public interface public-interface-1 failed: timeout",
+        "hint": ""
+      }
+    ],
+    "artifacts": [
+      {
+        "pathPointer": "/candidates/0/artifact_path",
+        "relativePath": "candidates/0/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-00.py",
+        "sha256": "b5a8b7ecda1a64a6097dacc6f373c3948639fe365908cea8c20575ad0bc8f6cc",
+        "sizeBytes": 27175
+      },
+      {
+        "pathPointer": "/candidates/1/artifact_path",
+        "relativePath": "candidates/1/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-01.py",
+        "sha256": "9fab4518d29b9dbdafe623027a9b41ef2eac6211f956bc5ef40ff15668bcfdf0",
+        "sizeBytes": 27179
+      },
+      {
+        "pathPointer": "/candidates/2/artifact_path",
+        "relativePath": "candidates/2/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-02.py",
+        "sha256": "fb856bbc1cdcf1b418af5cda8569d6b66af3ac8fc31c810d05632aff67362966",
+        "sizeBytes": 27172
+      },
+      {
+        "pathPointer": "/candidates/3/artifact_path",
+        "relativePath": "candidates/3/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-03.py",
+        "sha256": "8f6aa8d9ab30c087f74b04463b7451ffc4b60c6389c8579526b39990c0be87d3",
+        "sizeBytes": 27178
+      },
+      {
+        "pathPointer": "/candidates/4/artifact_path",
+        "relativePath": "candidates/4/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-04.py",
+        "sha256": "25739695cb6e595cfe37fe6e2f6ae8f452d89b74dc7354c678ebc3f170f5fa0d",
+        "sizeBytes": 27182
+      },
+      {
+        "pathPointer": "/candidates/5/artifact_path",
+        "relativePath": "candidates/5/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-05.py",
+        "sha256": "5916e8798bc5875f3a1ffdcb74675962345f9b5cef16ad9d5bd9d0d7f8a79048",
+        "sizeBytes": 27188
+      },
+      {
+        "pathPointer": "/candidates/6/artifact_path",
+        "relativePath": "candidates/6/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-06.py",
+        "sha256": "82f858f2002e8b7f009dad96889520f98466dc68044652bbfdd59f93b0e269f9",
+        "sizeBytes": 27178
+      },
+      {
+        "pathPointer": "/candidates/7/artifact_path",
+        "relativePath": "candidates/7/solver.py",
+        "snapshotPath": "sessions/researcher_2/turns/researcher_2_round_11/attempts/0001/artifacts/artifact-07.py",
+        "sha256": "5334ffdb80e0247ca68ca96fc752b95b466ab3680c677ac8c9f358a053b02936",
+        "sizeBytes": 27180
+      }
+    ]
+  }
+]

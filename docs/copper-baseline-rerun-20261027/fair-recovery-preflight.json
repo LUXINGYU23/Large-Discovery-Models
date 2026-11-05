@@ -1,0 +1,91 @@
+{
+  "time": 1793171354.4197392,
+  "rows": [
+    {
+      "group": "mcmc-42",
+      "service_pid": 2399472,
+      "budgets": {
+        "client": {
+          "charged": 145,
+          "sha256": "629ded0b86a8cc2991f1f32182cb0397702982775800a86758602e46d7b308a4"
+        },
+        "private": {
+          "charged": 145,
+          "sha256": "39972ee7b19dc408e8e8f35cb6c80d4103eb224cc2b958709d759830532e49f3"
+        }
+      }
+    },
+    {
+      "group": "acq-42",
+      "service_pid": 2399523,
+      "budgets": {
+        "client": {
+          "charged": 145,
+          "sha256": "6bf6ad29828d893427a0c198346d5755c093c1aba8f74c49222f9c1a4e2da2be"
+        },
+        "private": {
+          "charged": 145,
+          "sha256": "57f7564eaceeef95710f5b163beada79749445babe8062a70701324254eaf910"
+        }
+      }
+    },
+    {
+      "group": "mcmc-43",
+      "service_pid": 2399584,
+      "budgets": {
+        "client": {
+          "charged": 129,
+          "sha256": "1da4f1cde21bff3abcca11262cbfe3e77c5e7981de0cf8d4e4e3acb2109a9f6b"
+        },
+        "private": {
+          "charged": 129,
+          "sha256": "d07acaba89ed7e4b9fca7b777dbe46bab8b189ed88088ef16a449f91e3a9b113"
+        }
+      }
+    },
+    {
+      "group": "acq-43",
+      "service_pid": 2399621,
+      "budgets": {
+        "client": {
+          "charged": 145,
+          "sha256": "133ff6346252a6dff55f8a630d4b1048d9091caef0e101f908776a89b24d14da"
+        },
+        "private": {
+          "charged": 145,
+          "sha256": "3996bd983799fcd41397a9c73a76e2b5af98df490993f99f2254dbbdc6e9f412"
+        }
+      }
+    },
+    {
+      "group": "mcmc-3407",
+      "service_pid": 2399680,
+      "budgets": {
+        "client": {
+          "charged": 145,
+          "sha256": "e915ac08bbbf4172b05a0700337c518033eb4afba01ad3077800c704258a088c"
+        },
+        "private": {
+          "charged": 145,
+          "sha256": "4bf8af9a7e69b1854bb816f99fdc58ddce592c71fb73097ab5369bb29e0bb2c3"
+        }
+      }
+    },
+    {
+      "group": "acq-3407",
+      "service_pid": 2399718,
+      "budgets": {
+        "client": {
+          "charged": 145,
+          "sha256": "9d5a4b2d0ee435d237ba5c2c07fa2fd528aad86ce749a9586be2f3e87038bf48"
+        },
+        "private": {
+          "charged": 145,
+          "sha256": "bbe2dbac316e7826ec845869b40e67b1b0f90440016e3e9ca042089d3daab0ad"
+        }
+      }
+    }
+  ],
+  "unreceipted": 0,
+  "all_manifests_unchanged": true
+}

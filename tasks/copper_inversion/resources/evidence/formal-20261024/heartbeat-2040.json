@@ -1,0 +1,68 @@
+{
+  "timestamp": 1792845658.638121,
+  "runs": {
+    "ldm-42": {
+      "activity_age_s": 53,
+      "slots": 66,
+      "rejected": 1,
+      "observations": 65,
+      "recovered_interrupted_sources": 0
+    },
+    "mcmc-42": {
+      "activity_age_s": 0,
+      "slots": 49,
+      "rejected": 3,
+      "observations": null,
+      "recovered_interrupted_sources": 0
+    },
+    "acq-42": {
+      "activity_age_s": 21,
+      "slots": 50,
+      "rejected": 4,
+      "observations": null,
+      "recovered_interrupted_sources": 0
+    },
+    "ldm-43": {
+      "activity_age_s": 44,
+      "slots": 65,
+      "rejected": 0,
+      "observations": 65,
+      "recovered_interrupted_sources": 0
+    },
+    "mcmc-43": {
+      "activity_age_s": 3,
+      "slots": 50,
+      "rejected": 4,
+      "observations": null,
+      "recovered_interrupted_sources": 0
+    },
+    "acq-43": {
+      "activity_age_s": 3,
+      "slots": 45,
+      "rejected": 2,
+      "observations": null,
+      "recovered_interrupted_sources": 0
+    },
+    "ldm-3407": {
+      "activity_age_s": 0,
+      "slots": 81,
+      "rejected": 0,
+      "observations": 65,
+      "recovered_interrupted_sources": 0
+    },
+    "mcmc-3407": {
+      "activity_age_s": 1,
+      "slots": 50,
+      "rejected": 4,
+      "observations": null,
+      "recovered_interrupted_sources": 1
+    },
+    "acq-3407": {
+      "activity_age_s": 1,
+      "slots": 48,
+      "rejected": 2,
+      "observations": null,
+      "recovered_interrupted_sources": 0
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "time": 1792893409.0552254,
+  "status": "blocked_requires_explicit_history_repair",
+  "group": "ldm-43",
+  "reason": {
+    "continuations": 0,
+    "failure": {
+      "message": "Session wall-time limit reached: 1800s; explicit repair is required before resuming this turn.",
+      "compactionId": null
+    }
+  },
+  "frozen_code_unchanged": true,
+  "budget_reset": false,
+  "automatic_private_finish_blocked_by_failed_client": true,
+  "evidence_sha256": {
+    "ldm-43.log": "02b30b3d29ef7f0f0c4866716769c620f79643a3648f88142ebbd88eac980b22",
+    "ldm-43/budget.json": "d3cbe3f6e11a9731562b9510ebc06eeb96e8f48d2306a7478ce4d94ed200064f",
+    "ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/history-recovery.json": "f922b1da4eb0a36ecf7fbf107bc344bd88109be52a8c03ba6d9bdeeace2751f2",
+    "ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/history-events.jsonl": "1f359ceb2ad54f49493f59d29ccc01c4144aac02b09da8fc80172d796298d2a7"
+  }
+}

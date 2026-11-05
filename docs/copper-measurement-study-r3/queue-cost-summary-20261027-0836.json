@@ -1,0 +1,128 @@
+{
+  "ldm-42": {
+    "research": {
+      "records": 3924,
+      "summed_wait_seconds": 7884.715168237686
+    },
+    "training": {
+      "records": 31416,
+      "summed_wait_seconds": 4856540.439370155
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2699.9393075872213
+    }
+  },
+  "ldm-43": {
+    "research": {
+      "records": 3833,
+      "summed_wait_seconds": 9750.124174307566
+    },
+    "training": {
+      "records": 32537,
+      "summed_wait_seconds": 5024682.294386735
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2625.595696637407
+    }
+  },
+  "ldm-3407": {
+    "research": {
+      "records": 3846,
+      "summed_wait_seconds": 12814.194730641786
+    },
+    "training": {
+      "records": 32545,
+      "summed_wait_seconds": 5114479.219692318
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2360.4711317820475
+    }
+  },
+  "mcmc-42": {
+    "research": {
+      "records": 1925,
+      "summed_wait_seconds": 9669.105438445695
+    },
+    "training": {
+      "records": 32541,
+      "summed_wait_seconds": 5256325.796223463
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2281.2211416307837
+    }
+  },
+  "mcmc-43": {
+    "research": {
+      "records": 1926,
+      "summed_wait_seconds": 6336.171147007961
+    },
+    "training": {
+      "records": 32742,
+      "summed_wait_seconds": 5080445.277049964
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2175.727257969789
+    }
+  },
+  "mcmc-3407": {
+    "research": {
+      "records": 1926,
+      "summed_wait_seconds": 12751.14300525887
+    },
+    "training": {
+      "records": 32742,
+      "summed_wait_seconds": 5306970.702668215
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2236.431322890334
+    }
+  },
+  "acq-42": {
+    "research": {
+      "records": 1926,
+      "summed_wait_seconds": 13939.762112150434
+    },
+    "training": {
+      "records": 32742,
+      "summed_wait_seconds": 5379084.832580466
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2415.3730551647022
+    }
+  },
+  "acq-43": {
+    "research": {
+      "records": 1921,
+      "summed_wait_seconds": 10497.86867564125
+    },
+    "training": {
+      "records": 32442,
+      "summed_wait_seconds": 5093280.456372355
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2357.715101413429
+    }
+  },
+  "acq-3407": {
+    "research": {
+      "records": 1926,
+      "summed_wait_seconds": 15460.894048240967
+    },
+    "training": {
+      "records": 32646,
+      "summed_wait_seconds": 5415473.343496652
+    },
+    "holdout": {
+      "records": 414,
+      "summed_wait_seconds": 2037.8745759958401
+    }
+  }
+}

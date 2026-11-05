@@ -1,0 +1,5508 @@
+{
+  "discovery_seed": 42,
+  "reference": {
+    "url": "https://github.com/karpathy/autoresearch/blob/228791fb499afffb54b46200aca536f79142f117/analysis.ipynb",
+    "commit": "228791fb499afffb54b46200aca536f79142f117",
+    "adapted_elements": [
+      "faint candidate dots",
+      "prominent record points",
+      "running-best step",
+      "description annotations"
+    ],
+    "differences": [
+      "batch-end x coordinates; no invented within-batch ordering",
+      "all 308 scored candidates included; 13 charged interface rejections have no score",
+      "record improvement is not autoresearch KEEP or evidence of direct parentage"
+    ]
+  },
+  "candidates": [
+    {
+      "round": 0,
+      "batch_end_slot": 1,
+      "source_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5533681447355032,
+        "mean_iou": 0.25748363759670745,
+        "mean_solver_wall_seconds": 1.0042369812726974,
+        "parent_count": 24.0,
+        "research_utility": 0.4466318552644967,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "546db9442c107c342b52b67b73549046950c65b14cb2802515f494f1f31a0296",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.6232985202070651,
+        "mean_iou": 0.2146800994390042,
+        "mean_solver_wall_seconds": 3.0288994014263153,
+        "parent_count": 24.0,
+        "research_utility": 0.3767014797929349,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "db7e22d78f988eb1f4c3f079983a2819d8b451f80117082e8f9334d8b8320f07",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4051005170650064,
+        "mean_iou": 0.19423928547699568,
+        "mean_solver_wall_seconds": 91.1016815205415,
+        "parent_count": 24.0,
+        "research_utility": 0.5948994829349936,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "c15bb0d30badb6f33003d09ccc0bff9abc57c5d7dada9798257aa8a3528faf36",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5218745388296542,
+        "mean_iou": 0.3271096158675853,
+        "mean_solver_wall_seconds": 1.216510643561681,
+        "parent_count": 24.0,
+        "research_utility": 0.47812546117034577,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "0af4ae26415abdf4f0339e258e137f2c400222cb8adaafc55b5104980b702361",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9344680801917742,
+        "mean_iou": 0.0068357263756114,
+        "mean_solver_wall_seconds": 1.661751647790273,
+        "parent_count": 24.0,
+        "research_utility": 0.06553191980822581,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "7be46bb083ff231ad8628a30f1b3dc279ec43ee1a9a1342b542a1cc5a9cb7bfe",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.513643337228348,
+        "mean_iou": 0.3221045676794349,
+        "mean_solver_wall_seconds": 1.1717243989308674,
+        "parent_count": 24.0,
+        "research_utility": 0.48635666277165196,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "25ddd5643274c1312bb808c7d43f21db4dde0c3d39248f5a474c2094bb27b019",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5092579539044471,
+        "mean_iou": 0.3440522448417777,
+        "mean_solver_wall_seconds": 1.0434231956799824,
+        "parent_count": 24.0,
+        "research_utility": 0.490742046095553,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "6271100f6ca5a955a923326b1b576d6a26481aa71d2642cc4b6e3ea9b8b074bb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.504012342072488,
+        "mean_iou": 0.3435121054053991,
+        "mean_solver_wall_seconds": 1.0595960319042206,
+        "parent_count": 24.0,
+        "research_utility": 0.495987657927512,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "b72cd92609bef8ccc9934c21a43bd144b8833913e1c6418398820bba540dd4ac",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5380131618023778,
+        "mean_iou": 0.3100940656716169,
+        "mean_solver_wall_seconds": 1.0507901807626088,
+        "parent_count": 24.0,
+        "research_utility": 0.46198683819762215,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "d456ba2b08c6ad27fe483f18c93417e1c65de672874f854c0e5e9952a58ce6fa",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.504012342072488,
+        "mean_iou": 0.3435121054053991,
+        "mean_solver_wall_seconds": 1.01653919617335,
+        "parent_count": 24.0,
+        "research_utility": 0.495987657927512,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "b9c15e0fdc4e06ac550cf0f9a3deff34e2c21283cc0407081b1ac5896d7c648e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5678084440912932,
+        "mean_iou": 0.2989211443703604,
+        "mean_solver_wall_seconds": 0.9612424572308859,
+        "parent_count": 24.0,
+        "research_utility": 0.4321915559087069,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "073ff1669ba4bdd84187c97f7342842434b7a8107d75cf85f8104c09b291a587",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5657943794068669,
+        "mean_iou": 0.2538164504707149,
+        "mean_solver_wall_seconds": 4.254560073216756,
+        "parent_count": 24.0,
+        "research_utility": 0.434205620593133,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "423b6c93a488b252c770e16d32259ea309985b1292c2c2f9aa42df3eb63971de",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5535006811658423,
+        "mean_iou": 0.25846089736822164,
+        "mean_solver_wall_seconds": 7.921299795309703,
+        "parent_count": 24.0,
+        "research_utility": 0.44649931883415767,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "a926ef20a7bb07251247776068bb173d321642efda73d5e555b28d3ea7eb2157",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5544359217453825,
+        "mean_iou": 0.25890069896677914,
+        "mean_solver_wall_seconds": 1.8104491233825684,
+        "parent_count": 24.0,
+        "research_utility": 0.4455640782546176,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "3d307a065b5e6e4fc9dbc3c4cf8bcc960126356dff3e69f85645039fdbcd1ed5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5774962315806209,
+        "mean_iou": 0.2377382174313211,
+        "mean_solver_wall_seconds": 1.5711105316877365,
+        "parent_count": 24.0,
+        "research_utility": 0.42250376841937903,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "a278be24b8768cca8b8011f30c0906091bd74211c8a8ea26119dcbb8b298f779",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5308177775971161,
+        "mean_iou": 0.26704176199385216,
+        "mean_solver_wall_seconds": 1.760553851723671,
+        "parent_count": 24.0,
+        "research_utility": 0.4691822224028839,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 1,
+      "batch_end_slot": 17,
+      "source_sha256": "70c08739a4081ac79a0a6186d931f48aab7258e34232a1d366fe34cfbead2043",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5609258839287796,
+        "mean_iou": 0.2608251476524974,
+        "mean_solver_wall_seconds": 2.9321956038475037,
+        "parent_count": 24.0,
+        "research_utility": 0.4390741160712203,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "8550a37543ffeffbbe1c7cc1a46f159806a32a9786721b60da94b3b13393bc43",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.46180606465516294,
+        "mean_iou": 0.2010317611586483,
+        "mean_solver_wall_seconds": 94.99665688474973,
+        "parent_count": 24.0,
+        "research_utility": 0.5381939353448371,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "0e73ab742ff8ab7681082474ed6af716fb0dbeb8d45dc61ba7ce72cba19f2454",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4766671386130886,
+        "mean_iou": 0.19475830847711692,
+        "mean_solver_wall_seconds": 94.87460460762183,
+        "parent_count": 24.0,
+        "research_utility": 0.5233328613869114,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "dedcc0bd4586c898e038a2dda6acffff992609ef6c050fa02f776e230491679b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4682232853160039,
+        "mean_iou": 0.2323565768374091,
+        "mean_solver_wall_seconds": 109.38234544793765,
+        "parent_count": 24.0,
+        "research_utility": 0.5317767146839961,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "89d613145b89180f0074ef1d7c0b4e29ed09056e6abb66bc87237a04325ea5eb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.46703789722585953,
+        "mean_iou": 0.2577446790528495,
+        "mean_solver_wall_seconds": 94.96917140483856,
+        "parent_count": 24.0,
+        "research_utility": 0.5329621027741405,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "2a9e8556c733ff28fde444709a04afe906b4ed85255cefe2a522700ddaa802bc",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5023169102097038,
+        "mean_iou": 0.23840900458346845,
+        "mean_solver_wall_seconds": 95.04554934799671,
+        "parent_count": 24.0,
+        "research_utility": 0.4976830897902962,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "446e7c91dc2ecda0f0953c573c3bc68a56cf8b51b09aeceffa29912b45484140",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4722152824446617,
+        "mean_iou": 0.2555655276718008,
+        "mean_solver_wall_seconds": 95.01023795207341,
+        "parent_count": 24.0,
+        "research_utility": 0.5277847175553383,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "24e8f8219a448ea1f13ba2d13056f320be7789daf1f92f9d4fa7bb31ccf4903f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4947947642620123,
+        "mean_iou": 0.2803435422057024,
+        "mean_solver_wall_seconds": 94.97500563164552,
+        "parent_count": 24.0,
+        "research_utility": 0.5052052357379877,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "d1b624ed8196632d4273f5d2c8b73ee805d8ace1f84814621f144a355446ef9e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5011534107905966,
+        "mean_iou": 0.21697393794791778,
+        "mean_solver_wall_seconds": 95.06412814557552,
+        "parent_count": 24.0,
+        "research_utility": 0.4988465892094034,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "4ce566279641e244cfae5a306ad976193a4b195b93504443744d4c75d61f3b02",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.43246123885021215,
+        "mean_iou": 0.20637336854530974,
+        "mean_solver_wall_seconds": 94.89802262187004,
+        "parent_count": 24.0,
+        "research_utility": 0.5675387611497879,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "8a5eb112e0bb689bf764a73761411d20d859b364203c528ff296af9eb8ba61f4",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4447274293721982,
+        "mean_iou": 0.1879317493402901,
+        "mean_solver_wall_seconds": 94.92178361614545,
+        "parent_count": 24.0,
+        "research_utility": 0.5552725706278018,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "d7356588b3a99b0d25474464fd58a4432e93076c8311924da18eff48ba49a849",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5123165910601772,
+        "mean_iou": 0.21253668842466852,
+        "mean_solver_wall_seconds": 94.99672478437424,
+        "parent_count": 24.0,
+        "research_utility": 0.4876834089398227,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "b8ad77535a096a42b97ef38803480b604beec7babc86331f46f0bd180e1bef48",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5401557096555092,
+        "mean_iou": 0.1765181169105673,
+        "mean_solver_wall_seconds": 95.02052560945351,
+        "parent_count": 24.0,
+        "research_utility": 0.45984429034449076,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "a45978d91a2ded0fb6bf3a25cc4bca411061ebe000a8d0b5fa387d4a6c4109d4",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5016636409277095,
+        "mean_iou": 0.3447196072649019,
+        "mean_solver_wall_seconds": 1.91558272143205,
+        "parent_count": 24.0,
+        "research_utility": 0.4983363590722905,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "81f03ee66d13167fa575f4ed5869403768a5a4bdec81c3e6f5ca9af6d327222f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.46464655821554224,
+        "mean_iou": 0.222035706262283,
+        "mean_solver_wall_seconds": 95.01250066856544,
+        "parent_count": 24.0,
+        "research_utility": 0.5353534417844578,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "815ec057dcb03e653b74f40971fcd56c00da88c915743f36eb0a7e4d3f536511",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4264985083804037,
+        "mean_iou": 0.21710366952505167,
+        "mean_solver_wall_seconds": 95.02774900694688,
+        "parent_count": 24.0,
+        "research_utility": 0.5735014916195963,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 2,
+      "batch_end_slot": 33,
+      "source_sha256": "5122f5457dd3d142491a74028b3a9168db770db1c0408dbd5d4afc6dad531f0a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.461738014963617,
+        "mean_iou": 0.21364320643281268,
+        "mean_solver_wall_seconds": 92.78264423708121,
+        "parent_count": 24.0,
+        "research_utility": 0.538261985036383,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "1a45102f133247bf517854603c85810bab384e4d7127065b18ab00206804ea4d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.48727921715911693,
+        "mean_iou": 0.16035473507298545,
+        "mean_solver_wall_seconds": 84.36805505057175,
+        "parent_count": 24.0,
+        "research_utility": 0.5127207828408831,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "361ee624546c4d730de07a4641c484f4c37c884f8c50134fd511f1087f39a60d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5689510962932778,
+        "mean_iou": 0.20628032226729917,
+        "mean_solver_wall_seconds": 2.1985254933436713,
+        "parent_count": 24.0,
+        "research_utility": 0.4310489037067223,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "d7a540953970460fe9f7895dc869bff9a304021c9c6670c49c20dd28ebc4690a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5609694167841002,
+        "mean_iou": 0.22135503307359608,
+        "mean_solver_wall_seconds": 2.2060038993755975,
+        "parent_count": 24.0,
+        "research_utility": 0.4390305832158998,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "3e936812e42605d6ecac331c6a496d09925d60fa5dd5bab4cd69fedd3b27f677",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5541009009845914,
+        "mean_iou": 0.2591024773766946,
+        "mean_solver_wall_seconds": 2.2425334254900613,
+        "parent_count": 24.0,
+        "research_utility": 0.4458990990154086,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "49cf9eae2dc24201a86d398db3866286a335df6a8a1b310ce16d2305a4182a13",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5778027150519909,
+        "mean_iou": 0.19608452496756454,
+        "mean_solver_wall_seconds": 7.399471327662468,
+        "parent_count": 24.0,
+        "research_utility": 0.4221972849480091,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "a2547660ad2fdd433c9128547ddb9f0cae94bc36b0d5456f9c4c1b877fb76a4e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4975711952151902,
+        "mean_iou": 0.26827456622723267,
+        "mean_solver_wall_seconds": 8.94837581117948,
+        "parent_count": 24.0,
+        "research_utility": 0.5024288047848098,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "3234fe1e8b28a7532c218c2df125049d0809f715316a3412b44e60dc8c814148",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5718681334489004,
+        "mean_iou": 0.20305310233099053,
+        "mean_solver_wall_seconds": 3.058515027165413,
+        "parent_count": 24.0,
+        "research_utility": 0.4281318665510995,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "f3ccb85b3eb3100bd623b97852f5544585056f1c5b113b4f8143e3dd5f70afe8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.568379031110855,
+        "mean_iou": 0.20640060832529428,
+        "mean_solver_wall_seconds": 4.106774300336838,
+        "parent_count": 24.0,
+        "research_utility": 0.43162096888914503,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "f9e87f7debb38374722ce29a0fb055990154a600dad98e8773d4f411a8a8fcbf",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4113137073252865,
+        "mean_iou": 0.19532859000606304,
+        "mean_solver_wall_seconds": 103.27306994299094,
+        "parent_count": 24.0,
+        "research_utility": 0.5886862926747135,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "cd9afa05007cdca93bb7e8826137e8cbc89bbc6407f259b06d13c2f1434f2d2a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4410008438364149,
+        "mean_iou": 0.19842200253598116,
+        "mean_solver_wall_seconds": 99.70447431008022,
+        "parent_count": 24.0,
+        "research_utility": 0.5589991561635851,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "aa4050efd924ca82bcfe62650dc7e1c95726a1a763189fe5c86de11b17575f30",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41392718296129627,
+        "mean_iou": 0.1960161709694612,
+        "mean_solver_wall_seconds": 99.73257414996624,
+        "parent_count": 24.0,
+        "research_utility": 0.5860728170387037,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "f316dccaf95ab1805a79b46974a220e9df6c196d8273dbfd592f9e913004f865",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5462551871459025,
+        "mean_iou": 0.15512041414056532,
+        "mean_solver_wall_seconds": 99.75173603494962,
+        "parent_count": 24.0,
+        "research_utility": 0.45374481285409757,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "8d690b3aaf103c23ba1a60f1fffed84b12c797d2a433c60aa4c0575317abbf41",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42118026335099634,
+        "mean_iou": 0.2157360431686461,
+        "mean_solver_wall_seconds": 99.66505850851536,
+        "parent_count": 24.0,
+        "research_utility": 0.5788197366490037,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "893054670d3a5686b1a4ce565ea629de018a030e43ee03fae01cd65aaac87de7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4217907928732293,
+        "mean_iou": 0.19714999215228482,
+        "mean_solver_wall_seconds": 102.24719056983788,
+        "parent_count": 24.0,
+        "research_utility": 0.5782092071267707,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "aeb2e3f8a3cb3434967840f29907bfaa8822156a6ca75452a55ab3c0c4672a8d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.6139942873684021,
+        "mean_iou": 0.15132554576594315,
+        "mean_solver_wall_seconds": 97.41131623089314,
+        "parent_count": 24.0,
+        "research_utility": 0.38600571263159783,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 3,
+      "batch_end_slot": 49,
+      "source_sha256": "da8988d59939123ebc59755e0ebe18df527a9dfa5752c8b13436a3d2aec0c4a0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.44083086082719614,
+        "mean_iou": 0.26261888580175113,
+        "mean_solver_wall_seconds": 102.14113811651866,
+        "parent_count": 24.0,
+        "research_utility": 0.5591691391728039,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "17af63fe3a3eacebdb0341114dc907e8feded417ae4105602aa2c669dd4e6885",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40511729128221663,
+        "mean_iou": 0.18793668134614236,
+        "mean_solver_wall_seconds": 91.37167526284854,
+        "parent_count": 24.0,
+        "research_utility": 0.5948827087177834,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "bd1b32af822d9c9cff2e6261f2719e301170fbeb21b02dcd9b95f2ba9488d178",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4077635462758217,
+        "mean_iou": 0.19491558299627845,
+        "mean_solver_wall_seconds": 91.37614542245865,
+        "parent_count": 24.0,
+        "research_utility": 0.5922364537241783,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "5e33f43e31b59278a8f8314383d8cf7ef829293eeb67652602d2f21486039c22",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40758459629543686,
+        "mean_iou": 0.19059639242880969,
+        "mean_solver_wall_seconds": 91.34095179537933,
+        "parent_count": 24.0,
+        "research_utility": 0.5924154037045631,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "fa1cd083a76e7baf2407ec570c9755211bb81c9f3a6bb131fcea9e1263aa0c74",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4055210529132518,
+        "mean_iou": 0.1886515003193846,
+        "mean_solver_wall_seconds": 87.80009080469608,
+        "parent_count": 24.0,
+        "research_utility": 0.5944789470867482,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "7726793c289f205c86791ab979921cdba1d78b680cc380d3984d7ef2d7b212ff",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.417747107229686,
+        "mean_iou": 0.19194013741065277,
+        "mean_solver_wall_seconds": 91.39447664717834,
+        "parent_count": 24.0,
+        "research_utility": 0.582252892770314,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "7a6e513db5d3bd604a6dde42540ca0aa873eeada1ee4c201e6801feaf7dc5e7b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4006930182153149,
+        "mean_iou": 0.1876458833961203,
+        "mean_solver_wall_seconds": 91.3879970262448,
+        "parent_count": 24.0,
+        "research_utility": 0.5993069817846851,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "0ac8b81c84ad3408969d3bb1367ff27979b778c84f5d29ddbf4376625ef73b84",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41083698322533246,
+        "mean_iou": 0.18792272555980485,
+        "mean_solver_wall_seconds": 91.44191404183705,
+        "parent_count": 24.0,
+        "research_utility": 0.5891630167746675,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "f9663a709a42752068f2b4fce5817144edf66fc9edcf0c03018dfdfc747c42d2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3958475680832846,
+        "mean_iou": 0.19091784703618886,
+        "mean_solver_wall_seconds": 83.04367458820343,
+        "parent_count": 24.0,
+        "research_utility": 0.6041524319167154,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "27b7c943b02ccae45471428473f7978655d5d2159581473beb096e70ce2fb8d9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4088421454350528,
+        "mean_iou": 0.18716561102334697,
+        "mean_solver_wall_seconds": 95.03231723606586,
+        "parent_count": 24.0,
+        "research_utility": 0.5911578545649472,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "c111587e5afaef9303227a6fcd342880bed07135593d61ad760ec5bfd9d49e48",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3961485208285611,
+        "mean_iou": 0.18843558240879207,
+        "mean_solver_wall_seconds": 95.06831029057503,
+        "parent_count": 24.0,
+        "research_utility": 0.6038514791714389,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "ae1b4730393d2a1cca6f217c214ac0300d1c25e1ce2a110d67fb677e2f293371",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42376198515413266,
+        "mean_iou": 0.18516575243812625,
+        "mean_solver_wall_seconds": 95.03765551745892,
+        "parent_count": 24.0,
+        "research_utility": 0.5762380148458673,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "963b84005b6de9ba27f9d8f41f32085313dc47c93ebfb1572b53e53d975d4b8f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5165778402731183,
+        "mean_iou": 0.3401094534387566,
+        "mean_solver_wall_seconds": 1.9617402255535126,
+        "parent_count": 24.0,
+        "research_utility": 0.4834221597268817,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "954a110a1b5f5308667b324056b9cc42db701390008ac2ffb02279dd65b960d0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40304305450766653,
+        "mean_iou": 0.19054388548692555,
+        "mean_solver_wall_seconds": 94.98464677731197,
+        "parent_count": 24.0,
+        "research_utility": 0.5969569454923335,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "6f562590d0bcf3f4b597707e5bfa67474521870c902e3533ec9795447b076ace",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40679671009825935,
+        "mean_iou": 0.18799182487425217,
+        "mean_solver_wall_seconds": 91.31627168258031,
+        "parent_count": 24.0,
+        "research_utility": 0.5932032899017406,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "1f4a3735fe23d1a65ce2986c47fbd7f90a6610a680e82f68e95ec0105a0424d9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41355553319768645,
+        "mean_iou": 0.19437793232927422,
+        "mean_solver_wall_seconds": 103.31460439165433,
+        "parent_count": 24.0,
+        "research_utility": 0.5864444668023135,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 4,
+      "batch_end_slot": 65,
+      "source_sha256": "dfd4f5f71b24f7a3f2be012cdbbdbf7684eff2ca04b955529067e0b3bd350687",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4029348614378945,
+        "mean_iou": 0.18790136351682687,
+        "mean_solver_wall_seconds": 103.27189900477727,
+        "parent_count": 24.0,
+        "research_utility": 0.5970651385621055,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "0852cc60301744e7a4298ebdb026e31c1d576d305db15360c98d6a170055715f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40549383727331567,
+        "mean_iou": 0.18949791909976846,
+        "mean_solver_wall_seconds": 83.06531851987044,
+        "parent_count": 24.0,
+        "research_utility": 0.5945061627266843,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "36a2193984f04131f945589535345ec5f9660e43748140c748238e3f830d1109",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4039984299200131,
+        "mean_iou": 0.19182077927609642,
+        "mean_solver_wall_seconds": 83.08901526530583,
+        "parent_count": 24.0,
+        "research_utility": 0.5960015700799869,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "c239d5ea37dd3a3f462cd58d11668cc4c191fd52d68f4e2ac05bfa2d04c5ae12",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4189941487994172,
+        "mean_iou": 0.1887316440734659,
+        "mean_solver_wall_seconds": 83.07485386232536,
+        "parent_count": 24.0,
+        "research_utility": 0.5810058512005828,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "13dff96ac27cb6809c27f27e1555579a54c57baff93231d1a3130b21d23d9d34",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.428144101899807,
+        "mean_iou": 0.2005647154071927,
+        "mean_solver_wall_seconds": 83.12373609344165,
+        "parent_count": 24.0,
+        "research_utility": 0.571855898100193,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "bf4635b894fd379397acbc775bf66cb87ac3227d54773436f212c5e31095b665",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5205635250267318,
+        "mean_iou": 0.24021576870855785,
+        "mean_solver_wall_seconds": 83.06238807737827,
+        "parent_count": 24.0,
+        "research_utility": 0.4794364749732682,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "536eeceb9b2436ee6edf2fcb697833dbd4e2d5d0b9e80a242fd6ac44816b2af6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3951308688663403,
+        "mean_iou": 0.19060131456263685,
+        "mean_solver_wall_seconds": 83.15538600087166,
+        "parent_count": 24.0,
+        "research_utility": 0.6048691311336597,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "02b3587c0f04126b0a739e79a2f76c49551eec5a6a0d963e0aa8a3c0841deb28",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4194302898904225,
+        "mean_iou": 0.16866464234284864,
+        "mean_solver_wall_seconds": 97.43295483291149,
+        "parent_count": 24.0,
+        "research_utility": 0.5805697101095775,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "9cf70c82a4fb82ad8577832a7141d0f57c6ea78bbbe78924ac0fe2add9b3330d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4319195322700028,
+        "mean_iou": 0.20030321338131163,
+        "mean_solver_wall_seconds": 83.13446296254794,
+        "parent_count": 24.0,
+        "research_utility": 0.5680804677299972,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "fe7022359ed457ac13adb8a7491bf61d89a0f906d862314a3426af5d003420b6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5033322824437851,
+        "mean_iou": 0.1903246646047653,
+        "mean_solver_wall_seconds": 97.45811391373475,
+        "parent_count": 24.0,
+        "research_utility": 0.49666771755621486,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "545c15c872cd9e29a11ad5c334a5a579a01fff488e2cd152955501cb8ef7ef6b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3999629342983596,
+        "mean_iou": 0.18967575199072337,
+        "mean_solver_wall_seconds": 80.7181841780742,
+        "parent_count": 24.0,
+        "research_utility": 0.6000370657016404,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "50f40dac4332f32dbe2b564f542929910385f4bc5203977b1989bed75606cccd",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39253394071181247,
+        "mean_iou": 0.19247550448654308,
+        "mean_solver_wall_seconds": 83.07902703185876,
+        "parent_count": 24.0,
+        "research_utility": 0.6074660592881875,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "b141b40fb19c9a96689483826ad5fc240cbe5e32d2d94580fc6d1a1ef9dae824",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39814839868411755,
+        "mean_iou": 0.18992036183695357,
+        "mean_solver_wall_seconds": 85.49065287907918,
+        "parent_count": 24.0,
+        "research_utility": 0.6018516013158824,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "931ec23ec9e2880462a052a240b0b52cc07ebff0a25c2d38bd9ce42e8c5aa4f5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.47133690284593244,
+        "mean_iou": 0.19712510099191158,
+        "mean_solver_wall_seconds": 97.55263261497021,
+        "parent_count": 24.0,
+        "research_utility": 0.5286630971540676,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "ba00228b08189df9370d705b2d139a7784649cd2996c66aa59491ead660092ae",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.400365931742961,
+        "mean_iou": 0.18742802765848854,
+        "mean_solver_wall_seconds": 83.0989913692077,
+        "parent_count": 24.0,
+        "research_utility": 0.599634068257039,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "3d9540a802cc0b124ee8bb199e761346be07f2b093ecbdc51c0861ed5f885f6a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4033047087472603,
+        "mean_iou": 0.18715845682885365,
+        "mean_solver_wall_seconds": 83.039703865846,
+        "parent_count": 24.0,
+        "research_utility": 0.5966952912527397,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 5,
+      "batch_end_slot": 81,
+      "source_sha256": "eb4bd068002e0f7644bc752a791493090ab48b1acdbce13944e37722579b362c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4042125526147914,
+        "mean_iou": 0.19138459930086646,
+        "mean_solver_wall_seconds": 83.07775158186753,
+        "parent_count": 24.0,
+        "research_utility": 0.5957874473852086,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "9a8a0e729958b85ea09a34f72a0a761aeb3ff50470e1699acb3f6008469b62e1",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38669357017328365,
+        "mean_iou": 0.1943365486261679,
+        "mean_solver_wall_seconds": 83.14664162695408,
+        "parent_count": 24.0,
+        "research_utility": 0.6133064298267163,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "2a6840916fa916fdfc0ada6513ef21b53722234299c1b2b208192c0f32603769",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5525584993108521,
+        "mean_iou": 0.25536256644392386,
+        "mean_solver_wall_seconds": 83.18287155032158,
+        "parent_count": 24.0,
+        "research_utility": 0.44744150068914795,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "ba49e1d85a72018493b763549ec43d4f03ad07157c8ab33195b695f03618e4e1",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5525631654736534,
+        "mean_iou": 0.25599892238484473,
+        "mean_solver_wall_seconds": 85.58027178545792,
+        "parent_count": 24.0,
+        "research_utility": 0.4474368345263467,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "5204a53d17d2b8f57009d52fe1aff0a82f61a5e3e043a660636d8deaae196b7e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39406772746575514,
+        "mean_iou": 0.19262707851736804,
+        "mean_solver_wall_seconds": 83.20496087769668,
+        "parent_count": 24.0,
+        "research_utility": 0.6059322725342449,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "832aa76bcb2638861555237ad4c084cb4e00483d561647c5707f0469958ce5f7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5535738279531217,
+        "mean_iou": 0.2535322049073087,
+        "mean_solver_wall_seconds": 87.90773159762223,
+        "parent_count": 24.0,
+        "research_utility": 0.4464261720468783,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "bea9b015497a93242a1b84811a97aefe44d8c82ff9e7c059922307d100cf646f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.552595960119729,
+        "mean_iou": 0.2554402407214194,
+        "mean_solver_wall_seconds": 83.13753772775333,
+        "parent_count": 24.0,
+        "research_utility": 0.44740403988027094,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "793e6240a359ed9895a4025b30d0b267b5302883b32fe37ac00de6cdfe2d51ba",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5525520443706344,
+        "mean_iou": 0.25547803645232003,
+        "mean_solver_wall_seconds": 87.99966982007027,
+        "parent_count": 24.0,
+        "research_utility": 0.4474479556293655,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "8825dd6c0e039fe6c508cde9e0ba7fa4014636b124ad9493f1e1518b4aeb52ab",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5232806346781116,
+        "mean_iou": 0.25914344138369394,
+        "mean_solver_wall_seconds": 90.34954236447811,
+        "parent_count": 24.0,
+        "research_utility": 0.4767193653218884,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "51be2940efadca2feae9d8daf9276395525825ba4bec3e72e6254fe5755aa566",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39368199430077755,
+        "mean_iou": 0.19455283022482805,
+        "mean_solver_wall_seconds": 80.7548949867487,
+        "parent_count": 24.0,
+        "research_utility": 0.6063180056992225,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "84e7a441d7041742a7fa29eef42755aa740a9868a17770e941b8643aba86a629",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5127774853055718,
+        "mean_iou": 0.20334335478163182,
+        "mean_solver_wall_seconds": 85.5248777816693,
+        "parent_count": 24.0,
+        "research_utility": 0.4872225146944282,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "39e1e3e9f04b0192dc01dcbc581c9412383feb3ea1f116de85a2254e494b9cdb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39362743199419103,
+        "mean_iou": 0.19288929470142857,
+        "mean_solver_wall_seconds": 85.53433379034202,
+        "parent_count": 24.0,
+        "research_utility": 0.606372568005809,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "efd987a1d7202770a1d7fa0ee0e6425894ac09700746bbab6be5af3b0de9b5ca",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3919012480048839,
+        "mean_iou": 0.19238237666621694,
+        "mean_solver_wall_seconds": 83.14826875925064,
+        "parent_count": 24.0,
+        "research_utility": 0.6080987519951161,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "0c7471954eb803bbd01aa644f79cbaf46c7b981aca69b6e759a3eee77eff3ddc",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.45331246221978805,
+        "mean_iou": 0.2523042561712941,
+        "mean_solver_wall_seconds": 87.77198281387489,
+        "parent_count": 24.0,
+        "research_utility": 0.546687537780212,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "32599527e6a169bc58342ffc36e3b23729ccae1ea17ebf5e4dc87e94010448f8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40687385209696625,
+        "mean_iou": 0.19213599444541354,
+        "mean_solver_wall_seconds": 83.06785837809245,
+        "parent_count": 24.0,
+        "research_utility": 0.5931261479030338,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "a399488bb628179666ccaa5aab8eee01ed023ef59ff6c42c35fb6f32f312051a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39728024411254814,
+        "mean_iou": 0.1944007827218036,
+        "mean_solver_wall_seconds": 82.88364048798879,
+        "parent_count": 24.0,
+        "research_utility": 0.6027197558874519,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 6,
+      "batch_end_slot": 97,
+      "source_sha256": "a3f5a4d2d39f255c52aee48f40bb42d64b3f5dde422b19594fc14d1add1f17ec",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4778462557881089,
+        "mean_iou": 0.2533947454964855,
+        "mean_solver_wall_seconds": 83.04301438728969,
+        "parent_count": 24.0,
+        "research_utility": 0.5221537442118911,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "2ae55b01c235e04472921cf8e7d96f93a764e681401fb3c048df5c7025fe7298",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39390385975218944,
+        "mean_iou": 0.19568697644558164,
+        "mean_solver_wall_seconds": 82.95982511838277,
+        "parent_count": 24.0,
+        "research_utility": 0.6060961402478106,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "f9aee306226ff4de91613c0c5cebadea2f18e392dfb69b914c8fb098bc84a17b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38801808238278634,
+        "mean_iou": 0.19556624828720548,
+        "mean_solver_wall_seconds": 82.99287416537602,
+        "parent_count": 24.0,
+        "research_utility": 0.6119819176172137,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "b58bbeae82174c6ca614622d7bc4f36697ce6fa92f0fefd6f23ba7db67d7812b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3868824451106073,
+        "mean_iou": 0.19292987661209451,
+        "mean_solver_wall_seconds": 82.94962161282699,
+        "parent_count": 24.0,
+        "research_utility": 0.6131175548893927,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "adbb5b1c996fb8fd72b63cbcac3902aae3e1dbfbe37b408bb23395b855179d96",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3977201223645116,
+        "mean_iou": 0.18812146153667975,
+        "mean_solver_wall_seconds": 82.86913441618283,
+        "parent_count": 24.0,
+        "research_utility": 0.6022798776354884,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "242085b7685309390039a991ec590e652f0331756928b979e36834ad9ee5bb30",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3984076982687099,
+        "mean_iou": 0.19627078469815895,
+        "mean_solver_wall_seconds": 84.05155257383983,
+        "parent_count": 24.0,
+        "research_utility": 0.6015923017312901,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "d65155b9b3af86b79b383e716e380ea5205f60a76a1c84877b11ef1ecd05d41e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4210698494108044,
+        "mean_iou": 0.20406746708743326,
+        "mean_solver_wall_seconds": 82.92146988213062,
+        "parent_count": 24.0,
+        "research_utility": 0.5789301505891956,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "d857ee3bddb0ccb666063bea670cc6e49f67a6440e7667632a0ce36c8cfad71a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42833980031827945,
+        "mean_iou": 0.19794338827178812,
+        "mean_solver_wall_seconds": 82.83643777668476,
+        "parent_count": 24.0,
+        "research_utility": 0.5716601996817205,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "b69ed5d37d49e5cd802eddfbb937af3ad9b60d41a35097f93f7f1b1cd37dcb21",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3887103486355913,
+        "mean_iou": 0.19925933282343777,
+        "mean_solver_wall_seconds": 82.84535698095958,
+        "parent_count": 24.0,
+        "research_utility": 0.6112896513644087,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "9d7c2775f2c6535f3ebf3e03dc26c0cfba6de0278d59a6126eec0adcefa0a39f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3963304666642813,
+        "mean_iou": 0.1925801982899351,
+        "mean_solver_wall_seconds": 82.8294798930486,
+        "parent_count": 24.0,
+        "research_utility": 0.6036695333357187,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "d3ed66ced4804df543879022348eb17a145dbb04e49b063333dcaee6eac442da",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41143048336793053,
+        "mean_iou": 0.19401852701832625,
+        "mean_solver_wall_seconds": 82.77832964559396,
+        "parent_count": 24.0,
+        "research_utility": 0.5885695166320695,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "79b260270768fe688df395d9e4d8b607a037a1ff4e0afbcdf4c4c2e00ecb4b26",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3934871163634678,
+        "mean_iou": 0.1927946640668919,
+        "mean_solver_wall_seconds": 82.88551217814286,
+        "parent_count": 24.0,
+        "research_utility": 0.6065128836365322,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "a42ff6ddd69739a7a1ce233742b4946dd7cf6719479cb35d6ee482b8404951b9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38462270719806024,
+        "mean_iou": 0.195495867021494,
+        "mean_solver_wall_seconds": 82.77554794649284,
+        "parent_count": 24.0,
+        "research_utility": 0.6153772928019398,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "a86aa1af1944bee6993ee75323a4f143eca47606715843f3cc37611ea1a085db",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3881047462134889,
+        "mean_iou": 0.1940742058124922,
+        "mean_solver_wall_seconds": 82.92115445435047,
+        "parent_count": 24.0,
+        "research_utility": 0.6118952537865111,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "123b637e1768fa4c60296cde59b1b1c1bb9c1936385a5f0052f332fafaad229f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38933134252609536,
+        "mean_iou": 0.19395043644129148,
+        "mean_solver_wall_seconds": 82.74045792222023,
+        "parent_count": 24.0,
+        "research_utility": 0.6106686574739046,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "fb5de22eac9bfa96839c67c5dc541465ad6d871fa895790439aeb95363363353",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3988176766762642,
+        "mean_iou": 0.19750619347460763,
+        "mean_solver_wall_seconds": 82.82578485210736,
+        "parent_count": 24.0,
+        "research_utility": 0.6011823233237358,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 7,
+      "batch_end_slot": 113,
+      "source_sha256": "68ba07e8c1abe6fa6634bc5c4c2bdfc2cd921f243275279cc70b9194a5dbb912",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40624712347257885,
+        "mean_iou": 0.1958299783622914,
+        "mean_solver_wall_seconds": 82.98054087162018,
+        "parent_count": 24.0,
+        "research_utility": 0.5937528765274211,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "b5ce2d66c4c7cbfdab9de921878c533e040f3fb98b08eca381fc5037d5628511",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38180441563166434,
+        "mean_iou": 0.19798929502546803,
+        "mean_solver_wall_seconds": 83.1388731400172,
+        "parent_count": 24.0,
+        "research_utility": 0.6181955843683357,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "00ffcdec42cc45e7d3dfb496c230fb4d51501bf0024c9714b5717b65b4ec6e26",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38996288591979533,
+        "mean_iou": 0.19357729786196823,
+        "mean_solver_wall_seconds": 83.2371370146672,
+        "parent_count": 24.0,
+        "research_utility": 0.6100371140802047,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "e6e2ff0f69b6efc2473c56213e2427504320979b85f8dc47835e10315848bfae",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41902745315507517,
+        "mean_iou": 0.20746319880887007,
+        "mean_solver_wall_seconds": 67.64891686538856,
+        "parent_count": 24.0,
+        "research_utility": 0.5809725468449248,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "84494456b73a97e66d4bc1a8e74196aa1832e6066d5f224f0e5ff4f0d23208c5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.432178582339389,
+        "mean_iou": 0.20732573691111458,
+        "mean_solver_wall_seconds": 76.13519735137622,
+        "parent_count": 24.0,
+        "research_utility": 0.567821417660611,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "a4d5e57f18b34d39de71493178aeabafce340ae51d1c263200cdf716de225536",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5545625701229391,
+        "mean_iou": 0.2650249141492648,
+        "mean_solver_wall_seconds": 4.041111141443253,
+        "parent_count": 24.0,
+        "research_utility": 0.4454374298770609,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "ea711f0587140e93ddc0c41839a1149ecff91cd273d60df3337b5f7665e36395",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5373570940147785,
+        "mean_iou": 0.29492483692137267,
+        "mean_solver_wall_seconds": 2.512567793329557,
+        "parent_count": 24.0,
+        "research_utility": 0.46264290598522156,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "dad145cb57d786084ed0fca7246233dad8c4666b773436325c95bef146173e0b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4357404621671871,
+        "mean_iou": 0.22056993418980034,
+        "mean_solver_wall_seconds": 35.45930001139641,
+        "parent_count": 24.0,
+        "research_utility": 0.5642595378328129,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "93ca5fa1a9bd66af8a9bed6ccd31974ab1688f01382ca79beb756c3d391dd09a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5508178232175225,
+        "mean_iou": 0.2651134158309118,
+        "mean_solver_wall_seconds": 3.0738131602605185,
+        "parent_count": 24.0,
+        "research_utility": 0.4491821767824775,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "93ea14737f96a25eb5695e9fb027499ab1af04d012724b0f326978e1d7f6aee2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5545625701229391,
+        "mean_iou": 0.2650249141492648,
+        "mean_solver_wall_seconds": 4.143996169169744,
+        "parent_count": 24.0,
+        "research_utility": 0.4454374298770609,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "45b2e60b180904e5f0adbe69ed63ccc946cb435ebc3240a0421667573040e27b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38470939712619134,
+        "mean_iou": 0.1924842506100761,
+        "mean_solver_wall_seconds": 83.18371081352234,
+        "parent_count": 24.0,
+        "research_utility": 0.6152906028738087,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "5c084046e240ab2c53db955d56d9d69c950f860a5c9959355e000ce33878acde",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.378764987727233,
+        "mean_iou": 0.1951322797851226,
+        "mean_solver_wall_seconds": 83.31676033635934,
+        "parent_count": 24.0,
+        "research_utility": 0.621235012272767,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "c44598f1498f1ea14da0b1cb041609aa3a1a6245efd2b3c82fc9132f698304d8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37658036094554237,
+        "mean_iou": 0.1833469456540109,
+        "mean_solver_wall_seconds": 83.21494504312675,
+        "parent_count": 24.0,
+        "research_utility": 0.6234196390544576,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "b2e62428d3996b308c3e0e3a864715d9ceef414503838627b14cb722c2b3c752",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.385699529609136,
+        "mean_iou": 0.19637045031754216,
+        "mean_solver_wall_seconds": 83.1989666869243,
+        "parent_count": 24.0,
+        "research_utility": 0.614300470390864,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "25d56f85830253db65845849d9f934252b6c6b1b935aeac63839ac78993f801a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3825160324949658,
+        "mean_iou": 0.19872451838924599,
+        "mean_solver_wall_seconds": 83.16140887637933,
+        "parent_count": 24.0,
+        "research_utility": 0.6174839675050342,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "e40c0bdc2ab4c81927f7dfa1f9c63cccdc9c7b4bf975be54ed34b59bb1b2b593",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38707061817941624,
+        "mean_iou": 0.19301270616865188,
+        "mean_solver_wall_seconds": 83.22740953167279,
+        "parent_count": 24.0,
+        "research_utility": 0.6129293818205838,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 8,
+      "batch_end_slot": 129,
+      "source_sha256": "814a9ba287b8a121bc48f419a89c45c57bc5738d9891dd069194d238afd5d539",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.387345760913668,
+        "mean_iou": 0.19289525255113374,
+        "mean_solver_wall_seconds": 83.15099848310153,
+        "parent_count": 24.0,
+        "research_utility": 0.612654239086332,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "725f10175ac6742e138cbc5dce7fa2689ad6f32d9e1aae0162d59310523c9f9f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4265082322026533,
+        "mean_iou": 0.20458776308942372,
+        "mean_solver_wall_seconds": 110.71233501036961,
+        "parent_count": 24.0,
+        "research_utility": 0.5734917677973467,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "d299c1c38776b434d7843fdaba87105783f8f3eaa7c5bf5bb9f796e0540e3958",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3777345659541397,
+        "mean_iou": 0.1995251922204572,
+        "mean_solver_wall_seconds": 83.1199219127496,
+        "parent_count": 24.0,
+        "research_utility": 0.6222654340458603,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "0e9708385374684691b54b8000ec16a8a7b9167dcf308b3f35f961ae8af0f65a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4090610425415929,
+        "mean_iou": 0.20945791659585047,
+        "mean_solver_wall_seconds": 108.29141225914161,
+        "parent_count": 24.0,
+        "research_utility": 0.5909389574584071,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "70de55634130da60fc77eb06fcad4cad2bbadc8b03440d0534ba331e8ae5c952",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4252198232896175,
+        "mean_iou": 0.21035340179849568,
+        "mean_solver_wall_seconds": 110.75929978489876,
+        "parent_count": 24.0,
+        "research_utility": 0.5747801767103825,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "58d44e4ce0cb79d8b043da60723f5a99869b56763596057a09af8cab30bd167f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3824494766050073,
+        "mean_iou": 0.18436001275191985,
+        "mean_solver_wall_seconds": 83.13662855823834,
+        "parent_count": 24.0,
+        "research_utility": 0.6175505233949927,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "9294c07a1add50b7d5c3c1596bfbaa63a62a1e96eb465b3a0aa5bf226ea0fb8b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36318084525382377,
+        "mean_iou": 0.18589824768224136,
+        "mean_solver_wall_seconds": 83.18295507133007,
+        "parent_count": 24.0,
+        "research_utility": 0.6368191547461762,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "65b8a49bb361f6c06217f417e37cac35fcb86b242274bea99372d58b6e3e3106",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38860938263754585,
+        "mean_iou": 0.1947423811026231,
+        "mean_solver_wall_seconds": 83.3138331969579,
+        "parent_count": 24.0,
+        "research_utility": 0.6113906173624541,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "037cdbe6bef8fe2f50517a073c188d4784558fea6292e6af026cdd9b66e6ba8d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3797643692443079,
+        "mean_iou": 0.1814025540451142,
+        "mean_solver_wall_seconds": 83.18284610410531,
+        "parent_count": 24.0,
+        "research_utility": 0.6202356307556921,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "cc3178595bcd1cfbaaf1e909853626bae6e81f3a1136a6bcd357e12b7d64db91",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4333462941813079,
+        "mean_iou": 0.2064482220460726,
+        "mean_solver_wall_seconds": 109.59892058869202,
+        "parent_count": 24.0,
+        "research_utility": 0.5666537058186921,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "688dd9f8d7fd52b7a74c458a2fa7e2b830f8316ad4f1d51832b29d540bee9c9e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3792607244087127,
+        "mean_iou": 0.17877685100885246,
+        "mean_solver_wall_seconds": 83.13141819338004,
+        "parent_count": 24.0,
+        "research_utility": 0.6207392755912873,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "2dad5751b643ca908c498713954fe0df4690fb78a028659fe5200a94b84d7a8d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3714565627516673,
+        "mean_iou": 0.18388108545940196,
+        "mean_solver_wall_seconds": 83.12335517505805,
+        "parent_count": 24.0,
+        "research_utility": 0.6285434372483327,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "b0900a69025b7ad0593a4e2020fc7be4f41df331c8dd2b5e7613ce2d4d7730a5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3738242234392569,
+        "mean_iou": 0.18115716594313255,
+        "mean_solver_wall_seconds": 83.24998219311237,
+        "parent_count": 24.0,
+        "research_utility": 0.6261757765607431,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "51f5e7fad32693433e91de5f35fe6a9f2761eeb2a2df69d11f8180a4bff92c59",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39549210673424706,
+        "mean_iou": 0.192112830186283,
+        "mean_solver_wall_seconds": 109.43866037329038,
+        "parent_count": 24.0,
+        "research_utility": 0.6045078932657529,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "ccb3b9ab7c9bca9af0962f3e76cd7b0a76bfe7cf2944cf696f9707ccc9a9175c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.474423101490015,
+        "mean_iou": 0.223843066804055,
+        "mean_solver_wall_seconds": 111.91415058573087,
+        "parent_count": 24.0,
+        "research_utility": 0.525576898509985,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "8a22b97b7bd92996136fd0b01d8180708b144d792d88b2a93ad357e80c6343cb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38360766137860614,
+        "mean_iou": 0.188015914822791,
+        "mean_solver_wall_seconds": 83.15232669810455,
+        "parent_count": 24.0,
+        "research_utility": 0.6163923386213939,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 9,
+      "batch_end_slot": 145,
+      "source_sha256": "44818e1a6da43f784ab9a77adca1932f8c9105d1222eb3988ac80e29dd583ecc",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4255020451524977,
+        "mean_iou": 0.2164858341016851,
+        "mean_solver_wall_seconds": 107.10735640923183,
+        "parent_count": 24.0,
+        "research_utility": 0.5744979548475023,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "8f669a58f030f18e7fa460fecd596393fb670705a7e63e555dade3f84b57cfc2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3716210802947867,
+        "mean_iou": 0.182614004246629,
+        "mean_solver_wall_seconds": 83.12243821223576,
+        "parent_count": 24.0,
+        "research_utility": 0.6283789197052133,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "6963b60f1a6d7f23dcb746b233a2ff8446ab2b9f90d4820ec4e39bb4a6501257",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3488870836418322,
+        "mean_iou": 0.17701146090363895,
+        "mean_solver_wall_seconds": 114.30802730222543,
+        "parent_count": 24.0,
+        "research_utility": 0.6511129163581678,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "933e19e3c8b19fd50a23d725cb294acd260f080ce98954409cd4210d4f26449c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35207084355731433,
+        "mean_iou": 0.17673921067371126,
+        "mean_solver_wall_seconds": 114.22153720756371,
+        "parent_count": 24.0,
+        "research_utility": 0.6479291564426857,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "5952f4c8b485827c070ee5e63e62a91db74c8bda99d29c1c9abda3ac5879cfbf",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3520872636747088,
+        "mean_iou": 0.17785417896306285,
+        "mean_solver_wall_seconds": 114.3599563439687,
+        "parent_count": 24.0,
+        "research_utility": 0.6479127363252912,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "2dff5619b6f59122c445e1ef46cdef4b52e7fc3e9a6b1bfc465c4bafe6786b82",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3669454161641341,
+        "mean_iou": 0.18191076955503716,
+        "mean_solver_wall_seconds": 83.1064228117466,
+        "parent_count": 24.0,
+        "research_utility": 0.6330545838358659,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "a617e55b7e90d3a28ca096850d0b0a00ccbc28248e584e4a24f220b45923d7b0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3764882782805269,
+        "mean_iou": 0.17865807908130607,
+        "mean_solver_wall_seconds": 83.14306566615899,
+        "parent_count": 24.0,
+        "research_utility": 0.6235117217194731,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "70953bc47826c030187182c30b952a63bba91d4645de49441e986b20f6bb0c69",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35723537228588,
+        "mean_iou": 0.17565810228089096,
+        "mean_solver_wall_seconds": 114.29600313305855,
+        "parent_count": 24.0,
+        "research_utility": 0.64276462771412,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "d8eb054448ecb7c1dde917dfe1544f83c87c03cbadab46cabc85582cddbece62",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3650102469291623,
+        "mean_iou": 0.18261489589538984,
+        "mean_solver_wall_seconds": 83.11546126504739,
+        "parent_count": 24.0,
+        "research_utility": 0.6349897530708377,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "d838a38a2f4e1ad6e794ee89436087d69665c7a21fb6ade7a350ae56f2b9b279",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.351340020498102,
+        "mean_iou": 0.17607284557496025,
+        "mean_solver_wall_seconds": 114.26520405213039,
+        "parent_count": 24.0,
+        "research_utility": 0.648659979501898,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "7b617ffb116df8e74dfc7587d4f2c8bc45ad3ec8abc19722c90b0b46b8e9b569",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36524254858929417,
+        "mean_iou": 0.18387710464802595,
+        "mean_solver_wall_seconds": 83.22943551838398,
+        "parent_count": 24.0,
+        "research_utility": 0.6347574514107058,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "cab8ce2e601fee688413e95a5c4b66ff9b55f10619e1c4abf4a213478c6112d9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3787740596645145,
+        "mean_iou": 0.18211841746877866,
+        "mean_solver_wall_seconds": 83.18257004519303,
+        "parent_count": 24.0,
+        "research_utility": 0.6212259403354855,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "40945a2707bd6be927b978d3195e85fc3d71e6245413bd468c06b84f0204fbce",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36172479280442904,
+        "mean_iou": 0.17594730555671578,
+        "mean_solver_wall_seconds": 114.28905585904916,
+        "parent_count": 24.0,
+        "research_utility": 0.638275207195571,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "9a68bfdace0a5bcd1b227ec8a55ba8f9af44eec97f7a104aff3a76b06bccf191",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3809744118975097,
+        "mean_iou": 0.1818403231981837,
+        "mean_solver_wall_seconds": 83.14783996840318,
+        "parent_count": 24.0,
+        "research_utility": 0.6190255881024903,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "e569bb18c889968e3339dc7ff340c705ae958c92ad46f352ba20450216ae2a8b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3510471610610798,
+        "mean_iou": 0.1787993030389601,
+        "mean_solver_wall_seconds": 114.38294027745724,
+        "parent_count": 24.0,
+        "research_utility": 0.6489528389389202,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "b3ec7bc90dc9400f00c1885427e2a1d4fdaf43a287595cd4d22a8fe3f947f4c7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37231164313714593,
+        "mean_iou": 0.18229372831200133,
+        "mean_solver_wall_seconds": 83.17899339397748,
+        "parent_count": 24.0,
+        "research_utility": 0.6276883568628541,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 10,
+      "batch_end_slot": 161,
+      "source_sha256": "45f2c52630a7b592b7f109eb47f24b0046156d2ea4f0e5a474385374e1cc3a85",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37742387015009937,
+        "mean_iou": 0.1871190436361709,
+        "mean_solver_wall_seconds": 83.20786099135876,
+        "parent_count": 24.0,
+        "research_utility": 0.6225761298499006,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "97aaa2a05d6c966cbe230c685837435808a546c4d9969ed5682d7001aef7f3a6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36806848530629555,
+        "mean_iou": 0.18458296360762985,
+        "mean_solver_wall_seconds": 115.47140761216481,
+        "parent_count": 24.0,
+        "research_utility": 0.6319315146937045,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "ac4d3d3052e44a987956875bce0ad106738a5d7add6d6a3e9e5164e66a7dc7a5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36993710652201306,
+        "mean_iou": 0.17726329685279874,
+        "mean_solver_wall_seconds": 115.48688775797685,
+        "parent_count": 24.0,
+        "research_utility": 0.6300628934779869,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "b4c05fb1471c01f8285edf2a60b5090743d43f34978947c66f90085fdd7ea39f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3821090169483351,
+        "mean_iou": 0.19630447216776326,
+        "mean_solver_wall_seconds": 115.52206326524417,
+        "parent_count": 24.0,
+        "research_utility": 0.6178909830516649,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "5e1f4d86ad728db9c0859819a911a5fcef92e19b1d2e0e3c5bc5aa0243c03e74",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3729242395872149,
+        "mean_iou": 0.189700050222692,
+        "mean_solver_wall_seconds": 115.45031575858593,
+        "parent_count": 24.0,
+        "research_utility": 0.6270757604127851,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "6bfc1e192f2341356538af72298d9ca4cd7f46071593318b9977e7dc254bb027",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37974502110257224,
+        "mean_iou": 0.18309454860689825,
+        "mean_solver_wall_seconds": 115.55317353705566,
+        "parent_count": 24.0,
+        "research_utility": 0.6202549788974278,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "52e2b94c2db646b38cf7a5a5d019111f9b7ef12ef993827c1e52e909898545af",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3590868767402916,
+        "mean_iou": 0.17600651450355,
+        "mean_solver_wall_seconds": 116.72407472630341,
+        "parent_count": 24.0,
+        "research_utility": 0.6409131232597084,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "739cad735f9b66ce5ff056e761bc313bc367ae26540abec52e290e59005af87c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36295300249842677,
+        "mean_iou": 0.17199599298386833,
+        "mean_solver_wall_seconds": 114.2735708206892,
+        "parent_count": 24.0,
+        "research_utility": 0.6370469975015732,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "63e114a1abe2665eb347911b378df29b7659a4ccd942c499d76b357d677499f2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35667743207389646,
+        "mean_iou": 0.18247138454894574,
+        "mean_solver_wall_seconds": 114.38907819489638,
+        "parent_count": 24.0,
+        "research_utility": 0.6433225679261035,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "4d643505be177f750af3585c6a019850f1141dd682b0137f52c573776664ea44",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3586398033633934,
+        "mean_iou": 0.17834526763946812,
+        "mean_solver_wall_seconds": 114.33492501576741,
+        "parent_count": 24.0,
+        "research_utility": 0.6413601966366066,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "177c330ef82ac94130593d7dfb483b4b673cc2283bda3bf6bd067635cebe5e10",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35501311230549437,
+        "mean_iou": 0.18165221620457273,
+        "mean_solver_wall_seconds": 116.82218444347382,
+        "parent_count": 24.0,
+        "research_utility": 0.6449868876945056,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "16bf792c84f7cad0798b2725648ad00934733d425977448c88d5cf66710f86ce",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39557296846935397,
+        "mean_iou": 0.1966288790530114,
+        "mean_solver_wall_seconds": 116.83489014208317,
+        "parent_count": 24.0,
+        "research_utility": 0.604427031530646,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "7f8cf2deb7f60fbdc01d74f1a8ce3a6fc2ed4d2fa1d8d0966754d08e5c76e441",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.34897188786589073,
+        "mean_iou": 0.17859424185581319,
+        "mean_solver_wall_seconds": 114.33889734248321,
+        "parent_count": 24.0,
+        "research_utility": 0.6510281121341093,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "0ec48a387b4d048c3bd3add63e51c686d72d25b6905070299e7ed2060d9a1e08",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35366810894360456,
+        "mean_iou": 0.17883081509061152,
+        "mean_solver_wall_seconds": 114.32426268359025,
+        "parent_count": 24.0,
+        "research_utility": 0.6463318910563954,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "c2d55dc13505a18cb3455c02c6cab7d6e026da5efbdd6bc948ba8f0e1b12753b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37343932749568187,
+        "mean_iou": 0.1812512329863791,
+        "mean_solver_wall_seconds": 116.71693271398544,
+        "parent_count": 24.0,
+        "research_utility": 0.6265606725043181,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "3fa5ca98186e832a925f3dc62bb4c2a8957f803567ca89065d747b4b5f155ea3",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35322020324781245,
+        "mean_iou": 0.17614952750738122,
+        "mean_solver_wall_seconds": 114.37197962403297,
+        "parent_count": 24.0,
+        "research_utility": 0.6467797967521876,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 11,
+      "batch_end_slot": 177,
+      "source_sha256": "e9867f76d290d01bac6168b2ea4cfe98973fa23a23dca11b15d91020ad54a593",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36036176075314386,
+        "mean_iou": 0.17640741549652064,
+        "mean_solver_wall_seconds": 114.32626315454642,
+        "parent_count": 24.0,
+        "research_utility": 0.6396382392468561,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "b1570c02617998b749b7bc42a7b9c0e04c41968092bf829cbbd56aa5467c6866",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3725554407342434,
+        "mean_iou": 0.17609430689042385,
+        "mean_solver_wall_seconds": 114.32544394830863,
+        "parent_count": 24.0,
+        "research_utility": 0.6274445592657566,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "86b1f4132dcd7623605e8ff12a9637fdf30ad7b90d2cbfbf6a8c226e03aef99e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3600549894153837,
+        "mean_iou": 0.17873031310524745,
+        "mean_solver_wall_seconds": 114.35927561422189,
+        "parent_count": 24.0,
+        "research_utility": 0.6399450105846163,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "f97655ae8f23ae50cdef642a671e49b53ec6301c91947570baf7caa59d0c0173",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3561621088717125,
+        "mean_iou": 0.17893612786199528,
+        "mean_solver_wall_seconds": 114.37430933117867,
+        "parent_count": 24.0,
+        "research_utility": 0.6438378911282875,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "93b3f046109a9b21955d34f3ca2213e3c4fb8da13d564922003a05f455b95535",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3516016818615285,
+        "mean_iou": 0.17985120146560543,
+        "mean_solver_wall_seconds": 114.41599077979724,
+        "parent_count": 24.0,
+        "research_utility": 0.6483983181384715,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "d3477d64d9660ee623d67b0c6fb9fffa931154ead27f64c15593b6a81191b733",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4371536535660182,
+        "mean_iou": 0.18629803069827636,
+        "mean_solver_wall_seconds": 114.34637060264747,
+        "parent_count": 24.0,
+        "research_utility": 0.5628463464339818,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "5daf158b902979c0d2319938a3918e5fc2b81a0fa0ed787c344758104ec435b8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3593304393509106,
+        "mean_iou": 0.18183057262938393,
+        "mean_solver_wall_seconds": 113.9925713588794,
+        "parent_count": 24.0,
+        "research_utility": 0.6406695606490894,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "4bfd526bb872e2e652c4f6b43998f23547e0af8fea72df83b35fe6069f8ee097",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.353338290582932,
+        "mean_iou": 0.1781240451526737,
+        "mean_solver_wall_seconds": 114.38006676236789,
+        "parent_count": 24.0,
+        "research_utility": 0.646661709417068,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "3f861abaf9cafcfbd0f48fe94631c125b2bbe691549118d6ef5a67fe07ed1de8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3569912737943126,
+        "mean_iou": 0.18041661803923903,
+        "mean_solver_wall_seconds": 116.69361140827338,
+        "parent_count": 24.0,
+        "research_utility": 0.6430087262056874,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "3817102234bae8d45499ac05a2f309c8bddf21976761ad73d37fd0627902c559",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38296950682603403,
+        "mean_iou": 0.17346634347629428,
+        "mean_solver_wall_seconds": 114.25657028456529,
+        "parent_count": 24.0,
+        "research_utility": 0.617030493173966,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "3a99261f2e844814a8a5c952a3c8a71b427020c5eac20e490d32c1c7518bde6f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35621494051202207,
+        "mean_iou": 0.17859882858049136,
+        "mean_solver_wall_seconds": 114.29635923107465,
+        "parent_count": 24.0,
+        "research_utility": 0.6437850594879779,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "95def5c33995330fcd685c4502027dc41705190839d284cc924075f51c9be1c5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35694340661162516,
+        "mean_iou": 0.18577381112547567,
+        "mean_solver_wall_seconds": 114.28732839723428,
+        "parent_count": 24.0,
+        "research_utility": 0.6430565933883748,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "f6b35f0918df23b2eac1634d038d012a36c9c68a625b94a297edac8f8a162045",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36555749924440484,
+        "mean_iou": 0.17937133630308288,
+        "mean_solver_wall_seconds": 114.23741606871288,
+        "parent_count": 24.0,
+        "research_utility": 0.6344425007555952,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "9ca00e80c3f4c8eb24fb982b1c1e3ea78530fe6ddcccf1d667a20212c7b1431f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3554965354477334,
+        "mean_iou": 0.18019584382200016,
+        "mean_solver_wall_seconds": 114.29207825660706,
+        "parent_count": 24.0,
+        "research_utility": 0.6445034645522666,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "b09334c563174345cee9477cb5d0c8cba5f13763e3bfd339785c85780fc9fab5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3616055521502315,
+        "mean_iou": 0.18162609179363096,
+        "mean_solver_wall_seconds": 114.31621440251668,
+        "parent_count": 24.0,
+        "research_utility": 0.6383944478497685,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "26c522cd15c30431bde835f6a7056c4f98b4bf247c1287f012f174e91770c515",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3592672076247624,
+        "mean_iou": 0.1828238449227554,
+        "mean_solver_wall_seconds": 114.34254715343316,
+        "parent_count": 24.0,
+        "research_utility": 0.6407327923752376,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 12,
+      "batch_end_slot": 193,
+      "source_sha256": "dc3a77180aded3bcd4eaf3787d75a12c464284deaf50cca473b93983d480c027",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3546879223739615,
+        "mean_iou": 0.18271317349510752,
+        "mean_solver_wall_seconds": 114.36705643932025,
+        "parent_count": 24.0,
+        "research_utility": 0.6453120776260385,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "d7ca7fc4fc5762fa2ee80f8fa08ae36245199a26c464aa3680f0112dcf90b54a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5185762371726137,
+        "mean_iou": 0.2585140873812875,
+        "mean_solver_wall_seconds": 0.8991636782884598,
+        "parent_count": 24.0,
+        "research_utility": 0.4814237628273863,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "e6175bcf407acbeb42eec54320d6293ca0994821f9d66dc7d95b893ddd97826e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5533681447355032,
+        "mean_iou": 0.25748363759670745,
+        "mean_solver_wall_seconds": 0.8309267262617747,
+        "parent_count": 24.0,
+        "research_utility": 0.4466318552644967,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "0899f5b28ab1f084c4b58c7cba18eeb7b2cb7976dd42ed967d83fa9e82ba498f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5533681447355032,
+        "mean_iou": 0.25748363759670745,
+        "mean_solver_wall_seconds": 0.8108048439025879,
+        "parent_count": 24.0,
+        "research_utility": 0.4466318552644967,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "f6bb403763be0da6df7c666794224f392887c900e669a21ff65b3b872c22cb6b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35584452633326136,
+        "mean_iou": 0.17587187571737595,
+        "mean_solver_wall_seconds": 113.41117240985234,
+        "parent_count": 24.0,
+        "research_utility": 0.6441554736667386,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "7c9c4fce3cc42c4e3c32b8d0b0ba88c3d202e8752628824383bb5dd4e6d2eb01",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3501541193879929,
+        "mean_iou": 0.1736962997092587,
+        "mean_solver_wall_seconds": 113.41498594979446,
+        "parent_count": 24.0,
+        "research_utility": 0.6498458806120071,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "01b6f64d42c7695742996cc891bd98db4e6e1df2c90475ed594a501d8a027fa1",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3758076971361902,
+        "mean_iou": 0.18335316840688146,
+        "mean_solver_wall_seconds": 113.41123394171397,
+        "parent_count": 24.0,
+        "research_utility": 0.6241923028638098,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "3560b85bb13a8b5615c3d37a71fe79c36cd80a727d1b549bb51e41a37413d5a3",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.34917863129810756,
+        "mean_iou": 0.17519794699459937,
+        "mean_solver_wall_seconds": 113.40499944984913,
+        "parent_count": 24.0,
+        "research_utility": 0.6508213687018924,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "e0dc5367a7d39b95345ffb3751571197a69f2cbd438988f8e0c5c9bb212557ab",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3520363756648097,
+        "mean_iou": 0.1749659680909292,
+        "mean_solver_wall_seconds": 113.41109431783359,
+        "parent_count": 24.0,
+        "research_utility": 0.6479636243351903,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "bc3e11690a05e0ef96bf4e19dfc6d7973e370b95696f31cf29345f8cbab0b5cd",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3482670926851066,
+        "mean_iou": 0.17447007776395385,
+        "mean_solver_wall_seconds": 113.38827411830425,
+        "parent_count": 24.0,
+        "research_utility": 0.6517329073148934,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "5683b4b54f2ce80fab5f3ae8edde57cbab0575fd76ca588ffad79d6ba2df81fc",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3551517929355512,
+        "mean_iou": 0.1762721047054329,
+        "mean_solver_wall_seconds": 113.39283522466819,
+        "parent_count": 24.0,
+        "research_utility": 0.6448482070644488,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "e0e6791f31dc4f224dffb3c09b0a9062641686f5eada3c831b8c0ddea03c8140",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3492187216139121,
+        "mean_iou": 0.17502336798555573,
+        "mean_solver_wall_seconds": 113.39299272497495,
+        "parent_count": 24.0,
+        "research_utility": 0.6507812783860879,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "a30866a9a972ca1003cea53352a0e1b1aea7ce98051312036e5caf87b3948bdb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3523852677158946,
+        "mean_iou": 0.17437432117222648,
+        "mean_solver_wall_seconds": 113.43138918777306,
+        "parent_count": 24.0,
+        "research_utility": 0.6476147322841054,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "726fc1bcaf376242daa493f8bc8a59d713d7b1602110ff0d818ddca047f54f6f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36205587314584464,
+        "mean_iou": 0.17932866312034643,
+        "mean_solver_wall_seconds": 113.42885479331017,
+        "parent_count": 24.0,
+        "research_utility": 0.6379441268541554,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "06fe2053acfae12e2bcfaccfd8578bcd6bfa014ec1de67f09a441fc8885893f2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3522685016956394,
+        "mean_iou": 0.1777494958852391,
+        "mean_solver_wall_seconds": 113.40178074936073,
+        "parent_count": 24.0,
+        "research_utility": 0.6477314983043606,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "7b5537f72b421b7d0c2750714bd0c1dcd4faee0dd76ce2b2a50429def6f7a2d9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3516061722787378,
+        "mean_iou": 0.17551255837731894,
+        "mean_solver_wall_seconds": 113.39695896208286,
+        "parent_count": 24.0,
+        "research_utility": 0.6483938277212622,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 13,
+      "batch_end_slot": 209,
+      "source_sha256": "9344d0ce5a54aa173df96a56c094bee7a132bc8eb3e53d276b12d285894fbbe6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3506160602770353,
+        "mean_iou": 0.1762585586354127,
+        "mean_solver_wall_seconds": 113.41032674908638,
+        "parent_count": 24.0,
+        "research_utility": 0.6493839397229647,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "a6459c5412cf57f967e143a16c984d97eb38f9d0b0f959c53d91f2c88a15aabb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3742720890589859,
+        "mean_iou": 0.17391707282033264,
+        "mean_solver_wall_seconds": 113.3249954978625,
+        "parent_count": 24.0,
+        "research_utility": 0.6257279109410141,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "ed5c987c26bfd7357fddd04537248b559075e5bb081e0a0d9398a28c9f4b1d68",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3556198751953551,
+        "mean_iou": 0.1790235178716654,
+        "mean_solver_wall_seconds": 113.32764799396197,
+        "parent_count": 24.0,
+        "research_utility": 0.6443801248046449,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "5e24cab48076c6001b93d7ab443d4fd19a756d78a37643ea8fd3760c55739ed7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3521202614111254,
+        "mean_iou": 0.1752670312263677,
+        "mean_solver_wall_seconds": 113.32714494566123,
+        "parent_count": 24.0,
+        "research_utility": 0.6478797385888746,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "7b40d5c58063da0c7aadc9a1ad6577f4daa59b92fcb39ff5647676b871f6344c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3563735598468266,
+        "mean_iou": 0.17659196646685762,
+        "mean_solver_wall_seconds": 113.31925528744857,
+        "parent_count": 24.0,
+        "research_utility": 0.6436264401531734,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "0970057ee8af279272dcaa1a6688e5947aa2c99e2a49b56c9e05a100e24934f5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36074720398399174,
+        "mean_iou": 0.17441874396564747,
+        "mean_solver_wall_seconds": 113.32628505428632,
+        "parent_count": 24.0,
+        "research_utility": 0.6392527960160083,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "a6c8255f480f9d069214af029a2665fb7d6acf900709180b80f26865d87fa118",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3703179247726279,
+        "mean_iou": 0.17824512852824945,
+        "mean_solver_wall_seconds": 113.31343152622382,
+        "parent_count": 24.0,
+        "research_utility": 0.6296820752273721,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "6df2406225eec862cef68b85cb6b76e7e046bf23b57b9e85cbbb4076819c72dc",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3667608823199697,
+        "mean_iou": 0.18248512535643083,
+        "mean_solver_wall_seconds": 113.34624596436818,
+        "parent_count": 24.0,
+        "research_utility": 0.6332391176800303,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "205742cbba654265ce8618d7a5710b4e540577c897be07f3ee1cd3b70c2a6539",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.38190823868215873,
+        "mean_iou": 0.176743418741199,
+        "mean_solver_wall_seconds": 113.31718013683955,
+        "parent_count": 24.0,
+        "research_utility": 0.6180917613178413,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "1187e92034b143bc1ba579adc2d0f043e0270723c9ed6c16ca895981c59bf6e6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36564413700889387,
+        "mean_iou": 0.17876220169640641,
+        "mean_solver_wall_seconds": 113.32552341620128,
+        "parent_count": 24.0,
+        "research_utility": 0.6343558629911061,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "d617aed1c4e606581095435cd602477e6c25a5c8d994e3d914bd743f412ae8db",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37359518126367053,
+        "mean_iou": 0.1714679032854575,
+        "mean_solver_wall_seconds": 113.32700384656589,
+        "parent_count": 24.0,
+        "research_utility": 0.6264048187363295,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "9cf28c89ced3f906a6a188078a68a77d2817425d1e2098f15040820610c8e071",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3715526429287729,
+        "mean_iou": 0.173160997545151,
+        "mean_solver_wall_seconds": 113.31399485468864,
+        "parent_count": 24.0,
+        "research_utility": 0.6284473570712271,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "421e6a5c956991de142b4c5bec786d174b4cb9e4d0beaecbe0a0b3166ea6b71f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3690175055677384,
+        "mean_iou": 0.17654103622957287,
+        "mean_solver_wall_seconds": 113.31791114310424,
+        "parent_count": 24.0,
+        "research_utility": 0.6309824944322616,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "17a319d9c8b731ad463e1147164feb4288c4151de657e76a3366cda5fed36504",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3714265200063712,
+        "mean_iou": 0.1763085798314783,
+        "mean_solver_wall_seconds": 113.32146831353505,
+        "parent_count": 24.0,
+        "research_utility": 0.6285734799936288,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "c6d806793857815a2054ff6382fa688ee83025763282fb69a3c0e2f1d04e02f0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35195231026679463,
+        "mean_iou": 0.17475269756600267,
+        "mean_solver_wall_seconds": 115.72238848606746,
+        "parent_count": 24.0,
+        "research_utility": 0.6480476897332054,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "ea198ec381f58d07e5141e6ec4a0bcc73806a247e390982bb9e1a0e46c382d83",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4098500427244104,
+        "mean_iou": 0.19566681050881485,
+        "mean_solver_wall_seconds": 113.34545273085435,
+        "parent_count": 24.0,
+        "research_utility": 0.5901499572755896,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 14,
+      "batch_end_slot": 225,
+      "source_sha256": "4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.34485066048909296,
+        "mean_iou": 0.1772241318231528,
+        "mean_solver_wall_seconds": 113.32340793311596,
+        "parent_count": 24.0,
+        "research_utility": 0.655149339510907,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "8c161c52f1960e7a7f800ab6c81aed0c8ea8dba49cdd0ebbdd0ae640564043e6",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36126587710784863,
+        "mean_iou": 0.1766989455895953,
+        "mean_solver_wall_seconds": 113.33441706498463,
+        "parent_count": 24.0,
+        "research_utility": 0.6387341228921514,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "105aa87526f9f64b3e2211352c9b04375270da3b4dcb282813e011d93aba3552",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36153357028634325,
+        "mean_iou": 0.17525538649687733,
+        "mean_solver_wall_seconds": 113.32072208325069,
+        "parent_count": 24.0,
+        "research_utility": 0.6384664297136567,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "51e9d9b62442e0165e25871d1461eb5a80fc5ec9c0ae1e59eaedb43803819235",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36818399583275785,
+        "mean_iou": 0.17826582097373447,
+        "mean_solver_wall_seconds": 113.34279448787372,
+        "parent_count": 24.0,
+        "research_utility": 0.6318160041672422,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "9b9cabb8cdd2bb997d9493a6eb027bb792e959f70c0878884cbb91780f6c558e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.37472515577888665,
+        "mean_iou": 0.17607782911334824,
+        "mean_solver_wall_seconds": 113.32632674276829,
+        "parent_count": 24.0,
+        "research_utility": 0.6252748442211133,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "7e095bbed94bfbe7de12d1af56014fdd0fdb0b552dae7ac2569bee62f75b9329",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35192962863320787,
+        "mean_iou": 0.17547324265546513,
+        "mean_solver_wall_seconds": 113.32919628421466,
+        "parent_count": 24.0,
+        "research_utility": 0.6480703713667921,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "3a3a836cf667084add23d5bba8982d52e531dc515216a939686689c8590bf460",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3594740599816467,
+        "mean_iou": 0.17432048158878655,
+        "mean_solver_wall_seconds": 113.32506855328877,
+        "parent_count": 24.0,
+        "research_utility": 0.6405259400183533,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "4b8b90f1e9fad030e77d0a719297b22903e7e69acec3c688138c1bf7a9ebe4b0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35189894885617556,
+        "mean_iou": 0.17720242352073004,
+        "mean_solver_wall_seconds": 113.3275899887085,
+        "parent_count": 24.0,
+        "research_utility": 0.6481010511438244,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "e74a8aae65dcb1107f3507d4ae67b41180b0e669fef25297d2dbc37e1babea16",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3605726018266041,
+        "mean_iou": 0.17662303051966666,
+        "mean_solver_wall_seconds": 113.3248022099336,
+        "parent_count": 24.0,
+        "research_utility": 0.6394273981733959,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "23affd36eb3cdf22917a486f523174b3eb1e73861a5f5af9f7cfbbc9d663f581",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3663338850154232,
+        "mean_iou": 0.17547140428781818,
+        "mean_solver_wall_seconds": 113.31933598717053,
+        "parent_count": 24.0,
+        "research_utility": 0.6336661149845768,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "11e9a16668a227a71b9379a90c8965756ddeb3dbaa5cdf5ab80d8b598ad417a8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.349044298586637,
+        "mean_iou": 0.17685254215646432,
+        "mean_solver_wall_seconds": 108.52815802395344,
+        "parent_count": 24.0,
+        "research_utility": 0.650955701413363,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "3be35b26cf8d4c9486f77c8d6fa6d9d8f2a88a0eea2573f1721481c1e58d9a2b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3506396697429386,
+        "mean_iou": 0.17681725052118513,
+        "mean_solver_wall_seconds": 113.32010241846244,
+        "parent_count": 24.0,
+        "research_utility": 0.6493603302570614,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "6d49d4961ec9bc5cc46b6807179eeec9f2540d533078028e078287d3d43ad6b1",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36123093847687016,
+        "mean_iou": 0.17552198840806318,
+        "mean_solver_wall_seconds": 113.3250722984473,
+        "parent_count": 24.0,
+        "research_utility": 0.6387690615231298,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "45eb7640e44491e3218058fb899881cff1909913a8ea0498f3af8e79737baa73",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3590530270836436,
+        "mean_iou": 0.17648805790787783,
+        "mean_solver_wall_seconds": 113.32644317547481,
+        "parent_count": 24.0,
+        "research_utility": 0.6409469729163564,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "bced56481fbf90036766b52f652bce465189072daa59e68e33dae0aabbd01806",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35166227021898644,
+        "mean_iou": 0.17613454938939932,
+        "mean_solver_wall_seconds": 113.31526925663154,
+        "parent_count": 24.0,
+        "research_utility": 0.6483377297810136,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "d54a73bcfa81c57e944ecf2b1baf565925883f10528d6808127c4fe685c36f5b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.352034260166214,
+        "mean_iou": 0.17528302140035557,
+        "mean_solver_wall_seconds": 116.91575952867667,
+        "parent_count": 24.0,
+        "research_utility": 0.647965739833786,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 15,
+      "batch_end_slot": 241,
+      "source_sha256": "e0db70667314c0f06aa9f0cddb6ba371b965f8c2fe87a7a3ec0681a174c1b312",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3493855272150793,
+        "mean_iou": 0.17677508277942144,
+        "mean_solver_wall_seconds": 113.33254768451054,
+        "parent_count": 24.0,
+        "research_utility": 0.6506144727849207,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "dd57452102061e8710ba1ce6400133d300a50e66a67698a5a8caee38f9dbdc33",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35382924146026695,
+        "mean_iou": 0.17611817836054275,
+        "mean_solver_wall_seconds": 108.55942969024181,
+        "parent_count": 24.0,
+        "research_utility": 0.646170758539733,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "f835ede16c65a0f2f8ebe0f3930d194c14ab150bbbeb5cf355edee18ab5f2c35",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3574197159963398,
+        "mean_iou": 0.17286983016633117,
+        "mean_solver_wall_seconds": 113.34276392062505,
+        "parent_count": 24.0,
+        "research_utility": 0.6425802840036602,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "b70ec451415fd7212b24ac96e797370e4baa7be16f6989e48106ec5bf4af89b8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35459175835498746,
+        "mean_iou": 0.17395819058218862,
+        "mean_solver_wall_seconds": 113.35000522434711,
+        "parent_count": 24.0,
+        "research_utility": 0.6454082416450125,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "39b4da78618f4814a55bddeb5253952d26b5fb52565a81624daa04542eb1ed99",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3516995141641571,
+        "mean_iou": 0.17573599954860994,
+        "mean_solver_wall_seconds": 110.95325516164303,
+        "parent_count": 24.0,
+        "research_utility": 0.6483004858358429,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "389b06454279f8408ea105d959ffa435b1192311b99e9cc046f56f0fb547fd89",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35158209306995813,
+        "mean_iou": 0.17308729444164184,
+        "mean_solver_wall_seconds": 113.34944661955039,
+        "parent_count": 24.0,
+        "research_utility": 0.6484179069300419,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "e45cd0f07dfa225148c16c8a3745d2e37a9301ae49747f0d2f1abc5eaa8c49f9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3493956449686889,
+        "mean_iou": 0.17476144150458525,
+        "mean_solver_wall_seconds": 108.55075886845589,
+        "parent_count": 24.0,
+        "research_utility": 0.6506043550313111,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "9ca86f6076ff45f39b53b8e5e5334d4b88c8223493b725195a8845dcce8de351",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3532075924197636,
+        "mean_iou": 0.17595501430085805,
+        "mean_solver_wall_seconds": 113.34895269572735,
+        "parent_count": 24.0,
+        "research_utility": 0.6467924075802364,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "82ae0cd5d369cc5a0fa6cff6268b6354bc373360f6eb0740edc63bba7e5eb8cb",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3589071832700207,
+        "mean_iou": 0.1750248806920077,
+        "mean_solver_wall_seconds": 113.3583489159743,
+        "parent_count": 24.0,
+        "research_utility": 0.6410928167299793,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "df5ab3233b1f8fb6c9b9a7c4796bc952bd3c787a37c20e31797767b4dbcd1f20",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3492713257865194,
+        "mean_iou": 0.17549369138791568,
+        "mean_solver_wall_seconds": 113.35340363780658,
+        "parent_count": 24.0,
+        "research_utility": 0.6507286742134806,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "7a8319bd8d6e17958bafd078bbffeeae7b7ac231adf9b2f220b846dab47be675",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3618678223894214,
+        "mean_iou": 0.17617451575160592,
+        "mean_solver_wall_seconds": 113.39652477701505,
+        "parent_count": 24.0,
+        "research_utility": 0.6381321776105786,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "86f972cd90c0c356435edd82e0cb2de6761b9fb35cc29d79d743553f95c10f9c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35837037426625473,
+        "mean_iou": 0.17524226230018758,
+        "mean_solver_wall_seconds": 113.34488958120346,
+        "parent_count": 24.0,
+        "research_utility": 0.6416296257337453,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "f84ddb8dbf7ca5334db9e74db5fbecd8abb4fa9d727d53f7daa580a738db5d30",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.34822946792195786,
+        "mean_iou": 0.17505677824281177,
+        "mean_solver_wall_seconds": 110.9584898898999,
+        "parent_count": 24.0,
+        "research_utility": 0.6517705320780421,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "d9eb180ec9af9ea3b2710ee1632738ae67bfde27796edcaedf75f28f035445ea",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3524227146270905,
+        "mean_iou": 0.1735504940370887,
+        "mean_solver_wall_seconds": 113.34567201634248,
+        "parent_count": 24.0,
+        "research_utility": 0.6475772853729095,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "1353d60a75a5d699e797e85d97215b65abcbea85db6307d009d83143f0e08f25",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3642879135400422,
+        "mean_iou": 0.17598206619473897,
+        "mean_solver_wall_seconds": 113.3426861812671,
+        "parent_count": 24.0,
+        "research_utility": 0.6357120864599578,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "0bb60a189f1c79c907a6ea15264dbd5774a8dd85962b1207ea5c737b3e9de399",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36293333538279404,
+        "mean_iou": 0.17601336894237174,
+        "mean_solver_wall_seconds": 115.75418595969677,
+        "parent_count": 24.0,
+        "research_utility": 0.637066664617206,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 16,
+      "batch_end_slot": 257,
+      "source_sha256": "cc8fb2df5fbd162733fc487cf9f4b055ac1a88422649608202d7737f50dbad49",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.355281845502441,
+        "mean_iou": 0.17980693569817832,
+        "mean_solver_wall_seconds": 115.74138814210892,
+        "parent_count": 24.0,
+        "research_utility": 0.644718154497559,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "bbbeaea4d79472799212a92f11c5b525856247c11d807e6aa8f6997315613f2f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5759961060940584,
+        "mean_iou": 0.2675439630209823,
+        "mean_solver_wall_seconds": 108.54020280639331,
+        "parent_count": 24.0,
+        "research_utility": 0.42400389390594156,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "173c13c02e2af659dd5967c6d607d72087ef7bb74f58dace8242393b8b0882c0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.44912711200834254,
+        "mean_iou": 0.18359946835232457,
+        "mean_solver_wall_seconds": 106.15296115974586,
+        "parent_count": 24.0,
+        "research_utility": 0.5508728879916575,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "c0585f75a585f81f42f3313fbb1225c0eb24628b078504df8fdb9e163b889e41",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5032518549529339,
+        "mean_iou": 0.2811729362711664,
+        "mean_solver_wall_seconds": 2.778869777917862,
+        "parent_count": 24.0,
+        "research_utility": 0.49674814504706605,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "3b0cf548ba43fef1bb0733db0d38739b87bf4cc9943e21dba5b39133cb69d2c8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.48259908341018554,
+        "mean_iou": 0.27100393856566174,
+        "mean_solver_wall_seconds": 108.54756932457288,
+        "parent_count": 24.0,
+        "research_utility": 0.5174009165898145,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "f3e747c97bb3474b175ffed7ebbafa377c4f46b9b1f0d03c75dac3353dc8c7ad",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35695491181801386,
+        "mean_iou": 0.17780116776676916,
+        "mean_solver_wall_seconds": 110.92636153101921,
+        "parent_count": 24.0,
+        "research_utility": 0.6430450881819861,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "cfe49839cf7aa3a33fbf9d4accec385a59b64acd0e5e01d0e3328498483ed0ee",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5725639212018618,
+        "mean_iou": 0.2570286772317552,
+        "mean_solver_wall_seconds": 6.352228517333667,
+        "parent_count": 24.0,
+        "research_utility": 0.4274360787981382,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "c74032c93e5a97646709f11f8732d52164be366766b4ed62c9b6ce6890bf712c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5737539105295331,
+        "mean_iou": 0.25687676524561226,
+        "mean_solver_wall_seconds": 6.22615001598994,
+        "parent_count": 24.0,
+        "research_utility": 0.42624608947046694,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "fe5f53254751674d3b367466c0dea5836cc4f2a9bd801af75075d817f356e8ad",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.5682081983260423,
+        "mean_iou": 0.25869309730041806,
+        "mean_solver_wall_seconds": 108.54836625854175,
+        "parent_count": 24.0,
+        "research_utility": 0.43179180167395764,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "68b56de95fc919e33928acc9fb1b076d4124368b358af61ac0d2892531ce62ce",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3727496260986872,
+        "mean_iou": 0.17388216318824087,
+        "mean_solver_wall_seconds": 113.32115189234416,
+        "parent_count": 24.0,
+        "research_utility": 0.6272503739013128,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "10534d19323ddca0d6002921832764489a484f965bf26a888903b196ee64b5d0",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.357659887054265,
+        "mean_iou": 0.17393868004304155,
+        "mean_solver_wall_seconds": 110.92710175116856,
+        "parent_count": 24.0,
+        "research_utility": 0.642340112945735,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "5bb0998168ee93026d7adfe7ef38b2c27e73c0dbc3a1fc6f57f4ecc041474a78",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35059050466081876,
+        "mean_iou": 0.17968699018560985,
+        "mean_solver_wall_seconds": 108.52740709980328,
+        "parent_count": 24.0,
+        "research_utility": 0.6494094953391812,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "7044a47c2e4b0c1a721da9d19f5a47a5e576e6d49338ef7558c3f227852593e2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3503224567938815,
+        "mean_iou": 0.1758283603301581,
+        "mean_solver_wall_seconds": 108.53250580032666,
+        "parent_count": 24.0,
+        "research_utility": 0.6496775432061185,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "2ad4a8ed527d7b2d444848c723b847c045922cf9f734d943c98744831f3a196b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35015551318786364,
+        "mean_iou": 0.1758346328425192,
+        "mean_solver_wall_seconds": 108.52452594041824,
+        "parent_count": 24.0,
+        "research_utility": 0.6498444868121364,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "426f535d6f4921f0d2a2218d10385db086a2f5fa67a979f019c573022fe4d2b2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35433269566214476,
+        "mean_iou": 0.17765226255097433,
+        "mean_solver_wall_seconds": 108.53309215108554,
+        "parent_count": 24.0,
+        "research_utility": 0.6456673043378552,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "702a1bc0b83f52edd470c39ca7f42206e3cb8156a313e6512f6d62ce17da73b5",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3562850684751141,
+        "mean_iou": 0.17603380635522,
+        "mean_solver_wall_seconds": 113.32040632764499,
+        "parent_count": 24.0,
+        "research_utility": 0.6437149315248859,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 17,
+      "batch_end_slot": 273,
+      "source_sha256": "ce11d7b6c1ea323eb0390c86a5629c2d028f1afceba3ea0bacf7665e5bea9714",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3594774390435913,
+        "mean_iou": 0.1758126213178717,
+        "mean_solver_wall_seconds": 108.53230867286523,
+        "parent_count": 24.0,
+        "research_utility": 0.6405225609564087,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "2db22301c1968ad04284159baa7f3c721e7400973f192dadf07ad0015e64b4c8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3768799934158139,
+        "mean_iou": 0.18787633100153064,
+        "mean_solver_wall_seconds": 113.32631594936053,
+        "parent_count": 24.0,
+        "research_utility": 0.6231200065841861,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "fe209fa7351275211b145d5c6eddd82c4ec700869892d3a5c77799b60f6f9d08",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3795781879683452,
+        "mean_iou": 0.18017930551051317,
+        "mean_solver_wall_seconds": 113.32423755029838,
+        "parent_count": 24.0,
+        "research_utility": 0.6204218120316548,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "127809ee1834c563c0bc1185884c805ff817793a1c71419f695a40bbf3826d07",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35408701620261274,
+        "mean_iou": 0.18004729684294,
+        "mean_solver_wall_seconds": 108.52343492706616,
+        "parent_count": 24.0,
+        "research_utility": 0.6459129837973873,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "34cb77f0c75b532c7914c0def265257352b7e66cbf7dd35c19518a62db2e57f8",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36498250143928945,
+        "mean_iou": 0.17794448580589797,
+        "mean_solver_wall_seconds": 110.9196121742328,
+        "parent_count": 24.0,
+        "research_utility": 0.6350174985607105,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "55213738f29732746570dd3c28fd966f4809d64b033467d0583b8161e7855547",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3617850934094552,
+        "mean_iou": 0.1775698790774495,
+        "mean_solver_wall_seconds": 110.92433576285839,
+        "parent_count": 24.0,
+        "research_utility": 0.6382149065905448,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "bbeaa08d3b4b61ab949e681c35a470803a4095e255af2ea1e68c16304105a856",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35876208937485154,
+        "mean_iou": 0.1821328290682611,
+        "mean_solver_wall_seconds": 110.91984733939171,
+        "parent_count": 24.0,
+        "research_utility": 0.6412379106251485,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "9d8af1810b27ebbd9782a41ebc43028d85aab0c47ed9ac7c2dcf987d7032a03e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.36337076272729407,
+        "mean_iou": 0.17599666382737722,
+        "mean_solver_wall_seconds": 113.32587902247906,
+        "parent_count": 24.0,
+        "research_utility": 0.6366292372727059,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "b62b4414796d50cf4eb8a6bfe2d12aa3bec528b88cf7cb7052f06d52e2a98d1c",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3473896165226701,
+        "mean_iou": 0.17597137273623553,
+        "mean_solver_wall_seconds": 110.92955627540748,
+        "parent_count": 24.0,
+        "research_utility": 0.6526103834773299,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "6e4518f597c49164e28611447339cdb8dee9f5ba00a04efd0fe806923b01cb81",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3481084492005063,
+        "mean_iou": 0.17501311511434345,
+        "mean_solver_wall_seconds": 110.92779436210792,
+        "parent_count": 24.0,
+        "research_utility": 0.6518915507994937,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "916ad6d23246c6b31ec208e33f199abea0bd210252e79612135f09d895a82b16",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3472598203890176,
+        "mean_iou": 0.17683975056579035,
+        "mean_solver_wall_seconds": 110.93096558252971,
+        "parent_count": 24.0,
+        "research_utility": 0.6527401796109824,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "37f80d195efb4658622984eab70a2eee0091569ecf87a5746813cb3b18423dba",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3580606698545469,
+        "mean_iou": 0.17514966651183606,
+        "mean_solver_wall_seconds": 108.52557196219762,
+        "parent_count": 24.0,
+        "research_utility": 0.6419393301454531,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "bab06b8bdd96738bec39676069a50e8cda1a4d04fe16ad41a9314ec2dfc525af",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3589851809979564,
+        "mean_iou": 0.1769644262826456,
+        "mean_solver_wall_seconds": 108.52286670605342,
+        "parent_count": 24.0,
+        "research_utility": 0.6410148190020436,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "a77465235a68bca13789a799112b0d915f7475357370ab789b8b245131de034a",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42210361509073524,
+        "mean_iou": 0.20243709009165478,
+        "mean_solver_wall_seconds": 113.32272277772427,
+        "parent_count": 24.0,
+        "research_utility": 0.5778963849092648,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "02db37c719f5e0e7ac4cfe90bcc3764093215f250a69cf4a065f202f36af0b32",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35850711745839836,
+        "mean_iou": 0.17530576200074247,
+        "mean_solver_wall_seconds": 113.31925638516744,
+        "parent_count": 24.0,
+        "research_utility": 0.6414928825416016,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "6ef9615985f301274c7381b5582f9bdcaab44d37aec6402802b2c04a94bae26d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35183929531644353,
+        "mean_iou": 0.17571369965668904,
+        "mean_solver_wall_seconds": 113.31983091930549,
+        "parent_count": 24.0,
+        "research_utility": 0.6481607046835565,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 18,
+      "batch_end_slot": 289,
+      "source_sha256": "bb4499aa0f6dabddcc1675a3b140f8885e8a6a6eda0406671b8421fe6a38925f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.367187889916861,
+        "mean_iou": 0.18032785997468626,
+        "mean_solver_wall_seconds": 108.52748897174995,
+        "parent_count": 24.0,
+        "research_utility": 0.632812110083139,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "39b1a75ea0fc7b38812a6880c88a490a69c34b27aba5c40121143d2ea317f0a9",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3595962947790039,
+        "mean_iou": 0.17221594174419377,
+        "mean_solver_wall_seconds": 110.92735915879409,
+        "parent_count": 24.0,
+        "research_utility": 0.6404037052209961,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "7019d0dc0648bf42f61d01523a237dd6fe92cd54c2fb54f4f6179aba032fa799",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3532230726032505,
+        "mean_iou": 0.1767595721980767,
+        "mean_solver_wall_seconds": 110.93585452437401,
+        "parent_count": 24.0,
+        "research_utility": 0.6467769273967495,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "e655b550e3a779603b85380ae61982f860c3836b29920a4184bba82646e2d300",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3660033839729463,
+        "mean_iou": 0.17523659276002324,
+        "mean_solver_wall_seconds": 113.32800042629242,
+        "parent_count": 24.0,
+        "research_utility": 0.6339966160270537,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "1572a492f844f7a6c9a0d93f99a93d59c1d0a7d27c1c5145e93719cdf7ff1b7d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3565026761628629,
+        "mean_iou": 0.17712493756014522,
+        "mean_solver_wall_seconds": 113.32950579623382,
+        "parent_count": 24.0,
+        "research_utility": 0.6434973238371371,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "9ca76ae5538973763ff202692aa321b88d3fc56aefb4d72cd8379064681b35f1",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3621635937815638,
+        "mean_iou": 0.17710730008271894,
+        "mean_solver_wall_seconds": 113.3380118260781,
+        "parent_count": 24.0,
+        "research_utility": 0.6378364062184362,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.33972010839952604,
+        "mean_iou": 0.16554304432427516,
+        "mean_solver_wall_seconds": 113.3349891602993,
+        "parent_count": 24.0,
+        "research_utility": 0.660279891600474,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "09022f6c0c2817691640a0ba5e95416d914a96cbcfcf55d06cc57d57391d9881",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3537933443326816,
+        "mean_iou": 0.1764024046930696,
+        "mean_solver_wall_seconds": 113.33106028536956,
+        "parent_count": 24.0,
+        "research_utility": 0.6462066556673184,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "330154a6368ae0ba48575821c79088abef290b174520e8bc1dcfebc43744bfe7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3600268509672079,
+        "mean_iou": 0.1789059523090318,
+        "mean_solver_wall_seconds": 113.34461685021718,
+        "parent_count": 24.0,
+        "research_utility": 0.6399731490327921,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "a6329bd7a80ae09e79b9e09038a4cc8ed07c8e7ae022d2b3e60d15b6426d6b42",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3617709165192796,
+        "mean_iou": 0.17647669182416267,
+        "mean_solver_wall_seconds": 113.3321213076512,
+        "parent_count": 24.0,
+        "research_utility": 0.6382290834807204,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "aefb72cc0714e02106fb448dc12e380b2e2d3ee353b788bffc4c1cbfe760ef34",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3643670005298556,
+        "mean_iou": 0.17196197359123463,
+        "mean_solver_wall_seconds": 113.33844453593095,
+        "parent_count": 24.0,
+        "research_utility": 0.6356329994701444,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "38bb3c632155e051b631569ecc067c7bb45b8721ed7cf6438e231471381c0fee",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35420069662657927,
+        "mean_iou": 0.17630237533184032,
+        "mean_solver_wall_seconds": 110.95010640720527,
+        "parent_count": 24.0,
+        "research_utility": 0.6457993033734207,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "1d3faf041707c0cf7a06c90bdf8eb2ad00ead278446ade10091446a8a0092f2d",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35821097245112166,
+        "mean_iou": 0.17599045888914308,
+        "mean_solver_wall_seconds": 110.93683892985185,
+        "parent_count": 24.0,
+        "research_utility": 0.6417890275488783,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "8d32ffa62985cce2a5ec700b3818658ae525ccbdb8878c0c92c2cd3e536728a2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35817829608285356,
+        "mean_iou": 0.17582697319234897,
+        "mean_solver_wall_seconds": 108.5510068188111,
+        "parent_count": 24.0,
+        "research_utility": 0.6418217039171464,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "dcf5a60da68c86b043576e04a8828f3785ca4c9a3b7ac2e6b1450043df72d748",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35750459528196743,
+        "mean_iou": 0.1743706953813461,
+        "mean_solver_wall_seconds": 112.1339985926946,
+        "parent_count": 24.0,
+        "research_utility": 0.6424954047180326,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "56ade07dd0db91bbe1fae94b55ccff9cb1e72cbf767c7fd29446908c2a203f5f",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3505892282778672,
+        "mean_iou": 0.17527112211509602,
+        "mean_solver_wall_seconds": 110.94157735009988,
+        "parent_count": 24.0,
+        "research_utility": 0.6494107717221328,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 19,
+      "batch_end_slot": 305,
+      "source_sha256": "d53440f4ac20fdda3bdd7d45dc5b6437384c7e9de9cc42e8d89f955a5ed78c6e",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3554304072617128,
+        "mean_iou": 0.17535478344869157,
+        "mean_solver_wall_seconds": 110.93085517982642,
+        "parent_count": 24.0,
+        "research_utility": 0.6445695927382872,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 20,
+      "batch_end_slot": 321,
+      "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.34374634587047215,
+        "mean_iou": 0.1643998757154583,
+        "mean_solver_wall_seconds": 113.30375763773918,
+        "parent_count": 24.0,
+        "research_utility": 0.6562536541295279,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 20,
+      "batch_end_slot": 321,
+      "source_sha256": "bfcb25de3f15111722c97b6299511c77d77bdaf0561d0ae9fc0ad6f81d4b76c7",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3748869204748241,
+        "mean_iou": 0.16778042590412648,
+        "mean_solver_wall_seconds": 113.30044797062874,
+        "parent_count": 24.0,
+        "research_utility": 0.6251130795251759,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    },
+    {
+      "round": 20,
+      "batch_end_slot": 321,
+      "source_sha256": "b9ecee7a4bcadeb9029b0ef676b7923541e54e69afda987bb7424abb7d6e4415",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3513984369627714,
+        "mean_iou": 0.17568812706559975,
+        "mean_solver_wall_seconds": 113.30985207855701,
+        "parent_count": 24.0,
+        "research_utility": 0.6486015630372286,
+        "solve_count": 48.0
+      },
+      "status": "succeeded"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "A",
+      "round": 0,
+      "batch_end_slot": 1,
+      "loss": 0.5533681447355032,
+      "improvement_absolute": null,
+      "mean_solver_seconds": 1.0042369812726974,
+      "source_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "source_path": "source/trajectory/r00-153f0991291a.py",
+      "title": "只返回观测初始化",
+      "code_change": "直接调用共享initialize，不进行迭代搜索。",
+      "mechanism": "建立搜索前对照。",
+      "constants": {},
+      "changed_functions": [
+        "solve"
+      ],
+      "removed_functions": [],
+      "diff_path": null
+    },
+    {
+      "id": "B",
+      "round": 1,
+      "batch_end_slot": 17,
+      "loss": 0.4051005170650064,
+      "improvement_absolute": 0.14826762767049684,
+      "mean_solver_seconds": 91.1016815205415,
+      "source_sha256": "db7e22d78f988eb1f4c3f079983a2819d8b451f80117082e8f9334d8b8320f07",
+      "source_path": "source/trajectory/r01-db7e22d78f98.py",
+      "title": "加入球形贪心搜索",
+      "code_change": "在可行域随机选球心，0.075D尺度翻转体素；每次修复约束，仅接受更低公开损失；工作比例0.75。",
+      "mechanism": "让观测初始体持续改善，而非直接返回。",
+      "constants": {},
+      "changed_functions": [
+        "_prune",
+        "_repair",
+        "_rank",
+        "solve"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r01-vs-previous-record.diff"
+    },
+    {
+      "id": "C",
+      "round": 4,
+      "batch_end_slot": 65,
+      "loss": 0.3958475680832846,
+      "improvement_absolute": 0.009252948981721798,
+      "mean_solver_seconds": 83.04367458820343,
+      "source_sha256": "f9663a709a42752068f2b4fce5817144edf66fc9edcf0c03018dfdfc747c42d2",
+      "source_path": "source/trajectory/r04-f9663a709a42.py",
+      "title": "省去重复规范化",
+      "code_change": "FAST=True，评分函数已做规范化，删去评分前重复canonicalize；单尺度仍为0.075D，工作比例0.68。",
+      "mechanism": "减少一次提议中的重复距离场计算。",
+      "constants": {
+        "TIME_FRAC": 0.68,
+        "RADIUS_FRAC": 0.075,
+        "JITTER_LOW": 0.35,
+        "SCHEDULE": null,
+        "FAST": true,
+        "SEED_OFFSET": 0,
+        "N_RUNS": 1
+      },
+      "changed_functions": [
+        "_score",
+        "_search",
+        "_initial",
+        "solve"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r04-vs-previous-record.diff"
+    },
+    {
+      "id": "D",
+      "round": 5,
+      "batch_end_slot": 81,
+      "loss": 0.39253394071181247,
+      "improvement_absolute": 0.0033136273714721165,
+      "mean_solver_seconds": 83.07902703185876,
+      "source_sha256": "50f40dac4332f32dbe2b564f542929910385f4bc5203977b1989bed75606cccd",
+      "source_path": "source/trajectory/r05-50f40dac4332.py",
+      "title": "从单尺度到三尺度",
+      "code_change": "新增SCALE_MIX=(0.05,0.075,0.105)，每次随机抽取球形翻转尺度。",
+      "mechanism": "同时尝试小范围边界修改与较大形状修改。",
+      "constants": {
+        "TIME_FRAC": 0.68,
+        "RADIUS_FRAC": 0.075,
+        "JITTER_LOW": 0.35,
+        "SCHEDULE": null,
+        "SCALE_MIX": [
+          0.05,
+          0.075,
+          0.105
+        ],
+        "FAST": true,
+        "SEED_OFFSET": 0,
+        "N_RUNS": 1
+      },
+      "changed_functions": [
+        "_search"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r05-vs-previous-record.diff"
+    },
+    {
+      "id": "E",
+      "round": 6,
+      "batch_end_slot": 97,
+      "loss": 0.38669357017328365,
+      "improvement_absolute": 0.005840370538528816,
+      "mean_solver_seconds": 83.14664162695408,
+      "source_sha256": "9a8a0e729958b85ea09a34f72a0a761aeb3ff50470e1699acb3f6008469b62e1",
+      "source_path": "source/trajectory/r06-9a8a0e729958.py",
+      "title": "增加0.13大尺度",
+      "code_change": "半径集合扩展到0.13D；增加_add/_remove，按排名补足或裁剪体积。",
+      "mechanism": "扩大空间搜索步幅，并更明确处理体积约束。",
+      "constants": {
+        "CFG": {
+          "time": 0.68,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13
+          ],
+          "jitter": 0.35,
+          "phases": null,
+          "seed_offset": 0,
+          "note": "add_large_68"
+        }
+      },
+      "changed_functions": [
+        "_prune",
+        "_add",
+        "_remove",
+        "_repair",
+        "_rank",
+        "_score",
+        "_search",
+        "solve"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r06-vs-previous-record.diff"
+    },
+    {
+      "id": "F",
+      "round": 7,
+      "batch_end_slot": 113,
+      "loss": 0.38462270719806024,
+      "improvement_absolute": 0.0020708629752234087,
+      "mean_solver_seconds": 82.77554794649284,
+      "source_sha256": "a42ff6ddd69739a7a1ce233742b4946dd7cf6719479cb35d6ee482b8404951b9",
+      "source_path": "source/trajectory/r07-a42ff6ddd697.py",
+      "title": "扩大到五种尺度",
+      "code_change": "半径集合再加入0.17D，保持0.68工作比例与贪心接受。",
+      "mechanism": "进一步覆盖更大范围的形状变化。",
+      "constants": {
+        "CFG": {
+          "time": 0.68,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "phases": null,
+          "seed_offset": 0,
+          "note": "upper_17_68"
+        }
+      },
+      "changed_functions": [],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r07-vs-previous-record.diff"
+    },
+    {
+      "id": "G",
+      "round": 8,
+      "batch_end_slot": 129,
+      "loss": 0.37658036094554237,
+      "improvement_absolute": 0.008042346252517873,
+      "mean_solver_seconds": 83.21494504312675,
+      "source_sha256": "c44598f1498f1ea14da0b1cb041609aa3a1a6245efd2b3c82fc9132f698304d8",
+      "source_path": "source/trajectory/r08-c44598f1498f.py",
+      "title": "加入低温退火与快速评分",
+      "code_change": "mode=anneal，T0=1e-5；fast_legal/fast_loss启用；先评分合法提议，不合法才修复；偏移43。",
+      "mechanism": "允许少量非改进移动，并减少合法提议的重复处理。",
+      "constants": {
+        "CFG": {
+          "time": 0.68,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "mode": "anneal",
+          "seed_offset": 43,
+          "fast_legal": true,
+          "fast_loss": true,
+          "T0": 1e-05,
+          "shell_frac": 0.012
+        }
+      },
+      "changed_functions": [
+        "_add",
+        "_repair",
+        "_gm",
+        "_fast_loss",
+        "_score",
+        "_proposal",
+        "solve"
+      ],
+      "removed_functions": [
+        "_search"
+      ],
+      "diff_path": "source/trajectory/r08-vs-previous-record.diff"
+    },
+    {
+      "id": "H",
+      "round": 9,
+      "batch_end_slot": 145,
+      "loss": 0.36318084525382377,
+      "improvement_absolute": 0.0133995156917186,
+      "mean_solver_seconds": 83.18295507133007,
+      "source_sha256": "9294c07a1add50b7d5c3c1596bfbaa63a62a1e96eb465b3a0aa5bf226ea0fb8b",
+      "source_path": "source/trajectory/r09-9294c07a1add.py",
+      "title": "调整退火温度与随机流",
+      "code_change": "T0由1e-5改为3e-5，随机偏移43改为11；尺度与工作比例保持不变。",
+      "mechanism": "调整接受较差提议的概率和随机搜索路径。",
+      "constants": {
+        "CFG": {
+          "time": 0.68,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "mode": "anneal",
+          "seed_offset": 11,
+          "fast_legal": true,
+          "fast_loss": true,
+          "T0": 3e-05,
+          "shell_frac": 0.012
+        }
+      },
+      "changed_functions": [],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r09-vs-previous-record.diff"
+    },
+    {
+      "id": "I",
+      "round": 10,
+      "batch_end_slot": 161,
+      "loss": 0.3488870836418322,
+      "improvement_absolute": 0.014293761611991584,
+      "mean_solver_seconds": 114.30802730222543,
+      "source_sha256": "6963b60f1a6d7f23dcb746b233a2ff8446ab2b9f90d4820ec4e39bb4a6501257",
+      "source_path": "source/trajectory/r10-6963b60f1a6d.py",
+      "title": "退火后增加边界精修",
+      "code_change": "实际分支仍为sphere；工作比例0.68→0.94，前0.68退火，余下做边界半径1/2立方翻转。",
+      "mechanism": "把额外工作时间投入边界局部改进；收益同时包含实际算时增加。",
+      "constants": {
+        "CFG": {
+          "search": "anneal",
+          "move": "sphere",
+          "time": 0.94,
+          "anneal_frac": 0.68,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "T0": 3e-05,
+          "seed_offset": 11,
+          "slab_frac": 0.03,
+          "sphere_mix": 0.5,
+          "cycles": 3,
+          "rbf": false,
+          "polish": true,
+          "temp_mults": [
+            1.0,
+            0.45,
+            1.8
+          ]
+        }
+      },
+      "changed_functions": [
+        "_add",
+        "_grid",
+        "_rank",
+        "_score",
+        "_rbf_seed",
+        "_proposal",
+        "_anneal",
+        "_polish",
+        "solve"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r10-vs-previous-record.diff"
+    },
+    {
+      "id": "J",
+      "round": 13,
+      "batch_end_slot": 209,
+      "loss": 0.3482670926851066,
+      "improvement_absolute": 0.0006199909567256023,
+      "mean_solver_seconds": 113.38827411830425,
+      "source_sha256": "bc3e11690a05e0ef96bf4e19dfc6d7973e370b95696f31cf29345f8cbab0b5cd",
+      "source_path": "source/trajectory/r13-bc3e11690a05.py",
+      "title": "重新分配退火与精修",
+      "code_change": "退火比例0.68→0.56，工作截止仍0.94；精修随机半径改为1/2/3。",
+      "mechanism": "留出更多边界精修时间，并扩展局部邻域。",
+      "constants": {
+        "CFG": {
+          "search": "anneal",
+          "move": "sphere",
+          "time": 0.94,
+          "anneal_frac": 0.56,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "T0": 3e-05,
+          "seed_offset": 11,
+          "slab_frac": 0.03,
+          "sphere_mix": 0.5,
+          "cycles": 3,
+          "rbf": false,
+          "polish": true,
+          "polish_r_choices": [
+            1,
+            2,
+            3
+          ],
+          "temp_mults": [
+            1.0,
+            0.45,
+            1.8
+          ]
+        }
+      },
+      "changed_functions": [
+        "_polish"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r13-vs-previous-record.diff"
+    },
+    {
+      "id": "K",
+      "round": 14,
+      "batch_end_slot": 225,
+      "loss": 0.34485066048909296,
+      "improvement_absolute": 0.003416432196013619,
+      "mean_solver_seconds": 113.32340793311596,
+      "source_sha256": "4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00",
+      "source_path": "source/trajectory/r14-4eec5e53873b.py",
+      "title": "精修保留小／大两尺度",
+      "code_change": "精修半径1/2/3→1/3，随机偏移11→31；仍随机选一个邻域评分。",
+      "mechanism": "在最小和较大邻域间分配局部搜索。",
+      "constants": {
+        "CFG": {
+          "search": "anneal",
+          "move": "sphere",
+          "time": 0.94,
+          "anneal_frac": 0.56,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "T0": 3e-05,
+          "seed_offset": 31,
+          "slab_frac": 0.03,
+          "sphere_mix": 0.5,
+          "cycles": 3,
+          "rbf": false,
+          "polish": true,
+          "polish_r_choices": [
+            1,
+            3
+          ],
+          "temp_mults": [
+            1.0,
+            0.45,
+            1.8
+          ]
+        }
+      },
+      "changed_functions": [],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r14-vs-previous-record.diff"
+    },
+    {
+      "id": "L",
+      "round": 19,
+      "batch_end_slot": 305,
+      "loss": 0.33972010839952604,
+      "improvement_absolute": 0.00513055208956692,
+      "mean_solver_seconds": 113.3349891602993,
+      "source_sha256": "776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd",
+      "source_path": "source/trajectory/r19-776ee0300e97.py",
+      "title": "改为同点双提议比较",
+      "code_change": "best_pair对同一边界点分别评分半径1和3，再选改进提议；其best模型记录问题已披露。",
+      "mechanism": "用同一边界位置比较两种邻域；该源码整体获得训练最佳。",
+      "constants": {
+        "CFG": {
+          "search": "anneal",
+          "move": "sphere",
+          "time": 0.94,
+          "anneal_frac": 0.56,
+          "radii": [
+            0.05,
+            0.075,
+            0.105,
+            0.13,
+            0.17
+          ],
+          "jitter": 0.35,
+          "T0": 3e-05,
+          "seed_offset": 31,
+          "slab_frac": 0.03,
+          "sphere_mix": 0.5,
+          "cycles": 3,
+          "rbf": false,
+          "polish": true,
+          "temp_mults": [
+            1.0,
+            0.45,
+            1.8
+          ],
+          "polish_mode": "best_pair",
+          "polish_r_choices": [
+            1,
+            3
+          ]
+        }
+      },
+      "changed_functions": [
+        "_polish"
+      ],
+      "removed_functions": [],
+      "diff_path": "source/trajectory/r19-vs-previous-record.diff"
+    }
+  ],
+  "baselines": {
+    "mcmc": {
+      "source_sha256": "98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c",
+      "source_path": "source/mcmc42-selected-solver.py",
+      "constants": {
+        "CONFIG": {
+          "batch": 4,
+          "beta": 0.75,
+          "initializer": "random_field",
+          "method": "mcmc_v2",
+          "range_scale": 0.15869715416589739,
+          "step_cells": 3.9279155851572716,
+          "temperature": 4.874215419831749,
+          "warmup": 4
+        }
+      },
+      "functions": {
+        "project_proposal": {
+          "start": 30,
+          "end": 56
+        },
+        "search_distance": {
+          "start": 59,
+          "end": 76
+        },
+        "stop_search": {
+          "start": 83,
+          "end": 84
+        },
+        "solve": {
+          "start": 87,
+          "end": 182
+        }
+      }
+    },
+    "acq": {
+      "source_sha256": "4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6",
+      "source_path": "source/acq42-selected-solver.py",
+      "constants": {
+        "CONFIG": {
+          "batch": 4,
+          "beta": 0.6208450309932232,
+          "initializer": "random_field",
+          "method": "acq_v2",
+          "range_scale": 0.15869715416589739,
+          "step_cells": 3.9279155851572716,
+          "temperature": 4.874215419831749,
+          "warmup": 4
+        }
+      },
+      "functions": {
+        "project_proposal": {
+          "start": 30,
+          "end": 56
+        },
+        "search_distance": {
+          "start": 59,
+          "end": 76
+        },
+        "stop_search": {
+          "start": 83,
+          "end": 84
+        },
+        "solve": {
+          "start": 87,
+          "end": 182
+        }
+      }
+    }
+  },
+  "report_data_sha256": "34889a50ed50ce5f2bbf733a1baf4fe3f64e1b95c222e1c492294dd27770af5e",
+  "selected": {
+    "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+    "round": 20,
+    "batch_end_slot": 321,
+    "metrics": {
+      "failed_solves": 0.0,
+      "legal_rate": 1.0,
+      "loss_total": 0.34374634587047215,
+      "mean_iou": 0.1643998757154583,
+      "mean_solver_wall_seconds": 113.30375763773918,
+      "parent_count": 24.0,
+      "research_utility": 0.6562536541295279,
+      "solve_count": 48.0
+    },
+    "note": "validation-selected winner; distinct from training record L"
+  },
+  "baselines_function_bodies_identical": true,
+  "training_summary": {
+    "charged": 321,
+    "scored": 308,
+    "charged_interface_rejected": 13,
+    "record_improvements": 11,
+    "baseline_loss": 0.5533681447355032,
+    "final_training_loss": 0.33972010839952604,
+    "absolute_reduction": 0.21364803633597718,
+    "relative_reduction_percent": 38.608661949288006
+  },
+  "protected_r3_files_verified": 29
+}

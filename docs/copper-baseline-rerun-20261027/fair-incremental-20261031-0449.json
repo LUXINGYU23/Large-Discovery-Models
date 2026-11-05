@@ -1,0 +1,79 @@
+{
+  "time": 1793393403.1570263,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 1153.8712193965912
+    },
+    {
+      "name": "acq-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 1899.0990326404572
+    },
+    {
+      "name": "mcmc-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 1198.6868302822113
+    },
+    {
+      "name": "acq-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 1322.3040058612823
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 6913.991140604019
+    },
+    {
+      "name": "acq-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 4616.003103971481
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "private_validation_then_test",
+    "updated_at": 1793392275.438575,
+    "supervisor_pid": 2833147,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261030",
+    "finish_pid": 1383061
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_runtime_unchanged": true,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261030.py ",
+  "fair_unchanged": true,
+  "failure_set_unchanged": true,
+  "new_cases": 240,
+  "wait_count": 389,
+  "max_wait": 415.02283028140664,
+  "median_wait": 236.90791644062847,
+  "old_orphans_restored": 19,
+  "terminal_reused": true
+}

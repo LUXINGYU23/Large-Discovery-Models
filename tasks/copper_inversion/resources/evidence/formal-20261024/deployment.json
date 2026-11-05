@@ -1,0 +1,142 @@
+{
+  "release": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1",
+  "services": {
+    "ldm-42": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-42",
+    "mcmc-42": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-42",
+    "acq-42": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-42",
+    "ldm-43": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-43",
+    "mcmc-43": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-43",
+    "acq-43": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-43",
+    "ldm-3407": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-3407",
+    "mcmc-3407": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-3407",
+    "acq-3407": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-3407"
+  },
+  "selection_root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/selection",
+  "source": "/Aidata/shared/ldm/copper-v2-evaluator/code/formal-study-r1",
+  "client_source": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/source",
+  "case_workers": 4,
+  "discovery_seeds": [
+    42,
+    43,
+    3407
+  ],
+  "feedback_slots": 321,
+  "rounds": 20,
+  "batch": 16,
+  "solver_seconds": 120,
+  "pids": {
+    "ldm-42": 1641949,
+    "mcmc-42": 1642146,
+    "acq-42": 1643031,
+    "ldm-43": 1643332,
+    "mcmc-43": 1643663,
+    "acq-43": 1644072,
+    "ldm-3407": 1644476,
+    "mcmc-3407": 1645092,
+    "acq-3407": 1645775
+  },
+  "service_pids": {
+    "ldm-42": 1641777,
+    "mcmc-42": 1641950,
+    "acq-42": 1642147,
+    "ldm-43": 1643032,
+    "mcmc-43": 1643333,
+    "acq-43": 1643664,
+    "ldm-3407": 1644073,
+    "mcmc-3407": 1644477,
+    "acq-3407": 1645093
+  },
+  "configs": {
+    "ldm-42": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-42",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-42/evaluator.sock",
+      "contract": "bd81f6e35dde710650acc767c97b2cc75abca3fe859b1f2a10581ef38c1e8eb9"
+    },
+    "mcmc-42": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-42",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-mcmc-42/evaluator.sock",
+      "contract": "b54c7fd7a7bffbfe0eb14c6a67520b40e82389c1194981b588eff99bb720255e"
+    },
+    "acq-42": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-42",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-acq-42/evaluator.sock",
+      "contract": "a32511fdc9e876068ce354cb2e46dbc0f5098dc15ea76f1a16b25caefec5a473"
+    },
+    "ldm-43": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-43",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-43/evaluator.sock",
+      "contract": "7cf9ba62179f854f0cfac01ae6ae4b5b10f7caea2ead236b0dd3f65d3a878718"
+    },
+    "mcmc-43": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-43",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-mcmc-43/evaluator.sock",
+      "contract": "06704d063ca5b4131200c30a098ac746452452cf220c1a5e174bbed7364a2d4b"
+    },
+    "acq-43": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-43",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-acq-43/evaluator.sock",
+      "contract": "f6b5496c00621c7fa3d2b31bdaff35eecd864c1e365af6577065d0d4fe026574"
+    },
+    "ldm-3407": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-3407",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-3407/evaluator.sock",
+      "contract": "1962efdbf6f45336a56062c50d26e4fb2fbb207d23b8f523088d3ae1fedb144a"
+    },
+    "mcmc-3407": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-3407",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-mcmc-3407/evaluator.sock",
+      "contract": "e26da69241f6c491c8e3d21ad430944cb851b9aec2461079dc6984e7cd8c039b"
+    },
+    "acq-3407": {
+      "manifest": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/formal-20261024-r1/train/manifest.json",
+      "root": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-3407",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "seconds": 120,
+      "slots": 321,
+      "caller_uid": 1001,
+      "socket": "/Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-acq-3407/evaluator.sock",
+      "contract": "d8db7f484bc2447836e99546fa05251983eb634223c2ec4017f067f6766f593d"
+    }
+  },
+  "supervisor_pid": 1641770
+}

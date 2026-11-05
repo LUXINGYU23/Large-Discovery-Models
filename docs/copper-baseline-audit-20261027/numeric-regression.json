@@ -1,0 +1,71 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "job": "a20405cf0422b4b336a5ee52f8ed6216be5b2d42d51d16ffac3bb28f6d7c75ea",
+      "scale": 0.001,
+      "signs_preserved": true
+    },
+    {
+      "job": "a20405cf0422b4b336a5ee52f8ed6216be5b2d42d51d16ffac3bb28f6d7c75ea",
+      "scale": 1.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "a20405cf0422b4b336a5ee52f8ed6216be5b2d42d51d16ffac3bb28f6d7c75ea",
+      "scale": 1000.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "a8b79cfaaf53b4445514daadb8ac8f128ad9431b5dba66d92d58616c2c4b173f",
+      "scale": 0.001,
+      "signs_preserved": true
+    },
+    {
+      "job": "a8b79cfaaf53b4445514daadb8ac8f128ad9431b5dba66d92d58616c2c4b173f",
+      "scale": 1.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "a8b79cfaaf53b4445514daadb8ac8f128ad9431b5dba66d92d58616c2c4b173f",
+      "scale": 1000.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "10296043a7b47f76c27491f3a345f5990b232af12fb367a08d21c61baf20e2b6",
+      "scale": 0.001,
+      "signs_preserved": true
+    },
+    {
+      "job": "10296043a7b47f76c27491f3a345f5990b232af12fb367a08d21c61baf20e2b6",
+      "scale": 1.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "10296043a7b47f76c27491f3a345f5990b232af12fb367a08d21c61baf20e2b6",
+      "scale": 1000.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "16ae102d25f9abed6f7bdb3a7121e0c0ede99aeb49f3fc53d7878c10ecf4a608",
+      "scale": 0.001,
+      "signs_preserved": true
+    },
+    {
+      "job": "16ae102d25f9abed6f7bdb3a7121e0c0ede99aeb49f3fc53d7878c10ecf4a608",
+      "scale": 1.0,
+      "signs_preserved": true
+    },
+    {
+      "job": "16ae102d25f9abed6f7bdb3a7121e0c0ede99aeb49f3fc53d7878c10ecf4a608",
+      "scale": 1000.0,
+      "signs_preserved": true
+    },
+    {
+      "subvoxel_motion": true
+    },
+    {
+      "illegal_geometry_rejected": true
+    }
+  ]
+}

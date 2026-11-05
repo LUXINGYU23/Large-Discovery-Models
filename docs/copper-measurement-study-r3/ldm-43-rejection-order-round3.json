@@ -1,0 +1,28 @@
+{
+  "group": "ldm-43",
+  "rows": [
+    {
+      "charged_position": 34,
+      "source_sha256": "2bef02f3c62ef00a269f982352fc0a1c29d72bb655ed694da093f09b0d69fdf8",
+      "validation": "harness/branches/round_0003/sessions/researcher_2/turns/researcher_2_round_3/attempts/0001/validation.json",
+      "validation_sha256": "c34d32abd28ef71ab32690c14de247c898fb37039ce97dbe77a80a76d2a0f2b1",
+      "attempt": 1,
+      "usage": {
+        "algorithm_feedback_slots": 1,
+        "interface_rejected_sources": 1
+      }
+    },
+    {
+      "charged_position": 35,
+      "source_sha256": "77123ab016cd66aa5c061bcb870f60e6c13db422b27e8fcac62277a2f327a279",
+      "validation": "harness/branches/round_0003/sessions/researcher_2/turns/researcher_2_round_3/attempts/0002/validation.json",
+      "validation_sha256": "16c9d4f56127061d75525d520e93e8483ab8fd4f23d1d8ef4142c3a8020e06eb",
+      "attempt": 2,
+      "usage": {
+        "algorithm_feedback_slots": 1,
+        "interface_rejected_sources": 1
+      }
+    }
+  ],
+  "ordering_evidence": "Same researcher sequential attempts 1 then 2, after round2 selected 33 sources and before round3 selection; immutable validation bytes plus charge ledger."
+}

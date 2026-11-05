@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "links": 23,
+  "broken_links": 0,
+  "source_hashes": 9,
+  "pdf_header": true,
+  "png_visual_review": "axes, labels, legend and error bars inspected; no clipping",
+  "r3_science_unchanged": "see comparison-qa.json"
+}

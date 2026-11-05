@@ -1,0 +1,77 @@
+{
+  "time": 1793145105.113988,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "new_job_receipts": 3,
+      "new_nonzero": 0,
+      "charged": 113,
+      "client_alive": true
+    },
+    {
+      "name": "acq-42",
+      "new_job_receipts": 2,
+      "new_nonzero": 0,
+      "charged": 113,
+      "client_alive": true
+    },
+    {
+      "name": "mcmc-43",
+      "new_job_receipts": 3,
+      "new_nonzero": 0,
+      "charged": 113,
+      "client_alive": true
+    },
+    {
+      "name": "acq-43",
+      "new_job_receipts": 0,
+      "new_nonzero": 0,
+      "charged": 113,
+      "client_alive": true
+    },
+    {
+      "name": "mcmc-3407",
+      "new_job_receipts": 2,
+      "new_nonzero": 0,
+      "charged": 129,
+      "client_alive": true
+    },
+    {
+      "name": "acq-3407",
+      "new_job_receipts": 0,
+      "new_nonzero": 0,
+      "charged": 129,
+      "client_alive": true
+    }
+  ],
+  "orphan_receipts": [
+    {
+      "job": "b5543ad3c9951381f7b7ed07ea9dd8c78adbf1866819060bc5793ba2899705b7",
+      "state": "terminal_reuse",
+      "exit_code": 0,
+      "same_container": true
+    },
+    {
+      "job": "6c0b856eedecf0718e7e911c8bfb88ef198ae83b7748df5ac486447718d29556",
+      "state": "terminal_reuse",
+      "exit_code": 0,
+      "same_container": true
+    }
+  ],
+  "active_paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793145099.4154809,
+    "supervisor_pid": 1529637,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-20261028-0751",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "controller_sha": "1204a9b5d44c13d59ab9fb12aaa45379d2347c1d7b0825f835f7ae52582512de"
+}

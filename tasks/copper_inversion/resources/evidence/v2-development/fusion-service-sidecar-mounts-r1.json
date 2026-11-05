@@ -1,0 +1,31 @@
+{
+  "container_id": "d162d68acc6f8a8ceb3685e2d73d112701e1ef3b292b4da05073d2a113f7c019",
+  "image": "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+  "user": "1001:1001",
+  "privileged": false,
+  "network_mode": "bridge",
+  "mounts": [
+    {
+      "source": "/Aidata/shared/ldm/copper-v2-development/runs/fusion-service-pilot-r1/harness/branches/round_0001",
+      "destination": "/artifacts",
+      "writable": true
+    },
+    {
+      "source": "/Aidata/shared/ldm/cache/gondolin",
+      "destination": "/runtime-home/.cache/gondolin",
+      "writable": true
+    },
+    {
+      "source": "/Aidata/shared/ldm/copper-v2-development/runs/fusion-service-pilot-r1/v2-harness-resources",
+      "destination": "/resources",
+      "writable": false
+    }
+  ],
+  "devices": [
+    {
+      "PathOnHost": "/dev/kvm",
+      "PathInContainer": "/dev/kvm",
+      "CgroupPermissions": "rwm"
+    }
+  ]
+}

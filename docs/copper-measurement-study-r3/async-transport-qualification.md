@@ -1,0 +1,16 @@
+# Async private evaluation transport qualification
+
+2026-10-26 04:36–04:40: formal training remains paused. No scientific source, candidate, dataset, scoring function, receipt or budget has been changed.
+
+The development implementation is `tasks/copper_inversion/v2/async_transport.py`. It uses short authenticated Unix requests for source-keyed submit/status operations, a bounded 16-worker service executor, and deduplication of concurrent submissions. Completed scientific receipts remain owned by the existing evaluator. After service restart, submitting the identical source reuses the existing scientific execution and budget identities.
+
+The client uses 30-second individual network requests and checks service job-completion progress, with a 30-minute inactivity bound. Queue and suite duration have no fixed two-hour socket deadline. Peer mismatch, malformed responses and source substitution fail closed. Sealing is rejected while any async evaluation is active; submitted training is rejected after sealing. The formal solver limit remains 120 seconds.
+
+Remote regression: 27 tests passed, including existing service-client tests and seven new async tests. Coverage includes duplicate submission, abandoned request ownership, real Unix sockets with 32 concurrent callers, peer identity, long work with progress, no-progress stalls, lost replies and source substitution. This is not full-load acceptance.
+
+The single development qualification controller is `/Aidata/shared/ldm/copper-permanent-repair-20261025/qualify_async_20261026.py`, PID 825530 at launch. State: `async-qualification-20261026.json`; logs: `async-private-protocol.log`, `async-qualification.log`, `async-load-full.log`. It first runs the private development sealing/selection/testing closure through the new transport, including receipt replay and budget rejection. If that passes, it runs the 1308-job / 96-slot container load acceptance in a fresh directory. It does not automatically resume formal work.
+
+Remaining gates: inspect protocol and load evidence, add combined async transport under saturated container load if not already exercised, pin operational module digests, reconcile the ten unfinished formal jobs and all original receipts, stop old private writers, and use a new single guarded continuation. Never rerun an existing one-shot controller or remove pause markers without reconciliation.
+
+
+2026-10-26 06:06 CST update: combined async Unix submit/status plus real-container qualification passed 1308/1308 jobs, peak 64, zero failures. The one-shot gate exec-transferred PID 3294205 to OPS/continue_async64_20261026.py. All nine clients and nine services are alive; scheduling-epoch confirms 64 total slots (56 solver/scoring + 8 interface), startup 1, per-process 32. Both pause markers were reconciled and archived; no queue pause remains. Continuation checked 233177 retained accounting/receipt/result files. Post-start audit observed 413 new private receipts, all exit_code 0, with new receipts in every group. This is evidence of resumed execution, not merely process liveness. Scientific identity and per-candidate budgets remain unchanged. Snapshot monitor-20261026-0606.json still supports only common charged prefix 179; comparative losses/timing remain unchanged and formal validation/testing has not started.

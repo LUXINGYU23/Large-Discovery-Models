@@ -1,0 +1,103 @@
+{
+  "time": 1792869880.9749293,
+  "stage": "training",
+  "rows": {
+    "acq-3407": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 6,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "acq-42": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 5,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "acq-43": {
+      "charged": 17,
+      "private_charged": 16,
+      "complete": 5,
+      "client_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "ldm-3407": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 16,
+      "client_rejections": {},
+      "private_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "ldm-42": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 17,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "ldm-43": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 1,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "mcmc-3407": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 7,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "mcmc-42": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 7,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    },
+    "mcmc-43": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 8,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_process_alive": true,
+      "service_alive": true
+    }
+  },
+  "policy": {
+    "queue_root": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/queue",
+    "global_jobs": 128,
+    "interface_slots": 8,
+    "jobs_per_process": 32,
+    "startup_slots": 4,
+    "runtime_sha256": "e11b6d38dfabaaa7d09c52e15a0f38dbeb87b802d1fcf42c294252afb13fe64f",
+    "policy_sha256": "b12f1bf657584d4f16c7c9721b61d273cdb46c588391e389c54899a039ea8059"
+  },
+  "paused": false,
+  "supervisor_alive": true,
+  "formal_holdouts_evaluated": false
+}

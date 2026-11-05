@@ -1,58 +1,50 @@
 {
   "schema_version": 1,
   "task_id": "copper_inversion",
-  "stage": "contract_verified",
+  "stage": "registered",
   "benchmark_commit": "37ebd33d",
-  "contract_profile": "harness_2d_smoke",
+  "contract_profile": "fusion_pilot",
   "gates": {
     "scaffolded": {
       "status": "passed",
       "evidence": [
         "tasks/copper_inversion/task.json",
-        "tasks/copper_inversion/experiment.json"
-      ]
+        "tasks/copper_inversion/ldm_task/procedure.py"
+      ],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "registered": {
       "status": "passed",
       "evidence": [
         "tasks/copper_inversion/task.json",
-        "tasks/copper_inversion/experiment.json",
         "tasks/copper_inversion/ldm_task/procedure.py"
-      ]
+      ],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "mock_verified": {
-      "status": "passed",
-      "evidence": [
-        "config/copper_inversion/mock.yaml",
-        "tasks/copper_inversion/tests/test_procedure.py",
-        "tasks/copper_inversion/resources/evidence/verification.json",
-        "tasks/copper_inversion/resources/evidence/runtime/final-registration.json"
-      ]
+      "status": "pending",
+      "evidence": [],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "contract_verified": {
-      "status": "passed",
-      "evidence": [
-        "tasks/copper_inversion/tests/test_submission.py",
-        "tasks/copper_inversion/tests/test_isolation.py",
-        "tasks/copper_inversion/tests/test_science.py",
-        "tasks/copper_inversion/resources/evidence/verification.json",
-        "docs/evidence/copper-inversion/reference-check.json",
-        "tasks/copper_inversion/resources/evidence/runtime/input-integrity.json",
-        "tasks/copper_inversion/resources/evidence/runtime/supervisor.json",
-        "tasks/copper_inversion/resources/evidence/runtime/final-acceptance.json"
-      ]
+      "status": "pending",
+      "evidence": [],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "seed_evaluated": {
       "status": "pending",
-      "evidence": []
+      "evidence": [],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "tiny_campaign_verified": {
       "status": "pending",
-      "evidence": []
+      "evidence": [],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     },
     "campaign_qualified": {
       "status": "pending",
-      "evidence": []
+      "evidence": [],
+      "description": "v2 qualification; archived v1 evidence does not qualify the new scientific contract"
     }
   }
 }

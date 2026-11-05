@@ -1,0 +1,137 @@
+[
+  {
+    "case": "drillholes_3d",
+    "caveat": "Instrumentation changes code identity and timing; diagnostic only, not a replacement performance run",
+    "instrumented_sha256": "127ecc7efea197b0498e7a46ce089ecb062e2f84a465241e2c993c0cd9e6332d",
+    "method": "ast",
+    "original_sha256": "8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421",
+    "profile": {
+      "distance_seconds": 102.03380347974598,
+      "elapsed_seconds": 115.89938899688423,
+      "first_full_losses": [
+        6.515520106171216,
+        6.515518686388489,
+        6.515520106171216,
+        6.515518261242923,
+        6.515518686388489,
+        6.51650601047675,
+        6.515714029120288,
+        6.515518259011097
+      ],
+      "full_distance_calls": 3935,
+      "narrow_distance_calls": 0
+    },
+    "receipt": {
+      "container": "ldm-copper-2cc50a8be3-0250066d13eacfd796d3",
+      "container_id": "e19d2ead210017708f929a85421cba5ec9b14d4d8e574bcaeed3f1820075a32b",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "0250066d13eacfd796d36cbd46ec1103feae65c4b8fb865820b16b8fbaea3792",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 115.958671,
+        "last_sample_unix": 1792819040.6452694,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 58896384,
+        "samples": 524,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 116.42866396903992,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 116.080586,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 58896384,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "score": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07723548523802796,
+        "air_positive_volume": 2187.0,
+        "air_positive_voxels": 2187,
+        "contact_rmse": 0.2701766460010612,
+        "label_mismatches": 0,
+        "loss_drillhole": 6.514416579540286,
+        "loss_total": 6.514416579540286,
+        "positive_volume": 28316.0,
+        "positive_voxels": 28316,
+        "research_utility": -6.514416579540286
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Instrumentation changes code identity and timing; diagnostic only, not a replacement performance run",
+    "instrumented_sha256": "04462f2e34ba5efde555171d371a54a87ac4297b4cf4a186efa8bb48af44d771",
+    "method": "qwen",
+    "original_sha256": "c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f",
+    "profile": {
+      "distance_seconds": 91.4944714200683,
+      "elapsed_seconds": 95.009700181894,
+      "first_full_losses": [
+        33.148448798124335,
+        33.216639253749484,
+        33.66866499610051,
+        33.7798493744207,
+        33.553849200180984,
+        33.148448798124335,
+        33.000323879321435,
+        32.99688270463833
+      ],
+      "full_distance_calls": 1052,
+      "narrow_distance_calls": 6912
+    },
+    "receipt": {
+      "container": "ldm-copper-686ca04e5a-68753cec9f862c542bba",
+      "container_id": "03c32eca05f167bbae8029290eb2e9e14194ae1b6587eb34b052a961db12b263",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "68753cec9f862c542bbae0f933527a1942ccd63f63999cab5178609fc59b321a",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.145829,
+        "last_sample_unix": 1792819019.8359127,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46829568,
+        "samples": 430,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.59533500671387,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.262823,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47226880,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "score": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02234531968829218,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.9120577660968506,
+        "label_mismatches": 34,
+        "loss_drillhole": 7.5033673980725055,
+        "loss_outcrop": 24.872677787552156,
+        "loss_total": 32.37604518562466,
+        "positive_volume": 10651.0,
+        "positive_voxels": 10651,
+        "research_utility": -32.37604518562466
+      },
+      "status": "succeeded"
+    }
+  }
+]

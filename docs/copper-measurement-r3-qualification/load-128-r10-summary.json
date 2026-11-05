@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "jobs": 1308,
+  "peak_active": 128,
+  "failures": 0,
+  "cpu_busy_median": 79.3348268926861,
+  "cpu_busy_max": 82.6678350986817,
+  "completion_sha256": "04cfc92e7717634b0f181ea638020b424747d8c13d4317e8968957096ce3f2bb"
+}

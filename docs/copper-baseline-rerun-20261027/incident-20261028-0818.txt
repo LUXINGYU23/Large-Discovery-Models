@@ -1,0 +1,7 @@
+2026-10-28 08:18 CST observation
+Supervisor 1529637 no longer exists. progress.json: needs_attention, updated_at 1793145399.4231555, AssertionError: training client failed; reconciliation required.
+Active queue32-20261028/PAUSED.json: time1793145384.3712788 pid1537549, container supervisor exceeded infrastructure grace; reconcile recorded job.
+startup/PAUSED.json: time1793145384.40673 pid1537442, shared scheduler paused; reconcile infrastructure before dispatch.
+Six client logs end in private evaluator did not complete: paused.
+Subsequent SSH attempts repeatedly closed by remote host. Detailed job, daemon and kernel diagnosis incomplete. No restart, pause removal or budget mutation performed.
+The attempted monitor-20261028-0818.json was NOT saved because reading the exited controller procfs command raised FileNotFoundError.

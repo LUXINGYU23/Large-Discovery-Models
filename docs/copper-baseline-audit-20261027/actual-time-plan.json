@@ -1,0 +1,128 @@
+{
+  "role": "development_validation_comparison_not_unseen_test",
+  "dataset": "/Aidata/shared/ldm/copper-baseline-audit-20261027/development-policy/id/validation",
+  "cases": [
+    {
+      "case_id": "422be3115255983bb0bf",
+      "modality": "drill",
+      "parent_id": "561c60b3ce424d212efcfa044f37be00bf1a08f93e443a0b275e2ca9068f59ac",
+      "public": "public/422be3115255983bb0bf",
+      "sha256": {
+        "problem.json": "12905604edefe4e47f37a3ad5f5576ca2ef74508a41ba9e1c05f9489bf08d777",
+        "problem.npz": "a496d563d1f0410887dcc24944846cc1b9d4bf309abf70c1c042015a141a9d23",
+        "truth.npy": "6d86642a359f6595408290b73a39da273839964c46c0fe83ed931aac81670448"
+      },
+      "truth": "private/561c60b3ce424d212efcfa044f37be00bf1a08f93e443a0b275e2ca9068f59ac"
+    },
+    {
+      "case_id": "042530a6a5dbac436dcd",
+      "modality": "drill_outcrop",
+      "parent_id": "561c60b3ce424d212efcfa044f37be00bf1a08f93e443a0b275e2ca9068f59ac",
+      "public": "public/042530a6a5dbac436dcd",
+      "sha256": {
+        "problem.json": "2f7642380d4f09049e5c7aaaa2cfe5ad79f298cbb48838b35a321326dd7efc62",
+        "problem.npz": "3ca63e81245815e78d7757b4e89114139d920af6b7a81ca3b9ddff362ecf4fc9",
+        "truth.npy": "6d86642a359f6595408290b73a39da273839964c46c0fe83ed931aac81670448"
+      },
+      "truth": "private/561c60b3ce424d212efcfa044f37be00bf1a08f93e443a0b275e2ca9068f59ac"
+    },
+    {
+      "case_id": "f12a3cca44342cdbd2cd",
+      "modality": "drill",
+      "parent_id": "1075671916529b05f4a48c74d92bc6b541d303868295104750bc441d94776fc9",
+      "public": "public/f12a3cca44342cdbd2cd",
+      "sha256": {
+        "problem.json": "e7a70c724635245f23f7e6d8bf7b9310f90c38b84faa21f1b04067251b0c5c0b",
+        "problem.npz": "9707024589bdfc4fd29e2184fe1dc750b6ceef151355b144f7f9c49cc3690487",
+        "truth.npy": "207663811078a70d7d2512dde5636da70f17b16d1b7cfa15f4ca2c8e46e6e2f4"
+      },
+      "truth": "private/1075671916529b05f4a48c74d92bc6b541d303868295104750bc441d94776fc9"
+    },
+    {
+      "case_id": "a2148762aa1c9d9839a1",
+      "modality": "drill_outcrop",
+      "parent_id": "1075671916529b05f4a48c74d92bc6b541d303868295104750bc441d94776fc9",
+      "public": "public/a2148762aa1c9d9839a1",
+      "sha256": {
+        "problem.json": "43f678bf1d78f1e8221b2d1f4756ffba2da5483f915032a8a267aa788717cffb",
+        "problem.npz": "e8cfa0054297d73a177e61ba2292bfea94b42c527727c99ee014b6d0c681055a",
+        "truth.npy": "207663811078a70d7d2512dde5636da70f17b16d1b7cfa15f4ca2c8e46e6e2f4"
+      },
+      "truth": "private/1075671916529b05f4a48c74d92bc6b541d303868295104750bc441d94776fc9"
+    },
+    {
+      "case_id": "de6836d019a4a5c014b4",
+      "modality": "drill",
+      "parent_id": "308f8a728d5745e551ecc6ecdb900373998ba12a6f7e3f32829de2a653f44472",
+      "public": "public/de6836d019a4a5c014b4",
+      "sha256": {
+        "problem.json": "70750cd52e22871ac686c1ff3e9a04e29a3adff340bb309cc5c7ac168a51183e",
+        "problem.npz": "2a1172879e61796d2665e2d1a103ae9bfae341eb114dd2461982ecf24b8c7ed6",
+        "truth.npy": "1f318cec41c3a528365f54861f3513fd524d47f9c5591a3f89ababad4b0b91d9"
+      },
+      "truth": "private/308f8a728d5745e551ecc6ecdb900373998ba12a6f7e3f32829de2a653f44472"
+    },
+    {
+      "case_id": "bf57e4384f1d8c68a9e2",
+      "modality": "drill_outcrop",
+      "parent_id": "308f8a728d5745e551ecc6ecdb900373998ba12a6f7e3f32829de2a653f44472",
+      "public": "public/bf57e4384f1d8c68a9e2",
+      "sha256": {
+        "problem.json": "3f8582ec94ab37a7ed75ad0f0cae4f4dfda8c1f0efc7c6199a5da3812c085b98",
+        "problem.npz": "74fcb3e9c6b959472047ebe1b10b1c96a784bc6b39e2040674f21fc26a6a3234",
+        "truth.npy": "1f318cec41c3a528365f54861f3513fd524d47f9c5591a3f89ababad4b0b91d9"
+      },
+      "truth": "private/308f8a728d5745e551ecc6ecdb900373998ba12a6f7e3f32829de2a653f44472"
+    },
+    {
+      "case_id": "c077ad8bf67925207529",
+      "modality": "drill",
+      "parent_id": "54f2cae41c789a41562c3f45d866ec17628695b5e55b1b999821b9b9f2dd43de",
+      "public": "public/c077ad8bf67925207529",
+      "sha256": {
+        "problem.json": "a37ff09a8b540db450cf044cb3622cca48dcaffb97690b6febfebf58ad93ca6c",
+        "problem.npz": "fbbb7e8bcbae2ad97a72117ba65eefb18160417c7032cae1bec3a2e886806468",
+        "truth.npy": "4ee2429365ead87c81adf69e31296bd97ec3057a48eba4be07e30ca0b5cfecb7"
+      },
+      "truth": "private/54f2cae41c789a41562c3f45d866ec17628695b5e55b1b999821b9b9f2dd43de"
+    },
+    {
+      "case_id": "4f5a8e792302ea61fc7c",
+      "modality": "drill_outcrop",
+      "parent_id": "54f2cae41c789a41562c3f45d866ec17628695b5e55b1b999821b9b9f2dd43de",
+      "public": "public/4f5a8e792302ea61fc7c",
+      "sha256": {
+        "problem.json": "40de1ef7aecf40c1c14828e115a2fc96fe3241a638e49d8b861171018dd9f904",
+        "problem.npz": "bdd997bc52622b1859aad0d6130184d9e15aa6027b2a08674d13acb74cb70405",
+        "truth.npy": "4ee2429365ead87c81adf69e31296bd97ec3057a48eba4be07e30ca0b5cfecb7"
+      },
+      "truth": "private/54f2cae41c789a41562c3f45d866ec17628695b5e55b1b999821b9b9f2dd43de"
+    }
+  ],
+  "sources": {
+    "ldm-42": "a29862695efcc1137b4db61607f3035e64d042d9f0f07e70495726821f85aea6",
+    "ldm-43": "0f547944c7e18b683e854b272da4510048a26cc99509c6f6d1074b01a79126d3",
+    "ldm-3407": "7de916f2a8ebb87e928cea0d3206cde6f37740f33656ae2fc864dd6e907875de",
+    "mcmc-42": "9fae6ab716e751b281ef590946a823ae74739094e204a0ba26b3e9f1ad9e52ec",
+    "mcmc-43": "fd426497bd3b0c8ae965526a0c86fd941cbc01534cb7ca2efa37fec904bb8896",
+    "mcmc-3407": "a5f160e673225591ee9b5e4a9ce9a6e9d63a62a5cf6debbae2acd99381c340c9",
+    "acq-42": "750b38505653466b72a1999bb90bc8434fe8738e31adcaa29b5aadda59daa465",
+    "acq-43": "001b11cafcf64f8e23365e5dfdec074b8cfb3523c0638e357e74f49742c79666",
+    "acq-3407": "d1a133fe081943819bd40edf929001d527dd208dd3fb77e5b5aa721a79a289ec"
+  },
+  "target_seconds": [
+    30,
+    90
+  ],
+  "hard_margin_seconds": 5,
+  "output_reserve_seconds": 1,
+  "execution_seeds": [
+    47,
+    48,
+    49
+  ],
+  "workers": 32,
+  "tasks": 432,
+  "time_adapter": "cancel native fractions; shared worker-entry deadline; no padding; same 2CPU/4GiB",
+  "tuning": "no parameter tuning; frozen r3 configs, first-order plus public-prior projection; no parameter tuning"
+}

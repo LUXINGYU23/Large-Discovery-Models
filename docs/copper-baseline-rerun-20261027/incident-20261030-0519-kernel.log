@@ -1,0 +1,247 @@
+Oct 30 05:01:23 h20-117 kernel: audit: type=1400 audit(1793307683.336:1649): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3076394 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:23 h20-117 kernel: audit: type=1400 audit(1793307683.346:1650): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3076402 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:37 h20-117 kernel: audit: type=1400 audit(1793307697.072:1651): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3098951 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:37 h20-117 kernel: audit: type=1400 audit(1793307697.078:1652): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=3098952 comm="3" capability=8  capname="setpcap"
+Oct 30 05:01:37 h20-117 kernel: audit: type=1400 audit(1793307697.078:1653): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=3098952 comm="3" capability=12  capname="net_admin"
+Oct 30 05:01:37 h20-117 kernel: audit: type=1400 audit(1793307697.081:1654): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3098953 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:58 h20-117 kernel: audit: type=1400 audit(1793307718.774:1655): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3134242 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:58 h20-117 kernel: audit: type=1400 audit(1793307718.783:1656): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=3134271 comm="3" requested="userns_create" target="unprivileged_userns"
+Oct 30 05:01:58 h20-117 kernel: audit: type=1400 audit(1793307718.788:1657): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=3134286 comm="3" capability=8  capname="setpcap"
+Oct 30 05:01:58 h20-117 kernel: audit: type=1400 audit(1793307718.788:1658): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=3134286 comm="3" capability=12  capname="net_admin"
+Oct 30 05:04:19 h20-117 kernel: workqueue: sync_rcu_exp_select_node_cpus hogged CPU for >10000us 8192 times, consider switching to WQ_UNBOUND
+Oct 30 05:05:01 h20-117 kernel: workqueue: wait_rcu_exp_gp hogged CPU for >10000us 1024 times, consider switching to WQ_UNBOUND
+Oct 30 05:07:32 h20-117 kernel: watchdog: BUG: soft lockup - CPU#168 stuck for 22s! [python:3314521]
+Oct 30 05:07:32 h20-117 kernel: Modules linked in: exfat uas usb_storage nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_redir nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib cpuid tcp_diag inet_diag nf_conntrack_netlink xt_nat xt_tcpudp veth xt_conntrack xt_MASQUERADE bridge stp llc xfrm_user xfrm_algo xt_set ip_set nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 xt_addrtype nft_compat nf_tables qrtr uio_pci_generic uio vfio_pci vfio_pci_core vfio_iommu_type1 gdrdrv(POE) vfio overlay iommufd cuse bonding cfg80211 nvidia_uvm(POE) sch_fq_codel nvidia_drm(POE) nvidia_modeset(POE) nvidia_peermem(POE) rdma_ucm(OE) rdma_cm(OE) iw_cm(OE) ib_ipoib(OE) ib_cm(OE) intel_rapl_msr intel_rapl_common intel_uncore_frequency intel_uncore_frequency_common intel_ifs ib_umad(OE) i10nm_edac skx_edac_common nfit x86_pkg_temp_thermal binfmt_misc coretemp kvm_intel iaa_crypto kvm irqbypass rapl cmdlinepart mlx5_ib(OE) qat_4xxx spi_nor dax_hmem mtd intel_qat pmt_telemetry ib_uverbs(OE) cxl_acpi intel_sdsi pmt_class cxl_port ipmi_ssif
+Oct 30 05:07:32 h20-117 kernel:  nls_iso8859_1 intel_cstate cxl_core crc8 isst_if_mbox_pci isst_if_mmio idxd ses mei_me acpi_power_meter i2c_i801 isst_if_common authenc enclosure video intel_vsec idxd_bus ast macsec spi_intel_pci spi_intel mei switchtec i2c_algo_bit i2c_smbus i2c_ismt ipmi_si acpi_ipmi ipmi_devintf ipmi_msghandler input_leds joydev nvidia(POE) pfr_update pfr_telemetry mac_hid ib_core(OE) knem(OE) nfsd dm_multipath scsi_dh_rdac scsi_dh_emc scsi_dh_alua auth_rpcgss nfs_acl lockd grace msr efi_pstore sunrpc nfnetlink dmi_sysfs ip_tables x_tables autofs4 btrfs blake2b_generic raid10 raid456 async_raid6_recov async_memcpy async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 hid_generic usbhid hid mlx5_core(OE) crct10dif_pclmul crc32_pclmul polyval_clmulni polyval_generic ghash_clmulni_intel mlxfw(OE) sha256_ssse3 sha1_ssse3 psample nvme mlxdevm(OE) mpt3sas tls nvme_core ahci raid_class mlx_compat(OE) xhci_pci megaraid_sas scsi_transport_sas nvme_auth pci_hyperv_intf libahci xhci_pci_renesas wmi pinctrl_emmitsburg
+Oct 30 05:07:32 h20-117 kernel:  aesni_intel crypto_simd cryptd
+Oct 30 05:07:32 h20-117 kernel: CPU: 168 PID: 3314521 Comm: python Tainted: P           OEL     6.8.0-139-generic #139-Ubuntu
+Oct 30 05:07:32 h20-117 kernel: Hardware name: IEITSYSTEMS NF5688-M7-A0-R0-00/NF5688-M7-A0-R0-00, BIOS 06.08.05 05/15/2025
+Oct 30 05:07:32 h20-117 kernel: RIP: 0010:_raw_spin_unlock_irqrestore+0x21/0x60
+Oct 30 05:07:32 h20-117 kernel: Code: 90 90 90 90 90 90 90 90 90 0f 1f 44 00 00 55 49 89 f0 48 89 e5 c6 07 00 0f 1f 00 41 f7 c0 00 02 00 00 74 06 fb 0f 1f 44 00 00 <65> ff 0d d0 9f 1c 48 74 13 5d 31 c0 31 d2 31 c9 31 f6 31 ff 45 31
+Oct 30 05:07:32 h20-117 kernel: RSP: 0000:ff60f38a83367940 EFLAGS: 00000206
+Oct 30 05:07:32 h20-117 kernel: RAX: ff372d8778c355b8 RBX: ff372e25fffd5010 RCX: 0000000000000206
+Oct 30 05:07:32 h20-117 kernel: RDX: 0000000000000005 RSI: 0000000000000206 RDI: ff372e25fffff798
+Oct 30 05:07:32 h20-117 kernel: RBP: ff60f38a83367940 R08: 0000000000000206 R09: 0000000000000002
+Oct 30 05:07:32 h20-117 kernel: R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000002
+Oct 30 05:07:32 h20-117 kernel: R13: ff372e25fffd5000 R14: 0000000000000002 R15: ff372e25fffff798
+Oct 30 05:07:32 h20-117 kernel: FS:  0000701d39be0740(0000) GS:ff372f21fe200000(0000) knlGS:0000000000000000
+Oct 30 05:07:32 h20-117 kernel: CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Oct 30 05:07:32 h20-117 kernel: CR2: 00007017a5800000 CR3: 000000b09e4aa006 CR4: 0000000000f71ef0
+Oct 30 05:07:32 h20-117 kernel: PKRU: 55555554
+Oct 30 05:07:32 h20-117 kernel: Call Trace:
+Oct 30 05:07:32 h20-117 kernel:  <TASK>
+Oct 30 05:07:32 h20-117 kernel:  lru_gen_rotate_memcg+0x1da/0x410
+Oct 30 05:07:32 h20-117 kernel:  ? shrink_one+0x1ba/0x1d0
+Oct 30 05:07:32 h20-117 kernel:  shrink_many+0x1bb/0x310
+Oct 30 05:07:32 h20-117 kernel:  shrink_node+0xf7/0x4c0
+Oct 30 05:07:32 h20-117 kernel:  shrink_zones.constprop.0+0x90/0x2d0
+Oct 30 05:07:32 h20-117 kernel:  do_try_to_free_pages+0x69/0x330
+Oct 30 05:07:32 h20-117 kernel:  try_to_free_pages+0xe6/0x210
+Oct 30 05:07:32 h20-117 kernel:  __alloc_pages_slowpath.constprop.0+0x3b0/0xa70
+Oct 30 05:07:32 h20-117 kernel:  __alloc_pages+0x31f/0x350
+Oct 30 05:07:32 h20-117 kernel:  alloc_pages_mpol+0x91/0x210
+Oct 30 05:07:32 h20-117 kernel:  ? __mod_lruvec_state+0x36/0x50
+Oct 30 05:07:32 h20-117 kernel:  vma_alloc_folio+0x64/0xd0
+Oct 30 05:07:32 h20-117 kernel:  do_huge_pmd_anonymous_page+0xb2/0x370
+Oct 30 05:07:32 h20-117 kernel:  __handle_mm_fault+0x786/0x790
+Oct 30 05:07:32 h20-117 kernel:  handle_mm_fault+0x18a/0x380
+Oct 30 05:07:32 h20-117 kernel:  do_user_addr_fault+0x169/0x670
+Oct 30 05:07:32 h20-117 kernel:  exc_page_fault+0x83/0x1b0
+Oct 30 05:07:32 h20-117 kernel:  asm_exc_page_fault+0x27/0x30
+Oct 30 05:07:32 h20-117 kernel: RIP: 0033:0x701d399a19d2
+Oct 30 05:07:32 h20-117 kernel: Code: 00 73 35 f6 05 6e 98 06 00 01 74 ac 83 f9 c0 0f 87 49 fe ff ff 48 29 fe 48 83 c7 3f 49 8d 0c 10 48 83 e7 c0 48 01 fe 48 29 f9 <f3> a4 62 c1 fe 48 7f 00 c3 0f 1f 44 00 00 4c 8b 1d 49 98 06 00 4c
+Oct 30 05:07:32 h20-117 kernel: RSP: 002b:00007fff640d41c8 EFLAGS: 00010202
+Oct 30 05:07:32 h20-117 kernel: RAX: 00007017a57f8010 RBX: 00007fff640d42a0 RCX: 0000000000038010
+Oct 30 05:07:32 h20-117 kernel: RDX: 0000000000040000 RSI: 00005b83f4b052a0 RDI: 00007017a5800000
+Oct 30 05:07:32 h20-117 kernel: RBP: 00005b83f4915240 R08: 00007017a57f8010 R09: 0000000000000000
+Oct 30 05:07:32 h20-117 kernel: R10: 0000000000000008 R11: 00007fff640d422c R12: 00005b83dd4416f0
+Oct 30 05:07:32 h20-117 kernel: R13: 00005b83f4915248 R14: 00007fff640d43a0 R15: 00007fff640d44a0
+Oct 30 05:07:32 h20-117 kernel:  </TASK>
+Oct 30 05:07:32 h20-117 kernel: watchdog: BUG: soft lockup - CPU#172 stuck for 22s! [python:3314523]
+Oct 30 05:07:32 h20-117 kernel: Modules linked in: exfat uas usb_storage nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_redir nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib cpuid tcp_diag inet_diag nf_conntrack_netlink xt_nat xt_tcpudp veth xt_conntrack xt_MASQUERADE bridge stp llc xfrm_user xfrm_algo xt_set ip_set nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 xt_addrtype nft_compat nf_tables qrtr uio_pci_generic uio vfio_pci vfio_pci_core vfio_iommu_type1 gdrdrv(POE) vfio overlay iommufd cuse bonding cfg80211 nvidia_uvm(POE) sch_fq_codel nvidia_drm(POE) nvidia_modeset(POE) nvidia_peermem(POE) rdma_ucm(OE) rdma_cm(OE) iw_cm(OE) ib_ipoib(OE) ib_cm(OE) intel_rapl_msr intel_rapl_common intel_uncore_frequency intel_uncore_frequency_common intel_ifs ib_umad(OE) i10nm_edac skx_edac_common nfit x86_pkg_temp_thermal binfmt_misc coretemp kvm_intel iaa_crypto kvm irqbypass rapl cmdlinepart mlx5_ib(OE) qat_4xxx spi_nor dax_hmem mtd intel_qat pmt_telemetry ib_uverbs(OE) cxl_acpi intel_sdsi pmt_class cxl_port ipmi_ssif
+Oct 30 05:07:32 h20-117 kernel:  nls_iso8859_1 intel_cstate cxl_core crc8 isst_if_mbox_pci isst_if_mmio idxd ses mei_me acpi_power_meter i2c_i801 isst_if_common authenc enclosure video intel_vsec idxd_bus ast macsec spi_intel_pci spi_intel mei switchtec i2c_algo_bit i2c_smbus i2c_ismt ipmi_si acpi_ipmi ipmi_devintf ipmi_msghandler input_leds joydev nvidia(POE) pfr_update pfr_telemetry mac_hid ib_core(OE) knem(OE) nfsd dm_multipath scsi_dh_rdac scsi_dh_emc scsi_dh_alua auth_rpcgss nfs_acl lockd grace msr efi_pstore sunrpc nfnetlink dmi_sysfs ip_tables x_tables autofs4 btrfs blake2b_generic raid10 raid456 async_raid6_recov async_memcpy async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 hid_generic usbhid hid mlx5_core(OE) crct10dif_pclmul crc32_pclmul polyval_clmulni polyval_generic ghash_clmulni_intel mlxfw(OE) sha256_ssse3 sha1_ssse3 psample nvme mlxdevm(OE) mpt3sas tls nvme_core ahci raid_class mlx_compat(OE) xhci_pci megaraid_sas scsi_transport_sas nvme_auth pci_hyperv_intf libahci xhci_pci_renesas wmi pinctrl_emmitsburg
+Oct 30 05:07:32 h20-117 kernel:  aesni_intel crypto_simd cryptd
+Oct 30 05:07:32 h20-117 kernel: CPU: 172 PID: 3314523 Comm: python Tainted: P           OEL     6.8.0-139-generic #139-Ubuntu
+Oct 30 05:07:32 h20-117 kernel: Hardware name: IEITSYSTEMS NF5688-M7-A0-R0-00/NF5688-M7-A0-R0-00, BIOS 06.08.05 05/15/2025
+Oct 30 05:07:32 h20-117 kernel: RIP: 0010:_raw_spin_unlock_irqrestore+0x21/0x60
+Oct 30 05:07:32 h20-117 kernel: Code: 90 90 90 90 90 90 90 90 90 0f 1f 44 00 00 55 49 89 f0 48 89 e5 c6 07 00 0f 1f 00 41 f7 c0 00 02 00 00 74 06 fb 0f 1f 44 00 00 <65> ff 0d d0 9f 1c 48 74 13 5d 31 c0 31 d2 31 c9 31 f6 31 ff 45 31
+Oct 30 05:07:32 h20-117 kernel: RSP: 0000:ff60f38a83397940 EFLAGS: 00000206
+Oct 30 05:07:32 h20-117 kernel: RAX: ff372d85eac065b8 RBX: ff372e25fffd5010 RCX: 0000000000000207
+Oct 30 05:07:32 h20-117 kernel: RDX: 0000000000000005 RSI: 0000000000000207 RDI: ff372e25fffff798
+Oct 30 05:07:32 h20-117 kernel: RBP: ff60f38a83397940 R08: 0000000000000207 R09: 0000000000000002
+Oct 30 05:07:32 h20-117 kernel: R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000002
+Oct 30 05:07:32 h20-117 kernel: R13: ff372e25fffd5000 R14: 0000000000000002 R15: ff372e25fffff798
+Oct 30 05:07:32 h20-117 kernel: FS:  00007873d0814740(0000) GS:ff372f21fe400000(0000) knlGS:0000000000000000
+Oct 30 05:07:32 h20-117 kernel: CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Oct 30 05:07:32 h20-117 kernel: CR2: 0000786e49c00000 CR3: 00000182e0dd2001 CR4: 0000000000f71ef0
+Oct 30 05:07:32 h20-117 kernel: PKRU: 55555554
+Oct 30 05:07:32 h20-117 kernel: Call Trace:
+Oct 30 05:07:32 h20-117 kernel:  <TASK>
+Oct 30 05:07:32 h20-117 kernel:  lru_gen_rotate_memcg+0x1da/0x410
+Oct 30 05:07:32 h20-117 kernel:  ? shrink_one+0x1ba/0x1d0
+Oct 30 05:07:32 h20-117 kernel:  shrink_many+0x1bb/0x310
+Oct 30 05:07:32 h20-117 kernel:  shrink_node+0xf7/0x4c0
+Oct 30 05:07:32 h20-117 kernel:  shrink_zones.constprop.0+0x90/0x2d0
+Oct 30 05:07:32 h20-117 kernel:  do_try_to_free_pages+0x69/0x330
+Oct 30 05:07:32 h20-117 kernel:  try_to_free_pages+0xe6/0x210
+Oct 30 05:07:32 h20-117 kernel:  __alloc_pages_slowpath.constprop.0+0x3b0/0xa70
+Oct 30 05:07:32 h20-117 kernel:  __alloc_pages+0x31f/0x350
+Oct 30 05:07:32 h20-117 kernel:  alloc_pages_mpol+0x91/0x210
+Oct 30 05:07:32 h20-117 kernel:  ? __mod_lruvec_state+0x36/0x50
+Oct 30 05:07:32 h20-117 kernel:  vma_alloc_folio+0x64/0xd0
+Oct 30 05:07:32 h20-117 kernel:  do_huge_pmd_anonymous_page+0xb2/0x370
+Oct 30 05:07:32 h20-117 kernel:  __handle_mm_fault+0x786/0x790
+Oct 30 05:07:32 h20-117 kernel:  handle_mm_fault+0x18a/0x380
+Oct 30 05:07:32 h20-117 kernel:  do_user_addr_fault+0x169/0x670
+Oct 30 05:07:32 h20-117 kernel:  exc_page_fault+0x83/0x1b0
+Oct 30 05:07:32 h20-117 kernel:  asm_exc_page_fault+0x27/0x30
+Oct 30 05:07:32 h20-117 kernel: RIP: 0033:0x7873d07a19d2
+Oct 30 05:07:32 h20-117 kernel: Code: 00 73 35 f6 05 6e 98 06 00 01 74 ac 83 f9 c0 0f 87 49 fe ff ff 48 29 fe 48 83 c7 3f 49 8d 0c 10 48 83 e7 c0 48 01 fe 48 29 f9 <f3> a4 62 c1 fe 48 7f 00 c3 0f 1f 44 00 00 4c 8b 1d 49 98 06 00 4c
+Oct 30 05:07:32 h20-117 kernel: RSP: 002b:00007ffd87801318 EFLAGS: 00010202
+Oct 30 05:07:32 h20-117 kernel: RAX: 0000786e49be3010 RBX: 00007ffd878013f0 RCX: 0000000000023010
+Oct 30 05:07:32 h20-117 kernel: RDX: 0000000000040000 RSI: 00005954edd97430 RDI: 0000786e49c00000
+Oct 30 05:07:32 h20-117 kernel: RBP: 00005954e675cdc0 R08: 0000786e49be3010 R09: 0000000000000000
+Oct 30 05:07:32 h20-117 kernel: R10: 0000000000000008 R11: 00007ffd8780137c R12: 00005954d25106f0
+Oct 30 05:07:32 h20-117 kernel: R13: 00005954e675cdc8 R14: 00007ffd878014f0 R15: 00007ffd878015f0
+Oct 30 05:07:32 h20-117 kernel:  </TASK>
+Oct 30 05:07:36 h20-117 kernel: watchdog: BUG: soft lockup - CPU#79 stuck for 26s! [python:3314518]
+Oct 30 05:07:36 h20-117 kernel: Modules linked in: exfat uas usb_storage nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_redir nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib cpuid tcp_diag inet_diag nf_conntrack_netlink xt_nat xt_tcpudp veth xt_conntrack xt_MASQUERADE bridge stp llc xfrm_user xfrm_algo xt_set ip_set nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 xt_addrtype nft_compat nf_tables qrtr uio_pci_generic uio vfio_pci vfio_pci_core vfio_iommu_type1 gdrdrv(POE) vfio overlay iommufd cuse bonding cfg80211 nvidia_uvm(POE) sch_fq_codel nvidia_drm(POE) nvidia_modeset(POE) nvidia_peermem(POE) rdma_ucm(OE) rdma_cm(OE) iw_cm(OE) ib_ipoib(OE) ib_cm(OE) intel_rapl_msr intel_rapl_common intel_uncore_frequency intel_uncore_frequency_common intel_ifs ib_umad(OE) i10nm_edac skx_edac_common nfit x86_pkg_temp_thermal binfmt_misc coretemp kvm_intel iaa_crypto kvm irqbypass rapl cmdlinepart mlx5_ib(OE) qat_4xxx spi_nor dax_hmem mtd intel_qat pmt_telemetry ib_uverbs(OE) cxl_acpi intel_sdsi pmt_class cxl_port ipmi_ssif
+Oct 30 05:07:36 h20-117 kernel:  nls_iso8859_1 intel_cstate cxl_core crc8 isst_if_mbox_pci isst_if_mmio idxd ses mei_me acpi_power_meter i2c_i801 isst_if_common authenc enclosure video intel_vsec idxd_bus ast macsec spi_intel_pci spi_intel mei switchtec i2c_algo_bit i2c_smbus i2c_ismt ipmi_si acpi_ipmi ipmi_devintf ipmi_msghandler input_leds joydev nvidia(POE) pfr_update pfr_telemetry mac_hid ib_core(OE) knem(OE) nfsd dm_multipath scsi_dh_rdac scsi_dh_emc scsi_dh_alua auth_rpcgss nfs_acl lockd grace msr efi_pstore sunrpc nfnetlink dmi_sysfs ip_tables x_tables autofs4 btrfs blake2b_generic raid10 raid456 async_raid6_recov async_memcpy async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 hid_generic usbhid hid mlx5_core(OE) crct10dif_pclmul crc32_pclmul polyval_clmulni polyval_generic ghash_clmulni_intel mlxfw(OE) sha256_ssse3 sha1_ssse3 psample nvme mlxdevm(OE) mpt3sas tls nvme_core ahci raid_class mlx_compat(OE) xhci_pci megaraid_sas scsi_transport_sas nvme_auth pci_hyperv_intf libahci xhci_pci_renesas wmi pinctrl_emmitsburg
+Oct 30 05:07:36 h20-117 kernel:  aesni_intel crypto_simd cryptd
+Oct 30 05:07:36 h20-117 kernel: CPU: 79 PID: 3314518 Comm: python Tainted: P           OEL     6.8.0-139-generic #139-Ubuntu
+Oct 30 05:07:36 h20-117 kernel: Hardware name: IEITSYSTEMS NF5688-M7-A0-R0-00/NF5688-M7-A0-R0-00, BIOS 06.08.05 05/15/2025
+Oct 30 05:07:36 h20-117 kernel: RIP: 0010:_raw_spin_unlock_irqrestore+0x21/0x60
+Oct 30 05:07:36 h20-117 kernel: Code: 90 90 90 90 90 90 90 90 90 0f 1f 44 00 00 55 49 89 f0 48 89 e5 c6 07 00 0f 1f 00 41 f7 c0 00 02 00 00 74 06 fb 0f 1f 44 00 00 <65> ff 0d d0 9f 1c 48 74 13 5d 31 c0 31 d2 31 c9 31 f6 31 ff 45 31
+Oct 30 05:07:36 h20-117 kernel: RSP: 0000:ff60f38a83317940 EFLAGS: 00000206
+Oct 30 05:07:36 h20-117 kernel: RAX: ff372dfe2bb745b8 RBX: ff372e25fffd5010 RCX: 0000000000000203
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000000005 RSI: 0000000000000203 RDI: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: RBP: ff60f38a83317940 R08: 0000000000000203 R09: 0000000000000002
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000002
+Oct 30 05:07:36 h20-117 kernel: R13: ff372e25fffd5000 R14: 0000000000000002 R15: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: FS:  0000757d7c884740(0000) GS:ff372f21fd180000(0000) knlGS:0000000000000000
+Oct 30 05:07:36 h20-117 kernel: CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Oct 30 05:07:36 h20-117 kernel: CR2: 00007577ecc00000 CR3: 000000c18a0da003 CR4: 0000000000f71ef0
+Oct 30 05:07:36 h20-117 kernel: PKRU: 55555554
+Oct 30 05:07:36 h20-117 kernel: Call Trace:
+Oct 30 05:07:36 h20-117 kernel:  <TASK>
+Oct 30 05:07:36 h20-117 kernel:  lru_gen_rotate_memcg+0x1da/0x410
+Oct 30 05:07:36 h20-117 kernel:  ? shrink_one+0x1ba/0x1d0
+Oct 30 05:07:36 h20-117 kernel:  shrink_many+0x1bb/0x310
+Oct 30 05:07:36 h20-117 kernel:  shrink_node+0xf7/0x4c0
+Oct 30 05:07:36 h20-117 kernel:  shrink_zones.constprop.0+0x90/0x2d0
+Oct 30 05:07:36 h20-117 kernel:  do_try_to_free_pages+0x69/0x330
+Oct 30 05:07:36 h20-117 kernel:  try_to_free_pages+0xe6/0x210
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages_slowpath.constprop.0+0x3b0/0xa70
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages+0x31f/0x350
+Oct 30 05:07:36 h20-117 kernel:  alloc_pages_mpol+0x91/0x210
+Oct 30 05:07:36 h20-117 kernel:  ? __mod_lruvec_state+0x36/0x50
+Oct 30 05:07:36 h20-117 kernel:  vma_alloc_folio+0x64/0xd0
+Oct 30 05:07:36 h20-117 kernel:  do_huge_pmd_anonymous_page+0xb2/0x370
+Oct 30 05:07:36 h20-117 kernel:  __handle_mm_fault+0x786/0x790
+Oct 30 05:07:36 h20-117 kernel:  handle_mm_fault+0x18a/0x380
+Oct 30 05:07:36 h20-117 kernel:  do_user_addr_fault+0x169/0x670
+Oct 30 05:07:36 h20-117 kernel:  exc_page_fault+0x83/0x1b0
+Oct 30 05:07:36 h20-117 kernel:  asm_exc_page_fault+0x27/0x30
+Oct 30 05:07:36 h20-117 kernel: RIP: 0033:0x757d7c7a19d2
+Oct 30 05:07:36 h20-117 kernel: Code: 00 73 35 f6 05 6e 98 06 00 01 74 ac 83 f9 c0 0f 87 49 fe ff ff 48 29 fe 48 83 c7 3f 49 8d 0c 10 48 83 e7 c0 48 01 fe 48 29 f9 <f3> a4 62 c1 fe 48 7f 00 c3 0f 1f 44 00 00 4c 8b 1d 49 98 06 00 4c
+Oct 30 05:07:36 h20-117 kernel: RSP: 002b:00007fff82b63208 EFLAGS: 00010202
+Oct 30 05:07:36 h20-117 kernel: RAX: 00007577ecbc5010 RBX: 00007fff82b632e0 RCX: 0000000000005010
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000040000 RSI: 00006162d4007f30 RDI: 00007577ecc00000
+Oct 30 05:07:36 h20-117 kernel: RBP: 00006162d408ded0 R08: 00007577ecbc5010 R09: 0000000000000000
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000008 R11: 00007fff82b6326c R12: 00006162b87616f0
+Oct 30 05:07:36 h20-117 kernel: R13: 00006162d408ded8 R14: 00007fff82b633e0 R15: 00007fff82b634e0
+Oct 30 05:07:36 h20-117 kernel:  </TASK>
+Oct 30 05:07:36 h20-117 kernel: watchdog: BUG: soft lockup - CPU#94 stuck for 26s! [python:3314519]
+Oct 30 05:07:36 h20-117 kernel: Modules linked in: exfat uas usb_storage nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_redir nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib cpuid tcp_diag inet_diag nf_conntrack_netlink xt_nat xt_tcpudp veth xt_conntrack xt_MASQUERADE bridge stp llc xfrm_user xfrm_algo xt_set ip_set nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 xt_addrtype nft_compat nf_tables qrtr uio_pci_generic uio vfio_pci vfio_pci_core vfio_iommu_type1 gdrdrv(POE) vfio overlay iommufd cuse bonding cfg80211 nvidia_uvm(POE) sch_fq_codel nvidia_drm(POE) nvidia_modeset(POE) nvidia_peermem(POE) rdma_ucm(OE) rdma_cm(OE) iw_cm(OE) ib_ipoib(OE) ib_cm(OE) intel_rapl_msr intel_rapl_common intel_uncore_frequency intel_uncore_frequency_common intel_ifs ib_umad(OE) i10nm_edac skx_edac_common nfit x86_pkg_temp_thermal binfmt_misc coretemp kvm_intel iaa_crypto kvm irqbypass rapl cmdlinepart mlx5_ib(OE) qat_4xxx spi_nor dax_hmem mtd intel_qat pmt_telemetry ib_uverbs(OE) cxl_acpi intel_sdsi pmt_class cxl_port ipmi_ssif
+Oct 30 05:07:36 h20-117 kernel:  nls_iso8859_1 intel_cstate cxl_core crc8 isst_if_mbox_pci isst_if_mmio idxd ses mei_me acpi_power_meter i2c_i801 isst_if_common authenc enclosure video intel_vsec idxd_bus ast macsec spi_intel_pci spi_intel mei switchtec i2c_algo_bit i2c_smbus i2c_ismt ipmi_si acpi_ipmi ipmi_devintf ipmi_msghandler input_leds joydev nvidia(POE) pfr_update pfr_telemetry mac_hid ib_core(OE) knem(OE) nfsd dm_multipath scsi_dh_rdac scsi_dh_emc scsi_dh_alua auth_rpcgss nfs_acl lockd grace msr efi_pstore sunrpc nfnetlink dmi_sysfs ip_tables x_tables autofs4 btrfs blake2b_generic raid10 raid456 async_raid6_recov async_memcpy async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 hid_generic usbhid hid mlx5_core(OE) crct10dif_pclmul crc32_pclmul polyval_clmulni polyval_generic ghash_clmulni_intel mlxfw(OE) sha256_ssse3 sha1_ssse3 psample nvme mlxdevm(OE) mpt3sas tls nvme_core ahci raid_class mlx_compat(OE) xhci_pci megaraid_sas scsi_transport_sas nvme_auth pci_hyperv_intf libahci xhci_pci_renesas wmi pinctrl_emmitsburg
+Oct 30 05:07:36 h20-117 kernel:  aesni_intel crypto_simd cryptd
+Oct 30 05:07:36 h20-117 kernel: CPU: 94 PID: 3314519 Comm: python Tainted: P           OEL     6.8.0-139-generic #139-Ubuntu
+Oct 30 05:07:36 h20-117 kernel: Hardware name: IEITSYSTEMS NF5688-M7-A0-R0-00/NF5688-M7-A0-R0-00, BIOS 06.08.05 05/15/2025
+Oct 30 05:07:36 h20-117 kernel: RIP: 0010:_raw_spin_unlock_irqrestore+0x21/0x60
+Oct 30 05:07:36 h20-117 kernel: Code: 90 90 90 90 90 90 90 90 90 0f 1f 44 00 00 55 49 89 f0 48 89 e5 c6 07 00 0f 1f 00 41 f7 c0 00 02 00 00 74 06 fb 0f 1f 44 00 00 <65> ff 0d d0 9f 1c 48 74 13 5d 31 c0 31 d2 31 c9 31 f6 31 ff 45 31
+Oct 30 05:07:36 h20-117 kernel: RSP: 0000:ff60f38a8331f940 EFLAGS: 00000206
+Oct 30 05:07:36 h20-117 kernel: RAX: ff372dfe2bb745b8 RBX: ff372e25fffd5010 RCX: 0000000000000202
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000000005 RSI: 0000000000000202 RDI: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: RBP: ff60f38a8331f940 R08: 0000000000000202 R09: 0000000000000002
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000002
+Oct 30 05:07:36 h20-117 kernel: R13: ff372e25fffd5000 R14: 0000000000000002 R15: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: FS:  00007061625b6740(0000) GS:ff372f21fd900000(0000) knlGS:0000000000000000
+Oct 30 05:07:36 h20-117 kernel: CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Oct 30 05:07:36 h20-117 kernel: CR2: 0000705bd9200000 CR3: 000001a2857bc002 CR4: 0000000000f71ef0
+Oct 30 05:07:36 h20-117 kernel: PKRU: 55555554
+Oct 30 05:07:36 h20-117 kernel: Call Trace:
+Oct 30 05:07:36 h20-117 kernel:  <TASK>
+Oct 30 05:07:36 h20-117 kernel:  lru_gen_rotate_memcg+0x1da/0x410
+Oct 30 05:07:36 h20-117 kernel:  ? shrink_one+0x1ba/0x1d0
+Oct 30 05:07:36 h20-117 kernel:  shrink_many+0x1bb/0x310
+Oct 30 05:07:36 h20-117 kernel:  shrink_node+0xf7/0x4c0
+Oct 30 05:07:36 h20-117 kernel:  shrink_zones.constprop.0+0x90/0x2d0
+Oct 30 05:07:36 h20-117 kernel:  do_try_to_free_pages+0x69/0x330
+Oct 30 05:07:36 h20-117 kernel:  try_to_free_pages+0xe6/0x210
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages_slowpath.constprop.0+0x3b0/0xa70
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages+0x31f/0x350
+Oct 30 05:07:36 h20-117 kernel:  alloc_pages_mpol+0x91/0x210
+Oct 30 05:07:36 h20-117 kernel:  ? __mod_lruvec_state+0x36/0x50
+Oct 30 05:07:36 h20-117 kernel:  vma_alloc_folio+0x64/0xd0
+Oct 30 05:07:36 h20-117 kernel:  do_huge_pmd_anonymous_page+0xb2/0x370
+Oct 30 05:07:36 h20-117 kernel:  __handle_mm_fault+0x786/0x790
+Oct 30 05:07:36 h20-117 kernel:  handle_mm_fault+0x18a/0x380
+Oct 30 05:07:36 h20-117 kernel:  do_user_addr_fault+0x169/0x670
+Oct 30 05:07:36 h20-117 kernel:  exc_page_fault+0x83/0x1b0
+Oct 30 05:07:36 h20-117 kernel:  asm_exc_page_fault+0x27/0x30
+Oct 30 05:07:36 h20-117 kernel: RIP: 0033:0x7061623a19d2
+Oct 30 05:07:36 h20-117 kernel: Code: 00 73 35 f6 05 6e 98 06 00 01 74 ac 83 f9 c0 0f 87 49 fe ff ff 48 29 fe 48 83 c7 3f 49 8d 0c 10 48 83 e7 c0 48 01 fe 48 29 f9 <f3> a4 62 c1 fe 48 7f 00 c3 0f 1f 44 00 00 4c 8b 1d 49 98 06 00 4c
+Oct 30 05:07:36 h20-117 kernel: RSP: 002b:00007ffdc5ae7858 EFLAGS: 00010202
+Oct 30 05:07:36 h20-117 kernel: RAX: 0000705bd91e3010 RBX: 00007ffdc5ae7930 RCX: 0000000000023010
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000040000 RSI: 000056c22f3efb80 RDI: 0000705bd9200000
+Oct 30 05:07:36 h20-117 kernel: RBP: 000056c22f48eab0 R08: 0000705bd91e3010 R09: 0000000000000000
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000008 R11: 00007ffdc5ae78bc R12: 000056c213b676f0
+Oct 30 05:07:36 h20-117 kernel: R13: 000056c22f48eab8 R14: 00007ffdc5ae7a30 R15: 00007ffdc5ae7b30
+Oct 30 05:07:36 h20-117 kernel:  </TASK>
+Oct 30 05:07:36 h20-117 kernel: watchdog: BUG: soft lockup - CPU#174 stuck for 26s! [python:3314524]
+Oct 30 05:07:36 h20-117 kernel: Modules linked in: exfat uas usb_storage nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_redir nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib cpuid tcp_diag inet_diag nf_conntrack_netlink xt_nat xt_tcpudp veth xt_conntrack xt_MASQUERADE bridge stp llc xfrm_user xfrm_algo xt_set ip_set nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 xt_addrtype nft_compat nf_tables qrtr uio_pci_generic uio vfio_pci vfio_pci_core vfio_iommu_type1 gdrdrv(POE) vfio overlay iommufd cuse bonding cfg80211 nvidia_uvm(POE) sch_fq_codel nvidia_drm(POE) nvidia_modeset(POE) nvidia_peermem(POE) rdma_ucm(OE) rdma_cm(OE) iw_cm(OE) ib_ipoib(OE) ib_cm(OE) intel_rapl_msr intel_rapl_common intel_uncore_frequency intel_uncore_frequency_common intel_ifs ib_umad(OE) i10nm_edac skx_edac_common nfit x86_pkg_temp_thermal binfmt_misc coretemp kvm_intel iaa_crypto kvm irqbypass rapl cmdlinepart mlx5_ib(OE) qat_4xxx spi_nor dax_hmem mtd intel_qat pmt_telemetry ib_uverbs(OE) cxl_acpi intel_sdsi pmt_class cxl_port ipmi_ssif
+Oct 30 05:07:36 h20-117 kernel:  nls_iso8859_1 intel_cstate cxl_core crc8 isst_if_mbox_pci isst_if_mmio idxd ses mei_me acpi_power_meter i2c_i801 isst_if_common authenc enclosure video intel_vsec idxd_bus ast macsec spi_intel_pci spi_intel mei switchtec i2c_algo_bit i2c_smbus i2c_ismt ipmi_si acpi_ipmi ipmi_devintf ipmi_msghandler input_leds joydev nvidia(POE) pfr_update pfr_telemetry mac_hid ib_core(OE) knem(OE) nfsd dm_multipath scsi_dh_rdac scsi_dh_emc scsi_dh_alua auth_rpcgss nfs_acl lockd grace msr efi_pstore sunrpc nfnetlink dmi_sysfs ip_tables x_tables autofs4 btrfs blake2b_generic raid10 raid456 async_raid6_recov async_memcpy async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 hid_generic usbhid hid mlx5_core(OE) crct10dif_pclmul crc32_pclmul polyval_clmulni polyval_generic ghash_clmulni_intel mlxfw(OE) sha256_ssse3 sha1_ssse3 psample nvme mlxdevm(OE) mpt3sas tls nvme_core ahci raid_class mlx_compat(OE) xhci_pci megaraid_sas scsi_transport_sas nvme_auth pci_hyperv_intf libahci xhci_pci_renesas wmi pinctrl_emmitsburg
+Oct 30 05:07:36 h20-117 kernel:  aesni_intel crypto_simd cryptd
+Oct 30 05:07:36 h20-117 kernel: CPU: 174 PID: 3314524 Comm: python Tainted: P           OEL     6.8.0-139-generic #139-Ubuntu
+Oct 30 05:07:36 h20-117 kernel: Hardware name: IEITSYSTEMS NF5688-M7-A0-R0-00/NF5688-M7-A0-R0-00, BIOS 06.08.05 05/15/2025
+Oct 30 05:07:36 h20-117 kernel: RIP: 0010:_raw_spin_unlock_irqrestore+0x21/0x60
+Oct 30 05:07:36 h20-117 kernel: Code: 90 90 90 90 90 90 90 90 90 0f 1f 44 00 00 55 49 89 f0 48 89 e5 c6 07 00 0f 1f 00 41 f7 c0 00 02 00 00 74 06 fb 0f 1f 44 00 00 <65> ff 0d d0 9f 1c 48 74 13 5d 31 c0 31 d2 31 c9 31 f6 31 ff 45 31
+Oct 30 05:07:36 h20-117 kernel: RSP: 0000:ff60f38a833b7940 EFLAGS: 00000206
+Oct 30 05:07:36 h20-117 kernel: RAX: ff372d895db455b8 RBX: ff372e25fffd5008 RCX: 0000000000000202
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000000005 RSI: 0000000000000202 RDI: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: RBP: ff60f38a833b7940 R08: 0000000000000202 R09: 0000000000000001
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000001
+Oct 30 05:07:36 h20-117 kernel: R13: ff372e25fffd5000 R14: 0000000000000002 R15: ff372e25fffff798
+Oct 30 05:07:36 h20-117 kernel: FS:  00007c610eaaa740(0000) GS:ff372f21fe500000(0000) knlGS:0000000000000000
+Oct 30 05:07:36 h20-117 kernel: CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Oct 30 05:07:36 h20-117 kernel: CR2: 00007c5b8c600000 CR3: 0000005c7f5ca006 CR4: 0000000000f71ef0
+Oct 30 05:07:36 h20-117 kernel: PKRU: 55555554
+Oct 30 05:07:36 h20-117 kernel: Call Trace:
+Oct 30 05:07:36 h20-117 kernel:  <TASK>
+Oct 30 05:07:36 h20-117 kernel:  lru_gen_rotate_memcg+0x1da/0x410
+Oct 30 05:07:36 h20-117 kernel:  ? shrink_one+0x1ba/0x1d0
+Oct 30 05:07:36 h20-117 kernel:  shrink_many+0x1bb/0x310
+Oct 30 05:07:36 h20-117 kernel:  shrink_node+0xf7/0x4c0
+Oct 30 05:07:36 h20-117 kernel:  shrink_zones.constprop.0+0x90/0x2d0
+Oct 30 05:07:36 h20-117 kernel:  do_try_to_free_pages+0x69/0x330
+Oct 30 05:07:36 h20-117 kernel:  try_to_free_pages+0xe6/0x210
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages_slowpath.constprop.0+0x3b0/0xa70
+Oct 30 05:07:36 h20-117 kernel:  __alloc_pages+0x31f/0x350
+Oct 30 05:07:36 h20-117 kernel:  alloc_pages_mpol+0x91/0x210
+Oct 30 05:07:36 h20-117 kernel:  ? __mod_lruvec_state+0x36/0x50
+Oct 30 05:07:36 h20-117 kernel:  vma_alloc_folio+0x64/0xd0
+Oct 30 05:07:36 h20-117 kernel:  do_huge_pmd_anonymous_page+0xb2/0x370
+Oct 30 05:07:36 h20-117 kernel:  __handle_mm_fault+0x786/0x790
+Oct 30 05:07:36 h20-117 kernel:  handle_mm_fault+0x18a/0x380
+Oct 30 05:07:36 h20-117 kernel:  do_user_addr_fault+0x169/0x670
+Oct 30 05:07:36 h20-117 kernel:  exc_page_fault+0x83/0x1b0
+Oct 30 05:07:36 h20-117 kernel:  asm_exc_page_fault+0x27/0x30
+Oct 30 05:07:36 h20-117 kernel: RIP: 0033:0x7c610e9a19d2
+Oct 30 05:07:36 h20-117 kernel: Code: 00 73 35 f6 05 6e 98 06 00 01 74 ac 83 f9 c0 0f 87 49 fe ff ff 48 29 fe 48 83 c7 3f 49 8d 0c 10 48 83 e7 c0 48 01 fe 48 29 f9 <f3> a4 62 c1 fe 48 7f 00 c3 0f 1f 44 00 00 4c 8b 1d 49 98 06 00 4c
+Oct 30 05:07:36 h20-117 kernel: RSP: 002b:00007fff32fdc138 EFLAGS: 00010202
+Oct 30 05:07:36 h20-117 kernel: RAX: 00007c5b8c5c5010 RBX: 00007fff32fdc210 RCX: 0000000000005010
+Oct 30 05:07:36 h20-117 kernel: RDX: 0000000000040000 RSI: 000059342523a180 RDI: 00007c5b8c600000
+Oct 30 05:07:36 h20-117 kernel: RBP: 00005934252bb880 R08: 00007c5b8c5c5010 R09: 0000000000000000
+Oct 30 05:07:36 h20-117 kernel: R10: 0000000000000008 R11: 00007fff32fdc19c R12: 00005934099956f0
+Oct 30 05:07:36 h20-117 kernel: R13: 00005934252bb888 R14: 00007fff32fdc310 R15: 00007fff32fdc410
+Oct 30 05:07:36 h20-117 kernel:  </TASK>

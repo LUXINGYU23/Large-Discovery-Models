@@ -1,0 +1,48 @@
+[
+  {
+    "case": "drillholes_3d",
+    "method": "paper_mcmc",
+    "finished": 1,
+    "successful": 1,
+    "seeds": [
+      47
+    ],
+    "losses": [
+      6.898354673163223
+    ],
+    "mean_loss": 6.898354673163223,
+    "std_loss": null,
+    "solver_seconds": [
+      1891.4392910003662
+    ],
+    "objective_calls": [
+      1000
+    ],
+    "native_loss": [
+      6.905544343700285
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "paper_mcmc",
+    "finished": 1,
+    "successful": 1,
+    "seeds": [
+      47
+    ],
+    "losses": [
+      39.76906548519625
+    ],
+    "mean_loss": 39.76906548519625,
+    "std_loss": null,
+    "solver_seconds": [
+      1890.2944481372833
+    ],
+    "objective_calls": [
+      1000
+    ],
+    "native_loss": [
+      39.80559615584218
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+--- 9a8a0e729958b85ea09a34f72a0a761aeb3ff50470e1699acb3f6008469b62e1
+
++++ a42ff6ddd69739a7a1ce233742b4946dd7cf6719479cb35d6ee482b8404951b9
+
+@@ -12,7 +12,7 @@
+
+ from tasks.copper_inversion.v2.baselines import initialize
+ 
+ # Replaced per candidate by the generator.
+-CFG = {'time': 0.68, 'radii': (0.05, 0.075, 0.105, 0.13), 'jitter': 0.35, 'phases': None, 'seed_offset': 0, 'note': 'add_large_68'}
++CFG = {'time': 0.68, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'phases': None, 'seed_offset': 0, 'note': 'upper_17_68'}
+ 
+ _ST = ndimage.generate_binary_structure(3, 1)
+ 

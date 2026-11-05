@@ -1,0 +1,54 @@
+{
+  "time": 1793174712.596514,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "cases": 6200,
+      "new_cases": 2,
+      "charged": 145,
+      "complete": 129
+    },
+    {
+      "name": "acq-42",
+      "cases": 6294,
+      "new_cases": 2,
+      "charged": 145,
+      "complete": 129
+    },
+    {
+      "name": "mcmc-43",
+      "cases": 6192,
+      "new_cases": 1,
+      "charged": 145,
+      "complete": 129
+    },
+    {
+      "name": "acq-43",
+      "cases": 6240,
+      "new_cases": 7,
+      "charged": 145,
+      "complete": 129
+    },
+    {
+      "name": "mcmc-3407",
+      "cases": 6585,
+      "new_cases": 2,
+      "charged": 145,
+      "complete": 129
+    },
+    {
+      "name": "acq-3407",
+      "cases": 6515,
+      "new_cases": 1,
+      "charged": 145,
+      "complete": 129
+    }
+  ],
+  "historical_result_source_files_unchanged": 165660,
+  "budget_originals_preserved": 12,
+  "known_failures": 10,
+  "new_failures": 0,
+  "all_groups_new_cases": true,
+  "mcmc43_tail_completed": true,
+  "manifests_unchanged": true
+}

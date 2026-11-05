@@ -1,0 +1,62 @@
+[
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/ldm-42/jobs/532d9b17326fbc1a04363ec026aa2536a99d13d8feb59dd1f8b77734fa783417/job.json",
+    "name": "ldm-copper-25641a8065-532d9b17326fbc1a0436",
+    "started": true,
+    "state": "created"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/ldm-42/jobs/135dff3aeaf7370387ce05951090a59dbb5c34e92c2018236f2f9b8cb3bdd82f/job.json",
+    "name": "ldm-copper-25641a8065-135dff3aeaf7370387ce",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/ldm-42/jobs/e64e9149f0048efc5e7973b76dae90bc88983127c3616fb42ffd5d86970df60e/job.json",
+    "name": "ldm-copper-25641a8065-e64e9149f0048efc5e79",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/mcmc-42/jobs/7088d66035e5cf269c0b19c69e59c590a9d93f9d8994864042163f7a84567827/job.json",
+    "name": "ldm-copper-54e59eeba6-7088d66035e5cf269c0b",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/acq-42/jobs/2d19192609899606c9f40f337e2f5f9416214d285e62a0ee1966a2001a1182e5/job.json",
+    "name": "ldm-copper-ed1cd32994-2d19192609899606c9f4",
+    "started": true,
+    "state": "created"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/ldm-43/jobs/63fd8faf7559819de74d5dbb8e85abef38e6d26e0a12f6c0039b4adbddb32c93/job.json",
+    "name": "ldm-copper-746ec8346f-63fd8faf7559819de74d",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/mcmc-43/jobs/bd4c1991f55055d3deb5e65a66a5adc47a81059badfd3be2122e0695d7db86c3/job.json",
+    "name": "ldm-copper-5da56c20d4-bd4c1991f55055d3deb5",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/mcmc-43/jobs/0596d3dcf82c137dbee62c7e2350860dbbaadb98fc15c508dc20f57992dd1dcf/job.json",
+    "name": "ldm-copper-5da56c20d4-0596d3dcf82c137dbee6",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/mcmc-43/jobs/58f1ed4c5abaea9aa9e4af4cf93437dff4907fbcd4d1376b2f850a5abb5b49c7/job.json",
+    "name": "ldm-copper-5da56c20d4-58f1ed4c5abaea9aa9e4",
+    "started": false,
+    "state": "missing"
+  },
+  {
+    "job": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/ldm-3407/jobs/e97c5daa59427ae00a8203e756de98e07c77371b59429652217f6a384caaf0a6/job.json",
+    "name": "ldm-copper-9f749fe863-e97c5daa59427ae00a82",
+    "started": false,
+    "state": "missing"
+  }
+]

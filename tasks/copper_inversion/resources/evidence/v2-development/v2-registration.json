@@ -1,0 +1,20 @@
+[
+  {
+    "level": "info",
+    "message": "Experiment contract is draft; campaign qualification is incomplete.",
+    "path": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion/experiment.json",
+    "task": "copper_inversion"
+  },
+  {
+    "level": "ok",
+    "message": "Qualification evidence reaches stage 'registered'.",
+    "path": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion/resources/qualification_evidence.json",
+    "task": "copper_inversion"
+  },
+  {
+    "level": "ok",
+    "message": "Task registration and layout are valid.",
+    "path": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion",
+    "task": "copper_inversion"
+  }
+]

@@ -1,0 +1,187 @@
+{
+  "time": 1792848543.9297533,
+  "reason": "user requested stop all copper formal search and heldout evaluation before fixes",
+  "epoch": {
+    "policy": {
+      "queue_root": "/Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/queue",
+      "global_jobs": 80,
+      "jobs_per_process": 16,
+      "candidate_batch": 16,
+      "runtime_sha256": "1a45d211524002970a1c70790025005d5a0e9a748057ba0b7a0c58c5570e0f76",
+      "solver_seconds": 120,
+      "feedback_slots": 321,
+      "scientific_source_unchanged": true,
+      "ordered_results": true,
+      "queue_time_excluded_from_solver": true,
+      "interface_slots": 8,
+      "policy_sha256": "8a764901d4075014fb8aff3d50429b3ab268eb71aee8f9da8cde2b8de417cbac"
+    },
+    "started_at": 1792838544.6444669,
+    "pids": {
+      "ldm-42": 3984908,
+      "mcmc-42": 686108,
+      "acq-42": 686109,
+      "ldm-43": 3984911,
+      "mcmc-43": 686116,
+      "acq-43": 686117,
+      "ldm-3407": 3984916,
+      "mcmc-3407": 686118,
+      "acq-3407": 686119
+    },
+    "service_pids": {
+      "ldm-42": 3984101,
+      "mcmc-42": 3984185,
+      "acq-42": 3984257,
+      "ldm-43": 3984308,
+      "mcmc-43": 3984416,
+      "acq-43": 3984510,
+      "ldm-3407": 3984660,
+      "mcmc-3407": 3984736,
+      "acq-3407": 3984811
+    },
+    "supervisor_pid": 680862,
+    "replay_adapter_sha256": "31ccf04a1ab5f69537bccfac7687aea79a8ecde8be38fc1299a9ca0674df1965"
+  },
+  "processes": [
+    {
+      "pid": 680862,
+      "pgid": 680570,
+      "command": "python3 /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/recover_baselines_r3.py "
+    },
+    {
+      "pid": 3984908,
+      "pgid": 3984908,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/replay_parallel.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json ldm --public-catalog /Aidata/shared/ldm/copper-formal-study-20261024-r1/publication/training/catalog.json --evaluation-socket /Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-42/evaluator.sock --evaluation-contract bd81f6e35dde710650acc767c97b2cc75abca3fe859b1f2a10581ef38c1e8eb9 --evaluation-service-uid 991 --out-dir /Aidata/shared/ldm/copper-formal-study-20261024-r1/ldm-42 --seed 42 --iterations 20 --candidates-per-researcher 8 --evaluations-per-round 16 --solver-seconds 120 --harness-seconds 1800 --embedding-model-path /Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614 --embedding-device cuda:0 --harness-cache-dir /Aidata/shared/ldm/cache/gondolin --sidecar-image sha256:8100350c577497d9eec5289f03dfc978f318b4cfc00a6efb9784856c5b95fc74 --evaluator-image sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5 --resume "
+    },
+    {
+      "pid": 686108,
+      "pgid": 686108,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/mcmc-42 "
+    },
+    {
+      "pid": 686109,
+      "pgid": 686109,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/acq-42 "
+    },
+    {
+      "pid": 3984911,
+      "pgid": 3984911,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/replay_parallel.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json ldm --public-catalog /Aidata/shared/ldm/copper-formal-study-20261024-r1/publication/training/catalog.json --evaluation-socket /Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-43/evaluator.sock --evaluation-contract 7cf9ba62179f854f0cfac01ae6ae4b5b10f7caea2ead236b0dd3f65d3a878718 --evaluation-service-uid 991 --out-dir /Aidata/shared/ldm/copper-formal-study-20261024-r1/ldm-43 --seed 43 --iterations 20 --candidates-per-researcher 8 --evaluations-per-round 16 --solver-seconds 120 --harness-seconds 1800 --embedding-model-path /Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614 --embedding-device cuda:1 --harness-cache-dir /Aidata/shared/ldm/cache/gondolin --sidecar-image sha256:8100350c577497d9eec5289f03dfc978f318b4cfc00a6efb9784856c5b95fc74 --evaluator-image sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5 --resume "
+    },
+    {
+      "pid": 686116,
+      "pgid": 686116,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/mcmc-43 "
+    },
+    {
+      "pid": 686117,
+      "pgid": 686117,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/acq-43 "
+    },
+    {
+      "pid": 3984916,
+      "pgid": 3984916,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/replay_parallel.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json ldm --public-catalog /Aidata/shared/ldm/copper-formal-study-20261024-r1/publication/training/catalog.json --evaluation-socket /Aidata/shared/ldm/copper-formal-study-20261024-r1/rpc-ldm-3407/evaluator.sock --evaluation-contract 1962efdbf6f45336a56062c50d26e4fb2fbb207d23b8f523088d3ae1fedb144a --evaluation-service-uid 991 --out-dir /Aidata/shared/ldm/copper-formal-study-20261024-r1/ldm-3407 --seed 3407 --iterations 20 --candidates-per-researcher 8 --evaluations-per-round 16 --solver-seconds 120 --harness-seconds 1800 --embedding-model-path /Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614 --embedding-device cuda:2 --harness-cache-dir /Aidata/shared/ldm/cache/gondolin --sidecar-image sha256:8100350c577497d9eec5289f03dfc978f318b4cfc00a6efb9784856c5b95fc74 --evaluator-image sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5 --resume "
+    },
+    {
+      "pid": 686118,
+      "pgid": 686118,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/mcmc-3407 "
+    },
+    {
+      "pid": 686119,
+      "pgid": 686119,
+      "command": "runuser -u zsgpu -- /Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline_runtime_r3.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/baseline-policy-r3.json tune --run /Aidata/shared/ldm/copper-formal-study-20261024-r1/acq-3407 "
+    },
+    {
+      "pid": 3984101,
+      "pgid": 3984101,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-42-config.json "
+    },
+    {
+      "pid": 3984185,
+      "pgid": 3984185,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-42-config.json "
+    },
+    {
+      "pid": 3984257,
+      "pgid": 3984257,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-42-config.json "
+    },
+    {
+      "pid": 3984308,
+      "pgid": 3984308,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-43-config.json "
+    },
+    {
+      "pid": 3984416,
+      "pgid": 3984416,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-43-config.json "
+    },
+    {
+      "pid": 3984510,
+      "pgid": 3984510,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-43-config.json "
+    },
+    {
+      "pid": 3984660,
+      "pgid": 3984660,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/ldm-3407-config.json "
+    },
+    {
+      "pid": 3984736,
+      "pgid": 3984736,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/mcmc-3407-config.json "
+    },
+    {
+      "pid": 3984811,
+      "pgid": 3984811,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/parallel_runtime.py --policy /Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/policy.json service --config /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-formal-study-20261024-r1/acq-3407-config.json "
+    },
+    {
+      "pid": 3402661,
+      "pgid": 3402661,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run ldm-42 "
+    },
+    {
+      "pid": 3402673,
+      "pgid": 3402673,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run ldm-43 "
+    },
+    {
+      "pid": 3402675,
+      "pgid": 3402675,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run ldm-3407 "
+    },
+    {
+      "pid": 3402682,
+      "pgid": 3402682,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run mcmc-42 "
+    },
+    {
+      "pid": 3402683,
+      "pgid": 3402683,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run mcmc-43 "
+    },
+    {
+      "pid": 3402687,
+      "pgid": 3402687,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run mcmc-3407 "
+    },
+    {
+      "pid": 3402689,
+      "pgid": 3402689,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run acq-42 "
+    },
+    {
+      "pid": 3402695,
+      "pgid": 3402695,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run acq-43 "
+    },
+    {
+      "pid": 3402705,
+      "pgid": 3402705,
+      "command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-formal-preparation-20261024/copper_interim_audit.py run acq-3407 "
+    }
+  ]
+}

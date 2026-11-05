@@ -1,0 +1,196 @@
+{
+  "checked_at": 1793413219.3653426,
+  "verified": 27,
+  "selected_count": 9,
+  "rows": [
+    {
+      "method": "ldm",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/candidates/776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd/solver.py",
+      "sha256": "776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd",
+      "selected": false
+    },
+    {
+      "method": "ldm",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/candidates/2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b/solver.py",
+      "sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+      "selected": true
+    },
+    {
+      "method": "ldm",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/candidates/4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00/solver.py",
+      "sha256": "4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00",
+      "selected": false
+    },
+    {
+      "method": "ldm",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/candidates/e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493/solver.py",
+      "sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+      "selected": true
+    },
+    {
+      "method": "ldm",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/candidates/dd748c2b31617db049174ea54bbc5c16d43be77d406503a4aa4ab5e24e8ccc48/solver.py",
+      "sha256": "dd748c2b31617db049174ea54bbc5c16d43be77d406503a4aa4ab5e24e8ccc48",
+      "selected": false
+    },
+    {
+      "method": "ldm",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/candidates/8e346f96b0e4bb70d7eb82fa70072cd4cb62361632c5aea4dcead53f2d8d399d/solver.py",
+      "sha256": "8e346f96b0e4bb70d7eb82fa70072cd4cb62361632c5aea4dcead53f2d8d399d",
+      "selected": false
+    },
+    {
+      "method": "ldm",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/candidates/d654cd2c7dfa3bf790e0dd85b0e9bff77346c4dca6eb038d92d05fc5ef815684/solver.py",
+      "sha256": "d654cd2c7dfa3bf790e0dd85b0e9bff77346c4dca6eb038d92d05fc5ef815684",
+      "selected": false
+    },
+    {
+      "method": "ldm",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/candidates/97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361/solver.py",
+      "sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+      "selected": true
+    },
+    {
+      "method": "ldm",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/candidates/6d8fe7e668fee3075ad59e10a85ac598375fee44898e671de9b537d657f035e4/solver.py",
+      "sha256": "6d8fe7e668fee3075ad59e10a85ac598375fee44898e671de9b537d657f035e4",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/candidates/98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c/solver.py",
+      "sha256": "98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c",
+      "selected": true
+    },
+    {
+      "method": "mcmc",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/candidates/4e087ec008d9393460cb7192701696b6f12afc1e3dde6d1d61ce2fc116796947/solver.py",
+      "sha256": "4e087ec008d9393460cb7192701696b6f12afc1e3dde6d1d61ce2fc116796947",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/candidates/28fb0ce30aad375a2fe8c16eb6f26f8712755a75e18c2680b1abe82db543f836/solver.py",
+      "sha256": "28fb0ce30aad375a2fe8c16eb6f26f8712755a75e18c2680b1abe82db543f836",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/candidates/040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c/solver.py",
+      "sha256": "040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c",
+      "selected": true
+    },
+    {
+      "method": "mcmc",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/candidates/46ad5263fb7830141a4407b5e4281ecf75b3d35225fb68216c101bd16668d237/solver.py",
+      "sha256": "46ad5263fb7830141a4407b5e4281ecf75b3d35225fb68216c101bd16668d237",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/candidates/d08aefe715649d2b7ab1f6d2be5ee7ce75c9284fcd6c38023ea3e2855553c401/solver.py",
+      "sha256": "d08aefe715649d2b7ab1f6d2be5ee7ce75c9284fcd6c38023ea3e2855553c401",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/candidates/1422e594d78f3cf74c4bc0ee312c3cbbbc25ffd67a936cf2473d4323b7f05fc2/solver.py",
+      "sha256": "1422e594d78f3cf74c4bc0ee312c3cbbbc25ffd67a936cf2473d4323b7f05fc2",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/candidates/944f9837096752a8c974a87b1f2b817654c0d6d0a34024902e3125813bf519ab/solver.py",
+      "sha256": "944f9837096752a8c974a87b1f2b817654c0d6d0a34024902e3125813bf519ab",
+      "selected": false
+    },
+    {
+      "method": "mcmc",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/candidates/d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d/solver.py",
+      "sha256": "d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d",
+      "selected": true
+    },
+    {
+      "method": "acq",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/candidates/29888d2667e6583b0534b86b3a9837dbe9288a85c2d12cd3af33590d44f7f134/solver.py",
+      "sha256": "29888d2667e6583b0534b86b3a9837dbe9288a85c2d12cd3af33590d44f7f134",
+      "selected": false
+    },
+    {
+      "method": "acq",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/candidates/ab96e6be719f0fcc666e4438b715ceeafc97ecedf3e6b834cb6f86aec5585a08/solver.py",
+      "sha256": "ab96e6be719f0fcc666e4438b715ceeafc97ecedf3e6b834cb6f86aec5585a08",
+      "selected": false
+    },
+    {
+      "method": "acq",
+      "seed": 42,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/candidates/4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6/solver.py",
+      "sha256": "4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6",
+      "selected": true
+    },
+    {
+      "method": "acq",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/candidates/f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983/solver.py",
+      "sha256": "f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983",
+      "selected": true
+    },
+    {
+      "method": "acq",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/candidates/059836a576615ee1ac0e2d622083eb0d810f627287b5b6f97eaf648016091bfd/solver.py",
+      "sha256": "059836a576615ee1ac0e2d622083eb0d810f627287b5b6f97eaf648016091bfd",
+      "selected": false
+    },
+    {
+      "method": "acq",
+      "seed": 43,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/candidates/410180f78296ad1ae0cd91c23c4cad1c7a915aaba171b0a6734c1ef17a16e7fd/solver.py",
+      "sha256": "410180f78296ad1ae0cd91c23c4cad1c7a915aaba171b0a6734c1ef17a16e7fd",
+      "selected": false
+    },
+    {
+      "method": "acq",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/candidates/281259cf9735471efcea6963f98d8680b8041e73ca119e2e9a869a7a699ea5cd/solver.py",
+      "sha256": "281259cf9735471efcea6963f98d8680b8041e73ca119e2e9a869a7a699ea5cd",
+      "selected": true
+    },
+    {
+      "method": "acq",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/candidates/3115d62354b4a75de63885ca5a355252f0f472b7677c1664f7903994799eec78/solver.py",
+      "sha256": "3115d62354b4a75de63885ca5a355252f0f472b7677c1664f7903994799eec78",
+      "selected": false
+    },
+    {
+      "method": "acq",
+      "seed": 3407,
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/candidates/b4cba76f0883b7c5996025ff072da3331e2bf84b0e37e1d025ca0c9e73e6d5df/solver.py",
+      "sha256": "b4cba76f0883b7c5996025ff072da3331e2bf84b0e37e1d025ca0c9e73e6d5df",
+      "selected": false
+    }
+  ]
+}

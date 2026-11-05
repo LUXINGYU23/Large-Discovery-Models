@@ -1,0 +1,41 @@
+{
+  "diagnostic_only": true,
+  "observations": [
+    {
+      "candidate": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "round": 0,
+      "mean_iou": 0.06982055111803796,
+      "loss_total": 0.930179448881962,
+      "research_utility": 0.06982055111803796,
+      "legal_rate": 1.0,
+      "parent_count": 1.0,
+      "solve_count": 2.0,
+      "failed_solves": 0.0,
+      "mean_solver_wall_seconds": 0.5217341184616089
+    },
+    {
+      "candidate": "6a3bf3ae945fd0f03e360d7e36879a5cfde541a834e31bfe6ac4c9047c13eeaf",
+      "round": 1,
+      "mean_iou": 0.4110292475999107,
+      "loss_total": 0.5889707524000893,
+      "research_utility": 0.4110292475999107,
+      "legal_rate": 1.0,
+      "parent_count": 1.0,
+      "solve_count": 2.0,
+      "failed_solves": 0.0,
+      "mean_solver_wall_seconds": 0.786137580871582
+    },
+    {
+      "candidate": "f65abb694a18545200b8cfeb6ac722d224f30e0e725f8221e1b0d0223c1d2f56",
+      "round": 1,
+      "mean_iou": 0.4152164212405176,
+      "loss_total": 0.5847835787594824,
+      "research_utility": 0.4152164212405176,
+      "legal_rate": 1.0,
+      "parent_count": 1.0,
+      "solve_count": 2.0,
+      "failed_solves": 0.0,
+      "mean_solver_wall_seconds": 0.5584734678268433
+    }
+  ]
+}

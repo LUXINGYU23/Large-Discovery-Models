@@ -1,0 +1,32 @@
+{
+  "ldm": {
+    "status": "training_sealed",
+    "contract_digest": "f186fffa05b4ddcad1982897538552b35a2e9458188315fc0082039188aee8e1",
+    "source_sha256s": [
+      "4a28cadede884f8a4ba2b0588095d7bce6c48a17beb6d152c0867ceefdc7b824",
+      "56e0afde7a69d618af7e3292b700b2537c0c6e4e773a93829db280370e22a4a3",
+      "9cce29004ab9be6283a2dff30141352df09f23fbefc9b0a874bd8a970422e6a0"
+    ],
+    "used_slots": 5
+  },
+  "mcmc": {
+    "status": "training_sealed",
+    "contract_digest": "08cd0f1396f7b856453e9c7d3fb750516aa54e1b3f0dbd624b7f0428f8f0f1cf",
+    "source_sha256s": [
+      "43da6234cc6eae167fa5c609357b3a9a6fa2d023d96f9f3b77983119ee70bd28",
+      "dbbe086ecb692db19710468b51568c659c3ada09156d1ade4226f61162578950",
+      "0ab4dab67af2c62667e5cf9faa0939b86ca31a7ce1b9a2777b1afc4e0f191b40"
+    ],
+    "used_slots": 5
+  },
+  "acq": {
+    "status": "training_sealed",
+    "contract_digest": "dfd094d761ec90cf6c0d48c5aeb30cebfbfff43536c253d5d1662f40385bf771",
+    "source_sha256s": [
+      "2b3c793e52731120894f51f7e84eee4397e0a1b439cf7af7607cd7735ce41822",
+      "59117d499861d1abc966754b55dee5b7036368b1b0178533d7c77e94485c6ad9",
+      "d993ab0afc2cd559f0978bf130ef3046e2862912c46b4505a2e3b0edc51b465d"
+    ],
+    "used_slots": 5
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "common_budget": 31,
+  "summary": {
+    "ldm": {
+      "losses": [
+        0.6597531428613073,
+        0.6080110933790894,
+        0.6490665132393756
+      ],
+      "mean_loss": 0.6389435831599241,
+      "sd_loss": 0.027316024714444956,
+      "solver_seconds": [
+        1.0901983479658763,
+        4.564682612816493,
+        1.297102928161621
+      ],
+      "mean_solver_seconds": 2.31732796298133
+    },
+    "mcmc": {
+      "losses": [
+        0.7143280465349204,
+        0.7152610002187487,
+        0.7154364844120038
+      ],
+      "mean_loss": 0.7150085103885576,
+      "sd_loss": 0.0005957952396593202,
+      "solver_seconds": [
+        91.3603486220042,
+        91.31160298983256,
+        91.26434370875359
+      ],
+      "mean_solver_seconds": 91.31209844019678
+    },
+    "acq": {
+      "losses": [
+        0.7150357183757952,
+        0.7152597948301942,
+        0.7154364844120038
+      ],
+      "mean_loss": 0.7152439992059977,
+      "sd_loss": 0.00020084939694311823,
+      "solver_seconds": [
+        91.27563148240249,
+        91.2369613101085,
+        91.27559935549895
+      ],
+      "mean_solver_seconds": 91.26273071600332
+    }
+  },
+  "progress": {
+    "ldm-42": {
+      "committed_records": 65,
+      "complete_charged_prefix": 66,
+      "reserved_slots": 82,
+      "interface_rejections": 1,
+      "completed_rounds": 4
+    },
+    "ldm-43": {
+      "committed_records": 65,
+      "complete_charged_prefix": 65,
+      "reserved_slots": 81,
+      "interface_rejections": 0,
+      "completed_rounds": 4
+    },
+    "ldm-3407": {
+      "committed_records": 81,
+      "complete_charged_prefix": 81,
+      "reserved_slots": 81,
+      "interface_rejections": 0,
+      "completed_rounds": 5
+    },
+    "mcmc-42": {
+      "committed_records": 36,
+      "complete_charged_prefix": 35,
+      "reserved_slots": 53,
+      "interface_rejections": 3,
+      "completed_rounds": null
+    },
+    "mcmc-43": {
+      "committed_records": 38,
+      "complete_charged_prefix": 31,
+      "reserved_slots": 55,
+      "interface_rejections": 4,
+      "completed_rounds": null
+    },
+    "mcmc-3407": {
+      "committed_records": 38,
+      "complete_charged_prefix": 34,
+      "reserved_slots": 54,
+      "interface_rejections": 4,
+      "completed_rounds": null
+    },
+    "acq-42": {
+      "committed_records": 37,
+      "complete_charged_prefix": 36,
+      "reserved_slots": 54,
+      "interface_rejections": 4,
+      "completed_rounds": null
+    },
+    "acq-43": {
+      "committed_records": 33,
+      "complete_charged_prefix": 31,
+      "reserved_slots": 50,
+      "interface_rejections": 2,
+      "completed_rounds": null
+    },
+    "acq-3407": {
+      "committed_records": 36,
+      "complete_charged_prefix": 36,
+      "reserved_slots": 52,
+      "interface_rejections": 2,
+      "completed_rounds": null
+    }
+  }
+}

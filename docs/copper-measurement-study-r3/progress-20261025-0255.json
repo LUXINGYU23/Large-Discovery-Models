@@ -1,0 +1,93 @@
+{
+  "time": 1792868114.4510858,
+  "stage": "training",
+  "rows": {
+    "acq-3407": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "acq-42": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "acq-43": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "ldm-3407": {
+      "charged": 17,
+      "complete_results": 7,
+      "outcomes": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ]
+    },
+    "ldm-42": {
+      "charged": 17,
+      "complete_results": 17,
+      "outcomes": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ]
+    },
+    "ldm-43": {
+      "charged": 1,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "mcmc-3407": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "mcmc-42": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    },
+    "mcmc-43": {
+      "charged": 17,
+      "complete_results": 1,
+      "outcomes": [
+        "succeeded"
+      ]
+    }
+  },
+  "paused": false,
+  "note": "One private LDM-3407 5-second interface timeout retained; no reset or free retry; providers automatically resume."
+}

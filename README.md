@@ -1,3 +1,5 @@
+> **RSI4Geo branch:** [Paper codebase guide](docs/rsi4geo/README.md) | [Copper inversion task](tasks/copper_inversion/README.md)
+
 <h1 align="center">
   Large Discovery Models (LDM v0.1):<br>
   Empirically-grounded Model-Based Open-Ended Search

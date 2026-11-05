@@ -1,0 +1,12 @@
+[
+  {
+    "split": "test_id",
+    "case_id": "043db7bb47f107720770",
+    "rule": "lexicographically smallest case_id per split; discovery seed42, execution seed47 fixed"
+  },
+  {
+    "split": "test_ood",
+    "case_id": "03b6e10983e2a678a37c",
+    "rule": "lexicographically smallest case_id per split; discovery seed42, execution seed47 fixed"
+  }
+]

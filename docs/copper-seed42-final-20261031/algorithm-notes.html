@@ -1,0 +1,18 @@
+
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>LDM42算法与源码复核</title>
+<style>body{max-width:1000px;margin:35px auto;padding:20px;font:16px/1.8 system-ui;color:#20364b}code{overflow-wrap:anywhere}pre{white-space:pre-wrap;background:#f0f5f8;padding:20px}a{color:#176e91}</style>
+<h1>LDM42：算法、候选身份与源码复核</h1>
+<p><a href="index.html#page4">返回报告算法章节</a> · <a href="data/algorithm-audit.json">结构化审计证据</a> · <a href="source/audit_selected_algorithm.py">只读源码复核与隔离探针脚本</a></p>
+<h2>冻结源码</h2><ul><li><a href="source/ldm42-selected-solver.py">验证选中的冻结求解器</a> · SHA256 <code>2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b</code></li><li><a href="source/ldm42-training-best-solver.py">训练最佳冻结求解器</a> · SHA256 <code>776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd</code></li></ul>
+<p>复核只读正式实验目录，复制源码原字节供审阅；report.json摘要前后一致，没有调用solve()、Docker、评估服务或大模型API。</p>
+<h2>实际执行路径</h2>
+<p>initialize → sphere / anneal → best_pair → canonicalize。RBF、cycle、portfolio、slab、topology、ellipsoid分支未启用。共享初始化器从公开正负观测计算最近邻距离；两个类别都有时以d+ &lt; d−构造占据体，再满足公开约束。退火损失为公开观测NLL与接触点Huber项，按组与模态权重聚合；不使用隐藏确认观测或真值。</p>
+<h2>最佳记录的实现问题</h2>
+<pre>if chosen is not None:
+    field, cur = chosen, chosen_val
+    if cur &lt; best_l:
+        best, best_l = prop.copy(), cur  # 冻结源码第321行</pre>
+<p>循环比较半径1、3两种提议。chosen可能是半径1的模型，prop始终指最后一次构造的半径3模型。因此此行的模型与分数可能不对应。隔离探针直接提取原函数，使用合成数组、固定时钟和桩评分，只执行一轮：半径1分数0.4，半径3分数0.8，函数返回半径3模型而内部记录0.4。该探针证明控制流问题，不测量真实案例受影响的频次或性能。</p>
+<p>本报告保留原赢家与正式收据。报告中的损失、IoU及时间来自外部评分对实际输出的评估，不采用该内部best_l作为测试结果。此处没有修复或重新计算科学结果；原实验效应仍按冻结程序整体解释。</p>
+<h2>选型口径</h2>
+<p>训练最佳776ee0300e97…与验证赢家2d2c33ed6a58…的函数体一致，仅anneal_frac与seed_offset不同。验证仅使用执行47；不补评、不重选。“最好”指既定验证选型规则下的当前赢家。</p></html>

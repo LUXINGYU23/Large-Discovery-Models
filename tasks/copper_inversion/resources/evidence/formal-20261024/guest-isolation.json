@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "readonly_write_denials": 3,
+  "private_paths_absent": true,
+  "host_credentials_absent": true,
+  "private_socket_inaccessible": true,
+  "http_egress_probe_failed": true,
+  "read_tool_escape_denied": true,
+  "runtime": {
+    "imageRef": "ldm/copper-inversion-research:1d71efa7d6f5",
+    "recipeSha256": "1d71efa7d6f589af24c4ba971f40e86096171f7175785af47e92764b390c7ebc",
+    "buildId": "58634160-5935-5f69-939e-067d555b5a04",
+    "manifestSha256": "8a1f94bbd36c4ff4839478680ebce8e1d361cae8471e58dab89feca6a2454146",
+    "architecture": "x86_64",
+    "rootfsSize": "4G",
+    "installPolicy": "session_overlay"
+  },
+  "scope": "Actual GondolinController guest filesystem and environment probes; not an exhaustive sandbox escape or network audit"
+}

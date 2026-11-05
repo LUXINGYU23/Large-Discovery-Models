@@ -1,0 +1,106 @@
+{
+  "time": 1792897000.6556313,
+  "groups": {
+    "ldm-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 81,
+      "private_errors": {},
+      "last_receipt_age": 10.159110069274902,
+      "pid": 2665576,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "mcmc-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 96,
+      "private_errors": {},
+      "last_receipt_age": 9.548739433288574,
+      "pid": 2666278,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "acq-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 93,
+      "private_errors": {},
+      "last_receipt_age": 12.323364734649658,
+      "pid": 2667091,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "ldm-43": {
+      "charged": 67,
+      "private_charged": 65,
+      "complete": 65,
+      "private_errors": {},
+      "last_receipt_age": 6485.401051998138,
+      "pid": 1861748,
+      "interface_rejected_sources": 2,
+      "alive": true
+    },
+    "mcmc-43": {
+      "charged": 113,
+      "private_charged": 107,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 0.8682138919830322,
+      "pid": 2668343,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "acq-43": {
+      "charged": 113,
+      "private_charged": 108,
+      "complete": 95,
+      "private_errors": {},
+      "last_receipt_age": 1.5369877815246582,
+      "pid": 2669098,
+      "interface_rejected_sources": 2,
+      "alive": true
+    },
+    "ldm-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 108,
+      "private_errors": {
+        "timeout": 1
+      },
+      "last_receipt_age": 1.2268836498260498,
+      "pid": 2669668,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "mcmc-3407": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 94,
+      "private_errors": {},
+      "last_receipt_age": 0.9325993061065674,
+      "pid": 2670836,
+      "interface_rejected_sources": 0,
+      "alive": true
+    },
+    "acq-3407": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 94,
+      "private_errors": {},
+      "last_receipt_age": 1.3106586933135986,
+      "pid": 2671910,
+      "interface_rejected_sources": 0,
+      "alive": true
+    }
+  },
+  "paused": false,
+  "recovery": {
+    "supervisor_pid": 1860444,
+    "replacement_client_pid": 1861748,
+    "original_supervisor": 2665407,
+    "source_unchanged": true,
+    "budget_reset": false,
+    "started_at": 1792896969.3069777
+  }
+}

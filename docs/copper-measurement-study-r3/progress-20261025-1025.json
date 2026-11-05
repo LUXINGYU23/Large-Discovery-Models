@@ -1,0 +1,123 @@
+{
+  "timestamp": 1792895134.0515466,
+  "stage": {
+    "stage": "training",
+    "updated_at": 1792895128.9188082,
+    "exit_codes": {
+      "ldm-42": null,
+      "mcmc-42": null,
+      "acq-42": null,
+      "ldm-43": 1,
+      "mcmc-43": null,
+      "acq-43": null,
+      "ldm-3407": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "paused": false,
+  "groups": {
+    "ldm-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 81,
+      "last_receipt_age": 0.8248341083526611,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 85,
+      "last_receipt_age": 0.8506803512573242,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 83,
+      "last_receipt_age": 1.02231764793396,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "ldm-43": {
+      "charged": 67,
+      "private_charged": 65,
+      "complete": 65,
+      "last_receipt_age": 4624.527529001236,
+      "client_alive": false,
+      "service_alive": true
+    },
+    "mcmc-43": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 92,
+      "last_receipt_age": 0.46735548973083496,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-43": {
+      "charged": 97,
+      "private_charged": 95,
+      "complete": 90,
+      "last_receipt_age": 2.6442015171051025,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "ldm-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 96,
+      "last_receipt_age": 1.1017155647277832,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-3407": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 83,
+      "last_receipt_age": 9.130728244781494,
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-3407": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 82,
+      "last_receipt_age": 1.9834237098693848,
+      "client_alive": true,
+      "service_alive": true
+    }
+  },
+  "ldm43_admissions": [
+    {
+      "path": "ldm-43/harness/branches/round_0005/admissions/5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be.json",
+      "mtime": 1792892911.763103,
+      "sha256": "cee7198c9e1a6ffbae9e6cb633bf4f1b0002c5fcc8b7ae491494b1caa27c21bb",
+      "profile": "researcher_2",
+      "sources": 8
+    },
+    {
+      "path": "ldm-43/harness/branches/round_0005/admissions/c905aa4721e2d39e7ca77f8a8eee6469bf8a19b5f541bb78594bddb9a7067def.json",
+      "mtime": 1792892232.4350426,
+      "sha256": "3f75c4d9e09d6d7baef569cfceea8af675872b323a6431a2efbb6c1a73b9dcb4",
+      "profile": "researcher_1",
+      "sources": 8
+    },
+    {
+      "path": "ldm-43/harness/branches/round_0005/admissions/418a2b4b2644ac13b329d75954ace8fe6956ad128998b48a53844ddc66b65eaa.json",
+      "mtime": 1792891922.1183083,
+      "sha256": "e186e0ff2570fdef2c4402368b105eb1bbecebda714d90f00d5a9d06fef298ca",
+      "profile": "researcher_4",
+      "sources": 8
+    },
+    {
+      "path": "ldm-43/harness/branches/round_0005/admissions/844b9287224577903f3e3f1b9f125a8f2c8226d089e94529f48f73530c37479e.json",
+      "mtime": 1792891247.445584,
+      "sha256": "626a48823edc0af97887db37756af4bb12bba9e196d15d62982586cd44f95fb0",
+      "profile": "researcher_3",
+      "sources": 8
+    }
+  ]
+}

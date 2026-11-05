@@ -1,0 +1,10 @@
+{
+  "checked_at": 1793419941.8503213,
+  "status": "accepted_with_disclosed_validation_deviation",
+  "final_manifest_files_verified": 4,
+  "main_links_verified": 14,
+  "image_hashes_verified": 432,
+  "page_errors": [],
+  "main_report_sha256": "3fcfc33b0197628d7f0b04881b260b7f4efd0e4fc66628370e248e8943188a1e",
+  "no_evaluation_or_reselection_performed": true
+}

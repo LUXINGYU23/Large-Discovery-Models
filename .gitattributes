@@ -2,3 +2,8 @@
 
 # The upstream contract pins the raw bytes of this seed.
 tasks/llm_kv_adaptive_quantization/resources/seed_quantizer.py text eol=lf
+
+# Frozen report exports and evidence keep their original bytes for SHA256 audits.
+# Generated CSV/SVG/vendor assets and archived patches retain original whitespace.
+docs/copper-*/** -text -whitespace
+tasks/copper_inversion/resources/evidence/** -text

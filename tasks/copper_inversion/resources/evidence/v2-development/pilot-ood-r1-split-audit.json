@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "scope": "lineage and exact/coarse geometry collision checks only",
+  "parents": {
+    "test_id": 4,
+    "test_ood": 4,
+    "train": 8,
+    "validation": 4
+  },
+  "manifest_sha256": {
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-ood-r1/suites/test_ood/manifest.json": "4aba9c9eae8582f46c3b913dc922cfd122d789bc3f167f28fec986afb45e143c",
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r3/suites/train/manifest.json": "d8822275c509eba0d50dc0000072e66ff0f001d80744f4cdf3df2649eb104e55",
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r3/suites/validation/manifest.json": "e01c36afdfdf5aeea26fe17d039054aa9529aeff614e36a420cf9b2a5a2f98d8",
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r3/suites/test_id/manifest.json": "31303a7f069a9ef40bb00cb448d7429d2a612b5c1a9c6ab33bb7391c1cf0174c"
+  },
+  "lineage_sha256": "60fdf43d7e38a82d50f7ad7796c3ed36fc8bdc5269eb39677e491f889a664771",
+  "remaining_checks": [
+    "near-duplicate retrieval and geological review",
+    "independent hidden-access isolation"
+  ]
+}

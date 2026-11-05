@@ -1,0 +1,462 @@
+{
+  "status": "draft_pending_protocol_decision",
+  "disclosures": [
+    "Validation actually seed47 only, requested47/48/49; no reselection",
+    "Repaired reevaluation on previously revealed benchmark, not first blind test",
+    "Equal hard caps do not imply equal measured time",
+    "Projected stochastic optimization is not strict posterior MCMC"
+  ],
+  "rows": [
+    {
+      "method": "ldm",
+      "discovery_seed": 42,
+      "source": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3478232317984524,
+        "mean_iou": 0.15100625788375674,
+        "mean_solver_wall_seconds": 113.30727634827296,
+        "parent_count": 16.0,
+        "research_utility": 0.6521767682015476,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "ldm",
+      "discovery_seed": 42,
+      "source": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.35161845280075243,
+        "mean_iou": 0.1389863995135603,
+        "mean_solver_wall_seconds": 113.29931530853112,
+        "parent_count": 8.0,
+        "research_utility": 0.6483815471992476,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "ldm",
+      "discovery_seed": 43,
+      "source": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.39902682528145705,
+        "mean_iou": 0.23051827210884968,
+        "mean_solver_wall_seconds": 111.14646719892819,
+        "parent_count": 16.0,
+        "research_utility": 0.600973174718543,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "ldm",
+      "discovery_seed": 43,
+      "source": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.49175234241256427,
+        "mean_iou": 0.2787455388691563,
+        "mean_solver_wall_seconds": 111.13391590118408,
+        "parent_count": 8.0,
+        "research_utility": 0.5082476575874357,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "ldm",
+      "discovery_seed": 3407,
+      "source": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3383266003289107,
+        "mean_iou": 0.17546237099047712,
+        "mean_solver_wall_seconds": 113.23539584130049,
+        "parent_count": 16.0,
+        "research_utility": 0.6616733996710893,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "ldm",
+      "discovery_seed": 3407,
+      "source": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.3430872780403572,
+        "mean_iou": 0.17546318685511636,
+        "mean_solver_wall_seconds": 113.22526812553406,
+        "parent_count": 8.0,
+        "research_utility": 0.6569127219596428,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 42,
+      "source": "98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40036691071972386,
+        "mean_iou": 0.10812898022626471,
+        "mean_solver_wall_seconds": 91.11844002952178,
+        "parent_count": 16.0,
+        "research_utility": 0.5996330892802761,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 42,
+      "source": "98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40735927271343675,
+        "mean_iou": 0.08700283215453081,
+        "mean_solver_wall_seconds": 91.12896753847599,
+        "parent_count": 8.0,
+        "research_utility": 0.5926407272865633,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 43,
+      "source": "040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42702300840494023,
+        "mean_iou": 0.10820650627200479,
+        "mean_solver_wall_seconds": 91.13079261779785,
+        "parent_count": 16.0,
+        "research_utility": 0.5729769915950598,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 43,
+      "source": "040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.42759192771195365,
+        "mean_iou": 0.0890424793525198,
+        "mean_solver_wall_seconds": 91.11682184537251,
+        "parent_count": 8.0,
+        "research_utility": 0.5724080722880464,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 3407,
+      "source": "d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41721606464897554,
+        "mean_iou": 0.10854904317587363,
+        "mean_solver_wall_seconds": 91.06958683083455,
+        "parent_count": 16.0,
+        "research_utility": 0.5827839353510245,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "mcmc",
+      "discovery_seed": 3407,
+      "source": "d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4276018847031743,
+        "mean_iou": 0.08874077212260559,
+        "mean_solver_wall_seconds": 91.12427128354709,
+        "parent_count": 8.0,
+        "research_utility": 0.5723981152968257,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 42,
+      "source": "4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40402175464711787,
+        "mean_iou": 0.11044115300979575,
+        "mean_solver_wall_seconds": 91.11951085925102,
+        "parent_count": 16.0,
+        "research_utility": 0.5959782453528821,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 42,
+      "source": "4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41242368311557365,
+        "mean_iou": 0.08773389722906663,
+        "mean_solver_wall_seconds": 91.09755434592564,
+        "parent_count": 8.0,
+        "research_utility": 0.5875763168844264,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 43,
+      "source": "f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.40684023525652,
+        "mean_iou": 0.10898963200497416,
+        "mean_solver_wall_seconds": 91.09288939088583,
+        "parent_count": 16.0,
+        "research_utility": 0.59315976474348,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 43,
+      "source": "f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4103893975847589,
+        "mean_iou": 0.08975805086673892,
+        "mean_solver_wall_seconds": 91.06594201425712,
+        "parent_count": 8.0,
+        "research_utility": 0.5896106024152411,
+        "solve_count": 48.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 3407,
+      "source": "281259cf9735471efcea6963f98d8680b8041e73ca119e2e9a869a7a699ea5cd",
+      "split": "test_id",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.41012454720905045,
+        "mean_iou": 0.10782946601891602,
+        "mean_solver_wall_seconds": 91.0879538282752,
+        "parent_count": 16.0,
+        "research_utility": 0.5898754527909496,
+        "solve_count": 96.0
+      }
+    },
+    {
+      "method": "acq",
+      "discovery_seed": 3407,
+      "source": "281259cf9735471efcea6963f98d8680b8041e73ca119e2e9a869a7a699ea5cd",
+      "split": "test_ood",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.4115763041765441,
+        "mean_iou": 0.08815025075632811,
+        "mean_solver_wall_seconds": 91.154405772686,
+        "parent_count": 8.0,
+        "research_utility": 0.5884236958234559,
+        "solve_count": 48.0
+      }
+    }
+  ],
+  "summary": [
+    {
+      "method": "ldm",
+      "split": "test_id",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.36172555246960675,
+          "sample_sd": 0.03265096043541653
+        },
+        "mean_iou": {
+          "mean": 0.1856623003276945,
+          "sample_sd": 0.04072553278222418
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 112.56304646283388,
+          "sample_sd": 1.2273199705114972
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    },
+    {
+      "method": "ldm",
+      "split": "test_ood",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.3954860244178913,
+          "sample_sd": 0.08347813019519977
+        },
+        "mean_iou": {
+          "mean": 0.19773170841261098,
+          "sample_sd": 0.07249185849198295
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 112.55283311174975,
+          "sample_sd": 1.2293759734747745
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    },
+    {
+      "method": "mcmc",
+      "split": "test_id",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.41486866125787986,
+          "sample_sd": 0.013482196147562346
+        },
+        "mean_iou": {
+          "mean": 0.10829484322471437,
+          "sample_sd": 0.0002235302738311938
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.10627315938473,
+          "sample_sd": 0.0323660568520184
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    },
+    {
+      "method": "mcmc",
+      "split": "test_ood",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.4208510283761882,
+          "sample_sd": 0.011684204206233237
+        },
+        "mean_iou": {
+          "mean": 0.08826202787655206,
+          "sample_sd": 0.0011008801991647882
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.12335355579853,
+          "sample_sd": 0.006124633328315872
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    },
+    {
+      "method": "acq",
+      "split": "test_id",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.4069955123708961,
+          "sample_sd": 0.0030543579522023328
+        },
+        "mean_iou": {
+          "mean": 0.10908675034456197,
+          "sample_sd": 0.0013085492782069087
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.10011802613735,
+          "sample_sd": 0.016975023614176646
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    },
+    {
+      "method": "acq",
+      "split": "test_ood",
+      "metrics": {
+        "loss_total": {
+          "mean": 0.4114631282922922,
+          "sample_sd": 0.0010218541925356628
+        },
+        "mean_iou": {
+          "mean": 0.08854739961737788,
+          "sample_sd": 0.0010689223080282044
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.10596737762292,
+          "sample_sd": 0.044827931756837296
+        },
+        "legal_rate": {
+          "mean": 1.0,
+          "sample_sd": 0.0
+        }
+      }
+    }
+  ],
+  "file_hashes": {
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/selection.json": "5713de2653af7c884cfb363a1bd1a7db7686e64409bcd3853809588d12bcf875",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/test-result.json": "decf6b98096d22220493e60c48cdda581880c6b9448cd20355067bd5fe043e2f",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/frozen.json": "25116f62224e45c2d3ee079c6116d9a43d99ed4ef798ef6d2656acde51584984",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/selection.json": "4c71fc5ae4212f5711cc43253f5024481a4eef1fa23ff02a0bceddd88d70f97c",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/test-result.json": "3a6c75fa82d2db4372ae4d5540796b30a5612e841429f63077054077276648b0",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-43/frozen.json": "3ad9fa3d30e1582f9873a67b21b21a7778c7d45dd6b63619ab354071f1a27510",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/selection.json": "5199e2c150b0a2e4c0461e844515604db44993eca9b98f515bd956c2d2c21bba",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/test-result.json": "6958a0691240296c89b9a663999eec369052c652c3655173e1c2c016a5d9f7cf",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-3407/frozen.json": "616cd4096132baaee1d7805dea2a0f1cd011977844083f554a841cc2e5f3242b",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/selection.json": "bbd25ed6678e62ccb91540c6ce9f1747998f29101d60761dc1fb60228660c72c",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/test-result.json": "8b0fc16338c0cdf76f291f79859a1dbfb8b8527c65e15703d93d312e79e8ad4d",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-42/frozen.json": "63d4fe756180a98147d4910cb279bc2c8b04b37c5850aa1dce27036327620fe3",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/selection.json": "fbc7ff371e062a6e12dbce95d59b7d93195279ca5bb313cc2f573f72acdbcafa",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/test-result.json": "b39e07756ed0fe265be713b38b989e2718c51baa71795a0d0aab92687ddb7a7e",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-43/frozen.json": "1966fc50807d23f8e84b999c30c4e9c31c6b995f3af3465c68087a0a81571409",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/selection.json": "0f7b0d0e550e20d4195ac159701c55fe1cc0193391575a30fe4e267f50c392fc",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/test-result.json": "23d30d2d52d723eaea8eb4309e0328e1c01fc3d090f40869199905e8807568cc",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/mcmc-3407/frozen.json": "ecf581efb42e8d412f2dcf2f42435280c3571e595134769132be629f82cbfbf1",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/selection.json": "c7354d2613d04146020dcf673f936ef47097e123c3a65b1336c07ea7f9fb6655",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/test-result.json": "9dec7e804dd02bce3fc5adcb172138c7c4447b42ff4c3cd5dffcdc031b4b99d5",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-42/frozen.json": "f33372dd934cc3471d0aebcca67865b62cb7383aeb1fc6386fee9211735b5054",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/selection.json": "488ab3d08689faaefe8c1cf15ef59e352026e4166a64097b59dc90dbcf9dc188",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/test-result.json": "1858d69337c69015d41bffaca827bacc3cbe0210b54eebde2704f2add45152d4",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-43/frozen.json": "2d3c99455b3f24f455af5d311d0623a7e2dd6c84825ebb581684dae7dacb6cf5",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/selection.json": "41a45ccd5530e50b54356b48b1aa76f66399fc8e74b530b807d22f6e8c0d2170",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/test-result.json": "978a86b659250be28c8e78be4797789236f1be52bdd9a668f542ad79861c4aa0",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/selection/acq-3407/frozen.json": "5a121f10a0ce5764af377869b10ad039f41224a38dca47603b7a63157dd1c020"
+  }
+}

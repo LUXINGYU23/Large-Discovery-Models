@@ -1,0 +1,92 @@
+{
+  "time": 1793177368.0134304,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6303,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 7.670372009277344
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6398,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 10.805683135986328
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6280,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 190.66564106941223
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6346,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 10.89888072013855
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6690,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 16.45445728302002
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6619,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 25.344771146774292
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793177356.6092014,
+    "supervisor_pid": 355698,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261028.py ",
+  "new_failures": [],
+  "missing_failures": [],
+  "known_failures": 10,
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_unchanged": true,
+  "fair_unchanged": true,
+  "new_cases": 393,
+  "window_seconds": 1772.154646396637,
+  "scheduling_rows": 887,
+  "queue_wait_seconds": {
+    "max": 862.2409555101767,
+    "median": 600.6525272680447,
+    "p95": 809.1377127300948
+  },
+  "case_rate_per_hour": 798.3501907560639,
+  "eta_note": "30-minute window only; no completion commitment, excludes future pauses and validation/test"
+}

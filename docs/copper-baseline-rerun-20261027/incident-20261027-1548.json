@@ -1,0 +1,16 @@
+{
+  "status": "paused_pending_recovery_qualification",
+  "observed_at": "2026-10-27T15:48:00+08:00",
+  "trigger": "Docker command outcome unavailable; reconcile the job before retry",
+  "daemon_evidence": "Docker/containerd reported multiple DeadlineExceeded errors at 15:26–15:27; underlying host cause remains undetermined",
+  "charged_sources_per_group": 17,
+  "complete_candidate_suites": {"mcmc-42": 5, "acq-42": 2, "mcmc-43": 3, "acq-43": 3, "mcmc-3407": 2, "acq-3407": 1},
+  "complete_case_receipts": 3956,
+  "unreceipted_jobs": {"not_started_container_missing": 3, "exited_zero_authenticated_scorer": 1},
+  "scorer_worker_seconds": 0.3792813550680876,
+  "r3_preservation": "29 recorded hashes unchanged",
+  "regression": "10 existing remote queue/budget/replay tests passed; full takeover qualification remains pending",
+  "evidence_root": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops",
+  "evidence_files": ["monitor-20261027-1548.json", "unreceipted-inventory-20261027-1548.json", "docker-incident-evidence-20261027-1548.json", "recovery-regression-1548.log"],
+  "next": "Qualify exact incomplete-job and batch replay; preserve all historical bytes, budgets and completed work; use a new one-shot recovery controller after verification. Do not restart the original controller or shared Docker."
+}

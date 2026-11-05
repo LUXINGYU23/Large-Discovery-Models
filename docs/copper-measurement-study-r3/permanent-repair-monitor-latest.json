@@ -1,0 +1,88 @@
+{
+  "time": 1792906623.6852393,
+  "paused": false,
+  "stage": "training",
+  "groups": {
+    "ldm-42": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 113,
+      "complete_results": 107,
+      "new_job_receipts": 27,
+      "new_failed_jobs": [],
+      "latest_receipt_age": 5.2
+    },
+    "mcmc-42": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 112,
+      "new_job_receipts": 17,
+      "new_failed_jobs": [],
+      "latest_receipt_age": -0.4
+    },
+    "acq-42": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 113,
+      "new_job_receipts": 35,
+      "new_failed_jobs": [],
+      "latest_receipt_age": 0.7
+    },
+    "ldm-43": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 99,
+      "complete_results": 81,
+      "new_job_receipts": 29,
+      "new_failed_jobs": [],
+      "latest_receipt_age": -0.7
+    },
+    "mcmc-43": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 119,
+      "new_job_receipts": 25,
+      "new_failed_jobs": [],
+      "latest_receipt_age": 5.2
+    },
+    "acq-43": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 117,
+      "new_job_receipts": 25,
+      "new_failed_jobs": [],
+      "latest_receipt_age": -1.5
+    },
+    "ldm-3407": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 145,
+      "complete_results": 128,
+      "new_job_receipts": 35,
+      "new_failed_jobs": [],
+      "latest_receipt_age": -0.6
+    },
+    "mcmc-3407": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 113,
+      "new_job_receipts": 25,
+      "new_failed_jobs": [],
+      "latest_receipt_age": -2.0
+    },
+    "acq-3407": {
+      "client_alive": true,
+      "expected_command": true,
+      "charged": 129,
+      "complete_results": 113,
+      "new_job_receipts": 22,
+      "new_failed_jobs": [],
+      "latest_receipt_age": 3.3
+    }
+  }
+}

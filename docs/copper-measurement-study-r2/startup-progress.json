@@ -1,0 +1,122 @@
+{
+  "captured_at": 1792851794.531231,
+  "groups": [
+    {
+      "name": "ldm-42",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 1,
+      "private_job_receipts": 102,
+      "job_exit_codes": {
+        "0": 102
+      },
+      "latest_receipt_age": 127.8,
+      "provider_activity_age": 1.9,
+      "traceback": false
+    },
+    {
+      "name": "mcmc-42",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 39.1,
+      "provider_activity_age": null,
+      "traceback": false
+    },
+    {
+      "name": "acq-42",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 36.2,
+      "provider_activity_age": null,
+      "traceback": false
+    },
+    {
+      "name": "ldm-43",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 1,
+      "private_job_receipts": 102,
+      "job_exit_codes": {
+        "0": 102
+      },
+      "latest_receipt_age": 120.9,
+      "provider_activity_age": 7.7,
+      "traceback": false
+    },
+    {
+      "name": "mcmc-43",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 33.1,
+      "provider_activity_age": null,
+      "traceback": false
+    },
+    {
+      "name": "acq-43",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 32.4,
+      "provider_activity_age": null,
+      "traceback": false
+    },
+    {
+      "name": "ldm-3407",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 1,
+      "private_job_receipts": 102,
+      "job_exit_codes": {
+        "0": 102
+      },
+      "latest_receipt_age": 109.0,
+      "provider_activity_age": 0.7,
+      "traceback": false
+    },
+    {
+      "name": "mcmc-3407",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 26.5,
+      "provider_activity_age": null,
+      "traceback": false
+    },
+    {
+      "name": "acq-3407",
+      "controller_alive": true,
+      "charged": 1,
+      "complete_results": 0,
+      "private_job_receipts": 14,
+      "job_exit_codes": {
+        "0": 14
+      },
+      "latest_receipt_age": 25.7,
+      "provider_activity_age": null,
+      "traceback": false
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+[
+  {
+    "algorithm": "surrogate_guided_harness",
+    "argv": [
+      "--iterations",
+      "1",
+      "--candidates-per-researcher",
+      "2",
+      "--evaluations-per-round",
+      "4",
+      "--solver-seconds",
+      "10",
+      "--harness-seconds",
+      "900",
+      "--manifest",
+      "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r3/suites/train/manifest.json",
+      "--out-dir",
+      "runs/copper_v2_fusion_pilot",
+      "--embedding-model-path",
+      "/Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614",
+      "--embedding-device",
+      "cuda:0",
+      "--harness-cache-dir",
+      "/Aidata/shared/ldm/cache/gondolin",
+      "--sidecar-image",
+      "sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4"
+    ],
+    "command_display": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python -m tasks.copper_inversion.ldm_task.procedure --iterations 1 --candidates-per-researcher 2 --evaluations-per-round 4 --solver-seconds 10 --harness-seconds 900 --manifest /Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r3/suites/train/manifest.json --out-dir runs/copper_v2_fusion_pilot --embedding-model-path /Aidata/shared/codebo/models/Qwen3-Embedding-0.6B-97b0c614 --embedding-device cuda:0 --harness-cache-dir /Aidata/shared/ldm/cache/gondolin --sidecar-image sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "config_path": "/Aidata/shared/ldm/copper-v2-development/config/copper_inversion/fusion_pilot.yaml",
+    "cwd": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion",
+    "env_overrides": {
+      "LDM_EXPERIMENT_CONTRACT_PATH": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion/experiment.json",
+      "LDM_EXPERIMENT_CONTRACT_PROFILE": "fusion_pilot"
+    },
+    "experiment_contract": {
+      "path": "/Aidata/shared/ldm/copper-v2-development/tasks/copper_inversion/experiment.json",
+      "profile": "fusion_pilot",
+      "sha256": "9246bfeee6889e511ce652316d7db0b360639da63bc06b60b483c4e515dd52ea"
+    },
+    "mode": "real",
+    "module": "tasks.copper_inversion.ldm_task.procedure",
+    "name": "copper_v2_fusion_pilot",
+    "task": "copper_inversion"
+  }
+]

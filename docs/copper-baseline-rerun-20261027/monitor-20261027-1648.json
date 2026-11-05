@@ -1,0 +1,129 @@
+{
+  "time": 1793090925.81393,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 840,
+      "completed_sources": 17,
+      "new_jobs": 258,
+      "cases_last_10min": 37,
+      "latest_age": 20.392282247543335,
+      "charged": 33
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 826,
+      "completed_sources": 17,
+      "new_jobs": 352,
+      "cases_last_10min": 54,
+      "latest_age": 10.315099239349365,
+      "charged": 33
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 816,
+      "completed_sources": 17,
+      "new_jobs": 275,
+      "cases_last_10min": 45,
+      "latest_age": 204.4429771900177,
+      "charged": 33
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 820,
+      "completed_sources": 17,
+      "new_jobs": 356,
+      "cases_last_10min": 80,
+      "latest_age": 23.948347091674805,
+      "charged": 33
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 847,
+      "completed_sources": 17,
+      "new_jobs": 399,
+      "cases_last_10min": 58,
+      "latest_age": 4.742998838424683,
+      "charged": 33
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 820,
+      "completed_sources": 17,
+      "new_jobs": 331,
+      "cases_last_10min": 56,
+      "latest_age": 8.958074808120728,
+      "charged": 33
+    }
+  ],
+  "failures": [],
+  "terminal_scorer_receipt": true,
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793090914.2134807,
+    "supervisor_pid": 4010559,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-20261027-1623",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "original_container_reused": true,
+  "r3_unchanged": true,
+  "host_load": [
+    71.3974609375,
+    65.38671875,
+    61.6982421875
+  ],
+  "meminfo": [
+    "MemTotal:       2113324988 kB",
+    "MemAvailable:   585595032 kB"
+  ],
+  "orphan_receipts": [
+    {
+      "job": "fe074c8865986ca0fdee03df9a07a9016bdf26a2a4efbf58629cb721892016e7",
+      "exit_code": 0,
+      "container_id": "7230b21de39f5ff291a3475ee68af3f277fd2abc00c55ce4c4d604fb236899c2"
+    },
+    {
+      "job": "7fb64cd61df28e9fb18e97fec7cf532a9d83cd6a7d87e2295e34d599e177a8a2",
+      "exit_code": 0,
+      "container_id": "191c89e41887ad6b50a81792a374ccbc0a2ce373edd5ad2952ecc12f8c9c7302"
+    },
+    {
+      "job": "777f4f7bf21bb68a1a878bcab742069fb140ad5ce30a5fa12868975c49428e83",
+      "exit_code": 0,
+      "container_id": "c26e1d93ac0c9b97c687c09e2a5651692c40ffd693b3d579842fa6e280eb0cc4"
+    },
+    {
+      "job": "b06294c9865ea193a1485fe9fb4337741645e7c843347edade6d2632db45e2d2",
+      "exit_code": 0,
+      "container_id": "98a86a7ded851ae91728903b50d54165de39c35ae6cd85ab870e6a25547ecffb"
+    }
+  ],
+  "history_checked": 17489,
+  "history_changed": [],
+  "eta": {
+    "cases_per_hour_10min": 1980,
+    "training_hours_at_current_rate": 44.18131313131313,
+    "validation_test_hours_at_current_rate": 0.8727272727272727,
+    "qualification": "10-minute window only; excludes future pauses, interface/admission and batch-tail effects; not a firm completion deadline"
+  }
+}

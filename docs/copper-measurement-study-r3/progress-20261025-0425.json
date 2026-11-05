@@ -1,0 +1,151 @@
+{
+  "time": 1792873467.4665112,
+  "rows": {
+    "acq-3407": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3372,
+      "errors": {},
+      "last_job_age": 4,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-42": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3094,
+      "errors": {},
+      "last_job_age": 2,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-43": {
+      "charged": 33,
+      "private_charged": 32,
+      "complete": 16,
+      "job_receipts": 3414,
+      "errors": {},
+      "last_job_age": 1,
+      "client_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "ldm-3407": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 32,
+      "job_receipts": 4801,
+      "errors": {
+        "timeout": 1
+      },
+      "last_job_age": 1382,
+      "client_rejections": {},
+      "private_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0003/sessions/researcher_4/turns/researcher_4_round_3/provider/researcher_4_round_3-provider-14.authorized.json",
+          5
+        ],
+        [
+          "harness/branches/round_0003/sessions/researcher_4/turns/researcher_4_round_3/provider/researcher_4_round_3-provider-14.request.bin",
+          5
+        ]
+      ]
+    },
+    "ldm-42": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 28,
+      "job_receipts": 4743,
+      "errors": {},
+      "last_job_age": 3,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0002/panel.json",
+          3540
+        ],
+        [
+          "harness/branches/round_0002/tree.json",
+          3540
+        ]
+      ]
+    },
+    "ldm-43": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 17,
+      "job_receipts": 2550,
+      "errors": {},
+      "last_job_age": 1452,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0002/sessions/researcher_4/turns/researcher_4_round_2/provider/researcher_4_round_2-provider-19.authorized.json",
+          12
+        ],
+        [
+          "harness/branches/round_0002/sessions/researcher_4/turns/researcher_4_round_2/provider/researcher_4_round_2-provider-19.request.bin",
+          12
+        ]
+      ]
+    },
+    "mcmc-3407": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3441,
+      "errors": {},
+      "last_job_age": 0,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-42": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3335,
+      "errors": {},
+      "last_job_age": 0,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-43": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3471,
+      "errors": {},
+      "last_job_age": 11,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    }
+  },
+  "stage": "training",
+  "paused": false
+}

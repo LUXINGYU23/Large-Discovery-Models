@@ -1,0 +1,605 @@
+{
+  "rows": [
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0002/sessions/researcher_4/turns/researcher_4_round_2/input.json",
+      "digest": "9db5c15e5d3b65215407ad630ae82948ed0be216621d5a4ad0c382c5687827a0",
+      "round": 2,
+      "turn": "researcher_4_round_2"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0002/sessions/researcher_1/turns/researcher_1_round_2/input.json",
+      "digest": "d91b95ef6e1845eae2f274fd3a0189bfdc0b25e2f3c723735ff829f73fa42184",
+      "round": 2,
+      "turn": "researcher_1_round_2"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0002/sessions/researcher_3/turns/researcher_3_round_2/input.json",
+      "digest": "281dbeaacba38c0310d282beb93ff94c43ce9c2e3859d641af07ea992b93c167",
+      "round": 2,
+      "turn": "researcher_3_round_2"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0002/sessions/researcher_2/turns/researcher_2_round_2/input.json",
+      "digest": "12390eda72ad982bd7628d0d18521d24b70102b6af97f17cc68c55534b0e7f3a",
+      "round": 2,
+      "turn": "researcher_2_round_2"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0007/sessions/researcher_4/turns/researcher_4_round_7/input.json",
+      "digest": "a7934a24f99bf53fa56720dcff7215605a223aa2540facbe73b010e7cc72fdc5",
+      "round": 7,
+      "turn": "researcher_4_round_7"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0007/sessions/researcher_1/turns/researcher_1_round_7/input.json",
+      "digest": "9983e9052bd4fe7c5f1a5e009c970b441fc7005776c0f133b220c85e89511951",
+      "round": 7,
+      "turn": "researcher_1_round_7"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0007/sessions/researcher_3/turns/researcher_3_round_7/input.json",
+      "digest": "24f7e0e6b6b57549cc22f7641c2aad0c66c7c4f8e28ba1524c21a38497fb83b0",
+      "round": 7,
+      "turn": "researcher_3_round_7"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0007/sessions/researcher_2/turns/researcher_2_round_7/input.json",
+      "digest": "c4906837dcb30826094f444ec8e77efd78fe32624cd1fdc0487d5fc0d09eb7b1",
+      "round": 7,
+      "turn": "researcher_2_round_7"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0001/sessions/researcher_4/turns/researcher_4_round_1/input.json",
+      "digest": "ecca70611f0eef0c85f6d25c1b3d1c2a30e8df760a92ce4306f9eaaeafa33139",
+      "round": 1,
+      "turn": "researcher_4_round_1"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0001/sessions/researcher_1/turns/researcher_1_round_1/input.json",
+      "digest": "36e76e14f4c81c06b9c82560ccc6bf22e24a6226b458d00e739f6b4838445e0c",
+      "round": 1,
+      "turn": "researcher_1_round_1"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0001/sessions/researcher_3/turns/researcher_3_round_1/input.json",
+      "digest": "eb486e5418a70ae0e6fbba63979bd22141f0ddc98e074a1e30db2f3ec5bff696",
+      "round": 1,
+      "turn": "researcher_3_round_1"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0001/sessions/researcher_2/turns/researcher_2_round_1/input.json",
+      "digest": "bab578504e9b73c617c06995bce6a161c4e7fea919defcb2adabf07e03554fcd",
+      "round": 1,
+      "turn": "researcher_2_round_1"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0015/sessions/researcher_4/turns/researcher_4_round_15/input.json",
+      "digest": "6d4ac65d6eec73acec8bab55b8c2ab588b616f05b46b53b1bf1a99e55694fbea",
+      "round": 15,
+      "turn": "researcher_4_round_15"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0015/sessions/researcher_1/turns/researcher_1_round_15/input.json",
+      "digest": "afaa1523b7c9cffb0c5ea156a6880d5a809d7974b308da6f3dbbe36db395228a",
+      "round": 15,
+      "turn": "researcher_1_round_15"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0015/sessions/researcher_3/turns/researcher_3_round_15/input.json",
+      "digest": "0fda2d635289c60195a0229e7d5959cf5add7b6fa1fffec3406a271bef7ff16a",
+      "round": 15,
+      "turn": "researcher_3_round_15"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0015/sessions/researcher_2/turns/researcher_2_round_15/input.json",
+      "digest": "356f391ee0ac9ba2143d214049027bfb2615f2fe01e6f3b6972968338ae57e70",
+      "round": 15,
+      "turn": "researcher_2_round_15"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0006/sessions/researcher_4/turns/researcher_4_round_6/input.json",
+      "digest": "6315a598b922d37160280434254d81c9c232d44ef0a0529454a7d6ae823cad80",
+      "round": 6,
+      "turn": "researcher_4_round_6"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0006/sessions/researcher_1/turns/researcher_1_round_6/input.json",
+      "digest": "fdd5c63c2457768bea6add7bf308d0fc8bcc3f970bbf731e282d20130644b6f3",
+      "round": 6,
+      "turn": "researcher_1_round_6"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0006/sessions/researcher_3/turns/researcher_3_round_6/input.json",
+      "digest": "4675a3782019dbb84cd19404f4d3b407c444b4ea2563a8297da53255b77a1d95",
+      "round": 6,
+      "turn": "researcher_3_round_6"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0006/sessions/researcher_2/turns/researcher_2_round_6/input.json",
+      "digest": "f345b1d778b6dfdd150e133da4c8a9044920fa171bf715f3a591186a569f04e8",
+      "round": 6,
+      "turn": "researcher_2_round_6"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0009/sessions/researcher_4/turns/researcher_4_round_9/input.json",
+      "digest": "d04101af490dda729e3c7c3aa1df2f917141f8755b5a2ce8f97f78b725e266e0",
+      "round": 9,
+      "turn": "researcher_4_round_9"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0009/sessions/researcher_1/turns/researcher_1_round_9/input.json",
+      "digest": "1d0c1e6d6d9c3f00b6f9541ed3794664cb5dbdb27fb10e6f5f6fe17f6a488bad",
+      "round": 9,
+      "turn": "researcher_1_round_9"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0009/sessions/researcher_3/turns/researcher_3_round_9/input.json",
+      "digest": "9bb91c25b57afeb5a74f1be256e521436ec4ce734255087491f563d85c5ab1a6",
+      "round": 9,
+      "turn": "researcher_3_round_9"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0009/sessions/researcher_2/turns/researcher_2_round_9/input.json",
+      "digest": "c5faec75c106dab7df3b3e3f6d82e9af4dd7c3df1f279a0428969826f8ea8df9",
+      "round": 9,
+      "turn": "researcher_2_round_9"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0008/sessions/researcher_4/turns/researcher_4_round_8/input.json",
+      "digest": "8a28c05015da60f5118e80b79b528e3dfb7864e900ed9ff4b3747c3ce8b1dfe7",
+      "round": 8,
+      "turn": "researcher_4_round_8"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0008/sessions/researcher_1/turns/researcher_1_round_8/input.json",
+      "digest": "0fb76daafeaae7d7b3356a4c73ff71e2520b541d1f8f96f5017b331bde873057",
+      "round": 8,
+      "turn": "researcher_1_round_8"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0008/sessions/researcher_3/turns/researcher_3_round_8/input.json",
+      "digest": "c1bbb1878de8e1f648ea0aea658c79f672a1fbb346b9bc9bc5d55310eb4b7564",
+      "round": 8,
+      "turn": "researcher_3_round_8"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0008/sessions/researcher_2/turns/researcher_2_round_8/input.json",
+      "digest": "ead94a9795326b6c1d675332111e6bded5e664ea2fd17b7330596dc389b1f355",
+      "round": 8,
+      "turn": "researcher_2_round_8"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0014/sessions/researcher_4/turns/researcher_4_round_14/input.json",
+      "digest": "0f1425f90b9f64c68fbfd4971123ab94203929888fdf1c26ba08b14b5272d851",
+      "round": 14,
+      "turn": "researcher_4_round_14"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0014/sessions/researcher_1/turns/researcher_1_round_14/input.json",
+      "digest": "cb0394a5782f2dbe52571496328ba0272a5aebc76f1c3d61b3f7f77e3d7a9895",
+      "round": 14,
+      "turn": "researcher_1_round_14"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0014/sessions/researcher_3/turns/researcher_3_round_14/input.json",
+      "digest": "b71a8f5812a22973ba358d69bd9aa3a8ef6af490e156760f08d500009b70c66e",
+      "round": 14,
+      "turn": "researcher_3_round_14"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0014/sessions/researcher_2/turns/researcher_2_round_14/input.json",
+      "digest": "d13e3a487ee675aca47d0cb2b0e111af260404dbeead41a78e747f2cb54b3403",
+      "round": 14,
+      "turn": "researcher_2_round_14"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0018/sessions/researcher_4/turns/researcher_4_round_18/input.json",
+      "digest": "08bd5fc954b25a260d0e81c36c5022bf0ec0862ca8749d4b9ea356021c4012a2",
+      "round": 18,
+      "turn": "researcher_4_round_18"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0018/sessions/researcher_1/turns/researcher_1_round_18/input.json",
+      "digest": "84a93f114bf09a6aa3b641b9c99621d6ee9d65fe584ecae30444b24ddfbecfbd",
+      "round": 18,
+      "turn": "researcher_1_round_18"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0018/sessions/researcher_3/turns/researcher_3_round_18/input.json",
+      "digest": "67c9c87d0b5143758598e76f6d572fe749538dbc7839bd3ccf0c35c78bb82722",
+      "round": 18,
+      "turn": "researcher_3_round_18"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0018/sessions/researcher_2/turns/researcher_2_round_18/input.json",
+      "digest": "5a2e75e0c8a781d00e4839a69d0040d3cf695ffed14ae12e6feb0a52f17b8c6e",
+      "round": 18,
+      "turn": "researcher_2_round_18"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0011/sessions/researcher_4/turns/researcher_4_round_11/input.json",
+      "digest": "082355c561cdcaa4710ff59e2ddf4002406067fdf3a6b01ab474ae7cc30a5121",
+      "round": 11,
+      "turn": "researcher_4_round_11"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0011/sessions/researcher_1/turns/researcher_1_round_11/input.json",
+      "digest": "e5a57245adfcd698c301a6c64a690cc92a51ba4fcf8948957892ed592501e2aa",
+      "round": 11,
+      "turn": "researcher_1_round_11"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0011/sessions/researcher_3/turns/researcher_3_round_11/input.json",
+      "digest": "bd494668764c132cee2c5ddd1987d9c662a3c84fd9f2213f413f9ccf65273c5b",
+      "round": 11,
+      "turn": "researcher_3_round_11"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0011/sessions/researcher_2/turns/researcher_2_round_11/input.json",
+      "digest": "e52a1b75ab230972fb397a2e9eab75a540f21c0591cb0049c4e90efba9ba9696",
+      "round": 11,
+      "turn": "researcher_2_round_11"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0013/sessions/researcher_4/turns/researcher_4_round_13/input.json",
+      "digest": "91bb8f2b0124e6211df2db20c45dc9bf5f5cbbf942d82afac09f7c7fa261ac9a",
+      "round": 13,
+      "turn": "researcher_4_round_13"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0013/sessions/researcher_1/turns/researcher_1_round_13/input.json",
+      "digest": "317b0b19656b0689c475d2412b8c84bf2f5227b93b79c587a885158927ec1a9b",
+      "round": 13,
+      "turn": "researcher_1_round_13"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0013/sessions/researcher_3/turns/researcher_3_round_13/input.json",
+      "digest": "b79b101e7679d2e468428cf2ce8c142d67dff11a919549a179b1828e857f2367",
+      "round": 13,
+      "turn": "researcher_3_round_13"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0013/sessions/researcher_2/turns/researcher_2_round_13/input.json",
+      "digest": "428f1aa8eaef5ff07c277a057cc854b4d4198d1a271ed0a34b5436eb4ef770bf",
+      "round": 13,
+      "turn": "researcher_2_round_13"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0010/sessions/researcher_4/turns/researcher_4_round_10/input.json",
+      "digest": "f3fc03173c207e05f264f49e22e16b0bd8c5dfb1d68ee8311f935bd85f562373",
+      "round": 10,
+      "turn": "researcher_4_round_10"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0010/sessions/researcher_1/turns/researcher_1_round_10/input.json",
+      "digest": "ddeccaa68901b99b565d3b61a78e03b1ed73a986fd6b3863749872e0fad5ff4b",
+      "round": 10,
+      "turn": "researcher_1_round_10"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0010/sessions/researcher_3/turns/researcher_3_round_10/input.json",
+      "digest": "983e1ce8e0fdace0ae5313c1ad6b3093a19ecbaaeb6c544fe82d3f75308c0fce",
+      "round": 10,
+      "turn": "researcher_3_round_10"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0010/sessions/researcher_2/turns/researcher_2_round_10/input.json",
+      "digest": "228a4f94e52386731243c4ba93fbca72f8e3e7fe00e528e26cddc4239a5b8f0c",
+      "round": 10,
+      "turn": "researcher_2_round_10"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0019/sessions/researcher_4/turns/researcher_4_round_19/input.json",
+      "digest": "699a8f127b7d1da9c60f6714c1e56de50d5bd0ddb850d64a2ececcc7ab694e41",
+      "round": 19,
+      "turn": "researcher_4_round_19"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0019/sessions/researcher_1/turns/researcher_1_round_19/input.json",
+      "digest": "79fb168417a1c3c0660a5d2b8a28116fa507e100711867b7398d1222c2c511b9",
+      "round": 19,
+      "turn": "researcher_1_round_19"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0019/sessions/researcher_3/turns/researcher_3_round_19/input.json",
+      "digest": "cfce68660a945d4097b0ccfbab6aa3ed03e5b2c60643febcbf6e9d253feda2ec",
+      "round": 19,
+      "turn": "researcher_3_round_19"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0019/sessions/researcher_2/turns/researcher_2_round_19/input.json",
+      "digest": "0f7568b0fbe02fff06eb8d3861430f4374de2f7b0734681c615e89cdb7220b75",
+      "round": 19,
+      "turn": "researcher_2_round_19"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0004/sessions/researcher_4/turns/researcher_4_round_4/input.json",
+      "digest": "c2eda016bbc8e3ae4d2270865e356345bb9a7bc563cf2d99feb44d89d410c19f",
+      "round": 4,
+      "turn": "researcher_4_round_4"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0004/sessions/researcher_1/turns/researcher_1_round_4/input.json",
+      "digest": "69bfd3b4d32c674b23bff86bdb209fafe9eeae4707b9432fa23924489dc03baf",
+      "round": 4,
+      "turn": "researcher_1_round_4"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0004/sessions/researcher_3/turns/researcher_3_round_4/input.json",
+      "digest": "30d3c51456fb406689bba28a3ea4ddcd334d5ad226cfea2ebabdf406252b565e",
+      "round": 4,
+      "turn": "researcher_3_round_4"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0004/sessions/researcher_2/turns/researcher_2_round_4/input.json",
+      "digest": "b4ba17f2077421066c5e04d03a953ea3aaa8c3f71a34f82363c8f77b5ceb0dd3",
+      "round": 4,
+      "turn": "researcher_2_round_4"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0017/sessions/researcher_4/turns/researcher_4_round_17/input.json",
+      "digest": "32c0cc952fe4e2c1978ee5ac7ff17b5318adf36f5fe85db4d90a2f6c97180b95",
+      "round": 17,
+      "turn": "researcher_4_round_17"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0017/sessions/researcher_1/turns/researcher_1_round_17/input.json",
+      "digest": "e7aaef4d4ec76a1bf91ad8f819de7e81f31b57305585485f885ceaea132251bc",
+      "round": 17,
+      "turn": "researcher_1_round_17"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0017/sessions/researcher_3/turns/researcher_3_round_17/input.json",
+      "digest": "5d36ddbffde1985606f74ee21be5334f4308bb5545878901198790a8464c06f4",
+      "round": 17,
+      "turn": "researcher_3_round_17"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0017/sessions/researcher_2/turns/researcher_2_round_17/input.json",
+      "digest": "747d7cb90e6eeb7335e398783cf33fac8ceddfffef6b1c956560247ed1f011bd",
+      "round": 17,
+      "turn": "researcher_2_round_17"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0016/sessions/researcher_4/turns/researcher_4_round_16/input.json",
+      "digest": "6d4207e7de41dbd2f1ff5f54edfcf36868b679fbbb7ff47ed54a34b315488849",
+      "round": 16,
+      "turn": "researcher_4_round_16"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0016/sessions/researcher_1/turns/researcher_1_round_16/input.json",
+      "digest": "e42753181eba1a0d88d3d70b02950b6d5154528bde863fe7f100a8e2151c78c0",
+      "round": 16,
+      "turn": "researcher_1_round_16"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0016/sessions/researcher_3/turns/researcher_3_round_16/input.json",
+      "digest": "8419af88c3a111259063995b3699e4add5b02a8172a1f155bd8890daf77077e1",
+      "round": 16,
+      "turn": "researcher_3_round_16"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0016/sessions/researcher_2/turns/researcher_2_round_16/input.json",
+      "digest": "74bb4e29ec7a3682911ec9ddff234b6d7b75f9c8fba3b70b679dd360cc175d06",
+      "round": 16,
+      "turn": "researcher_2_round_16"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0003/sessions/researcher_4/turns/researcher_4_round_3/input.json",
+      "digest": "99e6c2b8add9d4bfd576e41cb4c648c444f5dae5866dc6c0dd174bcd60f45e6a",
+      "round": 3,
+      "turn": "researcher_4_round_3"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0003/sessions/researcher_1/turns/researcher_1_round_3/input.json",
+      "digest": "f8140c480f6561262868d79bf911b317ebc6bc35232325dc40f3f6c2875fc6de",
+      "round": 3,
+      "turn": "researcher_1_round_3"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0003/sessions/researcher_3/turns/researcher_3_round_3/input.json",
+      "digest": "4c01183edb3199b4bbaf8676f0d7a5a76e8366775c287dac103ee4c682c7e53c",
+      "round": 3,
+      "turn": "researcher_3_round_3"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0003/sessions/researcher_2/turns/researcher_2_round_3/input.json",
+      "digest": "c5658f226ae2ad9b69ddbfd842fb39ffb1a1ef189906efe4ad2c307d40386002",
+      "round": 3,
+      "turn": "researcher_2_round_3"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_4/turns/researcher_4_round_5/input.json",
+      "digest": "418a2b4b2644ac13b329d75954ace8fe6956ad128998b48a53844ddc66b65eaa",
+      "round": 5,
+      "turn": "researcher_4_round_5"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_1/turns/researcher_1_round_5/input.json",
+      "digest": "c905aa4721e2d39e7ca77f8a8eee6469bf8a19b5f541bb78594bddb9a7067def",
+      "round": 5,
+      "turn": "researcher_1_round_5"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_3/turns/researcher_3_round_5/input.json",
+      "digest": "844b9287224577903f3e3f1b9f125a8f2c8226d089e94529f48f73530c37479e",
+      "round": 5,
+      "turn": "researcher_3_round_5"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/input.json",
+      "digest": "5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be",
+      "round": 5,
+      "turn": "researcher_2_round_5"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0012/sessions/researcher_4/turns/researcher_4_round_12/input.json",
+      "digest": "2dbd52f3671dab9e7a5c15ce8015906f42c484b26f9e5f6fade973836c6d6947",
+      "round": 12,
+      "turn": "researcher_4_round_12"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0012/sessions/researcher_1/turns/researcher_1_round_12/input.json",
+      "digest": "cdafd8ebd0ba5e96c2ba80f9bd744f7125794f4b72a2ad7b2e6ee5b3804ca50a",
+      "round": 12,
+      "turn": "researcher_1_round_12"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0012/sessions/researcher_3/turns/researcher_3_round_12/input.json",
+      "digest": "f46e866d985b45417b414ff22ee3882a264450e9c9b88d2d056171903fec31a4",
+      "round": 12,
+      "turn": "researcher_3_round_12"
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0012/sessions/researcher_2/turns/researcher_2_round_12/input.json",
+      "digest": "4301f76fe038bf61735670509cee5fc7a2d098b6836150bcb2c5657e80cf9843",
+      "round": 12,
+      "turn": "researcher_2_round_12"
+    }
+  ],
+  "unmatched": [
+    "4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b",
+    "8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b",
+    "918838c8e8eaa95867b2d66d555abd3ee9112d54e62246f68c9647c5e731e437",
+    "fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b"
+  ],
+  "serialization_matches": [],
+  "unmatched_usage": {
+    "4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b": {
+      "copper:turn:4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b": {
+        "harness_turns": 1
+      },
+      "copper:usage:4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b": {
+        "harness_validation_submissions": 0
+      }
+    },
+    "8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b": {
+      "copper:turn:8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b": {
+        "harness_turns": 1
+      },
+      "copper:usage:8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b": {
+        "harness_validation_submissions": 0
+      }
+    },
+    "918838c8e8eaa95867b2d66d555abd3ee9112d54e62246f68c9647c5e731e437": {
+      "copper:turn:918838c8e8eaa95867b2d66d555abd3ee9112d54e62246f68c9647c5e731e437": {
+        "harness_turns": 1
+      }
+    },
+    "fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b": {
+      "copper:turn:fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b": {
+        "harness_turns": 1
+      },
+      "copper:usage:fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b": {
+        "harness_validation_submissions": 0
+      }
+    }
+  },
+  "finding": "76 persisted input digests map exactly to 19 rounds x4; four unmatched charge keys remain. Three have only zero-validation usage, one has no usage. Historical snapshots show +3 excess by round6; final partial round20 reservation likely fourth, not yet cryptographically mapped. No budget correction authorized by this evidence.",
+  "time": 1793038094.7812097,
+  "pause_sha256": "e30bd0f70d3220b4ac81616ecdd33e8193dfb753bd6da25c5a8ac6dd5ff7fcad",
+  "nested_serialization_matches": [
+    {
+      "digest": "fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b",
+      "persisted_digest": "418a2b4b2644ac13b329d75954ace8fe6956ad128998b48a53844ddc66b65eaa",
+      "turn": "researcher_4_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_4/turns/researcher_4_round_5/input.json",
+      "sorted_fields": [
+        "metrics"
+      ],
+      "branchsort": false
+    },
+    {
+      "digest": "fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b",
+      "persisted_digest": "418a2b4b2644ac13b329d75954ace8fe6956ad128998b48a53844ddc66b65eaa",
+      "turn": "researcher_4_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_4/turns/researcher_4_round_5/input.json",
+      "sorted_fields": [
+        "metrics",
+        "resource_usage"
+      ],
+      "branchsort": false
+    },
+    {
+      "digest": "8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b",
+      "persisted_digest": "844b9287224577903f3e3f1b9f125a8f2c8226d089e94529f48f73530c37479e",
+      "turn": "researcher_3_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_3/turns/researcher_3_round_5/input.json",
+      "sorted_fields": [
+        "metrics"
+      ],
+      "branchsort": false
+    },
+    {
+      "digest": "8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b",
+      "persisted_digest": "844b9287224577903f3e3f1b9f125a8f2c8226d089e94529f48f73530c37479e",
+      "turn": "researcher_3_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_3/turns/researcher_3_round_5/input.json",
+      "sorted_fields": [
+        "metrics",
+        "resource_usage"
+      ],
+      "branchsort": false
+    },
+    {
+      "digest": "4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b",
+      "persisted_digest": "5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be",
+      "turn": "researcher_2_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/input.json",
+      "sorted_fields": [
+        "metrics"
+      ],
+      "branchsort": false
+    },
+    {
+      "digest": "4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b",
+      "persisted_digest": "5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be",
+      "turn": "researcher_2_round_5",
+      "path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/input.json",
+      "sorted_fields": [
+        "metrics",
+        "resource_usage"
+      ],
+      "branchsort": false
+    }
+  ],
+  "verified_aliases": [
+    {
+      "alias": "fcadd0722e08660a2548d45b962a1317d9d672f50db9b44e0d01011e1e7a998b",
+      "canonical": "418a2b4b2644ac13b329d75954ace8fe6956ad128998b48a53844ddc66b65eaa",
+      "turn": "researcher_4_round_5",
+      "input_path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_4/turns/researcher_4_round_5/input.json",
+      "input_file_sha256": "cc0116cf48e8eeb6a12077eacce921f9b5b197be85a73ead6e41af25df6fbda7",
+      "metadata_equal": true,
+      "parsed_message_equal": true,
+      "alias_usage": {
+        "harness_validation_submissions": 0
+      }
+    },
+    {
+      "alias": "8952a20ea378dc8eace034a1869358489eb93f3483a1ca4d9e08ae0270f7142b",
+      "canonical": "844b9287224577903f3e3f1b9f125a8f2c8226d089e94529f48f73530c37479e",
+      "turn": "researcher_3_round_5",
+      "input_path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_3/turns/researcher_3_round_5/input.json",
+      "input_file_sha256": "ec420b379043e0e0cace43120d1e2ef52a0a13bfa4ad2fbd452f244e7078c91c",
+      "metadata_equal": true,
+      "parsed_message_equal": true,
+      "alias_usage": {
+        "harness_validation_submissions": 0
+      }
+    },
+    {
+      "alias": "4d601cacfc40f862ab4beb544e6efac0cd1b0f7b0ab81d71cf1e6ad8d10ffc9b",
+      "canonical": "5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be",
+      "turn": "researcher_2_round_5",
+      "input_path": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/ldm-43/harness/branches/round_0005/sessions/researcher_2/turns/researcher_2_round_5/input.json",
+      "input_file_sha256": "55115ff696d8a89fb7c41191e5648576456538d4e8af351fa4cb68fe68ae93e5",
+      "metadata_equal": true,
+      "parsed_message_equal": true,
+      "alias_usage": {
+        "harness_validation_submissions": 0
+      }
+    }
+  ],
+  "conclusion": "Three round5 researcher2/3/4 turn charges duplicate persisted inputs solely through metrics key-order serialization. Formal ledger unchanged. Remaining fourth unmatched key requires round20 mapping."
+}

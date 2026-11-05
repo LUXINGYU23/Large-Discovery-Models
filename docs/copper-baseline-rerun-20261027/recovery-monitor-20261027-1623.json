@@ -1,0 +1,75 @@
+{
+  "time": 1793089356.651038,
+  "groups": [
+    {
+      "name": "mcmc-42",
+      "charged": 17,
+      "case_receipts": 717,
+      "new_case_receipts": 0
+    },
+    {
+      "name": "acq-42",
+      "charged": 17,
+      "case_receipts": 653,
+      "new_case_receipts": 10
+    },
+    {
+      "name": "mcmc-43",
+      "charged": 17,
+      "case_receipts": 670,
+      "new_case_receipts": 3
+    },
+    {
+      "name": "acq-43",
+      "charged": 17,
+      "case_receipts": 634,
+      "new_case_receipts": 0
+    },
+    {
+      "name": "mcmc-3407",
+      "charged": 17,
+      "case_receipts": 665,
+      "new_case_receipts": 14
+    },
+    {
+      "name": "acq-3407",
+      "charged": 17,
+      "case_receipts": 649,
+      "new_case_receipts": 5
+    }
+  ],
+  "history_checked": 17489,
+  "changed": [],
+  "orphans": [
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-42/jobs/fe074c8865986ca0fdee03df9a07a9016bdf26a2a4efbf58629cb721892016e7/receipt.json",
+      "exists": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/7fb64cd61df28e9fb18e97fec7cf532a9d83cd6a7d87e2295e34d599e177a8a2/receipt.json",
+      "exists": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/777f4f7bf21bb68a1a878bcab742069fb140ad5ce30a5fa12868975c49428e83/receipt.json",
+      "exists": true,
+      "exit_code": 0,
+      "container_id": "c26e1d93ac0c9b97c687c09e2a5651692c40ffd693b3d579842fa6e280eb0cc4",
+      "worker": {
+        "cpu_seconds_through_reap": 0.305542,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 39772160,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 30.0,
+        "worker_elapsed_seconds": 0.23385464772582054,
+        "workload_complete": true
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-42/jobs/b06294c9865ea193a1485fe9fb4337741645e7c843347edade6d2632db45e2d2/receipt.json",
+      "exists": false
+    }
+  ],
+  "paused": false
+}

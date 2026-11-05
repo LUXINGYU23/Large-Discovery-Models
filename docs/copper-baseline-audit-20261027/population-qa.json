@@ -1,0 +1,146 @@
+[
+  {
+    "split": "train",
+    "case": "3a616bb547c2d1f1e5a7",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "ee91ba41f1b70bf9f530",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "2fd57928057b32b5b4ba",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "ec979e838de59fcd13c0",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "1810d15a831befc1b0ba",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "e08d14e87aea2fc8ca2d",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "eaf3caab9a3e8b866d29",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "866dda9fbdcec915ff97",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "1cfd27885343bb24a52c",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "6d233c92ed95de91dc6d",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "2999f217a5775af16244",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "3af4520dfbccd33535ee",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "dab2a78eafb5ae231f8a",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "3d3d87a594d7256a320f",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "b254d3a243a58d82cb17",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "train",
+    "case": "f50e30f307ea8cd03deb",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "422be3115255983bb0bf",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "042530a6a5dbac436dcd",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "f12a3cca44342cdbd2cd",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "a2148762aa1c9d9839a1",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "de6836d019a4a5c014b4",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "bf57e4384f1d8c68a9e2",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "c077ad8bf67925207529",
+    "truth_legal": true,
+    "reason": null
+  },
+  {
+    "split": "validation",
+    "case": "4f5a8e792302ea61fc7c",
+    "truth_legal": true,
+    "reason": null
+  }
+]

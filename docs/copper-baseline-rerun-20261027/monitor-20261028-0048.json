@@ -1,0 +1,92 @@
+{
+  "time": 1793119730.584456,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3564,
+      "completed_sources": 65,
+      "cases_last_10min": 59,
+      "latest_age": 1.100088119506836,
+      "charged": 81
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3651,
+      "completed_sources": 65,
+      "cases_last_10min": 72,
+      "latest_age": 2.170262098312378,
+      "charged": 81
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3555,
+      "completed_sources": 65,
+      "cases_last_10min": 69,
+      "latest_age": 7.14963698387146,
+      "charged": 81
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3546,
+      "completed_sources": 65,
+      "cases_last_10min": 65,
+      "latest_age": 11.796661138534546,
+      "charged": 81
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3793,
+      "completed_sources": 65,
+      "cases_last_10min": 54,
+      "latest_age": 15.861303567886353,
+      "charged": 81
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 3630,
+      "completed_sources": 65,
+      "cases_last_10min": 56,
+      "latest_age": 15.738253831863403,
+      "charged": 81
+    }
+  ],
+  "failures": [],
+  "new_failures": [],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793119730.1520436,
+    "supervisor_pid": 4010559,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-20261027-1623",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "host_load": [
+    89.7666015625,
+    87.57373046875,
+    86.37744140625
+  ],
+  "cases_added": 1082,
+  "cases_per_hour_since_previous": 2166.1258488472695,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_controller_20261027_v3.py "
+}

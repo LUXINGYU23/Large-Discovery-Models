@@ -1,0 +1,24 @@
+{
+  "timestamp": 1792779387.9587133,
+  "historical_observations_unchanged": 49,
+  "current_observations": 50,
+  "round13_selection_timestamp": 1792779262.6394465,
+  "round13_selection_event_key": "engine:selection:13",
+  "tail_events": [
+    {
+      "event_type": "reservoir_built",
+      "iteration": 13,
+      "timestamp_unix": 1792779242.5238926
+    },
+    {
+      "event_type": "checkpoint_written",
+      "iteration": null,
+      "timestamp_unix": 1792779262.6384034
+    },
+    {
+      "event_type": "candidates_selected",
+      "iteration": 13,
+      "timestamp_unix": 1792779262.6394465
+    }
+  ]
+}

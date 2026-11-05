@@ -1,0 +1,40 @@
+{
+  "policy": {
+    "queue_root": "/Aidata/shared/ldm/copper-formal-scheduling-20261024-r1/queue",
+    "global_jobs": 80,
+    "jobs_per_process": 16,
+    "candidate_batch": 16,
+    "runtime_sha256": "a867d1537b09dd6648c066cdef337d255697a2d9587469e6bcc3a544ef019b46",
+    "solver_seconds": 120,
+    "feedback_slots": 321,
+    "scientific_source_unchanged": true,
+    "ordered_results": true,
+    "queue_time_excluded_from_solver": true,
+    "policy_sha256": "a7200d545d2e289571834613ca861c3a121a98ddd71b4b3652ba34b2812eb82a"
+  },
+  "started_at": 1792833884.0751233,
+  "pids": {
+    "ldm-42": 1819432,
+    "mcmc-42": 1110403,
+    "acq-42": 1110404,
+    "ldm-43": 1110405,
+    "mcmc-43": 1110406,
+    "acq-43": 1110407,
+    "ldm-3407": 1819436,
+    "mcmc-3407": 1110410,
+    "acq-3407": 1110412
+  },
+  "service_pids": {
+    "ldm-42": 1109680,
+    "mcmc-42": 1109785,
+    "acq-42": 1109900,
+    "ldm-43": 1109964,
+    "mcmc-43": 1110032,
+    "acq-43": 1110113,
+    "ldm-3407": 1110149,
+    "mcmc-3407": 1110215,
+    "acq-3407": 1110358
+  },
+  "supervisor_pid": 1819028,
+  "replay_adapter_sha256": "31ccf04a1ab5f69537bccfac7687aea79a8ecde8be38fc1299a9ca0674df1965"
+}

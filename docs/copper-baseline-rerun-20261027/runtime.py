@@ -1,0 +1,23 @@
+"""Frozen baseline-only runtime: qualified async transport and interface gate."""
+import hashlib,importlib.util,json,runpy,sys
+from pathlib import Path
+O=Path(__file__).resolve().parent
+manifest=json.loads((O/'frozen-files.json').read_text())
+for name,sha in manifest.items():
+ assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==sha,'frozen component changed: '+name
+def load(name,path):
+ spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);sys.modules[name]=m;spec.loader.exec_module(m);return m
+transport=load('tasks.copper_inversion.v2.async_transport',O/'async_transport.py')
+gate=load('tasks.copper_inversion.v2.concurrent_interfaces',O/'interface_checks.py')
+from tasks.copper_inversion.v2 import interface_checks,service
+interface_checks.InterfaceChecks=gate.InterfaceChecks;service.InterfaceChecks=gate.InterfaceChecks
+from tasks.copper_inversion.experiments.v2 import parallel_runtime
+if sys.argv[1]=='load':
+ sys.argv=[str(O/'qualify_load.py'),*sys.argv[2:]]
+ runpy.run_path(str(O/'qualify_load.py'),run_name='__main__')
+elif sys.argv[1]=='qualify':
+ policy=json.loads(Path(sys.argv[2]).read_text());parallel_runtime.install(policy)
+ sys.argv=[sys.argv[0],*sys.argv[3:]]
+ runpy.run_module('tasks.copper_inversion.experiments.v2.qualify_async_protocol',run_name='__main__')
+else:
+ transport.install();parallel_runtime.main()

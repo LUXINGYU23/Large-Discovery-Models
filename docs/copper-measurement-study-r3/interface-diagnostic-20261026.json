@@ -1,0 +1,422 @@
+[
+  {
+    "probe": 0,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.348082065582275,
+      "container": "ldm-copper-025cdf14b6-4b6b295bd6e0b922ecf3",
+      "container_id": "83252b979f11600750bee1c97196f550ff28fddeb2207a0c0e0883b8abe2d401",
+      "key": "4b6b295bd6e0b922ecf3293d2c0998cf6897e04f8684f8b6b3512b72009be847",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.19725,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96686080,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.100351298227906,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96473088,
+        "cpu_seconds_observed": 4.087249,
+        "last_sample_unix": 1792948064.77844,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.19725,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96686080,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.100351298227906,\\\"workload_complete\\\":true}\", \"mac\": \"d017fc7dda99528652029ce2fe387160ee8748a69d44c6bb728a0ac86b2ae47a\"}\ncandidate_import_start 4195860.252618258\nsolve_start 4195860.983845999\ninitialized 4195860.98518413\nTimeout (0:00:02)!\nThread 0x000074a4caf29b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 82 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195864.135682139\nsolve_return 4195864.136184156\n"
+  },
+  {
+    "probe": 1,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.1628217697143555,
+      "container": "ldm-copper-da52390261-40d4642205c6cbf802dc",
+      "container_id": "360fdc81b3889c16c5564018728a65462586c4d5f53a5170ea3d425b3197e80d",
+      "key": "40d4642205c6cbf802dca5de535942970058b57031c28c1d77099bde2d818898",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.188472,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96395264,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.079924532212317,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96395264,
+        "cpu_seconds_observed": 4.112469,
+        "last_sample_unix": 1792948064.6743338,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.188472,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96395264,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.079924532212317,\\\"workload_complete\\\":true}\", \"mac\": \"6c7bf1204a85b44877560bebd03faa00f6321403feb011bc88bb71be49bcb23a\"}\ncandidate_import_start 4195860.135452847\nsolve_start 4195860.866225111\ninitialized 4195860.867420387\nTimeout (0:00:02)!\nThread 0x00007ef11a7b0b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/numpy/core/numeric.py\", line 1931 in isscalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 706 in _scalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 511 in <listcomp>\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 550 in compute_log_prob\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195864.005626177\nsolve_return 4195864.006024473\n"
+  },
+  {
+    "probe": 2,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.264965057373047,
+      "container": "ldm-copper-236528b4ab-cef9ee98aae32022b622",
+      "container_id": "ac2191bc26d2b00c404199a70836f0b1438a276328cd02ce9f05c8e2d4fba88d",
+      "key": "cef9ee98aae32022b622038605fd370ce1d84adf7e7f7ac7d85fa7def1eb89ed",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.194483,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96264192,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.100567235611379,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96264192,
+        "cpu_seconds_observed": 4.078579,
+        "last_sample_unix": 1792948064.74056,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.194483,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96264192,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.100567235611379,\\\"workload_complete\\\":true}\", \"mac\": \"7c727e09a32e1558e7caa4dfec2b69bc8b6b23024cd98c18ba585472ce82e5d2\"}\ncandidate_import_start 4195860.221120395\nsolve_start 4195860.94988604\ninitialized 4195860.951248969\nTimeout (0:00:02)!\nThread 0x00007a0f3e905b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 90 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195864.10258199\nsolve_return 4195864.103064182\n"
+  },
+  {
+    "probe": 3,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.220521926879883,
+      "container": "ldm-copper-48743a8d76-95c8c91f286922b60244",
+      "container_id": "a7f95f1e7398ccfbf3a313de4d681ccf7cf54e060e5416f44de0846f530b2bdb",
+      "key": "95c8c91f286922b602445948d62959fef754ad0ca47abd41bc91a17118712712",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.206763,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96301056,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.086264853365719,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96301056,
+        "cpu_seconds_observed": 4.111865,
+        "last_sample_unix": 1792948064.7187185,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.206763,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96301056,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.086264853365719,\\\"workload_complete\\\":true}\", \"mac\": \"7ee008cce6856ee874b844f973ea615572847fb24177a6b206cb7eb7f0ce80b8\"}\ncandidate_import_start 4195860.196428085\nsolve_start 4195860.931388465\ninitialized 4195860.932639688\nTimeout (0:00:02)!\nThread 0x0000753ae2078b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/numpy/core/numeric.py\", line 1931 in isscalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 706 in _scalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 511 in <listcomp>\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 550 in compute_log_prob\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195864.063887233\nsolve_return 4195864.064299573\n"
+  },
+  {
+    "probe": 4,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.153486013412476,
+      "container": "ldm-copper-6fab29e1b3-e68bf23b0c82f302baec",
+      "container_id": "a43a53762f73e9b9ecba89c2be0504344b844cbfe503401a609f2a86122d7e49",
+      "key": "e68bf23b0c82f302baec4aecfad08100d328166d0695bf5bdf1f2bbd6819b53d",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.160285,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 97091584,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.078117712400854,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 97091584,
+        "cpu_seconds_observed": 4.087293,
+        "last_sample_unix": 1792948070.1296728,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "emcee: Exception while calling your likelihood function:\n  params: [[ 0.4444455 ]\n [-0.25494304]\n [-0.19240648]\n [-0.09426469]\n [-0.14361591]\n [ 0.16822969]\n [-0.14868416]\n [-0.23034275]\n [ 0.20414844]\n [ 0.06408816]\n [ 0.15261298]\n [-0.0235112 ]\n [ 0.03386881]\n [-0.03242441]\n [ 0.05461819]\n [ 0.0448215 ]\n [-0.24593908]\n [-0.25142493]\n [-0.07694299]\n [-0.02364505]\n [ 0.46162631]\n [ 0.14379128]\n [ 0.30525032]\n [-0.01954223]\n [ 0.18343095]]\n  args: []\n  kwargs: {}\n  exception:\nCOPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.160285,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":97091584,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.078117712400854,\\\"workload_complete\\\":true}\", \"mac\": \"880354c70f65f6c70ebd609144b2dfd5cae9bf5adaa9f40873564dd6a1ad366c\"}\ncandidate_import_start 4195865.59106561\nsolve_start 4195866.322826135\ninitialized 4195866.324092627\nTimeout (0:00:02)!\nThread 0x000070680728cb80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195869.455325874\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 640, in __call__\n    return self.f(x, *self.args, **self.kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 561, in ln_spectral_rad_pdf\n    return np.log(self.spectral_rad_pdf(r))\n                  ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 556, in spectral_rad_pdf\n    return spectral_rad_pdf(self, r)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/tools.py\", line 394, in spectral_rad_pdf\n    r_gz = np.logical_not(np.isclose(r, 0))\n                          ^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/numpy/core/numeric.py\", line 2346, in isclose\n    y = asanyarray(y, dtype=dt)\n        ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/submitted/solver.py\", line 55, in stop_search\n    raise SearchDeadline\ncandidate.SearchDeadline\nsolve_return 4195869.457801237\n"
+  },
+  {
+    "probe": 5,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.170618057250977,
+      "container": "ldm-copper-f7c95809f0-a2db50fcf84ea260f64f",
+      "container_id": "1aef4ed09bda3f3791cf3f9ecb4e28a47aba0d8b2c439d34ce5eff27627f7979",
+      "key": "a2db50fcf84ea260f64fbb6f6d43121ee154bfc259087cba281f8e9f6cdb10e9",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.2112,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96489472,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.103659405373037,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96489472,
+        "cpu_seconds_observed": 4.096197,
+        "last_sample_unix": 1792948070.1700196,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.2112,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96489472,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.103659405373037,\\\"workload_complete\\\":true}\", \"mac\": \"9d478e7d6e0370b03d0d11d04155dc1ae2ebb86af16a31eb059e8006d93e6a09\"}\ncandidate_import_start 4195865.647610853\nsolve_start 4195866.380448039\ninitialized 4195866.381750038\nTimeout (0:00:02)!\nThread 0x00007332f5463b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/numpy/core/numeric.py\", line 1932 in isscalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 706 in _scalar\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 511 in <listcomp>\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 511 in compute_log_prob\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195869.529424814\nsolve_return 4195869.529834493\n"
+  },
+  {
+    "probe": 6,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.256331920623779,
+      "container": "ldm-copper-4b1050b94b-b42b1114b67154d8331f",
+      "container_id": "da171ba80fe22e1e9d7dcf8488113f9fff0c177a361965b263420587b980dab8",
+      "key": "b42b1114b67154d8331fe9e329237195c0fe18a7577ad1811f93e39164e07cfd",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.233792,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96456704,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.134442549198866,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96374784,
+        "cpu_seconds_observed": 4.076655,
+        "last_sample_unix": 1792948070.186855,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.233792,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96456704,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.134442549198866,\\\"workload_complete\\\":true}\", \"mac\": \"8c8a99e5836e4ad731224452eb752022c503dc9b7494dc5f2835d64cf2f00a5c\"}\ncandidate_import_start 4195865.674999118\nsolve_start 4195866.402507714\ninitialized 4195866.403856231\nTimeout (0:00:02)!\nThread 0x0000738c52d64b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 99 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195869.539803845\nsolve_return 4195869.540749051\n"
+  },
+  {
+    "probe": 7,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.158614873886108,
+      "container": "ldm-copper-3cc40c6059-4205fc8978c1561187c7",
+      "container_id": "f638f26e3e79c4f09991edb071ec57232801e66de6deaae982f372611351b9ab",
+      "key": "4205fc8978c1561187c77c18e922405a6447d4b52bceb8ea1b7aff55df369e75",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.153781,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96354304,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.079112442210317,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96354304,
+        "cpu_seconds_observed": 4.058773,
+        "last_sample_unix": 1792948070.2250323,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.153781,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96354304,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.079112442210317,\\\"workload_complete\\\":true}\", \"mac\": \"ed468df681307a178c0921b8dd7c515cceef2b1985a071d0e5bfd87877481742\"}\ncandidate_import_start 4195865.704328051\nsolve_start 4195866.429952609\ninitialized 4195866.431189189\nTimeout (0:00:02)!\nThread 0x00007325b1b31b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195869.571193158\nsolve_return 4195869.571601764\n"
+  },
+  {
+    "probe": 8,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.2333807945251465,
+      "container": "ldm-copper-d85b268280-7abe9ec70b8ab8c6e3eb",
+      "container_id": "4841aea4a2dd351757a689378fce00bf74f72dd9132456fa7618632f6a8e5ee3",
+      "key": "7abe9ec70b8ab8c6e3eb1cd4c0bb2ebfefd98484ba10ee3d07754b1cdeb5136d",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.163361,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96632832,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.083318187855184,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96493568,
+        "cpu_seconds_observed": 4.066357,
+        "last_sample_unix": 1792948075.6583037,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "emcee: Exception while calling your likelihood function:\n  params: [[ 0.06511477]\n [-0.72630976]\n [-0.12259631]\n [ 0.16486384]\n [ 0.27805103]\n [ 0.38636787]\n [-0.12157683]\n [ 0.02543872]\n [ 0.05410838]\n [ 0.10897788]\n [ 0.20208497]\n [-0.04511705]\n [ 0.10192551]\n [ 0.09921509]\n [-0.12096466]\n [ 0.19935763]\n [ 0.2892755 ]\n [ 0.18000633]\n [-0.05612138]\n [ 0.23654595]\n [ 0.06319002]\n [ 0.01068644]\n [-0.10009311]\n [-0.06135018]\n [-0.22351818]]\n  args: []\n  kwargs: {}\n  exception:\nCOPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.163361,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96632832,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.083318187855184,\\\"workload_complete\\\":true}\", \"mac\": \"c64abce85a87f39978c49211f58f1eb7beeb621fe44ce3fcc78f0dd0331968e0\"}\ncandidate_import_start 4195871.13927338\nsolve_start 4195871.871341294\ninitialized 4195871.872759349\nTimeout (0:00:02)!\nThread 0x00007fa9f2926b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 226 in random_state\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 410 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195875.002859021\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 640, in __call__\n    return self.f(x, *self.args, **self.kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 560, in ln_spectral_rad_pdf\n    with np.errstate(divide=\"ignore\"):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/numpy/core/_ufunc_config.py\", line 426, in __init__\n    def __init__(self, *, call=_Unspecified, **kwargs):\n    \n  File \"/submitted/solver.py\", line 55, in stop_search\n    raise SearchDeadline\ncandidate.SearchDeadline\nsolve_return 4195875.004936675\n"
+  },
+  {
+    "probe": 9,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.242377996444702,
+      "container": "ldm-copper-d9fe6cd4a7-56315575317f5e43394a",
+      "container_id": "a3bf3ae6a42cbf9759a5ddeb0cd3b11361e1ea78778fb6c5064f678bbbf4ea81",
+      "key": "56315575317f5e43394a7d6ba9764ea3e96040a04e955f4e41a6678f346cb965",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.162089,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96342016,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.079437147825956,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96129024,
+        "cpu_seconds_observed": 4.036074,
+        "last_sample_unix": 1792948075.6821818,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.162089,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96342016,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.079437147825956,\\\"workload_complete\\\":true}\", \"mac\": \"92d92724778e13cd872a21559f267155c7cb5b182af3545d92464bae92ded405\"}\ncandidate_import_start 4195871.194895593\nsolve_start 4195871.925914149\ninitialized 4195871.927078434\nTimeout (0:00:02)!\nThread 0x00007bb64310cb80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/tools.py\", line 397 in spectral_rad_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 556 in spectral_rad_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 561 in ln_spectral_rad_pdf\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 506 in __call__\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 511 in compute_log_prob\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 93 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195875.059042209\nsolve_return 4195875.059463858\n"
+  },
+  {
+    "probe": 10,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.195696115493774,
+      "container": "ldm-copper-910c9a9941-0c4665f650cb39bca85f",
+      "container_id": "5e18eb8eefc90d2518d89f714ea04aafd87e922d1a4b90287912b954ebf7e947",
+      "key": "0c4665f650cb39bca85fb0422ef57f53f9ba1a03c5f0e33ac3c68fd2e86b20bd",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.165599,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96464896,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.081613480113447,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96464896,
+        "cpu_seconds_observed": 4.057595,
+        "last_sample_unix": 1792948075.6729333,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "emcee: Exception while calling your likelihood function:\n  params: [[ 0.09778575]\n [ 0.09152234]\n [-0.22178534]\n [-0.1374261 ]\n [-0.06006241]\n [ 0.12195296]\n [ 0.09164437]\n [-0.38314952]\n [-0.3100167 ]\n [-0.28505409]\n [ 0.1940783 ]\n [-0.21997411]\n [-0.08472508]\n [-0.11147439]\n [-0.09100176]\n [ 0.21220169]\n [-0.09897224]\n [-0.09082433]\n [ 0.32897987]\n [ 0.18225943]\n [-0.21294982]\n [ 0.0951222 ]\n [-0.337042  ]\n [-0.09305898]\n [ 0.1588921 ]]\n  args: []\n  kwargs: {}\n  exception:\nCOPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.165599,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96464896,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.081613480113447,\\\"workload_complete\\\":true}\", \"mac\": \"71c244f020d44f88b947c1ee72046c64af99e0205fcf4cead5a68ebb7a04e9e1\"}\ncandidate_import_start 4195871.164978126\nsolve_start 4195871.892887528\ninitialized 4195871.894075635\nTimeout (0:00:02)!\nThread 0x000074b436d53b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 100 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195875.028500191\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 640, in __call__\n    return self.f(x, *self.args, **self.kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 561, in ln_spectral_rad_pdf\n    return np.log(self.spectral_rad_pdf(r))\n                  ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/base.py\", line 556, in spectral_rad_pdf\n    return spectral_rad_pdf(self, r)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/tools.py\", line 398, in spectral_rad_pdf\n    model.spectral_density(r[r_gz])\n  File \"/usr/local/lib/python3.11/site-packages/gstools/covmodel/models.py\", line 148, in spectral_density\n    def spectral_density(self, k):  # noqa: D102\n    \n  File \"/submitted/solver.py\", line 55, in stop_search\n    raise SearchDeadline\ncandidate.SearchDeadline\nsolve_return 4195875.030853955\n"
+  },
+  {
+    "probe": 11,
+    "receipt": {
+      "exit_code": 0,
+      "oom": false,
+      "reason": null,
+      "wall_seconds": 5.078885078430176,
+      "container": "ldm-copper-082dea81f3-2e1d80e4326c61ef904e",
+      "container_id": "c059d56c8e8b7ffe2c4e0483337f2dc8fb77a5fe62d03855db17beece6477d39",
+      "key": "2e1d80e4326c61ef904e0079a0352f79f365e1fa27360f0f754330acf7d3960b",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "cpus": 1,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 4.148517,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 96301056,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "worker_budget_seconds": 5.0,
+        "worker_elapsed_seconds": 4.074050854891539,
+        "workload_complete": true
+      },
+      "resource_sampling": {
+        "method": "host_cgroup_v2_polling",
+        "target_interval_seconds": 0.2,
+        "samples": 19,
+        "sampled_peak_memory_bytes": 96251904,
+        "cpu_seconds_observed": 4.061526,
+        "last_sample_unix": 1792948075.6020005,
+        "complete_lifetime_measurement": false
+      }
+    },
+    "log": "COPPER_RESOURCE_V1 {\"payload\": \"{\\\"cpu_seconds_through_reap\\\":4.148517,\\\"exit_code\\\":0,\\\"oom_kill_count\\\":0,\\\"peak_memory_bytes\\\":96301056,\\\"schema_version\\\":1,\\\"scope\\\":\\\"container workload and supervisor through final descendant reap\\\",\\\"worker_budget_seconds\\\":5.0,\\\"worker_elapsed_seconds\\\":4.074050854891539,\\\"workload_complete\\\":true}\", \"mac\": \"3f8cfe547214196612430a86a6f9497a37abcaef698a3dbfa5897d847795f2de\"}\ncandidate_import_start 4195871.080774661\nsolve_start 4195871.804762255\ninitialized 4195871.806124274\nTimeout (0:00:02)!\nThread 0x00007a482d213b80 (most recent call first):\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 640 in __call__\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 487 in compute_log_prob\n  File \"/usr/local/lib/python3.11/site-packages/emcee/moves/red_blue.py\", line 93 in propose\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 409 in sample\n  File \"/usr/local/lib/python3.11/site-packages/emcee/ensemble.py\", line 450 in run_mcmc\n  File \"/usr/local/lib/python3.11/site-packages/gstools/random/rng.py\", line 101 in sample_ln_pdf\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 392 in reset_seed\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 324 in update\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/generator.py\", line 252 in __init__\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 187 in set_generator\n  File \"/usr/local/lib/python3.11/site-packages/gstools/field/srf.py\", line 109 in __init__\n  File \"/baseline/run_3d_comparison.py\", line 276 in field_3d\n  File \"/submitted/solver.py\", line 94 in solve\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 23 in main\n  File \"/code/tasks/copper_inversion/v2/runner.py\", line 32 in <module>\n  File \"<frozen runpy>\", line 88 in _run_code\n  File \"<frozen runpy>\", line 198 in _run_module_as_main\nalarm_delivered 4195874.943808724\nsolve_return 4195874.944223917\n"
+  }
+]

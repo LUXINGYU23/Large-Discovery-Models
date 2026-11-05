@@ -1,0 +1,216 @@
+{
+  "drillholes_3d": [
+    {
+      "round": 0,
+      "total_evaluations": 3,
+      "best": 405.0795810830953
+    },
+    {
+      "round": 1,
+      "total_evaluations": 15,
+      "best": 6.519494572166378
+    },
+    {
+      "round": 2,
+      "total_evaluations": 27,
+      "best": 6.518379892774445
+    },
+    {
+      "round": 3,
+      "total_evaluations": 39,
+      "best": 6.515693220841565
+    },
+    {
+      "round": 4,
+      "total_evaluations": 51,
+      "best": 6.515572087714029
+    },
+    {
+      "round": 5,
+      "total_evaluations": 63,
+      "best": 6.515384024667719
+    },
+    {
+      "round": 6,
+      "total_evaluations": 75,
+      "best": 6.515262925895621
+    },
+    {
+      "round": 7,
+      "total_evaluations": 87,
+      "best": 6.515262925895621
+    },
+    {
+      "round": 8,
+      "total_evaluations": 99,
+      "best": 6.51514072750861
+    },
+    {
+      "round": 9,
+      "total_evaluations": 111,
+      "best": 6.51514072750861
+    },
+    {
+      "round": 10,
+      "total_evaluations": 123,
+      "best": 6.514605300415729
+    },
+    {
+      "round": 11,
+      "total_evaluations": 135,
+      "best": 6.51447320076144
+    },
+    {
+      "round": 12,
+      "total_evaluations": 147,
+      "best": 6.51447320076144
+    },
+    {
+      "round": 13,
+      "total_evaluations": 159,
+      "best": 6.514451924237641
+    },
+    {
+      "round": 14,
+      "total_evaluations": 171,
+      "best": 6.514451924237641
+    },
+    {
+      "round": 15,
+      "total_evaluations": 183,
+      "best": 6.514451924237641
+    },
+    {
+      "round": 16,
+      "total_evaluations": 195,
+      "best": 6.514451924237641
+    },
+    {
+      "round": 17,
+      "total_evaluations": 207,
+      "best": 6.514426202763167
+    },
+    {
+      "round": 18,
+      "total_evaluations": 219,
+      "best": 6.514426202763167
+    },
+    {
+      "round": 19,
+      "total_evaluations": 231,
+      "best": 6.514426202763167
+    },
+    {
+      "round": 20,
+      "total_evaluations": 239,
+      "best": 6.514410006112401
+    }
+  ],
+  "drillholes_outcrops_3d": [
+    {
+      "round": 0,
+      "total_evaluations": 3,
+      "best": 1248.8385761871953
+    },
+    {
+      "round": 1,
+      "total_evaluations": 15,
+      "best": 33.465595742830715
+    },
+    {
+      "round": 2,
+      "total_evaluations": 27,
+      "best": 33.382459072830386
+    },
+    {
+      "round": 3,
+      "total_evaluations": 39,
+      "best": 33.168653047261564
+    },
+    {
+      "round": 4,
+      "total_evaluations": 51,
+      "best": 33.137720995278066
+    },
+    {
+      "round": 5,
+      "total_evaluations": 63,
+      "best": 32.749187492771874
+    },
+    {
+      "round": 6,
+      "total_evaluations": 75,
+      "best": 32.43411512133546
+    },
+    {
+      "round": 7,
+      "total_evaluations": 87,
+      "best": 32.43411512133546
+    },
+    {
+      "round": 8,
+      "total_evaluations": 99,
+      "best": 32.43411512133546
+    },
+    {
+      "round": 9,
+      "total_evaluations": 111,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 10,
+      "total_evaluations": 123,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 11,
+      "total_evaluations": 135,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 12,
+      "total_evaluations": 147,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 13,
+      "total_evaluations": 159,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 14,
+      "total_evaluations": 171,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 15,
+      "total_evaluations": 183,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 16,
+      "total_evaluations": 195,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 17,
+      "total_evaluations": 207,
+      "best": 32.38966419840703
+    },
+    {
+      "round": 18,
+      "total_evaluations": 219,
+      "best": 32.3895987226749
+    },
+    {
+      "round": 19,
+      "total_evaluations": 231,
+      "best": 32.3809407861128
+    },
+    {
+      "round": 20,
+      "total_evaluations": 243,
+      "best": 32.3764701149274
+    }
+  ]
+}

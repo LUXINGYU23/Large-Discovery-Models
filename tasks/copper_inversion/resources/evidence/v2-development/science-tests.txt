@@ -1,0 +1,14 @@
+test_canonical_amplitude_invariance (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_canonical_amplitude_invariance) ... ok
+test_contact_not_positive (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_contact_not_positive) ... ok
+test_empty_and_open (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_empty_and_open) ... ok
+test_forbidden_not_clipped (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_forbidden_not_clipped) ... ok
+test_group_duplication (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_group_duplication) ... ok
+test_metric_empty (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_metric_empty) ... ok
+test_physical_unit_scaling (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_physical_unit_scaling) ... ok
+test_readonly_and_hidden_fields (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_readonly_and_hidden_fields) ... ok
+test_shared_baseline_objective (tasks.copper_inversion.tests.test_v2_science.ScienceV2.test_shared_baseline_objective) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.259s
+
+OK

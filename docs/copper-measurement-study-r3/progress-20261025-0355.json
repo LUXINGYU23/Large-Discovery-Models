@@ -1,0 +1,160 @@
+{
+  "time": 1792871669.22373,
+  "rows": {
+    "acq-3407": {
+      "charged": 33,
+      "private_charged": 19,
+      "complete": 17,
+      "job_receipts": 2554,
+      "errors": {},
+      "last_job_age": 3,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-42": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 16,
+      "job_receipts": 2535,
+      "errors": {},
+      "last_job_age": 23,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-43": {
+      "charged": 33,
+      "private_charged": 19,
+      "complete": 16,
+      "job_receipts": 2418,
+      "errors": {},
+      "last_job_age": 0,
+      "client_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "ldm-3407": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 26,
+      "job_receipts": 4319,
+      "errors": {
+        "timeout": 1
+      },
+      "last_job_age": 1,
+      "client_rejections": {},
+      "private_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0002/panel.json",
+          774
+        ],
+        [
+          "harness/branches/round_0002/tree.json",
+          774
+        ]
+      ]
+    },
+    "ldm-42": {
+      "charged": 33,
+      "private_charged": 33,
+      "complete": 17,
+      "job_receipts": 3591,
+      "errors": {},
+      "last_job_age": 1,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0002/panel.json",
+          1743
+        ],
+        [
+          "harness/branches/round_0002/tree.json",
+          1743
+        ]
+      ]
+    },
+    "ldm-43": {
+      "charged": 17,
+      "private_charged": 17,
+      "complete": 14,
+      "job_receipts": 2454,
+      "errors": {},
+      "last_job_age": 8,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0001/panel.json",
+          2988
+        ],
+        [
+          "harness/branches/round_0001/tree.json",
+          2988
+        ]
+      ]
+    },
+    "mcmc-3407": {
+      "charged": 33,
+      "private_charged": 19,
+      "complete": 17,
+      "job_receipts": 2556,
+      "errors": {},
+      "last_job_age": 9,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-42": {
+      "charged": 33,
+      "private_charged": 18,
+      "complete": 17,
+      "job_receipts": 2550,
+      "errors": {},
+      "last_job_age": 72,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-43": {
+      "charged": 33,
+      "private_charged": 19,
+      "complete": 17,
+      "job_receipts": 2557,
+      "errors": {},
+      "last_job_age": 7,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    }
+  },
+  "policy": {
+    "queue_root": "/Aidata/shared/ldm/copper-measurement-study-20261025-r3/queue",
+    "global_jobs": 128,
+    "interface_slots": 8,
+    "jobs_per_process": 32,
+    "startup_slots": 4,
+    "runtime_sha256": "e11b6d38dfabaaa7d09c52e15a0f38dbeb87b802d1fcf42c294252afb13fe64f",
+    "policy_sha256": "b12f1bf657584d4f16c7c9721b61d273cdb46c588391e389c54899a039ea8059"
+  },
+  "stage": "training",
+  "paused": false
+}

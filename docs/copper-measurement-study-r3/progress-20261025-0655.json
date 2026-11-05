@@ -1,0 +1,153 @@
+{
+  "time": 1792882474.6522086,
+  "rows": {
+    "acq-3407": {
+      "charged": 65,
+      "private_charged": 58,
+      "complete": 49,
+      "job_receipts": 7600,
+      "errors": {},
+      "last_job_age": 3,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-42": {
+      "charged": 65,
+      "private_charged": 56,
+      "complete": 49,
+      "job_receipts": 7444,
+      "errors": {},
+      "last_job_age": 3,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "acq-43": {
+      "charged": 65,
+      "private_charged": 64,
+      "complete": 48,
+      "job_receipts": 7885,
+      "errors": {},
+      "last_job_age": 4,
+      "client_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "ldm-3407": {
+      "charged": 65,
+      "private_charged": 65,
+      "complete": 63,
+      "job_receipts": 9591,
+      "errors": {
+        "timeout": 1
+      },
+      "last_job_age": 76,
+      "client_rejections": {},
+      "private_rejections": {
+        "interface_rejected_sources": 1
+      },
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0004/panel.json",
+          3335
+        ],
+        [
+          "harness/branches/round_0004/tree.json",
+          3335
+        ]
+      ]
+    },
+    "ldm-42": {
+      "charged": 49,
+      "private_charged": 49,
+      "complete": 49,
+      "job_receipts": 7350,
+      "errors": {},
+      "last_job_age": 927,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0004/turns/researcher_3_round_4/turn_committed.json",
+          61
+        ],
+        [
+          "harness/branches/round_0004/sessions/researcher_3/turns/researcher_3_round_4/provider_index.jsonl",
+          62
+        ]
+      ]
+    },
+    "ldm-43": {
+      "charged": 51,
+      "private_charged": 49,
+      "complete": 33,
+      "job_receipts": 6807,
+      "errors": {},
+      "last_job_age": 1,
+      "client_rejections": {
+        "interface_rejected_sources": 2
+      },
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true,
+      "activity": [
+        [
+          "harness/branches/round_0003/panel.json",
+          3103
+        ],
+        [
+          "harness/branches/round_0003/tree.json",
+          3103
+        ]
+      ]
+    },
+    "mcmc-3407": {
+      "charged": 65,
+      "private_charged": 61,
+      "complete": 49,
+      "job_receipts": 7732,
+      "errors": {},
+      "last_job_age": 17,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-42": {
+      "charged": 65,
+      "private_charged": 61,
+      "complete": 49,
+      "job_receipts": 7723,
+      "errors": {},
+      "last_job_age": 1,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    },
+    "mcmc-43": {
+      "charged": 65,
+      "private_charged": 65,
+      "complete": 49,
+      "job_receipts": 8050,
+      "errors": {},
+      "last_job_age": 1,
+      "client_rejections": {},
+      "private_rejections": {},
+      "client_alive": true,
+      "service_alive": true
+    }
+  },
+  "stage": "training",
+  "paused": false
+}

@@ -1,0 +1,56 @@
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+{"recipe": "gempy-folded-layer-development-v2", "shape": [28, 32, 25], "positive_fraction": 0.18391405342624856, "geometry_sha256": "ca9f2cd17648d5ca1ad039b39cb6248ec89134cff22142f922080cbfcaa3f1ba"}
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+{"stage": "development-only", "hole_count": 3, "drill_labels": 109, "contacts": 6, "cases": 2}
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+Active grids: GridTypes.CUSTOM|NONE
+Setting Backend To: AvailableBackends.numpy
+{"status": "passed", "reconstructed_voxels": 22400, "checks": [{"case": "d91c16a4bf1b2f98928d", "modality": "drill", "binary_count": 103, "contact_count": 6}, {"case": "00fa711e6ec3c8562435", "modality": "drill", "binary_count": 103, "contact_count": 6}, {"case": "00fa711e6ec3c8562435", "modality": "outcrop", "binary_count": 120, "contact_count": 0}]}

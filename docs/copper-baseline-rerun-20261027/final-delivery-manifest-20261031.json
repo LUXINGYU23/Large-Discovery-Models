@@ -1,0 +1,9 @@
+{
+  "status": "accepted_with_disclosed_validation_deviation",
+  "file_hashes": {
+    "copper-v2-formal-study.md": "3fcfc33b0197628d7f0b04881b260b7f4efd0e4fc66628370e248e8943188a1e",
+    "copper-baseline-rerun-20261027/test-summary-draft-20261031.html": "11b5b6b53bc5589460b71329db7411d6c7978c85170bb3b2588b187e562f814b",
+    "copper-baseline-rerun-20261027/all-case-visual-draft-20261031/index.html": "1d810ade19f2f666baf8a1955f97ef7a254881f623082bb8f883f7da24c48be8",
+    "copper-baseline-rerun-20261027/final-acceptance-20261031.json": "15fc513051a6da0de68ac888a9ad433cdc2ffe378a631fe20b5115af306154c6"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "time": 1793143187.940294,
+  "history_files": 587125,
+  "budgets": {
+    "mcmc-42-client": 113,
+    "mcmc-42-private": 113,
+    "acq-42-client": 113,
+    "acq-42-private": 113,
+    "mcmc-43-client": 113,
+    "mcmc-43-private": 113,
+    "acq-43-client": 113,
+    "acq-43-private": 113,
+    "mcmc-3407-client": 129,
+    "mcmc-3407-private": 129,
+    "acq-3407-client": 129,
+    "acq-3407-private": 129
+  },
+  "orphans": 22,
+  "old_clients_exited": true,
+  "r3_and_runtime_unchanged": true,
+  "production_mutation": false,
+  "gate_required": true
+}

@@ -1,0 +1,35 @@
+{
+  "development_only": true,
+  "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+  "results": [
+    {
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7778463812903225,
+        "mean_iou": 0.22215361870967754,
+        "mean_solver_wall_seconds": 0.5623553991317749,
+        "parent_count": 4.0,
+        "research_utility": 0.22215361870967754,
+        "solve_count": 8.0
+      },
+      "source_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "split": "test_id"
+    },
+    {
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7849347301358813,
+        "mean_iou": 0.2150652698641187,
+        "mean_solver_wall_seconds": 0.5361655056476593,
+        "parent_count": 4.0,
+        "research_utility": 0.2150652698641187,
+        "solve_count": 8.0
+      },
+      "source_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "split": "test_ood"
+    }
+  ],
+  "selected_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5"
+}

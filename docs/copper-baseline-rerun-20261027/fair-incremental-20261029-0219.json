@@ -1,0 +1,84 @@
+{
+  "time": 1793211567.7090762,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 7796,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 0.4263794422149658
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 7872,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 63.4958655834198
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 7771,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 3.2302322387695312
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 7820,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 74.62889528274536
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8152,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 38.78050637245178
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8055,
+      "complete": 161,
+      "charged": 177,
+      "latest_age": 8.174909114837646
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793211557.5027747,
+    "supervisor_pid": 355698,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_runtime_unchanged": true,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261028.py ",
+  "fair_unchanged": true,
+  "failure_set_unchanged": true,
+  "new_cases": 410,
+  "wait_count": 1015,
+  "max_wait": 802.8257604287937,
+  "median_wait": 622.4533874699846
+}

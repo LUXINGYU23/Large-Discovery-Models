@@ -1,0 +1,119 @@
+{
+  "checked_at": 1793589437.0701017,
+  "discovery_seed": 42,
+  "test_records": 432,
+  "cases": 48,
+  "static_comparisons_verified": 144,
+  "geometry_files_verified": 144,
+  "browser_combinations_decoded": 144,
+  "interactive_3d_scenes_checked": 8,
+  "linked_camera_passed": true,
+  "pdf_pages": 18,
+  "page_errors": [],
+  "html_page_sizes": [
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    },
+    {
+      "h": 1123,
+      "scroll": 1123
+    }
+  ],
+  "footer_clearance_px": [
+    218.1875,
+    255.796875,
+    82.640625,
+    219.21875,
+    170.578125,
+    265.96875,
+    186.8125,
+    193.453125,
+    105.953125,
+    254.078125,
+    272.34375,
+    52.625,
+    177.28125,
+    173.4375,
+    157.21875,
+    157.21875,
+    157.21875,
+    157.21875
+  ],
+  "pdf_sha256": "7a302745cb2dc01fd513364d1ee00d35e50574f1b98b0d247f482b4f53f2c27d",
+  "algorithm_source_hashes_verified": true,
+  "algorithm_audit_disclosed": true,
+  "experiment_data_unchanged": true,
+  "trajectory_source_nodes_verified": 12,
+  "trajectory_candidates": 308,
+  "trajectory_toggles_passed": true,
+  "baseline_winner_sources_verified": 2,
+  "print_recheck_at": 1793589964.5482516,
+  "portable_pdf_links_verified": 20,
+  "latest_render_matches_reviewed_pages": true,
+  "pdf_visual_review": "18-page contact sheet and full pages 7-11 inspected; no clipping, missing glyphs, or overlaps"
+}

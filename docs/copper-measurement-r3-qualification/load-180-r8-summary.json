@@ -1,0 +1,11 @@
+{
+  "status": "failed",
+  "jobs": 1308,
+  "peak_active": 180,
+  "failures": 10,
+  "errors": {
+    "timeout": 10
+  },
+  "interface_failures": 10,
+  "receipt_sha256": "c6a7e932bedf8f6ee2c7109af6be2a5d1dd5e098055f392f0f54003d7a838ccc"
+}

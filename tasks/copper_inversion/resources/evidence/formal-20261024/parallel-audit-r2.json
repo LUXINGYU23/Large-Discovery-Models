@@ -1,0 +1,100 @@
+{
+  "timestamp": 1792838602.0824976,
+  "epoch_age_seconds": 57.43803095817566,
+  "preserved_receipts_checked": 22433,
+  "changed_immutable_files": [],
+  "active_containers": {
+    "mcmc-43": 9,
+    "acq-42": 4,
+    "acq-43": 13,
+    "acq-3407": 10,
+    "mcmc-3407": 8,
+    "mcmc-42": 3
+  },
+  "active_sources": {
+    "mcmc-43": 3,
+    "acq-42": 3,
+    "acq-43": 4,
+    "acq-3407": 4,
+    "mcmc-3407": 2,
+    "mcmc-42": 3
+  },
+  "phases": {
+    "tasks.copper_inversion.v2.runner": 47
+  },
+  "queue_tokens_in_use": 45,
+  "clients": {
+    "ldm-42": {
+      "alive": true,
+      "client_slots": 18,
+      "private_slots": 17,
+      "successful_evaluations": 17,
+      "completed_tuning": 0,
+      "log_tail": ", \"serialization_only\": true}\nContinuing unfinished Harness sessions; committed turns are replayed: harness sidecar response timed out\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_1_round_2\", \"serialization_only\": false}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_2_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_3_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_4_round_2\", \"serialization_only\": true}\n"
+    },
+    "mcmc-42": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"0ab4dab67af2c62667e5cf9faa0939b86ca31a7ce1b9a2777b1afc4e0f191b40\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.28164394909849727, \"loss_total\": 0.7183560509015028, \"research_utility\": 0.28164394909849727, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.44495089352131}}\n"
+    },
+    "acq-42": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"d993ab0afc2cd559f0978bf130ef3046e2862912c46b4505a2e3b0edc51b465d\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.2827987322675762, \"loss_total\": 0.7172012677324238, \"research_utility\": 0.2827987322675762, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.45987554391225}}\n"
+    },
+    "ldm-43": {
+      "alive": true,
+      "client_slots": 17,
+      "private_slots": 17,
+      "successful_evaluations": 17,
+      "completed_tuning": 0,
+      "log_tail": "ne 400, in _request\n    raise HarnessError(\nldm_tts.harness.protocol.HarnessError: Error: provider response failed: Request timed out.\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_1_round_2\", \"serialization_only\": false}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_2_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_3_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_4_round_2\", \"serialization_only\": true}\n"
+    },
+    "mcmc-43": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"0ab4dab67af2c62667e5cf9faa0939b86ca31a7ce1b9a2777b1afc4e0f191b40\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.28164394909849727, \"loss_total\": 0.7183560509015028, \"research_utility\": 0.28164394909849727, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.37418937683105}}\n"
+    },
+    "acq-43": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"d993ab0afc2cd559f0978bf130ef3046e2862912c46b4505a2e3b0edc51b465d\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.2827987322675762, \"loss_total\": 0.7172012677324238, \"research_utility\": 0.2827987322675762, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.35346632202466}}\n"
+    },
+    "ldm-3407": {
+      "alive": true,
+      "client_slots": 17,
+      "private_slots": 17,
+      "successful_evaluations": 17,
+      "completed_tuning": 0,
+      "log_tail": "ne 400, in _request\n    raise HarnessError(\nldm_tts.harness.protocol.HarnessError: Error: provider response failed: Request timed out.\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_1_round_2\", \"serialization_only\": false}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_2_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_3_round_2\", \"serialization_only\": true}\n{\"event\": \"exact_turn_replay\", \"turn\": \"researcher_4_round_2\", \"serialization_only\": true}\n"
+    },
+    "mcmc-3407": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"0ab4dab67af2c62667e5cf9faa0939b86ca31a7ce1b9a2777b1afc4e0f191b40\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.28164394909849727, \"loss_total\": 0.7183560509015028, \"research_utility\": 0.28164394909849727, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.42233686645825}}\n"
+    },
+    "acq-3407": {
+      "alive": true,
+      "client_slots": 19,
+      "private_slots": 18,
+      "successful_evaluations": null,
+      "completed_tuning": 14,
+      "log_tail": "{\"index\": 0, \"source_sha256\": \"d993ab0afc2cd559f0978bf130ef3046e2862912c46b4505a2e3b0edc51b465d\", \"status\": \"succeeded\", \"metrics\": {\"mean_iou\": 0.2827987322675762, \"loss_total\": 0.7172012677324238, \"research_utility\": 0.2827987322675762, \"legal_rate\": 1.0, \"parent_count\": 24.0, \"solve_count\": 48.0, \"failed_solves\": 0.0, \"mean_solver_wall_seconds\": 91.29084081947803}}\n"
+    }
+  }
+}

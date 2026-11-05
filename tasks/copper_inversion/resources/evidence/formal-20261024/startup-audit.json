@@ -1,0 +1,128 @@
+{
+  "checked_at": 1792832401.0949676,
+  "runs": {
+    "ldm-42": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 0.613834,
+        "interface_cpu_seconds_through_reap": 1.5951679999999997,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 3.748202085494995,
+        "scorer_cpu_seconds_observed": 9.842592999999999,
+        "scorer_cpu_seconds_through_reap": 10.378821999999998,
+        "scorer_jobs": 32,
+        "scorer_wall_seconds": 44.269779682159424,
+        "solver_cpu_seconds_observed": 9.253021,
+        "solver_cpu_seconds_through_reap": 9.970943000000002,
+        "solver_jobs": 33,
+        "solver_wall_seconds": 45.952839374542236
+      }
+    },
+    "mcmc-42": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 16.252757000000003,
+        "interface_cpu_seconds_through_reap": 16.489514,
+        "interface_jobs": 4,
+        "interface_wall_seconds": 20.901931047439575
+      }
+    },
+    "acq-42": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 16.013293,
+        "interface_cpu_seconds_through_reap": 16.31567,
+        "interface_jobs": 4,
+        "interface_wall_seconds": 20.609151124954224
+      }
+    },
+    "ldm-43": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 0.433736,
+        "interface_cpu_seconds_through_reap": 1.6131829999999998,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 4.402354717254639,
+        "scorer_cpu_seconds_observed": 8.216451,
+        "scorer_cpu_seconds_through_reap": 8.702053,
+        "scorer_jobs": 27,
+        "scorer_wall_seconds": 38.05584955215454,
+        "solver_cpu_seconds_observed": 8.02785,
+        "solver_cpu_seconds_through_reap": 8.827513999999997,
+        "solver_jobs": 29,
+        "solver_wall_seconds": 41.91886925697327
+      }
+    },
+    "mcmc-43": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 16.219075,
+        "interface_cpu_seconds_through_reap": 16.397078,
+        "interface_jobs": 4,
+        "interface_wall_seconds": 20.142566204071045
+      }
+    },
+    "acq-43": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 12.151781,
+        "interface_cpu_seconds_through_reap": 12.269984000000001,
+        "interface_jobs": 3,
+        "interface_wall_seconds": 16.002822875976562
+      }
+    },
+    "ldm-3407": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 0.7255910000000001,
+        "interface_cpu_seconds_through_reap": 1.7215159999999998,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 6.095257043838501,
+        "scorer_cpu_seconds_observed": 5.8176440000000005,
+        "scorer_cpu_seconds_through_reap": 6.134879,
+        "scorer_jobs": 19,
+        "scorer_wall_seconds": 28.37030529975891,
+        "solver_cpu_seconds_observed": 5.928022,
+        "solver_cpu_seconds_through_reap": 6.898464,
+        "solver_jobs": 23,
+        "solver_wall_seconds": 32.92864465713501
+      }
+    },
+    "mcmc-3407": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 12.111318,
+        "interface_cpu_seconds_through_reap": 12.172325999999998,
+        "interface_jobs": 3,
+        "interface_wall_seconds": 14.322333097457886
+      }
+    },
+    "acq-3407": {
+      "alive": true,
+      "observations": 0,
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 12.158279,
+        "interface_cpu_seconds_through_reap": 12.220075000000001,
+        "interface_jobs": 3,
+        "interface_wall_seconds": 15.187759399414062
+      }
+    }
+  }
+}

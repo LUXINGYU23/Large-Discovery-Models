@@ -1,0 +1,136 @@
+{
+  "timestamp": 1792847488.2133677,
+  "charged_budget": 17,
+  "runs": {
+    "ldm-42": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.6948998242825721,
+        "mean_iou": 0.3051001757174279,
+        "mean_solver_wall_seconds": 1.93895028034846,
+        "parent_count": 24.0,
+        "research_utility": 0.3051001757174279,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "ldm-43": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.6530166305059373,
+        "mean_iou": 0.3469833694940627,
+        "mean_solver_wall_seconds": 2.4898345122734704,
+        "parent_count": 24.0,
+        "research_utility": 0.3469833694940627,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "ldm-3407": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.6640513584010963,
+        "mean_iou": 0.33594864159890364,
+        "mean_solver_wall_seconds": 1.2378719945748646,
+        "parent_count": 24.0,
+        "research_utility": 0.33594864159890364,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "mcmc-42": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7165408163722371,
+        "mean_iou": 0.28345918362776296,
+        "mean_solver_wall_seconds": 91.35761585831642,
+        "parent_count": 24.0,
+        "research_utility": 0.28345918362776296,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "mcmc-43": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7152610002187487,
+        "mean_iou": 0.2847389997812512,
+        "mean_solver_wall_seconds": 91.31160298983256,
+        "parent_count": 24.0,
+        "research_utility": 0.2847389997812512,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "mcmc-3407": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.715460635684544,
+        "mean_iou": 0.284539364315456,
+        "mean_solver_wall_seconds": 91.35423421363036,
+        "parent_count": 24.0,
+        "research_utility": 0.284539364315456,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "acq-42": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7150357183757952,
+        "mean_iou": 0.2849642816242048,
+        "mean_solver_wall_seconds": 91.27563148240249,
+        "parent_count": 24.0,
+        "research_utility": 0.2849642816242048,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "acq-43": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.7159253833933511,
+        "mean_iou": 0.2840746166066489,
+        "mean_solver_wall_seconds": 91.332167511185,
+        "parent_count": 24.0,
+        "research_utility": 0.2840746166066489,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    },
+    "acq-3407": {
+      "best": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.715697312169717,
+        "mean_iou": 0.28430268783028306,
+        "mean_solver_wall_seconds": 91.24708016216755,
+        "parent_count": 24.0,
+        "research_utility": 0.28430268783028306,
+        "solve_count": 48.0
+      },
+      "incomplete_paid_sources": []
+    }
+  },
+  "ldm": {
+    "mean": 0.6706559377298685,
+    "sd": 0.021708657980522898
+  },
+  "mcmc": {
+    "mean": 0.7157541507585099,
+    "sd": 0.0006885460555884215
+  },
+  "acq": {
+    "mean": 0.7155528046462878,
+    "sd": 0.0004621014813993163
+  },
+  "all_paid_sources_resolved": true
+}

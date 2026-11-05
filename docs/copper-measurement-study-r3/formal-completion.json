@@ -1,0 +1,758 @@
+{
+  "status": "completed",
+  "results": {
+    "validation": {
+      "ldm-42": {
+        "selected_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+        "candidates": [
+          {
+            "source_sha256": "776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.12804272930426208,
+              "loss_total": 0.3712228256658838,
+              "research_utility": 0.6287771743341162,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.3053190112114
+            }
+          },
+          {
+            "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.12739699928688777,
+              "loss_total": 0.3640640537637443,
+              "research_utility": 0.6359359462362557,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.30437111854553
+            }
+          },
+          {
+            "source_sha256": "4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.13052214931750933,
+              "loss_total": 0.39704343745028847,
+              "research_utility": 0.6029565625497115,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.29775293171406
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "mcmc-42": {
+        "selected_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+        "candidates": [
+          {
+            "source_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10757175936038126,
+              "loss_total": 0.4077628684593899,
+              "research_utility": 0.5922371315406101,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.04931877553463
+            }
+          },
+          {
+            "source_sha256": "381a0f7840eeb41b085e41aeb0cbd8571700cdfd5636c0ed5f425f74183ad758",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10517124869152707,
+              "loss_total": 0.4133849142297793,
+              "research_utility": 0.5866150857702207,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.07588848471642
+            }
+          },
+          {
+            "source_sha256": "6f8bbd2f2fb23e872f47a5455a0c673b81650ed60bca5b325531d64f0734e788",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10604230622312757,
+              "loss_total": 0.4125300091876898,
+              "research_utility": 0.5874699908123102,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.02358558773994
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "acq-42": {
+        "selected_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+        "candidates": [
+          {
+            "source_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10760787373752892,
+              "loss_total": 0.40821935603475246,
+              "research_utility": 0.5917806439652475,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.07352761924267
+            }
+          },
+          {
+            "source_sha256": "ac4730be3d348edf729075c4fa54ba7e43acda8c5d06f164879f6e00e2c6f51a",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10513916424583783,
+              "loss_total": 0.4128351003367903,
+              "research_utility": 0.5871648996632097,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 90.99537262320518
+            }
+          },
+          {
+            "source_sha256": "dcccca890a8a89d7395ff9a4be95ad61bdbb84d3217e1ecc067fc69702f56111",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10604969433487665,
+              "loss_total": 0.4125569501404792,
+              "research_utility": 0.5874430498595208,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.03083264827728
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "ldm-43": {
+        "selected_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+        "candidates": [
+          {
+            "source_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.17978991744016443,
+              "loss_total": 0.4533022551768462,
+              "research_utility": 0.5466977448231538,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 111.13534286618233
+            }
+          },
+          {
+            "source_sha256": "dd748c2b31617db049174ea54bbc5c16d43be77d406503a4aa4ab5e24e8ccc48",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.17116792179287516,
+              "loss_total": 0.47421935206877863,
+              "research_utility": 0.5257806479312214,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 108.92026425898075
+            }
+          },
+          {
+            "source_sha256": "8e346f96b0e4bb70d7eb82fa70072cd4cb62361632c5aea4dcead53f2d8d399d",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.17384422731415855,
+              "loss_total": 0.4615816525700239,
+              "research_utility": 0.5384183474299761,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 109.2354896068573
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "mcmc-43": {
+        "selected_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+        "candidates": [
+          {
+            "source_sha256": "c70ae13155bcec4397a7dd775f1cf14fb4c7ade5051c0ce34e731972c7a4e9c5",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10597862287059252,
+              "loss_total": 0.41340007946751023,
+              "research_utility": 0.5865999205324898,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.00196641683578
+            }
+          },
+          {
+            "source_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10512259147530602,
+              "loss_total": 0.4082092991766849,
+              "research_utility": 0.5917907008233151,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.05976076424122
+            }
+          },
+          {
+            "source_sha256": "ebe44a592c88f0009bdcb3d71ffb6a7887e74ccbc92a208c3d3cbb1b0bcc3646",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10645513823092956,
+              "loss_total": 0.41299323663829124,
+              "research_utility": 0.5870067633617088,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.00972309708595
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "acq-43": {
+        "selected_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+        "candidates": [
+          {
+            "source_sha256": "4f84cec7520ce2677563a352ccd5db4aa92b6ac6c3b5fef9eee1ec6426bba6f4",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10590493727797899,
+              "loss_total": 0.41271934019296985,
+              "research_utility": 0.5872806598070301,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.03858061134815
+            }
+          },
+          {
+            "source_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10512259147530602,
+              "loss_total": 0.4082092991766849,
+              "research_utility": 0.5917907008233151,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.07309378683567
+            }
+          },
+          {
+            "source_sha256": "5fc97f8bd036ac2e9ba95f26ece7c3099c0977ed0c471010b984105708ecd861",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10423876308751318,
+              "loss_total": 0.4147915080924931,
+              "research_utility": 0.5852084919075069,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 90.98366521298885
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "ldm-3407": {
+        "selected_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+        "candidates": [
+          {
+            "source_sha256": "d654cd2c7dfa3bf790e0dd85b0e9bff77346c4dca6eb038d92d05fc5ef815684",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.1417519875046385,
+              "loss_total": 0.4039404252829264,
+              "research_utility": 0.5960595747170736,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.23059329390526
+            }
+          },
+          {
+            "source_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.14514415159632674,
+              "loss_total": 0.3789365866673666,
+              "research_utility": 0.6210634133326334,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.22402837872505
+            }
+          },
+          {
+            "source_sha256": "6d8fe7e668fee3075ad59e10a85ac598375fee44898e671de9b537d657f035e4",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.14886027064205903,
+              "loss_total": 0.40192674297573827,
+              "research_utility": 0.5980732570242617,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.21884024143219
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "mcmc-3407": {
+        "selected_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+        "candidates": [
+          {
+            "source_sha256": "75f097db92e3ebd5c24770134e2364697e96532cc7eda0ed053496b92ec852ce",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10600914727240365,
+              "loss_total": 0.41999553658410393,
+              "research_utility": 0.5800044634158961,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.02827994525433
+            }
+          },
+          {
+            "source_sha256": "ddcbced5854227898dbe13ca608ba41ab110c60c1fd7f088a799d907fab8a826",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10502086760932978,
+              "loss_total": 0.4149900265979526,
+              "research_utility": 0.5850099734020474,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.04448953270912
+            }
+          },
+          {
+            "source_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.1053806911592774,
+              "loss_total": 0.41368879424244853,
+              "research_utility": 0.5863112057575515,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.03746694326401
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      },
+      "acq-3407": {
+        "selected_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+        "candidates": [
+          {
+            "source_sha256": "19e878d7b3addaaf34cdb93a323a03be9e117ab544489112f96296ffc8b1c934",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10602030738953971,
+              "loss_total": 0.4192748122737233,
+              "research_utility": 0.5807251877262767,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.05077874660492
+            }
+          },
+          {
+            "source_sha256": "a70e1c402edb872e854e3720b7c5673ac240cd10210a00d7cc737854f1dc7cb1",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10520105746765224,
+              "loss_total": 0.4155734186505058,
+              "research_utility": 0.5844265813494942,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.15956564247608
+            }
+          },
+          {
+            "source_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+            "split": "validation",
+            "metrics": {
+              "mean_iou": 0.10534742099343249,
+              "loss_total": 0.41376601549263836,
+              "research_utility": 0.5862339845073616,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 16.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.01465009152889
+            }
+          }
+        ],
+        "rule": "minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)"
+      }
+    },
+    "test": {
+      "ldm-42": {
+        "selected_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.15100625788375674,
+              "loss_total": 0.3478232317984524,
+              "research_utility": 0.6521767682015476,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.30727634827296
+            }
+          },
+          {
+            "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.1389863995135603,
+              "loss_total": 0.35161845280075243,
+              "research_utility": 0.6483815471992476,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.29931530853112
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "mcmc-42": {
+        "selected_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.10672957685191972,
+              "loss_total": 0.41431031575076904,
+              "research_utility": 0.585689684249231,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.05848636478186
+            }
+          },
+          {
+            "source_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08687443012392836,
+              "loss_total": 0.4170135003775739,
+              "research_utility": 0.5829864996224261,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.03119311730067
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "acq-42": {
+        "selected_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.1067102557382542,
+              "loss_total": 0.41464100660256464,
+              "research_utility": 0.5853589933974354,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.03270961592595
+            }
+          },
+          {
+            "source_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08678141533524711,
+              "loss_total": 0.41760736225146333,
+              "research_utility": 0.5823926377485367,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.10449532667796
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "ldm-43": {
+        "selected_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.23051827210884968,
+              "loss_total": 0.39902682528145705,
+              "research_utility": 0.600973174718543,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 111.14646719892819
+            }
+          },
+          {
+            "source_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.2787455388691563,
+              "loss_total": 0.49175234241256427,
+              "research_utility": 0.5082476575874357,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 111.13391590118408
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "mcmc-43": {
+        "selected_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.10608939201357495,
+              "loss_total": 0.41513587526942675,
+              "research_utility": 0.5848641247305733,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.08913102000952
+            }
+          },
+          {
+            "source_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08506095837585863,
+              "loss_total": 0.41753936683601567,
+              "research_utility": 0.5824606331639843,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.10149110356967
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "acq-43": {
+        "selected_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.10608939201357495,
+              "loss_total": 0.41513587526942675,
+              "research_utility": 0.5848641247305733,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.05193308989207
+            }
+          },
+          {
+            "source_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08505785412060879,
+              "loss_total": 0.4175692689736056,
+              "research_utility": 0.5824307310263944,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.11904309689999
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "ldm-3407": {
+        "selected_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.17546237099047712,
+              "loss_total": 0.3383266003289107,
+              "research_utility": 0.6616733996710893,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.23539584130049
+            }
+          },
+          {
+            "source_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.17546318685511636,
+              "loss_total": 0.3430872780403572,
+              "research_utility": 0.6569127219596428,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 113.22526812553406
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "mcmc-3407": {
+        "selected_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.10633890223828593,
+              "loss_total": 0.41626035248711946,
+              "research_utility": 0.5837396475128805,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.0354176312685
+            }
+          },
+          {
+            "source_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08518110760269852,
+              "loss_total": 0.41925454499908676,
+              "research_utility": 0.5807454550009132,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.12660858531792
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      },
+      "acq-3407": {
+        "selected_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+        "development_only": false,
+        "results": [
+          {
+            "source_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+            "split": "test_id",
+            "metrics": {
+              "mean_iou": 0.10635678465188665,
+              "loss_total": 0.4158247908962598,
+              "research_utility": 0.5841752091037402,
+              "legal_rate": 1.0,
+              "parent_count": 16.0,
+              "solve_count": 96.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.08146026482184
+            }
+          },
+          {
+            "source_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+            "split": "test_ood",
+            "metrics": {
+              "mean_iou": 0.08513077116410513,
+              "loss_total": 0.41946954560406347,
+              "research_utility": 0.5805304543959365,
+              "legal_rate": 1.0,
+              "parent_count": 8.0,
+              "solve_count": 48.0,
+              "failed_solves": 0.0,
+              "mean_solver_wall_seconds": 91.1495045175155
+            }
+          }
+        ],
+        "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation"
+      }
+    }
+  },
+  "replay_receipts_unchanged": true,
+  "receipt_count": 5454
+}

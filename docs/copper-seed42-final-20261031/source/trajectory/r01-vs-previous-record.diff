@@ -1,0 +1,143 @@
+--- 153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5
+
++++ db7e22d78f988eb1f4c3f079983a2819d8b451f80117082e8f9334d8b8320f07
+
+@@ -1,3 +1,135 @@
+
++"""Candidate 5: legal baseline plus bounded greedy local boundary refinement (control)."""
++import os
++for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
++           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
++    os.environ.setdefault(_v, "1")
++import time
++import numpy as np
++from scipy import ndimage
++from tasks.copper_inversion.v2.objective import score
++from tasks.copper_inversion.v2.geometry import canonicalize
+ from tasks.copper_inversion.v2.baselines import initialize
+-def solve(problem,budget,seed):
+-    return initialize(problem)
++
++_STRUCT = ndimage.generate_binary_structure(3, 1)
++
++
++def _prune(mask, maximum):
++    if maximum is None or not mask.any():
++        return mask
++    lab, n = ndimage.label(mask, structure=_STRUCT)
++    if n <= maximum:
++        return mask
++    sizes = np.bincount(lab.ravel())
++    sizes[0] = 0
++    keep = np.argsort(sizes[1:])[::-1][:maximum] + 1
++    return np.isin(lab, keep)
++
++
++def _repair(problem, mask, rank):
++    feasible = problem["domain_mask"] & ~problem["forbidden_mask"]
++    m = np.asarray(mask, bool) & feasible
++    pri = problem["priors"]
++    m = _prune(m, pri["max_components"])
++    cell = float(np.prod(np.asarray(problem["spacing"], float)))
++    bounds = pri["hard_volume_bounds"]
++    lo = 0 if bounds is None else int(np.ceil(bounds[0] / cell - 1e-9))
++    hi = int(feasible.sum()) if bounds is None else int(np.floor(bounds[1] / cell + 1e-9))
++    for _ in range(4):
++        n = int(m.sum())
++        if n > hi:
++            idx = np.argwhere(m)
++            vals = np.asarray(rank, float)[tuple(idx.T)]
++            m[tuple(idx[np.argsort(vals)[:n - hi]].T)] = False
++            m = _prune(m, pri["max_components"])
++        elif n < lo:
++            idx = np.argwhere(feasible & ~m)
++            if not len(idx):
++                break
++            if m.any():
++                dist = ndimage.distance_transform_edt(~m)
++                add = -dist * 1e9 + np.asarray(rank, float)
++            else:
++                add = np.asarray(rank, float)
++            vals = add[tuple(idx.T)]
++            m[tuple(idx[np.argsort(vals)[::-1][:lo - n]].T)] = True
++            m = _prune(m, pri["max_components"])
++        else:
++            break
++    return m
++
++
++def _rank(problem):
++    sp = np.asarray(problem["spacing"], float)
++    org = np.asarray(problem["origin"], float)
++    xyz = np.stack(np.meshgrid(*[org[i] + (np.arange(n) + .5) * sp[i]
++                                 for i, n in enumerate(problem["shape"])], indexing="ij"), axis=-1)
++    pts = np.concatenate([o["points"] for o in problem["observations"]])
++    lab = np.concatenate([o["labels"] for o in problem["observations"]])
++    from scipy.spatial import cKDTree
++    pos, neg = pts[lab == 1], pts[lab == 0]
++    if len(pos):
++        dp = cKDTree(pos).query(xyz.reshape(-1, 3))[0].reshape(problem["shape"])
++        if len(neg):
++            dn = cKDTree(neg).query(xyz.reshape(-1, 3))[0].reshape(problem["shape"])
++            return dn - dp
++        return -dp
++    center = org + .5 * np.asarray(problem["shape"]) * sp
++    return -np.linalg.norm(xyz - center, axis=-1)
++
++
++def solve(problem, budget, seed):
++    started = time.monotonic()
++    try:
++        secs = float(budget.get("wall_time_seconds", 120))
++    except Exception:
++        secs = 120.
++    if not np.isfinite(secs) or secs <= 0:
++        secs = 120.
++    small = int(np.prod(problem["shape"])) < 5000
++    cap = 1.5 if small else .75 * secs
++    deadline = started + max(.5, cap)
++    rng = np.random.default_rng(seed)
++    rank = _rank(problem)
++    try:
++        field = np.asarray(initialize(problem), float)
++        cur = float(score(problem, field)["loss_total"])
++        best, best_l = field.copy(), cur
++    except Exception:
++        m = _repair(problem, np.zeros(tuple(problem["shape"]), bool), rank)
++        best = np.where(m, 1., -1.)
++        best_l = float(score(problem, best)["loss_total"])
++        field, cur = best.copy(), best_l
++    feasible = problem["domain_mask"] & ~problem["forbidden_mask"]
++    centers = np.argwhere(feasible)
++    if not len(centers):
++        return best
++    coords = np.indices(tuple(problem["shape"]), dtype=float)
++    sp = np.asarray(problem["spacing"], float)
++    length = float(np.linalg.norm(np.asarray(problem["shape"]) * sp))
++    while time.monotonic() < deadline:
++        center = centers[rng.integers(len(centers))]
++        radius = max(float(sp.min()), length * .075 * rng.uniform(.35, 1.0))
++        patch = (((coords[0] - center[0]) * sp[0]) ** 2 +
++                 ((coords[1] - center[1]) * sp[1]) ** 2 +
++                 ((coords[2] - center[2]) * sp[2]) ** 2) <= radius ** 2
++        patch &= feasible
++        if not patch.any():
++            continue
++        prop = field.copy()
++        prop[patch] *= -1
++        m = _repair(problem, prop > 0, prop)
++        prop = np.where(m, 1., -1.)
++        try:
++            canonicalize(problem, prop)
++            val = float(score(problem, prop)["loss_total"])
++        except Exception:
++            continue
++        if np.isfinite(val) and val < cur:
++            field, cur = prop, val
++            if val < best_l:
++                best, best_l = prop.copy(), val
++    try:
++        canonicalize(problem, best)
++        return best.astype(np.float64)
++    except Exception:
++        return field.astype(np.float64)

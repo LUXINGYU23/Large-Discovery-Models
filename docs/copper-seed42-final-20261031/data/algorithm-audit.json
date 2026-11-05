@@ -1,0 +1,254 @@
+{
+  "discovery_seed": 42,
+  "selected": {
+    "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+    "frozen_path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/candidates/2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b/solver.py",
+    "report_path": "source/ldm42-selected-solver.py",
+    "cfg": {
+      "search": "anneal",
+      "move": "sphere",
+      "time": 0.94,
+      "anneal_frac": 0.58,
+      "radii": [
+        0.05,
+        0.075,
+        0.105,
+        0.13,
+        0.17
+      ],
+      "jitter": 0.35,
+      "T0": 3e-05,
+      "seed_offset": 41,
+      "slab_frac": 0.03,
+      "sphere_mix": 0.5,
+      "cycles": 3,
+      "rbf": false,
+      "polish": true,
+      "temp_mults": [
+        1.0,
+        0.45,
+        1.8
+      ],
+      "polish_mode": "best_pair",
+      "polish_r_choices": [
+        1,
+        3
+      ]
+    },
+    "functions": {
+      "_prune": {
+        "start": 19,
+        "end": 27
+      },
+      "_add": {
+        "start": 30,
+        "end": 44
+      },
+      "_remove": {
+        "start": 47,
+        "end": 53
+      },
+      "_repair": {
+        "start": 56,
+        "end": 92
+      },
+      "_grid": {
+        "start": 95,
+        "end": 99
+      },
+      "_rank": {
+        "start": 102,
+        "end": 114
+      },
+      "_gm": {
+        "start": 117,
+        "end": 120
+      },
+      "_fast_loss": {
+        "start": 123,
+        "end": 147
+      },
+      "_score": {
+        "start": 150,
+        "end": 155
+      },
+      "_rbf_seed": {
+        "start": 158,
+        "end": 191
+      },
+      "_initial": {
+        "start": 194,
+        "end": 205
+      },
+      "_proposal": {
+        "start": 208,
+        "end": 258
+      },
+      "_anneal": {
+        "start": 261,
+        "end": 286
+      },
+      "_polish": {
+        "start": 289,
+        "end": 334
+      },
+      "solve": {
+        "start": 336,
+        "end": 417
+      }
+    },
+    "training_metrics": {
+      "failed_solves": 0.0,
+      "legal_rate": 1.0,
+      "loss_total": 0.34374634587047215,
+      "mean_iou": 0.1643998757154583,
+      "mean_solver_wall_seconds": 113.30375763773918,
+      "parent_count": 24.0,
+      "research_utility": 0.6562536541295279,
+      "solve_count": 48.0
+    }
+  },
+  "training_best": {
+    "source_sha256": "776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd",
+    "frozen_path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261025-r3/selection/ldm-42/candidates/776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd/solver.py",
+    "report_path": "source/ldm42-training-best-solver.py",
+    "cfg": {
+      "search": "anneal",
+      "move": "sphere",
+      "time": 0.94,
+      "anneal_frac": 0.56,
+      "radii": [
+        0.05,
+        0.075,
+        0.105,
+        0.13,
+        0.17
+      ],
+      "jitter": 0.35,
+      "T0": 3e-05,
+      "seed_offset": 31,
+      "slab_frac": 0.03,
+      "sphere_mix": 0.5,
+      "cycles": 3,
+      "rbf": false,
+      "polish": true,
+      "temp_mults": [
+        1.0,
+        0.45,
+        1.8
+      ],
+      "polish_mode": "best_pair",
+      "polish_r_choices": [
+        1,
+        3
+      ]
+    },
+    "functions": {
+      "_prune": {
+        "start": 19,
+        "end": 27
+      },
+      "_add": {
+        "start": 30,
+        "end": 44
+      },
+      "_remove": {
+        "start": 47,
+        "end": 53
+      },
+      "_repair": {
+        "start": 56,
+        "end": 92
+      },
+      "_grid": {
+        "start": 95,
+        "end": 99
+      },
+      "_rank": {
+        "start": 102,
+        "end": 114
+      },
+      "_gm": {
+        "start": 117,
+        "end": 120
+      },
+      "_fast_loss": {
+        "start": 123,
+        "end": 147
+      },
+      "_score": {
+        "start": 150,
+        "end": 155
+      },
+      "_rbf_seed": {
+        "start": 158,
+        "end": 191
+      },
+      "_initial": {
+        "start": 194,
+        "end": 205
+      },
+      "_proposal": {
+        "start": 208,
+        "end": 258
+      },
+      "_anneal": {
+        "start": 261,
+        "end": 286
+      },
+      "_polish": {
+        "start": 289,
+        "end": 334
+      },
+      "solve": {
+        "start": 336,
+        "end": 417
+      }
+    }
+  },
+  "cfg_differences": {
+    "anneal_frac": {
+      "training_best": 0.56,
+      "selected": 0.58
+    },
+    "seed_offset": {
+      "training_best": 31,
+      "selected": 41
+    }
+  },
+  "identical_function_bodies": true,
+  "selected_active_path": [
+    "shared_observation_initializer",
+    "sphere",
+    "anneal",
+    "best_pair"
+  ],
+  "inactive_paths": [
+    "rbf",
+    "cycle",
+    "portfolio",
+    "slab",
+    "topology",
+    "ellipsoid"
+  ],
+  "polish_bookkeeping": {
+    "kind": "isolated bookkeeping unit probe",
+    "formal_solves": 0,
+    "frozen_function_lines": [
+      289,
+      334
+    ],
+    "first_proposal_score": 0.4,
+    "last_proposal_score": 0.8,
+    "returned_model_stub_score": 0.8,
+    "stored_best_score": 0.4,
+    "mismatch_reproduced": true,
+    "meaning": "best stores final prop rather than selected chosen when radius 1 wins",
+    "measured_performance_impact": "not measured; no rerun or reselection"
+  },
+  "preserved_r3_files_verified": 29,
+  "data_sha256_before": "34889a50ed50ce5f2bbf733a1baf4fe3f64e1b95c222e1c492294dd27770af5e",
+  "data_sha256_after": "34889a50ed50ce5f2bbf733a1baf4fe3f64e1b95c222e1c492294dd27770af5e",
+  "formal_evaluation_rerun": false,
+  "winner_changed": false
+}

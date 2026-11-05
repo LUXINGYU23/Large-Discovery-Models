@@ -1,0 +1,414 @@
+{
+  "status": "completed",
+  "replay_receipts_unchanged": true,
+  "receipt_count": 5454,
+  "groups": {
+    "ldm-3407": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.3383266003289107,
+            "mean_iou": 0.17546237099047712,
+            "mean_solver_wall_seconds": 113.23539584130049,
+            "parent_count": 16.0,
+            "research_utility": 0.6616733996710893,
+            "solve_count": 96.0
+          },
+          "source_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.3430872780403572,
+            "mean_iou": 0.17546318685511636,
+            "mean_solver_wall_seconds": 113.22526812553406,
+            "parent_count": 8.0,
+            "research_utility": 0.6569127219596428,
+            "solve_count": 48.0
+          },
+          "source_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "97b1cf05e0ae68d5e9c0d60bdda77ce37e99ac0387e4369d91a115320aa14361"
+    },
+    "ldm-43": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.39902682528145705,
+            "mean_iou": 0.23051827210884968,
+            "mean_solver_wall_seconds": 111.14646719892819,
+            "parent_count": 16.0,
+            "research_utility": 0.600973174718543,
+            "solve_count": 96.0
+          },
+          "source_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.49175234241256427,
+            "mean_iou": 0.2787455388691563,
+            "mean_solver_wall_seconds": 111.13391590118408,
+            "parent_count": 8.0,
+            "research_utility": 0.5082476575874357,
+            "solve_count": 48.0
+          },
+          "source_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "e25dbedd2ef695233425b2fbe238cd43dac5a82a9f8958819950fa917a2eb493"
+    },
+    "acq-3407": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.4158247908962598,
+            "mean_iou": 0.10635678465188665,
+            "mean_solver_wall_seconds": 91.08146026482184,
+            "parent_count": 16.0,
+            "research_utility": 0.5841752091037402,
+            "solve_count": 96.0
+          },
+          "source_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41946954560406347,
+            "mean_iou": 0.08513077116410513,
+            "mean_solver_wall_seconds": 91.1495045175155,
+            "parent_count": 8.0,
+            "research_utility": 0.5805304543959365,
+            "solve_count": 48.0
+          },
+          "source_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "9bab628bb702d5f8c235bd07e64c1ba5cbdc8db23614443bf2039adb7b8a5c7f"
+    },
+    "acq-42": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41464100660256464,
+            "mean_iou": 0.1067102557382542,
+            "mean_solver_wall_seconds": 91.03270961592595,
+            "parent_count": 16.0,
+            "research_utility": 0.5853589933974354,
+            "solve_count": 96.0
+          },
+          "source_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41760736225146333,
+            "mean_iou": 0.08678141533524711,
+            "mean_solver_wall_seconds": 91.10449532667796,
+            "parent_count": 8.0,
+            "research_utility": 0.5823926377485367,
+            "solve_count": 48.0
+          },
+          "source_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "41fe749985e14bde828c81a6c70585be6c591eb987e6433e3a9459ad0b1a97ce"
+    },
+    "acq-43": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41513587526942675,
+            "mean_iou": 0.10608939201357495,
+            "mean_solver_wall_seconds": 91.05193308989207,
+            "parent_count": 16.0,
+            "research_utility": 0.5848641247305733,
+            "solve_count": 96.0
+          },
+          "source_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.4175692689736056,
+            "mean_iou": 0.08505785412060879,
+            "mean_solver_wall_seconds": 91.11904309689999,
+            "parent_count": 8.0,
+            "research_utility": 0.5824307310263944,
+            "solve_count": 48.0
+          },
+          "source_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "b9dff5158882b7d57221e0797f30a5f4482b35f4862910466bc9c16dccc9674f"
+    },
+    "ldm-42": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.3478232317984524,
+            "mean_iou": 0.15100625788375674,
+            "mean_solver_wall_seconds": 113.30727634827296,
+            "parent_count": 16.0,
+            "research_utility": 0.6521767682015476,
+            "solve_count": 96.0
+          },
+          "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.35161845280075243,
+            "mean_iou": 0.1389863995135603,
+            "mean_solver_wall_seconds": 113.29931530853112,
+            "parent_count": 8.0,
+            "research_utility": 0.6483815471992476,
+            "solve_count": 48.0
+          },
+          "source_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "2d2c33ed6a588d9e444a104d135c8d358ca715e6cf061130a92bf5fd0d1c9d0b"
+    },
+    "mcmc-3407": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41626035248711946,
+            "mean_iou": 0.10633890223828593,
+            "mean_solver_wall_seconds": 91.0354176312685,
+            "parent_count": 16.0,
+            "research_utility": 0.5837396475128805,
+            "solve_count": 96.0
+          },
+          "source_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41925454499908676,
+            "mean_iou": 0.08518110760269852,
+            "mean_solver_wall_seconds": 91.12660858531792,
+            "parent_count": 8.0,
+            "research_utility": 0.5807454550009132,
+            "solve_count": 48.0
+          },
+          "source_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "a453bad3a5ee4d39c48149f627b15d9e192e5ed0c1e102fdddfcbfb98135115a"
+    },
+    "mcmc-43": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41513587526942675,
+            "mean_iou": 0.10608939201357495,
+            "mean_solver_wall_seconds": 91.08913102000952,
+            "parent_count": 16.0,
+            "research_utility": 0.5848641247305733,
+            "solve_count": 96.0
+          },
+          "source_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41753936683601567,
+            "mean_iou": 0.08506095837585863,
+            "mean_solver_wall_seconds": 91.10149110356967,
+            "parent_count": 8.0,
+            "research_utility": 0.5824606331639843,
+            "solve_count": 48.0
+          },
+          "source_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "f8742ab62205709c0ee70c5d81dc538c81dadcebd29c6dd3d9985e9285003e04"
+    },
+    "mcmc-42": {
+      "development_only": false,
+      "disclosure": "test results now seen; these datasets cannot be reused as unseen evaluation",
+      "results": [
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.41431031575076904,
+            "mean_iou": 0.10672957685191972,
+            "mean_solver_wall_seconds": 91.05848636478186,
+            "parent_count": 16.0,
+            "research_utility": 0.585689684249231,
+            "solve_count": 96.0
+          },
+          "source_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+          "split": "test_id"
+        },
+        {
+          "metrics": {
+            "failed_solves": 0.0,
+            "legal_rate": 1.0,
+            "loss_total": 0.4170135003775739,
+            "mean_iou": 0.08687443012392836,
+            "mean_solver_wall_seconds": 91.03119311730067,
+            "parent_count": 8.0,
+            "research_utility": 0.5829864996224261,
+            "solve_count": 48.0
+          },
+          "source_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e",
+          "split": "test_ood"
+        }
+      ],
+      "selected_sha256": "dd55f69c573084f06478555da5ecab59a1529f68f678024acfe7a1dd66aa5b1e"
+    }
+  },
+  "summary": {
+    "ldm": {
+      "test_id": {
+        "loss_total": {
+          "mean": 0.36172555246960675,
+          "std": 0.03265096043541653
+        },
+        "mean_iou": {
+          "mean": 0.1856623003276945,
+          "std": 0.04072553278222418
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 112.56304646283388,
+          "std": 1.2273199705114972
+        }
+      },
+      "test_ood": {
+        "loss_total": {
+          "mean": 0.3954860244178913,
+          "std": 0.08347813019519977
+        },
+        "mean_iou": {
+          "mean": 0.19773170841261098,
+          "std": 0.07249185849198295
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 112.55283311174975,
+          "std": 1.2293759734747745
+        }
+      }
+    },
+    "mcmc": {
+      "test_id": {
+        "loss_total": {
+          "mean": 0.4152355145024384,
+          "std": 0.0009788293011784067
+        },
+        "mean_iou": {
+          "mean": 0.10638595703459354,
+          "std": 0.00032267595541547956
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.06101167201996,
+          "std": 0.026945591754422356
+        }
+      },
+      "test_ood": {
+        "loss_total": {
+          "mean": 0.4179358040708921,
+          "std": 0.0011719394650750081
+        },
+        "mean_iou": {
+          "mean": 0.0857054987008285,
+          "std": 0.0010141052524813407
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.0864309353961,
+          "std": 0.04945841064268202
+        }
+      }
+    },
+    "acq": {
+      "test_id": {
+        "loss_total": {
+          "mean": 0.41520055758941704,
+          "std": 0.000594536933578836
+        },
+        "mean_iou": {
+          "mean": 0.10638547746790526,
+          "std": 0.0003114247893536341
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.05536765687995,
+          "std": 0.02455613222269078
+        }
+      },
+      "test_ood": {
+        "loss_total": {
+          "mean": 0.41821539227637744,
+          "std": 0.0010862956326267265
+        },
+        "mean_iou": {
+          "mean": 0.08565668020665368,
+          "std": 0.0009747312736991298
+        },
+        "mean_solver_wall_seconds": {
+          "mean": 91.12434764703114,
+          "std": 0.022968685291780817
+        }
+      }
+    }
+  }
+}

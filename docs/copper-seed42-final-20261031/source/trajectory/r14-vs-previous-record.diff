@@ -1,0 +1,14 @@
+--- bc3e11690a05e0ef96bf4e19dfc6d7973e370b95696f31cf29345f8cbab0b5cd
+
++++ 4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00
+
+@@ -12,7 +12,7 @@
+
+ from tasks.copper_inversion.v2.geometry import canonicalize
+ from tasks.copper_inversion.v2.baselines import initialize
+ 
+-CFG = {'search': 'anneal', 'move': 'sphere', 'time': 0.94, 'anneal_frac': 0.56, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'T0': 3e-05, 'seed_offset': 11, 'slab_frac': 0.03, 'sphere_mix': 0.5, 'cycles': 3, 'rbf': False, 'polish': True, 'polish_r_choices': (1, 2, 3), 'temp_mults': (1.0, 0.45, 1.8)}
++CFG = {'search': 'anneal', 'move': 'sphere', 'time': 0.94, 'anneal_frac': 0.56, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'T0': 3e-05, 'seed_offset': 31, 'slab_frac': 0.03, 'sphere_mix': 0.5, 'cycles': 3, 'rbf': False, 'polish': True, 'polish_r_choices': (1, 3), 'temp_mults': (1.0, 0.45, 1.8)}
+ _ST = ndimage.generate_binary_structure(3, 1)
+ 
+ 

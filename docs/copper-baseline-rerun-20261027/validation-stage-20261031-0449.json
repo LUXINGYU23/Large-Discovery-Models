@@ -1,0 +1,162 @@
+{
+  "seal": {
+    "time": 1793392275.4376395,
+    "groups": [
+      "mcmc-42",
+      "acq-42",
+      "mcmc-43",
+      "acq-43",
+      "mcmc-3407",
+      "acq-3407"
+    ]
+  },
+  "reconciliation": {
+    "mcmc-42": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    },
+    "acq-42": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    },
+    "mcmc-43": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    },
+    "acq-43": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    },
+    "mcmc-3407": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    },
+    "acq-3407": {
+      "status": "passed",
+      "cap": 321,
+      "client_sources": 321,
+      "private_sources": 321,
+      "complete_sources": 321,
+      "local_rejections": 0,
+      "private_rejections": 0
+    }
+  },
+  "selection": [
+    {
+      "group": "acq-3407",
+      "receipts": 151,
+      "receipt_examples": [
+        "validation/3115d62354b4a75de63885ca5a355252f0f472b7677c1664f7903994799eec78/validation/evaluations/10860b108b8249cabedbf1fb903f9729947b32f3dbda57345dcaf71819b6c504/555c7d713f5d0244f4cc/47/receipt.json",
+        "validation/3115d62354b4a75de63885ca5a355252f0f472b7677c1664f7903994799eec78/validation/evaluations/10860b108b8249cabedbf1fb903f9729947b32f3dbda57345dcaf71819b6c504/5e16056f112898586dea/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    },
+    {
+      "group": "acq-42",
+      "receipts": 150,
+      "receipt_examples": [
+        "validation/29888d2667e6583b0534b86b3a9837dbe9288a85c2d12cd3af33590d44f7f134/validation/evaluations/f4cf31a46e35354e5ec6ab1219b2df7e07da0fcd419eb90c4e255224441e3088/555c7d713f5d0244f4cc/47/receipt.json",
+        "validation/29888d2667e6583b0534b86b3a9837dbe9288a85c2d12cd3af33590d44f7f134/validation/evaluations/f4cf31a46e35354e5ec6ab1219b2df7e07da0fcd419eb90c4e255224441e3088/5e16056f112898586dea/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    },
+    {
+      "group": "acq-43",
+      "receipts": 150,
+      "receipt_examples": [
+        "validation/f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983/validation/evaluations/b3105d1c61f8a1207b8cab64ab176c5fe3a2fe511cc33249088370064616763d/555c7d713f5d0244f4cc/47/receipt.json",
+        "validation/f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983/validation/evaluations/b3105d1c61f8a1207b8cab64ab176c5fe3a2fe511cc33249088370064616763d/5e16056f112898586dea/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    },
+    {
+      "group": "mcmc-3407",
+      "receipts": 150,
+      "receipt_examples": [
+        "validation/d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d/validation/evaluations/816e8d7020006d93f060157bbf1e2515d8d1f3a099c366f0b0541b7c1e77eac3/5e16056f112898586dea/47/receipt.json",
+        "validation/d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d/validation/evaluations/816e8d7020006d93f060157bbf1e2515d8d1f3a099c366f0b0541b7c1e77eac3/87eac4eab94f169474fc/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    },
+    {
+      "group": "mcmc-42",
+      "receipts": 150,
+      "receipt_examples": [
+        "validation/98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c/validation/evaluations/69a1833baa46d3283a5e8ad6bbb1c2f0ce386af8fdcf8a9dce85ac20e51b0987/555c7d713f5d0244f4cc/47/receipt.json",
+        "validation/98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c/validation/evaluations/69a1833baa46d3283a5e8ad6bbb1c2f0ce386af8fdcf8a9dce85ac20e51b0987/5e16056f112898586dea/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    },
+    {
+      "group": "mcmc-43",
+      "receipts": 150,
+      "receipt_examples": [
+        "validation/040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c/validation/evaluations/75b44cd76e89d5cfddeff156560c1dafeca3429afa27ec68c503e69ec3e87bd8/555c7d713f5d0244f4cc/47/receipt.json",
+        "validation/040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c/validation/evaluations/75b44cd76e89d5cfddeff156560c1dafeca3429afa27ec68c503e69ec3e87bd8/5e16056f112898586dea/47/receipt.json"
+      ],
+      "root_files": [
+        "frozen.json",
+        "protocol.lock",
+        "validation",
+        "candidates",
+        "state.json"
+      ]
+    }
+  ],
+  "completion_exists": false
+}

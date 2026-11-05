@@ -1,0 +1,163 @@
+{
+  "time": 1792902268.2265196,
+  "groups": {
+    "ldm-42": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 0.5152711868286133,
+      "pid": 2665576,
+      "alive": true,
+      "client_rejections": 0,
+      "latest_events": [
+        {
+          "type": "reservoir_built",
+          "iteration": 7,
+          "time": 1792901288.1120508
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792901300.4675446
+        },
+        {
+          "type": "candidates_selected",
+          "iteration": 7,
+          "time": 1792901300.4707532
+        }
+      ],
+      "provider_age": 1015.3300070762634
+    },
+    "mcmc-42": {
+      "charged": 113,
+      "private_charged": 112,
+      "complete": 111,
+      "private_errors": {},
+      "last_receipt_age": 48.50076651573181,
+      "pid": 2666278,
+      "alive": true,
+      "client_rejections": 1
+    },
+    "acq-42": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 110,
+      "private_errors": {},
+      "last_receipt_age": 1.8361740112304688,
+      "pid": 2667091,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "ldm-43": {
+      "charged": 83,
+      "private_charged": 81,
+      "complete": 81,
+      "private_errors": {},
+      "last_receipt_age": 1006.7974007129669,
+      "pid": 2439449,
+      "alive": true,
+      "client_rejections": 2,
+      "latest_events": [
+        {
+          "type": "candidate_evaluated",
+          "iteration": 5,
+          "time": 1792901264.8028421
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792901265.0803125
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792901265.5323768
+        }
+      ],
+      "provider_age": 110.61418986320496
+    },
+    "mcmc-43": {
+      "charged": 129,
+      "private_charged": 123,
+      "complete": 113,
+      "private_errors": {},
+      "last_receipt_age": 3.2186954021453857,
+      "pid": 2668343,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "acq-43": {
+      "charged": 129,
+      "private_charged": 122,
+      "complete": 111,
+      "private_errors": {},
+      "last_receipt_age": 2.1548025608062744,
+      "pid": 2669098,
+      "alive": true,
+      "client_rejections": 2
+    },
+    "ldm-3407": {
+      "charged": 129,
+      "private_charged": 129,
+      "complete": 128,
+      "private_errors": {
+        "timeout": 1
+      },
+      "last_receipt_age": 230.23021960258484,
+      "pid": 2669668,
+      "alive": true,
+      "client_rejections": 0,
+      "latest_events": [
+        {
+          "type": "candidate_evaluated",
+          "iteration": 8,
+          "time": 1792902048.058336
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792902048.7930133
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792902049.5063722
+        }
+      ],
+      "provider_age": 0.10860824584960938
+    },
+    "mcmc-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 111,
+      "private_errors": {},
+      "last_receipt_age": 2.157156229019165,
+      "pid": 2670836,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "acq-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 109,
+      "private_errors": {},
+      "last_receipt_age": 5.079228401184082,
+      "pid": 2671910,
+      "alive": true,
+      "client_rejections": 0
+    }
+  },
+  "paused": false,
+  "recovery": {
+    "stage": "training_recovery",
+    "updated_at": 1792902254.9350028,
+    "supervisor_pid": 2438552,
+    "replacement_client_pid": 2439449,
+    "original_supervisor": 2665407,
+    "source_unchanged": true,
+    "budget_reset": false,
+    "started_at": 1792897064.6791995,
+    "client_exit": null
+  }
+}

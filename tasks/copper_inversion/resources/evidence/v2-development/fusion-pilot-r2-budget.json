@@ -1,0 +1,447 @@
+{
+  "counters": {
+    "algorithm_feedback_slots": 3,
+    "benchmark_jobs": 12,
+    "expensive_evaluation_attempts": 3,
+    "external_evaluations": 3,
+    "harness_artifact_bytes": 39415842,
+    "harness_tool_calls": 74,
+    "harness_turns": 5,
+    "harness_validation_submissions": 6,
+    "harness_wall_time_seconds": 454.37286951672286,
+    "interface_cpu_seconds_observed": 7.175024000000001,
+    "interface_cpu_seconds_through_reap": 8.498031,
+    "interface_jobs": 30,
+    "interface_wall_seconds": 16.234254837036133,
+    "llm_requests": 65,
+    "main_research_turns": 1,
+    "outer_iterations": 2,
+    "proposal_attempts": 4,
+    "scorer_cpu_seconds_observed": 1.704196,
+    "scorer_cpu_seconds_through_reap": 1.667214,
+    "scorer_jobs": 6,
+    "scorer_wall_seconds": 3.2253811359405518,
+    "selected_candidates": 3,
+    "solver_cpu_seconds_observed": 1.257568,
+    "solver_cpu_seconds_through_reap": 1.7270089999999998,
+    "solver_jobs": 6,
+    "solver_wall_seconds": 3.3530356884002686,
+    "successful_evaluations": 3,
+    "valid_search_candidates": 5
+  },
+  "limits": {
+    "algorithm_feedback_slots": 3,
+    "benchmark_jobs": 12,
+    "expensive_evaluation_attempts": 3,
+    "external_evaluations": 3,
+    "harness_turns": 5,
+    "interface_jobs": 78,
+    "main_research_turns": 1,
+    "outer_iterations": 2,
+    "scorer_jobs": 6,
+    "selected_candidates": 3,
+    "solver_jobs": 6,
+    "successful_evaluations": 3,
+    "valid_search_candidates": 8
+  },
+  "metadata": {
+    "cumulative_usage": {
+      "copper:job:07054fd9cae5efe3e1fa1aa7ac258b26ee318f978e026fb59c853f5c86a5110e": {
+        "solver_cpu_seconds_observed": 0.283891,
+        "solver_cpu_seconds_through_reap": 0.29889,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.558635950088501
+      },
+      "copper:job:0bb90769c1bb417ff2e03d1cd760a3544678f5ae860beb92d343024eb786ed23": {
+        "solver_cpu_seconds_observed": 0.06381,
+        "solver_cpu_seconds_through_reap": 0.266039,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.5271778106689453
+      },
+      "copper:job:0edff2ede65686f2cc12cc462caee925f33dcf2d2dd0845fa0394346adddc389": {
+        "interface_cpu_seconds_observed": 0.285095,
+        "interface_cpu_seconds_through_reap": 0.295096,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5402359962463379
+      },
+      "copper:job:1362a60dec9494c2206b1e130086f80f734f7b0ade7adf27eae24e507ad8c8dc": {
+        "solver_cpu_seconds_observed": 0.283845,
+        "solver_cpu_seconds_through_reap": 0.298847,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.6296370029449463
+      },
+      "copper:job:137c9fa386f4348923971ff0908bd7979bc64c9d1af892db7b02737cef205d68": {
+        "interface_cpu_seconds_observed": 0.283638,
+        "interface_cpu_seconds_through_reap": 0.288921,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5418899059295654
+      },
+      "copper:job:14a08a26f7629415d7f44f762f346f02faba099c7efef50b075d7a51d02cb152": {
+        "scorer_cpu_seconds_observed": 0.283918,
+        "scorer_cpu_seconds_through_reap": 0.277944,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.5391509532928467
+      },
+      "copper:job:15054eeb35d67adef565f31548d14af9c5bf52dac689cccc55ebd98bf04ce5f7": {
+        "scorer_cpu_seconds_observed": 0.284461,
+        "scorer_cpu_seconds_through_reap": 0.278468,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.538503885269165
+      },
+      "copper:job:1d5bf2d8f4e3bad96c8b8375abff1cc9c12c2a8b72ddeac9811cf83d8d2fc36b": {
+        "interface_cpu_seconds_observed": 0.280426,
+        "interface_cpu_seconds_through_reap": 0.292427,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5358238220214844
+      },
+      "copper:job:20e0385561f70b10041f8606cf5a14279bc62a6c60e3527b407a010358eb9ba6": {
+        "interface_cpu_seconds_observed": 0.285791,
+        "interface_cpu_seconds_through_reap": 0.287812,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5531280040740967
+      },
+      "copper:job:2319b6691ff9a0db08968b7bd03a0465d7b6cd31ba6f3405e4242f03540ae574": {
+        "interface_cpu_seconds_observed": 0.282232,
+        "interface_cpu_seconds_through_reap": 0.290232,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5339980125427246
+      },
+      "copper:job:292600978d84173ce573d7db3966c7e4a1d22cf845356259dfb572846dcfa3c7": {
+        "interface_cpu_seconds_observed": 0.061275,
+        "interface_cpu_seconds_through_reap": 0.252483,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5124509334564209
+      },
+      "copper:job:35bac74a676bd88e0958dfe361eef6fc62bbd7f4ec55d69439f7a60675eb6677": {
+        "interface_cpu_seconds_observed": 0.064868,
+        "interface_cpu_seconds_through_reap": 0.254453,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5233149528503418
+      },
+      "copper:job:407a1979f2dd9856492a1f42d57e0e888117f0fb1efb87d8ff305e43c45cd8e1": {
+        "interface_cpu_seconds_observed": 0.283218,
+        "interface_cpu_seconds_through_reap": 0.288221,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.533221960067749
+      },
+      "copper:job:4b952486762a767ba23933c980000794c3a663b846c181360da6a091c91801f9": {
+        "interface_cpu_seconds_observed": 0.283964,
+        "interface_cpu_seconds_through_reap": 0.291965,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5535180568695068
+      },
+      "copper:job:50a78c93ef7d0ee5bfce5a373385a41a725e59d4dadbc2d654dc961c3fb3382e": {
+        "solver_cpu_seconds_observed": 0.283828,
+        "solver_cpu_seconds_through_reap": 0.296831,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.5618300437927246
+      },
+      "copper:job:50c4f3a38056ed70d81f9e41767efc37f0ecc738394a9f2171f3869ab587ce4d": {
+        "interface_cpu_seconds_observed": 0.06119,
+        "interface_cpu_seconds_through_reap": 0.254401,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5063228607177734
+      },
+      "copper:job:513fd34acf86857e359de14f51151bd236e26b722d7b8eda86506369b266a34d": {
+        "interface_cpu_seconds_observed": 0.062852,
+        "interface_cpu_seconds_through_reap": 0.251064,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5053598880767822
+      },
+      "copper:job:54367cad1e1a6a880e5cae5216cc8784d7136def45391e509a9b31b4baa6f2e2": {
+        "interface_cpu_seconds_observed": 0.281088,
+        "interface_cpu_seconds_through_reap": 0.28809,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5438821315765381
+      },
+      "copper:job:561bfc4059042c9290abfa532b1df07a9712928b868c20b4e8aa2d7212618a35": {
+        "interface_cpu_seconds_observed": 0.285215,
+        "interface_cpu_seconds_through_reap": 0.291216,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5523080825805664
+      },
+      "copper:job:5ceaa9e76246a05372cced504d3027fa499a771beb5295def451616fc059426e": {
+        "interface_cpu_seconds_observed": 0.286375,
+        "interface_cpu_seconds_through_reap": 0.291377,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.535128116607666
+      },
+      "copper:job:664880c69362b406ed8166dea227cd55069c941b9c66551a4da784f04f3bf809": {
+        "solver_cpu_seconds_observed": 0.280344,
+        "solver_cpu_seconds_through_reap": 0.298346,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.5495278835296631
+      },
+      "copper:job:667bf410ae402d962eae43644445d705058d7cc4d58256c7d74aa933757b2d8c": {
+        "solver_cpu_seconds_observed": 0.06185,
+        "solver_cpu_seconds_through_reap": 0.268056,
+        "solver_jobs": 1,
+        "solver_wall_seconds": 0.5262269973754883
+      },
+      "copper:job:694d5b9614499b13dcf44916a758af3102b411b57713a8bb7d6dc9695b502595": {
+        "interface_cpu_seconds_observed": 0.284248,
+        "interface_cpu_seconds_through_reap": 0.290248,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.547497034072876
+      },
+      "copper:job:7afe324631b9f0d0f91b10717ef3ceb551c11de47398c8fd28ab9645e853251a": {
+        "interface_cpu_seconds_observed": 0.280744,
+        "interface_cpu_seconds_through_reap": 0.290746,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5333788394927979
+      },
+      "copper:job:7c0a5350032651c49aa8075b8a4a81e8650148e7d5e254a3f96802df8ce7aa65": {
+        "interface_cpu_seconds_observed": 0.284698,
+        "interface_cpu_seconds_through_reap": 0.288702,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5304598808288574
+      },
+      "copper:job:82ed4cfc8056edb3015dcfe129c630ce315301877cd131c6ecd58b2a16885545": {
+        "interface_cpu_seconds_observed": 0.061801,
+        "interface_cpu_seconds_through_reap": 0.254015,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5100440979003906
+      },
+      "copper:job:90199020d0a83adf2e07c2bc391b0815fedbf3cca2babba323ee4993a3399706": {
+        "interface_cpu_seconds_observed": 0.283198,
+        "interface_cpu_seconds_through_reap": 0.292199,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5388989448547363
+      },
+      "copper:job:920148cc465e59b0f71661aa77e028a785093139efae20bebba3b3e79be3e3a8": {
+        "interface_cpu_seconds_observed": 0.282888,
+        "interface_cpu_seconds_through_reap": 0.289889,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5382399559020996
+      },
+      "copper:job:9543a31634371af6685ce8b9e8c3587fa665a1dd63e8fef34e267aadcf186f8e": {
+        "scorer_cpu_seconds_observed": 0.283608,
+        "scorer_cpu_seconds_through_reap": 0.278608,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.5347261428833008
+      },
+      "copper:job:99fab6b304438008ec81938fa79abcacf199e650f8e384545485fff9b5d3fbee": {
+        "interface_cpu_seconds_observed": 0.283686,
+        "interface_cpu_seconds_through_reap": 0.291687,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5421261787414551
+      },
+      "copper:job:a7d775a4be12fb11a87b46130da8719c49b9d17e500d44f72af6a17478ea8df4": {
+        "interface_cpu_seconds_observed": 0.282979,
+        "interface_cpu_seconds_through_reap": 0.290981,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5497848987579346
+      },
+      "copper:job:ac871278eb16628048f5a533a250a6dd7f14f25aa74c9cf06efe8cc28d59b77a": {
+        "interface_cpu_seconds_observed": 0.281691,
+        "interface_cpu_seconds_through_reap": 0.292694,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.546273946762085
+      },
+      "copper:job:bb0b92ee4448426176273b00a025738813b3932c4fbb2fc4ffe8a953d364534b": {
+        "scorer_cpu_seconds_observed": 0.285163,
+        "scorer_cpu_seconds_through_reap": 0.278461,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.53997802734375
+      },
+      "copper:job:be33ad07f10645ae9102ccbd5add01460b07e1ee37289c58d8cccceb7455cc5f": {
+        "scorer_cpu_seconds_observed": 0.28301,
+        "scorer_cpu_seconds_through_reap": 0.276089,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.5440361499786377
+      },
+      "copper:job:d0b03dac2d584ea71e38f7750dfb153c738354232010a9944c81b416d51a71fe": {
+        "interface_cpu_seconds_observed": 0.282526,
+        "interface_cpu_seconds_through_reap": 0.290528,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.542914867401123
+      },
+      "copper:job:d18a583d1338fced84fd6faf257cc0028d243eff7d8596a8c4fdfbd40a892595": {
+        "interface_cpu_seconds_observed": 0.283089,
+        "interface_cpu_seconds_through_reap": 0.288091,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5457279682159424
+      },
+      "copper:job:d7de24dad40cc47202508f2775db6282b5de26913411a39d6b7d1ccba8ccee50": {
+        "interface_cpu_seconds_observed": 0.0617,
+        "interface_cpu_seconds_through_reap": 0.251923,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5163979530334473
+      },
+      "copper:job:dec0b28b5cec6cd40aec0eec5f2c3c1572568de14358872521b0a48989ae7107": {
+        "interface_cpu_seconds_observed": 0.283029,
+        "interface_cpu_seconds_through_reap": 0.290045,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5559680461883545
+      },
+      "copper:job:e1c1ad52ebf7ae961dcf6784018f9785d25da7a024f484bfffc64088105cb45b": {
+        "interface_cpu_seconds_observed": 0.286671,
+        "interface_cpu_seconds_through_reap": 0.299671,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.656832218170166
+      },
+      "copper:job:ebc29d719ef8adf7d36451cbd83629b2d7dd86f96f67cbc61b19c99706c7d3d5": {
+        "scorer_cpu_seconds_observed": 0.284036,
+        "scorer_cpu_seconds_through_reap": 0.277644,
+        "scorer_jobs": 1,
+        "scorer_wall_seconds": 0.5289859771728516
+      },
+      "copper:job:f1a7eab16e1275c87518bd14d23a51bdac5df7d3ecdc8dc24cc41a99f85339c7": {
+        "interface_cpu_seconds_observed": 0.281463,
+        "interface_cpu_seconds_through_reap": 0.288465,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5567591190338135
+      },
+      "copper:job:f81108717aff49938a004413ec37fc4fc34eeb0a818cd5abbf1a7b134a39036f": {
+        "interface_cpu_seconds_observed": 0.283386,
+        "interface_cpu_seconds_through_reap": 0.290389,
+        "interface_jobs": 1,
+        "interface_wall_seconds": 0.5523681640625
+      },
+      "copper:preflight:usage": {
+        "harness_artifact_bytes": 217709,
+        "harness_tool_calls": 5,
+        "harness_validation_submissions": 1,
+        "llm_requests": 6
+      },
+      "copper:turn:0a20f70f007fe3c7668c1535a9b20b2a661242242ba51d42703eb26d9eee2f21": {
+        "harness_turns": 1
+      },
+      "copper:turn:1001b2cfb3477dad09290911254817f3c130c89f8d3ea97cf0b4783a236e994a": {
+        "harness_turns": 1
+      },
+      "copper:turn:b33359949fce0ed0d9cd1074ce449e7c52a2a143c26615d20e442f5ebac0ecb0": {
+        "harness_turns": 1
+      },
+      "copper:turn:f4ae7c68698a1699912358d511fc12901e2ffbd96b0334b205f3d81918462874": {
+        "harness_turns": 1
+      },
+      "copper:usage:0a20f70f007fe3c7668c1535a9b20b2a661242242ba51d42703eb26d9eee2f21": {
+        "harness_artifact_bytes": 6795255,
+        "harness_tool_calls": 12,
+        "harness_validation_submissions": 1,
+        "llm_requests": 12
+      },
+      "copper:usage:1001b2cfb3477dad09290911254817f3c130c89f8d3ea97cf0b4783a236e994a": {
+        "harness_artifact_bytes": 9173733,
+        "harness_tool_calls": 15,
+        "harness_validation_submissions": 1,
+        "llm_requests": 13
+      },
+      "copper:usage:b33359949fce0ed0d9cd1074ce449e7c52a2a143c26615d20e442f5ebac0ecb0": {
+        "harness_artifact_bytes": 6473911,
+        "harness_tool_calls": 12,
+        "harness_validation_submissions": 1,
+        "llm_requests": 10
+      },
+      "copper:usage:f4ae7c68698a1699912358d511fc12901e2ffbd96b0334b205f3d81918462874": {
+        "harness_artifact_bytes": 5644512,
+        "harness_tool_calls": 13,
+        "harness_validation_submissions": 1,
+        "llm_requests": 10
+      },
+      "copper:v2:scientific-source:153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5": {
+        "algorithm_feedback_slots": 1
+      },
+      "copper:v2:scientific-source:2651b191cb24d51d21e8765701f4897a4ca848e00499d05acf346d19f145fe73": {
+        "algorithm_feedback_slots": 1
+      },
+      "copper:v2:scientific-source:a9c536651c1f93b5bddeffdedf562f1883b50b470b4c1c9b66a5807becc20bcd": {
+        "algorithm_feedback_slots": 1
+      },
+      "engine:evaluation_attempt:0a1de014f5b69ecfdc9c643af1f91d6c188f64fd5d737aeda3652998f270b998": {
+        "expensive_evaluation_attempts": 1,
+        "external_evaluations": 1,
+        "selected_candidates": 1
+      },
+      "engine:evaluation_attempt:32a4ccdbc665b9ad0ecab7361758b7d86c7648357c9e103bf1ec18dd7cb4d47a": {
+        "expensive_evaluation_attempts": 1,
+        "external_evaluations": 1,
+        "selected_candidates": 1
+      },
+      "engine:evaluation_attempt:6fbf429bb4bc9028217cb125959b354076f8912579507e19e040cfd2786ff728": {
+        "expensive_evaluation_attempts": 1,
+        "external_evaluations": 1,
+        "selected_candidates": 1
+      },
+      "engine:evaluation_result:0a1de014f5b69ecfdc9c643af1f91d6c188f64fd5d737aeda3652998f270b998": {
+        "benchmark_jobs": 4.0,
+        "successful_evaluations": 1
+      },
+      "engine:evaluation_result:32a4ccdbc665b9ad0ecab7361758b7d86c7648357c9e103bf1ec18dd7cb4d47a": {
+        "benchmark_jobs": 4.0,
+        "successful_evaluations": 1
+      },
+      "engine:evaluation_result:6fbf429bb4bc9028217cb125959b354076f8912579507e19e040cfd2786ff728": {
+        "benchmark_jobs": 4.0,
+        "successful_evaluations": 1
+      },
+      "engine:proposal_attempt:researcher_1_round_1-submission-1": {
+        "proposal_attempts": 1
+      },
+      "engine:proposal_attempt:researcher_2_round_1-submission-1": {
+        "proposal_attempts": 1
+      },
+      "engine:proposal_attempt:researcher_3_round_1-submission-1": {
+        "proposal_attempts": 1
+      },
+      "engine:proposal_attempt:researcher_4_round_1-submission-1": {
+        "proposal_attempts": 1
+      },
+      "engine:reservoir:0": {
+        "valid_search_candidates": 1
+      },
+      "engine:reservoir:1": {
+        "valid_search_candidates": 4
+      },
+      "engine:round:0": {
+        "outer_iterations": 1
+      },
+      "engine:round:1": {
+        "outer_iterations": 1
+      },
+      "main:main_round_0001": {
+        "harness_artifact_bytes": 11110722,
+        "harness_tool_calls": 17,
+        "harness_validation_submissions": 1,
+        "llm_requests": 14
+      },
+      "main:main_round_0001:count": {
+        "harness_turns": 1,
+        "main_research_turns": 1
+      }
+    },
+    "run_id": "fusion-pilot-r2",
+    "task": "copper_inversion"
+  },
+  "remaining": {
+    "algorithm_feedback_slots": 0,
+    "benchmark_jobs": 0,
+    "expensive_evaluation_attempts": 0,
+    "external_evaluations": 0,
+    "harness_artifact_bytes": null,
+    "harness_tool_calls": null,
+    "harness_turns": 0,
+    "harness_validation_submissions": null,
+    "harness_wall_time_seconds": null,
+    "interface_cpu_seconds_observed": null,
+    "interface_cpu_seconds_through_reap": null,
+    "interface_jobs": 48,
+    "interface_wall_seconds": null,
+    "llm_requests": null,
+    "main_research_turns": 0,
+    "outer_iterations": 0,
+    "proposal_attempts": null,
+    "scorer_cpu_seconds_observed": null,
+    "scorer_cpu_seconds_through_reap": null,
+    "scorer_jobs": 0,
+    "scorer_wall_seconds": null,
+    "selected_candidates": 0,
+    "solver_cpu_seconds_observed": null,
+    "solver_cpu_seconds_through_reap": null,
+    "solver_jobs": 0,
+    "solver_wall_seconds": null,
+    "successful_evaluations": 0,
+    "valid_search_candidates": 3
+  }
+}

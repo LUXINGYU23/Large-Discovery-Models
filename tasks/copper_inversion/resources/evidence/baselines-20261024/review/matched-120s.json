@@ -1,0 +1,398 @@
+[
+  {
+    "case": "drillholes_3d",
+    "method": "paper_mcmc",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      220.3399448391901,
+      172.347528627309,
+      151.5253373948378
+    ],
+    "mean_loss": 181.4042702871123,
+    "std_loss": 35.28995574592563,
+    "solver_seconds": [
+      112.978196144104,
+      112.19688510894775,
+      112.87169694900513
+    ],
+    "objective_calls": [
+      59,
+      59,
+      59
+    ],
+    "native_loss": [
+      220.3399448391901,
+      172.347528627309,
+      151.5253373948378
+    ]
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "MCMC",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      220.3399448391901,
+      172.347528627309,
+      151.5253373948378
+    ],
+    "mean_loss": 181.4042702871123,
+    "std_loss": 35.28995574592563,
+    "solver_seconds": [
+      113.16495490074158,
+      112.24805402755737,
+      113.2515058517456
+    ],
+    "objective_calls": [
+      59,
+      59,
+      59
+    ],
+    "native_loss": [
+      220.3399448391901,
+      172.347528627309,
+      151.5253373948378
+    ]
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ACQ_MCMC",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      353.6981427308057,
+      320.5772322309012,
+      319.3949007942438
+    ],
+    "mean_loss": 331.2234252519836,
+    "std_loss": 19.472651879525355,
+    "solver_seconds": [
+      114.57139301300049,
+      115.93237614631653,
+      117.34732699394226
+    ],
+    "objective_calls": [
+      16,
+      16,
+      16
+    ],
+    "native_loss": [
+      353.6981427308057,
+      320.5772322309012,
+      319.3949007942438
+    ]
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ast",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      6.515533262523911,
+      6.515533262523911,
+      6.515533262523911
+    ],
+    "mean_loss": 6.515533262523911,
+    "std_loss": 0.0,
+    "solver_seconds": [
+      0.44565296173095703,
+      0.4656338691711426,
+      0.46774792671203613
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "qwen",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      6.515262925895621,
+      6.515262925895621,
+      6.515262925895621
+    ],
+    "mean_loss": 6.515262925895621,
+    "std_loss": 0.0,
+    "solver_seconds": [
+      52.55737113952637,
+      52.568451166152954,
+      52.599952936172485
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "fusion",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      6.515501196073311,
+      6.515501196073311,
+      6.515501196073311
+    ],
+    "mean_loss": 6.515501196073311,
+    "std_loss": 0.0,
+    "solver_seconds": [
+      50.58425688743591,
+      49.93141293525696,
+      50.077024936676025
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "paper_mcmc",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      724.335156638055,
+      565.0101756711779,
+      527.340581451676
+    ],
+    "mean_loss": 605.5619712536363,
+    "std_loss": 104.57079782107716,
+    "solver_seconds": [
+      112.92466115951538,
+      112.04620504379272,
+      113.1666829586029
+    ],
+    "objective_calls": [
+      59,
+      59,
+      59
+    ],
+    "native_loss": [
+      724.335156638055,
+      565.0101756711779,
+      527.340581451676
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "MCMC",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      724.335156638055,
+      565.0101756711779,
+      527.340581451676
+    ],
+    "mean_loss": 605.5619712536363,
+    "std_loss": 104.57079782107716,
+    "solver_seconds": [
+      111.3615071773529,
+      112.52942395210266,
+      111.36735010147095
+    ],
+    "objective_calls": [
+      58,
+      59,
+      58
+    ],
+    "native_loss": [
+      724.335156638055,
+      565.0101756711779,
+      527.340581451676
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ACQ_MCMC",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      1109.510045140377,
+      1014.2527288581451,
+      1094.485534070002
+    ],
+    "mean_loss": 1072.7494360228413,
+    "std_loss": 51.21359726732857,
+    "solver_seconds": [
+      114.38445901870728,
+      115.53512692451477,
+      115.33862900733948
+    ],
+    "objective_calls": [
+      16,
+      16,
+      16
+    ],
+    "native_loss": [
+      1109.510045140377,
+      1014.2527288581451,
+      1094.485534070002
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ast",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      33.05741128908618,
+      33.05741128908618,
+      33.05741128908618
+    ],
+    "mean_loss": 33.05741128908618,
+    "std_loss": 0.0,
+    "solver_seconds": [
+      66.99890995025635,
+      66.96600699424744,
+      66.98241710662842
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "qwen",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      32.43381199350168,
+      32.43381199350168,
+      32.42921345811531
+    ],
+    "mean_loss": 32.43227914837289,
+    "std_loss": 0.0026549656431954097,
+    "solver_seconds": [
+      99.09810280799866,
+      99.07485604286194,
+      99.10720801353455
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "fusion",
+    "finished": 3,
+    "successful": 3,
+    "seeds": [
+      47,
+      49,
+      48
+    ],
+    "losses": [
+      33.168653047261564,
+      33.168653047261564,
+      33.168653047261564
+    ],
+    "mean_loss": 33.168653047261564,
+    "std_loss": 0.0,
+    "solver_seconds": [
+      2.1157991886138916,
+      2.177716016769409,
+      2.107280969619751
+    ],
+    "objective_calls": [
+      null,
+      null,
+      null
+    ],
+    "native_loss": [
+      null,
+      null,
+      null
+    ]
+  }
+]

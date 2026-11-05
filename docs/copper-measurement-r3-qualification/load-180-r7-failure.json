@@ -1,0 +1,13 @@
+{
+  "status": "failed_stopped",
+  "completed_rows": 638,
+  "legal_rows": 39,
+  "errors": {
+    "EvaluationPaused: Docker command outcome unavailable; reconcile the job before retry": 597,
+    "EvaluationPaused: container supervisor exceeded infrastructure grace; reconcile recorded job": 2
+  },
+  "job_records": 710,
+  "container_states_sha256": "930c5db3d1c5d6d2af44769a6a0bca697c719e7a9e84e95069c358fccb6aec9f",
+  "removed_container_count": 669,
+  "failed_removal_batches": 0
+}

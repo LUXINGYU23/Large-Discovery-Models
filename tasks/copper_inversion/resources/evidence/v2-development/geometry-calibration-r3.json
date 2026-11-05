@@ -1,0 +1,137 @@
+{
+  "scope": "analytic discretization diagnostics only; not external validation",
+  "sphere": [
+    {
+      "spacing": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "contact_rmse": 1.0803703966104845,
+      "proposed_scale": {
+        "measurement_sigma": 0.0,
+        "discretization_scale": 3.4641016151377544,
+        "effective_scale": 3.4641016151377544
+      },
+      "max_contact_error_over_proposed_scale": 0.57196896139674,
+      "contact_rmse_in_sigma": 1.0803703966104845,
+      "max_contact_distance": 1.981358602983111,
+      "public_loss": 0.8502015286420044,
+      "relative_volume_error": 0.1443830259379707,
+      "voxel_area_ratio": 1.2223099629457561,
+      "unit_conversion_loss_difference": 0.0
+    },
+    {
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contact_rmse": 0.21412855747195317,
+      "proposed_scale": {
+        "measurement_sigma": 0.0,
+        "discretization_scale": 1.7320508075688772,
+        "effective_scale": 1.7320508075688772
+      },
+      "max_contact_error_over_proposed_scale": 0.2861348380254443,
+      "contact_rmse_in_sigma": 0.42825711494390634,
+      "max_contact_distance": 0.4956000772755607,
+      "public_loss": 0.25303004606753426,
+      "relative_volume_error": 0.05424234304071485,
+      "voxel_area_ratio": 1.5278874536821951,
+      "unit_conversion_loss_difference": -5.551115123125783e-17
+    },
+    {
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contact_rmse": 0.12400315016115496,
+      "proposed_scale": {
+        "measurement_sigma": 0.0,
+        "discretization_scale": 0.8660254037844386,
+        "effective_scale": 0.8660254037844386
+      },
+      "max_contact_error_over_proposed_scale": 0.291505421073456,
+      "contact_rmse_in_sigma": 0.4960126006446198,
+      "max_contact_distance": 0.25245109999049253,
+      "public_loss": 0.22010520906874956,
+      "relative_volume_error": 0.008405719430248926,
+      "voxel_area_ratio": 1.5087888605111677,
+      "unit_conversion_loss_difference": -8.326672684688674e-17
+    },
+    {
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contact_rmse": 0.1797061514590333,
+      "proposed_scale": {
+        "measurement_sigma": 0.0,
+        "discretization_scale": 1.346291201783626,
+        "effective_scale": 1.346291201783626
+      },
+      "max_contact_error_over_proposed_scale": 0.3168190635625246,
+      "contact_rmse_in_sigma": 0.7188246058361332,
+      "max_contact_distance": 0.4265307178315542,
+      "public_loss": 0.34292672964323195,
+      "relative_volume_error": 0.014135297381557166,
+      "voxel_area_ratio": 1.5215212559585194,
+      "unit_conversion_loss_difference": 1.1102230246251565e-16
+    }
+  ],
+  "slab_rotation": [
+    {
+      "degrees": 0,
+      "area": 2112.0,
+      "analytic_area": 2112.0,
+      "voxel_area_ratio": 1.0,
+      "volume": 6336.0
+    },
+    {
+      "degrees": 15,
+      "area": 2624.0,
+      "analytic_area": 2186.5032930256475,
+      "voxel_area_ratio": 1.2000896629654518,
+      "volume": 6624.0
+    },
+    {
+      "degrees": 30,
+      "area": 3328.0,
+      "analytic_area": 2438.7275370583347,
+      "voxel_area_ratio": 1.3646460908110842,
+      "volume": 7296.0
+    },
+    {
+      "degrees": 45,
+      "area": 3616.0,
+      "analytic_area": 2557.564209737783,
+      "voxel_area_ratio": 1.4138452462824909,
+      "volume": 7776.0
+    },
+    {
+      "degrees": 60,
+      "area": 3200.0,
+      "analytic_area": 2364.8267026017306,
+      "voxel_area_ratio": 1.3531646934125998,
+      "volume": 7104.0
+    },
+    {
+      "degrees": 75,
+      "area": 2624.0,
+      "analytic_area": 2120.2456174799177,
+      "voxel_area_ratio": 1.2375924649328294,
+      "volume": 6336.0
+    },
+    {
+      "degrees": 90,
+      "area": 2048.0,
+      "analytic_area": 2048.0,
+      "voxel_area_ratio": 1.0,
+      "volume": 6144.0
+    }
+  ],
+  "limitations": "Axis-face area is an anisotropic voxel perimeter, not Euclidean surface area. Pilot prior/noise calibration remains open."
+}

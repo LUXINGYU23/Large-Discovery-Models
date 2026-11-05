@@ -1,0 +1,47 @@
+{
+  "role": "independent_development",
+  "policy": "synthetic-volume-connectivity-1",
+  "parents": [
+    {
+      "family": "folded",
+      "seed": 2540192433
+    },
+    {
+      "family": "folded",
+      "seed": 3650501183
+    },
+    {
+      "family": "lens",
+      "seed": 1625138824
+    },
+    {
+      "family": "lens",
+      "seed": 4234764802
+    },
+    {
+      "family": "multiple",
+      "seed": 2059122708
+    },
+    {
+      "family": "multiple",
+      "seed": 1564801663
+    },
+    {
+      "family": "faulted",
+      "seed": 1346786600
+    },
+    {
+      "family": "faulted",
+      "seed": 1025860912
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 1572553005
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 579465176
+    }
+  ],
+  "no_replacements": true
+}

@@ -1,0 +1,22 @@
+{
+  "base_url": "https://api.deepseek.com",
+  "latency_seconds": 24.396771990694106,
+  "readonly_guest_probe": true,
+  "request_model": "deepseek-flash",
+  "response_models": [
+    "deepseek-flash"
+  ],
+  "status": "ok",
+  "thinking": "low",
+  "usage": {
+    "artifactBytes": 183145,
+    "providerCalls": 5,
+    "toolCalls": {
+      "bash": 3,
+      "submit_readiness": 1,
+      "write": 1
+    },
+    "validationSubmissions": 1
+  },
+  "wire_api": "Responses via Pi"
+}

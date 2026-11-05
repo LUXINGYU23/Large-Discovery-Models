@@ -1,0 +1,171 @@
+{
+  "status": "failed",
+  "policy": "synthetic-volume-connectivity-1",
+  "calibration_scope": "independent_development",
+  "used_evaluation_truth": false,
+  "parents": [
+    {
+      "family": "folded",
+      "seed": 2540192433,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "folded",
+      "seed": 3650501183,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "lens",
+      "seed": 1625138824,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "lens",
+      "seed": 4234764802,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "multiple",
+      "seed": 2059122708,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "multiple",
+      "seed": 1564801663,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "faulted",
+      "seed": 1346786600,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "faulted",
+      "seed": 1025860912,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 1572553005,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    },
+    {
+      "family": "faulted_lens",
+      "seed": 579465176,
+      "passed": false,
+      "reason": "generator failure; retained without replacement"
+    }
+  ],
+  "numerical_checks": [
+    {
+      "fixture": 0,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 0,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 0,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 1,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 2,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 3,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 3,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 3,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 4,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 4,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 4,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    },
+    {
+      "fixture": 5,
+      "probe": "empty",
+      "passed": true
+    },
+    {
+      "fixture": 5,
+      "probe": "full_feasible",
+      "passed": true
+    },
+    {
+      "fixture": 5,
+      "probe": "legal_initial_and_unit_conversion",
+      "passed": true,
+      "components": 1
+    }
+  ],
+  "limitations": [
+    "Fixed synthetic population assumptions; not field-geology validation",
+    "No fitted area or fragment penalty",
+    "At most four connected bodies; 2-65% of feasible domain; same public policy for all methods"
+  ]
+}

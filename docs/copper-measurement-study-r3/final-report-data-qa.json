@@ -1,0 +1,6 @@
+{
+  "case_rows": 1296,
+  "seed_aggregates": 54,
+  "group_split_metrics": 18,
+  "normalization_and_parent_equal_reaggregation": "passed"
+}

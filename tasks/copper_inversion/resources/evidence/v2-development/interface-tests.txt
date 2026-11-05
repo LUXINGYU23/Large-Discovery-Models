@@ -1,0 +1,7 @@
+test_admission_gate_and_receipt_reuse (tasks.copper_inversion.tests.test_v2_interface.InterfaceV2.test_admission_gate_and_receipt_reuse) ... ok
+test_fixture_coverage (tasks.copper_inversion.tests.test_v2_interface.InterfaceV2.test_fixture_coverage) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 5.172s
+
+OK

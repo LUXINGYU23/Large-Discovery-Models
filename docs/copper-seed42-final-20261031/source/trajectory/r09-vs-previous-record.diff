@@ -1,0 +1,24 @@
+--- c44598f1498f1ea14da0b1cb041609aa3a1a6245efd2b3c82fc9132f698304d8
+
++++ 9294c07a1add50b7d5c3c1596bfbaa63a62a1e96eb465b3a0aa5bf226ea0fb8b
+
+@@ -1,4 +1,4 @@
+
+-"""Copper v2 round-8 candidate 7: rival very-low-temperature annealing dynamics."""
++"""Copper v2 round-9 main candidate 3: Refinement: T0=3e-5 annealing at leader radii."""
+ import os
+ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+@@ -12,10 +12,7 @@
+
+ from tasks.copper_inversion.v2.geometry import canonicalize
+ from tasks.copper_inversion.v2.baselines import initialize
+ 
+-CFG = {'time': 0.68, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17),
+-       'jitter': 0.35, 'mode': 'anneal', 'seed_offset': 43,
+-       'fast_legal': True, 'fast_loss': True, 'T0': 1e-5,
+-       'shell_frac': 0.012}
++CFG = {'time': 0.68, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'mode': 'anneal', 'seed_offset': 11, 'fast_legal': True, 'fast_loss': True, 'T0': 3e-05, 'shell_frac': 0.012}
+ _ST = ndimage.generate_binary_structure(3, 1)
+ 
+ 

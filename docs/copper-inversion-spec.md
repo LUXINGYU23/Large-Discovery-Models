@@ -1,5 +1,7 @@
 # Copper Inversion：Agent 反演算法发现任务规格
 
+> 后续科学评估改造见 [v2 约束、独立数据与公平评估方案](copper-inversion-v2-spec.md)（设计提案，尚未实施）。本文保留为 v1 工程契约及历史记录。
+
 日期：2026-10-23。版本：1.2，已对齐 main PR #14。状态：P0–P5 工程交付与逐项验收完成；注册资格保持 contract_verified / draft，不宣称官方 benchmark 或方法优势。详见 [最终审计](copper-inversion-final-audit.md)、[最终结果](copper-inversion-final-results.md)和[验收台账](copper-inversion-acceptance.md)。
 
 本规格规定新增 `copper_inversion` 任务的科学问题、候选接口、可信执行边界和交付门槛。第一阶段完成持久 Agent 设计、提交、执行、读取反馈并修改反演算法的闭环；第二阶段在相同科学契约上接入 LDM surrogate/acquisition。各阶段独立记录证据，不能把注册成功、mock 运行或分数下降当成完整方法有效性证明。

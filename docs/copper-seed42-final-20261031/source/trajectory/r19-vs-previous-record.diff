@@ -1,0 +1,67 @@
+--- 4eec5e53873bd422fd4c10c8ff95167626182a6e9a94f553f7d5a40ac681ca00
+
++++ 776ee0300e9757563c2d5e1b087c3499f111b2bfd9b7dfa979c35f3c8cc979fd
+
+@@ -12,7 +12,7 @@
+
+ from tasks.copper_inversion.v2.geometry import canonicalize
+ from tasks.copper_inversion.v2.baselines import initialize
+ 
+-CFG = {'search': 'anneal', 'move': 'sphere', 'time': 0.94, 'anneal_frac': 0.56, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'T0': 3e-05, 'seed_offset': 31, 'slab_frac': 0.03, 'sphere_mix': 0.5, 'cycles': 3, 'rbf': False, 'polish': True, 'polish_r_choices': (1, 3), 'temp_mults': (1.0, 0.45, 1.8)}
++CFG = {'search': 'anneal', 'move': 'sphere', 'time': 0.94, 'anneal_frac': 0.56, 'radii': (0.05, 0.075, 0.105, 0.13, 0.17), 'jitter': 0.35, 'T0': 3e-05, 'seed_offset': 31, 'slab_frac': 0.03, 'sphere_mix': 0.5, 'cycles': 3, 'rbf': False, 'polish': True, 'temp_mults': (1.0, 0.45, 1.8), 'polish_mode': 'best_pair', 'polish_r_choices': (1, 3)}
+ _ST = ndimage.generate_binary_structure(3, 1)
+ 
+ 
+@@ -287,6 +287,10 @@
+
+ 
+ 
+ def _polish(problem, rank, field, cur, end, rng, coords, sp, feasible, best, best_l):
++    start = time.monotonic()
++    mode = str(CFG.get('polish_mode', 'random'))
++    choices = tuple(int(v) for v in CFG.get('polish_r_choices', (1, 2)))
++    coarse_r = int(CFG.get('coarse_r', 3)); fine_r = int(CFG.get('fine_r', 1))
+     while time.monotonic() < end:
+         mask = field > 0
+         boundary = ((ndimage.binary_dilation(mask, structure=_ST) & ~mask) |
+@@ -295,8 +299,28 @@
+
+         if not len(idx):
+             break
+         c = idx[rng.integers(len(idx))]
+-        _rc = tuple(CFG.get('polish_r_choices', (1, 2)))
+-        r = int(_rc[int(rng.integers(len(_rc)))])
++        frac = (time.monotonic() - start) / max(end - start, 1e-6)
++        if mode == 'coarse_fine':
++            rc = (coarse_r,) if frac < float(CFG.get('coarse_frac', .6)) else (fine_r,)
++        elif mode == 'fine_coarse':
++            rc = (fine_r,) if frac < float(CFG.get('fine_frac', .4)) else (coarse_r,)
++        else:
++            rc = choices
++        if mode == 'best_pair':
++            chosen = None; chosen_val = cur
++            for rr in rc:
++                sl = tuple(slice(max(0, int(c[i]) - rr), min(field.shape[i], int(c[i]) + rr + 1))
++                           for i in range(3))
++                prop = field.copy(); prop[sl] *= -1.
++                val = _score(problem, prop)
++                if np.isfinite(val) and val < chosen_val:
++                    chosen, chosen_val = prop, val
++            if chosen is not None:
++                field, cur = chosen, chosen_val
++                if cur < best_l:
++                    best, best_l = prop.copy(), cur
++            continue
++        r = int(rc[int(rng.integers(len(rc)))])
+         sl = tuple(slice(max(0, int(c[i]) - r), min(field.shape[i], int(c[i]) + r + 1))
+                    for i in range(3))
+         prop = field.copy(); prop[sl] *= -1.
+@@ -308,7 +332,6 @@
+
+             if val < best_l:
+                 best, best_l = prop.copy(), val
+     return best, best_l
+-
+ 
+ def solve(problem, budget, seed):
+     started = time.monotonic()

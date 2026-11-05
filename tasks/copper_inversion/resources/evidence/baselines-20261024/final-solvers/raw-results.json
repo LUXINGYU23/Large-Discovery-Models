@@ -1,0 +1,1397 @@
+[
+  {
+    "case": "drillholes_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.07726807218278772,
+      "air_positive_volume": 2188.0,
+      "air_positive_voxels": 2188,
+      "contact_rmse": 0.27025554617061526,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514409870030431,
+      "loss_total": 6.514409870030431,
+      "positive_volume": 28317.0,
+      "positive_voxels": 28317,
+      "research_utility": -6.514409870030431
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/ast/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-6c9ebaead2-53ddc25414463e0671fe",
+      "container_id": "868c2205ad8467f5c9e93a12ce55d3e71748c05640b3e363a02e02543e3dde01",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "53ddc25414463e0671fed0466d67b356aab153f45843324f492ccf7a9c94e915",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.063188,
+        "last_sample_unix": 1792815533.1615767,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7413760,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4565999507904053,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.202475,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30887936,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-00795b73c2-8bdef14b36d851c19f51",
+      "container_id": "d89bbe86d0887b7692484dadf25d723e70ce25b9f18c6fa43ed196e3e72d33e7",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "8bdef14b36d851c19f510d91ea907b3ac658cde96dd37c1a47d739817d890885",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 116.089567,
+        "last_sample_unix": 1792815532.4494524,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 58609664,
+        "samples": 525,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 116.3447048664093,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 116.080646,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 58609664,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.07728990780317213,
+      "air_positive_volume": 2188.0,
+      "air_positive_voxels": 2188,
+      "contact_rmse": 0.2702659361122639,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514476976068047,
+      "loss_total": 6.514476976068047,
+      "positive_volume": 28309.0,
+      "positive_voxels": 28309,
+      "research_utility": -6.514476976068047
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/ast/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-6c9ebaead2-3ef3d906431ee6ad0787",
+      "container_id": "192fd0b395fcba50cfe2c1dcedcd4797a5430c134012fe3a593a2d91a63b7e8e",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "3ef3d906431ee6ad07876d58ad1bbd6ca8a3c53c92fda2c74901d5987d448953",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.064712,
+        "last_sample_unix": 1792815650.4428568,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7241728,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4584009647369385,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.210968,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30588928,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-00795b73c2-92e37c85bb43def9e562",
+      "container_id": "8f4ebb63a95ecb696d67b0ea42b8f66532f0173da64f3f07b423b896a2b0a3e8",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "92e37c85bb43def9e562882314e71c473935f4ab619345515fbb363dabe570ee",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 115.975096,
+        "last_sample_unix": 1792815649.7686858,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 59162624,
+        "samples": 526,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 116.34592294692993,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 116.083096,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 59219968,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.07697745104969252,
+      "air_positive_volume": 2178.0,
+      "air_positive_voxels": 2178,
+      "contact_rmse": 0.27030090211119195,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514523618798026,
+      "loss_total": 6.514523618798026,
+      "positive_volume": 28294.0,
+      "positive_voxels": 28294,
+      "research_utility": -6.514523618798026
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/ast/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-6c9ebaead2-0a33299155bf84d34df3",
+      "container_id": "c32c762cc134307081af7e122e4e1dccda4f2105e713355fef25e71b99108e3d",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "0a33299155bf84d34df3e3453763e4a4b22df339e6af345fae39b44f387bab01",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.0604,
+        "last_sample_unix": 1792815767.703942,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7151616,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.47704100608825684,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.207091,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30453760,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-00795b73c2-68f047bbac2e9723222e",
+      "container_id": "890fc77e6b73ac6a2ae42d3964c05bcf848f04c4c393e339d29828c4780524d0",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "68f047bbac2e9723222eddedba8dae6b211ade978f47a3ace672583d90ec7218",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 115.893813,
+        "last_sample_unix": 1792815766.9846294,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 58535936,
+        "samples": 527,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 116.3534460067749,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 116.085813,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 58699776,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.06781526317786801,
+      "air_positive_volume": 1787.0,
+      "air_positive_voxels": 1787,
+      "contact_rmse": 0.2705699526320513,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.5149819772406525,
+      "loss_total": 6.5149819772406525,
+      "positive_volume": 26351.0,
+      "positive_voxels": 26351,
+      "research_utility": -6.5149819772406525
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/qwen/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-f432db5132-7565c24715d18c70c5bc",
+      "container_id": "7e17dee323c7712cdcf22b3850327b6435c8645c4e3eda98df426c68352c1e0a",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "7565c24715d18c70c5bc7252e39bd41b225f68860decfd22ef8f32ec8023f0b6",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.062175,
+        "last_sample_unix": 1792815513.4038994,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7630848,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4688558578491211,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.206459,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31354880,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-f4d9521f6a-09f86035085b692e4680",
+      "container_id": "8ef135e14704cce11c4adc65f113b44b32203336e867ecf9271d86068cfcc500",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "09f86035085b692e46800531a1c3c04691e994a976102f2d924e3c8ab4dcdc06",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.901216,
+        "last_sample_unix": 1792815512.7162988,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 63135744,
+        "samples": 434,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 96.24424195289612,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.98822,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 63229952,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.06781526317786801,
+      "air_positive_volume": 1787.0,
+      "air_positive_voxels": 1787,
+      "contact_rmse": 0.2705699526320513,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.5149819772406525,
+      "loss_total": 6.5149819772406525,
+      "positive_volume": 26351.0,
+      "positive_voxels": 26351,
+      "research_utility": -6.5149819772406525
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/qwen/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-f432db5132-7fb77478c42466ce3197",
+      "container_id": "969baf291272cdbdd04b5c520555c6808a703759e8192a2f023d10cb97a4d1d0",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "7fb77478c42466ce3197555a46a3e4593bb0706aa31006db2f5ee3b6fed98a2c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.05974,
+        "last_sample_unix": 1792815610.5166922,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6905856,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4655301570892334,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.203986,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31166464,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-f4d9521f6a-d64f717e19a769b932ca",
+      "container_id": "96a22ea223ecb0db3a0c57e6e2ed62775b8aea082c81152d3311ee7c4e8607b9",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "d64f717e19a769b932ca3d146a22a32ebdc1bb9cf8c9935481e62abdd39e4e46",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.807578,
+        "last_sample_unix": 1792815609.8396633,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 63066112,
+        "samples": 434,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 96.2232551574707,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.966579,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 63356928,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.06781526317786801,
+      "air_positive_volume": 1787.0,
+      "air_positive_voxels": 1787,
+      "contact_rmse": 0.2705699526320513,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.5149819772406525,
+      "loss_total": 6.5149819772406525,
+      "positive_volume": 26351.0,
+      "positive_voxels": 26351,
+      "research_utility": -6.5149819772406525
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/qwen/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-f432db5132-f1129db8419cdf8d8473",
+      "container_id": "2f97dea8b3b28117227d77cbda19ed208257c027463114263c50cc01f5fedb82",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "f1129db8419cdf8d84733a234c7cdad1c313f06483ee77c50051b792f5cfedf8",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.059124,
+        "last_sample_unix": 1792815707.7918947,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6688768,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4593660831451416,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.200364,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30715904,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-f4d9521f6a-a8f321204ae8a5f94a46",
+      "container_id": "2809a6707efe94ca9fddad58b1a219b4e07fc5a1fbb34c8a73899b31897ca6b5",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "a8f321204ae8a5f94a46938e0baa472eccdfd049bfd339d79c58982d3b3ac2d7",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.964493,
+        "last_sample_unix": 1792815707.1136844,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 63062016,
+        "samples": 436,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 96.24184608459473,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.968511,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 63475712,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.07205374977301617,
+      "air_positive_volume": 1984.0,
+      "air_positive_voxels": 1984,
+      "contact_rmse": 0.2705393382206466,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514815230760057,
+      "loss_total": 6.514815230760057,
+      "positive_volume": 27535.0,
+      "positive_voxels": 27535,
+      "research_utility": -6.514815230760057
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/fusion/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a9e246a2eb-c5bd2d28188c10b65c6c",
+      "container_id": "0ae5319b54a0eed0e2d0b2c745133d4d499ddde0ef1d29f055ee1d7cc9bdeae2",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "c5bd2d28188c10b65c6c5e852656800bd9f4ad6ba7cfe28f5916b3ddb9733f1c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060481,
+        "last_sample_unix": 1792815829.4257157,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6746112,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.45609307289123535,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.202736,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30527488,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-e11c902398-229ead8b58aacf6652d7",
+      "container_id": "8e6cc44a53ef8154a9ad0612cf4de55551d0a4f46ef03d269d654408d356cec3",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "229ead8b58aacf6652d7836179dbbf5b58d1bc2520a4bdc1dd05820676e4acc5",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 118.475437,
+        "last_sample_unix": 1792815828.7474747,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 81428480,
+        "samples": 538,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 118.80084419250488,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 118.543487,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 101588992,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.07205374977301617,
+      "air_positive_volume": 1984.0,
+      "air_positive_voxels": 1984,
+      "contact_rmse": 0.2705393382206466,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514815230760057,
+      "loss_total": 6.514815230760057,
+      "positive_volume": 27535.0,
+      "positive_voxels": 27535,
+      "research_utility": -6.514815230760057
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/fusion/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a9e246a2eb-6abdc73ed222231b10c3",
+      "container_id": "7d92db74b14ee6619b5184ef2a06e9a95c1d01c7124dbd0676349eb49568766b",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "6abdc73ed222231b10c34676cac5a8ca87e6285226a8db9da42a116c68b40c7f",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060568,
+        "last_sample_unix": 1792815949.1268969,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6750208,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.45186495780944824,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.20586,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30404608,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-e11c902398-0920236bf0fa0612bd5f",
+      "container_id": "8c756c92eb086e50a0bf6012cb1dbe2421c67d3b99389b4866f0e7976188342c",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "0920236bf0fa0612bd5f750876c4e20ff83a7c15b515c651590d2ebe73b7d13a",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 118.364872,
+        "last_sample_unix": 1792815948.4153357,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 79446016,
+        "samples": 537,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 118.81861996650696,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 118.55487,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 101699584,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.07205374977301617,
+      "air_positive_volume": 1984.0,
+      "air_positive_voxels": 1984,
+      "contact_rmse": 0.2705393382206466,
+      "label_mismatches": 0,
+      "loss_drillhole": 6.514815230760057,
+      "loss_total": 6.514815230760057,
+      "positive_volume": 27535.0,
+      "positive_voxels": 27535,
+      "research_utility": -6.514815230760057
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/fusion/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a9e246a2eb-792ea401b783266f866b",
+      "container_id": "9d090196cd83fcadda0710b28a904c2710ecb7e3293ad84408f612b4dee2bf8b",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "792ea401b783266f866b3b5305b89d8c3298befbc1d1405f5ff5d5072c4e1749",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.063312,
+        "last_sample_unix": 1792816068.9934402,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7573504,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.5544769763946533,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.20657,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 30711808,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-e11c902398-f02c3a1c6f454f4feec0",
+      "container_id": "a38505efa9971e71b9f1797527504c57b95214b5f0315fd81f685e35367c168f",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "f02c3a1c6f454f4feec03399d5ac9efbedc71c3678cf716d4add41628c4e4666",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 118.450397,
+        "last_sample_unix": 1792816068.2208326,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 75214848,
+        "samples": 538,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 118.8126368522644,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 118.550402,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 101666816,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.01805416248746239,
+      "air_positive_volume": 108.0,
+      "air_positive_voxels": 108,
+      "contact_rmse": 0.9278077607797435,
+      "label_mismatches": 39,
+      "loss_drillhole": 7.34819710495827,
+      "loss_outcrop": 25.357266266559314,
+      "loss_total": 32.70546337151758,
+      "positive_volume": 5982.0,
+      "positive_voxels": 5982,
+      "research_utility": -32.70546337151758
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/ast/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-b8d9bf86fa-716319ae9dc794c5b275",
+      "container_id": "d3e760e6bbded3111fa2545524a54a9eb7b5914255c89e5ea5d7daaa0650b76a",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "716319ae9dc794c5b27522ee5bed578425858c5daec7c9a5907cdf8abc3d703c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.063021,
+        "last_sample_unix": 1792815869.155079,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7450624,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.45589208602905273,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.209277,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31084544,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-e571ed2863-404a44682586eafa6f30",
+      "container_id": "3e11a21adb83795e4c0a778ce1f72a1996f764854a217ac8d0cd0fa8757947c8",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "404a44682586eafa6f3024163f59792b26919930287bdb06c7a56f6d344b4074",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 98.280571,
+        "last_sample_unix": 1792815868.4793568,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 180543488,
+        "samples": 446,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 98.5365538597107,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 98.293572,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 180805632,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.01805416248746239,
+      "air_positive_volume": 108.0,
+      "air_positive_voxels": 108,
+      "contact_rmse": 0.9278077607797435,
+      "label_mismatches": 39,
+      "loss_drillhole": 7.34819710495827,
+      "loss_outcrop": 25.357266266559314,
+      "loss_total": 32.70546337151758,
+      "positive_volume": 5982.0,
+      "positive_voxels": 5982,
+      "research_utility": -32.70546337151758
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/ast/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-b8d9bf86fa-d36bf2e9b1d31c4fb119",
+      "container_id": "a5416dcc9d8b9d07310f4fc7f4c4cf701718ef1ee1fd148792fdd4b3857823eb",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "d36bf2e9b1d31c4fb1190251535af272ec6865a709e71c51acf5c6fe257fbf5c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060914,
+        "last_sample_unix": 1792815968.705596,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6750208,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4760627746582031,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.206158,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31399936,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-e571ed2863-0dc0a5ae941bb21c457e",
+      "container_id": "a30589d8c8fe33a81286f16857ef2c4c0d30b94ac52f4e73bd0e397bf69ccb8c",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "0dc0a5ae941bb21c457e9dd1953c445cbf04312d67eaa2be5e094b56d11ecd63",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 98.278859,
+        "last_sample_unix": 1792815968.0167642,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 180514816,
+        "samples": 446,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 98.52539086341858,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 98.29786,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 180776960,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ast",
+    "metrics": {
+      "air_fraction_of_positive": 0.01805416248746239,
+      "air_positive_volume": 108.0,
+      "air_positive_voxels": 108,
+      "contact_rmse": 0.9276077026842421,
+      "label_mismatches": 39,
+      "loss_drillhole": 7.348197073001064,
+      "loss_outcrop": 25.35889711302879,
+      "loss_total": 32.70709418602985,
+      "positive_volume": 5982.0,
+      "positive_voxels": 5982,
+      "research_utility": -32.70709418602985
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/ast/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-b8d9bf86fa-c79fa233ea848efa1a06",
+      "container_id": "23ac1ae2262e3214bb7d09bc1237f979872986a55d12e86fec756eb30fbb64af",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "c79fa233ea848efa1a0667ea6fbd8a5674ad0034bcdf881dba1c3b689d76fe84",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060417,
+        "last_sample_unix": 1792816068.2266557,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6455296,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.45679593086242676,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.208698,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31019008,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-e571ed2863-3d7161d6c8ca6d4e1cc1",
+      "container_id": "510cc16ca85fc7e7b4de4b1f296af614da767aa1578663f3b901019116e09767",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "3d7161d6c8ca6d4e1cc1054efcbbb689fc5d7b829daff67196069422401838f4",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 98.280599,
+        "last_sample_unix": 1792816067.5603185,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 180645888,
+        "samples": 446,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 98.52423286437988,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 98.3066,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 180908032,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.02234531968829218,
+      "air_positive_volume": 238.0,
+      "air_positive_voxels": 238,
+      "contact_rmse": 0.9120577660968506,
+      "label_mismatches": 34,
+      "loss_drillhole": 7.5033673980725055,
+      "loss_outcrop": 24.872677787552156,
+      "loss_total": 32.37604518562466,
+      "positive_volume": 10651.0,
+      "positive_voxels": 10651,
+      "research_utility": -32.37604518562466
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/qwen/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a2ef36ead4-a15a7c265a00b8c1ea08",
+      "container_id": "7fe06070935c60f42679cc930d5d82d2cf42a99d1e9cb2b6df6dabeb8530cd48",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "a15a7c265a00b8c1ea08ecb403e8ef67e0eb7b198315779d8dc66147c88e69a3",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060291,
+        "last_sample_unix": 1792816166.5915372,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7610368,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4775540828704834,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.208597,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31592448,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-9723c51dc8-efa622754dfdb315d53f",
+      "container_id": "fde4757c28671d614f994fb56f7463d8f8e981b8eed2768f3c7cbcb67dda7ebf",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "efa622754dfdb315d53f03bf5adc10759b104f91c6f33301b4ad45d74ad61a3b",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.164852,
+        "last_sample_unix": 1792816165.9063993,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46682112,
+        "samples": 432,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.5238151550293,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.248859,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47185920,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.02234531968829218,
+      "air_positive_volume": 238.0,
+      "air_positive_voxels": 238,
+      "contact_rmse": 0.912144030059083,
+      "label_mismatches": 34,
+      "loss_drillhole": 7.503231259158692,
+      "loss_outcrop": 24.873238855768705,
+      "loss_total": 32.3764701149274,
+      "positive_volume": 10651.0,
+      "positive_voxels": 10651,
+      "research_utility": -32.3764701149274
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/qwen/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a2ef36ead4-84c11263d41d47199288",
+      "container_id": "2a2e35c6656a55ad122234316f336ce640d1d703366f0c3e84654f186d35aa7f",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "84c11263d41d471992886dacdb2365b6d74b022b64e6daa92e445695b6041612",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060332,
+        "last_sample_unix": 1792816263.1311488,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7340032,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.47022199630737305,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.20559,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31354880,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-9723c51dc8-201f504df09b09db18af",
+      "container_id": "6564f094c5ecaa2472f8357df7b2b565e8d12310b35dac51d51f91f812dbde6f",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "201f504df09b09db18af036bc79e71f81ffe7c920d76e06e59372a98dfdf3ccb",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.203603,
+        "last_sample_unix": 1792816262.4452782,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46866432,
+        "samples": 433,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.52632308006287,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.256591,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47390720,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "qwen",
+    "metrics": {
+      "air_fraction_of_positive": 0.02234531968829218,
+      "air_positive_volume": 238.0,
+      "air_positive_voxels": 238,
+      "contact_rmse": 0.912144030059083,
+      "label_mismatches": 34,
+      "loss_drillhole": 7.503231259158692,
+      "loss_outcrop": 24.873238855768705,
+      "loss_total": 32.3764701149274,
+      "positive_volume": 10651.0,
+      "positive_voxels": 10651,
+      "research_utility": -32.3764701149274
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/qwen/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-a2ef36ead4-40c8c93757ae8d313aab",
+      "container_id": "89c895aa7d47a1b48f66540dad3b688d2b80cb435b38233eda0068bfb7f393f6",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "40c8c93757ae8d313aabbb1608a0944ad007b80fbcf34c1d182e4e0d559a8cd8",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.058883,
+        "last_sample_unix": 1792816359.6556103,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6811648,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.46859097480773926,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.20412,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31498240,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-9723c51dc8-aad42fd7547ddf60a947",
+      "container_id": "99d7820aa1314f2440c6cc2990dca7f75ba9d67aca64febcf065fb9c0ca82aba",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "aad42fd7547ddf60a94770aa44b77520f7f10fd95a05941e6a39439ef7c55119",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.166071,
+        "last_sample_unix": 1792816358.9708586,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46723072,
+        "samples": 433,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.53446698188782,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.25507,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47198208,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.0,
+      "air_positive_volume": 0.0,
+      "air_positive_voxels": 0,
+      "contact_rmse": 0.9740985437861867,
+      "label_mismatches": 27,
+      "loss_drillhole": 7.653716813890274,
+      "loss_outcrop": 25.174266789861484,
+      "loss_total": 32.82798360375176,
+      "positive_volume": 4303.0,
+      "positive_voxels": 4303,
+      "research_utility": -32.82798360375176
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/fusion/model-47/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-ad2857b1e5-f549a04f948671a2f40f",
+      "container_id": "fdb7fa8ffd09c549e4146cceb643f431a760be923aaf49845a79b5d22a3feec8",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "f549a04f948671a2f40f27718eed6b383a2e2f88d0cc62cc4f0e0e3b85ef7c6b",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.058754,
+        "last_sample_unix": 1792816202.044853,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6709248,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4543468952178955,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.20401,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31322112,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 47,
+    "solver_receipt": {
+      "container": "ldm-copper-0500ec709a-f507d2623dc2ba18ebb2",
+      "container_id": "5fdadf76f3377a5fe2b9a11871d3b9c62ac9e9cb69b0b9ddd05bcd0580cff0bd",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "f507d2623dc2ba18ebb24149c98ee7d30e0f3bb6d09d2801ea9d23ba7137f12a",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 114.304442,
+        "last_sample_unix": 1792816201.3785965,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 45871104,
+        "samples": 519,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 114.56615495681763,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 114.306408,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 45871104,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.0,
+      "air_positive_volume": 0.0,
+      "air_positive_voxels": 0,
+      "contact_rmse": 0.9740985437861867,
+      "label_mismatches": 27,
+      "loss_drillhole": 7.653716813890274,
+      "loss_outcrop": 25.174266789861484,
+      "loss_total": 32.82798360375176,
+      "positive_volume": 4303.0,
+      "positive_voxels": 4303,
+      "research_utility": -32.82798360375176
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/fusion/model-48/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-ad2857b1e5-bae681ee3c40bc3dbcd6",
+      "container_id": "144a0c3ddb710319906dae2dbf86ea02b8379f361d9f0285ad511abb7d51f900",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "bae681ee3c40bc3dbcd6a5491de7fd8d7e0cf18d9c29a56e2ead7873522e3a61",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.061521,
+        "last_sample_unix": 1792816317.5265117,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7188480,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.4607579708099365,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.206774,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31379456,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 48,
+    "solver_receipt": {
+      "container": "ldm-copper-0500ec709a-521b4be4cc984d112347",
+      "container_id": "ae5c50884e18ceeb7d17b479bca89a5e07dfd366b94f2b10bf79ae959ea14252",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "521b4be4cc984d112347a79bbd355da85de4f6755c0013fed88afa035f5b9d58",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 114.180603,
+        "last_sample_unix": 1792816316.853508,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 45969408,
+        "samples": 519,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 114.56568598747253,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 114.294604,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 45969408,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "fusion",
+    "metrics": {
+      "air_fraction_of_positive": 0.0,
+      "air_positive_volume": 0.0,
+      "air_positive_voxels": 0,
+      "contact_rmse": 0.9740985437861867,
+      "label_mismatches": 27,
+      "loss_drillhole": 7.653716813890274,
+      "loss_outcrop": 25.174266789861484,
+      "loss_total": 32.82798360375176,
+      "positive_volume": 4303.0,
+      "positive_voxels": 4303,
+      "research_utility": -32.82798360375176
+    },
+    "model": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/fusion/model-49/model.npy",
+    "scorer_receipt": {
+      "container": "ldm-copper-ad2857b1e5-c6862c8ad03d285ba17a",
+      "container_id": "4bdc7c207a13c331827ff83ede818df77a40edbde6117c55a2fafdb9690320b5",
+      "cpus": 1,
+      "exit_code": 0,
+      "image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "key": "c6862c8ad03d285ba17a25f5c431c88043840e954d471f17bbcce994f8fb1b8c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.061415,
+        "last_sample_unix": 1792816433.1827555,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6893568,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.46451306343078613,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.206664,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 31571968,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "seed": 49,
+    "solver_receipt": {
+      "container": "ldm-copper-0500ec709a-2171089bd455201b24db",
+      "container_id": "861d57c5c645ceb8748b20e11ce46287bfc654a9868c132082379567ad48de06",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "2171089bd455201b24db7268a04c76399f752c8c75af69bb07083f0605411ce7",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 114.114054,
+        "last_sample_unix": 1792816432.2838671,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 45912064,
+        "samples": 519,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 114.58928513526917,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 114.32206,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 45912064,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "status": "succeeded"
+  }
+]

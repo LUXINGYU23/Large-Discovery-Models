@@ -1,0 +1,10 @@
+test_collisions (tasks.copper_inversion.tests.test_v2_splits.SplitAudit.test_collisions) ... ok
+test_rotated_duplicate_screen (tasks.copper_inversion.tests.test_v2_splits.SplitAudit.test_rotated_duplicate_screen) ... ok
+test_fusion_task_contract (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_fusion_task_contract) ... ok
+test_parent_macro_includes_failures (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_parent_macro_includes_failures) ... ok
+test_real_suite_resume_and_data_identity (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_real_suite_resume_and_data_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.913s
+
+OK

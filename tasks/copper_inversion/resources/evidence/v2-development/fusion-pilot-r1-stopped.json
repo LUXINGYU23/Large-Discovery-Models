@@ -1,0 +1,6 @@
+{
+  "run": "/Aidata/shared/ldm/copper-v2-development/runs/fusion-pilot-r1",
+  "stopped_unix": 1792823869.995701,
+  "reason": "Confirmed all-profile admission barrier strands submitted peers when a sibling fails; preserve frozen run and candidate snapshots. New implementation uses independent per-profile admission.",
+  "process_identity_verified": true
+}

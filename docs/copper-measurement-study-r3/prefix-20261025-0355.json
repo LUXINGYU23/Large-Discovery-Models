@@ -1,0 +1,86 @@
+{
+  "time": 1792871704.0038648,
+  "charged_prefix": 7,
+  "complete_prefixes": {
+    "acq-3407": 17,
+    "acq-42": 14,
+    "acq-43": 17,
+    "ldm-3407": 15,
+    "ldm-42": 17,
+    "ldm-43": 7,
+    "mcmc-3407": 17,
+    "mcmc-42": 17,
+    "mcmc-43": 17
+  },
+  "note": "Conservative prefix: stops at missing result, including private rejection not yet mapped; no free replacements. Training only.",
+  "groups": {
+    "acq-3407": {
+      "best_loss": 0.537243797454805,
+      "best_mean_solver_seconds": 92.23863273362319,
+      "prefix_candidate_mean_solver_seconds_sum": 644.1679545193911,
+      "successful_sources": 7
+    },
+    "acq-42": {
+      "best_loss": 0.44236103534647164,
+      "best_mean_solver_seconds": 92.15306729574998,
+      "prefix_candidate_mean_solver_seconds_sum": 644.2605531960726,
+      "successful_sources": 7
+    },
+    "acq-43": {
+      "best_loss": 0.5409076207988981,
+      "best_mean_solver_seconds": 92.1147958189249,
+      "prefix_candidate_mean_solver_seconds_sum": 644.0379592329264,
+      "successful_sources": 7
+    },
+    "ldm-3407": {
+      "best_loss": 0.5011158255463648,
+      "best_mean_solver_seconds": 4.3281799256801605,
+      "prefix_candidate_mean_solver_seconds_sum": 20.076863368352253,
+      "successful_sources": 7
+    },
+    "ldm-42": {
+      "best_loss": 0.4051005170650064,
+      "best_mean_solver_seconds": 91.1016815205415,
+      "prefix_candidate_mean_solver_seconds_sum": 100.22822778920332,
+      "successful_sources": 7
+    },
+    "ldm-43": {
+      "best_loss": 0.4745543457250724,
+      "best_mean_solver_seconds": 73.10245822866757,
+      "prefix_candidate_mean_solver_seconds_sum": 387.6110558609168,
+      "successful_sources": 7
+    },
+    "mcmc-3407": {
+      "best_loss": 0.5468261086141797,
+      "best_mean_solver_seconds": 91.12022553384304,
+      "prefix_candidate_mean_solver_seconds_sum": 644.1662038366,
+      "successful_sources": 7
+    },
+    "mcmc-42": {
+      "best_loss": 0.44022773006302074,
+      "best_mean_solver_seconds": 92.27741398413976,
+      "prefix_candidate_mean_solver_seconds_sum": 644.0987010697523,
+      "successful_sources": 7
+    },
+    "mcmc-43": {
+      "best_loss": 0.5340135830594643,
+      "best_mean_solver_seconds": 92.12048519154389,
+      "prefix_candidate_mean_solver_seconds_sum": 643.6844840000073,
+      "successful_sources": 7
+    }
+  },
+  "method_summary": {
+    "ldm": {
+      "mean": 0.4602568961121479,
+      "sample_sd": 0.049578701725319425
+    },
+    "mcmc": {
+      "mean": 0.5070224739122215,
+      "sample_sd": 0.05819960100535763
+    },
+    "acq": {
+      "mean": 0.5068374845333916,
+      "sample_sd": 0.055868285056812704
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "time": 1793173761.8793778,
+  "gate": {
+    "stage": "full",
+    "time": 1793171212.3064864,
+    "root": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/qff28"
+  },
+  "completed": 1140,
+  "failed": 0,
+  "max_wait": 363.19152751378715,
+  "progress": {
+    "stage": "needs_attention",
+    "updated_at": 1793169697.8544164,
+    "supervisor_pid": 2394069,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-20261028-0859",
+    "error": "AssertionError: training client failed; reconciliation required"
+  },
+  "gate_command": "python3 /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/gate_fair_20261028.py ",
+  "handoff_command": "python3 /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/resume_after_fair_gate_20261028.py ",
+  "audit_command": "python3 /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/watch_fair_resume_audit_20261028.py ",
+  "recover-fair-20261028.log": "",
+  "fair-resume-audit.log": ""
+}

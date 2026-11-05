@@ -1,0 +1,45 @@
+{
+  "scope": "constrained synthetic population",
+  "counts": {
+    "train": {
+      "parents": 24,
+      "cases": 48,
+      "execution_seeds": [
+        47
+      ]
+    },
+    "validation": {
+      "parents": 8,
+      "cases": 16,
+      "execution_seeds": [
+        47
+      ]
+    },
+    "test_id": {
+      "parents": 16,
+      "cases": 32,
+      "execution_seeds": [
+        47,
+        48,
+        49
+      ]
+    },
+    "test_ood": {
+      "parents": 8,
+      "cases": 16,
+      "execution_seeds": [
+        47,
+        48,
+        49
+      ]
+    }
+  },
+  "primary": "parent-macro-confirmation-utility-v1",
+  "historical_exclusion": {
+    "historical_fingerprints": 86,
+    "new_fingerprints": 56,
+    "scope": "coarse normalized rotation/reflection fingerprint exclusion against prior private development suite",
+    "status": "passed"
+  },
+  "formal_validation_or_test_solver_runs": 0
+}

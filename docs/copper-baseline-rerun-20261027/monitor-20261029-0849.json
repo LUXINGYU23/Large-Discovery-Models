@@ -1,0 +1,146 @@
+{
+  "time": 1793234973.0756917,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8797,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 19.154739379882812
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8878,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 4.081343173980713
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8776,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 20.062496185302734
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 8833,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 22.73427987098694
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 9160,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 16.364396810531616
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 9057,
+      "complete": 177,
+      "charged": 193,
+      "latest_age": 19.004784107208252
+    }
+  ],
+  "failures": [
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-42/jobs/8ee8579dfa0ac4f39e074fa1feafd7a7424d5cbb65c043cade01a9ff6b461f11/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/77afcf7b63b56fa2671239a5e1db320838f184758e58fc3d6f49f7f11033e345/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/a5faa56169fee284877c6496a9a599c23bbec65a6ba21a8554fd36a5a5f0447b/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/699c8026fabed191aa7e9a03c6889e340e1350c30c893725904997eb29bd99b1/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/420e83f9bd46ebb3e42fb92801a986bcbed61053f7eccc3390547d572743f924/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/4b190eac2d359cf0bd3d90d68d36e2a42db3fba1e23d59aa4c79de40dd1fff29/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-3407/jobs/383185aa7bcf3a0e7d9bdd8bc19b5e70abada544d248dc60fa3331032e81b1d4/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-3407/jobs/277663134593fd53a81fc2165bbd177168139b8721cb860fba18d62d2dbe13f6/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-3407/jobs/f35e30e435031042905f66cd8bea5681266926547b7c40add92818bb47049055/receipt.json",
+      "exit_code": 0,
+      "reason": "supervisor_timeout",
+      "oom": false
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-3407/jobs/54f71da506cb24f3b7c8ac3d96f986cdf38b7a3f28abc1db21f7868c18484dcd/receipt.json",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false
+    }
+  ],
+  "orphans": [],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793234958.0812864,
+    "supervisor_pid": 355698,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_runtime_unchanged": true,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261028.py ",
+  "host_load": [
+    38.2685546875,
+    39.06396484375,
+    38.69482421875
+  ]
+}

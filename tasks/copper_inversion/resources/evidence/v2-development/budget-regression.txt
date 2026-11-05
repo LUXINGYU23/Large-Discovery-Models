@@ -1,0 +1,11 @@
+test_rejected_and_evaluated_share_cap_and_replay (tasks.copper_inversion.tests.test_v2_budget.ScientificBudget.test_rejected_and_evaluated_share_cap_and_replay) ... ok
+test_fusion_task_contract (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_fusion_task_contract) ... ok
+test_parent_macro_includes_failures (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_parent_macro_includes_failures) ... ok
+test_real_suite_resume_and_data_identity (tasks.copper_inversion.tests.test_v2_suite.SuiteV2.test_real_suite_resume_and_data_identity) ... ok
+test_admission_gate_and_receipt_reuse (tasks.copper_inversion.tests.test_v2_interface.InterfaceV2.test_admission_gate_and_receipt_reuse) ... ok
+test_fixture_coverage (tasks.copper_inversion.tests.test_v2_interface.InterfaceV2.test_fixture_coverage) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 7.910s
+
+OK

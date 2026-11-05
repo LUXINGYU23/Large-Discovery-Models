@@ -1,0 +1,86 @@
+{
+  "time": 1793346595.3653545,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13275,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 7.58449912071228
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13381,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 65.97581768035889
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13284,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 2.9540491104125977
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13317,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 12.921078205108643
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13686,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 34.21553444862366
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 13568,
+      "complete": 273,
+      "charged": 289,
+      "latest_age": 5.841548919677734
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793346593.1971045,
+    "supervisor_pid": 2833147,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261030",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_runtime_unchanged": true,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261030.py ",
+  "fair_unchanged": true,
+  "failure_set_unchanged": true,
+  "new_cases": 431,
+  "wait_count": 903,
+  "max_wait": 836.8692891998217,
+  "median_wait": 708.6920391554013,
+  "old_orphans_restored": 19,
+  "terminal_reused": true
+}

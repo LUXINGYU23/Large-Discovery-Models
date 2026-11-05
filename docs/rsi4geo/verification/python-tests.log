@@ -1,0 +1,22 @@
+..................ssssssssssssssssssss..sssssssssssssssss............... [ 20%]
+..........................ss............................................ [ 41%]
+...................s..s................................................. [ 61%]
+........................................................................ [ 82%]
+..............................................................           [100%]
+=========================== short test summary info ============================
+SKIPPED [3] tasks/copper_inversion/tests/test_isolation.py:19: requires remote Docker image
+SKIPPED [14] tasks/copper_inversion/tests/test_isolation.py:51: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_isolation.py:80: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_isolation.py:87: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_isolation.py:126: requires remote Docker image
+SKIPPED [8] tasks/copper_inversion/tests/test_recovery.py:21: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_recovery.py:97: requires remote Docker image
+SKIPPED [3] tasks/copper_inversion/tests/test_recovery.py:135: requires remote Docker image
+SKIPPED [3] tasks/copper_inversion/tests/test_recovery.py:167: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_recovery.py:208: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_recovery.py:244: requires remote Docker image
+SKIPPED [1] tasks/copper_inversion/tests/test_supervisor.py:15: remote Docker image required
+SKIPPED [1] tasks/copper_inversion/tests/test_supervisor.py:56: remote Docker image required
+SKIPPED [1] tasks/copper_inversion/tests/test_v2_public_catalog.py:45: remote integration suite required
+SKIPPED [1] tasks/copper_inversion/tests/test_v2_research.py:25: requires remote integration suite
+309 passed, 41 skipped in 31.34s

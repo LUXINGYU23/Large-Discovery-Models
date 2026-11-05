@@ -1,0 +1,80 @@
+{
+  "development_only": true,
+  "results": [
+    {
+      "method": "initialize",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.930179448881962,
+        "mean_iou": 0.06982055111803796,
+        "mean_solver_wall_seconds": 0.544406533241272,
+        "parent_count": 1.0,
+        "research_utility": 0.06982055111803796,
+        "solve_count": 2.0
+      },
+      "source_sha256": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+      "status": "succeeded"
+    },
+    {
+      "method": "mcmc_v2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9301656920077973,
+        "mean_iou": 0.06983430799220272,
+        "mean_solver_wall_seconds": 8.295872569084167,
+        "parent_count": 1.0,
+        "research_utility": 0.06983430799220272,
+        "solve_count": 2.0
+      },
+      "source_sha256": "095783700b29a23ca3a2ad250481061bf6e54476971114c9443f8b4b392b10ac",
+      "status": "succeeded"
+    },
+    {
+      "method": "acq_v2",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9301656920077973,
+        "mean_iou": 0.06983430799220272,
+        "mean_solver_wall_seconds": 8.253574013710022,
+        "parent_count": 1.0,
+        "research_utility": 0.06983430799220272,
+        "solve_count": 2.0
+      },
+      "source_sha256": "0574d45504384aecc9162398f42f83f45a5a9c0d5f1c52da3935c59d4c2eb44b",
+      "status": "succeeded"
+    },
+    {
+      "method": "distance_local",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9358353810273322,
+        "mean_iou": 0.06416461897266776,
+        "mean_solver_wall_seconds": 8.458510637283325,
+        "parent_count": 1.0,
+        "research_utility": 0.06416461897266776,
+        "solve_count": 2.0
+      },
+      "source_sha256": "cb4ebbc2b71b198cf69821eead73056804a4c5f16a48f7562e268894b3fbb2f4",
+      "status": "succeeded"
+    },
+    {
+      "method": "contact_rbf",
+      "metrics": {
+        "failed_solves": 0.0,
+        "legal_rate": 1.0,
+        "loss_total": 0.9346885558577503,
+        "mean_iou": 0.06531144414224963,
+        "mean_solver_wall_seconds": 8.460034489631653,
+        "parent_count": 1.0,
+        "research_utility": 0.06531144414224963,
+        "solve_count": 2.0
+      },
+      "source_sha256": "419b53031ead5ae321acb8144217259a955b0d3b6e65478115e7565b058609ec",
+      "status": "succeeded"
+    }
+  ]
+}

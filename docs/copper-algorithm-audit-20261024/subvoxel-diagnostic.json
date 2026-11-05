@@ -1,0 +1,55 @@
+{
+  "diagnostic": "constant velocity 0.1 voxel steps; original re-distance vs occupancy re-distance",
+  "rows": [
+    {
+      "step": 1,
+      "native_changed_voxels": 0,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 2,
+      "native_changed_voxels": 0,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 3,
+      "native_changed_voxels": 0,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 4,
+      "native_changed_voxels": 0,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 5,
+      "native_changed_voxels": 0,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 6,
+      "native_changed_voxels": 144,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 7,
+      "native_changed_voxels": 144,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 8,
+      "native_changed_voxels": 144,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 9,
+      "native_changed_voxels": 144,
+      "quantized_changed_voxels": 0
+    },
+    {
+      "step": 10,
+      "native_changed_voxels": 144,
+      "quantized_changed_voxels": 0
+    }
+  ]
+}

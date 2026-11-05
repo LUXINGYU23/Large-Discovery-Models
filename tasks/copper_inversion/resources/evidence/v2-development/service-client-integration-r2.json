@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "contract": {
+    "status": "ready",
+    "contract_digest": "08e241637cf7937fdc5def432941529be69d2982a0dc19a717ee3abc55ffa5a8",
+    "public_digest": "6b4e1bf48da28bfc984b1054a50f166596c3696f8e29e8b76f9190ada0c8b8b8",
+    "seconds": 10,
+    "slots": 5,
+    "used_slots": 1
+  },
+  "result": {
+    "candidate_id": "153f0991291ae89c1b8f20474cf2618b63a46770718cdf90baf25770f6eb0ab5",
+    "status": "succeeded",
+    "metrics": {
+      "mean_iou": 0.06982055111803796,
+      "loss_total": 0.930179448881962,
+      "research_utility": 0.06982055111803796,
+      "legal_rate": 1.0,
+      "parent_count": 1.0,
+      "solve_count": 2.0,
+      "failed_solves": 0.0,
+      "mean_solver_wall_seconds": 0.5325609445571899
+    },
+    "artifacts": {},
+    "resource_usage": {
+      "private_suite_evaluations": 1.0
+    },
+    "error": "",
+    "metadata": {
+      "ldm_evaluation_attempt_receipt": "a6f243b193369b7a91283e12e70d5c6bc10dc9d6a451f758a65e47332595e77d",
+      "service_contract_digest": "08e241637cf7937fdc5def432941529be69d2982a0dc19a717ee3abc55ffa5a8"
+    }
+  },
+  "replay_identical": true
+}

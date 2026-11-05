@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "jobs": 828,
+  "peak_active": 80,
+  "plan": {
+    "implementation": "3a91c7d3ce7bcf066cd6ffe0ccbd7ab2a79b75ce4533c9564848f920212819a8",
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "small": false,
+    "global_jobs": 80,
+    "interface_slots": 8,
+    "solver_jobs": 216,
+    "interface_jobs": 612,
+    "template_sha256": "c290798c18e3e03b055ebe7594a571ed0884915628471a9489f698421a18faa6"
+  },
+  "interface_jobs": 612,
+  "interface_worker_max": 4.817587654106319,
+  "interface_worker_median": 4.512694021454081,
+  "interface_worker_p95": 4.7305909669958055,
+  "completion_sha256": "1d08cfcca20d7bdcb989b1bb5faf098bc59fc5ffefef416df5243a341381ea36"
+}

@@ -1,0 +1,7 @@
+test_development_export_allowlist (tasks.copper_inversion.tests.test_v2_research.ResearchV2.test_development_export_allowlist) ... ok
+test_fixed_fusion_provider (tasks.copper_inversion.tests.test_v2_research.ResearchV2.test_fixed_fusion_provider) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.018s
+
+OK

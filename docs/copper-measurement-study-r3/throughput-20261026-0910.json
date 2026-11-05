@@ -1,0 +1,833 @@
+{
+  "time": 1792976913.887521,
+  "groups": [
+    {
+      "group": "acq-3407",
+      "charged": 257,
+      "rejected": 1,
+      "complete_cases": 12256,
+      "cases_per_hour_30_60_120": [
+        290.0,
+        288.0,
+        267.0
+      ],
+      "remaining_case_equivalents": 3104,
+      "pending": [
+        {
+          "eval": "9625cf07559fd0aca52148a2ca36dfa289d286c42c83aa727ccbb1e89bfe6316",
+          "done": 40,
+          "recent30": 9,
+          "age": 14
+        },
+        {
+          "eval": "d3659451fd66f04ec285d948535449944c7d02d29b4c682173685cd36a8d4bf0",
+          "done": 46,
+          "recent30": 12,
+          "age": 78
+        },
+        {
+          "eval": "3f73ee1f12e6312bc3a1a224c44c272b5e6220295ac954a7ad177297b8fe47fc",
+          "done": 43,
+          "recent30": 10,
+          "age": 87
+        },
+        {
+          "eval": "2a1c1b4e5ff9cefa9c7d4b5bdee388da11dc1a11e33e962cef2921e541ac843a",
+          "done": 44,
+          "recent30": 9,
+          "age": 3
+        },
+        {
+          "eval": "57103ade7fbc14d0a241789aaa3b6024bfd858aec914f0143eecc5ea2f21af69",
+          "done": 47,
+          "recent30": 9,
+          "age": 148
+        },
+        {
+          "eval": "69f2a613220fcef3856bdac6222fd4645bc8df8218dd8e9e4673cf28cb38c2bd",
+          "done": 43,
+          "recent30": 8,
+          "age": 152
+        },
+        {
+          "eval": "b26879adfec20a4a41febdc808d64bb78ab4baee83b407ea3247557a90568c9f",
+          "done": 47,
+          "recent30": 8,
+          "age": 301
+        },
+        {
+          "eval": "e2262e63d985018f1c81d0bef7c5d961683237f94156811f1fbbb676c2d24af3",
+          "done": 46,
+          "recent30": 8,
+          "age": 295
+        },
+        {
+          "eval": "7790109fa4fb0c29cc4f2d60952eca00ff6c8637687f2639703cf07a7a85da54",
+          "done": 46,
+          "recent30": 11,
+          "age": 90
+        },
+        {
+          "eval": "f001f102f123bd629ff48ed4d022d75639d787a057060b9e3da3af0b1ee94128",
+          "done": 46,
+          "recent30": 12,
+          "age": 16
+        }
+      ]
+    },
+    {
+      "group": "acq-42",
+      "charged": 257,
+      "rejected": 0,
+      "complete_cases": 12284,
+      "cases_per_hour_30_60_120": [
+        242.0,
+        267.0,
+        259.0
+      ],
+      "remaining_case_equivalents": 3124,
+      "pending": [
+        {
+          "eval": "c556f0fb3412aea5671bdd25cd8a2ac86bb0beb5aca71cb80c5c65bd839d02af",
+          "done": 44,
+          "recent30": 9,
+          "age": 98
+        },
+        {
+          "eval": "3d4e3e9d7d51a424f14d6a081a1e0c316ed26170577278a110ee696bde13a1c2",
+          "done": 42,
+          "recent30": 6,
+          "age": 211
+        },
+        {
+          "eval": "4dc353d567725314a229e622f6575051a0f3a91cc14e6a937e2d11fe71ebd71d",
+          "done": 46,
+          "recent30": 7,
+          "age": 121
+        },
+        {
+          "eval": "c478a1634daeb7d5d6491d9741ab6c46a9fb53dd1960d0b347f15139a638a3fe",
+          "done": 46,
+          "recent30": 9,
+          "age": 109
+        },
+        {
+          "eval": "eaa96b5f26b955e384adb0ec0bad0094ac71154cf0702b441479138efb559143",
+          "done": 46,
+          "recent30": 8,
+          "age": 72
+        },
+        {
+          "eval": "124eb4fea041279af6fa595da461900316f45b813d77fc374525961c7c8762b8",
+          "done": 47,
+          "recent30": 7,
+          "age": 40
+        },
+        {
+          "eval": "f310510aa30f63d633aab7f70d910936b1be47e85c558166d7842cfb41fba922",
+          "done": 45,
+          "recent30": 9,
+          "age": 269
+        },
+        {
+          "eval": "0bf109933d4e1475f9f77d3a2c8df5d5eb01ceed195692729a6b8d4c137e91c9",
+          "done": 47,
+          "recent30": 7,
+          "age": 268
+        },
+        {
+          "eval": "a533c1406bc1cd56ed87522a653bd7c8936fec31073539e2a3b77efd65c94e6e",
+          "done": 46,
+          "recent30": 7,
+          "age": 273
+        },
+        {
+          "eval": "0acbba381b03dcd4c320eacfeb8963bb87ff6cb30b7721526e798491f8f2e5ed",
+          "done": 44,
+          "recent30": 8,
+          "age": 158
+        },
+        {
+          "eval": "1eaf48bcc03d6a3e448c0156a13bb8b462df86378279a50b836771c4d73aad2c",
+          "done": 43,
+          "recent30": 7,
+          "age": 116
+        },
+        {
+          "eval": "52a8a1eb69e8219b3cd1be9e30badf7b8582a2b89b4f5010487641e3e670adcd",
+          "done": 41,
+          "recent30": 8,
+          "age": 19
+        },
+        {
+          "eval": "92218629292cf58f414539960f3709d5e4e8c29f7101002f64974a61d9a29f6d",
+          "done": 42,
+          "recent30": 7,
+          "age": 261
+        },
+        {
+          "eval": "00117711b60098d95b631505571e08bd68ca600b8cc179d43ce3b6feb4e98a0b",
+          "done": 41,
+          "recent30": 7,
+          "age": 93
+        }
+      ]
+    },
+    {
+      "group": "acq-43",
+      "charged": 273,
+      "rejected": 3,
+      "complete_cases": 12210,
+      "cases_per_hour_30_60_120": [
+        54.0,
+        121.0,
+        186.5
+      ],
+      "remaining_case_equivalents": 3054,
+      "pending": [
+        {
+          "eval": "7bd5ceb0e65fc5d3e82d49f00bce7bf278ba47b2cc3b452a262399e6395202dc",
+          "done": 2,
+          "recent30": 2,
+          "age": 77
+        },
+        {
+          "eval": "408f27b766801fcc5032c37c93f52381a4b110645a60faf70efaf669ed92b4b8",
+          "done": 2,
+          "recent30": 2,
+          "age": 57
+        },
+        {
+          "eval": "f4addc44a97ed4222942d08b35dfa1d4c16bb982ce874b02052c9abb0a6d8561",
+          "done": 2,
+          "recent30": 2,
+          "age": 17
+        },
+        {
+          "eval": "86ca1732e9e89e6dfb7193e6f42e788117741b5bf2dca76feb7f163dd2033943",
+          "done": 0,
+          "recent30": 0,
+          "age": 0
+        },
+        {
+          "eval": "81386c0f979940134e699e97e99436dccbad66b5ce3e9fbfb842653529a82f50",
+          "done": 3,
+          "recent30": 3,
+          "age": 32
+        },
+        {
+          "eval": "15df1fc369b56323ccd3a59087a973d141f2a997510bacf22103f025b30dbdab",
+          "done": 0,
+          "recent30": 0,
+          "age": 0
+        },
+        {
+          "eval": "965ecc0845c6456f49d89b9a1ac42db0008388a00607fd66ebd1879e15635ce0",
+          "done": 2,
+          "recent30": 2,
+          "age": 0
+        },
+        {
+          "eval": "9021de004bd679fe8d8b695cab5c60c55e1947dc796993a17d39e1d7ec5d3816",
+          "done": 0,
+          "recent30": 0,
+          "age": 0
+        },
+        {
+          "eval": "33d4f0c39e2a1f77075866fa9b0daf9de3064660f006b9fbfa4fe4383506b294",
+          "done": 0,
+          "recent30": 0,
+          "age": 0
+        },
+        {
+          "eval": "dd2c0a9eb9759ec0bc8d2e5f5f7e478ac45713f81ca52d42168fd697b894badb",
+          "done": 2,
+          "recent30": 2,
+          "age": 92
+        },
+        {
+          "eval": "26a5c6cb07bfc1d726773d82c9add1161b8aec6aaf09bd3fcf4d6389d4a62a71",
+          "done": 1,
+          "recent30": 1,
+          "age": 136
+        },
+        {
+          "eval": "7a3d938c1a5e5065807ae31ee48b7d14a199de2cd46104315a02557f0161c742",
+          "done": 2,
+          "recent30": 2,
+          "age": 28
+        },
+        {
+          "eval": "20ad93b6e10d42744bb020809f6e0cbc8182d2197ec881e56ea5ea2d07d991a5",
+          "done": 2,
+          "recent30": 2,
+          "age": 179
+        }
+      ]
+    },
+    {
+      "group": "ldm-3407",
+      "charged": 257,
+      "rejected": 2,
+      "complete_cases": 11980,
+      "cases_per_hour_30_60_120": [
+        256.0,
+        249.00000000000003,
+        230.0
+      ],
+      "remaining_case_equivalents": 3332,
+      "pending": [
+        {
+          "eval": "cc90293b219aabd82f05217c4c2439c2a33d6153b73cd14aa27dad4a718b2745",
+          "done": 29,
+          "recent30": 6,
+          "age": 591
+        },
+        {
+          "eval": "bf84744d8a497321ff582b4d7c8917020e281ba300c4010010284c08b1e2ab05",
+          "done": 32,
+          "recent30": 9,
+          "age": 158
+        },
+        {
+          "eval": "6310c0eb21c7fff0d92d0a70a64456b7209d7bb0701b442d7778bc298a3af702",
+          "done": 28,
+          "recent30": 9,
+          "age": 124
+        },
+        {
+          "eval": "a4fb2813bdce9de89e23c0f9c46cca5e353c0dbacdc1b96502188043a4c89310",
+          "done": 31,
+          "recent30": 8,
+          "age": -1
+        },
+        {
+          "eval": "3cc6aa1f55d619e48e429a600700af8fd1bea9f1c322719f55839594087b4fbb",
+          "done": 32,
+          "recent30": 9,
+          "age": 247
+        },
+        {
+          "eval": "8ff24c63435151158955b72464c3e67024e30677cf6f15de3d02723669f710b7",
+          "done": 28,
+          "recent30": 7,
+          "age": 108
+        },
+        {
+          "eval": "b84f2ca2da5a4ae41bcc0b41a6db47f80af1fe467272c483460c97cc4c73e79c",
+          "done": 28,
+          "recent30": 9,
+          "age": 89
+        },
+        {
+          "eval": "9773e224257c0307bcc39edfb39ab40880631aa344b07fa9dba9b76c90e60eb8",
+          "done": 27,
+          "recent30": 10,
+          "age": 97
+        },
+        {
+          "eval": "f80e811e6ca2e6a006f975fb7bc8c443fad2bcd39fc1ef8f8477187ff85a5b16",
+          "done": 33,
+          "recent30": 9,
+          "age": 18
+        },
+        {
+          "eval": "d99cca102df22737cc7747eb50fdde35750726131af59ea8462cebf0bc742c9f",
+          "done": 32,
+          "recent30": 9,
+          "age": 252
+        },
+        {
+          "eval": "fe70020c1c105986dd6035893f17e8a38270526dd1c822546b4c8aeda660a95f",
+          "done": 33,
+          "recent30": 8,
+          "age": 280
+        },
+        {
+          "eval": "81b10bf041c4d2de2b4ea2affdb5652fac262f1a636f7b0084e07f88edc91b07",
+          "done": 26,
+          "recent30": 8,
+          "age": 255
+        },
+        {
+          "eval": "79d8cc8fe46dfdc9ef458f782fecdb1afedf8179f4e062a77ae2d94a8986c4c3",
+          "done": 36,
+          "recent30": 10,
+          "age": 121
+        },
+        {
+          "eval": "54d851511b1781bff819445a7a045adfa9003e068f00d0d8edb1d3ceaf0eb413",
+          "done": 30,
+          "recent30": 8,
+          "age": 224
+        },
+        {
+          "eval": "75e56210caab971c7abbab73e8490f7081c2dae448e1d4812a83de03e3348a25",
+          "done": 35,
+          "recent30": 9,
+          "age": 54
+        }
+      ]
+    },
+    {
+      "group": "ldm-42",
+      "charged": 234,
+      "rejected": 9,
+      "complete_cases": 10450,
+      "cases_per_hour_30_60_120": [
+        238.0,
+        231.0,
+        209.0
+      ],
+      "remaining_case_equivalents": 4526,
+      "pending": [
+        {
+          "eval": "64f37c789ef9ae1254b02bbbf163a293468f64c5915dac2a02097944201ed23c",
+          "done": 27,
+          "recent30": 8,
+          "age": 386
+        },
+        {
+          "eval": "4a6800272472322f1e74ba16bca94a5d11642dd3e4dd61a653e9177336512bcd",
+          "done": 25,
+          "recent30": 7,
+          "age": 161
+        },
+        {
+          "eval": "28cb455b8dc4c766a9c85886d56e86493174be18dbda3a9feb33cc4da12242ce",
+          "done": 27,
+          "recent30": 9,
+          "age": 79
+        },
+        {
+          "eval": "20e268ecf0163e22e8102527a6a56eadaefe76d4e70f768d8e27ae3dbab01c1f",
+          "done": 28,
+          "recent30": 8,
+          "age": 41
+        },
+        {
+          "eval": "b2ad64734c0abf0293147ea9fd930cb3819c3826fb7458e9bd272bd0872d9378",
+          "done": 20,
+          "recent30": 9,
+          "age": 34
+        },
+        {
+          "eval": "c51bf36cd6dd239a871b68faafe3b7aedbaacbf5a645c1d7c36d27bfe8a4b2e9",
+          "done": 27,
+          "recent30": 8,
+          "age": -1
+        },
+        {
+          "eval": "8ddcb9b1b40c89b6e43c5926589f87395fefc36497a678a91fac209f082902de",
+          "done": 26,
+          "recent30": 10,
+          "age": 43
+        },
+        {
+          "eval": "2b7a84003422cc5439cf7c08bad825ae1f18fc3a0f074c3445f143029badc9e2",
+          "done": 29,
+          "recent30": 7,
+          "age": 316
+        },
+        {
+          "eval": "fdd83133ffbfa0eac0e9ac4649d5d09d5ec5f4d220fd8c8b9d04078f364e3c36",
+          "done": 26,
+          "recent30": 6,
+          "age": 254
+        },
+        {
+          "eval": "98dd252f42d5907283e0dc950b8ff9bee5b217bb0ed6a1ffbfa57907196f8615",
+          "done": 28,
+          "recent30": 6,
+          "age": 225
+        },
+        {
+          "eval": "495a6577436302108b2a4b7986d2851011f52b4272c77f1e8129dad587583964",
+          "done": 29,
+          "recent30": 7,
+          "age": 221
+        },
+        {
+          "eval": "21894a1cece74371d3c80d47e06898abada652d52d7826cb17a618327384abd7",
+          "done": 25,
+          "recent30": 7,
+          "age": 160
+        },
+        {
+          "eval": "7e9a0b49906ca28bf2e4fbf0db3837f0866bb1b12719d649ae4890df6fba888a",
+          "done": 26,
+          "recent30": 6,
+          "age": 386
+        },
+        {
+          "eval": "09d10ed101fa37758c16bb60be8ff45d5d7c0a4c6c09892d8ea1c28e5dc5aeaa",
+          "done": 24,
+          "recent30": 8,
+          "age": 43
+        },
+        {
+          "eval": "cca6ee00853e66c17cfba9ba997ce9f81a7cddc500d3b59aace469577275f56f",
+          "done": 27,
+          "recent30": 6,
+          "age": 60
+        },
+        {
+          "eval": "cfaa3a9107dc5834099b838f7346a018e4fdf0eca80fd77243024f583e810beb",
+          "done": 24,
+          "recent30": 7,
+          "age": 37
+        }
+      ]
+    },
+    {
+      "group": "ldm-43",
+      "charged": 211,
+      "rejected": 2,
+      "complete_cases": 9648,
+      "cases_per_hour_30_60_120": [
+        270.0,
+        266.0,
+        204.0
+      ],
+      "remaining_case_equivalents": 5664,
+      "pending": [
+        {
+          "eval": "ed8f5e00921a1fbfbff38b7635457c0fbd57f268102d5a5312116e1cc5c7b9ed",
+          "done": 22,
+          "recent30": 6,
+          "age": 138
+        },
+        {
+          "eval": "6e7879acd63d8b03af47a2a0291c082d6e859e3e5f9e0b63e64eab498b9b2356",
+          "done": 20,
+          "recent30": 9,
+          "age": 256
+        },
+        {
+          "eval": "015747c4b6ed1e78d2b368d4904168888b18ba793706c45e46bbc475f94f2928",
+          "done": 26,
+          "recent30": 9,
+          "age": 293
+        },
+        {
+          "eval": "831c4a6ef9bed5c7c5c2cb44cbac0e837c78e060a868aba3e5d361daf5b9b905",
+          "done": 25,
+          "recent30": 9,
+          "age": 85
+        },
+        {
+          "eval": "0170ff7c9f1de55054a0e3323360817869bba67dfed7bf407510efb67b4423c3",
+          "done": 27,
+          "recent30": 9,
+          "age": 35
+        },
+        {
+          "eval": "4ca099652d7cff34cf8caf345458b471616f223a37791ac96fa387398a1cf11e",
+          "done": 21,
+          "recent30": 7,
+          "age": 246
+        },
+        {
+          "eval": "bd38bc7ae339268f4a193597707ba15cbffa045217ee0191dd377ea2e877c65f",
+          "done": 24,
+          "recent30": 7,
+          "age": 330
+        },
+        {
+          "eval": "579d31329f0d0058ff3f9c47d5f4929edeb0db8489a408a0ce41a24a2dd0e703",
+          "done": 25,
+          "recent30": 7,
+          "age": 265
+        },
+        {
+          "eval": "8eaa7d9bb6b44174c62e5140ff59eefe68f3be8280cf1ecc98bc10d78abfce7d",
+          "done": 27,
+          "recent30": 9,
+          "age": 77
+        },
+        {
+          "eval": "2315f87132788886933a2c62646af42bc22255a2653df1d5f46621a9c06af72a",
+          "done": 23,
+          "recent30": 10,
+          "age": -3
+        },
+        {
+          "eval": "02a3c031efb8df9c6ab6e06f6c9fdc49eeda3b7866db30cd4b690788b53cc2dd",
+          "done": 24,
+          "recent30": 9,
+          "age": 20
+        },
+        {
+          "eval": "e39cfc828396a12a8e3159c11fc6d9c34fd3f71083746b0b1a6a1bf3f4f6f193",
+          "done": 20,
+          "recent30": 6,
+          "age": 276
+        },
+        {
+          "eval": "1b3e7cc522ae6e737284193a0b48bb9837158197b0a4b2201e7ce5997234a2cc",
+          "done": 26,
+          "recent30": 9,
+          "age": 29
+        },
+        {
+          "eval": "5b5a7d78f61db6bdfdd76823aeb467700c9610e791034eebff4772690e832b66",
+          "done": 22,
+          "recent30": 10,
+          "age": 151
+        },
+        {
+          "eval": "ee773a33baf71b74fe950f6d19e70b8984e07b37fc8e990d998c1abe3a6572da",
+          "done": 27,
+          "recent30": 10,
+          "age": 301
+        },
+        {
+          "eval": "100a985dff564545cacad03ecd5a71cb2cf82be860737dc7714d800d9e63e922",
+          "done": 25,
+          "recent30": 9,
+          "age": -3
+        }
+      ]
+    },
+    {
+      "group": "mcmc-3407",
+      "charged": 257,
+      "rejected": 0,
+      "complete_cases": 12335,
+      "cases_per_hour_30_60_120": [
+        210.0,
+        233.0,
+        248.00000000000003
+      ],
+      "remaining_case_equivalents": 3073,
+      "pending": [
+        {
+          "eval": "97e14df88a570a2b5d6c465139426d7969a721f76ea4665677e05b80cd08796b",
+          "done": 47,
+          "recent30": 11,
+          "age": 94
+        }
+      ]
+    },
+    {
+      "group": "mcmc-42",
+      "charged": 273,
+      "rejected": 2,
+      "complete_cases": 12336,
+      "cases_per_hour_30_60_120": [
+        194.0,
+        197.0,
+        224.0
+      ],
+      "remaining_case_equivalents": 2976,
+      "pending": [
+        {
+          "eval": "3d4fb273c7ae42b0aeefcb33e21435eb5841ceb3ecf23d1314b4010aa0d12f52",
+          "done": 7,
+          "recent30": 7,
+          "age": 122
+        },
+        {
+          "eval": "fafdaf5097b91ce3cd72acb27e218d71361bbd7aef0baec653502e3cfa238f61",
+          "done": 10,
+          "recent30": 10,
+          "age": 4
+        },
+        {
+          "eval": "730926c77c0f2725c7cd43050156767b19c4f542d109828faa3303fcaea87348",
+          "done": 4,
+          "recent30": 4,
+          "age": 384
+        },
+        {
+          "eval": "87ca55a00798220345fbfcedf7fefe3919145d1189c720905d7527db3979c6b3",
+          "done": 3,
+          "recent30": 3,
+          "age": 38
+        },
+        {
+          "eval": "8a87157b26c5d33773b05aca87873d5e3d2d2b70c929e55b49fdcadda3e4372d",
+          "done": 7,
+          "recent30": 7,
+          "age": 103
+        },
+        {
+          "eval": "3712781157cf039533a9072497c416b8f81fcf73e5e843dbd0758c6d4252d174",
+          "done": 7,
+          "recent30": 7,
+          "age": 74
+        },
+        {
+          "eval": "893e32c620f993ec3d3a4140ff8eb047994f4a70fe032c507c92a7cd8a66150f",
+          "done": 8,
+          "recent30": 8,
+          "age": 300
+        },
+        {
+          "eval": "9dc114c88305a7a7ea009c543250fbeea09486cb316902995d59c14ce39c7af4",
+          "done": 2,
+          "recent30": 2,
+          "age": 99
+        },
+        {
+          "eval": "6550661ff76350f1f7413c65d264f312188d33216edb23269457e7ca4b571683",
+          "done": 6,
+          "recent30": 6,
+          "age": 44
+        },
+        {
+          "eval": "6a4371d6460bb3d079d56b2356c59ac0ce0d4a9e1989105aadd25723576940f6",
+          "done": 4,
+          "recent30": 4,
+          "age": 479
+        },
+        {
+          "eval": "1af351dffd7661db0d4a13e63454d8bf78bd559ebe9e156956ae49ac7fdcbec3",
+          "done": 7,
+          "recent30": 7,
+          "age": 91
+        },
+        {
+          "eval": "34f5a868b5618ac3187ec38175dcd2efda7e57f8c516fe8f79187a262dc1f001",
+          "done": 7,
+          "recent30": 7,
+          "age": 234
+        },
+        {
+          "eval": "e68023bebd411a965c9ec834df2aeb9cc52c4213478fb1832673c2a716859d3c",
+          "done": 5,
+          "recent30": 5,
+          "age": 36
+        },
+        {
+          "eval": "cb530672caaa76588fe2779e44e5e449b267a203ba896ec5a1fc9e9c6d5df55a",
+          "done": 8,
+          "recent30": 8,
+          "age": 39
+        },
+        {
+          "eval": "eb4bf784076a887dd4be2004014b6488e7508ee5fb860e95fb1705a622462851",
+          "done": 5,
+          "recent30": 5,
+          "age": 256
+        },
+        {
+          "eval": "6358b1edaf0fa470b978c3a1498f5cc81e85d5c5d78bcbf8004db3e5aa9c6d17",
+          "done": 6,
+          "recent30": 6,
+          "age": 431
+        }
+      ]
+    },
+    {
+      "group": "mcmc-43",
+      "charged": 273,
+      "rejected": 0,
+      "complete_cases": 12524,
+      "cases_per_hour_30_60_120": [
+        240.0,
+        192.0,
+        183.0
+      ],
+      "remaining_case_equivalents": 2884,
+      "pending": [
+        {
+          "eval": "83edd09431a0f40d935ca897ddf9ac8e871da2425834c9d08347b188df0984a1",
+          "done": 10,
+          "recent30": 7,
+          "age": 88
+        },
+        {
+          "eval": "30e845b7748501ddf9f81ea7a3c187d560bffa7f013379a98b709a8d75c34aeb",
+          "done": 14,
+          "recent30": 9,
+          "age": 83
+        },
+        {
+          "eval": "5af0f47962e4b75f1dd01bfba80020c94a24e3607d46e77f101949c4d35531e6",
+          "done": 13,
+          "recent30": 8,
+          "age": -6
+        },
+        {
+          "eval": "31f9f743d106e69d8cd91b5e842052d9d54990f34571fe9f9f1aadc2f145cbdc",
+          "done": 13,
+          "recent30": 7,
+          "age": 262
+        },
+        {
+          "eval": "14f05e13cd1d6ce87536161a1f6acea51cdc978a50da120d3d264a06be75e369",
+          "done": 10,
+          "recent30": 6,
+          "age": 288
+        },
+        {
+          "eval": "ec82f5759fbae13c57a9122b3b0ea1536c26e207614ec7dcd683357457c23299",
+          "done": 10,
+          "recent30": 6,
+          "age": 1
+        },
+        {
+          "eval": "a735e186a0f331623ac408ea7ce113c59477d742a497fdb5f94ac06d6c961292",
+          "done": 8,
+          "recent30": 8,
+          "age": -4
+        },
+        {
+          "eval": "84e80f15c424c33a2131f8ce6b058f504ee544dc0ea25133b8d6e139c2d5e549",
+          "done": 13,
+          "recent30": 8,
+          "age": 258
+        },
+        {
+          "eval": "38cd2111d13c9c27e2dcf7a156f6f4b9d1953e6e5c687ec6f805f537b4bd2c5d",
+          "done": 14,
+          "recent30": 8,
+          "age": 153
+        },
+        {
+          "eval": "c81793214ef13dc4ee4642192c735cbe76f4e21ece515cc0a01e70dfebda9964",
+          "done": 10,
+          "recent30": 7,
+          "age": 101
+        },
+        {
+          "eval": "92d7596865d4ae24f46a1fb8a9d37269e95fc478e52cdca16805293778408c01",
+          "done": 15,
+          "recent30": 7,
+          "age": 152
+        },
+        {
+          "eval": "9271f2e656ed53892c56aab2218ed2af21854effb50dbff480c5bc030e01c15a",
+          "done": 9,
+          "recent30": 9,
+          "age": 42
+        },
+        {
+          "eval": "5da38afaeda439c336c93a2b212f9f4a3a1891ddac90fdaf8709731a2a638852",
+          "done": 14,
+          "recent30": 9,
+          "age": 113
+        },
+        {
+          "eval": "99fee7534bbbc834d480dabd9d17aafd6a75b40cfc7fb0b8d6fb298569265c9f",
+          "done": 13,
+          "recent30": 9,
+          "age": 35
+        },
+        {
+          "eval": "1bb783e8e4a21a53c748e62fc611a7b2a38491bec2e78f58b9b2f15714b25d59",
+          "done": 9,
+          "recent30": 5,
+          "age": 407
+        },
+        {
+          "eval": "faadc09b0570917ff58b927a59f85751cc4537073fd4cd0ad539ab6e95e31f79",
+          "done": 14,
+          "recent30": 8,
+          "age": 224
+        }
+      ]
+    }
+  ]
+}

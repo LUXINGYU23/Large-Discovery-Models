@@ -1,0 +1,232 @@
+{
+  "drillholes_3d": {
+    "Initial": {
+      "score": {
+        "loss_drillhole": 405.0795810830953,
+        "positive_volume": 1655.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 405.0795810830953,
+        "research_utility": -405.0795810830953,
+        "positive_voxels": 1655,
+        "label_mismatches": 54,
+        "contact_rmse": 5.563958690902462
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [],
+      "isosurface_area": 751.5499267578125,
+      "active_positive_voxels": 1655,
+      "volume_fraction": 0.027583333333333335
+    },
+    "MCMC 120s": {
+      "score": {
+        "loss_drillhole": 220.3399448391901,
+        "positive_volume": 3038.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 220.3399448391901,
+        "research_utility": -220.3399448391901,
+        "positive_voxels": 3038,
+        "label_mismatches": 47,
+        "contact_rmse": 3.6949904285891932
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [],
+      "isosurface_area": 1153.5654296875,
+      "active_positive_voxels": 3038,
+      "volume_fraction": 0.050633333333333336
+    },
+    "MCMC 1000 calls": {
+      "score": {
+        "loss_drillhole": 6.898354673163223,
+        "positive_volume": 11173.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 6.898354673163223,
+        "research_utility": -6.898354673163223,
+        "positive_voxels": 11173,
+        "label_mismatches": 0,
+        "contact_rmse": 0.15066142757380213
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [
+        "x+",
+        "z+"
+      ],
+      "isosurface_area": 1921.4393310546875,
+      "active_positive_voxels": 11173,
+      "volume_fraction": 0.18621666666666667
+    },
+    "LDM": {
+      "score": {
+        "loss_drillhole": 6.514409870030431,
+        "positive_volume": 28317.0,
+        "air_positive_voxels": 2188,
+        "air_positive_volume": 2188.0,
+        "air_fraction_of_positive": 0.07726807218278772,
+        "loss_total": 6.514409870030431,
+        "research_utility": -6.514409870030431,
+        "positive_voxels": 28317,
+        "label_mismatches": 0,
+        "contact_rmse": 0.27025554617061526
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [
+        "x-",
+        "x+",
+        "y-",
+        "y+",
+        "z+"
+      ],
+      "isosurface_area": 1957.4013671875,
+      "active_positive_voxels": 26129,
+      "volume_fraction": 0.47195
+    },
+    "seed_geometry": {
+      "pairwise_iou": [
+        0.9979535671441677,
+        0.9957343298314884,
+        0.9960856225975949
+      ],
+      "varying_voxels": 145
+    },
+    "observations": [
+      {
+        "name": "drillhole",
+        "counts": {
+          "0": 15,
+          "0.5": 4,
+          "1": 51
+        }
+      }
+    ]
+  },
+  "drillholes_outcrops_3d": {
+    "Initial": {
+      "score": {
+        "loss_drillhole": 405.0795810830953,
+        "loss_outcrop": 843.7589951040999,
+        "positive_volume": 1655.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 1248.8385761871953,
+        "research_utility": -1248.8385761871953,
+        "positive_voxels": 1655,
+        "label_mismatches": 884,
+        "contact_rmse": 10.032113812425068
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [],
+      "isosurface_area": 751.5499267578125,
+      "active_positive_voxels": 1655,
+      "volume_fraction": 0.027583333333333335
+    },
+    "MCMC 120s": {
+      "score": {
+        "loss_drillhole": 265.2344991563495,
+        "loss_outcrop": 459.1006574817054,
+        "positive_volume": 3999.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 724.335156638055,
+        "research_utility": -724.335156638055,
+        "positive_voxels": 3999,
+        "label_mismatches": 874,
+        "contact_rmse": 6.677632807320232
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [],
+      "isosurface_area": 1340.1038818359375,
+      "active_positive_voxels": 3999,
+      "volume_fraction": 0.06665
+    },
+    "MCMC 1000 calls": {
+      "score": {
+        "loss_drillhole": 11.507739820201426,
+        "loss_outcrop": 28.26132566499482,
+        "positive_volume": 7668.0,
+        "air_positive_voxels": 0,
+        "air_positive_volume": 0.0,
+        "air_fraction_of_positive": 0.0,
+        "loss_total": 39.76906548519625,
+        "research_utility": -39.76906548519625,
+        "positive_voxels": 7668,
+        "label_mismatches": 79,
+        "contact_rmse": 1.1316813683979305
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [
+        "x+",
+        "z+"
+      ],
+      "isosurface_area": 1925.1986083984375,
+      "active_positive_voxels": 7668,
+      "volume_fraction": 0.1278
+    },
+    "LDM": {
+      "score": {
+        "loss_drillhole": 7.5033673980725055,
+        "loss_outcrop": 24.872677787552156,
+        "positive_volume": 10651.0,
+        "air_positive_voxels": 238,
+        "air_positive_volume": 238.0,
+        "air_fraction_of_positive": 0.02234531968829218,
+        "loss_total": 32.37604518562466,
+        "research_utility": -32.37604518562466,
+        "positive_voxels": 10651,
+        "label_mismatches": 34,
+        "contact_rmse": 0.9120577660968506
+      },
+      "components_6": 1,
+      "largest_component_fraction": 1.0,
+      "boundary_faces": [
+        "x+",
+        "y-",
+        "y+",
+        "z-",
+        "z+"
+      ],
+      "isosurface_area": 2678.030029296875,
+      "active_positive_voxels": 10413,
+      "volume_fraction": 0.17751666666666666
+    },
+    "seed_geometry": {
+      "pairwise_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "varying_voxels": 0
+    },
+    "observations": [
+      {
+        "name": "drillhole",
+        "counts": {
+          "0": 15,
+          "0.5": 4,
+          "1": 51
+        }
+      },
+      {
+        "name": "outcrop",
+        "counts": {
+          "0": 2674,
+          "0.5": 26,
+          "1": 830
+        }
+      }
+    ]
+  }
+}

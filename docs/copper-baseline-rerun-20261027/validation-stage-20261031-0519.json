@@ -1,0 +1,168 @@
+{
+  "time": 1793395209.342938,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 2960.4293472766876
+    },
+    {
+      "name": "acq-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 3705.62980055809
+    },
+    {
+      "name": "mcmc-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 3005.178726673126
+    },
+    {
+      "name": "acq-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 3128.647823572159
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 8720.26033449173
+    },
+    {
+      "name": "acq-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 15408,
+      "complete": 321,
+      "charged": 321,
+      "latest_age": 6422.208327531815
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "private_validation_then_test",
+    "updated_at": 1793392275.438575,
+    "supervisor_pid": 2833147,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261030",
+    "finish_pid": 1383061
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_runtime_unchanged": true,
+  "controller_command": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261030.py ",
+  "failure_set_unchanged": true,
+  "fair_unchanged": true,
+  "finish_command": "runuser -u ldm-copper-eval -- /Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/runtime_fair_20261028.py --policy /Aidata/shared/ldm/copper-measurement-study-20261027-r4-baselines/scheduling-policy32-fair-20261030.json finish --plan /Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/finish-plan.json ",
+  "selection": [
+    {
+      "group": "acq-3407",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 66.39088201522827,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "dca198e99adc949fee513c09d0fb347597f480fbd3395e0af07ab61ac4a0c288",
+        "phase": "selected",
+        "selection_sha256": "744c3ee3b0e46e2e97f0cdd703223c3f39757e98c8b8de6d2d75b2b76012a391"
+      }
+    },
+    {
+      "group": "acq-42",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 53.848633766174316,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "2bdf27e32309fe880cf16b3602a9c74743624b8be6228f1294b739e99c284618",
+        "phase": "selected",
+        "selection_sha256": "7d83d8310e7621e16e7b8e7b252f8d07661127260c510c88dd1fb5a14257871e"
+      }
+    },
+    {
+      "group": "acq-43",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 44.30683708190918,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "1a1c2529245904e3cd658e1568d63d166130495ef859a379ca5e1dd56aa302ed",
+        "phase": "selected",
+        "selection_sha256": "886b459a9bb4de82bb340fa4d9c59a22d04b7a8f0ec70797a68b287f0debe1c2"
+      }
+    },
+    {
+      "group": "mcmc-3407",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 48.27630066871643,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "05fa9a77258032d48e2ee44200b806381f20cec265a77bbe95959459a138dc15",
+        "phase": "selected",
+        "selection_sha256": "8f3b92172dcadabfc6817a65e231c469060c18a1be2586f1fef50e1ad990effe"
+      }
+    },
+    {
+      "group": "mcmc-42",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 39.91647219657898,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "aa258e9783a3fd9a5b9676f38daa318bf50c3e189209b157a206dda51d3349e8",
+        "phase": "selected",
+        "selection_sha256": "3a5d7f4eaffac43d5529b6d63d70e3440af6155610de8626c7b24090a2a2cf1b"
+      }
+    },
+    {
+      "group": "mcmc-43",
+      "case_receipts": 120,
+      "validation": 48,
+      "test": 72,
+      "latest_age": 59.288188457489014,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "e1b49dcc58a785e63161dd98a2530b12f677cf93906dfd9d4bcf6f076b2b0f50",
+        "phase": "selected",
+        "selection_sha256": "7e21c8ab8c8da8bb477fa80129655a9cd8b3f4a23dbeee05b98a6ca1b0a6910f"
+      }
+    }
+  ],
+  "completion_exists": false,
+  "finish_log": "{\"phase\": \"validation\", \"status\": \"completed\"}\n"
+}

@@ -1,0 +1,97 @@
+{
+  "time": 1793395265.034796,
+  "issue": "validation manifest has only seed47; requested validation seeds47/48/49; selection already frozen and tests started",
+  "manifests": {
+    "validation": {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/measurement-formal-20261024-r2/validation/manifest.json",
+      "sha256": "c51f148e61309fbb642a32d18a6bcd14686b779bb9a044d0ce55cb8fc1546544",
+      "seeds": [
+        47
+      ],
+      "cases": 16
+    },
+    "test_id": {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/measurement-formal-20261024-r2/test_id/manifest.json",
+      "sha256": "8fe1b8650e31558cc5716a64a261a2415261b718330406b7938844810a5b16f9",
+      "seeds": [
+        47,
+        48,
+        49
+      ],
+      "cases": 32
+    },
+    "test_ood": {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/datasets/measurement-formal-20261024-r2/test_ood/manifest.json",
+      "sha256": "41d73633411a3395098c9cb6fbf4bce74cd1e392d660a566aaf66d377e7f4efa",
+      "seeds": [
+        47,
+        48,
+        49
+      ],
+      "cases": 16
+    }
+  },
+  "groups": [
+    {
+      "group": "acq-3407",
+      "selection_sha256": "41a45ccd5530e50b54356b48b1aa76f66399fc8e74b530b807d22f6e8c0d2170",
+      "selected_source": "281259cf9735471efcea6963f98d8680b8041e73ca119e2e9a869a7a699ea5cd",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    },
+    {
+      "group": "acq-42",
+      "selection_sha256": "c7354d2613d04146020dcf673f936ef47097e123c3a65b1336c07ea7f9fb6655",
+      "selected_source": "4ddf974f0200241558dc83b7009445b8787c22f0b564c74dadc2972112d599a6",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    },
+    {
+      "group": "acq-43",
+      "selection_sha256": "488ab3d08689faaefe8c1cf15ef59e352026e4166a64097b59dc90dbcf9dc188",
+      "selected_source": "f84263f7e4fddb19a51f0cfc1fcc37249d3e83288de86bb1bb9ee037edd17983",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    },
+    {
+      "group": "mcmc-3407",
+      "selection_sha256": "0f7b0d0e550e20d4195ac159701c55fe1cc0193391575a30fe4e267f50c392fc",
+      "selected_source": "d324ff5c84f8f798798c6f33edd17885d85a700b5e8cf636169f5fd06657fd7d",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    },
+    {
+      "group": "mcmc-42",
+      "selection_sha256": "bbd25ed6678e62ccb91540c6ce9f1747998f29101d60761dc1fb60228660c72c",
+      "selected_source": "98a8be6c93a9a075383ed5cfb1be6bf49b376e2a64a92dadca2ea708c16e5e3c",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    },
+    {
+      "group": "mcmc-43",
+      "selection_sha256": "fbc7ff371e062a6e12dbce95d59b7d93195279ca5bb313cc2f573f72acdbcafa",
+      "selected_source": "040321770f7d86c209d2d0231bc4973302f8e74232fd2a6214fdb9407762e65c",
+      "validation_receipts": 48,
+      "validation_seeds": [
+        "47"
+      ],
+      "test_started": true
+    }
+  ],
+  "action": "Evidence preserved; no manifest/source/selection changes or reruns; existing fixed-winner tests left intact pending decision"
+}

@@ -1,0 +1,24 @@
+{
+  "evaluator_uid": 991,
+  "evidence_sha256": {
+    "evidence/calibration.json": "6633fcd7573696364e161db5a9e729630d7177a8a00964ceef200871d8a9737c",
+    "evidence/confirmation.json": "fc9be35573ae66555cc189ce8d4c37b72bdc6fd22e4a69184b0c868f5b1623b7",
+    "evidence/geological_constraints.json": "45bffb5b6a70eff15dbaec08c76dbc413a913f46e20e16dc22a40c80cdebd196",
+    "evidence/historical_disjointness.json": "7c73c6ab4fecd118e9de05725efcb11fa5fb7f7c118d254f98a01a3d6fad062a",
+    "evidence/isolation.json": "f5cb609b4b9844a9abb8b6bc53e4dfc90d1b95f74971acf587b49f914a4859fc",
+    "evidence/population.json": "5e4f3cadefbfd7ad2ccb2ef7f28662b89691988b5df6913f948f11284545ed00"
+  },
+  "limitations": [
+    "Synthetic benchmark only; no real mine validation",
+    "Empirical discretization calibration, not an error-bound theorem",
+    "Not secure against host administrators or trusted Docker operator"
+  ],
+  "manifest_sha256": {
+    "test_id/manifest.json": "8fe1b8650e31558cc5716a64a261a2415261b718330406b7938844810a5b16f9",
+    "test_ood/manifest.json": "41d73633411a3395098c9cb6fbf4bce74cd1e392d660a566aaf66d377e7f4efa",
+    "train/manifest.json": "1b88e94431d39312ccea7184e6c69ac8ed4c8d1ef070e1e1a48aa97c0ab9941c",
+    "validation/manifest.json": "c51f148e61309fbb642a32d18a6bcd14686b779bb9a044d0ce55cb8fc1546544"
+  },
+  "schema": "copper-qualified-synthetic-v1",
+  "status": "qualified"
+}

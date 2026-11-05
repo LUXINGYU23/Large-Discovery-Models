@@ -1,0 +1,47 @@
+{
+  "pid": 1247571,
+  "controller_pid": 1247533,
+  "started_at": 1792779215.6632562,
+  "status": "running",
+  "physical_gpu": "2",
+  "logical_device": "cuda:0",
+  "command": [
+    "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python",
+    "scripts/run_ldm_tts.py",
+    "config/copper_inversion/encoding_drillholes_3d_fusion_full.yaml",
+    "--set",
+    "args.out-dir=/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion",
+    "--set",
+    "args.harness-cache-dir=/Aidata/shared/ldm/cache/gondolin",
+    "--set",
+    "args.evaluator-image=sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+    "--set",
+    "args.sidecar-image=sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4",
+    "--set",
+    "args.resume=true"
+  ],
+  "original_status": {
+    "pid": 1051246,
+    "status": "failed",
+    "started_at": 1792768184.1135466,
+    "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion",
+    "command": [
+      "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python",
+      "scripts/run_ldm_tts.py",
+      "config/copper_inversion/encoding_drillholes_3d_fusion_full.yaml",
+      "--set",
+      "args.out-dir=/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion",
+      "--set",
+      "args.harness-cache-dir=/Aidata/shared/ldm/cache/gondolin",
+      "--set",
+      "args.evaluator-image=sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+      "--set",
+      "args.sidecar-image=sha256:caffc0f9407f0ac895f8019af3d80f6d2feaa94df38218e800a01af7226a0df4"
+    ],
+    "returncode": 1,
+    "finished_at": 1792778870.8964942,
+    "elapsed_seconds": 9044.624020814896,
+    "recovery_record": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/recovery-drillholes_3d_fusion.json"
+  },
+  "reason": "CUDA OOM on shared GPU 0; unchanged code/config/checkpoint, GPU placement only"
+}

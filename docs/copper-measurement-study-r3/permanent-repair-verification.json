@@ -1,0 +1,99 @@
+{
+  "checked_at": 1792906550.7818558,
+  "epoch": "b81a969f03fa0d7e2efa79f0a7dd140548a4117d87f5b907c505ce36358fd556",
+  "controller": {
+    "pid": 993900,
+    "time": 1792906446.4440002,
+    "controller_sha256": "bc2df8fb4eaaf88be7d9de81fc9505bc883408389a20c077f53afbc79a59ad01",
+    "retained_files_verified": 118858,
+    "epoch_sha256": "b81a969f03fa0d7e2efa79f0a7dd140548a4117d87f5b907c505ce36358fd556"
+  },
+  "regressions": "217 passed, 41 skipped",
+  "sidecar_tests": 14,
+  "signal_tests": 4,
+  "load": {
+    "status": "passed",
+    "jobs": 1308,
+    "peak_active": 128
+  },
+  "parallel_admission": {
+    "status": "passed",
+    "sources": 32,
+    "receipts": 192,
+    "replay_unchanged": true,
+    "wall_seconds": 563.0407047662884
+  },
+  "private_protocol": {
+    "status": "passed",
+    "scope": "development_protocol_acceptance",
+    "charged_sources": 4,
+    "implementation_sha256": "c02f5fb584515b2f91059673d115c8d3b8c34bedeeefcedbb000b24b7cb173ab",
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "baseline_template_sha256": "3f04581af7348b25123b187b26ab4bc54ec50874fc4bc5e50c5bdd7b13fce0ab",
+    "accepted_sources": 3,
+    "rejected_sources": 1,
+    "solver_seconds": 120,
+    "replay_receipts_unchanged": true,
+    "budget_overflow_rejected": true,
+    "premature_test_rejected": true,
+    "sealed_training_rejected": true,
+    "formal_holdouts_accessed": false,
+    "receipt_count": 102
+  },
+  "groups": {
+    "ldm-42": {
+      "new_receipts": 17,
+      "failed": 0
+    },
+    "mcmc-42": {
+      "new_receipts": 8,
+      "failed": 0
+    },
+    "acq-42": {
+      "new_receipts": 13,
+      "failed": 0
+    },
+    "ldm-43": {
+      "new_receipts": 34,
+      "failed": 0
+    },
+    "mcmc-43": {
+      "new_receipts": 14,
+      "failed": 0
+    },
+    "acq-43": {
+      "new_receipts": 12,
+      "failed": 0
+    },
+    "ldm-3407": {
+      "new_receipts": 32,
+      "failed": 0
+    },
+    "mcmc-3407": {
+      "new_receipts": 14,
+      "failed": 0
+    },
+    "acq-3407": {
+      "new_receipts": 21,
+      "failed": 0
+    }
+  },
+  "progress": {
+    "stage": "training",
+    "updated_at": 1792906541.864379,
+    "epoch": "admission-deadline-r1",
+    "supervisor_pid": 993900,
+    "exit_codes": {
+      "ldm-42": null,
+      "mcmc-42": null,
+      "acq-42": null,
+      "ldm-43": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "ldm-3407": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "paused": false
+}

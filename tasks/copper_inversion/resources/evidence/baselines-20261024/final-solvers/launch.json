@@ -1,0 +1,26 @@
+{
+  "pid": 2945520,
+  "command": [
+    "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python",
+    "/Aidata/shared/ldm/copper-baselines-20261024/scripts-final/run.py",
+    "--root",
+    "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "--campaign",
+    "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full",
+    "--image",
+    "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "--seconds",
+    "120",
+    "--seeds",
+    "47",
+    "48",
+    "49",
+    "--methods",
+    "ast",
+    "qwen",
+    "fusion",
+    "--final-search"
+  ],
+  "started_at": 1792815414.043169,
+  "script_sha256": "e800aee2b1b1d219d9c4789400f08f67b13fefb59ce851c03f1d883119be1456"
+}

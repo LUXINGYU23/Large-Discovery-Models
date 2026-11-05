@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "contract_digest": "e48fe989cc77d8b5c0c0aa66d5054cf6923da9999610aae7f33975d00c03c284",
+  "evaluation": {
+    "status": "succeeded",
+    "source_sha256": "61a2b868deab0a91aaed9658bfa576f29c86ff7c4f95b40168cd510df8c27816",
+    "metrics": {
+      "mean_iou": 0.06982055111803796,
+      "loss_total": 0.930179448881962,
+      "research_utility": 0.06982055111803796,
+      "legal_rate": 1.0,
+      "parent_count": 1.0,
+      "solve_count": 2.0,
+      "failed_solves": 0.0,
+      "mean_solver_wall_seconds": 0.5659735202789307
+    }
+  },
+  "replay_identical": true,
+  "private_mounts_absent": true,
+  "request_path_override_rejected": true,
+  "invalid_output_rejected": true,
+  "feedback_cap_enforced": true,
+  "final_used_slots": 2,
+  "limitations": "Development socket probe only; no guest attack suite or formal qualification"
+}

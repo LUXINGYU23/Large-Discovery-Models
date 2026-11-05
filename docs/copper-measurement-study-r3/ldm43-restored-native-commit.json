@@ -1,0 +1,26 @@
+{
+  "time": 1792897128.6938834,
+  "native_commit_sha256": "fec69e079eb4daece78d5f14d8f69ad8dfa929c1a23b9a866710fea6018d3e2e",
+  "input_digest": "5b07a9358f704cf6273c57be92d16eb312252c5aaf085189bdd146032d4290be",
+  "submission_digest": "f02cbe4025dd3bb2a9bd82693ab7a2f43ebdd3e1d3625af09d11716aba604c60",
+  "provider_exchanges": 20,
+  "history_failure_preserved": true,
+  "events": [
+    {
+      "type": "campaign_resumed",
+      "iteration": null,
+      "sequence": 161
+    },
+    {
+      "type": "reservoir_expanded",
+      "iteration": 5,
+      "sequence": 162
+    },
+    {
+      "type": "reservoir_built",
+      "iteration": 5,
+      "sequence": 163
+    }
+  ],
+  "charged": 67
+}

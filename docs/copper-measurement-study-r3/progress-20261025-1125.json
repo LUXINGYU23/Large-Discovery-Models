@@ -1,0 +1,163 @@
+{
+  "time": 1792898670.4502997,
+  "groups": {
+    "ldm-42": {
+      "charged": 97,
+      "private_charged": 97,
+      "complete": 93,
+      "private_errors": {},
+      "last_receipt_age": 1.7627336978912354,
+      "pid": 2665576,
+      "alive": true,
+      "client_rejections": 0,
+      "latest_events": [
+        {
+          "type": "reservoir_built",
+          "iteration": 6,
+          "time": 1792894833.8839476
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792894849.7120538
+        },
+        {
+          "type": "candidates_selected",
+          "iteration": 6,
+          "time": 1792894849.7151265
+        }
+      ],
+      "provider_age": 3866.6865644454956
+    },
+    "mcmc-42": {
+      "charged": 113,
+      "private_charged": 112,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 4.844537019729614,
+      "pid": 2666278,
+      "alive": true,
+      "client_rejections": 1
+    },
+    "acq-42": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 0.3632526397705078,
+      "pid": 2667091,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "ldm-43": {
+      "charged": 83,
+      "private_charged": 81,
+      "complete": 68,
+      "private_errors": {},
+      "last_receipt_age": 5.426557302474976,
+      "pid": 2439449,
+      "alive": true,
+      "client_rejections": 2,
+      "latest_events": [
+        {
+          "type": "reservoir_built",
+          "iteration": 5,
+          "time": 1792897126.8166873
+        },
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792897155.7881243
+        },
+        {
+          "type": "candidates_selected",
+          "iteration": 5,
+          "time": 1792897155.7910595
+        }
+      ],
+      "provider_age": 6431.564877986908
+    },
+    "mcmc-43": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 98,
+      "private_errors": {},
+      "last_receipt_age": 1.0018579959869385,
+      "pid": 2668343,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "acq-43": {
+      "charged": 113,
+      "private_charged": 111,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 2.360694408416748,
+      "pid": 2669098,
+      "alive": true,
+      "client_rejections": 2
+    },
+    "ldm-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 112,
+      "private_errors": {
+        "timeout": 1
+      },
+      "last_receipt_age": 1250.8106334209442,
+      "pid": 2669668,
+      "alive": true,
+      "client_rejections": 0,
+      "latest_events": [
+        {
+          "type": "checkpoint_written",
+          "iteration": null,
+          "time": 1792897428.064095
+        },
+        {
+          "type": "reservoir_expanded",
+          "iteration": 8,
+          "time": 1792898645.5926557
+        },
+        {
+          "type": "reservoir_built",
+          "iteration": 8,
+          "time": 1792898661.303152
+        }
+      ],
+      "provider_age": 41.64303398132324
+    },
+    "mcmc-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 1.7226037979125977,
+      "pid": 2670836,
+      "alive": true,
+      "client_rejections": 0
+    },
+    "acq-3407": {
+      "charged": 113,
+      "private_charged": 113,
+      "complete": 97,
+      "private_errors": {},
+      "last_receipt_age": 3.651888132095337,
+      "pid": 2671910,
+      "alive": true,
+      "client_rejections": 0
+    }
+  },
+  "paused": false,
+  "recovery": {
+    "stage": "training_recovery",
+    "updated_at": 1792898669.7581706,
+    "supervisor_pid": 2438552,
+    "replacement_client_pid": 2439449,
+    "original_supervisor": 2665407,
+    "source_unchanged": true,
+    "budget_reset": false,
+    "started_at": 1792897064.6791995,
+    "client_exit": null
+  }
+}

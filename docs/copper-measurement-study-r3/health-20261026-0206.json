@@ -1,0 +1,88 @@
+{
+  "time": 1792951639.632633,
+  "progress": {
+    "stage": "training",
+    "updated_at": 1792951638.0467474,
+    "epoch": "admission-deadline-r1",
+    "supervisor_pid": 3919838,
+    "exit_codes": {
+      "ldm-42": null,
+      "mcmc-42": null,
+      "acq-42": null,
+      "ldm-43": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "ldm-3407": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "paused": [],
+  "groups": {
+    "ldm-42": {
+      "new_receipts": 259,
+      "latest_age": 15,
+      "failures": {
+        "AttributeError: 'float' object has no attribute 'copy'": 36
+      },
+      "alive": true,
+      "command_ok": true
+    },
+    "mcmc-42": {
+      "new_receipts": 330,
+      "latest_age": 5,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "acq-42": {
+      "new_receipts": 370,
+      "latest_age": 0,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "ldm-43": {
+      "new_receipts": 248,
+      "latest_age": 23,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "mcmc-43": {
+      "new_receipts": 312,
+      "latest_age": 2,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "acq-43": {
+      "new_receipts": 293,
+      "latest_age": 1,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "ldm-3407": {
+      "new_receipts": 244,
+      "latest_age": 4,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "mcmc-3407": {
+      "new_receipts": 292,
+      "latest_age": 5,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    },
+    "acq-3407": {
+      "new_receipts": 439,
+      "latest_age": 9,
+      "failures": {},
+      "alive": true,
+      "command_ok": true
+    }
+  }
+}

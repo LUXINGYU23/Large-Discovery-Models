@@ -1,0 +1,68 @@
+{
+  "scope": "Development load qualification only, excludes private protocol, pilot, tests and unfinished jobs; never merged into formal curves",
+  "runs": [
+    {
+      "run": "load-control-r3",
+      "completed_jobs": 155,
+      "failed_jobs": 37,
+      "status": "incomplete",
+      "container_wall_seconds": 8549.54571890831,
+      "attested_cpu_seconds": 7127.971173,
+      "missing_attestation": 36
+    },
+    {
+      "run": "load-full-r4",
+      "completed_jobs": 828,
+      "failed_jobs": 0,
+      "status": "passed",
+      "container_wall_seconds": 28348.270988225937,
+      "attested_cpu_seconds": 50306.045375,
+      "missing_attestation": 0
+    },
+    {
+      "run": "load-full-r5",
+      "completed_jobs": 828,
+      "failed_jobs": 2,
+      "status": "failed",
+      "container_wall_seconds": 29053.49563074112,
+      "attested_cpu_seconds": 51140.693546,
+      "missing_attestation": 0
+    },
+    {
+      "run": "load-full-r6",
+      "completed_jobs": 828,
+      "failed_jobs": 0,
+      "status": "passed",
+      "container_wall_seconds": 28916.888872385025,
+      "attested_cpu_seconds": 51095.956348,
+      "missing_attestation": 0
+    },
+    {
+      "run": "load-small-r3",
+      "completed_jobs": 12,
+      "failed_jobs": 0,
+      "status": "passed",
+      "container_wall_seconds": 53.435301303863525,
+      "attested_cpu_seconds": 41.414246,
+      "missing_attestation": 0
+    },
+    {
+      "run": "load-small-r4",
+      "completed_jobs": 12,
+      "failed_jobs": 0,
+      "status": "passed",
+      "container_wall_seconds": 53.689948081970215,
+      "attested_cpu_seconds": 41.623689,
+      "missing_attestation": 0
+    },
+    {
+      "run": "load-small-r6",
+      "completed_jobs": 12,
+      "failed_jobs": 0,
+      "status": "passed",
+      "container_wall_seconds": 62.47299146652222,
+      "attested_cpu_seconds": 49.884028,
+      "missing_attestation": 0
+    }
+  ]
+}

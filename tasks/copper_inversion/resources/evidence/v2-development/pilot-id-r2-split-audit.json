@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "scope": "lineage and exact/coarse geometry collision checks only",
+  "parents": {
+    "test_id": 4,
+    "train": 8,
+    "validation": 4
+  },
+  "manifest_sha256": {
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r2/suites/train/manifest.json": "443729cc04bfd3be90b4de241214baaaec522458512aecae25b2b4ac02494ba6",
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r2/suites/validation/manifest.json": "e406ab147ae6ea3741fcef1ccf2e20be201492c741e926b9626c083baee863b5",
+    "/Aidata/shared/ldm/copper-v2-development/datasets/pilot-id-r2/suites/test_id/manifest.json": "4c225e0ffc2eac54b741abb860e7fa178ea969ca24ca2a94ec4441836bec041a"
+  },
+  "lineage_sha256": "b1b29ac8f67407c474d73f5c1504009031088d4687e6a7e4c447502e09bd116f",
+  "remaining_checks": [
+    "near-duplicate retrieval and geological review",
+    "independent hidden-access isolation"
+  ]
+}

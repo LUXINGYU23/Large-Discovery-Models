@@ -1,0 +1,37 @@
+{
+  "source_sha256": "9041248c3d173c0421062db428906d9f6aece17eb1d43ce63d5c995033a00ae2",
+  "charged_position": 221,
+  "template": "signal-cleanup-r2",
+  "receipt": {
+    "container": "ldm-copper-e189ae91ff-9bfcccb284459ae42394",
+    "container_id": "fdd0ee0abda322be525d3b75eec56b378f296fc0d2e7235aaacf14d9cbf46832",
+    "cpus": 1,
+    "exit_code": 137,
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "key": "9bfcccb284459ae423941aca2867ee98c6f41cd56f0c2ae4b9ef3773ce2964ee",
+    "oom": false,
+    "reason": "timeout",
+    "resource_sampling": {
+      "complete_lifetime_measurement": false,
+      "cpu_seconds_observed": 5.778135,
+      "last_sample_unix": 1792938224.1893163,
+      "method": "host_cgroup_v2_polling",
+      "sampled_peak_memory_bytes": 96481280,
+      "samples": 23,
+      "target_interval_seconds": 0.2
+    },
+    "wall_seconds": 7.3490588665008545,
+    "workload_resources": {
+      "cpu_seconds_through_reap": 5.832506,
+      "exit_code": 137,
+      "oom_kill_count": 0,
+      "peak_memory_bytes": 96567296,
+      "schema_version": 1,
+      "scope": "container workload and supervisor through final descendant reap",
+      "worker_budget_seconds": 5.0,
+      "worker_elapsed_seconds": 5.654735441785306,
+      "workload_complete": true
+    }
+  },
+  "receipt_sha256": "a9ed7f8a6b1192a0fd124143a889ff6119e2dbbdef26de88f99f068592abfb42"
+}

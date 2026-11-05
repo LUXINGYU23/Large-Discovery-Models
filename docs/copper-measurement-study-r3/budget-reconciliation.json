@@ -1,0 +1,83 @@
+{
+  "ldm-42": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 308,
+    "complete_sources": 308,
+    "local_rejections": 13,
+    "private_rejections": 0
+  },
+  "mcmc-42": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 320,
+    "complete_sources": 319,
+    "local_rejections": 1,
+    "private_rejections": 1
+  },
+  "acq-42": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 321,
+    "complete_sources": 321,
+    "local_rejections": 0,
+    "private_rejections": 0
+  },
+  "ldm-43": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 319,
+    "complete_sources": 319,
+    "local_rejections": 2,
+    "private_rejections": 0
+  },
+  "mcmc-43": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 321,
+    "complete_sources": 321,
+    "local_rejections": 0,
+    "private_rejections": 0
+  },
+  "acq-43": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 319,
+    "complete_sources": 318,
+    "local_rejections": 2,
+    "private_rejections": 1
+  },
+  "ldm-3407": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 321,
+    "complete_sources": 319,
+    "local_rejections": 0,
+    "private_rejections": 2
+  },
+  "mcmc-3407": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 321,
+    "complete_sources": 321,
+    "local_rejections": 0,
+    "private_rejections": 0
+  },
+  "acq-3407": {
+    "status": "passed",
+    "cap": 321,
+    "client_sources": 321,
+    "private_sources": 321,
+    "complete_sources": 320,
+    "local_rejections": 0,
+    "private_rejections": 1
+  }
+}

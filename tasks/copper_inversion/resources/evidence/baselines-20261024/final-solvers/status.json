@@ -1,0 +1,35 @@
+{
+  "finished_at": 1792816433.456083,
+  "jobs": [
+    {
+      "case": "drillholes_3d",
+      "method": "ast",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_3d",
+      "method": "qwen",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_3d",
+      "method": "fusion",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "ast",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "qwen",
+      "status": "completed"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "fusion",
+      "status": "completed"
+    }
+  ]
+}

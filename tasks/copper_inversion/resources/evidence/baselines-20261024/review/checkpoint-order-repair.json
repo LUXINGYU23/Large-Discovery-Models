@@ -1,0 +1,9 @@
+{
+  "round": 13,
+  "observations": 20,
+  "before_sha256": "a4d40ca74a1ceac0da326be5bebc444342fd98101041308f6f1d371236c017b0",
+  "after_sha256": "a240b52a0aa063fde98a154c18944535ce4e6464c376e662d6c3477e64fa44fd",
+  "canonical_state_sha256": "4bc13e411d538dbcfa20a61802f8d1c5670f6a16f64a25fba2c34b07517fb031",
+  "values_unchanged": true,
+  "source": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion/harness/branches/round_0013"
+}

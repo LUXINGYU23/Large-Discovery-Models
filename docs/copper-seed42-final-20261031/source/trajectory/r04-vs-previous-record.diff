@@ -1,0 +1,163 @@
+--- db7e22d78f988eb1f4c3f079983a2819d8b451f80117082e8f9334d8b8320f07
+
++++ f9663a709a42752068f2b4fce5817144edf66fc9edcf0c03018dfdfc747c42d2
+
+@@ -1,4 +1,4 @@
+
+-"""Candidate 5: legal baseline plus bounded greedy local boundary refinement (control)."""
++"""Copper v2 candidate: baseline-seeded objective-greedy patch refinement."""
+ import os
+ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+@@ -11,6 +11,15 @@
+
+ from tasks.copper_inversion.v2.baselines import initialize
+ 
+ _STRUCT = ndimage.generate_binary_structure(3, 1)
++
++# ---- configuration (replaced per candidate) ----
++TIME_FRAC = 0.68
++RADIUS_FRAC = 0.075
++JITTER_LOW = 0.35
++SCHEDULE = None
++FAST = True
++SEED_OFFSET = 0
++N_RUNS = 1
+ 
+ 
+ def _prune(mask, maximum):
+@@ -77,6 +86,66 @@
+
+     return -np.linalg.norm(xyz - center, axis=-1)
+ 
+ 
++def _score(problem, field):
++    try:
++        v = float(score(problem, field)["loss_total"])
++        return v if np.isfinite(v) else np.inf
++    except Exception:
++        return np.inf
++
++
++def _search(problem, field, cur, rank, feasible, centers, coords, sp, length,
++            deadline, rng, schedule):
++    best = field.copy()
++    best_l = cur
++    phase_start = time.monotonic()
++    total = max(deadline - phase_start, 1e-6)
++    if schedule is None:
++        schedule = ((1.0, RADIUS_FRAC),)
++    for frac_end, rfrac in schedule:
++        phase_end = phase_start + total * frac_end
++        while time.monotonic() < min(phase_end, deadline):
++            center = centers[rng.integers(len(centers))]
++            radius = max(float(sp.min()), length * rfrac * rng.uniform(JITTER_LOW, 1.0))
++            patch = (((coords[0] - center[0]) * sp[0]) ** 2 +
++                     ((coords[1] - center[1]) * sp[1]) ** 2 +
++                     ((coords[2] - center[2]) * sp[2]) ** 2) <= radius ** 2
++            patch &= feasible
++            if not patch.any():
++                continue
++            prop = field.copy()
++            prop[patch] *= -1
++            m = _repair(problem, prop > 0, prop)
++            prop = np.where(m, 1., -1.)
++            if FAST:
++                val = _score(problem, prop)
++            else:
++                try:
++                    canonicalize(problem, prop)
++                    val = _score(problem, prop)
++                except Exception:
++                    continue
++            if val < cur:
++                field, cur = prop, val
++                if val < best_l:
++                    best, best_l = prop.copy(), val
++    return best, best_l
++
++
++def _initial(problem, rank):
++    try:
++        field = np.asarray(initialize(problem), float)
++        val = _score(problem, field)
++        if np.isfinite(val):
++            return field, val
++    except Exception:
++        pass
++    feasible = problem["domain_mask"] & ~problem["forbidden_mask"]
++    m = _repair(problem, np.zeros(tuple(problem["shape"]), bool), rank)
++    f = np.where(m, 1., -1.)
++    return f, _score(problem, f)
++
++
+ def solve(problem, budget, seed):
+     started = time.monotonic()
+     try:
+@@ -86,50 +155,30 @@
+
+     if not np.isfinite(secs) or secs <= 0:
+         secs = 120.
+     small = int(np.prod(problem["shape"])) < 5000
+-    cap = 1.5 if small else .75 * secs
++    cap = 1.5 if small else TIME_FRAC * secs
+     deadline = started + max(.5, cap)
+-    rng = np.random.default_rng(seed)
+     rank = _rank(problem)
+-    try:
+-        field = np.asarray(initialize(problem), float)
+-        cur = float(score(problem, field)["loss_total"])
+-        best, best_l = field.copy(), cur
+-    except Exception:
+-        m = _repair(problem, np.zeros(tuple(problem["shape"]), bool), rank)
+-        best = np.where(m, 1., -1.)
+-        best_l = float(score(problem, best)["loss_total"])
+-        field, cur = best.copy(), best_l
++    field, cur = _initial(problem, rank)
+     feasible = problem["domain_mask"] & ~problem["forbidden_mask"]
+     centers = np.argwhere(feasible)
+     if not len(centers):
+-        return best
++        return np.asarray(field, float)
+     coords = np.indices(tuple(problem["shape"]), dtype=float)
+     sp = np.asarray(problem["spacing"], float)
+     length = float(np.linalg.norm(np.asarray(problem["shape"]) * sp))
+-    while time.monotonic() < deadline:
+-        center = centers[rng.integers(len(centers))]
+-        radius = max(float(sp.min()), length * .075 * rng.uniform(.35, 1.0))
+-        patch = (((coords[0] - center[0]) * sp[0]) ** 2 +
+-                 ((coords[1] - center[1]) * sp[1]) ** 2 +
+-                 ((coords[2] - center[2]) * sp[2]) ** 2) <= radius ** 2
+-        patch &= feasible
+-        if not patch.any():
+-            continue
+-        prop = field.copy()
+-        prop[patch] *= -1
+-        m = _repair(problem, prop > 0, prop)
+-        prop = np.where(m, 1., -1.)
+-        try:
+-            canonicalize(problem, prop)
+-            val = float(score(problem, prop)["loss_total"])
+-        except Exception:
+-            continue
+-        if np.isfinite(val) and val < cur:
+-            field, cur = prop, val
+-            if val < best_l:
+-                best, best_l = prop.copy(), val
++    best, best_l = field.copy(), cur
++    search_start = time.monotonic()
++    span = max(deadline - search_start, 1e-6)
++    runs = max(int(N_RUNS), 1)
++    for i in range(runs):
++        run_deadline = search_start + span * (i + 1) / runs
++        rng = np.random.default_rng(int(seed) + int(SEED_OFFSET) + 1009 * i)
++        f, l = _search(problem, field, cur, rank, feasible, centers, coords,
++                       sp, length, run_deadline, rng, SCHEDULE)
++        if l < best_l:
++            best, best_l = f.copy(), l
+     try:
+         canonicalize(problem, best)
+         return best.astype(np.float64)
+     except Exception:
+-        return field.astype(np.float64)
++        return np.asarray(field, float)

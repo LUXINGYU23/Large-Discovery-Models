@@ -1,0 +1,30 @@
+--- f9663a709a42752068f2b4fce5817144edf66fc9edcf0c03018dfdfc747c42d2
+
++++ 50f40dac4332f32dbe2b564f542929910385f4bc5203977b1989bed75606cccd
+
+@@ -1,4 +1,4 @@
+
+-"""Copper v2 candidate: baseline-seeded objective-greedy patch refinement."""
++"""Copper v2 candidate 1: fast baseline-seeded objective-greedy patch refinement."""
+ import os
+ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+@@ -17,6 +17,7 @@
+
+ RADIUS_FRAC = 0.075
+ JITTER_LOW = 0.35
+ SCHEDULE = None
++SCALE_MIX = (0.05, 0.075, 0.105)
+ FAST = True
+ SEED_OFFSET = 0
+ N_RUNS = 1
+@@ -106,6 +107,8 @@
+
+         phase_end = phase_start + total * frac_end
+         while time.monotonic() < min(phase_end, deadline):
+             center = centers[rng.integers(len(centers))]
++            if SCALE_MIX is not None:
++                rfrac = float(SCALE_MIX[int(rng.integers(len(SCALE_MIX)))])
+             radius = max(float(sp.min()), length * rfrac * rng.uniform(JITTER_LOW, 1.0))
+             patch = (((coords[0] - center[0]) * sp[0]) ** 2 +
+                      ((coords[1] - center[1]) * sp[1]) ** 2 +

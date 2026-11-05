@@ -1,0 +1,293 @@
+{
+  "time": 1793148535.9321148,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "cases": 5394,
+      "complete": 106,
+      "charged": 113
+    },
+    {
+      "name": "acq-42",
+      "cases": 5413,
+      "complete": 108,
+      "charged": 113
+    },
+    {
+      "name": "mcmc-43",
+      "cases": 5370,
+      "complete": 101,
+      "charged": 113
+    },
+    {
+      "name": "acq-43",
+      "cases": 5374,
+      "complete": 100,
+      "charged": 113
+    },
+    {
+      "name": "mcmc-3407",
+      "cases": 5671,
+      "complete": 113,
+      "charged": 129
+    },
+    {
+      "name": "acq-3407",
+      "cases": 5438,
+      "complete": 113,
+      "charged": 129
+    }
+  ],
+  "failures": [
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-42/jobs/8ee8579dfa0ac4f39e074fa1feafd7a7424d5cbb65c043cade01a9ff6b461f11/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-3dfddd1095-8ee8579dfa0ac4f39e07",
+        "container_id": "d17f6a5c238493772319e41fe87edeaa93c7ea5b96a4539f01f3e99badd729f4",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "8ee8579dfa0ac4f39e074fa1feafd7a7424d5cbb65c043cade01a9ff6b461f11",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 90.045009,
+          "last_sample_unix": 1793138209.5697834,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 98799616,
+          "samples": 279,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 137.1887710094452,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 89.970464,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 98799616,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 128.67772058211267,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/77afcf7b63b56fa2671239a5e1db320838f184758e58fc3d6f49f7f11033e345/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-863607ad5d-77afcf7b63b56fa26712",
+        "container_id": "e82acea53a586a6dc035ed2c44fa7d8f8c916574fa2de8cfb417b74764e815ed",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "77afcf7b63b56fa2671239a5e1db320838f184758e58fc3d6f49f7f11033e345",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 90.18135,
+          "last_sample_unix": 1793138209.5271907,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 101695488,
+          "samples": 236,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 129.49002885818481,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 90.10948,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 101711872,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 121.05674989987165,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/a5faa56169fee284877c6496a9a599c23bbec65a6ba21a8554fd36a5a5f0447b/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-863607ad5d-a5faa56169fee284877c",
+        "container_id": "8a7bf822187c6c8500515676b3a7333278a46e0f16b447187fcc37ae8da08a93",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "a5faa56169fee284877c6496a9a599c23bbec65a6ba21a8554fd36a5a5f0447b",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 90.338812,
+          "last_sample_unix": 1793138209.5274756,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 99737600,
+          "samples": 228,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 130.0301718711853,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 90.16336,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 99971072,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 121.57816729322076,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/699c8026fabed191aa7e9a03c6889e340e1350c30c893725904997eb29bd99b1/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-d89f3696fa-699c8026fabed191aa7e",
+        "container_id": "12c83780f2a4566e50efba22cfdd038aee55f01cb0e4a3bd6d87d7f92cbbf560",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "699c8026fabed191aa7e9a03c6889e340e1350c30c893725904997eb29bd99b1",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 90.816656,
+          "last_sample_unix": 1793138202.4433784,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 99598336,
+          "samples": 261,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 138.46003198623657,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 90.78188,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 99778560,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 128.9164932956919,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/420e83f9bd46ebb3e42fb92801a986bcbed61053f7eccc3390547d572743f924/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-d89f3696fa-420e83f9bd46ebb3e42f",
+        "container_id": "8ddb4f151f4a06dc58090132c71e4124c6b83c7de26d7a270698b5aa4c4e5711",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "420e83f9bd46ebb3e42fb92801a986bcbed61053f7eccc3390547d572743f924",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 91.172344,
+          "last_sample_unix": 1793138202.4349625,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 100753408,
+          "samples": 276,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 140.07673716545105,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 91.145393,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 100986880,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 127.94034320954233,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/4b190eac2d359cf0bd3d90d68d36e2a42db3fba1e23d59aa4c79de40dd1fff29/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-d89f3696fa-4b190eac2d359cf0bd3d",
+        "container_id": "4e38be51b9a5d7c7e8c44f734ebab34002402befcba0dce410e88b1009e77ba4",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "4b190eac2d359cf0bd3d90d68d36e2a42db3fba1e23d59aa4c79de40dd1fff29",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 90.362968,
+          "last_sample_unix": 1793138202.4472554,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 99717120,
+          "samples": 275,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 138.9487280845642,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 90.324627,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 99717120,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 126.95682806614786,
+          "workload_complete": true
+        }
+      }
+    },
+    {
+      "path": "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-3407/jobs/383185aa7bcf3a0e7d9bdd8bc19b5e70abada544d248dc60fa3331032e81b1d4/receipt.json",
+      "receipt": {
+        "container": "ldm-copper-34e1279753-383185aa7bcf3a0e7d9b",
+        "container_id": "2987f2be47b41edf5bed9482dfc67290cf7d72f2215fe8c5c7e25c2aa8151bd0",
+        "cpus": 2,
+        "exit_code": 137,
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "key": "383185aa7bcf3a0e7d9bdd8bc19b5e70abada544d248dc60fa3331032e81b1d4",
+        "oom": false,
+        "reason": "timeout",
+        "resource_sampling": {
+          "complete_lifetime_measurement": false,
+          "cpu_seconds_observed": 89.923175,
+          "last_sample_unix": 1793138209.5968468,
+          "method": "host_cgroup_v2_polling",
+          "sampled_peak_memory_bytes": 99467264,
+          "samples": 237,
+          "target_interval_seconds": 0.2
+        },
+        "wall_seconds": 132.11416912078857,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 89.847534,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 99807232,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 120.0,
+          "worker_elapsed_seconds": 123.62332835327834,
+          "workload_complete": true
+        }
+      }
+    }
+  ],
+  "logs": {
+    "kernel": {
+      "lines": 1,
+      "soft_lockup": 0,
+      "deadline": 0
+    },
+    "docker": {
+      "lines": 864,
+      "soft_lockup": 0,
+      "deadline": 0
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "stage": "paused_scientific_audit",
+  "time": 1792853785.2815313,
+  "stopped_process_groups": 19,
+  "stopped_containers": 69,
+  "preserved_files": 10567,
+  "changed_preserved_files": [],
+  "failures": [
+    {
+      "group": "acq-42",
+      "side": "client",
+      "job": "fad404498aae82dcaa55467904eab3c67c09b15979dc3f5bdac966afa3194ec4",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.117779970169067
+    },
+    {
+      "group": "acq-43",
+      "side": "client",
+      "job": "62543e8ac04bd672d9b640ec3de33682b50d3087c17d9af479cfe02fb1d769be",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.300073862075806
+    },
+    {
+      "group": "mcmc-3407",
+      "side": "client",
+      "job": "e940bf584242c6f0110f7b4ff05c0fdf98ebe944ad3ee16e0fe25810238bc3ec",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.168730020523071
+    },
+    {
+      "group": "acq-3407",
+      "side": "client",
+      "job": "ca4af43d25fc427fa812783298c609d1222c46f85bc2833e3a8ea4e706925193",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.188509225845337
+    },
+    {
+      "group": "acq-42",
+      "side": "private",
+      "job": "6bc2af1cc3f10065f512d4f09c449944a0ed2239892b41b5e4a0f331950ed70b",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.075569868087769
+    },
+    {
+      "group": "acq-42",
+      "side": "private",
+      "job": "12e9abc3f61ac0ec56788efad820459c73365db1149c4febcedf00079ca62e84",
+      "exit_code": 1,
+      "reason": null,
+      "oom": false,
+      "wall_seconds": 87.74194884300232
+    },
+    {
+      "group": "acq-43",
+      "side": "private",
+      "job": "efeeac6a0182052388ce7d49fe5a430cee57760a3434caaa61b47a8403bcbb76",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.207334041595459
+    },
+    {
+      "group": "acq-3407",
+      "side": "private",
+      "job": "586adcebec854d8346471b49c29a24ebfe2fea7ff01fdce1339f23293d56230c",
+      "exit_code": 137,
+      "reason": "timeout",
+      "oom": false,
+      "wall_seconds": 8.164418935775757
+    }
+  ],
+  "fix_scope": "development only; reject fast-marching output whose sign mask differs from validated input; formal source unchanged",
+  "remaining": "interface timeout load qualification and new-version decision; no automatic resume"
+}

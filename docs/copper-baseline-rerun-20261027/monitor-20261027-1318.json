@@ -1,0 +1,188 @@
+{
+  "time": 1793078341.55367,
+  "stage": {
+    "stage": "training",
+    "updated_at": 1793078330.9629967,
+    "supervisor_pid": 757327,
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "load": {
+    "status": "passed",
+    "jobs": 1308,
+    "peak_active": 64,
+    "failures": []
+  },
+  "qualification": {
+    "status": "passed",
+    "private": {
+      "status": "passed",
+      "scope": "development_protocol_acceptance",
+      "charged_sources": 4,
+      "implementation_sha256": "3a91c7d3ce7bcf066cd6ffe0ccbd7ab2a79b75ce4533c9564848f920212819a8",
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "baseline_template_sha256": "316ac4e8e91007bf2d0baa787477ba5212b137422aecb04c9cad6221c8c9d436",
+      "accepted_sources": 3,
+      "rejected_sources": 1,
+      "solver_seconds": 120,
+      "replay_receipts_unchanged": true,
+      "budget_overflow_rejected": true,
+      "premature_test_rejected": true,
+      "sealed_training_rejected": true,
+      "formal_holdouts_accessed": false,
+      "receipt_count": 102
+    },
+    "load_jobs": 1308,
+    "peak": 64,
+    "template": "316ac4e8e91007bf2d0baa787477ba5212b137422aecb04c9cad6221c8c9d436"
+  },
+  "groups": {
+    "mcmc-42": {
+      "client_pid": 2831059,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.272731999999998,
+        "interface_cpu_seconds_through_reap": 24.777742,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 26.985578060150146
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.241770000000002,
+        "interface_cpu_seconds_through_reap": 24.82274,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.11378574371338
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 51.9,
+      "failures": []
+    },
+    "acq-42": {
+      "client_pid": 2831591,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.218871,
+        "interface_cpu_seconds_through_reap": 24.820819999999998,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.05152678489685
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.261080999999997,
+        "interface_cpu_seconds_through_reap": 24.866338,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.21847677230835
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 38.1,
+      "failures": []
+    },
+    "mcmc-43": {
+      "client_pid": 2832276,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.312105,
+        "interface_cpu_seconds_through_reap": 24.786089,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.04148292541504
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.310087,
+        "interface_cpu_seconds_through_reap": 24.892094,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.162691831588745
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 39.4,
+      "failures": []
+    },
+    "acq-43": {
+      "client_pid": 2833000,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.304114,
+        "interface_cpu_seconds_through_reap": 24.899516,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.263004064559937
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.259587,
+        "interface_cpu_seconds_through_reap": 24.824585000000003,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.068936824798584
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 25.0,
+      "failures": []
+    },
+    "mcmc-3407": {
+      "client_pid": 2833866,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.212546999999997,
+        "interface_cpu_seconds_through_reap": 24.790552,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 26.99459958076477
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.306976000000002,
+        "interface_cpu_seconds_through_reap": 24.900971999999996,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.14059615135193
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 24.5,
+      "failures": []
+    },
+    "acq-3407": {
+      "client_pid": 2834916,
+      "client_alive": true,
+      "service_alive": true,
+      "client_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.27482,
+        "interface_cpu_seconds_through_reap": 24.896824,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.256709337234497
+      },
+      "private_counters": {
+        "algorithm_feedback_slots": 1,
+        "interface_cpu_seconds_observed": 24.283101000000002,
+        "interface_cpu_seconds_through_reap": 24.881084,
+        "interface_jobs": 6,
+        "interface_wall_seconds": 27.201033115386963
+      },
+      "complete_candidates": 0,
+      "private_job_receipts": 6,
+      "latest_receipt_age_seconds": 25.5,
+      "failures": []
+    }
+  },
+  "paused": [],
+  "r3_preserved": 29,
+  "selection_started": false
+}

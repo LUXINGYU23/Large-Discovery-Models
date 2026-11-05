@@ -1,0 +1,36 @@
+{
+  "pid": 869697,
+  "source": "/Aidata/shared/ldm/copper-v2-development/source-tuning-service-suite-r1",
+  "started_unix": 1792828363.7309072,
+  "contract": {
+    "status": "ready",
+    "contract_digest": "08cd0f1396f7b856453e9c7d3fb750516aa54e1b3f0dbd624b7f0428f8f0f1cf",
+    "public_digest": "8bb09fba4533b50edd5f7723a032bb40fffc127ed288e8d994a48d181a055932",
+    "seconds": 10,
+    "slots": 5,
+    "used_slots": 0
+  },
+  "command": [
+    "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/source/tasks/copper_inversion/.venv/bin/python",
+    "-m",
+    "tasks.copper_inversion.experiments.v2.tune_stochastic",
+    "--public-catalog",
+    "/Aidata/shared/ldm/copper-v2-development/public-training-suite-r1/catalog.json",
+    "--evaluation-socket",
+    "/Aidata/shared/ldm/copper-v2-rpc-mcmc-r1/evaluator.sock",
+    "--evaluation-contract",
+    "08cd0f1396f7b856453e9c7d3fb750516aa54e1b3f0dbd624b7f0428f8f0f1cf",
+    "--evaluation-service-uid",
+    "991",
+    "--output",
+    "/Aidata/shared/ldm/copper-v2-development/runs/mcmc-service-tuning-r1",
+    "--method",
+    "mcmc_v2",
+    "--slots",
+    "5",
+    "--seed",
+    "47",
+    "--seconds",
+    "10"
+  ]
+}

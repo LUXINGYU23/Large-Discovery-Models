@@ -1,0 +1,10 @@
+{
+  "unique_complete_runs": 432,
+  "invalid": 0,
+  "acq_active": 144,
+  "acq_multiple_candidate_runs": 144,
+  "status": "passed",
+  "r3_control_hashes_preserved": 29,
+  "frozen_comparison_source_hashes": 9,
+  "frozen_baseline_configurations": 6
+}

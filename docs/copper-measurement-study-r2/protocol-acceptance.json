@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "scope": "development_protocol_acceptance",
+  "charged_sources": 4,
+  "accepted_sources": 3,
+  "rejected_sources": 1,
+  "solver_seconds": 120,
+  "replay_receipts_unchanged": true,
+  "budget_overflow_rejected": true,
+  "premature_test_rejected": true,
+  "sealed_training_rejected": true,
+  "formal_holdouts_accessed": false,
+  "receipt_count": 97,
+  "implementation_sha256": "d8876b5c6b855b7bbf2152ea028b19d031f2ae4d0b122717ff4310523b88f72f",
+  "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+  "all_qualification_outputs_legal": true,
+  "publication_verified": true
+}

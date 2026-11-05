@@ -1,0 +1,7 @@
+........................................................................ [ 34%]
+........................................................................ [ 69%]
+..s..s.........................................................          [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tasks/copper_inversion/tests/test_v2_public_catalog.py:45: remote integration suite required
+SKIPPED [1] tasks/copper_inversion/tests/test_v2_research.py:25: requires remote integration suite
+205 passed, 2 skipped in 114.86s (0:01:54)

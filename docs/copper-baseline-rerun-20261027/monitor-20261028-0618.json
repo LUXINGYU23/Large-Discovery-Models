@@ -1,0 +1,104 @@
+{
+  "time": 1793139530.4901888,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5378,
+      "completed_sources": 105,
+      "cases_last_10min": 0,
+      "latest_age": 1293.990275144577,
+      "charged": 113
+    },
+    {
+      "name": "acq-42",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5408,
+      "completed_sources": 108,
+      "cases_last_10min": 0,
+      "latest_age": 1415.1346983909607,
+      "charged": 113
+    },
+    {
+      "name": "mcmc-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5352,
+      "completed_sources": 98,
+      "cases_last_10min": 0,
+      "latest_age": 1295.003360748291,
+      "charged": 113
+    },
+    {
+      "name": "acq-43",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5366,
+      "completed_sources": 100,
+      "cases_last_10min": 0,
+      "latest_age": 1297.0272963047028,
+      "charged": 113
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5654,
+      "completed_sources": 113,
+      "cases_last_10min": 0,
+      "latest_age": 1296.2047595977783,
+      "charged": 129
+    },
+    {
+      "name": "acq-3407",
+      "alive": false,
+      "service_alive": true,
+      "cases": 5427,
+      "completed_sources": 113,
+      "cases_last_10min": 0,
+      "latest_age": 1437.4095816612244,
+      "charged": 129
+    }
+  ],
+  "failures": [
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-42/jobs/8ee8579dfa0ac4f39e074fa1feafd7a7424d5cbb65c043cade01a9ff6b461f11/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/77afcf7b63b56fa2671239a5e1db320838f184758e58fc3d6f49f7f11033e345/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/a5faa56169fee284877c6496a9a599c23bbec65a6ba21a8554fd36a5a5f0447b/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/699c8026fabed191aa7e9a03c6889e340e1350c30c893725904997eb29bd99b1/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/420e83f9bd46ebb3e42fb92801a986bcbed61053f7eccc3390547d572743f924/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/4b190eac2d359cf0bd3d90d68d36e2a42db3fba1e23d59aa4c79de40dd1fff29/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-3407/jobs/383185aa7bcf3a0e7d9bdd8bc19b5e70abada544d248dc60fa3331032e81b1d4/receipt.json"
+  ],
+  "new_failures": [
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/420e83f9bd46ebb3e42fb92801a986bcbed61053f7eccc3390547d572743f924/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/4b190eac2d359cf0bd3d90d68d36e2a42db3fba1e23d59aa4c79de40dd1fff29/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/acq-43/jobs/699c8026fabed191aa7e9a03c6889e340e1350c30c893725904997eb29bd99b1/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-3407/jobs/383185aa7bcf3a0e7d9bdd8bc19b5e70abada544d248dc60fa3331032e81b1d4/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-42/jobs/8ee8579dfa0ac4f39e074fa1feafd7a7424d5cbb65c043cade01a9ff6b461f11/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/77afcf7b63b56fa2671239a5e1db320838f184758e58fc3d6f49f7f11033e345/receipt.json",
+    "/Aidata/shared/ldm/copper-v2-evaluator/runs/copper-measurement-study-20261027-r4-baselines/mcmc-43/jobs/a5faa56169fee284877c6496a9a599c23bbec65a6ba21a8554fd36a5a5f0447b/receipt.json"
+  ],
+  "paused": [
+    "/Aidata/shared/ldm/copper-measurement-study-20261027-r4-baselines/queue/PAUSED.json",
+    "/Aidata/shared/ldm/copper-measurement-study-20261027-r4-baselines/queue/startup/PAUSED.json"
+  ],
+  "progress": {
+    "stage": "needs_attention",
+    "updated_at": 1793138216.7568834,
+    "supervisor_pid": 4010559,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-20261027-1623",
+    "error": "AssertionError: training client failed; reconciliation required"
+  },
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "host_load": [
+    18.857421875,
+    23.8369140625,
+    49.49853515625
+  ],
+  "cases_added": 191,
+  "cases_per_hour_since_previous": 397.9369284180085,
+  "controller_command": null
+}

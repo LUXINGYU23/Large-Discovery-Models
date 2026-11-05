@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "private": {
+    "status": "passed",
+    "scope": "development_protocol_acceptance",
+    "charged_sources": 4,
+    "implementation_sha256": "3a91c7d3ce7bcf066cd6ffe0ccbd7ab2a79b75ce4533c9564848f920212819a8",
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "baseline_template_sha256": "316ac4e8e91007bf2d0baa787477ba5212b137422aecb04c9cad6221c8c9d436",
+    "accepted_sources": 3,
+    "rejected_sources": 1,
+    "solver_seconds": 120,
+    "replay_receipts_unchanged": true,
+    "budget_overflow_rejected": true,
+    "premature_test_rejected": true,
+    "sealed_training_rejected": true,
+    "formal_holdouts_accessed": false,
+    "receipt_count": 102
+  },
+  "load_jobs": 1308,
+  "peak": 64,
+  "template": "316ac4e8e91007bf2d0baa787477ba5212b137422aecb04c9cad6221c8c9d436"
+}

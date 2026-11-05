@@ -1,0 +1,454 @@
+[
+  {
+    "case": "drillholes_3d",
+    "method": "paper_mcmc",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "2c40bdb0ef242b7cc3dddf48f487064aa68d27e1e833c032e3099e5e4485d984",
+    "origin": {
+      "adapter": "paper_mcmc",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      220.3399448391901,
+      151.5253373948378,
+      172.347528627309
+    ],
+    "mean_loss": 181.4042702871123,
+    "std_loss": 35.28995574592563,
+    "wall_seconds": [
+      112.978196144104,
+      112.87169694900513,
+      112.19688510894775
+    ],
+    "mean_seconds": 112.68225940068562,
+    "std_seconds": 0.42370587905905854
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "MCMC",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "c2e7fc092e51ac890916924fa51c69f2975518090c1726ed080a02839bf4a1ea",
+    "origin": {
+      "adapter": "MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      220.3399448391901,
+      151.5253373948378,
+      172.347528627309
+    ],
+    "mean_loss": 181.4042702871123,
+    "std_loss": 35.28995574592563,
+    "wall_seconds": [
+      113.16495490074158,
+      113.2515058517456,
+      112.24805402755737
+    ],
+    "mean_seconds": 112.88817159334819,
+    "std_seconds": 0.5560446387704782
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ACQ_warmup30",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "3a7fc098ecebb82abddb8543fbba33f8a191fbdd9031e2b496da628b63e233b8",
+    "origin": {
+      "adapter": "ACQ_MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      353.6981427308057,
+      319.3949007942438,
+      320.5772322309012
+    ],
+    "mean_loss": 331.2234252519836,
+    "std_loss": 19.472651879525355,
+    "wall_seconds": [
+      114.57139301300049,
+      117.34732699394226,
+      115.93237614631653
+    ],
+    "mean_seconds": 115.95036538441975,
+    "std_seconds": 1.3880544211782404
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "paper_mcmc",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "2c40bdb0ef242b7cc3dddf48f487064aa68d27e1e833c032e3099e5e4485d984",
+    "origin": {
+      "adapter": "paper_mcmc",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      724.335156638055,
+      527.340581451676,
+      565.0101756711779
+    ],
+    "mean_loss": 605.5619712536363,
+    "std_loss": 104.57079782107716,
+    "wall_seconds": [
+      112.92466115951538,
+      113.1666829586029,
+      112.04620504379272
+    ],
+    "mean_seconds": 112.71251638730367,
+    "std_seconds": 0.5895945578759285
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "MCMC",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "c2e7fc092e51ac890916924fa51c69f2975518090c1726ed080a02839bf4a1ea",
+    "origin": {
+      "adapter": "MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      724.335156638055,
+      527.340581451676,
+      565.0101756711779
+    ],
+    "mean_loss": 605.5619712536363,
+    "std_loss": 104.57079782107716,
+    "wall_seconds": [
+      111.3615071773529,
+      111.36735010147095,
+      112.52942395210266
+    ],
+    "mean_seconds": 111.75276041030884,
+    "std_seconds": 0.6726167019962831
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ACQ_warmup30",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-v2",
+    "source_sha256": "3a7fc098ecebb82abddb8543fbba33f8a191fbdd9031e2b496da628b63e233b8",
+    "origin": {
+      "adapter": "ACQ_MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      1109.510045140377,
+      1094.485534070002,
+      1014.2527288581451
+    ],
+    "mean_loss": 1072.7494360228413,
+    "std_loss": 51.21359726732857,
+    "wall_seconds": [
+      114.38445901870728,
+      115.33862900733948,
+      115.53512692451477
+    ],
+    "mean_seconds": 115.08607165018718,
+    "std_seconds": 0.6155063536249391
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ACQ_warmup4",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-acq-warmup4",
+    "source_sha256": "58d81cdc82bd9d067b1265db5f7f6f9b62c24e6eb6c84b716ea8e47d7d44d566",
+    "origin": {
+      "adapter": "ACQ_MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      150.14530975719407,
+      287.7942706295215,
+      352.5181641792417
+    ],
+    "mean_loss": 263.4859148553191,
+    "std_loss": 103.35310915529209,
+    "wall_seconds": [
+      114.72868800163269,
+      115.29023289680481,
+      115.83062195777893
+    ],
+    "mean_seconds": 115.28318095207214,
+    "std_seconds": 0.5510008242919519
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ACQ_warmup4",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-acq-warmup4",
+    "source_sha256": "58d81cdc82bd9d067b1265db5f7f6f9b62c24e6eb6c84b716ea8e47d7d44d566",
+    "origin": {
+      "adapter": "ACQ_MCMC",
+      "query_cap": 1000
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      503.42346568779044,
+      1038.6849779985262,
+      1070.4755087534422
+    ],
+    "mean_loss": 870.8613174799196,
+    "std_loss": 318.6072671152226,
+    "wall_seconds": [
+      114.44255089759827,
+      115.5697808265686,
+      115.45111513137817
+    ],
+    "mean_seconds": 115.15448228518169,
+    "std_seconds": 0.6193989927934914
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "ast",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421",
+    "origin": {
+      "historical_loss": 6.514410006112401,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_ast",
+      "selected": "8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421",
+      "selection_evaluations": 81,
+      "selection_round": 20
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      6.514409870030431,
+      6.514476976068047,
+      6.514523618798026
+    ],
+    "mean_loss": 6.514470154965501,
+    "std_loss": 5.7180338511280196e-05,
+    "wall_seconds": [
+      116.3447048664093,
+      116.34592294692993,
+      116.3534460067749
+    ],
+    "mean_seconds": 116.34802460670471,
+    "std_seconds": 0.00473440746867864
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "qwen",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "e295b4d7e0ec24edfc01401ac3fe55fa179940515e9855c45b69d85de5be327d",
+    "origin": {
+      "historical_loss": 6.514886964120364,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_qwen",
+      "selected": "e295b4d7e0ec24edfc01401ac3fe55fa179940515e9855c45b69d85de5be327d",
+      "selection_evaluations": 81,
+      "selection_round": 20
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      6.5149819772406525,
+      6.5149819772406525,
+      6.5149819772406525
+    ],
+    "mean_loss": 6.5149819772406525,
+    "std_loss": 0.0,
+    "wall_seconds": [
+      96.24424195289612,
+      96.2232551574707,
+      96.24184608459473
+    ],
+    "mean_seconds": 96.23644773165385,
+    "std_seconds": 0.011487735042764704
+  },
+  {
+    "case": "drillholes_3d",
+    "method": "fusion",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "b1c0ca0bc969701c1bb70c78b04562e113bd34b3994ba4e5766cb7cff191ac9c",
+    "origin": {
+      "historical_loss": 6.514815230760057,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion",
+      "selected": "b1c0ca0bc969701c1bb70c78b04562e113bd34b3994ba4e5766cb7cff191ac9c",
+      "selection_evaluations": 77,
+      "selection_round": 19
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      6.514815230760057,
+      6.514815230760057,
+      6.514815230760057
+    ],
+    "mean_loss": 6.514815230760057,
+    "std_loss": 0.0,
+    "wall_seconds": [
+      118.80084419250488,
+      118.81861996650696,
+      118.8126368522644
+    ],
+    "mean_seconds": 118.81070033709209,
+    "std_seconds": 0.009044727945200441
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "ast",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "94d89464d74b9c1ccb8ef313d345ef5aa5d3e79c0ffaa106faaf20e3baa3b3bd",
+    "origin": {
+      "historical_loss": 32.706691563452694,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_ast",
+      "selected": "94d89464d74b9c1ccb8ef313d345ef5aa5d3e79c0ffaa106faaf20e3baa3b3bd",
+      "selection_evaluations": 81,
+      "selection_round": 20
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      32.70546337151758,
+      32.70546337151758,
+      32.70709418602985
+    ],
+    "mean_loss": 32.706006976355006,
+    "std_loss": 0.000941551197656206,
+    "wall_seconds": [
+      98.5365538597107,
+      98.52539086341858,
+      98.52423286437988
+    ],
+    "mean_seconds": 98.52872586250305,
+    "std_seconds": 0.006803925018365423
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "qwen",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f",
+    "origin": {
+      "historical_loss": 32.3764701149274,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_qwen",
+      "selected": "c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f",
+      "selection_evaluations": 81,
+      "selection_round": 20
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      32.37604518562466,
+      32.3764701149274,
+      32.3764701149274
+    ],
+    "mean_loss": 32.37632847182649,
+    "std_loss": 0.0002453330473226441,
+    "wall_seconds": [
+      95.5238151550293,
+      95.52632308006287,
+      95.53446698188782
+    ],
+    "mean_seconds": 95.52820173899333,
+    "std_seconds": 0.005568875415083756
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "method": "fusion",
+    "root": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search",
+    "source_sha256": "9c9f79d69787b130196832d2078edaffa4a94dae91a3aa6c021e066d8f903930",
+    "origin": {
+      "historical_loss": 32.82798360375176,
+      "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_fusion",
+      "selected": "9c9f79d69787b130196832d2078edaffa4a94dae91a3aa6c021e066d8f903930",
+      "selection_evaluations": 81,
+      "selection_round": 20
+    },
+    "seeds": [
+      47,
+      48,
+      49
+    ],
+    "successful": 3,
+    "attempts": 3,
+    "losses": [
+      32.82798360375176,
+      32.82798360375176,
+      32.82798360375176
+    ],
+    "mean_loss": 32.82798360375176,
+    "std_loss": 0.0,
+    "wall_seconds": [
+      114.56615495681763,
+      114.56568598747253,
+      114.58928513526917
+    ],
+    "mean_seconds": 114.57370869318645,
+    "std_seconds": 0.013491632370805869
+  }
+]

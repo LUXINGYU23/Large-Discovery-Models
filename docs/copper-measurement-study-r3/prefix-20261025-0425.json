@@ -1,0 +1,86 @@
+{
+  "time": 1792873487.6846225,
+  "charged_prefix": 15,
+  "complete_prefixes": {
+    "acq-3407": 17,
+    "acq-42": 17,
+    "acq-43": 17,
+    "ldm-3407": 15,
+    "ldm-42": 25,
+    "ldm-43": 17,
+    "mcmc-3407": 17,
+    "mcmc-42": 17,
+    "mcmc-43": 17
+  },
+  "note": "Conservative original-order prefix; stop at missing/unmapped rejection. Training only; discovery overhead excluded from solver times.",
+  "groups": {
+    "acq-3407": {
+      "best_loss": 0.425881806168228,
+      "best_mean_solver_seconds": 92.24590813120206,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "acq-42": {
+      "best_loss": 0.4161154582364217,
+      "best_mean_solver_seconds": 92.16949811081092,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "acq-43": {
+      "best_loss": 0.4258949406261381,
+      "best_mean_solver_seconds": 92.22481932242711,
+      "successful_sources": 14,
+      "rejected_sources": 1
+    },
+    "ldm-3407": {
+      "best_loss": 0.4949157629240798,
+      "best_mean_solver_seconds": 6.439847315351169,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "ldm-42": {
+      "best_loss": 0.4051005170650064,
+      "best_mean_solver_seconds": 91.1016815205415,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "ldm-43": {
+      "best_loss": 0.47265079798132403,
+      "best_mean_solver_seconds": 94.82811843852203,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "mcmc-3407": {
+      "best_loss": 0.4252149479120083,
+      "best_mean_solver_seconds": 92.24835450947285,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "mcmc-42": {
+      "best_loss": 0.4161185622348814,
+      "best_mean_solver_seconds": 92.2475213110447,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    },
+    "mcmc-43": {
+      "best_loss": 0.42602756336287195,
+      "best_mean_solver_seconds": 92.22489840785663,
+      "successful_sources": 15,
+      "rejected_sources": 0
+    }
+  },
+  "method_summary": {
+    "ldm": {
+      "mean": 0.4575556926568034,
+      "sample_sd": 0.04677169283605447
+    },
+    "mcmc": {
+      "mean": 0.42245369116992054,
+      "sample_sd": 0.005501407086866343
+    },
+    "acq": {
+      "mean": 0.4226307350102626,
+      "sample_sd": 0.005642399020656826
+    }
+  }
+}

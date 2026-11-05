@@ -1,0 +1,270 @@
+{
+  "schema": "copper-contract-calibration-v1",
+  "status": "passed",
+  "criteria": {
+    "max_contact_error_in_effective_scale": 2.0,
+    "max_clean_label_error_away_from_interface": 0.01,
+    "unit_conversion_absolute_tolerance": 1e-09,
+    "forbidden_positive_must_reject": true
+  },
+  "rows": [
+    {
+      "family": "sphere",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.3014970187532603,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 1.0408340855860843e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "thin_slab",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.5773502691896258,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "oblique_slab",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.4075023281851025,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 1.0408340855860843e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "faulted_slab",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 144,
+      "max_contact_error_in_effective_scale": 0.5773502691896258,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "open_boundary",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "terrain_clipped",
+      "spacing": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "contacts": 123,
+      "max_contact_error_in_effective_scale": 0.5773502691896258,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "sphere",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.29509490722355447,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 5.204170427930421e-18,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "thin_slab",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "oblique_slab",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.28481417715255997,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 1.0408340855860843e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "faulted_slab",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 217,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "open_boundary",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "terrain_clipped",
+      "spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contacts": 146,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "sphere",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.34435889018617793,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 2.0816681711721685e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "thin_slab",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.7427813527082074,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "oblique_slab",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.2646444242649827,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 1.9081958235744878e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "faulted_slab",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 147,
+      "max_contact_error_in_effective_scale": 0.7427813527082074,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "open_boundary",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 300,
+      "max_contact_error_in_effective_scale": 0.0,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 0.0,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    },
+    {
+      "family": "terrain_clipped",
+      "spacing": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "contacts": 132,
+      "max_contact_error_in_effective_scale": 0.7427813527082074,
+      "clean_label_error_away_from_interface": 0.0,
+      "unit_conversion_error": 5.551115123125783e-17,
+      "forbidden_positive_rejected": true,
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Empirical numerical contract checks, not geological validation",
+    "Thin bodies below three coarse voxels are not qualified",
+    "Axis-face area is excluded from the objective; no isotropic surface-area claim",
+    "Independent population and hidden-data audits remain required"
+  ]
+}

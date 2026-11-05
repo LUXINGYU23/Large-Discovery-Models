@@ -1,0 +1,1054 @@
+[
+  {
+    "case": "drillholes_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07746277659608242,
+        "air_positive_volume": 2440.0,
+        "air_positive_voxels": 2440,
+        "contact_rmse": 2.792090955761156,
+        "label_mismatches": 6,
+        "loss_drillhole": 27.29626664826403,
+        "loss_total": 27.29626664826403,
+        "positive_volume": 31499.0,
+        "positive_voxels": 31499,
+        "research_utility": -27.29626664826403
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07746277659608242,
+        "air_positive_volume": 2440.0,
+        "air_positive_voxels": 2440,
+        "contact_rmse": 4.864184857274603,
+        "label_mismatches": 3,
+        "loss_drillhole": 56.169904144445226,
+        "loss_total": 56.169904144445226,
+        "positive_volume": 31499.0,
+        "positive_voxels": 31499,
+        "research_utility": -56.169904144445226
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      13
+    ],
+    "method": "ast",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_3d/hole_0/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-a64c329582-d7af206f5432f238c96d",
+      "container_id": "e95990560cc80217008ad1b4b47898a3403acc624abe432159219c9c1a270832",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "d7af206f5432f238c96dd8cabd8def782697ba14cc46ab1bbe999671779d4192",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.061261,
+        "last_sample_unix": 1792818679.7092729,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7462912,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.5359718799591064,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.179816,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 32866304,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_0",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07746277659608242,
+        "air_positive_volume": 2440.0,
+        "air_positive_voxels": 2440,
+        "contact_rmse": 1.583539631672604,
+        "label_mismatches": 3,
+        "loss_drillhole": 10.47674907309793,
+        "loss_total": 10.47674907309793,
+        "positive_volume": 31499.0,
+        "positive_voxels": 31499,
+        "research_utility": -10.47674907309793
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.08137655997524668,
+        "air_positive_volume": 2367.0,
+        "air_positive_voxels": 2367,
+        "contact_rmse": 2.1912389172700437,
+        "label_mismatches": 5,
+        "loss_drillhole": 19.312790897387433,
+        "loss_total": 19.312790897387433,
+        "positive_volume": 29087.0,
+        "positive_voxels": 29087,
+        "research_utility": -19.312790897387433
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.08137655997524668,
+        "air_positive_volume": 2367.0,
+        "air_positive_voxels": 2367,
+        "contact_rmse": 0.7639442025704513,
+        "label_mismatches": 0,
+        "loss_drillhole": 2.802317256236922,
+        "loss_total": 2.802317256236922,
+        "positive_volume": 29087.0,
+        "positive_voxels": 29087,
+        "research_utility": -2.802317256236922
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      19
+    ],
+    "method": "ast",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_3d/hole_1/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-cb690ed960-c416c59ae58f22ef5399",
+      "container_id": "e1a98be10be8b5961429c0fc5e73cf1c6467aaca6be0d7409f5d8cf2a69cc147",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "c416c59ae58f22ef53994dba7ad5a56d3f4b08717e4d1576f227045cb41817d7",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.062264,
+        "last_sample_unix": 1792818679.6919363,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7094272,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.5245740413665771,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.186504,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 32931840,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_1",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.08137655997524668,
+        "air_positive_volume": 2367.0,
+        "air_positive_voxels": 2367,
+        "contact_rmse": 2.491485582645701,
+        "label_mismatches": 5,
+        "loss_drillhole": 19.09688551898063,
+        "loss_total": 19.09688551898063,
+        "positive_volume": 29087.0,
+        "positive_voxels": 29087,
+        "research_utility": -19.09688551898063
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07321137223591488,
+        "air_positive_volume": 2109.0,
+        "air_positive_voxels": 2109,
+        "contact_rmse": 2.454250322333443,
+        "label_mismatches": 6,
+        "loss_drillhole": 24.02765515363979,
+        "loss_total": 24.02765515363979,
+        "positive_volume": 28807.0,
+        "positive_voxels": 28807,
+        "research_utility": -24.02765515363979
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07321137223591488,
+        "air_positive_volume": 2109.0,
+        "air_positive_voxels": 2109,
+        "contact_rmse": 0.49848963308414124,
+        "label_mismatches": 0,
+        "loss_drillhole": 2.552125054322852,
+        "loss_total": 2.552125054322852,
+        "positive_volume": 28807.0,
+        "positive_voxels": 28807,
+        "research_utility": -2.552125054322852
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      16
+    ],
+    "method": "ast",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_3d/hole_2/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-beda80e1b0-9d625e843e0b8284a2cb",
+      "container_id": "6fcec95cbc79cd3c65d8170c2fc5f437d65bf46d0ed82352ea876edc5fc71e50",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "9d625e843e0b8284a2cbccaca2635d74255360747ef6f7d6459fc8e0030c109c",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.064365,
+        "last_sample_unix": 1792818683.0574865,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 6950912,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.5288419723510742,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.189632,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 32772096,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_2",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07321137223591488,
+        "air_positive_volume": 2109.0,
+        "air_positive_voxels": 2109,
+        "contact_rmse": 2.81927216756399,
+        "label_mismatches": 6,
+        "loss_drillhole": 23.925364365026482,
+        "loss_total": 23.925364365026482,
+        "positive_volume": 28807.0,
+        "positive_voxels": 28807,
+        "research_utility": -23.925364365026482
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07588,
+        "air_positive_volume": 1897.0,
+        "air_positive_voxels": 1897,
+        "contact_rmse": 0.9646881227333626,
+        "label_mismatches": 1,
+        "loss_drillhole": 9.491533033282431,
+        "loss_total": 9.491533033282431,
+        "positive_volume": 25000.0,
+        "positive_voxels": 25000,
+        "research_utility": -9.491533033282431
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07588,
+        "air_positive_volume": 1897.0,
+        "air_positive_voxels": 1897,
+        "contact_rmse": 1.272242157924955,
+        "label_mismatches": 1,
+        "loss_drillhole": 6.44640997320582,
+        "loss_total": 6.44640997320582,
+        "positive_volume": 25000.0,
+        "positive_voxels": 25000,
+        "research_utility": -6.44640997320582
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      22
+    ],
+    "method": "ast",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_3d/hole_3/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-6a4d6e83e3-de7e8efde4134a09e4ff",
+      "container_id": "46f6bd0f15dc888b5a565ffe92871199474075a317db24899cec191773e1437c",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "de7e8efde4134a09e4fffc84c9ba5ed589fa9a239f02ae9b7661ec692b71ecc0",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 0.060777,
+        "last_sample_unix": 1792818683.0729773,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 7942144,
+        "samples": 1,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 0.5411710739135742,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 0.184032,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 33705984,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_3",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.07588,
+        "air_positive_volume": 1897.0,
+        "air_positive_voxels": 1897,
+        "contact_rmse": 0.8374350896576465,
+        "label_mismatches": 0,
+        "loss_drillhole": 6.253910107154921,
+        "loss_total": 6.253910107154921,
+        "positive_volume": 25000.0,
+        "positive_voxels": 25000,
+        "research_utility": -6.253910107154921
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019514203375874846,
+        "air_positive_volume": 237.0,
+        "air_positive_voxels": 237,
+        "contact_rmse": 1.142803090119955,
+        "label_mismatches": 36,
+        "loss_drillhole": 24.542887266542248,
+        "loss_outcrop": 24.846255534998676,
+        "loss_total": 49.38914280154093,
+        "positive_volume": 12145.0,
+        "positive_voxels": 12145,
+        "research_utility": -49.38914280154093
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019514203375874846,
+        "air_positive_volume": 237.0,
+        "air_positive_voxels": 237,
+        "contact_rmse": 3.773958434942276,
+        "label_mismatches": 3,
+        "loss_drillhole": 43.16559779357009,
+        "loss_outcrop": 0.0,
+        "loss_total": 43.16559779357009,
+        "positive_volume": 12145.0,
+        "positive_voxels": 12145,
+        "research_utility": -43.16559779357009
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      13,
+      0
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/hole_0/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-e6323000fd-c8f6d49c454d3a2f917d",
+      "container_id": "080ed3fc6f6b7eef71234a472b3f2af2f9f7650fb5fedb6816da88e05db0a4e0",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "c8f6d49c454d3a2f917d43ccd94bc8cc08dc5d962fbda436ed7cf18f920712ab",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.146583,
+        "last_sample_unix": 1792818781.2657611,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46796800,
+        "samples": 430,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.61247706413269,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.265587,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 46948352,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_0",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019514203375874846,
+        "air_positive_volume": 237.0,
+        "air_positive_voxels": 237,
+        "contact_rmse": 0.9273098804115867,
+        "label_mismatches": 33,
+        "loss_drillhole": 5.113875371308528,
+        "loss_outcrop": 24.846255534998676,
+        "loss_total": 29.960130906307203,
+        "positive_volume": 12145.0,
+        "positive_voxels": 12145,
+        "research_utility": -29.960130906307203
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02855194749850848,
+        "air_positive_volume": 335.0,
+        "air_positive_voxels": 335,
+        "contact_rmse": 0.942196260704588,
+        "label_mismatches": 37,
+        "loss_drillhole": 10.792580280277898,
+        "loss_outcrop": 24.872390268422294,
+        "loss_total": 35.66497054870019,
+        "positive_volume": 11733.0,
+        "positive_voxels": 11733,
+        "research_utility": -35.66497054870019
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02855194749850848,
+        "air_positive_volume": 335.0,
+        "air_positive_voxels": 335,
+        "contact_rmse": 1.3455465246880007,
+        "label_mismatches": 3,
+        "loss_drillhole": 7.949830827057933,
+        "loss_outcrop": 0.0,
+        "loss_total": 7.949830827057933,
+        "positive_volume": 11733.0,
+        "positive_voxels": 11733,
+        "research_utility": -7.949830827057933
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      19,
+      0
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/hole_1/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-2186b8f412-e092aa02b0f6e66b6372",
+      "container_id": "577300dcd9fb08850091bbfaa8587b7835b5265c8be0839ae51332619b5a2160",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "e092aa02b0f6e66b637207966be4b3bf608cca704e0e2a19b2b2a40c86a8992b",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.133711,
+        "last_sample_unix": 1792818781.2667425,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46776320,
+        "samples": 430,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.60288000106812,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.262711,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47190016,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_1",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02855194749850848,
+        "air_positive_volume": 335.0,
+        "air_positive_voxels": 335,
+        "contact_rmse": 0.9251564333793219,
+        "label_mismatches": 34,
+        "loss_drillhole": 5.819220475823196,
+        "loss_outcrop": 24.872390268422294,
+        "loss_total": 30.691610744245487,
+        "positive_volume": 11733.0,
+        "positive_voxels": 11733,
+        "research_utility": -30.691610744245487
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.009008163648306278,
+        "air_positive_volume": 96.0,
+        "air_positive_voxels": 96,
+        "contact_rmse": 1.1286036717355326,
+        "label_mismatches": 36,
+        "loss_drillhole": 16.105618673395192,
+        "loss_outcrop": 24.871552276401918,
+        "loss_total": 40.97717094979711,
+        "positive_volume": 10657.0,
+        "positive_voxels": 10657,
+        "research_utility": -40.97717094979711
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.009008163648306278,
+        "air_positive_volume": 96.0,
+        "air_positive_voxels": 96,
+        "contact_rmse": 3.663404743905061,
+        "label_mismatches": 2,
+        "loss_drillhole": 32.528957122977,
+        "loss_outcrop": 0.0,
+        "loss_total": 32.528957122977,
+        "positive_volume": 10657.0,
+        "positive_voxels": 10657,
+        "research_utility": -32.528957122977
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      16,
+      0
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/hole_2/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-7cea4f538e-c23e064d903f3f9027ac",
+      "container_id": "33e1bf8180e1fff10959e83e6b05ae55f3eccda7a914456105ce98529880a128",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "c23e064d903f3f9027ac22423349b4509d3e03071c4e3f0197e297449fe563a5",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.221667,
+        "last_sample_unix": 1792818879.347973,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46833664,
+        "samples": 432,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.53815507888794,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.277659,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47185920,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_2",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.009008163648306278,
+        "air_positive_volume": 96.0,
+        "air_positive_voxels": 96,
+        "contact_rmse": 0.9246034213796498,
+        "label_mismatches": 34,
+        "loss_drillhole": 5.962217182686616,
+        "loss_outcrop": 24.871552276401918,
+        "loss_total": 30.833769459088533,
+        "positive_volume": 10657.0,
+        "positive_voxels": 10657,
+        "research_utility": -30.833769459088533
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.024851206014409523,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.9227927807427169,
+        "label_mismatches": 34,
+        "loss_drillhole": 8.56153457476708,
+        "loss_outcrop": 24.87139549222323,
+        "loss_total": 33.43293006699031,
+        "positive_volume": 9577.0,
+        "positive_voxels": 9577,
+        "research_utility": -33.43293006699031
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.024851206014409523,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.7918381613192975,
+        "label_mismatches": 0,
+        "loss_drillhole": 3.9856752611843684,
+        "loss_outcrop": 0.0,
+        "loss_total": 3.9856752611843684,
+        "positive_volume": 9577.0,
+        "positive_voxels": 9577,
+        "research_utility": -3.9856752611843684
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      22,
+      0
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/hole_3/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-84f607b01a-29f8d61cb2ca082cee18",
+      "container_id": "d593c3b266e11e867cea4625fe636b8ba04e4d7f18d1deb39ca3976c0e0b2ee3",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "29f8d61cb2ca082cee186b8e002746a21f346ce0c5424bc20137a9e2faddf983",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.120041,
+        "last_sample_unix": 1792818879.494977,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46960640,
+        "samples": 430,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.52987790107727,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.265045,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 47251456,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "hole_3",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.024851206014409523,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.9269785514760931,
+        "label_mismatches": 34,
+        "loss_drillhole": 5.736655117414983,
+        "loss_outcrop": 24.87139549222323,
+        "loss_total": 30.608050609638212,
+        "positive_volume": 9577.0,
+        "positive_voxels": 9577,
+        "research_utility": -30.608050609638212
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.01965642550379914,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.9497783692275624,
+        "label_mismatches": 55,
+        "loss_drillhole": 7.496343295465739,
+        "loss_outcrop": 27.893443005299076,
+        "loss_total": 35.38978630076482,
+        "positive_volume": 12108.0,
+        "positive_voxels": 12108,
+        "research_utility": -35.38978630076482
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.01965642550379914,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 1.140415574477308,
+        "label_mismatches": 25,
+        "loss_drillhole": 0.0,
+        "loss_outcrop": 5.9203878205982345,
+        "loss_total": 5.9203878205982345,
+        "positive_volume": 12108.0,
+        "positive_voxels": 12108,
+        "research_utility": -5.9203878205982345
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      0,
+      628
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/spatial_quadrant_0/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-c18f2a9ea5-94b7ea7278acbb99ec01",
+      "container_id": "379326cfbfed4bcc0ad8f33d8534bb3ae5dfa28bafbd32063c92b965f8f0bbcf",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "94b7ea7278acbb99ec01930087f7fe79603073eef42a0ebcf04b75f3653f568b",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.082432,
+        "last_sample_unix": 1792818977.147067,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46542848,
+        "samples": 432,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.5095899105072,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.257431,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 46542848,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "spatial_quadrant_0",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.01965642550379914,
+        "air_positive_volume": 238.0,
+        "air_positive_voxels": 238,
+        "contact_rmse": 0.9169384215029299,
+        "label_mismatches": 30,
+        "loss_drillhole": 7.496343295465739,
+        "loss_outcrop": 22.126311277421358,
+        "loss_total": 29.622654572887097,
+        "positive_volume": 12108.0,
+        "positive_voxels": 12108,
+        "research_utility": -29.622654572887097
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.021819834835972423,
+        "air_positive_volume": 288.0,
+        "air_positive_voxels": 288,
+        "contact_rmse": 1.1469241808238175,
+        "label_mismatches": 61,
+        "loss_drillhole": 22.168110241131526,
+        "loss_outcrop": 28.039197000891207,
+        "loss_total": 50.207307242022736,
+        "positive_volume": 13199.0,
+        "positive_voxels": 13199,
+        "research_utility": -50.207307242022736
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.021819834835972423,
+        "air_positive_volume": 288.0,
+        "air_positive_voxels": 288,
+        "contact_rmse": 1.9062249677945802,
+        "label_mismatches": 30,
+        "loss_drillhole": 34.05438535052381,
+        "loss_outcrop": 8.018641649836928,
+        "loss_total": 42.07302700036074,
+        "positive_volume": 13199.0,
+        "positive_voxels": 13199,
+        "research_utility": -42.07302700036074
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      13,
+      887
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/spatial_quadrant_1/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-98b7e215d0-cf99b4faf236a601cb53",
+      "container_id": "a67b74533f2f1f10632b25ed81595b811079c2205e5d64f65b3a477f91482dfc",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "cf99b4faf236a601cb539a565fe5c1b9de986382616beba4f26e66f4d9afb272",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.120445,
+        "last_sample_unix": 1792818977.3669238,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46694400,
+        "samples": 432,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.54232597351074,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.254444,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 46821376,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "spatial_quadrant_1",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.021819834835972423,
+        "air_positive_volume": 288.0,
+        "air_positive_voxels": 288,
+        "contact_rmse": 0.922921105133788,
+        "label_mismatches": 31,
+        "loss_drillhole": 5.113771597008505,
+        "loss_outcrop": 20.32951727877085,
+        "loss_total": 25.443288875779356,
+        "positive_volume": 13199.0,
+        "positive_voxels": 13199,
+        "research_utility": -25.443288875779356
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019050642959199872,
+        "air_positive_volume": 240.0,
+        "air_positive_voxels": 240,
+        "contact_rmse": 2.8280849523624356,
+        "label_mismatches": 260,
+        "loss_drillhole": 8.381852081533156,
+        "loss_outcrop": 107.00053580776049,
+        "loss_total": 115.38238788929364,
+        "positive_volume": 12598.0,
+        "positive_voxels": 12598,
+        "research_utility": -115.38238788929364
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019050642959199872,
+        "air_positive_volume": 240.0,
+        "air_positive_voxels": 240,
+        "contact_rmse": 4.694249767017301,
+        "label_mismatches": 240,
+        "loss_drillhole": 3.7354110772343123,
+        "loss_outcrop": 93.29382726821325,
+        "loss_total": 97.02923834544757,
+        "positive_volume": 12598.0,
+        "positive_voxels": 12598,
+        "research_utility": -97.02923834544757
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      22,
+      960
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/spatial_quadrant_2/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-d815e34b43-17817cfad11aa48c7e8d",
+      "container_id": "8ec491180d36d760372c901612362fee40c0ec7588e0173f85d9349e3c0741b9",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "17817cfad11aa48c7e8d30fc472e4ac7a282d9b35ac5532f8188ed66cdcbcdfa",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.079018,
+        "last_sample_unix": 1792819075.0179157,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46448640,
+        "samples": 432,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.52260613441467,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.256004,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 46448640,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "spatial_quadrant_2",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.019050642959199872,
+        "air_positive_volume": 240.0,
+        "air_positive_voxels": 240,
+        "contact_rmse": 0.9894980086373439,
+        "label_mismatches": 20,
+        "loss_drillhole": 5.735465421303661,
+        "loss_outcrop": 16.510393114582207,
+        "loss_total": 22.24585853588587,
+        "positive_volume": 12598.0,
+        "positive_voxels": 12598,
+        "research_utility": -22.24585853588587
+      },
+      "status": "succeeded"
+    }
+  },
+  {
+    "case": "drillholes_outcrops_3d",
+    "caveat": "Post-hoc: frozen code was designed on the full original case; not unbiased validation",
+    "full": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02404035627019784,
+        "air_positive_volume": 305.0,
+        "air_positive_voxels": 305,
+        "contact_rmse": 2.1066575165150305,
+        "label_mismatches": 142,
+        "loss_drillhole": 21.957283654733175,
+        "loss_outcrop": 50.95806850218998,
+        "loss_total": 72.91535215692315,
+        "positive_volume": 12687.0,
+        "positive_voxels": 12687,
+        "research_utility": -72.91535215692315
+      },
+      "status": "succeeded"
+    },
+    "held": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02404035627019784,
+        "air_positive_volume": 305.0,
+        "air_positive_voxels": 305,
+        "contact_rmse": 3.3019844513693397,
+        "label_mismatches": 122,
+        "loss_drillhole": 29.229768867404864,
+        "loss_outcrop": 36.610385426688715,
+        "loss_total": 65.84015429409358,
+        "positive_volume": 12687.0,
+        "positive_voxels": 12687,
+        "research_utility": -65.84015429409358
+      },
+      "status": "succeeded"
+    },
+    "held_counts": [
+      35,
+      1055
+    ],
+    "method": "qwen",
+    "model": "/Aidata/shared/ldm/copper-technical-report-20261024/holdout/drillholes_outcrops_3d/spatial_quadrant_3/model/model.npy",
+    "solver_receipt": {
+      "container": "ldm-copper-4c20336556-25f39aeb1623df875922",
+      "container_id": "2a2c769b223766751d2e380c111ef9f6345476b28317bd9c4a6916fac5c68962",
+      "cpus": 2,
+      "exit_code": 0,
+      "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+      "key": "25f39aeb1623df87592279af7015c88ac91f7644b8d7940a89aa3c082371872e",
+      "oom": false,
+      "reason": null,
+      "resource_sampling": {
+        "complete_lifetime_measurement": false,
+        "cpu_seconds_observed": 95.194051,
+        "last_sample_unix": 1792819075.4579227,
+        "method": "host_cgroup_v2_polling",
+        "sampled_peak_memory_bytes": 46510080,
+        "samples": 433,
+        "target_interval_seconds": 0.2
+      },
+      "wall_seconds": 95.51513981819153,
+      "workload_resources": {
+        "cpu_seconds_through_reap": 95.260052,
+        "exit_code": 0,
+        "oom_kill_count": 0,
+        "peak_memory_bytes": 46542848,
+        "schema_version": 1,
+        "scope": "container workload and supervisor through final descendant reap",
+        "workload_complete": true
+      }
+    },
+    "split": "spatial_quadrant_3",
+    "status": "succeeded",
+    "train": {
+      "metrics": {
+        "air_fraction_of_positive": 0.02404035627019784,
+        "air_positive_volume": 305.0,
+        "air_positive_voxels": 305,
+        "contact_rmse": 0.8337001312710082,
+        "label_mismatches": 20,
+        "loss_drillhole": 4.26206605791124,
+        "loss_outcrop": 15.684014133962812,
+        "loss_total": 19.946080191874053,
+        "positive_volume": 12687.0,
+        "positive_voxels": 12687,
+        "research_utility": -19.946080191874053
+      },
+      "status": "succeeded"
+    }
+  }
+]

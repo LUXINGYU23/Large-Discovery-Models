@@ -1,0 +1,95 @@
+{
+  "time": 1793179167.4059489,
+  "rows": [
+    {
+      "name": "mcmc-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6377,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 0.9750425815582275
+    },
+    {
+      "name": "acq-42",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6472,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 1.1166973114013672
+    },
+    {
+      "name": "mcmc-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6356,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 40.23342776298523
+    },
+    {
+      "name": "acq-43",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6414,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 9.895874738693237
+    },
+    {
+      "name": "mcmc-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6764,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 0.9666221141815186
+    },
+    {
+      "name": "acq-3407",
+      "alive": true,
+      "service_alive": true,
+      "cases": 6693,
+      "complete": 129,
+      "charged": 145,
+      "latest_age": 4.803247928619385
+    }
+  ],
+  "paused": [],
+  "progress": {
+    "stage": "training",
+    "updated_at": 1793179156.666616,
+    "supervisor_pid": 355698,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261028",
+    "exit_codes": {
+      "mcmc-42": null,
+      "acq-42": null,
+      "mcmc-43": null,
+      "acq-43": null,
+      "mcmc-3407": null,
+      "acq-3407": null
+    }
+  },
+  "controller": "/Aidata/shared/ldm/copper-v2-evaluator/code/service-env/bin/python /Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recover_fair_20261028.py ",
+  "new_failures": [],
+  "missing_failures": [],
+  "known_failures": 10,
+  "r3_unchanged": true,
+  "runtime_unchanged": true,
+  "ack_unchanged": true,
+  "fair_unchanged": true,
+  "new_cases": 440,
+  "hour_window_seconds": 3571.547164916992,
+  "hour_window_new_cases": 833,
+  "rate_per_hour": 839.6361188946238,
+  "remaining_training_case_upper_bound": 53372,
+  "throughput_only_remaining_hours": 63.56563134785571,
+  "eta_caveat": "One-hour window; excludes future pauses, interface/batch tails, validation and test; charged rejections may reduce remaining case count.",
+  "waits": {
+    "count": 905,
+    "max": 952.1118079014122,
+    "median": 756.2351223500445,
+    "p95": 915.5932631390169
+  }
+}

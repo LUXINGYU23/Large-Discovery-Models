@@ -1,0 +1,40 @@
+{
+  "policy": {
+    "queue_root": "/Aidata/shared/ldm/copper-formal-scheduling-20261024-r2/queue",
+    "global_jobs": 80,
+    "jobs_per_process": 16,
+    "candidate_batch": 16,
+    "runtime_sha256": "1a45d211524002970a1c70790025005d5a0e9a748057ba0b7a0c58c5570e0f76",
+    "solver_seconds": 120,
+    "feedback_slots": 321,
+    "scientific_source_unchanged": true,
+    "ordered_results": true,
+    "queue_time_excluded_from_solver": true,
+    "interface_slots": 8,
+    "policy_sha256": "8a764901d4075014fb8aff3d50429b3ab268eb71aee8f9da8cde2b8de417cbac"
+  },
+  "started_at": 1792838544.6444669,
+  "pids": {
+    "ldm-42": 3984908,
+    "mcmc-42": 3984909,
+    "acq-42": 3984910,
+    "ldm-43": 3984911,
+    "mcmc-43": 3984912,
+    "acq-43": 3984914,
+    "ldm-3407": 3984916,
+    "mcmc-3407": 3984921,
+    "acq-3407": 3984922
+  },
+  "service_pids": {
+    "ldm-42": 3984101,
+    "mcmc-42": 3984185,
+    "acq-42": 3984257,
+    "ldm-43": 3984308,
+    "mcmc-43": 3984416,
+    "acq-43": 3984510,
+    "ldm-3407": 3984660,
+    "mcmc-3407": 3984736,
+    "acq-3407": 3984811
+  },
+  "supervisor_pid": 3983208
+}

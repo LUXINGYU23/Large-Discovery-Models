@@ -1,0 +1,82 @@
+{
+  "async-joint-load-20261026": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 81644.77977085114,
+    "cpu_seconds": 80870.36452200002,
+    "failed": 5,
+    "missing_cpu": 0
+  },
+  "async-load-full-20261026": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 81595.17963027954,
+    "cpu_seconds": 80881.22060999989,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "load-full-v2": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 82382.83513379097,
+    "cpu_seconds": 80867.95604299997,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "load-control-20261026": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 81558.32785105705,
+    "cpu_seconds": 80793.59668499997,
+    "failed": 2,
+    "missing_cpu": 0
+  },
+  "load-small-v2": {
+    "receipt_files": 12,
+    "container_receipts": 12,
+    "wall_seconds": 59.87017107009888,
+    "cpu_seconds": 49.929685,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "load-full": {
+    "receipt_files": 370,
+    "container_receipts": 370,
+    "wall_seconds": 27907.913833379745,
+    "cpu_seconds": 27496.460396000006,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "load-small": {
+    "receipt_files": 12,
+    "container_receipts": 12,
+    "wall_seconds": 60.023910999298096,
+    "cpu_seconds": 50.002666999999995,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "async-joint64-load-20261026": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 81259.47397875786,
+    "cpu_seconds": 80679.24707500012,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "load-control96-20261026": {
+    "receipt_files": 1308,
+    "container_receipts": 1308,
+    "wall_seconds": 81645.21999931335,
+    "cpu_seconds": 80882.49063700002,
+    "failed": 0,
+    "missing_cpu": 0
+  },
+  "async-joint64-small-20261026": {
+    "receipt_files": 12,
+    "container_receipts": 12,
+    "wall_seconds": 53.836352825164795,
+    "cpu_seconds": 49.637516999999995,
+    "failed": 0,
+    "missing_cpu": 0
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "time": 1793396995.989822,
+  "progress": {
+    "stage": "evaluation_completed_report_pending",
+    "updated_at": 1793396868.6445453,
+    "supervisor_pid": 2833147,
+    "recovery": "/Aidata/shared/ldm/copper-baseline-rerun-20261027-ops/recovery-fair-20261030"
+  },
+  "finish_log": "{\"phase\": \"validation\", \"status\": \"completed\"}\n{\"phase\": \"test\", \"status\": \"completed\"}\n",
+  "completion_exists": true,
+  "groups": [
+    {
+      "group": "acq-3407",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "dca198e99adc949fee513c09d0fb347597f480fbd3395e0af07ab61ac4a0c288",
+        "phase": "tested",
+        "selection_sha256": "744c3ee3b0e46e2e97f0cdd703223c3f39757e98c8b8de6d2d75b2b76012a391",
+        "test_result_sha256": "01e40b8721bad117fbf389a3afa6468ea2ca60e980e922cb10037e0386ef8021"
+      },
+      "selection_unchanged": true
+    },
+    {
+      "group": "acq-42",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "2bdf27e32309fe880cf16b3602a9c74743624b8be6228f1294b739e99c284618",
+        "phase": "tested",
+        "selection_sha256": "7d83d8310e7621e16e7b8e7b252f8d07661127260c510c88dd1fb5a14257871e",
+        "test_result_sha256": "5755e56cc6b22a327ff503543378abd1eb84b069042ed289c17b4c87d363c9e7"
+      },
+      "selection_unchanged": true
+    },
+    {
+      "group": "acq-43",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "1a1c2529245904e3cd658e1568d63d166130495ef859a379ca5e1dd56aa302ed",
+        "phase": "tested",
+        "selection_sha256": "886b459a9bb4de82bb340fa4d9c59a22d04b7a8f0ec70797a68b287f0debe1c2",
+        "test_result_sha256": "ad6c4347990a9a168e87a53da7e86f5505745a74485e5821e5e047ed45e45eaf"
+      },
+      "selection_unchanged": true
+    },
+    {
+      "group": "mcmc-3407",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "05fa9a77258032d48e2ee44200b806381f20cec265a77bbe95959459a138dc15",
+        "phase": "tested",
+        "selection_sha256": "8f3b92172dcadabfc6817a65e231c469060c18a1be2586f1fef50e1ad990effe",
+        "test_result_sha256": "6fcb88f60df59fab7303948ecff045e2a0a509250bffb70bf8117a113052e79c"
+      },
+      "selection_unchanged": true
+    },
+    {
+      "group": "mcmc-42",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "aa258e9783a3fd9a5b9676f38daa318bf50c3e189209b157a206dda51d3349e8",
+        "phase": "tested",
+        "selection_sha256": "3a5d7f4eaffac43d5529b6d63d70e3440af6155610de8626c7b24090a2a2cf1b",
+        "test_result_sha256": "3bcec4dfeb20c928cc603cc5b19c026066321645fa3b29f1c71f598e75d453b4"
+      },
+      "selection_unchanged": true
+    },
+    {
+      "group": "mcmc-43",
+      "test_cases": 144,
+      "statuses": [
+        "succeeded"
+      ],
+      "state": {
+        "frozen_sha256": "e1b49dcc58a785e63161dd98a2530b12f677cf93906dfd9d4bcf6f076b2b0f50",
+        "phase": "tested",
+        "selection_sha256": "7e21c8ab8c8da8bb477fa80129655a9cd8b3f4a23dbeee05b98a6ca1b0a6910f",
+        "test_result_sha256": "7374d6462502d7bc142d7aabf799ead0f033d8faace33d3dfe66ca3321a39919"
+      },
+      "selection_unchanged": true
+    }
+  ],
+  "pending_validation_protocol_decision": true
+}

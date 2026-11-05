@@ -1,0 +1,59 @@
+{
+  "status": "failed",
+  "jobs": 1308,
+  "peak_active": 144,
+  "failed": 1,
+  "failures": [
+    {
+      "index": 196,
+      "interface": true,
+      "acquired": 1792863184.2797406,
+      "released": 1792863191.3638268,
+      "queue_seconds": 0.00017395801842212677,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 6.030468940734863,
+        "container": "ldm-copper-4c4ace7502-58327474e7c742213085",
+        "container_id": "42b6430c2c3cdec5de7715fb845743e8887e412c912f37727dd5d3525f07746d",
+        "key": "58327474e7c742213085ba349e47f25c72c0e5061f5c52720384d28004e87d92",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 5.155068,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 96280576,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 5.015007340814918,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 18,
+          "sampled_peak_memory_bytes": 96018432,
+          "cpu_seconds_observed": 5.133974,
+          "last_sample_unix": 1792863190.677471,
+          "complete_lifetime_measurement": false
+        }
+      },
+      "legal": false
+    }
+  ],
+  "cpu_busy_median": 85.61787018043628,
+  "cpu_busy_max": 91.62029303679664,
+  "cpu_sample_nearest_failure": {
+    "time": 1792863183.5836658,
+    "load": [
+      253.75537109375,
+      184.48486328125,
+      113.8837890625
+    ],
+    "cpu_busy_percent": 91.0190229016342
+  },
+  "completion_sha256": "8022cdead51387044c389f7d690b2a177d530657ccd43f265448b6049d846670"
+}

@@ -1,0 +1,114 @@
+{
+  "acq_warmup": 30,
+  "cpus": 2,
+  "created_at": 1792815414.3201,
+  "memory_mb": 4096,
+  "objective": "aligned",
+  "scientific_comparison": "frozen solver resource budget, NOT matched end-to-end design cost or oracle calls",
+  "scorer_image": "sha256:9c0c855e43120f0000e3e5dcf79002763c65e55839e4908306cac29d1ff71062",
+  "seconds": 120,
+  "seeds": [
+    47,
+    48,
+    49
+  ],
+  "solver_image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+  "sources": [
+    {
+      "case": "drillholes_3d",
+      "method": "ast",
+      "origin": {
+        "historical_loss": 6.514410006112401,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_ast",
+        "selected": "8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421",
+        "selection_evaluations": 81,
+        "selection_round": 20
+      },
+      "payload": {
+        "sha256": "8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421",
+        "source_path": "candidates/8edb42991a675a0e21d93c0d26a57a39bbae79d2c7c9347731ebc01b11630421/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/ast"
+    },
+    {
+      "case": "drillholes_3d",
+      "method": "qwen",
+      "origin": {
+        "historical_loss": 6.514886964120364,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_qwen",
+        "selected": "e295b4d7e0ec24edfc01401ac3fe55fa179940515e9855c45b69d85de5be327d",
+        "selection_evaluations": 81,
+        "selection_round": 20
+      },
+      "payload": {
+        "sha256": "e295b4d7e0ec24edfc01401ac3fe55fa179940515e9855c45b69d85de5be327d",
+        "source_path": "candidates/e295b4d7e0ec24edfc01401ac3fe55fa179940515e9855c45b69d85de5be327d/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/qwen"
+    },
+    {
+      "case": "drillholes_3d",
+      "method": "fusion",
+      "origin": {
+        "historical_loss": 6.514815230760057,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_3d_fusion",
+        "selected": "b1c0ca0bc969701c1bb70c78b04562e113bd34b3994ba4e5766cb7cff191ac9c",
+        "selection_evaluations": 77,
+        "selection_round": 19
+      },
+      "payload": {
+        "sha256": "b1c0ca0bc969701c1bb70c78b04562e113bd34b3994ba4e5766cb7cff191ac9c",
+        "source_path": "candidates/b1c0ca0bc969701c1bb70c78b04562e113bd34b3994ba4e5766cb7cff191ac9c/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_3d/fusion"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "ast",
+      "origin": {
+        "historical_loss": 32.706691563452694,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_ast",
+        "selected": "94d89464d74b9c1ccb8ef313d345ef5aa5d3e79c0ffaa106faaf20e3baa3b3bd",
+        "selection_evaluations": 81,
+        "selection_round": 20
+      },
+      "payload": {
+        "sha256": "94d89464d74b9c1ccb8ef313d345ef5aa5d3e79c0ffaa106faaf20e3baa3b3bd",
+        "source_path": "candidates/94d89464d74b9c1ccb8ef313d345ef5aa5d3e79c0ffaa106faaf20e3baa3b3bd/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/ast"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "qwen",
+      "origin": {
+        "historical_loss": 32.3764701149274,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_qwen",
+        "selected": "c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f",
+        "selection_evaluations": 81,
+        "selection_round": 20
+      },
+      "payload": {
+        "sha256": "c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f",
+        "source_path": "candidates/c004c9198f9fd9aa339530930b6afe5726637bcb56a1c227ea047ff44cd29f7f/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/qwen"
+    },
+    {
+      "case": "drillholes_outcrops_3d",
+      "method": "fusion",
+      "origin": {
+        "historical_loss": 32.82798360375176,
+        "run": "/Aidata/shared/ldm/copper-encoding-ablation-v3-20261023/full/drillholes_outcrops_3d_fusion",
+        "selected": "9c9f79d69787b130196832d2078edaffa4a94dae91a3aa6c021e066d8f903930",
+        "selection_evaluations": 81,
+        "selection_round": 20
+      },
+      "payload": {
+        "sha256": "9c9f79d69787b130196832d2078edaffa4a94dae91a3aa6c021e066d8f903930",
+        "source_path": "candidates/9c9f79d69787b130196832d2078edaffa4a94dae91a3aa6c021e066d8f903930/solver.py"
+      },
+      "work": "/Aidata/shared/ldm/copper-baselines-20261024/matched-120s-final-search/drillholes_outcrops_3d/fusion"
+    }
+  ]
+}

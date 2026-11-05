@@ -1,0 +1,9 @@
+{
+  "time": 1793170221.792149,
+  "trigger": "mcmc-43 async no completed-job progress",
+  "paused": {
+    "error": "training client failed; reconciliation required",
+    "time": 1793169697.8542345
+  },
+  "unreceipted": []
+}

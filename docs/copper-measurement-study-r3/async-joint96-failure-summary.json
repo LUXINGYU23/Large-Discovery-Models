@@ -1,0 +1,202 @@
+{
+  "status": "failed",
+  "jobs": 1308,
+  "peak_active": 96,
+  "plan": {
+    "implementation": "3e6b58b989be35a74f99a8b1bcba5d97a2806225ea954c87e0515b7f5cef7dec",
+    "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+    "small": false,
+    "global_jobs": 96,
+    "interface_slots": 8,
+    "jobs_per_process": 32,
+    "startup_slots": 1,
+    "background_threads": 1,
+    "solver_jobs": 696,
+    "interface_jobs": 612,
+    "template_sha256": "3f04581af7348b25123b187b26ab4bc54ec50874fc4bc5e50c5bdd7b13fce0ab"
+  },
+  "failures": [
+    {
+      "index": 148,
+      "interface": true,
+      "queue_seconds": 6.384041095152497,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 9.051671981811523,
+        "container": "ldm-copper-4c9cf96247-bf5033a8cb40646af873",
+        "container_id": "074504f1aa7f2f30593dac729deb25a9eb684b0c9d822f28bb1b095a84e53f25",
+        "key": "bf5033a8cb40646af87358a463e3afd06ff76d323395b9e3c36f2ec08099935d",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 6.43561,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 96333824,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 6.7178626181557775,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 23,
+          "sampled_peak_memory_bytes": 96071680,
+          "cpu_seconds_observed": 6.464314,
+          "last_sample_unix": 1792962900.3868048,
+          "complete_lifetime_measurement": false
+        }
+      }
+    },
+    {
+      "index": 150,
+      "interface": true,
+      "queue_seconds": 3.856798161752522,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 10.48428201675415,
+        "container": "ldm-copper-4c9cf96247-e97e89162c03d06846c8",
+        "container_id": "0b94bfd8d3d4d7770f9f7965eb6b11817214c60dc1fd26b7f06a7da3f5146258",
+        "key": "e97e89162c03d06846c8fdd1d9fa3e53c37e51eae916c68e123528c0d0df62c1",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 7.796928,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 96071680,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 8.316230149008334,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 28,
+          "sampled_peak_memory_bytes": 96071680,
+          "cpu_seconds_observed": 7.813753,
+          "last_sample_unix": 1792962900.8561373,
+          "complete_lifetime_measurement": false
+        }
+      }
+    },
+    {
+      "index": 154,
+      "interface": true,
+      "queue_seconds": 1.104414463043213,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 8.765927076339722,
+        "container": "ldm-copper-4c9cf96247-5e4c6cf83e1175795714",
+        "container_id": "9862de20dccb5d251a7d04b4298040d1b0a657b8f819bc995984ed8a8e615666",
+        "key": "5e4c6cf83e117579571462a2a93bacf580822a37534634271dbf8f6d44035ba0",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 6.279257,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 85401600,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 6.514225462451577,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 21,
+          "sampled_peak_memory_bytes": 85233664,
+          "cpu_seconds_observed": 6.291647,
+          "last_sample_unix": 1792962900.883066,
+          "complete_lifetime_measurement": false
+        }
+      }
+    },
+    {
+      "index": 145,
+      "interface": true,
+      "queue_seconds": 0.00020715594291687012,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 10.744537115097046,
+        "container": "ldm-copper-719e2e3fa0-e63a48ce3f130b36ad4c",
+        "container_id": "e5d5d27163cd9cf210f61139b736153963a5865baa725584cf0f9e4e302ba63e",
+        "key": "e63a48ce3f130b36ad4cc8aa05208c321c927451609966ef42cdcbbe55f413fa",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 8.152682,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 96313344,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 8.125982510857284,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 28,
+          "sampled_peak_memory_bytes": 96051200,
+          "cpu_seconds_observed": 8.163015,
+          "last_sample_unix": 1792962900.2180243,
+          "complete_lifetime_measurement": false
+        }
+      }
+    },
+    {
+      "index": 147,
+      "interface": true,
+      "queue_seconds": 0.8040138203650713,
+      "receipt": {
+        "exit_code": 137,
+        "oom": false,
+        "reason": "timeout",
+        "wall_seconds": 7.595643043518066,
+        "container": "ldm-copper-719e2e3fa0-cd7aa20259341ff9cad7",
+        "container_id": "a95ae4bb269e831e1c0bef5a19a01645b246146c3902e93595a7e84237f24a22",
+        "key": "cd7aa20259341ff9cad7d00b75b3bd639fcc41095bab537e388010d8c64b089a",
+        "image": "sha256:f6856385a0da9444b1e5edb5048b2f6081593fe568c3473c2fda524d0c4489f5",
+        "cpus": 1,
+        "workload_resources": {
+          "cpu_seconds_through_reap": 4.413226,
+          "exit_code": 137,
+          "oom_kill_count": 0,
+          "peak_memory_bytes": 44023808,
+          "schema_version": 1,
+          "scope": "container workload and supervisor through final descendant reap",
+          "worker_budget_seconds": 5.0,
+          "worker_elapsed_seconds": 5.016175650991499,
+          "workload_complete": true
+        },
+        "resource_sampling": {
+          "method": "host_cgroup_v2_polling",
+          "target_interval_seconds": 0.2,
+          "samples": 15,
+          "sampled_peak_memory_bytes": 33955840,
+          "cpu_seconds_observed": 4.428007,
+          "last_sample_unix": 1792962900.9200814,
+          "complete_lifetime_measurement": false
+        }
+      }
+    }
+  ],
+  "time": 1792964227.7454445,
+  "host_loadavg": "9.76 17.66 48.63 11/8416 3292886\n"
+}
