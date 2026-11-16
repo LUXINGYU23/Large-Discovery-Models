@@ -1,0 +1,178 @@
+{
+  "arms": {
+    "accumulated": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "never",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "independent_sampling": {
+      "boundary_payload": "initial_program",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_round",
+      "round_feed": "none",
+      "turns_per_round": 1
+    },
+    "ldm4geo": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "program_evolution": {
+      "boundary_payload": "parents",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_round",
+      "round_feed": "none",
+      "turns_per_round": 1
+    },
+    "restart_best": {
+      "boundary_payload": "best_program",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "separate_runs": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "separate",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "single_conversation": {
+      "boundary_payload": "history",
+      "branches": 1,
+      "budget_split": "shared",
+      "clear": "never",
+      "round_feed": "all",
+      "turns_per_round": 4
+    }
+  },
+  "decisions": {
+    "e1_margin": "s0",
+    "mde_bound_relative": 0.2,
+    "q1_spearman_min": 0.8
+  },
+  "hashes": {
+    "analysis": null,
+    "embedding_model": null,
+    "evaluator_image": null,
+    "implementation": null,
+    "renderer": null,
+    "sidecar_image": null,
+    "tagger": null,
+    "task_brief": null,
+    "tool": null
+  },
+  "judges": {
+    "oracle": {
+      "objective": "oracle_iou"
+    },
+    "standard": {
+      "objective": "confirmation"
+    }
+  },
+  "layout": {
+    "assignment_rule": "alternate-within-family-v1",
+    "execution_seeds": [
+      47
+    ],
+    "packs_per_body": 1,
+    "sealed_bodies": {
+      "test_id": 4,
+      "test_ood": 4
+    }
+  },
+  "loop": {
+    "bash_calls": 8,
+    "batch": 4,
+    "branches": 4,
+    "finalists": 3,
+    "harness_seconds": 1800,
+    "proposals_per_branch": 2,
+    "reserved_per_branch": 1,
+    "reset_period": 1,
+    "rounds": 3
+  },
+  "model": {
+    "base_url": "https://api.deepseek.com",
+    "name": "deepseek-flash",
+    "thinking": "low"
+  },
+  "protocol_version": 1,
+  "release": {
+    "name": "rsi-dev",
+    "qualification_sha256": null
+  },
+  "seeds": {
+    "E3": [
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207,
+      208
+    ],
+    "F1": [
+      301,
+      302,
+      303
+    ],
+    "M1": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112
+    ],
+    "M1_reserve": [
+      113,
+      114,
+      115,
+      116
+    ]
+  },
+  "tiers": {
+    "F": {
+      "sealed_manifests": [
+        "test_id/manifest.json",
+        "test_ood/manifest.json"
+      ],
+      "slots": 13,
+      "solver_seconds": 120,
+      "train_bodies": 8,
+      "train_manifest": "train/manifest.json",
+      "validation_manifest": "validation/manifest.json"
+    },
+    "S": {
+      "sealed_manifests": [
+        "test_id/manifest.json",
+        "test_ood/manifest.json"
+      ],
+      "slots": 13,
+      "solver_seconds": 10,
+      "train_bodies": 8,
+      "train_manifest": "train/manifest.json",
+      "validation_manifest": "validation/manifest.json"
+    }
+  },
+  "token_cap_input": 0
+}
