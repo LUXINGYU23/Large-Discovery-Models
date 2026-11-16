@@ -14,7 +14,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ..core.encoding import CodeEncoder
 from ..core.execution import digest, docker
 from ..v2.public_catalog import catalog_digest, load_catalog
-from . import protocol as protocols
+from . import continuation as continuations, intervention as interventions, protocol as protocols
 from .agent import PiAgent, RESOURCES
 from .arms import policy
 from .client import RiskClient
@@ -66,7 +66,14 @@ def parse_args(argv=None):
                         help="accepted only as {\"name\": \"independent\"}; fork strategies are refused")
     parser.add_argument("--solver-seconds", type=int,
                         help="legacy releases without a tier table only (default 120)")
-    parser.add_argument("--intervention-file", type=Path)
+    parser.add_argument("--checkpoint-round", type=int,
+                        help="copy checkpoints/round_<t>/ after round t's evaluation (E1 sources)")
+    parser.add_argument("--continuation", type=Path, metavar="CHECKPOINT",
+                        help="E1/E2: start at round t+1 from <source run>/checkpoints/round_<t>")
+    parser.add_argument("--continuation-mode", choices=sorted(continuations.MODES))
+    parser.add_argument("--replicate", type=int)
+    parser.add_argument("--planted", action="store_true",
+                        help="E2: plant the templated note for the checkpoint's selected target tag")
     parser.add_argument("--fixture-only", action="store_true",
                         help="label a development integration fixture; never use for scientific results")
     parser.add_argument("--resume", action="store_true")
@@ -75,6 +82,47 @@ def parse_args(argv=None):
 
 def run_id(experiment, arm, judge, seed):
     return f"{arm}-{judge}-s{seed}" if experiment == "E3" else f"{arm}-s{seed}"
+
+
+def continuation_run_id(source_seed, mode, replicate, planted=False):
+    return f"ck{source_seed}-{mode}{'-planted' if planted else ''}-r{replicate}"
+
+
+def _continuation(args, protocol, tier):
+    """Checkpoint, contract field and planted note of an E1/E2 run; None for an ordinary run."""
+    continued = args.experiment in ("E1", "E2")
+    if args.continuation is None:
+        if continued or args.continuation_mode or args.replicate is not None or args.planted:
+            raise ValueError("E1 and E2 runs, and only they, start from a checkpoint")
+        return None
+    if not continued and args.experiment not in protocols.DEVELOPMENT_EXPERIMENTS:
+        raise ValueError("only E1, E2 and development runs continue from a checkpoint")
+    mode = args.continuation_mode
+    if mode is None or type(args.replicate) is not int or args.replicate < 1:
+        raise ValueError("a continuation needs --continuation-mode and a positive --replicate")
+    if args.checkpoint_round is not None:
+        raise ValueError("a continuation does not take its own checkpoint")
+    if args.arm != continuations.MODES[mode]:
+        raise ValueError(f"continuation mode {mode} runs arm {continuations.MODES[mode]}")
+    if args.planted != (args.experiment == "E2") and continued:
+        raise ValueError("E2 continuations are planted and E1 continuations are not")
+    if args.planted and mode == "best_program":
+        raise ValueError("planted notes are tested in conversation and history modes only")
+    checkpoint = continuations.open_checkpoint(args.continuation)
+    source = checkpoint.source_manifest
+    if (source.get("protocol_id") != protocols.protocol_id(protocol) or source.get("tier") != tier
+            or source.get("judge") != args.judge):
+        raise ValueError("checkpoint comes from another protocol, tier or judge")
+    if continued and source.get("experiment") != "M1":
+        raise ValueError("E1 and E2 continue checkpoints of M1 runs")
+    if args.seed != checkpoint.source_seed:
+        raise ValueError("a continuation keeps the source run's seed")
+    if mode == "conversation" and source.get("arm") != args.arm:
+        raise ValueError("a conversation continuation keeps the source arm")
+    note = interventions.from_checkpoint(checkpoint) if args.planted else None
+    return {"checkpoint": checkpoint, "mode": mode, "intervention": note,
+            "manifest": checkpoint.identity(mode, args.replicate),
+            "run_id": continuation_run_id(checkpoint.source_seed, mode, args.replicate, args.planted)}
 
 
 def build_config(protocol, arm, tier, seed, solver_seconds=None):
@@ -157,7 +205,8 @@ def prepare(args):
         solver_seconds = LEGACY_MAX_SECONDS if args.solver_seconds is None else args.solver_seconds
         if not 1 <= solver_seconds <= LEGACY_MAX_SECONDS:
             raise ValueError("solver limit must be between 1 and 120 seconds")
-    name = run_id(args.experiment, args.arm, args.judge, args.seed)
+    continued = _continuation(args, protocol, tier)
+    name = continued["run_id"] if continued else run_id(args.experiment, args.arm, args.judge, args.seed)
     if args.out_dir.name != name:
         raise ValueError("run directory must be named " + name)
     config = build_config(protocol, args.arm, tier, args.seed, solver_seconds)
@@ -165,6 +214,10 @@ def prepare(args):
         raise ValueError("controller settings differ from the requested arm or seed")
     if "tiers" in protocol and config.slots != protocol["tiers"][tier]["slots"]:
         raise ValueError("controller slots differ from the protocol tier")
+    if args.checkpoint_round is not None and not 1 <= args.checkpoint_round < config.rounds:
+        raise ValueError("checkpoint round must lie inside the campaign")
+    if continued:
+        continuations.check_config(continued["checkpoint"], config, continued["mode"])
     previous = _previous_manifest(args)
     manifest = {
         "run_id": name, "experiment": args.experiment, "protocol_id": protocols.protocol_id(protocol),
@@ -172,7 +225,8 @@ def prepare(args):
         "arm": args.arm, "tier": tier, "judge": args.judge, "seed": args.seed,
         "objective": protocol["judges"][args.judge]["objective"],
         "blind": protocol["judges"][args.judge]["objective"] != "oracle_iou",
-        "continuation": None,
+        "continuation": continued["manifest"] if continued else None,
+        "checkpoint_round": args.checkpoint_round,
         "evaluation": {"socket": str(args.evaluation_socket), "contract_digest": args.evaluation_contract,
                        "service_uid": args.evaluation_service_uid},
         "code_commit": protocols.code_commit(),
@@ -183,7 +237,7 @@ def prepare(args):
         "evaluator_image": protocol["hashes"].get("evaluator_image"),
     }
     return {"protocol": protocol, "config": config, "solver_seconds": solver_seconds, "manifest": manifest,
-            "agent": agent_settings(protocol)}
+            "agent": agent_settings(protocol), "continuation": continued}
 
 
 def main(argv=None):
@@ -201,8 +255,13 @@ def main(argv=None):
     public_digest = catalog_digest(args.public_catalog)
     client = RiskClient(args.out_dir, args.evaluation_socket, args.evaluation_contract,
                         service_uid=args.evaluation_service_uid)
-    info = client.verify_contract(public_digest, solver_seconds, config.slots)
-    if not args.resume and info["used_slots"]:
+    continued = plan["continuation"]
+    # A continuation's service imported exactly this checkpoint's prefix; any other run's was not started by import.
+    prefix = continued["checkpoint"].snapshot["ledger_prefix_sha256"] if continued else None
+    info = client.verify_contract(public_digest, solver_seconds, config.slots, import_ledger_prefix_sha256=prefix)
+    if continued:
+        continuations.check_service(info, continued["checkpoint"], resume=args.resume)
+    elif not args.resume and info["used_slots"]:
         raise ValueError("a new run requires an unused private evaluator")
     if "tiers" not in protocol and catalog["stage"] == "formal" and (
             config.rounds, config.proposals_per_branch, config.batch, solver_seconds) != LEGACY_FORMAL:
@@ -226,12 +285,18 @@ def main(argv=None):
                     cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
                     **plan["agent"])
     encoder = CodeEncoder(args.out_dir, "fusion", args.embedding_model_path, args.embedding_device)
-    intervention = json.loads(args.intervention_file.read_text()) if args.intervention_file else None
+    if args.checkpoint_round is not None:
+        agent = continuations.CheckpointingAgent(agent, args.out_dir, args.checkpoint_round)
+    start = continuations.continuation_start(continued["checkpoint"], continued["mode"]) if continued else None
     controller = Controller(args.out_dir, config, agent, client,
                             lambda pool, rows, count: select(pool, rows, encoder, count), brief, identity,
-                            intervention=intervention)
+                            intervention=continued["intervention"] if continued else None, start=start)
     try:
-        result = controller.run(resume=args.resume)
+        if continued:
+            result = continuations.run_continuation(controller, continued["checkpoint"], continued["mode"],
+                                                    resume=args.resume)
+        else:
+            result = controller.run(resume=args.resume)
         sealed = client.seal_training()
         if (sealed["used_slots"] != result["charged_records"]
                 or sealed["source_sha256s"] != result["training_finalists"]):
