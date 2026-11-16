@@ -1,0 +1,161 @@
+"""Evaluator-account unseal: one sealed-body evaluation per experiment (spec §8, gate G6).
+
+The input lists every frozen solver of one experiment. Nothing is evaluated
+unless the list covers every started run and every freeze on disk, and every
+run carries the experiment's protocol. Each execution appends one line to the
+unseal log. Repeating the same list only replays the stored results.
+"""
+
+import argparse
+import fcntl
+import json
+import os
+import pwd
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from ldm_tts.engine.run_store import atomic_json_write
+from tasks.copper_inversion.core.execution import digest
+from tasks.copper_inversion.experiments.rsi.freeze import EXPERIMENTS, layout, parse_prefix, run_manifest
+from tasks.copper_inversion.rsi.ledger import read
+from tasks.copper_inversion.v2 import selection
+
+
+def load_list(value):
+    listing = json.loads(Path(value).read_text()) if isinstance(value, (str, Path)) else value
+    if (not isinstance(listing, dict) or set(listing) != {"experiment", "protocol_id", "solvers"}
+            or listing["experiment"] not in EXPERIMENTS or not isinstance(listing["solvers"], list)
+            or not listing["solvers"]):
+        raise ValueError("invalid frozen solver list")
+    pairs = []
+    for item in listing["solvers"]:
+        if not isinstance(item, dict) or set(item) != {"run_id", "prefix"}:
+            raise ValueError("invalid frozen solver entry")
+        parse_prefix(item["prefix"])
+        pairs.append((item["run_id"], item["prefix"]))
+    if len(set(pairs)) != len(pairs):
+        raise ValueError("duplicate frozen solver")
+    return {"experiment": listing["experiment"], "protocol_id": listing["protocol_id"],
+            "solvers": [{"run_id": r, "prefix": p} for r, p in sorted(pairs)]}
+
+
+def check(root, listing, expected_runs=None):
+    """Refuse an incomplete list or a protocol mismatch; return {(run, prefix): selection dir}."""
+    experiment, protocol_id = listing["experiment"], listing["protocol_id"]
+    paths = layout(root, protocol_id, experiment)
+    by_run = {}
+    for item in listing["solvers"]:
+        by_run.setdefault(item["run_id"], set()).add(item["prefix"])
+    started = {p.name for p in paths["runs"].iterdir() if p.is_dir()} if paths["runs"].is_dir() else set()
+    frozen_runs = ({p.name for p in paths["selection"].iterdir() if p.is_dir()}
+                   if paths["selection"].is_dir() else set())
+    missing = (started | frozen_runs | set(expected_runs or ())) - set(by_run)
+    if missing:
+        raise ValueError("frozen solver list is missing runs: " + ", ".join(sorted(missing)))
+    if set(by_run) - started:
+        raise ValueError("frozen solver list names runs that were never started: "
+                         + ", ".join(sorted(set(by_run) - started)))
+    if len({frozenset(v) for v in by_run.values()}) != 1:
+        raise ValueError("every run must list the same freeze prefixes")
+    targets = {}
+    for run_id, prefixes in sorted(by_run.items()):
+        run_paths = layout(root, protocol_id, experiment, run_id)
+        run_manifest(run_paths["run"], protocol_id, experiment)
+        on_disk = ({p.name for p in run_paths["run_selection"].iterdir() if p.is_dir()}
+                   if run_paths["run_selection"].is_dir() else set())
+        if on_disk != prefixes:
+            raise ValueError(f"run {run_id}: frozen prefixes on disk differ from the list")
+        rows = read(run_paths["run"] / "ledger.jsonl")
+        for prefix in sorted(prefixes):
+            target = run_paths["run_selection"] / prefix
+            frozen, state = selection.verify(target)
+            record = json.loads((target / "prefix.json").read_text())
+            round_index = parse_prefix(prefix)
+            used = rows if round_index is None else [r for r in rows if r["round"] <= round_index]
+            if (record.get("protocol_id") != protocol_id or record.get("experiment") != experiment
+                    or record.get("run_id") != run_id or record.get("prefix") != prefix
+                    or record.get("frozen_sha256") != digest(frozen)
+                    or record.get("ledger_prefix_sha256") != digest(used)):
+                raise ValueError(f"run {run_id} {prefix}: freeze record or protocol differs")
+            if state["phase"] not in {"selected", "tested"}:
+                raise ValueError(f"run {run_id} {prefix}: validate before unsealing")
+            targets[(run_id, prefix)] = target
+    return targets
+
+
+def _receipts(targets):
+    return {str(p): p.stat().st_mtime_ns for t in targets for name in ("receipt.json", "result.json",
+            "private-case-results.json", "test-result.json") for p in Path(t).rglob(name)}
+
+
+def _log(path):
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def _append(path, entry):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        stream.write(json.dumps(entry, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def unseal(root, listing, *, expected_runs=None, operator=None, workers=8):
+    listing = load_list(listing)
+    experiment, protocol_id = listing["experiment"], listing["protocol_id"]
+    paths = layout(root, protocol_id, experiment)
+    targets = check(root, listing, expected_runs)
+    list_sha = digest(listing)
+    previous = [e for e in _log(paths["unseal_log"]) if e["experiment"] == experiment]
+    if any(e["frozen_list_sha256"] != list_sha for e in previous):
+        raise ValueError("experiment was already unsealed with a different frozen solver list")
+    states = {key: selection.verify(target)[1]["phase"] for key, target in targets.items()}
+    tested = [key for key, phase in states.items() if phase == "tested"]
+    if not previous and tested:
+        raise ValueError("sealed evaluation exists without an unseal log entry")
+    mode = "unseal" if not previous else "replay" if len(tested) == len(targets) else "resume"
+    before = _receipts(targets[key] for key in tested)
+    _append(paths["unseal_log"], {
+        "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "experiment": experiment,
+        "frozen_list_sha256": list_sha, "protocol_id": protocol_id, "mode": mode,
+        "operator": operator or pwd.getpwuid(os.geteuid()).pw_name, "uid": os.geteuid(),
+        "solvers": len(targets)})
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {key: pool.submit(selection.run, target, "test") for key, target in targets.items()}
+        results = {key: future.result() for key, future in futures.items()}
+    after = _receipts(targets[key] for key in tested)
+    if before != after:
+        raise ValueError("replay changed sealed evaluation receipts")
+    completion = {"schema": "rsi-unseal-v1", "experiment": experiment, "protocol_id": protocol_id,
+                  "frozen_list_sha256": list_sha, "solvers": listing["solvers"],
+                  "results_sha256": {f"{r}/{p}": digest(results[(r, p)]) for r, p in sorted(results)}}
+    path = paths["unseal"] / f"{experiment}.json"
+    if path.exists() and json.loads(path.read_text()) != completion:
+        raise ValueError("unsealed results changed")
+    if not path.exists():
+        atomic_json_write(path, completion)
+    return {"status": "unsealed", "mode": mode, "experiment": experiment, "solvers": len(targets),
+            "frozen_list_sha256": list_sha}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True, help="active area, e.g. /Aidata/shared/xingyulu/rsi4geo")
+    parser.add_argument("--list", type=Path, required=True,
+                        help='{"experiment", "protocol_id", "solvers": [{"run_id", "prefix"}, ...]}')
+    parser.add_argument("--expected-runs", type=Path, help="JSON list of run ids the experiment must contain")
+    parser.add_argument("--operator")
+    parser.add_argument("--workers", type=int, default=8)
+    args = parser.parse_args(argv)
+    expected = json.loads(args.expected_runs.read_text()) if args.expected_runs else None
+    print(json.dumps(unseal(args.root, args.list, expected_runs=expected, operator=args.operator,
+                            workers=args.workers), sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
