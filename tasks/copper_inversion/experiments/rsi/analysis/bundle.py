@@ -41,6 +41,10 @@ DEFAULTS = {
     "seed": 20261115, "n_boot": 10000, "n_perm": 20000, "alpha": 0.05, "level": 0.95,
     "mde_z": 2.80, "mde_ns": [5, 8, 12, 16], "mde_bound_relative": 0.20, "pilot_seeds": 4,
     "e3_standard_seeds": 8, "budget_rounds": [5, 10], "checkpoint_round": 10, "checkpoint_experiment": "M1", "e2_late_rounds": [16, 20],
+    "e1_curve_rounds": [12, 14, 15, 16, 18],
+    # Prefix freezes each experiment's batches must request (frozen at G3 with this file; launch.py checks).
+    "freeze_prefixes": {"M1": ["full", 5, 10], "E1": ["full", 12, 14, 15, 16, 18], "E2": ["full"],
+                        "E3": ["full"], "X1": ["full"], "F1": ["full"]},
     "judges": {"quarter": "q25", "all": "standard", "oracle": "oracle"},
     "primary": ["ldm4geo", "accumulated"],
     "secondary": [["ldm4geo", "restart_best", "test_id"], ["ldm4geo", "independent_sampling", "test_id"],
@@ -165,7 +169,8 @@ class Analysis:
 
     def contrast(self, label, groups, coefs):
         draws = stats.bootstrap_contrast(groups, coefs, self.config["n_boot"], self.rng(label))
-        return stats.interval(draws, self.config["level"])
+        return stats.t_interval(stats.contrast_estimate(groups, coefs), draws, stats.contrast_df(groups),
+                                self.config["level"])
 
     def body_method(self, matrices):
         bodies = {m.shape[1] for m in matrices}
@@ -275,6 +280,7 @@ class Analysis:
         modes = ("conversation", "history", "best_program")
         trajectories, finals, labels = {m: [] for m in modes}, {}, []
         rounds = max([r.rounds for r in runs] + [20])
+        curve = [cut] + [t for t in self.config["e1_curve_rounds"] if cut < t < rounds] + [rounds]
         for mode in modes:
             for run in runs:
                 if run.continuation["mode"] != mode:
@@ -282,8 +288,7 @@ class Analysis:
                 ck = run.continuation["checkpoint"]
                 if mode == "conversation":
                     labels.append(ck)
-                path = [checkpoints[ck]] + [self.validation(run, t, "risk")
-                                            for t in range(cut + 1, rounds + 1)]
+                path = [checkpoints[ck]] + [self.validation(run, t, "risk") for t in curve[1:]]
                 trajectories[mode].append(path)
                 final = self.final_round(run)
                 value = self.validation(run, final, "risk")
@@ -292,7 +297,7 @@ class Analysis:
                     continue
                 finals.setdefault((mode, ck), []).append(value)
         cks = sorted(checkpoints)
-        out = {"checkpoints": checkpoints, "checkpoint": labels, "runs": trajectories,
+        out = {"checkpoints": checkpoints, "checkpoint": labels, "rounds": curve, "runs": trajectories,
                "final_mean": {m: _mean([v for (mm, _), vs in finals.items() if mm == m for v in vs]) for m in modes}}
         s0 = stats.pooled_sd(list(finals.values()))
         strata = [(finals[("history", c)], finals[("conversation", c)]) for c in cks
@@ -362,8 +367,9 @@ class Analysis:
                 out["late_ci95"][mode], out["ci95_by_round"][mode] = None, None
                 continue
             draws = stats.stratified_bootstrap_rows(cells, self.config["n_boot"], self.rng(f"E2/{mode}"))
-            out["ci95_by_round"][mode] = [stats.interval(draws[:, i], self.config["level"]) for i in range(len(rounds))]
-            out["late_ci95"][mode] = stats.interval(draws[:, late_idx].mean(axis=1), self.config["level"])
+            est, df, level = stats.stratified_estimate(cells), stats.stratified_df(cells), self.config["level"]
+            out["ci95_by_round"][mode] = [stats.t_interval(float(est[i]), draws[:, i], df, level) for i in range(len(rounds))]
+            out["late_ci95"][mode] = stats.t_interval(float(est[late_idx].mean()), draws[:, late_idx].mean(axis=1), df, level)
         return out
 
     def coverage(self):
@@ -550,8 +556,9 @@ class Analysis:
             "E4_secondary": self.e4_secondary(), "pilot": self.pilot(), "F1": self.f1(),
             "prop3": self.prop3(), "branch_agreement": self.branch_agreement(), "main": self.main_block(),
             "process": self.process(),
-            "interval_method": "hierarchical bootstrap: runs within arm, bodies paired across arms "
-                               "(runs only where body scores are absent)",
+            "interval_method": "hierarchical bootstrap (n-1 of n at each level): runs within arm, bodies paired "
+                               "across arms (runs only where body scores are absent); estimate +- t(df = sum of "
+                               "runs - 1) x bootstrap SD. Proposition 3 intervals are percentile",
         }
         missing = sorted({json.dumps(m, sort_keys=True) for m in self.missing})
         results["missing_outcomes"] = [json.loads(m) for m in missing]

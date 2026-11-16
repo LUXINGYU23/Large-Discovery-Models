@@ -129,34 +129,37 @@ def test_at34_permutation_test_null_rejection_rate():
 
 @pytest.mark.parametrize("paired", [True, False])
 def test_at34_hierarchical_bootstrap_interval_coverage(paired):
-    """300 datasets with run effects, body effects shared by both arms and run-by-body noise; a known
-    difference of 0.02. The 95% interval must cover it in [0.88, 0.99] of the datasets, for the
-    body-paired bootstrap and for the runs-only fallback. With 8 runs per arm the percentile bootstrap
-    is about 2-5 points narrow (measured 0.933 paired, 0.903 runs only); 0.88 is three binomial
-    standard errors below 0.92."""
+    """1,000 datasets with run effects, body effects shared by both arms and run-by-body noise; a known
+    difference of 0.02. The t-calibrated 95% interval must cover it in [0.93, 0.97] of the datasets
+    (three binomial standard errors) for the runs-only fallback (measured 0.954) and in [0.93, 0.99]
+    body-paired: both levels see the run-by-body noise, so the paired interval is a little wide
+    (measured 0.974, also with an arm-by-body interaction). The plain percentile interval covered 0.933
+    paired and 0.903 runs only at 8 runs per arm."""
     rng = np.random.default_rng(35)
-    sims, runs, bodies, truth, covered = 300, 8, 16, 0.02, 0
+    sims, runs, bodies, truth, covered = 1000, 8, 16, 0.02, 0
     for _ in range(sims):
         body = rng.normal(0, .03, bodies)
         arms = [mu + rng.normal(0, .015, (runs, 1)) + body + rng.normal(0, .02, (runs, bodies))
                 for mu in (.2 + truth, .2)]
         if not paired:
             arms = [a.mean(axis=1, keepdims=True) for a in arms]
-        lo, hi = stats.interval(stats.bootstrap_contrast(arms, [1, -1], 999, rng))
+        draws = stats.bootstrap_contrast(arms, [1, -1], 999, rng)
+        lo, hi = stats.t_interval(stats.contrast_estimate(arms, [1, -1]), draws, stats.contrast_df(arms))
         covered += lo <= truth <= hi
-    assert 0.88 <= covered / sims <= 0.99
+    assert 0.93 <= covered / sims <= (0.99 if paired else 0.97)
 
 
 def test_at34_e1_upper_bound_coverage_and_test_size():
     """E1 layout (3 checkpoints, 4 vs 4 continuations). With a true difference of 0.01 the one-sided 95%
-    upper bound lies above it in [0.89, 0.995] of 150 datasets; under no difference the exact two-sided
-    stratified test rejects in [0.01, 0.10] of 200 datasets."""
+    upper bound lies above it in [0.92, 0.98] of 600 datasets (three binomial standard errors; the
+    bound inverts the permutation test under a common shift, so it needs no bootstrap correction);
+    under no difference the exact two-sided stratified test rejects in [0.01, 0.10] of 200 datasets."""
     rng = np.random.default_rng(36)
     covered = 0
-    for _ in range(150):
+    for _ in range(600):
         strata = [(c + .01 + rng.normal(0, .005, 4), c + rng.normal(0, .005, 4)) for c in rng.normal(.4, .01, 3)]
         covered += stats.shift_upper_bound(strata, iterations=25) >= .01
-    assert 0.89 <= covered / 150 <= 0.995
+    assert 0.92 <= covered / 600 <= 0.98
     rejections = 0
     for _ in range(200):
         strata = [(c + rng.normal(0, .005, 4), c + rng.normal(0, .005, 4)) for c in rng.normal(.4, .01, 3)]
@@ -166,20 +169,21 @@ def test_at34_e1_upper_bound_coverage_and_test_size():
 
 def test_at34_e2_stratified_bootstrap_coverage():
     """E2 layout (3 checkpoints, 4 planted vs 4 control continuations, 10 rounds); a known late-round
-    difference of 0.15. Coverage of the 95% interval of the rounds 16-20 mean over 200 datasets lies in
-    [0.85, 0.99]: with four runs per cell the percentile bootstrap is somewhat narrow."""
+    difference of 0.15. Coverage of the t-calibrated 95% interval of the rounds 16-20 mean over 1,000
+    datasets lies in [0.93, 0.97] (measured 0.947; the percentile interval covered 0.88)."""
     rng = np.random.default_rng(37)
     effect = np.r_[np.full(5, .3), np.full(5, .15)]
     covered = 0
-    for _ in range(200):
+    for _ in range(1000):
         strata = []
         for _ in range(3):
             base = rng.uniform(.3, .6)
             strata.append((base + effect + rng.normal(0, .05, (4, 10)), base + rng.normal(0, .05, (4, 10))))
         draws = stats.stratified_bootstrap_rows(strata, 999, rng)
-        lo, hi = stats.interval(draws[:, 5:].mean(axis=1))
+        est = stats.stratified_estimate(strata)[5:].mean()
+        lo, hi = stats.t_interval(est, draws[:, 5:].mean(axis=1), stats.stratified_df(strata))
         covered += lo <= .15 <= hi
-    assert 0.85 <= covered / 200 <= 0.99
+    assert 0.93 <= covered / 1000 <= 0.97
 
 
 # ---------------------------------------------------------------- fixture archive
@@ -250,7 +254,8 @@ def test_bundle_feeds_the_paper_plot_inputs(bundle):
     for name in ("LDM4Geo", "Accumulated context"):
         assert len(m["tokens_per_round_M"][name]) == T
     for mode in ("best_program", "conversation", "history"):
-        assert all(len(r) == 11 and all(map(number, r)) for r in d["E1"]["runs"][mode])
+        assert all(len(r) == 7 and all(map(number, r)) for r in d["E1"]["runs"][mode])
+    assert d["E1"]["rounds"] == [10, 12, 14, 15, 16, 18, 20]
     assert d["E1"]["verdict"] in {"non-inferior", "refuted", "inconclusive"}
     for mode in ("conversation", "history"):
         assert all(len(r) == 10 and all(map(number, r)) for r in d["E2"]["runs"][mode])

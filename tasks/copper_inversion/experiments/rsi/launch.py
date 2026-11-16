@@ -125,6 +125,8 @@ def check_batch(batch, protocol, policy):
             raise PlanError("judge is not defined by the protocol: " + str(run["judge"]))
         if allowed is not None and run["seed"] not in allowed:
             raise PlanError(f"seed {run['seed']} is not in the protocol seed table for {experiment}")
+    if not protocols.is_development(protocol):
+        check_frozen_prefixes(batch)
     names = [run_id(experiment, run) for run in batch["runs"]]
     if len(set(names)) != len(names):
         raise PlanError("a run appears twice in the batch")
@@ -152,6 +154,19 @@ def check_batch(batch, protocol, policy):
         raise PlanError(f"batch needs {sessions} agent sessions, policy allows {policy['max_agent_sessions']}")
     return {"experiment": experiment, "tier": tier, "runs": names, "arms": arms, "judges": judges,
             "seeds": sorted({s for s, _ in next(iter(seed_sets.values()))}), "agent_sessions": sessions}
+
+
+def check_frozen_prefixes(batch):
+    """A formal batch freezes exactly the prefixes the G3-frozen analysis config names for its
+    experiment, and only M1 batches take checkpoints (at the config's checkpoint round)."""
+    from tasks.copper_inversion.experiments.rsi.analysis.bundle import DEFAULTS
+    expected = DEFAULTS["freeze_prefixes"].get(batch["experiment"])
+    if expected is not None and sorted(batch.get("prefixes", [FULL]), key=str) != sorted(expected, key=str):
+        raise PlanError(f"{batch['experiment']} batches freeze prefixes {expected} (analysis config)")
+    ck = batch.get("checkpoint_round")
+    if ck is not None and (batch["experiment"] != DEFAULTS["checkpoint_experiment"] or ck != DEFAULTS["checkpoint_round"]):
+        raise PlanError(f"only {DEFAULTS['checkpoint_experiment']} batches take checkpoints, at round "
+                        f"{DEFAULTS['checkpoint_round']}")
 
 
 # Policy ----------------------------------------------------------------------------

@@ -37,12 +37,20 @@ def permutation_test(x, y, n_perm, rng):
     return (hits + 1) / (n_perm + 1)
 
 
+def _resample(n, m, rng):
+    """Weights of an (n - 1)-out-of-n bootstrap: its variance of a mean is s^2 / n, not (n - 1)/n of it."""
+    k = max(n - 1, 1)
+    return rng.multinomial(k, np.full(n, 1 / n), size=m) / k
+
+
 def bootstrap_contrast(groups, coefs, n_boot, rng, chunk=2000):
     """Hierarchical bootstrap of sum_g coef_g * mean_g.
 
     Each group is a runs x bodies matrix. Runs are resampled within each group;
     when every group has the same bodies (more than one column), one body
     resample per draw is shared by all groups (bodies paired across arms).
+    Both levels draw n - 1 of n, so the draws' SD estimates the standard error
+    without the plug-in shrinkage; t_interval turns it into the interval.
     """
     groups = [np.atleast_2d(np.asarray(g, float)) for g in groups]
     bodies = groups[0].shape[1]
@@ -50,17 +58,34 @@ def bootstrap_contrast(groups, coefs, n_boot, rng, chunk=2000):
     out = np.empty(n_boot)
     for start in range(0, n_boot, chunk):
         m = min(chunk, n_boot - start)
-        weights = rng.multinomial(bodies, np.full(bodies, 1 / bodies), size=m) / bodies if paired else None
+        weights = _resample(bodies, m, rng) if paired else None
         total = np.zeros(m)
         for g, c in zip(groups, coefs):
-            runs = g.shape[0]
-            rw = rng.multinomial(runs, np.full(runs, 1 / runs), size=m) / runs
+            rw = _resample(g.shape[0], m, rng)
             total += c * (np.einsum("ir,rb,ib->i", rw, g, weights) if paired else rw @ g.mean(axis=1))
         out[start:start + m] = total
     return out
 
 
+def contrast_estimate(groups, coefs):
+    return float(sum(c * np.atleast_2d(np.asarray(g, float)).mean() for g, c in zip(groups, coefs)))
+
+
+def contrast_df(groups):
+    return sum(np.atleast_2d(np.asarray(g, float)).shape[0] - 1 for g in groups)
+
+
+def t_interval(estimate, draws, df, level=0.95):
+    """estimate +- t_{df} * SD(draws). With 8 runs per arm the percentile interval of the
+    draws covers about 0.90; the t quantile restores the nominal level."""
+    from scipy.stats import t
+
+    half = float(t.ppf((1 + level) / 2, max(df, 1)) * np.std(draws, ddof=1))
+    return [estimate - half, estimate + half]
+
+
 def interval(draws, level=0.95):
+    """Percentile interval; kept for the nonlinear Proposition 3 quantities."""
     lo, hi = np.quantile(draws, [(1 - level) / 2, (1 + level) / 2])
     return [float(lo), float(hi)]
 
@@ -145,18 +170,25 @@ def e1_verdict(diff, upper, margin):
 # -- E2: stratified bootstrap of per-round differences
 
 def stratified_bootstrap_rows(strata, n_boot, rng):
-    """strata: [(planted rows x rounds, control rows x rounds)]. Returns draws x rounds of
-    mean_s(mean planted_s - mean control_s), resampling rows within each stratum."""
+    """strata: [(rows_a x rounds, rows_b x rounds)]. Returns draws x rounds of
+    mean_s(mean a_s - mean b_s), drawing n - 1 of n rows within each stratum."""
     out = 0
-    for planted, control in strata:
+    for a, b in strata:
         part = 0
-        for rows, sign in ((np.atleast_2d(np.asarray(planted, float)), 1),
-                           (np.atleast_2d(np.asarray(control, float)), -1)):
-            n = rows.shape[0]
-            w = rng.multinomial(n, np.full(n, 1 / n), size=n_boot) / n
-            part = part + sign * (w @ rows)
+        for rows, sign in ((np.atleast_2d(np.asarray(a, float)), 1),
+                           (np.atleast_2d(np.asarray(b, float)), -1)):
+            part = part + sign * (_resample(rows.shape[0], n_boot, rng) @ rows)
         out = out + part
     return out / len(strata)
+
+
+def stratified_estimate(strata):
+    return np.mean([np.atleast_2d(np.asarray(a, float)).mean(axis=0) - np.atleast_2d(np.asarray(b, float)).mean(axis=0)
+                    for a, b in strata], axis=0)
+
+
+def stratified_df(strata):
+    return sum(np.atleast_2d(np.asarray(x)).shape[0] - 1 for pair in strata for x in pair)
 
 
 def half_life(means):

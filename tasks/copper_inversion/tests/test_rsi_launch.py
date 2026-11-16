@@ -103,6 +103,18 @@ def test_batch_plan_schema(tmp_path):
             launch.load_batch(path)
 
 
+def test_formal_batches_freeze_the_frozen_prefixes():
+    """B4/B11/C3: prefixes and checkpoints come from the G3-frozen analysis config."""
+    seeds = [("ldm4geo", "standard", 101), ("accumulated", "standard", 101)]
+    launch.check_frozen_prefixes(plan(seeds, prefixes=["full", 5, 10], checkpoint_round=10))
+    launch.check_frozen_prefixes(plan(seeds, experiment="E2"))
+    for bad in (plan(seeds), plan(seeds, prefixes=["full", 5, 10, 15]),
+                plan(seeds, experiment="E3", checkpoint_round=10),
+                plan(seeds, prefixes=["full", 5, 10], checkpoint_round=12)):
+        with pytest.raises(launch.PlanError):
+            launch.check_frozen_prefixes(bad)
+
+
 # Policy, qualification, pause and reaping ----------------------------------------
 
 def test_policy_is_hashed_and_pinned_to_the_runtime(tmp_path):

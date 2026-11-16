@@ -25,6 +25,7 @@
     "history": "scalar"
    },
    "margin": "scalar",
+   "rounds": "list",
    "runs": {
     "best_program": "list",
     "conversation": "list",
