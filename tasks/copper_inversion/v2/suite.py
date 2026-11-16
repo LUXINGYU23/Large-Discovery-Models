@@ -86,12 +86,33 @@ def release_tiers(path,stage):
 
 def release_packs(path,stage):
     """Observation packs per body fixed by the release layout, or None."""
-    _,record=release_record(path,stage)
+    release,record=release_record(path,stage)
     layout=None if record is None else record.get("layout")
     if layout is None:return None
-    value=layout.get("packs_per_body") if isinstance(layout,dict) else None
+    if not isinstance(layout,dict):raise ValueError("invalid release observation layout")
+    special=layout.get("packs_per_body_by_manifest",{})
+    if not isinstance(special,dict):raise ValueError("invalid release observation layout")
+    relative=str(Path(path).resolve().relative_to(release)) if Path(path).resolve().is_relative_to(release) else None
+    value=special.get(relative,layout.get("packs_per_body"))
     if type(value) is not int or value not in (1,2):raise ValueError("invalid release observation layout")
     return value
+
+
+Q1_FIELDS={"execution_seeds","execution_seeds_manifest","both_packs_manifest","solver_seconds"}
+
+
+def q1_seconds(path,manifest):
+    """Solver budget of a Q1 measurement suite; Q1 is never a tier or a discovery loop."""
+    release,record=release_record(path,manifest["stage"])
+    q1=None if record is None else record.get("q1")
+    if not isinstance(q1,dict) or not Q1_FIELDS<=set(q1):raise ValueError("release has no Q1 measurement record")
+    if type(q1["solver_seconds"]) is not int or q1["solver_seconds"]<1:raise ValueError("invalid Q1 solver budget")
+    path=Path(path).resolve()
+    if path==(release/q1["execution_seeds_manifest"]).resolve():
+        if manifest["seeds"]!=q1["execution_seeds"]:raise ValueError("Q1 execution seeds differ from the release record")
+    elif path!=(release/q1["both_packs_manifest"]).resolve():
+        raise ValueError("manifest is not a Q1 measurement suite")
+    return q1["solver_seconds"]
 
 
 def public_projection(manifest):
@@ -171,7 +192,7 @@ def load_manifest(path,packs_per_body=None):
 
 
 class SuiteEvaluator:
-    def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation"):
+    def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None):
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
@@ -181,7 +202,12 @@ class SuiteEvaluator:
         if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
         self.seconds=seconds;self.objective=objective
         release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
-        if tiers is not None:
+        if purpose not in (None,"q1"):raise ValueError("unknown evaluation purpose")
+        if purpose=="q1":
+            # Explicit opt-in: Q1 suites are measured outside any discovery loop.
+            if seconds!=q1_seconds(self.manifest_path,self.manifest):
+                raise ValueError("solver budget differs from the release Q1 record")
+        elif tiers is not None:
             allowed={tiers[name]["solver_seconds"] for name in manifest_tiers(self.manifest_path,self.manifest,release,tiers)}
             if seconds not in allowed:raise ValueError("solver budget differs from the release tier table")
         elif self.manifest["stage"]=="formal" and seconds!=120:
@@ -189,6 +215,7 @@ class SuiteEvaluator:
         if seconds<=0:raise ValueError("invalid solver budget")
         self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),case_workers=4,
             image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=AGGREGATIONS[objective])
+        if purpose is not None:self.context["purpose"]=purpose
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))

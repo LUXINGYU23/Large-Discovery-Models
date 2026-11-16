@@ -12,7 +12,7 @@ from ldm_tts.contracts import RawProposal,CandidateRejection
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.candidate import seal,validate_source
 from ..core.execution import Execution,digest,source_identity
-from .suite import SuiteEvaluator,load_manifest,file_hash
+from .suite import SuiteEvaluator,load_manifest,file_hash,release_tiers,manifest_tiers
 from .domain import CheckedDomain
 from .interface_checks import InterfaceChecks
 from .training_receipts import eligible
@@ -23,6 +23,18 @@ def locked(root):
     with (Path(root)/"protocol.lock").open("a") as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         yield
+
+
+def selection_seconds(training_manifest,training,manifests,loaded):
+    """Solver budgets of tiers listing all four suites; old formal releases fix 120 s."""
+    release,tiers=release_tiers(training_manifest,training["stage"])
+    if tiers is None:return {120} if training["stage"]=="formal" else None
+    names=set(manifest_tiers(training_manifest,training,release,tiers,roles=("train",)))
+    names&=set(manifest_tiers(manifests[0],loaded[0],release,tiers,roles=("validation",)))
+    for path,manifest in zip(manifests[1:],loaded[1:]):
+        names&=set(manifest_tiers(path,manifest,release,tiers,roles=("sealed",)))
+    if not names:raise ValueError("suites do not belong to one release tier")
+    return {tiers[name]["solver_seconds"] for name in names}
 
 
 def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest):
@@ -39,7 +51,9 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
     if training["stage"]=="formal":
         from .qualification import verify_release
         for path in [training_manifest,*manifests]:verify_release(path)
-        if seconds!=120:raise ValueError("formal selection requires 120 seconds")
+    allowed=selection_seconds(training_manifest,training,manifests,loaded)
+    if allowed is not None and seconds not in allowed:
+        raise ValueError("selection solver budget differs from the release tier table")
     parents=[{c["parent_id"] for c in m["cases"]} for m in [training,*loaded]]
     if any(parents[i]&parents[j] for i in range(4) for j in range(i)):
         raise ValueError("held-out suites share geology parents")

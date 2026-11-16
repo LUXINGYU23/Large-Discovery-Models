@@ -27,6 +27,8 @@ def main():
     parser.add_argument("--image", required=True)
     parser.add_argument("--seconds", required=True, type=int)
     parser.add_argument("--slots", required=True, type=int)
+    parser.add_argument("--protocol", type=Path,
+                        help="frozen protocol.json; its hashes.evaluator_image must equal --image")
     parser.add_argument("--tier", help="tier name in the release's sealed tier table")
     parser.add_argument("--objective", choices=("confirmation", "oracle_iou"), default="confirmation")
     parser.add_argument("--import-source", type=Path,
@@ -43,6 +45,10 @@ def main():
         raise ValueError("research and evaluator accounts must differ")
     if not args.image.startswith("sha256:") or len(args.image) != 71:
         raise ValueError("pin the evaluator image digest")
+    if args.protocol is not None:
+        frozen = json.loads(args.protocol.read_text()).get("hashes", {}).get("evaluator_image")
+        if frozen is not None and frozen != args.image:
+            raise ValueError("evaluator image differs from the frozen protocol digest")
     private, socket_dir = args.private_root.resolve(), args.socket_dir.resolve()
     socket_path = socket_dir / "e.sock"
     if len(os.fsencode(socket_path)) >= 104:

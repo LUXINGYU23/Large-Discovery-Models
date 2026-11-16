@@ -31,6 +31,7 @@ from tasks.copper_inversion.v2.data import read_problem, save_problem
 from tasks.copper_inversion.v2.metrics import compare
 from tasks.copper_inversion.v2.objective import score
 from tasks.copper_inversion.v2.suite import SuiteEvaluator, aggregate, file_hash, load_manifest
+from tasks.copper_inversion.v2.selection import freeze
 from tasks.copper_inversion.v2.training_receipts import eligible
 
 IMAGE = "sha256:" + "e" * 64
@@ -45,6 +46,7 @@ REJECTED = "# interface_reject\ndef solve(problem, budget, seed):\n    return No
 def truth_for(index):
     truth = np.zeros(fixture()["shape"], bool)
     truth[:4 + index % 3, :, :-1] = True
+    truth[8, index % 8, (index // 8) % 6] = True  # distinct geometry per body
     return truth
 
 
@@ -80,11 +82,11 @@ class InProcessExecution:
 
 
 def write_suite(release, name, *, stage="development", bodies=4, packs=1, split="train",
-                confirmation_shift=.01, seeds=(47,)):
+                confirmation_shift=.01, seeds=(47,), offset=0):
     """<release>/<name>/manifest.json with one or two packs per synthetic body."""
     root = release / name
     rows = []
-    for index in range(bodies):
+    for index in range(offset, offset + bodies):
         parent = hashlib.sha256(f"private-body-{index}".encode()).hexdigest()
         truth = root / "private" / f"body{index}"
         truth.mkdir(parents=True)
@@ -339,9 +341,14 @@ def tiered_release(root, stage):
         for name in ("problem.json", "problem.npz"):
             case["sha256"]["confirmation/" + name] = file_hash(folder / name)
     path.write_text(json.dumps(manifest, sort_keys=True))
-    write_suite(release, "validation", stage=stage, bodies=2, split="validation")
-    write_record(release, stage, layout={"packs_per_body": 1},
-                 tiers={"S": tier(30, "train_s/manifest.json", 4), "F": tier(120, "train/manifest.json", 8)})
+    write_suite(release, "validation", stage=stage, bodies=2, split="validation", offset=10)
+    write_suite(release, "train_s_q1seeds", stage=stage, bodies=4, seeds=(47, 48, 49))
+    write_suite(release, "train_q1_both", stage=stage, bodies=4, packs=2)
+    write_record(release, stage,
+                 layout={"packs_per_body": 1, "packs_per_body_by_manifest": {"train_q1_both/manifest.json": 2}},
+                 tiers={"S": tier(30, "train_s/manifest.json", 4), "F": tier(120, "train/manifest.json", 8)},
+                 q1={"execution_seeds": [47, 48, 49], "execution_seeds_manifest": "train_s_q1seeds/manifest.json",
+                     "both_packs_manifest": "train_q1_both/manifest.json", "solver_seconds": 30})
     return release
 
 
@@ -392,6 +399,78 @@ def test_at19_releases_without_a_tier_table_keep_the_fixed_budget(tmp_path):
         make_service(tmp_path, development, name="e", seconds=121, slots=321)
     with pytest.raises(ValueError, match="fixed at 120"):
         SuiteEvaluator(tmp_path / "x", InProcessExecution(tmp_path / "jobs", IMAGE), formal, 30)
+
+
+@pytest.mark.parametrize("stage", ["development", "formal"])
+def test_at19_frozen_selection_uses_the_tier_budget(tmp_path, stage):
+    release = tiered_release(tmp_path, stage)
+    write_suite(release, "test_id", stage=stage, bodies=2, split="test_id", offset=20)
+    write_suite(release, "test_ood", stage=stage, bodies=2, split="test_ood", offset=30)
+    held_out = [release / f"{name}/manifest.json" for name in ("validation", "test_id", "test_ood")]
+    source = tmp_path / "solver.py"
+    source.write_text(VALID)
+    with patch("tasks.copper_inversion.v2.qualification.verify_release"):
+        short = make_service(tmp_path, release / "train_s/manifest.json", name="s30", seconds=30, slots=321)
+        evaluate(short, VALID)
+        provenance = dict(training_run=short.root, training_manifest=release / "train_s/manifest.json")
+        frozen = freeze(tmp_path / "freeze30", [source], held_out[0], held_out[1:], seconds=30, image=IMAGE,
+                        **provenance)
+        assert frozen["seconds"] == 30
+        with pytest.raises(ValueError, match="tier table"):
+            freeze(tmp_path / "freeze60", [source], held_out[0], held_out[1:], seconds=60, image=IMAGE,
+                   **provenance)
+        # The training suite of S with F's 120 s is not one tier's protocol either.
+        with pytest.raises(ValueError, match="tier table"):
+            freeze(tmp_path / "freeze120", [source], held_out[0], held_out[1:], seconds=120, image=IMAGE,
+                   **provenance)
+        unlisted = write_suite(release, "validation_other", stage=stage, bodies=2, split="validation", offset=40)
+        with pytest.raises(ValueError, match="one release tier"):
+            freeze(tmp_path / "unlisted", [source], unlisted, held_out[1:], seconds=30, image=IMAGE, **provenance)
+    # Old formal releases without a table keep the fixed 120 s.
+    from tasks.copper_inversion.v2.selection import selection_seconds
+    old = write_suite(tmp_path / "old", "train", stage="formal", packs=2)
+    assert selection_seconds(old, load_manifest(old), [], []) == {120}
+
+
+@pytest.mark.parametrize("stage", ["development", "formal"])
+def test_q1_suites_need_the_explicit_measurement_purpose(tmp_path, stage):
+    release = tiered_release(tmp_path, stage)
+    seeds, both = release / "train_s_q1seeds/manifest.json", release / "train_q1_both/manifest.json"
+    # Per-manifest layout overrides the release default.
+    assert len(load_manifest(both)["cases"]) == 8 and load_manifest(seeds)["seeds"] == [47, 48, 49]
+    record = release / ("qualification.json" if stage == "formal" else "development-receipt.json")
+    fields = json.loads(record.read_text())
+    write_record(release, stage, **{**fields, "layout": {"packs_per_body": 1}})
+    with pytest.raises(ValueError, match="exactly one"):
+        load_manifest(both)
+    write_record(release, stage, **fields)
+    execution = InProcessExecution(tmp_path / "jobs", IMAGE)
+    for manifest in (seeds, both):
+        evaluator = SuiteEvaluator(tmp_path / manifest.parent.name, execution, manifest, 30, purpose="q1")
+        assert evaluator.context["purpose"] == "q1"
+        with pytest.raises(ValueError, match="tier table"):
+            SuiteEvaluator(tmp_path / "loop", execution, manifest, 30)
+        with pytest.raises(ValueError, match="Q1 record"):
+            SuiteEvaluator(tmp_path / "slow", execution, manifest, 120, purpose="q1")
+    with pytest.raises(ValueError, match="not a Q1"):
+        SuiteEvaluator(tmp_path / "s", execution, release / "train_s/manifest.json", 30, purpose="q1")
+    write_record(release, stage, **{**fields, "q1": {**fields["q1"], "execution_seeds": [47, 48]}})
+    with pytest.raises(ValueError, match="seeds differ"):
+        SuiteEvaluator(tmp_path / "seeds", execution, seeds, 30, purpose="q1")
+    write_record(release, stage, **fields)
+    from tasks.copper_inversion.v2.service import EvaluatorService
+    with patch("tasks.copper_inversion.v2.qualification.verify_release"), \
+            patch("tasks.copper_inversion.v2.service.Execution", InProcessExecution):
+        base = dict(manifest=str(both), image=IMAGE, caller_uid=0, socket="s", seconds=30, slots=10)
+        service = EvaluatorService(dict(base, root=str(tmp_path / "q1service"), purpose="q1"))
+        assert service.identity["purpose"] == "q1" and service.tier is None
+        with pytest.raises(ValueError, match="one release tier"):
+            EvaluatorService(dict(base, root=str(tmp_path / "noflag")))
+        with pytest.raises(ValueError, match="no tier"):
+            EvaluatorService(dict(base, root=str(tmp_path / "tiered"), purpose="q1", tier="S"))
+        # Q1 never feeds a discovery loop: the risk-only service refuses it.
+        with pytest.raises(ValueError, match="measurement-only"):
+            make_service(tmp_path, seeds, name="rsi-q1", seconds=30, slots=10, purpose="q1")
 
 
 # AT-23 ---------------------------------------------------------------------

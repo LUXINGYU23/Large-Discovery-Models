@@ -16,7 +16,7 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetLedger,BudgetExceededError,atomic_json_write
 from ..core.candidate import seal,validate_source
 from ..core.execution import Execution,source_identity,digest
-from .suite import SuiteEvaluator,load_manifest,release_tiers,manifest_tiers,OBJECTIVES
+from .suite import SuiteEvaluator,load_manifest,release_tiers,manifest_tiers,q1_seconds,OBJECTIVES
 from .budget import ScientificSlots
 from .domain import CheckedDomain
 from .interface_checks import InterfaceChecks
@@ -33,6 +33,12 @@ def resolve_tier(configuration,manifest):
     release,tiers=release_tiers(path,manifest["stage"])
     seconds,slots=configuration["seconds"],configuration["slots"]
     if type(seconds) is not int or type(slots) is not int:raise ValueError("invalid service budget")
+    if configuration.get("purpose")=="q1":
+        # Q1 measurement is not a tier: budget from the release Q1 record only.
+        if "tier" in configuration or slots<1 or seconds!=q1_seconds(path,manifest):
+            raise ValueError("Q1 service requires the release Q1 solver budget and no tier")
+        return None
+    if configuration.get("purpose") is not None:raise ValueError("unknown service purpose")
     if tiers is None:
         if "tier" in configuration:raise ValueError("release has no tier table")
         if manifest["stage"]=="formal" and (slots!=321 or seconds!=120):
@@ -56,7 +62,7 @@ def resolve_tier(configuration,manifest):
 
 class EvaluatorService:
     configuration_keys=frozenset({"manifest","root","image","seconds","slots","caller_uid","socket"})
-    optional_keys=frozenset({"tier","objective"})
+    optional_keys=frozenset({"tier","objective","purpose"})
 
     def __init__(self,configuration):
         if not isinstance(configuration,dict) or not (
@@ -82,7 +88,7 @@ class EvaluatorService:
             solve_count=len(manifest["cases"])*len(manifest["seeds"]),
             failed_solves=len(manifest["cases"])*len(manifest["seeds"]),mean_solver_wall_seconds=0.)
         self.identity=dict(configuration=configuration,suite_digest=digest(manifest),implementation=source_identity(),
-            objective=self.objective,tier=self.tier)
+            objective=self.objective,tier=self.tier,purpose=configuration.get("purpose"))
         identity_file=self.root/"identity.json"
         if identity_file.exists():
             if json.loads(identity_file.read_text())!=self.identity:raise ValueError("private service identity changed")
@@ -97,7 +103,7 @@ class EvaluatorService:
         self.slots=slots
         self.domain=CheckedDomain(self.root,InterfaceChecks(self.root,execution,slots))
         self.evaluator=SuiteEvaluator(self.root,execution,configuration["manifest"],configuration["seconds"],slots,
-            objective=self.objective)
+            objective=self.objective,purpose=configuration.get("purpose"))
 
     def dispatch(self,request):
         if not isinstance(request,dict):return {"status":"rejected_request"}

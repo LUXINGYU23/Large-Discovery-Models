@@ -55,6 +55,8 @@ class RiskOnlyService(EvaluatorService):
     tier = None
 
     def __init__(self, configuration):
+        if isinstance(configuration, dict) and "purpose" in configuration:
+            raise ValueError("discovery feedback cannot use a measurement-only suite")
         super().__init__(configuration)
         path = self.root / "rsi-private-audit.json"
         cases = self.evaluator.manifest["cases"]
