@@ -20,10 +20,20 @@ def file_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+OBJECTIVES=("confirmation","oracle_iou")
+AGGREGATIONS={"confirmation":"parent-macro-confirmation-utility-v1","oracle_iou":"parent-macro-oracle-iou-v1"}
+TIER_FIELDS={"solver_seconds","train_manifest","train_bodies","validation_manifest","sealed_manifests","slots"}
+
+
 def aggregate(rows):
     """One vote per geology parent, including every planned failed solve."""
     if not rows:
         raise ValueError("empty evaluation suite")
+    # Oracle receipts name their objective; legacy confirmation rows do not.
+    objectives={row.get("objective","confirmation") for row in rows}
+    if len(objectives)!=1 or not objectives<=set(OBJECTIVES):
+        raise ValueError("mixed or unknown evaluation objective")
+    objective=objectives.pop()
     grouped={}
     for row in rows:
         grouped.setdefault(row["parent_id"],[]).append(row)
@@ -37,8 +47,10 @@ def aggregate(rows):
             raise ValueError('independent confirmation objective is missing or invalid')
         return 1./(1.+loss)
     # Bound the loss without dropping failed solves or choosing a numerical
-    # penalty scale. Each parent has equal weight. IoU is diagnostic only.
-    measurement_utility=float(np.mean([np.mean([utility(r) for r in members]) for members in grouped.values()]))
+    # penalty scale. Each parent has equal weight. IoU is diagnostic only,
+    # except for the deliberately unblinded oracle judge (risk = 1 - IoU).
+    if objective=="oracle_iou":measurement_utility=mean
+    else:measurement_utility=float(np.mean([np.mean([utility(r) for r in members]) for members in grouped.values()]))
     return dict(mean_iou=mean,loss_total=1-measurement_utility,research_utility=measurement_utility,
         legal_rate=float(np.mean([r["status"]=="succeeded" for r in rows])),
         parent_count=len(grouped),solve_count=len(rows),
@@ -46,7 +58,65 @@ def aggregate(rows):
         mean_solver_wall_seconds=float(np.mean([r["solver_wall_seconds"] for r in rows])))
 
 
-def load_manifest(path):
+def release_record(path,stage):
+    """Receipt of the release holding <release>/<suite>/manifest.json, if any."""
+    release=Path(path).resolve().parent.parent
+    names=("qualification.json",) if stage=="formal" else ("development-receipt.json","qualification.json")
+    for name in names:
+        if (release/name).is_file():return release,json.loads((release/name).read_text())
+    return release,None
+
+
+def release_tiers(path,stage):
+    """The sealed tier table (protocol.json tiers shape), or None for old releases."""
+    release,record=release_record(path,stage)
+    tiers=None if record is None else record.get("tiers")
+    if tiers is None:return release,None
+    if not isinstance(tiers,dict) or not tiers:raise ValueError("invalid release tier table")
+    for row in tiers.values():
+        if not isinstance(row,dict) or set(row)!=TIER_FIELDS or not isinstance(row["sealed_manifests"],list):
+            raise ValueError("invalid release tier table")
+        if any(type(row[k]) is not int or row[k]<1 for k in ("solver_seconds","train_bodies","slots")):
+            raise ValueError("invalid release tier budget")
+        for name in [row["train_manifest"],row["validation_manifest"],*row["sealed_manifests"]]:
+            if not isinstance(name,str) or not (release/name).resolve().is_relative_to(release):
+                raise ValueError("tier manifest escapes release")
+    return release,tiers
+
+
+def release_packs(path,stage):
+    """Observation packs per body fixed by the release layout, or None."""
+    _,record=release_record(path,stage)
+    layout=None if record is None else record.get("layout")
+    if layout is None:return None
+    value=layout.get("packs_per_body") if isinstance(layout,dict) else None
+    if type(value) is not int or value not in (1,2):raise ValueError("invalid release observation layout")
+    return value
+
+
+def public_projection(manifest):
+    """Bodies, public data and truth; judge variants differ only in confirmation."""
+    return dict(stage=manifest["stage"],split=manifest["split"],seeds=manifest["seeds"],
+        cases=sorted((c["case_id"],c["parent_id"],c["modality"],c["sha256"]["problem.json"],
+                      c["sha256"]["problem.npz"],c["sha256"]["truth.npy"]) for c in manifest["cases"]))
+
+
+def manifest_tiers(path,manifest,release,tiers,roles=("train","validation","sealed")):
+    """Tiers listing this manifest, or a judge variant of a listed one, in a role."""
+    path=Path(path).resolve();own=public_projection(manifest);names=[]
+    for name,row in sorted(tiers.items()):
+        listed=([row["train_manifest"]] if "train" in roles else [])+(
+            [row["validation_manifest"]] if "validation" in roles else [])+(
+            list(row["sealed_manifests"]) if "sealed" in roles else [])
+        for relative in listed:
+            other=(release/relative).resolve()
+            if other==path or (other.is_file() and public_projection(json.loads(other.read_text()))==own):
+                names.append(name);break
+    return names
+
+
+def load_manifest(path,packs_per_body=None):
+    """packs_per_body overrides the release layout, for release tools writing it."""
     path=Path(path).resolve()
     manifest=json.loads(path.read_text())
     if set(manifest)!={"schema","stage","split","seeds","cases"} or manifest["schema"]!="copper-suite-v2":
@@ -84,26 +154,41 @@ def load_manifest(path):
         previous=parent_geometry.setdefault(row["parent_id"],geometry)
         if previous!=geometry:raise ValueError("one parent has inconsistent geometry across observation packs")
 
-    if any(sorted(values) not in (["drill"], ["drill_outcrop"], ["drill","drill_outcrop"])
-           for values in parents.values()):
+    packs=release_packs(path,manifest["stage"]) if packs_per_body is None else packs_per_body
+    if packs==1:
+        if any(values not in (["drill"],["drill_outcrop"]) for values in parents.values()):
+            raise ValueError("each parent requires exactly one observation pack")
+    elif packs==2 or manifest["stage"]=="formal":
+        if any(sorted(values)!=["drill","drill_outcrop"] for values in parents.values()):
+            raise ValueError("each parent requires exactly two observation packs")
+    elif packs is not None:
+        raise ValueError("invalid observation layout")
+    # Development data without a recorded layout keep the rsi-dev tolerance.
+    elif any(sorted(values) not in (["drill"], ["drill_outcrop"], ["drill","drill_outcrop"])
+             for values in parents.values()):
         raise ValueError("each parent requires one or both distinct observation packs")
     return manifest
 
 
 class SuiteEvaluator:
-    def __init__(self,root,execution,manifest_path,seconds=120,slots=None):
+    def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation"):
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
         self.manifest=load_manifest(self.manifest_path)
         if any('confirmation/problem.npz' not in case['sha256'] for case in self.manifest['cases']):
             raise ValueError('independent confirmation measurements required for evaluation')
-        self.seconds=seconds
-        if self.manifest["stage"]=="formal" and seconds!=120:
+        if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
+        self.seconds=seconds;self.objective=objective
+        release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
+        if tiers is not None:
+            allowed={tiers[name]["solver_seconds"] for name in manifest_tiers(self.manifest_path,self.manifest,release,tiers)}
+            if seconds not in allowed:raise ValueError("solver budget differs from the release tier table")
+        elif self.manifest["stage"]=="formal" and seconds!=120:
             raise ValueError("formal solver budget is fixed at 120 seconds")
         if seconds<=0:raise ValueError("invalid solver budget")
         self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),case_workers=4,
-            image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation="parent-macro-confirmation-utility-v1")
+            image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=AGGREGATIONS[objective])
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
@@ -137,6 +222,7 @@ class SuiteEvaluator:
                 row=dict(parent_id=case["parent_id"],case_id=case["case_id"],seed=seed,
                     status="failed",metrics={"iou":0.},solver_wall_seconds=r["wall_seconds"],jobs=1,
                     solver_resources=r.get("workload_resources"),error="solver failed")
+                if self.objective!="confirmation":row["objective"]=self.objective
                 if r["reason"]=="timeout":row["status"]="timed_out"
                 if not (r["exit_code"] or r["reason"] or r["oom"]):
                     try:
