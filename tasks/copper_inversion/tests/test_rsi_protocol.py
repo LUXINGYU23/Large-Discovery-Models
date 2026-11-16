@@ -411,3 +411,14 @@ def test_model_settings_reach_the_agent_or_are_refused():
         workflow.agent_settings(other, Legacy)
     assert workflow.agent_settings(other, Configurable) == {
         "base_url": value["model"]["base_url"], "model": "other-model", "thinking": "high", "bash_calls": 4}
+
+
+def test_evaluation_concurrency_comes_from_the_scheduling_policy(tmp_path):
+    from tasks.copper_inversion.rsi.workflow import evaluation_concurrency
+    assert evaluation_concurrency({}) == 1
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps({"batch_workers": 16}))
+    assert evaluation_concurrency({"LDM4GEO_SCHEDULING_POLICY": str(policy)}) == 16
+    policy.write_text(json.dumps({"batch_workers": 0}))
+    with pytest.raises(ValueError):
+        evaluation_concurrency({"LDM4GEO_SCHEDULING_POLICY": str(policy)})

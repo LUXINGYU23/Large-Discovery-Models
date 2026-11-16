@@ -240,10 +240,26 @@ def prepare(args):
             "agent": agent_settings(protocol), "continuation": continued}
 
 
+def evaluation_concurrency(environ=os.environ):
+    """Concurrent evaluations per round from the scheduling policy (parallel_runtime ``rsi`` mode).
+
+    The runtime verifies the policy's hashes before exporting its path. Without a
+    policy the controller evaluates serially, as before.
+    """
+    path = environ.get("LDM4GEO_SCHEDULING_POLICY")
+    if not path:
+        return 1
+    value = json.loads(Path(path).read_text()).get("batch_workers", 1)
+    if type(value) is not int or value < 1:
+        raise ValueError("scheduling policy batch_workers must be a positive integer")
+    return value
+
+
 def main(argv=None):
     args = parse_args(argv)
     plan = prepare(args)
     protocol, config, solver_seconds = plan["protocol"], plan["config"], plan["solver_seconds"]
+    config = dataclasses.replace(config, evaluation_concurrency=evaluation_concurrency())
     catalog = load_catalog(args.public_catalog)
     if args.fixture_only and catalog["stage"] != "development":
         raise ValueError("fixture-only runs require a development catalog")
