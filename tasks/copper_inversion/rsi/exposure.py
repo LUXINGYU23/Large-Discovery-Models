@@ -7,17 +7,24 @@ import re
 VERSION = "rsi-feedback-v2"
 FIELDS = frozenset({"source_sha256", "status", "risk", "risk_by_case", "legal_rate",
                     "failed_solves", "seconds_per_solve", "message"})
+# Test-only switch for the AT-04 positive control; never set outside a test.
+UNSAFE_DISABLE_WHITELIST = False
 
 
 def valid_case_id(value):
     return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value) is not None
 
 
-def risk_by_case(rows, case_ids):
+def risk_by_case(rows, case_ids, objective="confirmation"):
     grouped = {case_id: [] for case_id in case_ids}
     for row in rows:
         case_id = row["case_id"]
-        if row["status"] == "succeeded":
+        if row["status"] == "succeeded" and objective == "oracle_iou":
+            iou = row["metrics"]["iou"]
+            if type(iou) not in (int, float) or not math.isfinite(iou) or not 0 <= iou <= 1:
+                raise ValueError("invalid oracle IoU in private receipt")
+            value = 1.0 - iou
+        elif row["status"] == "succeeded":
             loss = row["metrics"]["confirmation_loss_total"]
             if type(loss) not in (int, float) or not math.isfinite(loss) or loss < 0:
                 raise ValueError("invalid confirmation loss in private receipt")
@@ -30,7 +37,21 @@ def risk_by_case(rows, case_ids):
     return {key: sum(values) / len(values) for key, values in sorted(grouped.items())}
 
 
+def project(record):
+    """The whitelist: the only barrier between private metrics and the controller."""
+    if UNSAFE_DISABLE_WHITELIST:
+        return validate_feedback(dict(record))
+    return validate_feedback({key: record[key] for key in FIELDS})
+
+
 def validate_feedback(value):
+    if UNSAFE_DISABLE_WHITELIST and isinstance(value, dict) and FIELDS <= set(value):
+        _validate_exact({key: value[key] for key in FIELDS})
+        return value
+    return _validate_exact(value)
+
+
+def _validate_exact(value):
     if not isinstance(value, dict) or set(value) != FIELDS:
         raise ValueError("feedback contains unexpected or missing fields")
     if (not isinstance(value["source_sha256"], str)
