@@ -130,6 +130,17 @@ def held_out(release, manifest=None, protocol=None):
             [release / path for path in tier["sealed_manifests"]])
 
 
+def judge_objective(manifest, protocol, configuration):
+    """spec §3.3: the judge also scores validation; it must match the training service."""
+    service = configuration.get("objective", "confirmation")
+    if protocol is None:
+        return service
+    objective = protocol["judges"][manifest["judge"]].get("objective", "confirmation")
+    if objective != service:
+        raise ValueError("run judge objective differs from its training service")
+    return objective
+
+
 def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, release, protocol=None):
     paths = layout(root, protocol_id, experiment, run_id)
     manifest = run_manifest(paths["run"], protocol_id, experiment)
@@ -148,7 +159,9 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
         config = chosen["configuration"]
         frozen = selection.freeze(target, chosen["sources"], validation, tests, seconds=config["seconds"],
                                   image=config["image"], training_run=paths["service"],
-                                  training_manifest=config["manifest"])
+                                  training_manifest=config["manifest"],
+                                  objective=judge_objective(manifest, protocol, config))
+    record["selection_objective"] = frozen.get("selection_objective", "confirmation")
     record["frozen_sha256"] = digest(frozen)
     path = target / "prefix.json"
     if path.exists():

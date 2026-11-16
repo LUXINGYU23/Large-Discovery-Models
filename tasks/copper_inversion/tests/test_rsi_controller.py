@@ -767,3 +767,113 @@ def test_core_arms_run_and_their_briefs_reconstruct(tmp_path, arm):
         assert "solve(problem, budget, seed)" in message["brief"] and "# history" not in message["brief"]
         assert {seen["session_round"] for seen in agent.seen.values()} == {0}
         assert all(json.loads(v)["kind"] == "boundary" for v in briefs(root).values())
+
+
+class DelayedEvaluator(ScriptedEvaluator):
+    """Random per-call delays so completion order differs from selection order; thread-safe."""
+
+    def __init__(self, seed=0, fail_at=None):
+        super().__init__()
+        self.rng, self.lock = random.Random(seed), threading.Lock()
+        self.calls, self.active, self.peak, self.fail_at, self.done = [], 0, 0, fail_at, []
+
+    def evaluate_source(self, path):
+        with self.lock:
+            self.calls.append(path.parent.name)
+            number, delay = len(self.calls), self.rng.uniform(0, .03)
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+        try:
+            time.sleep(delay)
+            if number == self.fail_at:
+                raise Crash("synthetic kill")
+            result = super().evaluate_source(path)
+            with self.lock:
+                self.done.append(path.parent.name)
+            return result
+        finally:
+            with self.lock:
+                self.active -= 1
+
+
+def concurrent_controller(root, workers, evaluator=None, **settings):
+    return make_controller(root, rounds=4, reset=2, n=4, batch=8, evaluator=evaluator,
+                           evaluation_concurrency=workers, **settings)
+
+
+@pytest.mark.parametrize("workers", [2, 4, 8, 16])
+def test_concurrent_evaluation_records_in_selection_order(tmp_path, workers):
+    baseline = tmp_path / "serial"
+    concurrent_controller(baseline, 1).run()
+    evaluator = DelayedEvaluator(seed=workers)
+    concurrent_controller(tmp_path / "concurrent", workers, evaluator).run()
+    assert tree(tmp_path / "concurrent") == tree(baseline)  # manifest too: concurrency is not identity
+    assert 1 < evaluator.peak <= min(workers, 8)
+    assert evaluator.done != evaluator.calls  # completion order differed from selection order
+    selected = [p["program_id"] for r in range(1, 5)
+                for p in json.loads((baseline / f"selection/round_{r:02d}.json").read_text())["selected"]]
+    assert [r["program_id"] for r in read(baseline / "ledger.jsonl")[1:]] == selected
+    assert "evaluation_concurrency" not in json.loads((baseline / "manifest.json").read_text())["config"]
+    with pytest.raises(ValueError, match="evaluation_concurrency"):
+        Config("ldm4geo", 7, evaluation_concurrency=0)
+
+
+@pytest.mark.parametrize("fail_at", [12, 20])  # calls 10-17: round 2 (mid-epoch); 18-25: round 3 (boundary)
+def test_failure_inside_concurrent_batch_resumes_exactly(tmp_path, fail_at):
+    baseline = tmp_path / "baseline"
+    concurrent_controller(baseline, 1).run()
+    root = tmp_path / "run"
+    with pytest.raises(Crash):
+        concurrent_controller(root, 4, DelayedEvaluator(seed=fail_at, fail_at=fail_at)).run()
+    charged = {r["program_id"] for r in read(root / "ledger.jsonl")}
+    assert len(charged) < fail_at  # only the completed prefix in selection order was recorded
+    rows = read(root / "ledger.jsonl")
+    round_index = rows[-1]["round"]
+    selected = json.loads((root / f"selection/round_{round_index:02d}.json").read_text())["selected"]
+    assert [r["program_id"] for r in rows if r["round"] == round_index] == \
+        [p["program_id"] for p in selected][:sum(r["round"] == round_index for r in rows)]
+    resumed = DelayedEvaluator(seed=1)
+    concurrent_controller(root, 3, resumed).run(resume=True)  # concurrency may change on resume
+    assert not charged & set(resumed.calls)
+    assert tree(root) == tree(baseline)
+
+
+KILL_EVALUATION_CHILD = r"""
+import os, signal, sys, time
+from tasks.copper_inversion.tests import test_rsi_controller as t
+root, at = sys.argv[1], int(sys.argv[2])
+class Evaluator(t.DelayedEvaluator):
+    def evaluate_source(self, path):
+        with self.lock:
+            number = len(self.calls) + 1
+        if number == at:
+            time.sleep(0.01)
+            os.kill(os.getpid(), signal.SIGKILL)
+        return super().evaluate_source(path)
+t.concurrent_controller(root, 4, Evaluator(seed=at)).run()
+"""
+
+
+@pytest.mark.parametrize("at", [12, 18, 21])
+def test_killed_during_concurrent_evaluation_resumes_exactly(tmp_path, at):
+    """AT-14 for concurrent evaluation: SIGKILL mid-epoch (round 2) and in the boundary round's batch."""
+    baseline = tmp_path / "baseline"
+    concurrent_controller(baseline, 1).run()
+    root = tmp_path / "killed"
+    child = subprocess.run([sys.executable, "-c", KILL_EVALUATION_CHILD, str(root), str(at)], cwd=REPO,
+                           env={**os.environ, "PYTHONPATH": str(REPO)}, capture_output=True, timeout=300)
+    assert child.returncode == -9, child.stderr.decode()[-2000:]
+    charged = {r["program_id"] for r in read(root / "ledger.jsonl")}
+    resumed = DelayedEvaluator(seed=2)
+    concurrent_controller(root, 4, resumed).run(resume=True)
+    assert not charged & set(resumed.calls)
+    assert tree(root) == tree(baseline)
+
+
+def test_token_cap_rule_unchanged_under_concurrent_evaluation(tmp_path):
+    cap = _round_tokens(1, True) + 1
+    serial = make_controller(tmp_path / "serial", rounds=4, cap=cap).run()
+    concurrent = make_controller(tmp_path / "concurrent", rounds=4, cap=cap, evaluation_concurrency=4,
+                                 evaluator=DelayedEvaluator()).run()
+    assert concurrent == serial and concurrent["rounds_completed"] == 2
+    assert tree(tmp_path / "concurrent") == tree(tmp_path / "serial")
