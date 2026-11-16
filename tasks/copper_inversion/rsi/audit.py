@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from .controller import Config, make_message
@@ -55,35 +56,118 @@ def reconcile_budget(run, private):
     return {"status": "passed", "charged_sources": len(public_ids)}
 
 
-def scan_blind(run, private, *, require_requests=True, private_manifest=None, key_file=None):
-    """Search only internally; never print the sentinel or private parent IDs."""
-    run, private = Path(run), Path(private)
+IOU = re.compile(rb"iou", re.IGNORECASE)
+
+
+def _private_markers(private, private_manifest):
+    """Sentinel, private parent IDs and every truth-side file hash (AT-05)."""
     audit = json.loads((private / "rsi-private-audit.json").read_text())
-    markers = [audit["sentinel"].encode()] + [value.encode() for value in audit["private_parent_ids"]]
+    markers = {"sentinel": [audit["sentinel"].encode()],
+               "private_parent_id": [value.encode() for value in audit["private_parent_ids"]],
+               "truth_hash": []}
+    if private_manifest is None and (private / "identity.json").is_file():
+        private_manifest = json.loads((private / "identity.json").read_text())["configuration"]["manifest"]
     if private_manifest is not None:
         manifest = json.loads(Path(private_manifest).read_text())
-        markers += [row["sha256"]["truth.npy"].encode() for row in manifest["cases"]]
+        markers["truth_hash"] = [value.encode() for row in manifest["cases"]
+                                 for name, value in sorted(row["sha256"].items())
+                                 if name == "truth.npy" or name.startswith("confirmation/")]
+    return markers
+
+
+def _allowed_phrases(texts):
+    """Task-description lines that mention IoU, raw and as JSON string content."""
+    phrases = set()
+    for text in texts:
+        for line in text.splitlines():
+            line = line.strip()
+            if IOU.search(line.encode()):
+                phrases.add(line.encode())
+                phrases.add(json.dumps(line)[1:-1].encode())
+                phrases.add(json.dumps(line, ensure_ascii=False)[1:-1].encode())
+    return sorted(phrases, key=len, reverse=True)
+
+
+def _classify(body, start, phrases):
+    for phrase in phrases:
+        index = body.find(phrase, max(0, start + 3 - len(phrase)))
+        while index != -1 and index <= start:
+            if start + 3 <= index + len(phrase):
+                return "task_description"
+            index = body.find(phrase, index + 1)
+    left = start
+    while left > 0 and chr(body[left - 1]).isalpha():
+        left -= 1
+    following = body[start + 3:start + 4]
+    # English words such as "previous" or "Various": lowercase "iou" inside a longer word.
+    if body[start:start + 3] == b"iou" and following.isalpha() and following.islower() and start > left:
+        return "english_word"
+    return "unexplained"
+
+
+def scan_blind(run, private, *, require_requests=True, private_manifest=None, key_file=None,
+               allowed_text=(), expect_leak=False):
+    """Search the whole public run directory; never print a private marker.
+
+    Markers (sentinel, private parent IDs, truth-side file hashes, the key) are
+    searched in every file. Case-insensitive "iou" is searched in text files and
+    every hit is listed with a classification; task-description wording and
+    ordinary English words are explained, anything else is a leak. With
+    expect_leak (the whitelist-off control run) the audit passes only if the
+    sentinel is found.
+    """
+    run, private = Path(run), Path(private)
+    markers = _private_markers(private, private_manifest)
     if key_file is not None:
-        markers.append(Path(key_file).read_bytes().strip())
-    if any(not marker for marker in markers):
+        markers["api_key"] = [Path(key_file).read_bytes().strip()]
+    if any(not marker for values in markers.values() for marker in values):
         raise ValueError("blind-audit marker is empty")
-    requests = sorted((run / "harness").rglob("*.request.bin"))
+    requests = sorted(path for path in (run / "harness").rglob("*.request.bin") if path.is_file())
     if require_requests and not requests:
         raise ValueError("blind audit requires at least one preserved provider request")
-    paths = list(requests)
-    paths.extend((run / "harness").rglob("briefs/*.json"))
-    paths.extend((run / "harness").rglob("public/evidence/history.txt"))
-    paths.extend((run / "harness").rglob("public/evidence/sources/*.py"))
-    paths.append(run / "ledger.jsonl")
-    leaks = sum(any(marker in path.read_bytes() for marker in markers) or b"mean_iou" in path.read_bytes().lower()
-                for path in paths if path.is_file())
-    # Verify that the same byte-level predicate detects the private canary.
-    if not any(marker in b"positive-control:" + audit["sentinel"].encode() for marker in markers):
-        raise ValueError("blind-audit positive control failed")
-    if leaks:
-        raise ValueError(f"blind-channel audit found {leaks} contaminated files")
-    return {"status": "passed", "provider_requests_checked": len(requests),
-            "files_checked": len(paths), "sentinel_positive_control": "passed", "leaks": 0}
+    texts = list(allowed_text)
+    if (run / "task_brief.txt").is_file():
+        texts.append((run / "task_brief.txt").read_text())
+    phrases = _allowed_phrases(texts)
+    paths = sorted(path for path in run.rglob("*") if path.is_file() and not path.is_symlink())
+    hits = {name: 0 for name in markers}
+    contaminated, iou_hits, binary = set(), [], 0
+    for path in paths:
+        body = path.read_bytes()
+        marked = False
+        for name, values in markers.items():
+            found = sum(body.count(marker) for marker in values)
+            if found:
+                hits[name] += found
+                contaminated.add(path)
+                marked = True
+        if b"\x00" in body[:8192]:
+            binary += 1
+            continue
+        for match in IOU.finditer(body):
+            kind = _classify(body, match.start(), phrases)
+            # Never echo bytes from a file that holds a private marker.
+            context = ("<withheld: file contains a private marker>" if marked else
+                       body[max(0, match.start() - 24):match.end() + 24].decode("utf-8", "replace"))
+            iou_hits.append({"path": str(path.relative_to(run)), "offset": match.start(),
+                             "kind": kind, "context": context})
+            if kind == "unexplained":
+                contaminated.add(path)
+    unexplained = sum(hit["kind"] == "unexplained" for hit in iou_hits)
+    result = {"status": "passed", "provider_requests_checked": len(requests),
+              "files_checked": len(paths), "binary_files_marker_only": binary,
+              "marker_hits": hits, "iou_hits": iou_hits,
+              "iou_hits_by_kind": {kind: sum(h["kind"] == kind for h in iou_hits)
+                                   for kind in ("task_description", "english_word", "unexplained")},
+              "leaks": len(contaminated)}
+    if expect_leak:
+        if not hits["sentinel"]:
+            raise ValueError("whitelist-off control run did not expose the sentinel")
+        return {**result, "status": "control_detected"}
+    if contaminated:
+        raise ValueError(f"blind-channel audit found {len(contaminated)} contaminated files "
+                         f"({unexplained} unexplained iou hits)")
+    return result
 
 
 def main():
@@ -93,6 +177,10 @@ def main():
     parser.add_argument("--private", type=Path)
     parser.add_argument("--private-manifest", type=Path)
     parser.add_argument("--key-file", type=Path)
+    parser.add_argument("--allowed-text", type=Path, nargs="*", default=(),
+                        help="task-description files whose IoU wording is explained, not a leak")
+    parser.add_argument("--expect-leak", action="store_true", help="whitelist-off control run")
+    parser.add_argument("--hits-out", type=Path, help="write every listed iou hit here")
     args = parser.parse_args()
     if args.mode == "briefs":
         result = verify_briefs(args.run)
@@ -100,7 +188,12 @@ def main():
         if args.private is None:
             parser.error("--private is required for this audit")
         result = (reconcile_budget(args.run, args.private) if args.mode == "budget" else
-                  scan_blind(args.run, args.private, private_manifest=args.private_manifest, key_file=args.key_file))
+                  scan_blind(args.run, args.private, private_manifest=args.private_manifest, key_file=args.key_file,
+                             allowed_text=[p.read_text() for p in args.allowed_text], expect_leak=args.expect_leak))
+        if args.mode == "blind" and args.hits_out is not None:
+            args.hits_out.write_text(json.dumps(result["iou_hits"], indent=2, sort_keys=True) + "\n")
+        if args.mode == "blind":
+            result = {**result, "iou_hits": len(result["iou_hits"])}
     print(json.dumps(result, sort_keys=True))
 
 

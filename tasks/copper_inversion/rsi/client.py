@@ -7,17 +7,46 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetExceededError, atomic_json_write
 from ..core.candidate import validate_source
 from ..v2.service_client import ServiceEvaluator
-from .exposure import VERSION, validate_feedback
+from . import exposure
+from .exposure import FIELDS, VERSION, validate_feedback
+
+
+INFO = frozenset({"status", "contract_digest", "public_digest", "seconds", "slots", "used_slots",
+                  "exposure_version", "objective", "tier"})
+# Service refusals that are not results; anything else must be exactly allowlisted feedback.
+REFUSALS = frozenset({"paused", "infrastructure_error", "contract_mismatch", "rejected_request",
+                      "invalid_source", "training_sealed"})
+
+
+def checked_feedback(response, sha):
+    """Allowlisted feedback for sha; any other key set is an infrastructure pause."""
+    if not isinstance(response, dict):
+        raise EvaluationPaused("risk-only evaluator response is not an object")
+    if set(response) - FIELDS and set(response) != {"status"} and not exposure.UNSAFE_DISABLE_WHITELIST:
+        # Never a result and never saved: extra keys mean the whitelist failed.
+        raise EvaluationPaused("risk-only evaluator returned non-allowlisted fields; infrastructure pause")
+    if set(response) == {"status"}:
+        raise EvaluationPaused("risk-only evaluation did not complete: "
+                               + (response["status"] if response["status"] in REFUSALS else "unknown"))
+    try:
+        result = validate_feedback(response)
+        if result["source_sha256"] != sha:
+            raise ValueError("feedback source differs")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise EvaluationPaused("risk-only evaluation unavailable or unsafe") from exc
+    return result
 
 
 class RiskClient(ServiceEvaluator):
-    def verify_contract(self, public_digest, seconds, slots):
+    def verify_contract(self, public_digest, seconds, slots, *, objective=None, tier=None):
         info = self.request({"operation": "info"})
-        if (set(info) != {"status", "contract_digest", "public_digest", "seconds", "slots",
-                          "used_slots", "exposure_version"}
+        if (set(info) != INFO
                 or info["status"] != "ready" or info["contract_digest"] != self.contract_digest
                 or info["public_digest"] != public_digest or info["seconds"] != seconds
                 or info["slots"] != slots or info["exposure_version"] != VERSION
+                or info["objective"] not in ("confirmation", "oracle_iou")
+                or (objective is not None and info["objective"] != objective)
+                or (tier is not None and info["tier"] != tier)
                 or type(info["used_slots"]) is not int or not 0 <= info["used_slots"] <= slots):
             raise EvaluationPaused("risk-only evaluator identity or budget differs")
         return info
@@ -31,22 +60,14 @@ class RiskClient(ServiceEvaluator):
                 saved = json.loads(path.read_text())
                 if set(saved) != {"contract_digest", "feedback"} or saved["contract_digest"] != self.contract_digest:
                     raise ValueError("feedback contract differs")
-                result = validate_feedback(saved["feedback"])
-                if result["source_sha256"] != sha:
-                    raise ValueError("feedback source differs")
-                return result
-            except (ValueError, KeyError, TypeError) as exc:
+                return checked_feedback(saved["feedback"], sha)
+            except (ValueError, KeyError, TypeError, EvaluationPaused) as exc:
                 raise EvaluationPaused("saved risk-only feedback is invalid") from exc
         response = self.request({"operation": "evaluate", "source": body.decode("utf-8"),
                                  "contract_digest": self.contract_digest})
-        if response.get("status") == "budget_exhausted":
+        if response == {"status": "budget_exhausted"}:
             raise BudgetExceededError("risk-only feedback budget exhausted")
-        try:
-            result = validate_feedback(response)
-            if result["source_sha256"] != sha:
-                raise ValueError("feedback source differs")
-        except (ValueError, KeyError, TypeError) as exc:
-            raise EvaluationPaused("risk-only evaluation unavailable or unsafe") from exc
+        result = checked_feedback(response, sha)
         atomic_json_write(path, {"contract_digest": self.contract_digest, "feedback": result})
         return result
 
