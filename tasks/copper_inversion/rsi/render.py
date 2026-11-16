@@ -31,7 +31,19 @@ def stripped_source(source):
     return ast.unparse(tree) + "\n"
 
 
+HEADER = "# id            ep rd br  status    risk      legal  s/solve  sel"
+
+
+def _case_labels(case_ids):
+    """First 8 characters of each case_id, lengthened only if two would collide."""
+    width = 8
+    while len({c[:width] for c in case_ids}) != len(case_ids):
+        width += 1
+    return [c[:width] for c in case_ids]
+
+
 def render(records):
+    """rho (contracts §4.1): a pure function of a record prefix; columns follow HEADER."""
     rows = sorted((validate(dict(r)) for r in records), key=lambda r: r["seq"])
     if len({r["seq"] for r in rows}) != len(rows):
         raise ValueError("duplicate record sequence")
@@ -39,27 +51,40 @@ def render(records):
     if len(set(ids)) != len(ids):
         raise ValueError("source prefix collision")
     last = max((r["round"] for r in rows), default=0)
-    lines = [f"# history v1  records={len(rows)}  rounds=0..{last}",
-             "# id            ep rd br  status    risk      legal  s/solve  sel"]
+    lines = [f"# history v1  records={len(rows)}  rounds=0..{last}", HEADER]
     for row in rows:
         branch = "-" if row["branch"] == -1 else str(row["branch"])
-        line = (f"{row['program_id'][:12]:12}  {row['epoch']:2d} {row['round']:2d} "
-                f"{branch:>2}  {row['status']:<8}  {row['risk']:.6f}  "
-                f"{row['legal_rate']:.3f}  {row['seconds_per_solve']:.2f}  {row['selection']}")
+        line = (f"{row['program_id'][:12]:12}    {row['epoch']:2d} {row['round']:2d} {branch:>2}  "
+                f"{row['status']:<8}  {row['risk']:8.6f}  {row['legal_rate']:5.3f}  "
+                f"{row['seconds_per_solve']:7.2f}  {row['selection']}")
         if row["message"]:
             line += "  " + row["message"]
         lines.append(line)
+    best = sorted((r for r in rows if r["status"] == "valid"),
+                  key=lambda r: (r["risk"], r["program_id"]))[:10]
     lines.append("# per-case risk, 10 lowest-risk valid programs")
-    for row in sorted((r for r in rows if r["status"] == "valid"),
-                      key=lambda r: (r["risk"], r["program_id"]))[:10]:
-        values = " ".join(f"{key}={value:.4f}" for key, value in sorted(row["risk_by_case"].items()))
-        lines.append(f"{row['program_id'][:12]}  {values}")
+    cases = sorted({c for r in best for c in r["risk_by_case"]})
+    labels = _case_labels(cases)
+    width = max([8] + [len(x) for x in labels])
+    lines.append(("# id" + " " * 12 + " ".join(f"{x:<{width}}" for x in labels)).rstrip())
+    for row in best:
+        values = (f"{row['risk_by_case'][c]:<{width}.4f}" if c in row["risk_by_case"] else f"{'-':<{width}}"
+                  for c in cases)
+        lines.append((f"{row['program_id'][:12]:12}    " + " ".join(values)).rstrip())
     return "\n".join(lines) + "\n"
 
 
 def visible_history(records, *, branch, epoch_start_round):
     """Pooled records at the boundary plus only this branch's later records."""
     return [r for r in records if r["round"] < epoch_start_round or r["branch"] == branch]
+
+
+def write_view(directory, records, candidate_root):
+    """A branch view: rho of its visible records plus their stripped sources."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "history.txt").write_text(render(records), encoding="utf-8")
+    write_sources(directory / "sources", records, candidate_root)
 
 
 def write_sources(directory, records, candidate_root):
@@ -72,12 +97,12 @@ def write_sources(directory, records, candidate_root):
     for old in directory.glob("*.py"):
         if old.name not in expected:
             old.unlink()
+    from ..core.candidate import validate_source
     for row in records:
         sha = row["program_id"]
         source = candidate_root / "candidates" / sha / "solver.py"
         if source.is_symlink():
             raise ValueError("candidate source cannot be a symlink")
-        from ..core.candidate import validate_source
         body = source.read_bytes()
         if validate_source(body) != sha:
             raise ValueError("candidate source changed")
