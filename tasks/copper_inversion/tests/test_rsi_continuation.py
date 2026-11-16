@@ -206,7 +206,7 @@ def test_history_and_best_program_modes_start_fresh_from_the_prefix(tmp_path):
         assert not list(target.rglob("fork-sources"))
         message = json.loads(briefs(target)[(0, 3)])
         assert message["kind"] == "boundary" and message["brief"].startswith(BRIEF)
-        session = next(target.glob("harness/epoch_*/branch_0/sessions/researcher_0/pi-session/session.jsonl"))
+        session = sorted(target.glob("harness/epoch_*/branch_0/sessions/researcher_0/pi-session/session.jsonl"))[0]
         lines = [json.loads(line)["content"] for line in session.read_text().splitlines()]
         assert json.loads(lines[0])["round"] == 3  # no turn from before the checkpoint
         manifest = json.loads((target / "manifest.json").read_text())
@@ -282,7 +282,7 @@ def test_prefix_encodings_are_reused_by_the_continuation(tmp_path):
     agent = continuations.CheckpointingAgent(SessionAgent(), root, 2)
 
     def select(pool, history, count):
-        for row in history:  # the stand-in surrogate caches one encoding per charged program
+        for row in [*history, *pool]:  # like the GP selection, cache one encoding per program it sees
             path = root / "encodings" / f"{row['program_id']}.json"
             if not path.exists():
                 path.parent.mkdir(exist_ok=True)
@@ -304,6 +304,7 @@ def test_at27_imported_service_charges_the_prefix_and_seals_prefix_finalists(tmp
     pytest.importorskip("numpy")
     from tasks.copper_inversion.tests.test_rsi_service import LoopbackClient, make_service, write_suite
     from tasks.copper_inversion.v2.training_receipts import eligible
+    from ldm_tts.contracts.evaluation import EvaluationPaused
     train = write_suite(tmp_path / "release", "train")
     source_service = make_service(tmp_path, train, name="source", slots=17)
     source = tmp_path / "accumulated-s7"
@@ -318,8 +319,13 @@ def test_at27_imported_service_charges_the_prefix_and_seals_prefix_finalists(tmp
     info = service.dispatch({"operation": "info"})
     assert info["used_slots"] == len(checkpoint.records) == 9 and info["slots"] == 17
     continuations.check_service(info, checkpoint)
+    probe = LoopbackClient(tmp_path / "probe", service)
+    digest = hashlib.sha256(prefix.read_bytes()).hexdigest()
+    assert probe.verify_contract(service.public_digest, 10, 17, import_ledger_prefix_sha256=digest) == info
+    with pytest.raises(EvaluationPaused):
+        probe.verify_contract(service.public_digest, 10, 17, import_ledger_prefix_sha256=None)
     fresh = make_service(tmp_path, train, name="fresh", slots=17)
-    with pytest.raises(ValueError, match="imported prefix"):
+    with pytest.raises(ValueError, match="imported"):
         continuations.check_service(fresh.dispatch({"operation": "info"}), checkpoint)
     prefix_ids = {r["program_id"] for r in checkpoint.records}
     assert prefix_ids - {r["program_id"] for r in checkpoint.records if r["status"] == "rejected"} \
@@ -485,8 +491,6 @@ def test_entry_point_builds_the_continuation_manifest(tmp_path):
     assert plan["manifest"]["run_id"] == "ck101-history-planted-r1"
     note = plan["continuation"]["intervention"]
     assert note == interventions.from_checkpoint(opened) and note["round"] == 2
-    with pytest.raises(ValueError, match="only E1, E2"):
-        prepare(tmp_path, protocol_tests.EXAMPLE, checkpoint, experiment="M1")
 
 
 def test_entry_point_checkpoint_round_is_recorded_and_bounded(tmp_path):
@@ -514,6 +518,8 @@ def test_entry_point_e1_and_e2_continue_frozen_m1_checkpoints(tmp_path, sources)
                    mode="conversation")["manifest"]["run_id"] == "ck101-conversation-planted-r1"
     with pytest.raises(ValueError, match="start from a checkpoint"):
         protocol_tests._prepare(tmp_path, path, experiment="E1")
+    with pytest.raises(ValueError, match="only E1, E2"):
+        prepare(tmp_path, path, checkpoint, experiment="M1")
     smoke = protocol_source(tmp_path, path, experiment="smoke")
     with pytest.raises(ValueError, match="checkpoints of M1 runs"):
         prepare(tmp_path, path, smoke, experiment="E1")

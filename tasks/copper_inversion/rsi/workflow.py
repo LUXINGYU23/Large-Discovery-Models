@@ -255,8 +255,10 @@ def main(argv=None):
     public_digest = catalog_digest(args.public_catalog)
     client = RiskClient(args.out_dir, args.evaluation_socket, args.evaluation_contract,
                         service_uid=args.evaluation_service_uid)
-    info = client.verify_contract(public_digest, solver_seconds, config.slots)
     continued = plan["continuation"]
+    # A continuation's service imported exactly this checkpoint's prefix; any other run's was not started by import.
+    prefix = continued["checkpoint"].snapshot["ledger_prefix_sha256"] if continued else None
+    info = client.verify_contract(public_digest, solver_seconds, config.slots, import_ledger_prefix_sha256=prefix)
     if continued:
         continuations.check_service(info, continued["checkpoint"], resume=args.resume)
     elif not args.resume and info["used_slots"]:

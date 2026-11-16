@@ -29,7 +29,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness.pi import PiForkSource
 from ldm_tts.harness.research_store import snapshot_fork
 from ..core.candidate import validate_source
-from .controller import Config, Start, profile_name, session_round, turn_root
+from .controller import SCHEDULING, Config, Start, profile_name, session_round, turn_root
 from .ledger import read, validate as validate_record
 
 SCHEMA = "rsi-checkpoint-v1"
@@ -233,7 +233,7 @@ def check_config(checkpoint, config, mode):
     if mode not in MODES:
         raise ValueError("unknown continuation mode: " + str(mode))
     def shared(value):
-        return {k: v for k, v in asdict(value).items() if k not in ("arm", "policy")}
+        return {k: v for k, v in asdict(value).items() if k not in {"arm", "policy", *SCHEDULING}}
     source = checkpoint.config
     if shared(source) != shared(config):
         raise ValueError("continuation settings differ from the source run")
