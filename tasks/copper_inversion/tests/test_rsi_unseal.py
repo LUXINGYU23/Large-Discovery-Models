@@ -56,8 +56,8 @@ def make_release(root):
     return manifests
 
 
-def make_run(root, run_id, offset, train_manifest):
-    paths = layout(root, PID, "M1", run_id)
+def make_run(root, run_id, offset, train_manifest, experiment="M1"):
+    paths = layout(root, PID, experiment, run_id)
     service, run = paths["service"], paths["run"]
     train = json.loads(train_manifest.read_text())
     identity = {"configuration": {"manifest": str(train_manifest), "seconds": 10, "image": IMAGE},
@@ -95,7 +95,7 @@ def make_run(root, run_id, offset, train_manifest):
     RiskOnlyService.seal_training(SimpleNamespace(root=service, identity=identity, manifest_path=train_manifest,
                                                   ledger=SimpleNamespace(counters={"algorithm_feedback_slots": len(SCHEDULE)})))
     arm, seed = run_id.rsplit("-s", 1)
-    (run / "manifest.json").write_text(json.dumps(dict(run_id=run_id, experiment="M1", protocol_id=PID, arm=arm,
+    (run / "manifest.json").write_text(json.dumps(dict(run_id=run_id, experiment=experiment, protocol_id=PID, arm=arm,
                                                        tier="S", judge="standard", seed=int(seed))))
     (run / "result.json").write_text(json.dumps(dict(status="completed", stop_reason="completed")))
     return paths
@@ -139,18 +139,18 @@ def fake_evaluator():
         yield
 
 
-def setup(tmp_path, runs, prefixes=(None, 2), validate=True):
+def setup(tmp_path, runs, prefixes=(None, 2), validate=True, experiment="M1"):
     FakeSuite.calls.clear()
     manifests = make_release(tmp_path / "release")
     root = tmp_path / "active"
     for index, run_id in enumerate(runs):
-        make_run(root, run_id, index, manifests["train"])
+        make_run(root, run_id, index, manifests["train"], experiment)
         with fake_evaluator():
             for round_index in prefixes:
-                freeze_run(root, PID, "M1", run_id, round_index, release=tmp_path / "release")
+                freeze_run(root, PID, experiment, run_id, round_index, release=tmp_path / "release")
                 if validate:
-                    validate_run(root, PID, "M1", run_id, round_index)
-    listing = {"experiment": "M1", "protocol_id": PID,
+                    validate_run(root, PID, experiment, run_id, round_index)
+    listing = {"experiment": experiment, "protocol_id": PID,
                "solvers": [{"run_id": r, "prefix": "full" if p is None else f"round_{p:02d}"} for r in runs for p in prefixes]}
     return root, manifests, listing
 
