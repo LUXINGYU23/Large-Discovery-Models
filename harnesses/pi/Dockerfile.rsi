@@ -1,0 +1,12 @@
+# The base image provides the pinned Node runtime and dependencies. Verify the
+# lock before rebuilding the sidecar; record the resolved image digest per run.
+ARG RSI_SIDECAR_BASE=ldm-pi-harness:copper-validation-clock-20261025
+FROM ${RSI_SIDECAR_BASE}
+USER root
+WORKDIR /app
+COPY package-lock.json /tmp/rsi-package-lock.json
+RUN cmp /tmp/rsi-package-lock.json /app/package-lock.json
+COPY package.json tsconfig.json ./
+COPY src ./src
+RUN npm run build && rm -rf src /tmp/rsi-package-lock.json
+USER node

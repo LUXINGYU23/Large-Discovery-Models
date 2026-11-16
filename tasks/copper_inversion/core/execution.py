@@ -49,7 +49,7 @@ def source_identity():
     return digest(
         {
             str(p.relative_to(TASK)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for folder in ("core", "v2", "resources")
+            for folder in ("core", "v2", "rsi", "resources", "experiments/rsi")
             for p in sorted((TASK / folder).rglob("*"))
             if p.is_file()
             and "__pycache__" not in p.parts

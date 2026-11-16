@@ -91,7 +91,7 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 			const model = runtime.getModel("fixture", "fixture");
 			assert(model);
 			const settings = SettingsManager.inMemory({ compaction: HISTORY_POLICY.compaction, retry: { enabled: false } });
-			const history = new HistoryController();
+			const history = new HistoryController(mode === "success" ? "low" : "high");
 			const pressure = new ContextPressureController(join(root, ".web-evidence"), HISTORY_POLICY.compaction.reserveTokens);
 			const loader = new DefaultResourceLoader({ cwd: root, agentDir, settingsManager: settings,
 				noExtensions: true, noSkills: true, noContextFiles: true, noPromptTemplates: true, noThemes: true,
@@ -127,7 +127,7 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 				assert.match(await readFile(join(root, "history-events.jsonl"), "utf8"), /compaction_committed/);
 			}
 			assert.equal(requests.length, mode === "transient" ? 2 : 1, "no fallback or research dispatch on failed compaction");
-			assert.equal((requests[0]!.reasoning as { effort: string }).effort, "high");
+			assert.equal((requests[0]!.reasoning as { effort: string }).effort, mode === "success" ? "low" : "high");
 			assert.equal(requests[0]!.max_output_tokens, 32768);
 			assert.notEqual(requests[0]!.tool_choice, "required");
 			assert.equal(session.thinkingLevel, "max", "research reasoning must remain unchanged");

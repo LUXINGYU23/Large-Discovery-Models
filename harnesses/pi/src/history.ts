@@ -2,6 +2,7 @@ import { appendFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { compact, type ExtensionFactory, type SessionManager } from "@earendil-works/pi-coding-agent";
 import { atomicJson } from "./trace.js";
+import type { ThinkingLevel } from "./protocol.js";
 
 // Leave room for a full research response plus newly returned tool data.
 export const HISTORY_POLICY = {
@@ -25,6 +26,8 @@ export class HistoryController {
 	private root: string | undefined;
 	private manager: SessionManager | undefined;
 	private state: RecoveryState = { continuations: 0 };
+
+	constructor(private readonly summaryThinking: ThinkingLevel = HISTORY_POLICY.summaryThinking) {}
 
 	async begin(root: string, manager: SessionManager): Promise<void> {
 		this.root = root;
@@ -96,14 +99,14 @@ export class HistoryController {
 				if (this.state.failure) return { cancel: true };
 				const started = Date.now();
 				await this.record({ type: "compaction_started", reason: event.reason,
-					tokensBefore: event.preparation.tokensBefore, thinking: HISTORY_POLICY.summaryThinking });
+					tokensBefore: event.preparation.tokensBefore, thinking: this.summaryThinking });
 				try {
 					if (!ctx.model) throw new Error("Compaction requires a model");
 					const result = await compact({ ...event.preparation,
 						settings: { ...event.preparation.settings, reserveTokens: HISTORY_POLICY.summaryReserveTokens },
 					}, { ...ctx.model, baseUrl: `${ctx.model.baseUrl}/compaction` }, proxyApiKey, undefined, event.customInstructions,
 					AbortSignal.any([event.signal, AbortSignal.timeout(HISTORY_POLICY.summaryTimeoutMs)]),
-						HISTORY_POLICY.summaryThinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
+						this.summaryThinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
 							onRetryScheduled: (attempt, maxAttempts, delayMs, errorMessage) =>
 								this.record({ type: "compaction_retry", attempt, maxAttempts, delayMs, errorMessage }),
 						});

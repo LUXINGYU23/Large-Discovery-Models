@@ -39,6 +39,7 @@ def main():
     p.add_argument("--generator-python",type=Path,required=True);p.add_argument("--seed",type=int,required=True)
     p.add_argument("--ood-for",type=Path,help="completed ID pilot; generate four independent OOD parents and audit jointly")
     p.add_argument("--workers",type=int,default=8)
+    p.add_argument("--rsi-allocation-seed",type=int,help="Preassign one observation layout per parent for an RSI release")
     p.add_argument("--full-study",action="store_true",help="Generate the prespecified 24/8/16 ID or 8 OOD parent population for qualification; does not grant formal status")
     a=p.parse_args()
     if not 1<=a.workers<=16:raise ValueError("workers must be in [1,16]")
@@ -63,6 +64,16 @@ def main():
         members=[e for e in plan["parents"] if e["split"]==split]
         if sum(e["noisy"] for e in members)*2!=len(members):
             raise ValueError("ID splits require the same 50/50 noise mixture")
+    if a.rsi_allocation_seed is not None:
+        from tasks.copper_inversion.experiments.rsi.measurements import assign_modalities, preselect_short_train
+        assign_modalities(plan,a.rsi_allocation_seed)
+        plan["confirmation_policy"] = {"rule": "first of 16 presampled streams with no overlapping whole holes",
+                                       "seed_derivation": "SeedSequence([observation_seed, 920381])"}
+        for entry in plan["parents"]:
+            entry["confirmation_seeds"] = [int(s) for s in np.random.SeedSequence(
+                [entry["observation_seed"], 920381]).generate_state(16)]
+        if not a.ood_for and a.full_study:
+            plan["short_train"] = preselect_short_train(plan)
     (root/"plan.json").write_text(json.dumps(plan,sort_keys=True,indent=2))
     def generate(entry):
         records=[]

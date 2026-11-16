@@ -169,7 +169,7 @@ export class PersistentProfileSession {
 	private readonly submissions: SubmissionController;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
-	private readonly history = new HistoryController();
+	private readonly history: HistoryController;
 	private agentsSha256 = "";
 	private skillDirSha256: string[] = [];
 
@@ -181,6 +181,7 @@ export class PersistentProfileSession {
 		namedSecrets: Readonly<Record<string, string>>,
 		private readonly web: DeepSeekWebTools,
 	) {
+		this.history = new HistoryController(config.thinking);
 		this.forkSource = config.forkSources?.[profile.profileId];
 		this.profileRoot = join(config.artifactRoot, "sessions", profile.profileId);
 		this.workspace = join(this.profileRoot, "workspace");
@@ -750,7 +751,7 @@ export class PiSessionPool {
 			...(this.config.forkSources ? { forkSources: this.config.forkSources } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
-			historyPolicy: HISTORY_POLICY,
+			historyPolicy: { ...HISTORY_POLICY, summaryThinking: this.config.thinking },
 			submissionContractSha256: this.config.submissionContractSha256,
 			submissionContract: {
 				contractId: this.config.submissionContract.contractId,

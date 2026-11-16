@@ -84,8 +84,9 @@ def load_manifest(path):
         previous=parent_geometry.setdefault(row["parent_id"],geometry)
         if previous!=geometry:raise ValueError("one parent has inconsistent geometry across observation packs")
 
-    if any(sorted(values)!=["drill","drill_outcrop"] for values in parents.values()):
-        raise ValueError("each parent requires exactly two observation packs")
+    if any(sorted(values) not in (["drill"], ["drill_outcrop"], ["drill","drill_outcrop"])
+           for values in parents.values()):
+        raise ValueError("each parent requires one or both distinct observation packs")
     return manifest
 
 
