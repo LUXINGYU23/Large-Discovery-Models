@@ -143,7 +143,7 @@ class FakeDocker:
             seconds, count, module = rest[1:]
             runs = supervisor.batch(seconds, int(count), module, env, cases=str(root / "cases"),
                                     outputs=c["mounts"]["/output"], tmp=str(root / "tmp"), cgroup=str(cgroup),
-                                    user=None, owner=None, kill_all=False)
+                                    user=None, as_owner=False, kill_all=False)
             for run in runs:  # reproducible receipts: fixed wall unless killed
                 if not run["exit_code"] == 137:
                     run["worker_elapsed_seconds"] = WALL
@@ -343,7 +343,7 @@ def test_supervisor_batch_isolates_runs_and_enforces_output_limits(tmp_path):
     (tmp / "left").write_text("z")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "PYTHONPATH": str(module.parent)}
     runs = supervisor.batch("5", 3, "probe_worker", env, cases=str(cases), outputs=str(outputs), tmp=str(tmp),
-                            cgroup=str(cgroup), user=None, owner=None, kill_all=False)
+                            cgroup=str(cgroup), user=None, as_owner=False, kill_all=False)
     assert [r["exit_code"] for r in runs] == [0, 0, 0]
     assert [r["output_limit"] for r in runs] == [False, True, False]
     assert sorted(p.name for p in outputs.iterdir()) == ["0", "1", "2"]

@@ -38,28 +38,67 @@ def output_usage(root, skip=()):
     return count, size
 
 
-def freeze_tree(path, owner=(0, 0)):
-    """Root-owned and read-only, so later runs in the container cannot change it."""
-    for base, dirs, files in os.walk(path, topdown=False, followlinks=False):
-        for name in files + dirs:
-            item = Path(base) / name
-            if owner:
-                os.chown(item, *owner, follow_symlinks=False)
-            if not item.is_symlink():
-                item.chmod(0o555 if item.is_dir() else 0o444)
-    if owner:
-        os.chown(path, *owner)
-    Path(path).chmod(0o555)
+def _copy_out(source, target):
+    """Copy a run's files and links (never following one) into a new read-only directory."""
+    target.mkdir()
+    for item in sorted(source.iterdir()):
+        if item.is_symlink():
+            os.symlink(os.readlink(item), target / item.name)
+        elif item.is_file():
+            try:
+                descriptor = os.open(item, os.O_RDONLY | os.O_NOFOLLOW)
+            except OSError:
+                continue  # unreadable to the host as well: the model counts as missing
+            with os.fdopen(descriptor, "rb") as stream:
+                body = stream.read(MAX_OUTPUT_BYTES + 1)
+            (target / item.name).write_bytes(body)
+            (target / item.name).chmod(0o444)
+    target.chmod(0o555)
+
+
+def freeze_output(outputs, index, as_owner=True):
+    """Replace /output/<i> by a read-only copy owned by the host owner of /output.
+
+    PID 1 holds no CHOWN/FOWNER/DAC capability, so it cannot take files away from
+    the worker. Instead a child switches to the uid owning the /output mount and
+    writes the copy; later runs (uid 65534) can neither change nor remove it, and
+    the evaluator account on the host can still delete it.
+    """
+    outputs = Path(outputs)
+    run, spent = outputs / str(index), outputs / f".run{index}"
+    run.rename(spent)
+    if as_owner:
+        info = outputs.stat()
+        child = os.fork()
+        if child == 0:
+            try:
+                os.setgroups([])
+                os.setgid(info.st_gid)
+                os.setuid(info.st_uid)
+                _copy_out(spent, run)
+                os._exit(0)
+            except BaseException:
+                os._exit(1)
+        _, status = os.waitpid(child, 0)
+        if status:
+            raise RuntimeError("could not freeze a batch run's output")
+    else:
+        _copy_out(spent, run)
+    shutil.rmtree(spent, ignore_errors=True)
 
 
 def clear_children(path, keep=()):
+    """Best effort: without capabilities some worker-owned leftovers may stay."""
     for item in Path(path).iterdir():
         if item.name in keep:
             continue
-        if item.is_dir() and not item.is_symlink():
-            shutil.rmtree(item, ignore_errors=True)
-        else:
-            item.unlink(missing_ok=True)
+        try:
+            if item.is_dir() and not item.is_symlink():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def reap():
@@ -81,19 +120,20 @@ def oom_kills(cgroup="/sys/fs/cgroup"):
 
 
 def batch(seconds, count, module, env, *, cases="/cases", outputs="/output", tmp="/tmp",
-          cgroup="/sys/fs/cgroup", user=65534, owner=(0, 0), kill_all=True):
+          cgroup="/sys/fs/cgroup", user=65534, as_owner=True, kill_all=True):
     """One run per case, in order; returns the per-run attestation rows.
 
     The keyword paths and identities are the container's; tests run the same
-    logic unprivileged on a temporary tree (user/owner None, kill_all False).
+    logic unprivileged on a temporary tree (user None, as_owner/kill_all False).
+    Output limits apply to what each run adds under /output.
     """
     runs, frozen = [], []
     identity = {} if user is None else dict(user=user, group=user, extra_groups=[])
     for index in range(count):
         output = Path(outputs) / str(index)
         output.mkdir()
-        if user is not None:
-            os.chown(output, user, user)
+        output.chmod(0o777)  # PID 1 owns it; the worker writes into it
+        base_files, base_size = output_usage(outputs)
         before = oom_kills(cgroup)
         started = time.monotonic()
         worker = subprocess.Popen(
@@ -108,8 +148,8 @@ def batch(seconds, count, module, env, *, cases="/cases", outputs="/output", tmp
                 code = worker.wait(timeout=0.2)
                 break
             except subprocess.TimeoutExpired:
-                files, size = output_usage(outputs, frozen)
-                if not limited and (files > MAX_OUTPUT_FILES or size > MAX_OUTPUT_BYTES):
+                files, size = output_usage(outputs)
+                if not limited and (files - base_files > MAX_OUTPUT_FILES or size - base_size > MAX_OUTPUT_BYTES):
                     limited = True
                     os.killpg(worker.pid, signal.SIGKILL)
         elapsed = time.monotonic() - started
@@ -120,16 +160,16 @@ def batch(seconds, count, module, env, *, cases="/cases", outputs="/output", tmp
                 os.killpg(worker.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-        files, size = output_usage(outputs, frozen)
-        limited = limited or files > MAX_OUTPUT_FILES or size > MAX_OUTPUT_BYTES
+        files, size = output_usage(outputs)
+        limited = limited or files - base_files > MAX_OUTPUT_FILES or size - base_size > MAX_OUTPUT_BYTES
         runs.append({"index": index, "exit_code": code if code >= 0 else 128 - code,
                      "worker_elapsed_seconds": elapsed, "worker_budget_seconds": float(seconds),
                      "oom_kill_count": oom_kills(cgroup) - before, "output_limit": limited})
-        # Strays outside the run's own directory and in /tmp never reach the next run.
+        # Strays outside the run's own directory and in /tmp should not reach the next run.
         frozen.append(str(index))
+        freeze_output(outputs, index, as_owner)
         clear_children(outputs, keep=frozen)
         clear_children(tmp)
-        freeze_tree(output, owner)
     return runs
 
 

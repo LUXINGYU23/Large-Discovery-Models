@@ -72,7 +72,7 @@ class InterfaceChecks:
             raise ValueError("candidate changed before interface checks")
         problems = tuple(fixtures())
         self._prepare(problems)
-        if getattr(self.execution, "merged", False):
+        if getattr(self.execution, "merged", False) is True:
             return self._check_batch(payload, source, problems)
         # Queue limits govern actual containers. Consume results in fixture order
         # so parallel completion cannot change the reported rejection.

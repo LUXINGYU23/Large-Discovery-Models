@@ -234,7 +234,7 @@ class SuiteEvaluator:
         root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
         result_path=root/"result.json"
         if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
-        merged=getattr(self.execution,"merged",False)
+        merged=getattr(self.execution,"merged",False) is True
         def solve_one(item):
             # Returns a finished row, or (row, scoring job) when the model needs scoring.
             case,seed=item
