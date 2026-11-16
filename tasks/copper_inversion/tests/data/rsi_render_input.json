@@ -1,0 +1,268 @@
+[
+ {
+  "branch": -1,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "77abc86d5c37fe261ce84966b29ddcc90a2ced0dc4ff460df01f852a98327ff8",
+  "risk": 0.5355,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.5534,
+   "8e20c4d7f1a9b35c0e72": 0.612,
+   "a4b7d02e9c61f8135d0a": 0.4411
+  },
+  "round": 0,
+  "seconds_per_solve": 12.31,
+  "selection": "initial",
+  "seq": 0,
+  "status": "valid"
+ },
+ {
+  "branch": 0,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "2442ffeede6ab0781f47fb14845f2683237ccb5e6cd26af1d2be97f972d24b9e",
+  "risk": 0.41041,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.36,
+   "8e20c4d7f1a9b35c0e72": 0.41,
+   "a4b7d02e9c61f8135d0a": 0.46123
+  },
+  "round": 1,
+  "seconds_per_solve": 27.8,
+  "selection": "reserved",
+  "seq": 1,
+  "status": "valid"
+ },
+ {
+  "branch": 1,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "7fc3c2c1eb9394af89bee45c15f85978439e1a17e71a3562f1706b10ea641b04",
+  "risk": 0.52041,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.47000000000000003,
+   "8e20c4d7f1a9b35c0e72": 0.52,
+   "a4b7d02e9c61f8135d0a": 0.57123
+  },
+  "round": 1,
+  "seconds_per_solve": 31.133000000000003,
+  "selection": "reserved",
+  "seq": 2,
+  "status": "valid"
+ },
+ {
+  "branch": 2,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "336e4be6f30cfa46f61ef5b3323991e17906cfee427513c00fef059ed4a9addd",
+  "risk": 0.33041000000000004,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.28,
+   "8e20c4d7f1a9b35c0e72": 0.33,
+   "a4b7d02e9c61f8135d0a": 0.38123
+  },
+  "round": 1,
+  "seconds_per_solve": 34.466,
+  "selection": "acquisition",
+  "seq": 3,
+  "status": "valid"
+ },
+ {
+  "branch": 3,
+  "epoch": 0,
+  "failed_solves": 3,
+  "legal_rate": 0.875,
+  "message": "",
+  "program_id": "899495bbab1c65f7145b3cd960010db25dda42adcb41885e3a375d011b8e2e90",
+  "risk": 0.47040999999999994,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.42,
+   "8e20c4d7f1a9b35c0e72": 0.47,
+   "a4b7d02e9c61f8135d0a": 0.52123
+  },
+  "round": 1,
+  "seconds_per_solve": 37.799,
+  "selection": "acquisition",
+  "seq": 4,
+  "status": "valid"
+ },
+ {
+  "branch": 0,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "d7837a735e63d4506ca548bc37308f3702329c20cdba0312a75ea7e971faccb4",
+  "risk": 0.29041,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.24,
+   "8e20c4d7f1a9b35c0e72": 0.29,
+   "a4b7d02e9c61f8135d0a": 0.34123
+  },
+  "round": 2,
+  "seconds_per_solve": 41.132000000000005,
+  "selection": "reserved",
+  "seq": 5,
+  "status": "valid"
+ },
+ {
+  "branch": 1,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 0.0,
+  "message": "interface rejected",
+  "program_id": "9b531443d9d646ce4b32263a74ea384c0d1f871f1b8db9fb8849380e75d233ae",
+  "risk": 1.0,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 1.0,
+   "8e20c4d7f1a9b35c0e72": 1.0,
+   "a4b7d02e9c61f8135d0a": 1.0
+  },
+  "round": 2,
+  "seconds_per_solve": 44.465,
+  "selection": "reserved",
+  "seq": 6,
+  "status": "rejected"
+ },
+ {
+  "branch": 2,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "d1e73bb4cd6444b01d2827587bf640ed6f93046659afe3a58b4381536dbfe1af",
+  "risk": 0.38040999999999997,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.33,
+   "8e20c4d7f1a9b35c0e72": 0.38,
+   "a4b7d02e9c61f8135d0a": 0.43123
+  },
+  "round": 2,
+  "seconds_per_solve": 47.798,
+  "selection": "acquisition",
+  "seq": 7,
+  "status": "valid"
+ },
+ {
+  "branch": 3,
+  "epoch": 0,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "d93d69a1bf9d577d2b9953a99fab4936773afb054f3b2bf843b960a25bc11adc",
+  "risk": 0.44041,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.39,
+   "8e20c4d7f1a9b35c0e72": 0.44,
+   "a4b7d02e9c61f8135d0a": 0.49123
+  },
+  "round": 2,
+  "seconds_per_solve": 151.131,
+  "selection": "acquisition",
+  "seq": 8,
+  "status": "valid"
+ },
+ {
+  "branch": 0,
+  "epoch": 1,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "b9e2abdb9e65c233bd4cd67f3f7e2d16aebf6bf08e29720f5760f420f557e54b",
+  "risk": 0.36040999999999995,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.31,
+   "8e20c4d7f1a9b35c0e72": 0.36,
+   "a4b7d02e9c61f8135d0a": 0.41123
+  },
+  "round": 8,
+  "seconds_per_solve": 54.464,
+  "selection": "reserved",
+  "seq": 9,
+  "status": "valid"
+ },
+ {
+  "branch": 1,
+  "epoch": 1,
+  "failed_solves": 0,
+  "legal_rate": 0.0,
+  "message": "all planned solves failed",
+  "program_id": "3d199396b28eb4c9a417b1849aa3bb6697681c1c6f2a42c55a4853e09a2cc19f",
+  "risk": 1.0,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 1.0,
+   "8e20c4d7f1a9b35c0e72": 1.0,
+   "a4b7d02e9c61f8135d0a": 1.0
+  },
+  "round": 8,
+  "seconds_per_solve": 57.797,
+  "selection": "reserved",
+  "seq": 10,
+  "status": "failed"
+ },
+ {
+  "branch": 2,
+  "epoch": 1,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "bcafb082d44ccafc7ee8a248d15988899ef0d7ee06ebe417bbbb90880ad05a7f",
+  "risk": 0.31041,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.26,
+   "8e20c4d7f1a9b35c0e72": 0.31,
+   "a4b7d02e9c61f8135d0a": 0.36123
+  },
+  "round": 8,
+  "seconds_per_solve": 61.129999999999995,
+  "selection": "acquisition",
+  "seq": 11,
+  "status": "valid"
+ },
+ {
+  "branch": 3,
+  "epoch": 1,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "8f43abe8f7d4858a3e733396acfa14efb1e4bbc3b4267bb9963893ad06b9ded3",
+  "risk": 0.27041000000000004,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.22000000000000003,
+   "8e20c4d7f1a9b35c0e72": 0.27,
+   "a4b7d02e9c61f8135d0a": 0.32123
+  },
+  "round": 8,
+  "seconds_per_solve": 64.46300000000001,
+  "selection": "acquisition",
+  "seq": 12,
+  "status": "valid"
+ },
+ {
+  "branch": 0,
+  "epoch": 1,
+  "failed_solves": 0,
+  "legal_rate": 1.0,
+  "message": "",
+  "program_id": "1812f0ee3b82f22d25f4b40761c6c1a033618e444f99bc362ea7455e4d677517",
+  "risk": 0.49040999999999996,
+  "risk_by_case": {
+   "3c1f9a07be52d4e81a6b": 0.44,
+   "8e20c4d7f1a9b35c0e72": 0.49,
+   "a4b7d02e9c61f8135d0a": 0.54123
+  },
+  "round": 9,
+  "seconds_per_solve": 67.796,
+  "selection": "reserved",
+  "seq": 13,
+  "status": "valid"
+ }
+]
