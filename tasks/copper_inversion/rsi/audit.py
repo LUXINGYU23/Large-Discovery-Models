@@ -72,7 +72,26 @@ def _private_markers(private, private_manifest):
         markers["truth_hash"] = [value.encode() for row in manifest["cases"]
                                  for name, value in sorted(row["sha256"].items())
                                  if name == "truth.npy" or name.startswith("confirmation/")]
+    markers["private_value"] = _private_values(private)
     return markers
+
+
+def _significant(text):
+    digits = text.lower().split("e")[0].lstrip("-").replace(".", "").lstrip("0")
+    return len(digits)
+
+
+def _private_values(private, min_digits=8):
+    """Every hidden IoU the service recorded (per program and per case), written as
+    JSON writes a float. Short values are left out: they collide with ordinary numbers."""
+    values = set()
+    for path in sorted((private / "evaluations").glob("*/result.json")):
+        values.add(json.loads(path.read_text()).get("metrics", {}).get("mean_iou"))
+        cases = path.parent / "private-case-results.json"
+        if cases.is_file():
+            values.update(row.get("metrics", {}).get("iou") for row in json.loads(cases.read_text()))
+    texts = {json.dumps(v) for v in values if type(v) is float}
+    return sorted(t.encode() for t in texts if _significant(t) >= min_digits)
 
 
 def _allowed_phrases(texts):
@@ -109,12 +128,14 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
                allowed_text=(), expect_leak=False):
     """Search the whole public run directory; never print a private marker.
 
-    Markers (sentinel, private parent IDs, truth-side file hashes, the key) are
-    searched in every file. Case-insensitive "iou" is searched in text files and
-    every hit is listed with a classification; task-description wording and
-    ordinary English words are explained, anything else is a leak. With
-    expect_leak (the whitelist-off control run) the audit passes only if the
-    sentinel is found.
+    Markers (sentinel, private parent IDs, truth-side file hashes, every hidden
+    IoU value at full precision, the key) are searched in every file; any hit
+    fails the scan. Case-insensitive "iou" is searched in text files and every
+    hit is listed with a classification. Task-description wording and ordinary
+    English words are explained; the rest (an agent writing "IoU" in its notes)
+    does not fail the scan but must be signed off before unsealing:
+    `review_sha256` identifies that list. With expect_leak (the whitelist-off
+    control run) the audit passes only if the sentinel is found.
     """
     run, private = Path(run), Path(private)
     markers = _private_markers(private, private_manifest)
@@ -151,22 +172,21 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
                        body[max(0, match.start() - 24):match.end() + 24].decode("utf-8", "replace"))
             iou_hits.append({"path": str(path.relative_to(run)), "offset": match.start(),
                              "kind": kind, "context": context})
-            if kind == "unexplained":
-                contaminated.add(path)
-    unexplained = sum(hit["kind"] == "unexplained" for hit in iou_hits)
-    result = {"status": "passed", "provider_requests_checked": len(requests),
+    review = [{"path": h["path"], "offset": h["offset"]} for h in iou_hits if h["kind"] == "unexplained"]
+    result = {"status": "review_required" if review else "passed", "provider_requests_checked": len(requests),
               "files_checked": len(paths), "binary_files_marker_only": binary,
               "marker_hits": hits, "iou_hits": iou_hits,
               "iou_hits_by_kind": {kind: sum(h["kind"] == kind for h in iou_hits)
                                    for kind in ("task_description", "english_word", "unexplained")},
-              "leaks": len(contaminated)}
+              "leaks": len(contaminated), "review_required": len(review),
+              "review_sha256": hashlib.sha256(json.dumps(review, sort_keys=True).encode()).hexdigest() if review else None}
     if expect_leak:
         if not hits["sentinel"]:
             raise ValueError("whitelist-off control run did not expose the sentinel")
         return {**result, "status": "control_detected"}
     if contaminated:
         raise ValueError(f"blind-channel audit found {len(contaminated)} contaminated files "
-                         f"({unexplained} unexplained iou hits)")
+                         f"(markers: {', '.join(k for k, v in hits.items() if v)})")
     return result
 
 

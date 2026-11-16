@@ -231,6 +231,29 @@ def test_unseal_refuses_unvalidated_or_unlogged_sealed_evaluation(tmp_path):  # 
             unseal(root, listing)
 
 
+def test_unseal_needs_a_signed_off_blind_review(tmp_path):
+    root, _, listing = setup(tmp_path, ["ldm4geo-s101", "accumulated-s101"])
+    service = layout(root, PID, "M1", "accumulated-s101")["service"]
+    (service / unseal_module.REVIEW_FILE).write_text(json.dumps(
+        {"run_id": "accumulated-s101", "review_sha256": "a" * 64, "hits": 2}))
+    review = tmp_path / "review.json"
+    entry = {"review_sha256": "a" * 64, "verdict": "explained", "reviewer": "author", "note": "agent notes"}
+    with fake_evaluator():
+        with pytest.raises(ValueError, match="blind review required for: accumulated-s101"):
+            unseal(root, listing)
+        for bad in ({**entry, "review_sha256": "b" * 64}, {**entry, "verdict": "leak"}, {**entry, "reviewer": ""}):
+            review.write_text(json.dumps({"schema": "rsi-blind-review-v1", "experiment": "M1",
+                                          "runs": {"accumulated-s101": bad}}))
+            with pytest.raises(ValueError, match="blind review"):
+                unseal(root, listing, review=review)
+        assert not layout(root, PID, "M1")["unseal_log"].exists()
+        body = {"schema": "rsi-blind-review-v1", "experiment": "M1", "runs": {"accumulated-s101": entry}}
+        review.write_text(json.dumps(body))
+        assert unseal(root, listing, review=review)["mode"] == "unseal"
+    logged = json.loads(layout(root, PID, "M1")["unseal_log"].read_text().splitlines()[0])
+    assert logged["blind_review_sha256"] == digest(body)
+
+
 def test_exported_outcomes_hold_no_per_body_truth(tmp_path):  # AT-31
     root, manifests, listing = setup(tmp_path, ["ldm4geo-s101", "accumulated-s101"])
     with pytest.raises(ValueError, match="after the unseal"):

@@ -1,8 +1,9 @@
 """Evaluator-account unseal: one sealed-body evaluation per experiment (spec §8, gate G6).
 
 The input lists every frozen solver of one experiment. Nothing is evaluated
-unless the list covers every started run and every freeze on disk, and every
-run carries the experiment's protocol. Each execution appends one line to the
+unless the list covers every started run and every freeze on disk, every
+run carries the experiment's protocol, and every run whose blind scan listed
+unexplained "iou" hits has a signed-off review of that list. Each execution appends one line to the
 unseal log. Repeating the same list only replays the stored results.
 """
 
@@ -20,6 +21,34 @@ from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import EXPERIMENTS, layout, parse_prefix, run_manifest
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.v2 import selection
+
+
+REVIEW_FILE = "blind-review-required.json"
+
+
+def check_reviews(root, protocol_id, experiment, run_ids, review=None):
+    """Runs whose blind scan listed unexplained "iou" hits need a signed-off review of that
+    exact list (rsi-blind-review-v1). A run is never dropped for a hit: anything other than
+    "explained" stops the unseal for investigation. Returns the review file's digest."""
+    needed = {}
+    for run_id in run_ids:
+        path = layout(root, protocol_id, experiment, run_id)["service"] / REVIEW_FILE
+        if path.is_file():
+            needed[run_id] = json.loads(path.read_text())["review_sha256"]
+    if not needed:
+        return None
+    if review is None:
+        raise ValueError("blind review required for: " + ", ".join(sorted(needed)))
+    body = json.loads(Path(review).read_text())
+    if body.get("schema") != "rsi-blind-review-v1" or body.get("experiment") != experiment:
+        raise ValueError("invalid blind review file")
+    for run_id, sha in sorted(needed.items()):
+        entry = body.get("runs", {}).get(run_id) or {}
+        if entry.get("review_sha256") != sha or not entry.get("reviewer"):
+            raise ValueError(f"run {run_id}: blind review does not cover its current hit list")
+        if entry.get("verdict") != "explained":
+            raise ValueError(f"run {run_id}: blind review verdict is {entry.get('verdict')!r}; investigate")
+    return digest(body)
 
 
 def load_list(value):
@@ -104,11 +133,12 @@ def _append(path, entry):
         os.fsync(stream.fileno())
 
 
-def unseal(root, listing, *, expected_runs=None, operator=None, workers=8):
+def unseal(root, listing, *, expected_runs=None, operator=None, workers=8, review=None):
     listing = load_list(listing)
     experiment, protocol_id = listing["experiment"], listing["protocol_id"]
     paths = layout(root, protocol_id, experiment)
     targets = check(root, listing, expected_runs)
+    review_sha = check_reviews(root, protocol_id, experiment, sorted({r for r, _ in targets}), review)
     list_sha = digest(listing)
     previous = [e for e in _log(paths["unseal_log"]) if e["experiment"] == experiment]
     if any(e["frozen_list_sha256"] != list_sha for e in previous):
@@ -123,7 +153,7 @@ def unseal(root, listing, *, expected_runs=None, operator=None, workers=8):
         "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "experiment": experiment,
         "frozen_list_sha256": list_sha, "protocol_id": protocol_id, "mode": mode,
         "operator": operator or pwd.getpwuid(os.geteuid()).pw_name, "uid": os.geteuid(),
-        "solvers": len(targets)})
+        "solvers": len(targets), "blind_review_sha256": review_sha})
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {key: pool.submit(selection.run, target, "test") for key, target in targets.items()}
         results = {key: future.result() for key, future in futures.items()}
@@ -150,10 +180,13 @@ def main(argv=None):
     parser.add_argument("--expected-runs", type=Path, help="JSON list of run ids the experiment must contain")
     parser.add_argument("--operator")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--blind-review", type=Path,
+                        help='{"schema": "rsi-blind-review-v1", "experiment", "runs": {run_id: '
+                             '{"review_sha256", "verdict": "explained", "reviewer", "note"}}}')
     args = parser.parse_args(argv)
     expected = json.loads(args.expected_runs.read_text()) if args.expected_runs else None
     print(json.dumps(unseal(args.root, args.list, expected_runs=expected, operator=args.operator,
-                            workers=args.workers), sort_keys=True))
+                            workers=args.workers, review=args.blind_review), sort_keys=True))
     return 0
 
 

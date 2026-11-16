@@ -235,8 +235,12 @@ class RunMeasures:
                                      "r": (hit - start) if hit else end - start + 1, "censored": hit is None})
 
     def _lockin(self):
-        self.lockin = []
-        minimum = self.options["lock_min_rounds"]
+        self.lockin = self._lock_spells(self.options["lock_min_rounds"])
+        # Reported sensitivity: with 1, one all-one-family final round already counts as lock-in.
+        self.lockin_sensitivity = self._lock_spells(self.options.get("lock_min_rounds_sensitivity", 2))
+
+    def _lock_spells(self, minimum):
+        spells = []
         for start, end in self._epochs(self.last_round):
             for branch in self._branches():
                 per_round = [set(self._branch_families(t, branch)) for t in range(start, end + 1)]
@@ -248,9 +252,9 @@ class RunMeasures:
                     if len(tail) >= minimum and all(len(f) == 1 for f in tail) and len(set().union(*tail)) == 1:
                         lock = i
                         break
-                self.lockin.append({"epoch_start": start, "branch": branch,
-                                    "time": lock if lock is not None else len(per_round),
-                                    "event": lock is not None})
+                spells.append({"epoch_start": start, "branch": branch,
+                               "time": lock if lock is not None else len(per_round), "event": lock is not None})
+        return spells
 
     # -- E2 support
     def tag_share(self, target, t):

@@ -36,16 +36,20 @@ def note_text(target_tag):
     return TEMPLATE.format(design=target_tag.replace("_", " ").replace("-", " "), tag=target_tag)
 
 
-def planted_note(target_tag, round_index):
+def planted_note(target_tag, round_index, selection_sha256=None):
     """The controller's intervention value for one planted round."""
-    return {"round": round_index, "target_tag": target_tag, "note": note_text(target_tag),
-            "selection_rule": SELECTION_RULE}
+    value = {"round": round_index, "target_tag": target_tag, "note": note_text(target_tag),
+             "selection_rule": SELECTION_RULE}
+    if selection_sha256 is not None:
+        value["selection_sha256"] = selection_sha256
+    return value
 
 
 def validate(value, rounds):
     """A templated note with its selection rule; a rule-less free note is kept only for controller tests."""
     keys = {"round", "target_tag", "note"}
-    if not isinstance(value, dict) or set(value) not in (keys, keys | {"selection_rule"}):
+    if not isinstance(value, dict) or set(value) not in (keys, keys | {"selection_rule"},
+                                                         keys | {"selection_rule", "selection_sha256"}):
         raise ValueError("intervention requires round, target_tag and note")
     if type(value["round"]) is not int or not 1 <= value["round"] <= rounds:
         raise ValueError("intervention round is outside the run")
@@ -62,7 +66,7 @@ def validate(value, rounds):
 def identity(value):
     return {"kind": "planted_note", "round": value["round"], "target_tag": value["target_tag"],
             "note_sha256": hashlib.sha256(value["note"].encode()).hexdigest(),
-            "selection_rule": value.get("selection_rule")}
+            "selection_rule": value.get("selection_rule"), "selection_sha256": value.get("selection_sha256")}
 
 
 def choose_target(tag_sets, best_tags, low=SHARE_LOW, high=SHARE_HIGH):
@@ -133,11 +137,14 @@ def from_checkpoint(checkpoint):
     path = checkpoint.path / SELECTION_FILE
     if not path.is_file():
         raise ValueError("checkpoint has no target selection; run `intervention select` first")
-    record = json.loads(path.read_text())
+    body = path.read_bytes()
+    record = json.loads(body)
     if (record.get("selection_rule") != SELECTION_RULE or record.get("checkpoint_snapshot_sha256") != checkpoint.sha256
             or record.get("planted_round") != checkpoint.round + 1):
         raise ValueError("target selection belongs to another checkpoint or rule")
-    return planted_note(record["target_tag"], checkpoint.round + 1)
+    # The selection file sits outside the snapshot hash; its digest in the run manifest shows the
+    # target was fixed before the planted runs started.
+    return planted_note(record["target_tag"], checkpoint.round + 1, hashlib.sha256(body).hexdigest())
 
 
 def main(argv=None):

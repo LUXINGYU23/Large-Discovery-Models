@@ -52,7 +52,7 @@ DEFAULTS = {
                   ["ldm4geo", "independent_sampling", "test_ood"]],
     "family": {"mode": "tags", "threshold": None},
     "tagger_rules": DRAFT_RULES,
-    "measures": {"top_quarter": 0.25, "lock_min_rounds": 1, "coverage_statuses": ["valid"],
+    "measures": {"top_quarter": 0.25, "lock_min_rounds": 1, "lock_min_rounds_sensitivity": 2, "coverage_statuses": ["valid"],
                  "free_text_min_chars": 40},
     "round_digits": 6,
 }
@@ -426,6 +426,11 @@ class Analysis:
                "hr": None if r is None or h is None else r * h,
                "n_reentries": len(reentry), "n_reentries_censored": sum(x["censored"] for x in reentry),
                "n_lock_spells": len(lock), "n_lock_events": sum(x["event"] for x in lock)}
+        spells = [x for m in measures for x in m.lockin_sensitivity]
+        h2 = stats.exponential_rate([x["time"] for x in spells], [x["event"] for x in spells]) if spells else None
+        out["sensitivity"] = {"lock_min_rounds": self.config["measures"]["lock_min_rounds_sensitivity"], "h": h2,
+                              "K_star": None if r is None or h2 is None else stats.k_star(r, h2),
+                              "n_lock_events": sum(x["event"] for x in spells)}
         if len(measures) >= 2:
             rng = self.rng("prop3")
             draws = []
@@ -466,8 +471,13 @@ class Analysis:
         out = self.agreement([self.measures[r.run_id] for r in self.arm_runs("M1", arm)])
         out["by_arm"] = {a: self.agreement([self.measures[r.run_id] for r in self.arm_runs("M1", a)])
                          for a in CORE if self.arm_runs("M1", a)}
-        refs = [row["reference"] for r in self.arm_runs("M1", arm) for row in self.measures[r.run_id].branch_epochs]
-        out["reference_family_source"] = {s: refs.count(s) for s in sorted(set(refs))}
+        for a in [arm] + [x for x in CORE if x != arm]:
+            refs = [row["reference"] for r in self.arm_runs("M1", a) for row in self.measures[r.run_id].branch_epochs]
+            source = {s: refs.count(s) for s in sorted(set(refs))}
+            if a == arm:
+                out["reference_family_source"] = source
+            if a in out["by_arm"]:
+                out["by_arm"][a]["reference_family_source"] = source
         return out
 
     # -- main
@@ -541,6 +551,11 @@ class Analysis:
             out[arm]["compactions_per_run"] = _mean([sum(m.compactions_by_branch.values()) for m in ms])
             out[arm]["free_text_chars_mean"] = _mean([p["free_text_chars"] for m in ms for p in m.programs.values()])
             out[arm]["feature_spaces"] = sorted({m.feature_version for m in ms})
+            # Rounds whose incumbent had a validation; the rest have no optimism value (B5).
+            cells = [row.get("optimism") for m in ms for row in m.rounds.values()]
+            out[arm]["optimism_coverage"] = sum(v is not None for v in cells) / len(cells) if cells else None
+            # A capped run freezes early; the paper reports how many runs per arm hit the cap.
+            out[arm]["token_capped_runs"] = sum(r.stop_reason == "token_cap" for r in runs)
         return out
 
     # -- assemble

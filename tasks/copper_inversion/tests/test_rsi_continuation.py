@@ -371,7 +371,8 @@ def test_note_is_the_fixed_template_and_records_its_rule():
     assert interventions.validate(note, 20) == note
     identity = interventions.identity(note)
     assert identity == {"kind": "planted_note", "round": 11, "target_tag": "fast_marching",
-                        "note_sha256": hashlib.sha256(note["note"].encode()).hexdigest(), "selection_rule": "v1"}
+                        "note_sha256": hashlib.sha256(note["note"].encode()).hexdigest(), "selection_rule": "v1",
+                        "selection_sha256": None}
     with pytest.raises(ValueError, match="fixed template"):
         interventions.validate({**note, "note": "free text"}, 20)
     assert "iou" not in note["note"].lower()
@@ -389,6 +390,8 @@ def test_at28_planted_note_only_in_the_planted_round_messages(tmp_path):
     note = interventions.from_checkpoint(checkpoint)
     text = note["note"]
     assert note["target_tag"] == record["target_tag"] and note["round"] == 3
+    selection = checkpoint.path / continuations.SELECTION_FILE
+    assert note["selection_sha256"] == hashlib.sha256(selection.read_bytes()).hexdigest()
     for mode in ("conversation", "history"):
         target = tmp_path / f"ck7-{mode}-planted-r1"
         continue_run(target, checkpoint, mode, intervention=note)

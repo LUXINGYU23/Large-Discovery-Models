@@ -48,6 +48,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core import execution
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import FULL, layout
+from tasks.copper_inversion.experiments.rsi.unseal import REVIEW_FILE
 from tasks.copper_inversion.rsi import protocol as protocols
 
 SCHEMA = "rsi-batch-v1"
@@ -600,6 +601,11 @@ class Launcher:
         for name, _ in self.runs():
             paths = self.paths(name)
             reconciliation[name] = conditions(paths["run"], paths["service"])
+            blind = reconciliation[name]["blind"]
+            if blind["review_required"]:
+                # unseal.py refuses this run until a reviewer signs off this exact hit list.
+                atomic_json_write(paths["service"] / REVIEW_FILE, {
+                    "run_id": name, "review_sha256": blind["review_sha256"], "hits": blind["review_required"]})
         state["reconciliation"] = reconciliation
         state["stage"] = "reconciled"
         self.save_state(state)

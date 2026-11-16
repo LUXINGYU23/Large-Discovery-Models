@@ -246,8 +246,8 @@ def test_at04_scripted_run_has_no_leak_and_whitelist_off_control_detects_one(tmp
     assert result["charged_records"] == 13
     report = scan_blind(run, service.root)
     assert report["provider_requests_checked"] == 12 and report["leaks"] == 0
-    assert report["marker_hits"] == {"sentinel": 0, "private_parent_id": 0, "truth_hash": 0}
-    assert report["iou_hits_by_kind"]["unexplained"] == 0
+    assert report["marker_hits"] == {"sentinel": 0, "private_parent_id": 0, "truth_hash": 0, "private_value": 0}
+    assert report["iou_hits_by_kind"]["unexplained"] == 0 and report["status"] == "passed"
     assert any(p.parts[0] == "feedback" for p in (q.relative_to(run) for q in run.rglob("*.json")))
     assert reconcile_budget(run, service.root)["charged_sources"] == 13
 
@@ -261,6 +261,7 @@ def test_at04_scripted_run_has_no_leak_and_whitelist_off_control_detects_one(tmp
     monkeypatch.setattr(exposure, "UNSAFE_DISABLE_WHITELIST", False)
     detected = scan_blind(control, leaky.root, require_requests=False, expect_leak=True)
     assert detected["status"] == "control_detected" and detected["marker_hits"]["sentinel"] > 0
+    assert detected["marker_hits"]["private_value"] > 0
     assert detected["iou_hits_by_kind"]["unexplained"] > 0
     with pytest.raises(ValueError, match="contaminated"):
         scan_blind(control, leaky.root, require_requests=False)
@@ -279,9 +280,26 @@ def test_iou_hits_are_listed_and_only_task_wording_and_words_are_explained(tmp_p
     kinds = [(hit["path"], hit["kind"]) for hit in report["iou_hits"]]
     assert (str(request.relative_to(run)), "english_word") in kinds
     assert (str(request.relative_to(run)), "task_description") in kinds
+    # An unexplained word is listed for sign-off before unsealing, not a scan failure (A3).
     request.write_bytes(b'{"input": "best mean_iou=0.42"}')
-    with pytest.raises(ValueError, match="1 unexplained"):
-        scan_blind(run, service.root, allowed_text=[task_line])
+    report = scan_blind(run, service.root, allowed_text=[task_line])
+    assert report["status"] == "review_required" and report["review_required"] == 1 and report["leaks"] == 0
+    assert report["review_sha256"] == scan_blind(run, service.root)["review_sha256"]
+
+
+def test_hidden_iou_values_are_markers(tmp_path, train):
+    service = make_service(tmp_path, train)
+    run = tmp_path / "run"
+    run_controller(run, LoopbackClient(run, service), rounds=1)
+    values = [json.loads(p.read_text())["metrics"]["mean_iou"] for p in service.root.glob("evaluations/*/result.json")]
+    value = next(v for v in values if type(v) is float and len(json.dumps(v)) >= 10)
+    planted = run / "harness/epoch_00/branch_0/sessions/workspace/notes.txt"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"score {json.dumps(value)} and a rounded {value:.3f}")
+    with pytest.raises(ValueError, match="private_value"):
+        scan_blind(run, service.root, require_requests=False)
+    planted.write_text(f"only a rounded {value:.3f}")
+    assert scan_blind(run, service.root, require_requests=False)["marker_hits"]["private_value"] == 0
 
 
 @pytest.mark.parametrize("marker", ["truth", "confirmation", "parent"])

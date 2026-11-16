@@ -276,7 +276,8 @@ class FakeHost:
 def test_at37_launcher_starts_two_smoke_runs_and_resumes_after_a_pause(tmp_path, monkeypatch):
     from tasks.copper_inversion.rsi import workflow
     monkeypatch.setattr(workflow, "prepare", lambda args: None)
-    monkeypatch.setattr(archive, "conditions", lambda run, service: {"engine": "ok", "budget": "ok"})
+    monkeypatch.setattr(archive, "conditions", lambda run, service: {"engine": "ok", "budget": "ok", "blind": {
+        "review_required": 0, "review_sha256": None}})
     reaped = []
     monkeypatch.setattr(launch, "reap", lambda queue: reaped.append(queue) or {"removed": 0, "kept": []})
     root = tmp_path / "active"

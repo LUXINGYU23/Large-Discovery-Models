@@ -57,7 +57,8 @@ def conditions(run, service, *, key_file=None, require_requests=True):
     blind = scan_blind(run, service, key_file=key_file, require_requests=require_requests)
     return {"engine": {"status": result["status"], "stop_reason": result.get("stop_reason")},
             "budget": reconcile_budget(run, service),
-            "blind": {k: blind[k] for k in ("status", "files_checked", "marker_hits", "iou_hits_by_kind", "leaks")},
+            "blind": {k: blind[k] for k in ("status", "files_checked", "marker_hits", "iou_hits_by_kind", "leaks",
+                                            "review_required", "review_sha256")},
             "briefs": verify_briefs(run)}
 
 
