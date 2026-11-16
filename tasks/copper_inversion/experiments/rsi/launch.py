@@ -538,7 +538,9 @@ class Launcher:
                 entry["service"] = restarted
             if entry.get("controller_pid") and self.host.alive(entry["controller_pid"]):
                 raise PlanError("controller still running: " + name)
-            processes[name] = self.start_controller(name, run, entry["service"], resume=True)
+            # A controller that never wrote its run directory starts fresh.
+            processes[name] = self.start_controller(name, run, entry["service"],
+                                                    resume=self.paths(name)["run"].exists())
             entry.update(controller_pid=processes[name].pid, status="running",
                          resumes=entry.get("resumes", 0) + 1)
             self.save_state(state)
