@@ -192,6 +192,9 @@ def load_manifest(path,packs_per_body=None):
 
 
 class SuiteEvaluator:
+    # Scheduling only: cases solved at once (scheduling policy case_workers), never in the key.
+    case_workers=4
+
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None):
         self.root=Path(root);self.execution=execution
         self.slots=slots
@@ -213,7 +216,7 @@ class SuiteEvaluator:
         elif self.manifest["stage"]=="formal" and seconds!=120:
             raise ValueError("formal solver budget is fixed at 120 seconds")
         if seconds<=0:raise ValueError("invalid solver budget")
-        self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),case_workers=4,
+        self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),
             image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=AGGREGATIONS[objective])
         if purpose is not None:self.context["purpose"]=purpose
 
@@ -231,55 +234,77 @@ class SuiteEvaluator:
         root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
         result_path=root/"result.json"
         if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
-        rows=[];jobs=0;wall=0.
+        merged=getattr(self.execution,"merged",False)
         def solve_one(item):
+            # Returns a finished row, or (row, scoring job) when the model needs scoring.
             case,seed=item
             identity=dict(evaluation=key,case=case["case_id"],seed=seed)
             case_root=root/case["case_id"]/str(seed);case_root.mkdir(parents=True,exist_ok=True)
             row_path=case_root/"receipt.json"
-            if row_path.exists():
-                row=json.loads(row_path.read_text())
-            else:
-                inputs=case_root/"input"
-                problem=read_problem(self.manifest_path.parent/case["public"])
-                save_problem(problem,inputs)
-                atomic_json_write(inputs/"budget.json",dict(seed=seed,wall_time_seconds=self.seconds,cpu_count=2,memory_mb=4096))
-                job,r=self.execution.run(identity,phase="solver",inputs=inputs,source=source.parent,
-                    timeout=self.seconds,cpus=2,memory_mb=4096,science_module="v2")
-                row=dict(parent_id=case["parent_id"],case_id=case["case_id"],seed=seed,
-                    status="failed",metrics={"iou":0.},solver_wall_seconds=r["wall_seconds"],jobs=1,
-                    solver_resources=r.get("workload_resources"),error="solver failed")
-                if self.objective!="confirmation":row["objective"]=self.objective
-                if r["reason"]=="timeout":row["status"]="timed_out"
-                if not (r["exit_code"] or r["reason"] or r["oom"]):
+            if row_path.exists():return json.loads(row_path.read_text())
+            inputs=case_root/"input"
+            problem=read_problem(self.manifest_path.parent/case["public"])
+            save_problem(problem,inputs)
+            atomic_json_write(inputs/"budget.json",dict(seed=seed,wall_time_seconds=self.seconds,cpu_count=2,memory_mb=4096))
+            job,r=self.execution.run(identity,phase="solver",inputs=inputs,source=source.parent,
+                timeout=self.seconds,cpus=2,memory_mb=4096,science_module="v2")
+            row=dict(parent_id=case["parent_id"],case_id=case["case_id"],seed=seed,
+                status="failed",metrics={"iou":0.},solver_wall_seconds=r["wall_seconds"],jobs=1,
+                solver_resources=r.get("workload_resources"),error="solver failed")
+            if self.objective!="confirmation":row["objective"]=self.objective
+            if r["reason"]=="timeout":row["status"]="timed_out"
+            if not (r["exit_code"] or r["reason"] or r["oom"]):
+                try:
                     try:
-                        try:
-                            read_model(job/"output/model.npy",problem["shape"])
-                        except (FileNotFoundError,PermissionError) as exc:
-                            raise ValueError("candidate did not produce a readable model") from exc
-                        sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
-                    except OSError as exc:
-                        raise EvaluationPaused("model freeze infrastructure I/O failed") from exc
-                    except ValueError as exc:
-                        row.update(status="invalid",error=str(exc))
-                    else:
-                        score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=inputs,
-                            model=case_root/"model",truth=self.manifest_path.parent/case["truth"],timeout=30,science_module="v2")
-                        if s["exit_code"] or s["reason"] or s["oom"]:
-                            raise EvaluationPaused("independent scorer infrastructure failure")
-                        outcome=json.loads((score_root/"output/result.json").read_text())
-                        if outcome.get("status") not in {"invalid","succeeded"}:
-                            raise EvaluationPaused("invalid independent scorer receipt")
-                        value=outcome.get("metrics",{}).get("iou")
-                        if not isinstance(value,(int,float)) or not np.isfinite(value) or not 0<=value<=1:
-                            raise EvaluationPaused("invalid hidden geometry metric")
-                        row.update(outcome);row["jobs"]=2
-                        if row["status"]=="succeeded":row["error"]=""
-                atomic_json_write(row_path,row)
+                        read_model(job/"output/model.npy",problem["shape"])
+                    except (FileNotFoundError,PermissionError) as exc:
+                        raise ValueError("candidate did not produce a readable model") from exc
+                    sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
+                except OSError as exc:
+                    raise EvaluationPaused("model freeze infrastructure I/O failed") from exc
+                except ValueError as exc:
+                    row.update(status="invalid",error=str(exc))
+                else:
+                    scoring=dict(identity=identity,model=sha,inputs=inputs,model_dir=case_root/"model",
+                        truth=self.manifest_path.parent/case["truth"],row_path=row_path)
+                    if merged:return row,scoring
+                    score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=inputs,
+                        model=case_root/"model",truth=scoring["truth"],timeout=30,science_module="v2")
+                    if s["exit_code"] or s["reason"] or s["oom"]:
+                        raise EvaluationPaused("independent scorer infrastructure failure")
+                    scored(row,json.loads((score_root/"output/result.json").read_text()))
+            atomic_json_write(row_path,row)
             return row
+        def scored(row,outcome):
+            if outcome.get("status") not in {"invalid","succeeded"}:
+                raise EvaluationPaused("invalid independent scorer receipt")
+            value=outcome.get("metrics",{}).get("iou")
+            if not isinstance(value,(int,float)) or not np.isfinite(value) or not 0<=value<=1:
+                raise EvaluationPaused("invalid hidden geometry metric")
+            # jobs counts solve + score per case, also when scoring is merged.
+            row.update(outcome);row["jobs"]=2
+            if row["status"]=="succeeded":row["error"]=""
         plan=[(case,seed) for case in self.manifest["cases"] for seed in self.manifest["seeds"]]
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        # Case concurrency is a scheduling parameter (case_workers), not part of the key.
+        with ThreadPoolExecutor(max_workers=self.case_workers) as pool:
             rows=list(pool.map(solve_one,plan))
+        pending=[(i,item) for i,item in enumerate(rows) if isinstance(item,tuple)]
+        if pending:
+            # Every model of this evaluation in one scorer container (parallelism.md §4.1).
+            jobs=[job for _,(_,job) in pending]
+            score_root,s=self.execution.run(dict(evaluation=key,scoring=[dict(identity=j["identity"],model=j["model"]) for j in jobs]),
+                phase="scorer",cases=[dict(inputs=j["inputs"],model=j["model_dir"],truth=j["truth"]) for j in jobs],
+                timeout=30+5*len(jobs),science_module="v2")
+            if s["exit_code"] or s["reason"] or s["oom"]:
+                raise EvaluationPaused("independent scorer infrastructure failure")
+            outcomes=json.loads((score_root/"output/results.json").read_text())
+            if not isinstance(outcomes,list) or len(outcomes)!=len(jobs):
+                raise EvaluationPaused("invalid independent scorer receipt")
+            for (index,(row,job)),outcome in zip(pending,outcomes):
+                if not isinstance(outcome,dict):raise EvaluationPaused("invalid independent scorer receipt")
+                scored(row,outcome)
+                atomic_json_write(job["row_path"],row)
+                rows[index]=row
         jobs=sum(row["jobs"] for row in rows)
         wall=sum(row["solver_wall_seconds"] for row in rows)
         metrics=aggregate(rows)

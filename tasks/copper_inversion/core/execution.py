@@ -60,16 +60,44 @@ def source_identity():
     )
 
 
+class DockerTimeout(EvaluationPaused):
+    """The Docker CLI did not answer in time; the command's outcome is unknown."""
+
+
 def docker(*args, check=True):
     try:
         r = subprocess.run(
             ["docker", *map(str, args)], capture_output=True, text=True, timeout=40
         )
-    except (subprocess.TimeoutExpired, OSError) as exc:
+    except subprocess.TimeoutExpired as exc:
+        raise DockerTimeout("Docker command outcome unavailable; reconcile the job before retry") from exc
+    except OSError as exc:
         raise EvaluationPaused("Docker command outcome unavailable; reconcile the job before retry") from exc
     if check and r.returncode:
         raise EvaluationPaused("Docker operation failed: " + r.stderr[-700:])
     return r
+
+
+def batch_runs(resources, count, timeout):
+    """Per-case outcomes of a batch container, judged like single-run containers.
+
+    Only rows attested by PID 1 count. None means the container stopped before
+    PID 1 attested (host output limit or supervisor timeout).
+    """
+    if resources is None:
+        return None
+    runs = resources.get("runs")
+    if not isinstance(runs, list) or [r.get("index") for r in runs] != list(range(count)):
+        raise EvaluationPaused("batch attestation does not cover every case")
+    judged = []
+    for run in runs:
+        oom = bool(run["oom_kill_count"])
+        reason = "output_limit" if run["output_limit"] else None
+        if reason is None and not oom and run["exit_code"] == 137 and run["worker_elapsed_seconds"] >= timeout:
+            reason = "timeout"
+        judged.append(dict(exit_code=run["exit_code"], oom=oom, reason=reason,
+                           wall_seconds=run["worker_elapsed_seconds"]))
+    return judged
 
 
 def sample_resources(record, pid):
@@ -98,6 +126,13 @@ def sample_resources(record, pid):
 
 
 class Execution:
+    # Scheduling, not science: set by the scheduling policy (parallel_runtime.install).
+    start_retry_seconds = (5, 15, 45)
+    labels = {}
+    sleep = staticmethod(time.sleep)
+    # Merged scoring and batched interface runs (SuiteEvaluator, InterfaceChecks).
+    merged = True
+
     def __init__(self, root, image, account=None):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
@@ -112,7 +147,7 @@ class Execution:
         identity,
         *,
         phase,
-        inputs,
+        inputs=None,
         timeout,
         cpus=1,
         memory_mb=2048,
@@ -120,29 +155,47 @@ class Execution:
         model=None,
         science_module="core",
         truth=None,
+        cases=None,
+        batch=False,
     ):
+        """One container. `cases` mounts /cases/<i>/{input,model,truth}; with
+        `batch` the supervisor runs one worker per case, each under `timeout`."""
         if science_module not in {"core", "v2"}:
             raise ValueError("unknown scientific contract")
-        if truth is not None and (phase != "scorer" or science_module != "v2" or source is not None):
+        if cases is not None:
+            if inputs is not None or model is not None or truth is not None or not cases:
+                raise ValueError("merged jobs take every input from their cases")
+            if any(set(case) - {"inputs", "model", "truth"} or "inputs" not in case for case in cases):
+                raise ValueError("invalid merged case")
+            if batch and (phase == "scorer" or any(len(case) != 1 for case in cases)):
+                raise ValueError("batched runs take public inputs only")
+        elif batch or inputs is None:
+            raise ValueError("a single job needs inputs; batches need cases")
+        truths = [truth] if cases is None else [case.get("truth") for case in cases]
+        if any(t is not None for t in truths) and (phase != "scorer" or science_module != "v2" or source is not None):
             raise ValueError("hidden truth is restricted to the independent v2 scorer")
         if phase == "scorer" and source is not None:
             raise ValueError("independent scorer cannot mount candidate source")
         truth_digest = None
         if truth is not None:
             truth_digest = hashlib.sha256((Path(truth) / "truth.npy").read_bytes()).hexdigest()
-        key = digest(
-            {
-                "identity": identity,
-                "science_module": science_module,
-                "truth_digest": truth_digest,
-                "phase": phase,
-                "image": self.image,
-                "timeout": timeout,
-                "cpus": cpus,
-                "memory_mb": memory_mb,
-                "implementation": source_identity(),
-            }
-        )
+        scope = {
+            "identity": identity,
+            "science_module": science_module,
+            "truth_digest": truth_digest,
+            "phase": phase,
+            "image": self.image,
+            "timeout": timeout,
+            "cpus": cpus,
+            "memory_mb": memory_mb,
+            "implementation": source_identity(),
+        }
+        # Single jobs keep their historical key; merged jobs add their case layout.
+        if cases is not None:
+            scope.update(batch=batch, case_truth_digests=[
+                None if t is None else hashlib.sha256((Path(t) / "truth.npy").read_bytes()).hexdigest()
+                for t in truths])
+        key = digest(scope)
         root = self.root / key
         root.mkdir(exist_ok=True)
         receipt = root / "receipt.json"
@@ -154,14 +207,16 @@ class Execution:
         # Only public problem/budget files are mounted here. Atomic JSON writes
         # default to 0600. Keep host-owner write access for recovery; the worker
         # receives a read-only bind mount and can only read these public files.
-        Path(inputs).chmod(0o755)
-        for path in Path(inputs).iterdir():
-            path.chmod(0o644)
+        for folder in [inputs] if cases is None else [case["inputs"] for case in cases]:
+            Path(folder).chmod(0o755)
+            for path in Path(folder).iterdir():
+                path.chmod(0o755 if path.is_dir() else 0o644)
+        count = 1 if cases is None or not batch else len(cases)
         name = "ldm-copper-" + digest(str(self.root))[:10] + "-" + key[:20]
         if receipt.exists():
             result = json.loads(receipt.read_text())
             self._account(key, result, phase)
-            docker("rm", name, check=False)
+            self._remove(name)
             if result.get('reason') == 'supervisor_timeout':
                 raise EvaluationPaused('container supervisor exceeded infrastructure grace; reconcile recorded job')
             return root, result
@@ -229,12 +284,24 @@ class Execution:
                 "-w",
                 "/tmp",
             ]
+            # Labels let the operator find and remove every container this code
+            # left behind (launch.py reap); they never enter the job key.
+            for label, value in sorted({**self.labels, "ldm4geo.job_root": str(root)}.items()):
+                command += ["--label", f"{label}={value}"]
             mounts = [
-                (inputs, "/input", True),
                 (TASK / "core", "/code/tasks/copper_inversion/core", True),
                 (TASK / "v2", "/code/tasks/copper_inversion/v2", True),
                 (out, "/output", False),
             ]
+            if cases is None:
+                mounts.insert(0, (inputs, "/input", True))
+            else:
+                for index, case in enumerate(cases):
+                    mounts.append((case["inputs"], f"/cases/{index}/input", True))
+                    if case.get("model") is not None:
+                        mounts.append((case["model"], f"/cases/{index}/model", True))
+                    if case.get("truth") is not None:
+                        mounts.append((case["truth"], f"/cases/{index}/truth", True))
             if truth is not None:
                 mounts.append((truth, "/truth", True))
             if source:
@@ -247,16 +314,10 @@ class Execution:
                     f"type=bind,src={Path(a).resolve()},dst={b}"
                     + (",readonly" if ro else ""),
                 ]
-            command += [
-                self.image,
-                "python",
-                "-m",
-                "tasks.copper_inversion.core.supervisor",
-                str(timeout),
-                f"tasks.copper_inversion.{science_module}."
-                + ("scorer" if phase == "scorer" else "runner"),
-            ]
-            docker(*command)
+            module = f"tasks.copper_inversion.{science_module}." + ("scorer" if phase == "scorer" else "runner")
+            command += [self.image, "python", "-m", "tasks.copper_inversion.core.supervisor"]
+            command += (["--batch", str(timeout), str(count), module] if batch else [str(timeout), module])
+            self._retried(record, job, name, command, lambda: docker("inspect", name, check=False).returncode == 0)
         inspected = json.loads(docker("inspect", name).stdout)[0]
         if record.get("container_id") not in (None, inspected["Id"]):
             raise EvaluationPaused("container identity changed after dispatch")
@@ -265,7 +326,8 @@ class Execution:
         if state["Status"] == "created":
             record.update(started=True, start_time=time.time())
             atomic_json_write(job, record)
-            docker("start", name)
+            self._retried(record, job, name, ["start", name],
+                          lambda: json.loads(docker("inspect", name).stdout)[0]["State"]["Status"] != "created")
         elif not record["started"]:
             raise EvaluationPaused("container state differs from pre-dispatch receipt")
         # Workload timeout remains inside the container; allow only a bounded
@@ -276,7 +338,9 @@ class Execution:
         # because docker start was queued on a busy daemon.
         state = json.loads(docker("inspect", name).stdout)[0]["State"]
         container_started = datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00")).timestamp()
-        deadline = container_started + timeout + 30
+        # A batch adds per-run interpreter start and reap time to each run's budget.
+        deadline = container_started + (timeout if count == 1 else count * (timeout + 10)) + 30
+        max_files, max_bytes = 32 * count, 4 * 1024 * 1024 * count
         reason = record.get("stop_reason")
         while True:
             state = json.loads(docker("inspect", name).stdout)[0]["State"]
@@ -285,20 +349,20 @@ class Execution:
             sample_resources(record, state["Pid"])
             atomic_json_write(job, record)
             # Filesize limits apply per-file; also stop candidates that create many files.
-            count = 0
+            files = 0
             size = 0
-            for base, dirs, files in os.walk(out, followlinks=False):
-                for f in files:
-                    count += 1
+            for base, dirs, names in os.walk(out, followlinks=False):
+                for f in names:
+                    files += 1
                     try:
                         size += (Path(base) / f).lstat().st_size
                     except FileNotFoundError:
                         pass
-                    if count > 32 or size > 4 * 1024 * 1024:
+                    if files > max_files or size > max_bytes:
                         break
-                if count > 32 or size > 4 * 1024 * 1024:
+                if files > max_files or size > max_bytes:
                     break
-            if time.time() > deadline or count > 32 or size > 4 * 1024 * 1024:
+            if time.time() > deadline or files > max_files or size > max_bytes:
                 reason = "supervisor_timeout" if time.time() > deadline else "output_limit"
                 # Persist the controller's decision before killing: a restart must
                 # retain the timeout classification even if no receipt was written.
@@ -321,6 +385,10 @@ class Execution:
         (root / "log.txt").write_text((log.stdout + log.stderr)[-1024 * 1024 :])
         resources = authenticated_resources(log.stdout, record["resource_key"])
         oom = state["OOMKilled"] or bool(resources and resources["oom_kill_count"])
+        if batch:
+            # One authenticated row per case; the container-level OOM flag counts
+            # only when no run explains it.
+            oom = state["OOMKilled"] and not (resources and any(r["oom_kill_count"] for r in resources.get("runs", ())))
         if reason is None and not oom and state["ExitCode"] == 137 and wall_seconds >= timeout:
             reason = "timeout"
         if reason is not None:
@@ -350,12 +418,49 @@ class Execution:
                 "complete_lifetime_measurement": False,
             },
         }
+        if batch:
+            result["runs"] = batch_runs(resources, count, timeout)
         atomic_json_write(receipt, result)
         self._account(key, result, phase)
-        docker("rm", name, check=False)
+        self._remove(name)
         if reason == 'supervisor_timeout':
             raise EvaluationPaused('container supervisor exceeded infrastructure grace; reconcile recorded job')
         return root, result
+
+    def _retried(self, record, job, name, command, happened):
+        """Create/start with bounded retries (parallelism.md §4.4).
+
+        A timed-out command is retried only after Docker confirms it did not take
+        effect. Every retry is kept in job.json for the scheduling record; after
+        the last retry the timeout pauses the shared scheduler as before.
+        """
+        delays = list(self.start_retry_seconds)
+        while True:
+            try:
+                return docker(*command)
+            except DockerTimeout:
+                if happened():
+                    return None
+                if not delays:
+                    raise EvaluationPaused(f"docker {command[0]} timed out after "
+                                           f"{len(self.start_retry_seconds)} retries; reconcile before retry")
+                delay = delays.pop(0)
+                record.setdefault("start_retries", []).append(
+                    dict(command=command[0], time=time.time(), delay_seconds=delay))
+                atomic_json_write(job, record)
+                self.sleep(delay)
+
+    def _remove(self, name):
+        """Stopped containers never accumulate; a failed removal is listed, never fatal."""
+        try:
+            removed = docker("rm", "-f", name, check=False)
+            if removed.returncode == 0 or "No such container" in removed.stderr:
+                return
+            error = removed.stderr[-300:]
+        except EvaluationPaused as exc:
+            error = str(exc)
+        with (self.root / "cleanup-pending.jsonl").open("a") as stream:
+            stream.write(json.dumps(dict(name=name, time=time.time(), error=error), sort_keys=True) + "\n")
 
     def _account(self, key, result, phase):
         with self._account_lock:

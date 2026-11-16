@@ -1,4 +1,5 @@
 """Run public candidate admission checks on the remote Docker host."""
+import json
 import tempfile
 import unittest
 from unittest.mock import Mock
@@ -42,7 +43,11 @@ class InterfaceV2(unittest.TestCase):
             result = domain.admit(RawProposal(good, "test"))
             self.assertNotIsInstance(result, CandidateRejection)
             jobs = list((root / "jobs").glob("*/job.json"))
-            self.assertEqual(len(jobs), 6)
+            # One merged container; PID 1 attests each of the six fixture runs.
+            self.assertEqual(len(jobs), 1)
+            receipt = json.loads((jobs[0].parent / "receipt.json").read_text())
+            self.assertEqual([r["index"] for r in receipt["workload_resources"]["runs"]], list(range(6)))
+            self.assertEqual(len(receipt["runs"]), 6)
             before = {str(p): p.read_bytes() for p in jobs}
             self.assertNotIsInstance(domain.admit(RawProposal(good, "test")), CandidateRejection)
             self.assertEqual(before, {str(p): p.read_bytes() for p in jobs})
