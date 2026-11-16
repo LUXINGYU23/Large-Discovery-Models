@@ -6,10 +6,12 @@ from ldm_tts.optimization.records import BOObservation
 from ..core.surrogate import LossSelector
 
 
-def reserve_and_rank(predictions, count):
-    """Reserve each branch's best proposal, then select highest remaining UCBs."""
+def reserve_and_rank(predictions, count, reserved_per_branch=1):
+    """Reserve each branch's best proposals, then select highest remaining UCBs."""
     if not predictions or type(count) is not int or not 1 <= count <= len(predictions):
         raise ValueError("invalid proposal pool or batch size")
+    if type(reserved_per_branch) is not int or reserved_per_branch < 0:
+        raise ValueError("invalid reservation per branch")
     ids = [p["program_id"] for p in predictions]
     if len(set(ids)) != len(ids):
         raise ValueError("duplicate candidate in acquisition pool")
@@ -18,17 +20,17 @@ def reserve_and_rank(predictions, count):
            for p in predictions):
         raise ValueError("invalid acquisition prediction")
     ranked = sorted(predictions, key=lambda p: (-p["acquisition"], p["program_id"]))
-    branches = sorted({p["branch"] for p in ranked})
-    if count < len(branches):
-        raise ValueError("batch cannot reserve one proposal for each branch")
-    reserved = [next(p for p in ranked if p["branch"] == b) for b in branches]
+    reserved = [p for b in sorted({p["branch"] for p in ranked})
+                for p in [q for q in ranked if q["branch"] == b][:reserved_per_branch]]
+    if count < len(reserved):
+        raise ValueError("batch cannot hold the per-branch reservations")
     reserved_ids = {p["program_id"] for p in reserved}
     chosen = [(p, "reserved") for p in reserved]
     chosen += [(p, "acquisition") for p in ranked if p["program_id"] not in reserved_ids][:count-len(chosen)]
     return [{**p, "selection": reason} for p, reason in chosen]
 
 
-def select(pool, history, encoder, count):
+def select(pool, history, encoder, count, reserved_per_branch=1):
     """Fit the existing loss GP on all charged sources and score this pool."""
     if not history:
         raise ValueError("the initial solver must be measured before GP selection")
@@ -49,5 +51,5 @@ def select(pool, history, encoder, count):
     predictions = [{"program_id": p.candidate_id, "branch": owners[p.candidate_id],
                     "mean": p.scalar_mean, "std": p.scalar_std,
                     "acquisition": p.acquisition_score} for p in result.predictions]
-    return {"predictions": predictions, "selected": reserve_and_rank(predictions, count),
+    return {"predictions": predictions, "selected": reserve_and_rank(predictions, count, reserved_per_branch),
             "surrogate": result.metadata}
