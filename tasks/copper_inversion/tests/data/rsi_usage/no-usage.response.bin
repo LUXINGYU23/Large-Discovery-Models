@@ -1,0 +1,9 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_5","status":"in_progress","model":"fixture-model","output":[]}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","id":"msg_5","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_5","status":"completed","model":"fixture-model","output":[{"type":"message","id":"msg_5","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}}
+

@@ -53,6 +53,10 @@ class RiskOnlyService(EvaluatorService):
     optional_keys = EvaluatorService.optional_keys | {"import"}
     objective = "confirmation"
     tier = None
+    # SHA-256 hex of the exact ledger-prefix file bytes this service imported
+    # (the launcher's copy of --import-ledger, pinned in import.ledger_prefix_sha256);
+    # None when the service was not started by import.
+    import_ledger_prefix_sha256 = None
 
     def __init__(self, configuration):
         if isinstance(configuration, dict) and "purpose" in configuration:
@@ -78,6 +82,7 @@ class RiskOnlyService(EvaluatorService):
         self.shared_implementation = shared_identity()
         if "import" in configuration:
             self.import_prefix(configuration["import"])
+            self.import_ledger_prefix_sha256 = configuration["import"]["ledger_prefix_sha256"]
         self.public_contract = digest({"service": digest(self.identity), "version": VERSION,
                                        "private_audit_sha256": digest(audit),
                                        "shared_implementation_sha256": self.shared_implementation})
@@ -227,7 +232,8 @@ class RiskOnlyService(EvaluatorService):
                         slots=self.slot_limit,
                         used_slots=self.ledger.counters.get("algorithm_feedback_slots", 0),
                         exposure_version=VERSION, objective=self.objective,
-                        tier=None if self.tier is None else self.tier["name"])
+                        tier=None if self.tier is None else self.tier["name"],
+                        import_ledger_prefix_sha256=self.import_ledger_prefix_sha256)
         if not isinstance(request, dict) or request.get("contract_digest") != self.public_contract:
             return {"status": "contract_mismatch"}
         if shared_identity() != self.shared_implementation:

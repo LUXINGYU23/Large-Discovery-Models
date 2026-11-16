@@ -1,0 +1,9 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"fixture-model","output":[]}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"fixture-model","output":[{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":12000,"input_tokens_details":{"cached_tokens":8000},"output_tokens":900,"output_tokens_details":{"reasoning_tokens":7},"total_tokens":12900}}}
+
