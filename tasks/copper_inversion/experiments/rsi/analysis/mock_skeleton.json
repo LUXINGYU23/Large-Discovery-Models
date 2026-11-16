@@ -1,0 +1,274 @@
+{
+ "skeleton": {
+  "E1": {
+   "active_families": {
+    "best_program": "scalar",
+    "conversation": "scalar",
+    "history": "scalar"
+   },
+   "checkpoint": "list",
+   "checkpoints": {
+    "ck101": "scalar",
+    "ck102": "scalar",
+    "ck103": "scalar"
+   },
+   "diff_best_minus_history": "scalar",
+   "diff_by_checkpoint": {
+    "ck101": "scalar",
+    "ck102": "scalar",
+    "ck103": "scalar"
+   },
+   "diff_history_minus_conversation": "scalar",
+   "final_mean": {
+    "best_program": "scalar",
+    "conversation": "scalar",
+    "history": "scalar"
+   },
+   "margin": "scalar",
+   "runs": {
+    "best_program": "list",
+    "conversation": "list",
+    "history": "list"
+   },
+   "s0": "scalar",
+   "upper95_one_sided": "scalar",
+   "verdict": "scalar"
+  },
+  "E2": {
+   "first_round": "scalar",
+   "half_life_rounds": {
+    "conversation": "scalar",
+    "history": "scalar"
+   },
+   "late_mean_rounds_16_20": {
+    "conversation": "scalar",
+    "history": "scalar"
+   },
+   "mean": {
+    "conversation": "list",
+    "history": "list"
+   },
+   "reset_period": "scalar",
+   "runs": {
+    "conversation": "list",
+    "history": "list"
+   }
+  },
+  "E3": {
+   "all": {
+    "accumulated": "list",
+    "ldm4geo": "list"
+   },
+   "oracle": {
+    "accumulated": "list",
+    "ldm4geo": "list"
+   },
+   "quarter": {
+    "accumulated": "list",
+    "ldm4geo": "list"
+   }
+  },
+  "E3_gap": {
+   "all": "scalar",
+   "oracle": "scalar",
+   "quarter": "scalar"
+  },
+  "E3_gap_weak_minus_oracle": {
+   "ci95": "list",
+   "diff": "scalar"
+  },
+  "E4": {
+   "Accumulated context": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "Independent sampling": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "LDM4Geo": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "Program evolution": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "Restart from best": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "Separate runs": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   },
+   "Single conversation": {
+    "group": "scalar",
+    "held_hw": "scalar",
+    "held_mean": "scalar",
+    "held_out": "list",
+    "inherits": "scalar",
+    "n": "scalar",
+    "same": "list",
+    "same_hw": "scalar",
+    "same_mean": "scalar"
+   }
+  },
+  "E4_primary": {
+   "id": {
+    "ci95": "list",
+    "diff": "scalar",
+    "perm_p": "scalar"
+   },
+   "shift": {
+    "ci95": "list",
+    "diff": "scalar",
+    "perm_p": "scalar"
+   }
+  },
+  "E4_references": {
+   "Acquisition-guided search": "list",
+   "Initial solver": "list",
+   "Projected search": "list"
+  },
+  "F1": {
+   "ci95": "list",
+   "diff": "scalar",
+   "mean": {
+    "Accumulated context": "scalar",
+    "LDM4Geo": "scalar"
+   },
+   "runs": {
+    "Accumulated context": "list",
+    "LDM4Geo": "list"
+   }
+  },
+  "MOCK": "scalar",
+  "branch_agreement": {
+   "icc": "scalar",
+   "q_bar": "scalar"
+  },
+  "coverage": {
+   "accumulated": "list",
+   "ldm4geo": "list"
+  },
+  "design": "scalar",
+  "main": {
+   "R0": "scalar",
+   "budget_fractions": "list",
+   "budget_iou": {
+    "Accumulated context": "list",
+    "Independent sampling": "list",
+    "LDM4Geo": "list",
+    "Restart from best": "list"
+   },
+   "budget_rounds": "list",
+   "crossover_round": "scalar",
+   "extra_rows": {
+    "Acquisition-guided search": "list",
+    "Initial solver": "list",
+    "Projected search": "list"
+   },
+   "families": {
+    "Accumulated context": "list",
+    "LDM4Geo": "list",
+    "Restart from best": "list"
+   },
+   "final_mean": {
+    "Accumulated context": "scalar",
+    "Independent sampling": "scalar",
+    "LDM4Geo": "scalar",
+    "Restart from best": "scalar"
+   },
+   "layout_spearman": "scalar",
+   "proxy_programs": "scalar",
+   "proxy_spearman": "scalar",
+   "reset_period": "scalar",
+   "rounds": "scalar",
+   "tier_spearman": "scalar",
+   "token_saving": "scalar",
+   "tokens_per_round_M": {
+    "Accumulated context": "list",
+    "LDM4Geo": "list"
+   },
+   "tokens_total_M": {
+    "Accumulated context": "scalar",
+    "LDM4Geo": "scalar"
+   },
+   "tokens_uncached_M": {
+    "Accumulated context": "scalar",
+    "LDM4Geo": "scalar"
+   },
+   "trajectories": {
+    "Accumulated context": "list",
+    "Independent sampling": "list",
+    "LDM4Geo": "list",
+    "Restart from best": "list"
+   },
+   "trajectory_mean": {
+    "Accumulated context": "list",
+    "Independent sampling": "list",
+    "LDM4Geo": "list",
+    "Restart from best": "list"
+   }
+  },
+  "pilot": {
+   "bound": "scalar",
+   "m_v": "scalar",
+   "mde_n12": "scalar",
+   "mde_n16": "scalar",
+   "runs_per_arm": "scalar",
+   "s_v": "scalar"
+  },
+  "prop3": {
+   "K_star": "scalar",
+   "K_used": "scalar",
+   "h": "scalar",
+   "r": "scalar"
+  },
+  "warning": "scalar"
+ },
+ "source": "writing-input-20261111/paper/evidence/mock/MOCK-planned-results.json (2026-11-13, v16)"
+}
