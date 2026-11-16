@@ -48,6 +48,9 @@ USAGE_COUNTS = ("requests", "input_tokens", "cached_input_tokens", "output_token
                 "responses_missing_usage", "compactions")
 
 
+SCHEDULING = frozenset({"evaluation_concurrency"})  # Config fields that never change results
+
+
 def profile_name(branch):
     return f"researcher_{branch}"
 
@@ -70,6 +73,7 @@ class Config:
     tier: str = None
     solver_seconds: int = None
     model: dict = None
+    evaluation_concurrency: int = 1  # scheduling only: not in the run identity, may change on resume
 
     def __post_init__(self):
         if not isinstance(self.arm, str) or not self.arm:
@@ -82,7 +86,7 @@ class Config:
             raise ValueError("invalid controller setting: policy")
         lower = {"seed": 0, "token_cap_input": 0, "reserved_per_branch": 0, "bash_calls": 0}
         for name in ("seed", "rounds", "proposals_per_branch", "batch", "reset_period", "harness_seconds",
-                     "token_cap_input", "reserved_per_branch", "finalists", "bash_calls"):
+                     "token_cap_input", "reserved_per_branch", "finalists", "bash_calls", "evaluation_concurrency"):
             value = getattr(self, name)
             if type(value) is not int or value < lower.get(name, 1):
                 raise ValueError("invalid controller setting: " + name)
@@ -357,7 +361,8 @@ class Controller:
         self.start = start
         if {"schema", "config", "implementation_sha256", "task_brief_sha256", "intervention", "start"} & set(identity):
             raise ValueError("run identity cannot override controller fields")
-        self.identity = {"schema": "rsi-controller-v2", "config": asdict(config),
+        scientific = {k: v for k, v in asdict(config).items() if k not in SCHEDULING}
+        self.identity = {"schema": "rsi-controller-v2", "config": scientific,
                          "implementation_sha256": source_identity(),
                          "task_brief_sha256": hashlib.sha256(task_brief.encode()).hexdigest(),
                          "intervention": intervention_identity(self.intervention) if self.intervention else None,
@@ -544,16 +549,41 @@ class Controller:
         return selected
 
     def _evaluate(self, round_index, selected, existing):
-        recorded = {r["program_id"]: r for r in existing}
+        """Evaluate with bounded concurrency; records are appended strictly in selection order.
+
+        A record's seq is its position in the selection, whatever the completion order. After a
+        failure, queued evaluations are cancelled, in-flight ones finish, and only the completed
+        prefix before the first failure is recorded; the rest are resumed (the client replays
+        saved feedback, so nothing charged is evaluated twice).
+        """
+        recorded, pending = {r["program_id"]: r for r in existing}, []
         for item in selected:
             row = recorded.get(item["program_id"])
             if row is not None:  # charged before an interruption; never evaluated twice
-                if (row["round"], row["branch"], row["selection"]) != (round_index, item["branch"], item["selection"]):
+                if pending or (row["round"], row["branch"], row["selection"]) != (
+                        round_index, item["branch"], item["selection"]):
                     raise ValueError("replayed record changed")
                 continue
-            source = self.root / "candidates" / item["program_id"] / "solver.py"
-            self._record(self.evaluator.evaluate_source(source), round_index=round_index,
-                         branch=item["branch"], reason=item["selection"])
+            pending.append(item)
+
+        def evaluate(item):
+            return self.evaluator.evaluate_source(self.root / "candidates" / item["program_id"] / "solver.py")
+
+        def record(item, feedback):
+            self._record(feedback, round_index=round_index, branch=item["branch"], reason=item["selection"])
+
+        workers = min(self.config.evaluation_concurrency, len(pending))
+        if workers <= 1:
+            for item in pending:
+                record(item, evaluate(item))
+            return
+        pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="rsi-evaluation")
+        try:
+            futures = [pool.submit(evaluate, item) for item in pending]
+            for item, future in zip(pending, futures):
+                record(item, future.result())
+        finally:
+            pool.shutdown(wait=True, cancel_futures=True)
 
     def run(self, *, resume=False):
         self._manifest(resume)
