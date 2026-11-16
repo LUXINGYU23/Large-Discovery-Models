@@ -531,12 +531,26 @@ def test_import_charges_the_prefix_and_keeps_its_receipts_eligible(tmp_path, tra
     imported = make_service(tmp_path, train, name="continued", **{"import": spec})
     info = imported.dispatch({"operation": "info"})
     assert info["used_slots"] == len(prefix_rows) == 9
+    # T6 compares this with sha256 of the checkpoint's ledger-prefix.jsonl bytes.
+    assert info["import_ledger_prefix_sha256"] == hashlib.sha256(prefix.read_bytes()).hexdigest()
+    assert source.dispatch({"operation": "info"})["import_ledger_prefix_sha256"] is None
+    client = LoopbackClient(tmp_path / "continued-run", imported)
+    expected = hashlib.sha256(prefix.read_bytes()).hexdigest()
+    assert client.verify_contract(imported.public_digest, 10, 13, import_ledger_prefix_sha256=expected)
+    for wrong in ("0" * 64, None):
+        with pytest.raises(EvaluationPaused):
+            client.verify_contract(imported.public_digest, 10, 13, import_ledger_prefix_sha256=wrong)
+    plain = LoopbackClient(tmp_path / "source-run", source)
+    assert plain.verify_contract(source.public_digest, 10, 13, import_ledger_prefix_sha256=None)
+    with pytest.raises(EvaluationPaused):
+        plain.verify_contract(source.public_digest, 10, 13, import_ledger_prefix_sha256=expected)
     assert info["contract_digest"] != source.public_contract
     measured = eligible(imported.root, train)
     assert set(measured) == {r["program_id"] for r in prefix_rows if r["status"] != "rejected"}
     # Restart is idempotent and the public prefix reconciles with the private budget.
     again = make_service(tmp_path, train, name="continued", **{"import": spec})
     assert again.public_contract == imported.public_contract
+    assert again.dispatch({"operation": "info"})["import_ledger_prefix_sha256"] == expected
     assert again.ledger.counters["algorithm_feedback_slots"] == 9
     continuation = tmp_path / "continuation"
     continuation.mkdir()
