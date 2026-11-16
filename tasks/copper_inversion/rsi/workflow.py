@@ -281,9 +281,9 @@ def main(argv=None):
     key = args.api_key_file.read_text().strip()
     if not key:
         raise ValueError("protected model API key file is empty")
-    agent = PiAgent(public_catalog=args.public_catalog, api_key=key, sidecar_image=sidecar_digest,
-                    cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
-                    **plan["agent"])
+    agent = pi_agent = PiAgent(public_catalog=args.public_catalog, api_key=key, sidecar_image=sidecar_digest,
+                               cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
+                               **plan["agent"])
     encoder = CodeEncoder(args.out_dir, "fusion", args.embedding_model_path, args.embedding_device)
     if args.checkpoint_round is not None:
         agent = continuations.CheckpointingAgent(agent, args.out_dir, args.checkpoint_round)
@@ -305,6 +305,9 @@ def main(argv=None):
         if args.out_dir.exists():
             atomic_json_write(args.out_dir / "run-status.json", {"status": "paused", "error_type": type(exc).__name__})
         raise
+    finally:
+        # Sidecar clients stay open across rounds; stop them before the process exits.
+        pi_agent.close()
     atomic_json_write(args.out_dir / "run-status.json", {"status": result["status"],
                                                          "stop_reason": result["stop_reason"]})
     print(json.dumps({"run_dir": str(args.out_dir), **result}, sort_keys=True))
