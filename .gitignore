@@ -34,6 +34,7 @@ api_credential.json
 CLAUDE.md
 AGENTS.md
 !tasks/*/resources/harness/profiles/*/AGENTS.md
+!tasks/copper_inversion/resources/rsi/AGENTS.md
 
 # Experimental code/artifacts
 dev/
