@@ -24,13 +24,46 @@ def verify_geological_constraints(manifest):
             raise ValueError('formal priors differ from the fixed public population policy')
 
 
+TIER_KEYS={"solver_seconds","train_manifest","train_bodies","validation_manifest","sealed_manifests","slots"}
+EVIDENCE_V1=('calibration','population','historical_disjointness','confirmation','isolation','geological_constraints')
+# Release schema v2 (rsi-r1) adds the tier table, one-layout assignment, the
+# weak-judge thinning and the whole-hole audit.
+EVIDENCE_V2=EVIDENCE_V1+('hole_audit','layout','weak_judge')
+
+
+def verify_tiers(record,release=None):
+    """The `tiers` object read by the evaluator service: contracts §2.1 shape exactly."""
+    tiers=record.get('tiers')
+    if not isinstance(tiers,dict) or set(tiers)!={'S','F'}:raise ValueError('release tier table requires tiers S and F')
+    covered=record.get('manifest_sha256',{})
+    for name,tier in tiers.items():
+        if not isinstance(tier,dict) or set(tier)!=TIER_KEYS:raise ValueError('invalid tier fields: '+name)
+        for key in ('solver_seconds','train_bodies','slots'):
+            if type(tier[key]) is not int or tier[key]<1:raise ValueError(f'invalid tier {key}: {name}')
+        manifests=[tier['train_manifest'],tier['validation_manifest'],*tier['sealed_manifests']]
+        if not tier['sealed_manifests'] or any(not isinstance(m,str) or m not in covered for m in manifests):
+            raise ValueError('tier manifest not covered by qualification: '+name)
+        if release is not None:
+            cases=json.loads((Path(release)/tier['train_manifest']).read_text())['cases']
+            if len({row['parent_id'] for row in cases})!=tier['train_bodies']:
+                raise ValueError('tier training body count differs from its manifest: '+name)
+    return tiers
+
+
+def load_tiers(release):
+    """Validated tier table of a release root (formal `qualification.json`)."""
+    release=Path(release).resolve()
+    return verify_tiers(json.loads((release/'qualification.json').read_text()),release)
+
+
 def verify_release(manifest):
     manifest=Path(manifest).resolve()
     release=manifest.parent.parent
     receipt=release/'qualification.json'
     record=json.loads(receipt.read_text())
-    if record.get('schema')!='copper-qualified-synthetic-v1' or record.get('status')!='qualified':
+    if record.get('schema') not in {'copper-qualified-synthetic-v1','copper-qualified-synthetic-v2'} or record.get('status')!='qualified':
         raise ValueError('missing qualified synthetic release')
+    v2=record['schema']=='copper-qualified-synthetic-v2'
     if os.geteuid()!=record['evaluator_uid'] or receipt.stat().st_uid!=record['evaluator_uid']:
         raise ValueError('formal release requires its independent evaluator account')
     if file_hash(manifest)!=record['manifest_sha256'].get(str(manifest.relative_to(release))):
@@ -39,7 +72,7 @@ def verify_release(manifest):
         path=(release/relative).resolve()
         if not path.is_relative_to(release) or file_hash(path)!=expected:
             raise ValueError('qualification evidence changed')
-    for name in ('calibration','population','historical_disjointness','confirmation','isolation','geological_constraints'):
+    for name in (EVIDENCE_V2 if v2 else EVIDENCE_V1):
         if 'evidence/'+name+'.json' not in record['evidence_sha256']:
             raise ValueError('qualification does not seal evidence: '+name)
         evidence=json.loads((release/'evidence'/f'{name}.json').read_text())
@@ -51,5 +84,11 @@ def verify_release(manifest):
         if name=='geological_constraints':
             from .geological_policy import POLICY_VERSION
             if evidence.get('policy')!=POLICY_VERSION:raise ValueError('geological calibration policy differs')
+    if v2:
+        verify_tiers(record,release)
+        for judge in record['judges'].values():
+            for key in ('train_manifest','validation_manifest'):
+                if key in judge and judge[key] not in record['manifest_sha256']:
+                    raise ValueError('judge manifest not covered by qualification')
     verify_geological_constraints(manifest)
     return record

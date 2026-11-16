@@ -34,47 +34,59 @@ def quality(parent,family):
         component_voxels=np.bincount(components.ravel())[1:].tolist())
 
 
-def main():
-    p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)
-    p.add_argument("--generator-python",type=Path,required=True);p.add_argument("--seed",type=int,required=True)
-    p.add_argument("--ood-for",type=Path,help="completed ID pilot; generate four independent OOD parents and audit jointly")
-    p.add_argument("--workers",type=int,default=8)
-    p.add_argument("--rsi-allocation-seed",type=int,help="Preassign one observation layout per parent for an RSI release")
-    p.add_argument("--full-study",action="store_true",help="Generate the prespecified 24/8/16 ID or 8 OOD parent population for qualification; does not grant formal status")
-    a=p.parse_args()
-    if not 1<=a.workers<=16:raise ValueError("workers must be in [1,16]")
-    root=a.output.resolve();root.mkdir(parents=True,exist_ok=False)
-    source=Path(__file__).parent
-    splits=((("test_ood",8),) if a.ood_for else (("train",24),("validation",8),("test_id",16))) if a.full_study else ((("test_ood",4),) if a.ood_for else (("train",8),("validation",4),("test_id",4)))
-    plan=dict(schema="copper-pilot-plan-v4",stage="development",master_seed=a.seed,
+def make_plan(seed,splits,ood,source):
+    """Parent rows fixed from the master seed alone, before any geology exists."""
+    plan=dict(schema="copper-pilot-plan-v4",stage="development",master_seed=seed,
         geological_policy=POLICY_VERSION,max_components=MAX_COMPONENTS,
         quality_gates="generator fraction [0.02,0.65]; no air; lens exactly 1 closed component; multiple exactly 2 closed components; faulted_lens 1 to 4 closed components",
         replacements="up to 3 presampled seeds per parent; only geology quality failures may advance",
-        missing=[] if a.ood_for else ["test_ood"],source_sha256={n:hashlib.sha256((source/n).read_bytes()).hexdigest() for n in ("geology.py","observations.py","generate_pilot.py")},parents=[])
+        missing=[] if ood else ["test_ood"],source_sha256={n:hashlib.sha256((source/n).read_bytes()).hexdigest() for n in ("geology.py","observations.py","generate_pilot.py")},parents=[])
     for split_index,(split,count) in enumerate(splits):
         for i in range(count):
-            seed_stream=np.random.SeedSequence([a.seed,split_index,i]).generate_state(4)
-            lineage=hashlib.sha256(f"pilot:{a.seed}:{split}:{i}".encode()).hexdigest()
-            family=("faulted_lens" if i<count//2 else FAMILIES[(i-count//2)%len(FAMILIES)]) if a.ood_for else FAMILIES[i%4]
+            seed_stream=np.random.SeedSequence([seed,split_index,i]).generate_state(4)
+            lineage=hashlib.sha256(f"pilot:{seed}:{split}:{i}".encode()).hexdigest()
+            family=("faulted_lens" if i<count//2 else FAMILIES[(i-count//2)%len(FAMILIES)]) if ood else FAMILIES[i%4]
             plan["parents"].append(dict(split=split,index=i,family=family,lineage_id=lineage,
-                coverage="clustered" if a.ood_for and i>=count//2 else "uniform",
-                shift=("structure" if i<count//2 else "coverage") if a.ood_for else "id",
+                coverage="clustered" if ood and i>=count//2 else "uniform",
+                shift=("structure" if i<count//2 else "coverage") if ood else "id",
                 generation_seeds=[int(s) for s in seed_stream[:3]],observation_seed=int(seed_stream[3]),noisy=(i//4+i%2)%2==1))
     for split,_ in splits:
         members=[e for e in plan["parents"] if e["split"]==split]
         if sum(e["noisy"] for e in members)*2!=len(members):
             raise ValueError("ID splits require the same 50/50 noise mixture")
-    if a.rsi_allocation_seed is not None:
-        from tasks.copper_inversion.experiments.rsi.measurements import assign_modalities, preselect_short_train
-        assign_modalities(plan,a.rsi_allocation_seed)
-        plan["confirmation_policy"] = {"rule": "first of 16 presampled streams with no overlapping whole holes",
-                                       "seed_derivation": "SeedSequence([observation_seed, 920381])"}
-        for entry in plan["parents"]:
-            entry["confirmation_seeds"] = [int(s) for s in np.random.SeedSequence(
-                [entry["observation_seed"], 920381]).generate_state(16)]
-        if not a.ood_for and a.full_study:
-            plan["short_train"] = preselect_short_train(plan)
-    (root/"plan.json").write_text(json.dumps(plan,sort_keys=True,indent=2))
+    return plan
+
+
+def main():
+    p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)
+    p.add_argument("--generator-python",type=Path,required=True);p.add_argument("--seed",type=int,required=True)
+    p.add_argument("--ood-for",type=Path,help="completed ID pilot; generate independent OOD parents and audit jointly")
+    p.add_argument("--workers",type=int,default=8)
+    p.add_argument("--rsi-plan",type=Path,help="RSI release generation-plan.json (default: OUTPUT/../generation-plan.json when it is one); fixes counts, one layout per parent, confirmation policy and short tier")
+    p.add_argument("--full-study",action="store_true",help="Without an RSI plan: generate the legacy 24/8/16 ID or 8 OOD parent population; does not grant formal status")
+    a=p.parse_args()
+    if not 1<=a.workers<=16:raise ValueError("workers must be in [1,16]")
+    root=a.output.resolve()
+    rsi_root=a.rsi_plan.resolve().parent if a.rsi_plan else root.parent
+    rsi=None
+    if a.rsi_plan or ((rsi_root/"generation-plan.json").is_file() and
+            json.loads((rsi_root/"generation-plan.json").read_text()).get("schema")=="rsi-generation-plan-v1"):
+        from tasks.copper_inversion.experiments.rsi import plan as rsiplan
+        if a.rsi_plan and a.rsi_plan.name!="generation-plan.json":raise ValueError("RSI plan must be a generation-plan.json")
+        rsi,rsi_sha=rsiplan.load_generation_plan(rsi_root)
+        part="ood" if a.ood_for else "id"
+        if a.seed!=rsi[part+"_seed"]:raise ValueError("seed differs from the RSI generation plan")
+    root.mkdir(parents=True,exist_ok=False)
+    source=Path(__file__).parent
+    if rsi is not None:splits=rsiplan.part_splits(rsi,part)
+    else:splits=((("test_ood",8),) if a.ood_for else (("train",24),("validation",8),("test_id",16))) if a.full_study else ((("test_ood",4),) if a.ood_for else (("train",8),("validation",4),("test_id",4)))
+    plan=make_plan(a.seed,splits,bool(a.ood_for),source)
+    if rsi is not None:
+        # Layout, confirmation streams and short tier are fixed, and the plan
+        # hash recorded, before the first parent is generated.
+        rsiplan.part_plan(plan,rsi,rsi_sha,part)
+        rsiplan.write_part_plan(root,plan)
+    else:(root/"plan.json").write_text(json.dumps(plan,sort_keys=True,indent=2))
     def generate(entry):
         records=[]
         name=f"{entry['split']}-{entry['index']:02}"

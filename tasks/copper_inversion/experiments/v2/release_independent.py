@@ -1,4 +1,8 @@
-"""Trusted, one-time synthetic release after numerical and access qualification."""
+"""Trusted, one-time synthetic release after numerical and access qualification.
+
+The functions are shared with `experiments/rsi/release.py`; `main` is the legacy
+two-pack release. An RSI generation plan must use the RSI release tool instead.
+"""
 import argparse
 import json
 import os
@@ -12,6 +16,71 @@ from tasks.copper_inversion.v2.geometry import canonicalize
 from .split_audit import shape_fingerprint
 
 
+def qualify_evidence(root,calibration,isolation,geological_constraints):
+    """Fail closed unless population, calibration, isolation and prior evidence passed."""
+    if not (root/'qa-pipeline-complete.json').exists():raise ValueError('population pipeline incomplete')
+    evidence={name:json.loads(Path(path).read_text()) for name,path in [('calibration',calibration),('isolation',isolation),('population',root/'population-qa.json')]}
+    if any(v['status']!='passed' for v in evidence.values()):raise ValueError('qualification failed')
+    constraints=json.loads(Path(geological_constraints).read_text())
+    if (constraints.get('status')!='passed' or constraints.get('calibration_scope')!='independent_development'
+            or constraints.get('used_evaluation_truth') is not False):
+        raise ValueError('independent geological-prior calibration is required')
+    evidence['geological_constraints']=constraints
+    from tasks.copper_inversion.v2.geological_policy import POLICY_VERSION
+    if constraints.get('policy')!=POLICY_VERSION:raise ValueError('geological calibration policy differs')
+    return evidence
+
+
+def historical_fingerprints(historical):
+    found=set()
+    for path in Path(historical).rglob('truth.npy'):
+        found.add(shape_fingerprint(np.load(path,allow_pickle=False)))
+    # Calibration parents retain truth in the original generator archive.
+    for path in Path(historical).rglob('geology.npz'):
+        with np.load(path,allow_pickle=False) as data:
+            found.add(shape_fingerprint(data['truth']))
+    return found
+
+
+def historical_exclusion(historical,current):
+    """`historical` maps a label to a prior release or generator archive."""
+    historic=set();counts={}
+    for label,path in sorted(historical.items()):
+        found=historical_fingerprints(path)
+        if not found:raise ValueError('historical exclusion set missing: '+label)
+        counts[label]=len(found);historic|=found
+    if set(current)&historic:raise ValueError('new population collides with previously seen geometry')
+    return dict(status='passed',historical_fingerprints=len(historic),historical_sources=counts,new_fingerprints=len(set(current)),
+        scope='coarse normalized rotation/reflection fingerprint exclusion against prior private suites')
+
+
+def pair_confirmation(public_path,hidden_path,truth_path):
+    """Confirmation shares geometry, masks and priors but no public measurement."""
+    public=read_problem(public_path);confirm=read_problem(hidden_path)
+    truth=np.load(truth_path,allow_pickle=False)
+    canonicalize(public,np.where(truth,1.,-1.))
+    for key in ('shape','origin','spacing'):
+        if public[key]!=confirm[key]:raise ValueError('confirmation geometry mismatch')
+    for key in ('domain_mask','forbidden_mask'):
+        if not np.array_equal(public[key],confirm[key]):raise ValueError('confirmation domain mismatch')
+    if public['priors']!=confirm['priors']:raise ValueError('confirmation geological priors differ')
+    if all(np.array_equal(x['points'],y['points']) for x,y in zip(public['observations'],confirm['observations'])):
+        raise ValueError('confirmation reuses public measurements')
+    return public,confirm
+
+
+def expected_cases(root):
+    """Two packs per planned parent; the legacy population had 56 parents."""
+    path=root/'generation-plan.json'
+    plan=json.loads(path.read_text()) if path.is_file() else {}
+    if plan.get('schema')=='rsi-generation-plan-v1':
+        raise ValueError('one-layout RSI populations are released by experiments.rsi.release')
+    counts=plan.get('counts')
+    if isinstance(counts,dict) and counts and all(type(v) is int and v>0 for v in counts.values()):
+        return 2*sum(counts.values())
+    return 112
+
+
 def main():
     p=argparse.ArgumentParser()
     for name in ('dataset','output','calibration','isolation','geological-constraints'):
@@ -19,28 +88,10 @@ def main():
     p.add_argument('--historical',type=Path,nargs='+',required=True)
     a=p.parse_args();root=a.dataset
     if os.geteuid()!=991:raise ValueError('requires private evaluator account')
-    if not (root/'qa-pipeline-complete.json').exists():raise ValueError('population pipeline incomplete')
-    evidence={name:json.loads(path.read_text()) for name,path in [('calibration',a.calibration),('isolation',a.isolation),('population',root/'population-qa.json')]}
-    if any(v['status']!='passed' for v in evidence.values()):raise ValueError('qualification failed')
-    constraints=json.loads(a.geological_constraints.read_text())
-    if (constraints.get('status')!='passed' or constraints.get('calibration_scope')!='independent_development'
-            or constraints.get('used_evaluation_truth') is not False):
-        raise ValueError('independent geological-prior calibration is required')
-    evidence['geological_constraints']=constraints
-    from tasks.copper_inversion.v2.geological_policy import POLICY_VERSION
-    if constraints.get('policy')!=POLICY_VERSION:raise ValueError('geological calibration policy differs')
-    historic=set()
-    for historical in a.historical:
-        for path in historical.rglob('truth.npy'):
-            historic.add(shape_fingerprint(np.load(path,allow_pickle=False)))
-        # Calibration parents retain truth in the original generator archive.
-        for path in historical.rglob('geology.npz'):
-            with np.load(path,allow_pickle=False) as data:
-                historic.add(shape_fingerprint(data['truth']))
-    if not historic:raise ValueError('historical exclusion set missing')
+    expected=expected_cases(root)
+    evidence=qualify_evidence(root,a.calibration,a.isolation,a.geological_constraints)
     current={r['fingerprint'] for r in evidence['population']['parents']}
-    if current&historic:raise ValueError('new population collides with previously seen geometry')
-    evidence['historical_disjointness']=dict(status='passed',historical_fingerprints=len(historic),new_fingerprints=len(current),scope='coarse normalized rotation/reflection fingerprint exclusion against prior private development suite')
+    evidence['historical_disjointness']=historical_exclusion({str(i):path for i,path in enumerate(a.historical)},current)
     source_manifests=[root/'id/suites'/s/'manifest.json' for s in ('train','validation','test_id')]+[root/'ood/suites/test_ood/manifest.json']
     pending=[]
     for path in source_manifests:
@@ -52,18 +103,9 @@ def main():
         for row in m['cases']:
             folder,c=parentpacks[row['parent_id']]
             hidden=folder/next(x['case_id'] for x in c['cases'] if x['modality']==row['modality'])
-            public=read_problem(path.parent/row['public']);confirm=read_problem(hidden)
-            truth=np.load(path.parent/row['truth']/'truth.npy',allow_pickle=False)
-            canonicalize(public,np.where(truth,1.,-1.))
-            for key in ('shape','origin','spacing'):
-                if public[key]!=confirm[key]:raise ValueError('confirmation geometry mismatch')
-            for key in ('domain_mask','forbidden_mask'):
-                if not np.array_equal(public[key],confirm[key]):raise ValueError('confirmation domain mismatch')
-            if public['priors']!=confirm['priors']:raise ValueError('confirmation geological priors differ')
-            if all(np.array_equal(x['points'],y['points']) for x,y in zip(public['observations'],confirm['observations'])):
-                raise ValueError('confirmation reuses public measurements')
+            pair_confirmation(path.parent/row['public'],hidden,path.parent/row['truth']/'truth.npy')
             pending.append((path,m['split'],row,hidden))
-    if len(pending)!=112:raise ValueError('incomplete prespecified population')
+    if len(pending)!=expected:raise ValueError('incomplete prespecified population')
     evidence['confirmation']=dict(status='passed',cases=len(pending),scope='independent whole-hole/location and noise streams; geometry/masks identical; not a new geology parent')
     out=a.output.resolve();out.mkdir(mode=0o700,parents=True,exist_ok=False)
     manifests={s:dict(schema='copper-suite-v2',stage='formal',split=s,seeds=[47,48,49] if s.startswith('test') else [47],cases=[]) for s in ('train','validation','test_id','test_ood')}
