@@ -3,7 +3,9 @@
 Run as root on the authorized host. Every value comes from three files:
 
 - the batch (run plan): `{"schema": "rsi-batch-v1", "name", "protocol", "experiment", "tier",
-  "runs": [{"arm", "judge", "seed"}, ...], "prefixes": ["full", 5, 10]}`;
+  "runs": [{"arm", "judge", "seed"}, ...], "prefixes": ["full", 5, 10], "checkpoint_round": 10}`;
+  an E1/E2 run adds `"continuation": "<source run>/checkpoints/round_<t>", "mode", "replicate"`
+  and, for E2, `"planted": true`; its service imports the checkpoint's ledger prefix;
 - the site: accounts, interpreters, release, images, catalogs, key file, policy (see SITE_KEYS);
 - the scheduling policy written by `policy` (parallelism.md §6).
 
@@ -55,6 +57,7 @@ SITE_KEYS = frozenset({"root", "release", "source", "service_python", "client_py
 SITE_OPTIONAL = frozenset({"embedding_devices", "load_qualification", "archive_root", "poll_seconds",
                            "service_start_seconds"})
 RUN_KEYS = frozenset({"arm", "judge", "seed"})
+CONTINUATION_KEYS = frozenset({"continuation", "mode", "replicate", "planted"})
 POLICY_REQUIRED = ("queue_root", "global_jobs", "interface_slots", "startup_slots", "jobs_per_process")
 RUNTIME = Path(__file__).resolve().parents[1] / "v2" / "parallel_runtime.py"
 RUNTIME_MODULE = "tasks.copper_inversion.experiments.v2.parallel_runtime"
@@ -79,7 +82,7 @@ def load_batch(path):
     batch = json.loads(Path(path).read_text())
     if not isinstance(batch, dict) or batch.get("schema") != SCHEMA:
         raise PlanError("not an rsi batch plan")
-    if set(batch) - {"schema", "name", "protocol", "experiment", "tier", "runs", "prefixes"} or not {
+    if set(batch) - {"schema", "name", "protocol", "experiment", "tier", "runs", "prefixes", "checkpoint_round"} or not {
             "name", "protocol", "experiment", "tier", "runs"} <= set(batch):
         raise PlanError("batch plan fields differ from " + SCHEMA)
     if not isinstance(batch["name"], str) or NAME.fullmatch(batch["name"]) is None:
@@ -87,8 +90,12 @@ def load_batch(path):
     if not isinstance(batch["runs"], list) or not batch["runs"]:
         raise PlanError("a batch needs runs")
     for run in batch["runs"]:
-        if not isinstance(run, dict) or set(run) != RUN_KEYS or type(run["seed"]) is not int:
-            raise PlanError("each run is exactly {arm, judge, seed}")
+        if not isinstance(run, dict) or not RUN_KEYS <= set(run) <= RUN_KEYS | CONTINUATION_KEYS or type(run["seed"]) is not int:
+            raise PlanError("each run is {arm, judge, seed}, plus {continuation, mode, replicate[, planted]} for E1/E2")
+        if (set(run) & CONTINUATION_KEYS) and not {"continuation", "mode", "replicate"} <= set(run):
+            raise PlanError("a continuation run names its checkpoint, mode and replicate")
+    if batch.get("checkpoint_round") is not None and (type(batch["checkpoint_round"]) is not int or batch["checkpoint_round"] < 1):
+        raise PlanError("checkpoint_round is a positive round")
     prefixes = batch.get("prefixes", [FULL])
     if not prefixes or any(p != FULL and (type(p) is not int or p < 1) for p in prefixes) or len(set(prefixes)) != len(prefixes):
         raise PlanError("prefixes are 'full' or positive rounds, without repeats")
@@ -96,8 +103,10 @@ def load_batch(path):
 
 
 def run_id(experiment, run):
-    from tasks.copper_inversion.rsi.workflow import run_id as name
-    return name(experiment, run["arm"], run["judge"], run["seed"])
+    from tasks.copper_inversion.rsi import workflow
+    if "continuation" in run:
+        return workflow.continuation_run_id(run["seed"], run["mode"], run["replicate"], run.get("planted", False))
+    return workflow.run_id(experiment, run["arm"], run["judge"], run["seed"])
 
 
 def check_batch(batch, protocol, policy):
@@ -119,17 +128,21 @@ def check_batch(batch, protocol, policy):
     names = [run_id(experiment, run) for run in batch["runs"]]
     if len(set(names)) != len(names):
         raise PlanError("a run appears twice in the batch")
+    # A cell is one treatment: arm, continuation mode and planting, under one judge.
     cells = {}
     for run in batch["runs"]:
-        cells.setdefault((run["arm"], run["judge"]), []).append(run["seed"])
-    arms = sorted({arm for arm, _ in cells})
+        treatment = (run["arm"], run.get("mode"), bool(run.get("planted", False)))
+        cells.setdefault((treatment, run["judge"]), []).append((run["seed"], run.get("replicate")))
+    treatments = sorted({t for t, _ in cells}, key=str)
+    arms = sorted({t[0] for t in treatments})
     judges = sorted({judge for _, judge in cells})
-    if set(cells) != {(arm, judge) for arm in arms for judge in judges}:
+    if set(cells) != {(t, judge) for t in treatments for judge in judges}:
         raise PlanError("every arm must run under every judge of the batch")
-    seed_sets = {cell: sorted(values) for cell, values in cells.items()}
+    seed_sets = {cell: sorted(values, key=str) for cell, values in cells.items()}
     if len({tuple(values) for values in seed_sets.values()}) != 1:
+        label = lambda t, j: "/".join(str(x) for x in (*t, j) if x not in (None, False))
         raise PlanError("arms differ in run count or seeds within the batch: "
-                        + json.dumps({f"{a}/{j}": s for (a, j), s in sorted(seed_sets.items())}))
+                        + json.dumps({label(t, j): [s for s, _ in v] for (t, j), v in sorted(seed_sets.items(), key=str)}))
     limit = policy.get("max_concurrent_runs", {})
     limit = limit.get(tier) if isinstance(limit, dict) else limit
     if limit is not None and len(names) > limit:
@@ -138,7 +151,7 @@ def check_batch(batch, protocol, policy):
     if policy.get("max_agent_sessions") is not None and sessions > policy["max_agent_sessions"]:
         raise PlanError(f"batch needs {sessions} agent sessions, policy allows {policy['max_agent_sessions']}")
     return {"experiment": experiment, "tier": tier, "runs": names, "arms": arms, "judges": judges,
-            "seeds": next(iter(seed_sets.values())), "agent_sessions": sessions}
+            "seeds": sorted({s for s, _ in next(iter(seed_sets.values()))}), "agent_sessions": sessions}
 
 
 # Policy ----------------------------------------------------------------------------
@@ -356,6 +369,8 @@ class Launcher:
                       "image": self.site["image"], "seconds": tier["solver_seconds"], "slots": tier["slots"],
                       "caller_uid": client_uid, "socket": str(socket_path),
                       "objective": self.protocol["judges"][run["judge"]]["objective"], "tier": self.tier}
+            if "continuation" in run:
+                config["import"] = self.import_spec(run, private, uid, gid)
             config_path.write_text(json.dumps(config, sort_keys=True))
             self.host.chown(config_path, uid, gid)
             config_path.chmod(0o600)
@@ -370,7 +385,8 @@ class Launcher:
         argv = [self.site["service_python"], "-m", RUNTIME_MODULE, "--policy", str(self.policy_path),
                 "--tier", self.tier, "rsi-service", "--config", str(config_path)]
         process = self.host.spawn(self.site["service_user"], argv, env=env, log=log, cwd=self.site["source"])
-        deadline = time.monotonic() + self.site.get("service_start_seconds", 120)
+        # An import re-projects the whole prefix before the service listens.
+        deadline = time.monotonic() + self.site.get("service_start_seconds", 600 if "continuation" in run else 120)
         ready = None
         while ready is None:
             if socket_path.exists() and log.exists():
@@ -394,6 +410,24 @@ class Launcher:
         (sockets / "deployment.json").write_text(json.dumps(deployment, sort_keys=True) + "\n")
         return deployment
 
+    def import_spec(self, run, private, uid, gid):
+        """Continuation service: import the source run's ledger prefix (T4/T6 import hook)."""
+        checkpoint = Path(run["continuation"]).resolve()
+        source_run = checkpoint.parent.parent
+        source = json.loads((source_run / "manifest.json").read_text())
+        if source.get("protocol_id") != self.pid:
+            raise PlanError("checkpoint belongs to another protocol")
+        source_service = layout(self.root, self.pid, source["experiment"], source["run_id"])["service"]
+        if not (source_service / "identity.json").is_file():
+            raise PlanError("source service directory of the checkpoint is missing")
+        prefix = (checkpoint / "ledger-prefix.jsonl").read_bytes()
+        copy = private / "import-ledger-prefix.jsonl"
+        copy.write_bytes(prefix)
+        self.host.chown(copy, uid, gid)
+        copy.chmod(0o400)
+        return {"source_root": str(source_service), "ledger_prefix": str(copy),
+                "ledger_prefix_sha256": hashlib.sha256(prefix).hexdigest()}
+
     # controllers
     def controller_argv(self, name, run, deployment, resume):
         devices = self.site.get("embedding_devices") or ["cuda:0"]
@@ -409,6 +443,11 @@ class Launcher:
                 "--embedding-device", devices[index % len(devices)],
                 "--sidecar-image", self.site["sidecar_image"], "--harness-cache-dir", str(self.site["harness_cache_dir"]),
                 "--api-key-file", str(self.site["api_key_file"])]
+        if "continuation" in run:
+            argv += ["--continuation", str(run["continuation"]), "--continuation-mode", run["mode"],
+                     "--replicate", str(run["replicate"])] + (["--planted"] if run.get("planted") else [])
+        elif self.batch.get("checkpoint_round") is not None:
+            argv += ["--checkpoint-round", str(self.batch["checkpoint_round"])]
         return argv + (["--resume"] if resume else [])
 
     def start_controller(self, name, run, deployment, resume):

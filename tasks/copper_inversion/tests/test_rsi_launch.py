@@ -59,6 +59,22 @@ def test_at46_unbalanced_batches_are_refused():
     assert launch.check_batch(e3, proto, policy)["judges"] == ["oracle", "standard"]
 
 
+def test_continuation_batches_balance_modes_and_replicates():
+    proto = protocol()
+    modes = {"history": "ldm4geo", "conversation": "accumulated", "best_program": "restart_best"}
+    def runs(replicates):
+        return [{"arm": arm, "judge": "standard", "seed": 101, "continuation": "/runs/M1/accumulated-s101/checkpoints/round_10",
+                 "mode": mode, "replicate": r} for mode, arm in modes.items() for r in replicates[mode]]
+    good = {**plan([], experiment="E1"), "runs": runs({m: (1, 2) for m in modes})}
+    summary = launch.check_batch(good, proto, VALUES)
+    assert "ck101-history-r2" in summary["runs"] and summary["seeds"] == [101]
+    bad = {**plan([], experiment="E1"), "runs": runs({**{m: (1, 2) for m in modes}, "history": (1,)})}
+    with pytest.raises(launch.PlanError, match="differ"):
+        launch.check_batch(bad, proto, VALUES)
+    planted = [dict(r, planted=True) for r in runs({"history": (1,), "conversation": (1,), "best_program": ()})]
+    assert launch.run_id("E2", planted[0]) == "ck101-history-planted-r1"
+
+
 def test_batches_follow_the_protocol_and_the_policy():
     proto = protocol()
     with pytest.raises(launch.PlanError, match="seed table"):
@@ -362,6 +378,11 @@ def test_at38_archive_equals_the_active_copy_and_lists_every_file(tmp_path):
     shutil.copytree(target, moved)
     assert archive.verify(moved)["status"] == "passed"
     assert archive.create(root, store, pid, exp, name)["status"] == "passed"  # idempotent
+    # Unpacked read-only for the analysis recompute (T8 reads <exp>/<run_id>/).
+    unpacked = Path(archive.unpack(moved, tmp_path / "unpacked")["public"])
+    assert unpacked == tmp_path / "unpacked" / exp / name
+    active = {str(q.relative_to(paths["run"])): q.read_bytes() for q in paths["run"].rglob("*") if q.is_file()}
+    assert {str(q.relative_to(unpacked)): q.read_bytes() for q in unpacked.rglob("*") if q.is_file()} == active
     # Any difference is refused.
     (paths["run"] / "result.json").write_text("{}")
     with pytest.raises(ValueError, match="active public copy differs"):

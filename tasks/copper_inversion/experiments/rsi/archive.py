@@ -12,6 +12,7 @@ are archived like every other file; nothing is dropped to save space.
     python -m tasks.copper_inversion.experiments.rsi.archive create --root R --archive-root A \
         --protocol-id P --experiment M1 --run ldm4geo-s101 [--protocol protocol.json] [--private-uid U]
     python -m tasks.copper_inversion.experiments.rsi.archive verify --archive A/P/M1/ldm4geo-s101 [--root R]
+    python -m tasks.copper_inversion.experiments.rsi.archive unpack --archive A/P/M1/ldm4geo-s101 --to U [--private]
 
 The active copy may be deleted only after `verify --root` passes.
 """
@@ -227,6 +228,29 @@ def verify(target, root=None, packages=("public", "private")):
     return report
 
 
+def unpack(target, destination, *, private=False):
+    """Verified, read-only extraction: <destination>/<exp>/<run_id>/ is the public run
+    directory (the layout T8's recompute reads); with private, <run_id>.private/ too."""
+    record = json.loads((Path(target) / "archive-manifest.json").read_text())
+    names = ("public", "private") if private else ("public",)
+    verify(target, packages=names)
+    base = Path(destination) / record["experiment"]
+    out = {}
+    for name in names:
+        where = base if name == "public" else base / (record["run_id"] + ".private")
+        if (base / record["run_id"] if name == "public" else where).exists():
+            raise ValueError("unpack target exists: " + str(where))
+        where.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(Path(target) / record["packages"][name]["file"], "r:gz") as package:
+            package.extractall(where, filter="data")
+        out[name] = str(base / record["run_id"] if name == "public" else where)
+    for path in [Path(p) for p in out.values()]:
+        for item in [path, *path.rglob("*")]:
+            if not item.is_symlink():
+                item.chmod(0o555 if item.is_dir() else 0o444)
+    return out
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -243,7 +267,14 @@ def main(argv=None):
     check.add_argument("--archive", type=Path, required=True)
     check.add_argument("--root", type=Path, help="active area; compare the active copy too")
     check.add_argument("--public-only", action="store_true", help="for a reader without the private package")
+    extract = sub.add_parser("unpack")
+    extract.add_argument("--archive", type=Path, required=True)
+    extract.add_argument("--to", type=Path, required=True, help="unpacked root: <to>/<exp>/<run_id>/")
+    extract.add_argument("--private", action="store_true")
     args = parser.parse_args(argv)
+    if args.command == "unpack":
+        print(json.dumps(unpack(args.archive, args.to, private=args.private), sort_keys=True))
+        return 0
     if args.command == "create":
         for run_id in args.runs:
             print(json.dumps(create(args.root, args.archive_root, args.protocol_id, args.experiment, run_id,
