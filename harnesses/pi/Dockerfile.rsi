@@ -1,7 +1,23 @@
-# The base image provides the pinned Node runtime and dependencies. Verify the
-# lock before rebuilding the sidecar; record the resolved image digest per run.
+# Rebuilds the sidecar from the existing base image with this tree's sources (approved,
+# recorded deviation: compaction uses the run's thinking level). The base provides the
+# pinned Node runtime and dependencies; the lock is verified before the rebuild.
+#
+# Pin the base by digest. A registry image: RSI_SIDECAR_BASE=<name>@sha256:<repo digest>.
+# A local-only image has no repo digest; pass its tag, compare its image ID with the one in
+# the delivery notes, and record it as a label:
+#   ID=$(docker image inspect --format '{{.Id}}' ldm-pi-harness:copper-validation-clock-20261025)
+#   docker build -f harnesses/pi/Dockerfile.rsi --build-arg RSI_SIDECAR_BASE_ID=$ID \
+#     -t ldm-pi-harness:rsi-$(git rev-parse --short HEAD) harnesses/pi
+#   docker image inspect --format '{{index .Config.Labels "org.ldm4geo.rsi.base_id"}}' <built tag>   # = $ID
+# The built image ID is the protocol's hashes.sidecar_image:
+#   python -m tasks.copper_inversion.rsi.protocol freeze PROTOCOL --sidecar-image <built tag> ...
+# freeze stores `docker image inspect --format '{{.Id}}'`; the workflow resolves --sidecar-image
+# the same way at each start and refuses a different digest.
 ARG RSI_SIDECAR_BASE=ldm-pi-harness:copper-validation-clock-20261025
 FROM ${RSI_SIDECAR_BASE}
+ARG RSI_SIDECAR_BASE
+ARG RSI_SIDECAR_BASE_ID=unrecorded
+LABEL org.ldm4geo.rsi.base="${RSI_SIDECAR_BASE}" org.ldm4geo.rsi.base_id="${RSI_SIDECAR_BASE_ID}"
 USER root
 WORKDIR /app
 COPY package-lock.json /tmp/rsi-package-lock.json
