@@ -176,7 +176,7 @@ def scripted_select(pool, history, count):
 
 def run_controller(root, client, agent=None, rounds=3):
     controller = Controller(root, Config("ldm4geo", 7, rounds=rounds, proposals_per_branch=2, batch=4,
-                                         reset_period=2, token_cap_input=100),
+                                         reset_period=2, token_cap_input=0),
                             agent or RecordingAgent(), client, scripted_select,
                             "Fixed task brief: minimize the reported risk.", {"synthetic_test": True})
     return controller.run()
