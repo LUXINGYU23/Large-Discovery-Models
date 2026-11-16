@@ -176,7 +176,7 @@ def scripted_select(pool, history, count):
 
 def run_controller(root, client, agent=None, rounds=3):
     controller = Controller(root, Config("ldm4geo", 7, rounds=rounds, proposals_per_branch=2, batch=4,
-                                         reset_period=2, token_cap_input=100),
+                                         reset_period=2, token_cap_input=0),
                             agent or RecordingAgent(), client, scripted_select,
                             "Fixed task brief: minimize the reported risk.", {"synthetic_test": True})
     return controller.run()
@@ -531,12 +531,26 @@ def test_import_charges_the_prefix_and_keeps_its_receipts_eligible(tmp_path, tra
     imported = make_service(tmp_path, train, name="continued", **{"import": spec})
     info = imported.dispatch({"operation": "info"})
     assert info["used_slots"] == len(prefix_rows) == 9
+    # T6 compares this with sha256 of the checkpoint's ledger-prefix.jsonl bytes.
+    assert info["import_ledger_prefix_sha256"] == hashlib.sha256(prefix.read_bytes()).hexdigest()
+    assert source.dispatch({"operation": "info"})["import_ledger_prefix_sha256"] is None
+    client = LoopbackClient(tmp_path / "continued-run", imported)
+    expected = hashlib.sha256(prefix.read_bytes()).hexdigest()
+    assert client.verify_contract(imported.public_digest, 10, 13, import_ledger_prefix_sha256=expected)
+    for wrong in ("0" * 64, None):
+        with pytest.raises(EvaluationPaused):
+            client.verify_contract(imported.public_digest, 10, 13, import_ledger_prefix_sha256=wrong)
+    plain = LoopbackClient(tmp_path / "source-run", source)
+    assert plain.verify_contract(source.public_digest, 10, 13, import_ledger_prefix_sha256=None)
+    with pytest.raises(EvaluationPaused):
+        plain.verify_contract(source.public_digest, 10, 13, import_ledger_prefix_sha256=expected)
     assert info["contract_digest"] != source.public_contract
     measured = eligible(imported.root, train)
     assert set(measured) == {r["program_id"] for r in prefix_rows if r["status"] != "rejected"}
     # Restart is idempotent and the public prefix reconciles with the private budget.
     again = make_service(tmp_path, train, name="continued", **{"import": spec})
     assert again.public_contract == imported.public_contract
+    assert again.dispatch({"operation": "info"})["import_ledger_prefix_sha256"] == expected
     assert again.ledger.counters["algorithm_feedback_slots"] == 9
     continuation = tmp_path / "continuation"
     continuation.mkdir()
@@ -572,3 +586,113 @@ def test_import_refuses_a_changed_prefix_or_contract(tmp_path, train):
     spec["ledger_prefix_sha256"] = hashlib.sha256(body).hexdigest()
     with pytest.raises(ValueError, match="different scientific contract"):
         make_service(tmp_path, train, name="bad3", objective="oracle_iou", **{"import": spec})
+
+
+# Judge-specific validation selection (spec §3.3) ------------------------------
+
+def slab(rows):
+    return ("import numpy as np\ndef solve(problem, budget, seed):\n"
+            f"    field = np.full(problem['shape'], -1.)\n    field[:{rows}, :, :-1] = 1.\n    return field\n")
+
+
+def judge_release(tmp_path):
+    release = tiered_release(tmp_path, "development")
+    write_suite(release, "test_id", bodies=2, split="test_id", offset=20)
+    write_suite(release, "test_ood", bodies=2, split="test_ood", offset=30)
+    # Thinned confirmation: one hole whose label favours a deeper body than the full set.
+    shutil.copytree(release / "validation", release / "validation_q25")
+    path = release / "validation_q25/manifest.json"
+    manifest = json.loads(path.read_text())
+    for case in manifest["cases"]:
+        hidden = fixture()
+        obs = hidden["observations"][0]
+        obs.update(points=np.array([[6.5, 5., 7.5]]), labels=np.array([1.]), groups=np.array([0]))
+        folder = path.parent / case["truth"] / "confirmation"
+        save_problem(hidden, folder)
+        for name in ("problem.json", "problem.npz"):
+            case["sha256"]["confirmation/" + name] = file_hash(folder / name)
+    path.write_text(json.dumps(manifest, sort_keys=True))
+    return release
+
+
+PROTOCOL = {"tiers": {"S": tier(30, "train_s/manifest.json", 4), "F": tier(120, "train/manifest.json", 8)},
+            "judges": {"standard": {"objective": "confirmation"},
+                       "q25": {"objective": "confirmation", "train_manifest": "train_s_q25/manifest.json",
+                               "validation_manifest": "validation_q25/manifest.json"},
+                       "oracle": {"objective": "oracle_iou"}}}
+
+
+def judged_run(tmp_path, release, judge, service_objective):
+    from tasks.copper_inversion.rsi.ledger import append
+    run_id = f"ldm4geo-{judge}-s201"
+    train = release / PROTOCOL["judges"][judge].get("train_manifest", "train_s/manifest.json")
+    service = make_service(tmp_path, train, name=f"active/private/pid/services/E3/{run_id}", seconds=30,
+                           slots=321, objective=service_objective)
+    run = tmp_path / "active/runs/pid/E3" / run_id
+    for index, rows in enumerate((3, 4, 7)):
+        feedback = evaluate(service, slab(rows))
+        append(run / "ledger.jsonl", {"seq": index, "program_id": feedback["source_sha256"], "epoch": 0, "round": 1,
+                                      "branch": index, "selection": "reserved",
+                                      **{k: v for k, v in feedback.items() if k != "source_sha256"}})
+    service.dispatch({"operation": "seal_training", "contract_digest": service.public_contract})
+    (run / "manifest.json").write_text(json.dumps({"run_id": run_id, "experiment": "E3", "protocol_id": "pid",
+                                                   "arm": "ldm4geo", "tier": "S", "judge": judge,
+                                                   "blind": judge != "oracle"}))
+    (run / "result.json").write_text("{}")
+    return run_id
+
+
+def expected_pick(release, validation, objective):
+    """Independent recomputation of the judge's validation risk for each slab."""
+    manifest = json.loads(validation.read_text())
+    risks = {}
+    for rows in (3, 4, 7):
+        namespace = {}
+        exec(slab(rows), namespace)
+        values = []
+        for case in manifest["cases"]:
+            problem = read_problem(validation.parent / case["public"])
+            field = namespace["solve"](problem, {}, 47)
+            truth = validation.parent / case["truth"]
+            if objective == "oracle_iou":
+                values.append(1 - compare(problem, field, np.load(truth / "truth.npy"))["iou"])
+            else:
+                loss = score(read_problem(truth / "confirmation"), field)["loss_total"]
+                values.append(loss / (1 + loss))
+        risks[rows] = sum(values) / len(values)
+    return min(risks, key=risks.get)
+
+
+def test_validation_selection_uses_the_run_judge(tmp_path):
+    from tasks.copper_inversion.experiments.rsi.freeze import freeze_run, validate_run
+    release = judge_release(tmp_path)
+    picks = {}
+    with patch("tasks.copper_inversion.v2.selection.Execution", InProcessExecution), \
+            patch("tasks.copper_inversion.v2.selection.InterfaceChecks", lambda root, execution: lambda payload: True):
+        for judge, objective, validation in (("standard", "confirmation", "validation"),
+                                             ("q25", "confirmation", "validation_q25"),
+                                             ("oracle", "oracle_iou", "validation")):
+            run_id = judged_run(tmp_path, release, judge, objective)
+            record = freeze_run(tmp_path / "active", "pid", "E3", run_id, release=release, protocol=PROTOCOL)
+            target = tmp_path / "active/private/pid/selection/E3" / run_id / "full"
+            frozen = json.loads((target / "frozen.json").read_text())
+            assert record["selection_objective"] == frozen["selection_objective"] == objective
+            assert frozen["manifests"][0]["path"] == str((release / validation / "manifest.json").resolve())
+            report = validate_run(tmp_path / "active", "pid", "E3", run_id)
+            assert report["objective"] == objective
+            by_rows = {hashlib.sha256(slab(rows).encode()).hexdigest(): rows for rows in (3, 4, 7)}
+            picks[judge] = by_rows[report["selected_sha256"]]
+            assert picks[judge] == expected_pick(release, release / validation / "manifest.json", objective)
+            chosen = next(r for r in report["candidates"] if r["source_sha256"] == report["selected_sha256"])
+            if objective == "oracle_iou":
+                assert chosen["metrics"]["loss_total"] == pytest.approx(1 - chosen["metrics"]["mean_iou"])
+    # The judge changes the pick: standard confirmation differs from both q25 and oracle here.
+    assert picks["standard"] != picks["q25"] and picks["standard"] != picks["oracle"]
+
+
+def test_freeze_refuses_a_judge_that_differs_from_the_training_service(tmp_path):
+    from tasks.copper_inversion.experiments.rsi.freeze import freeze_run
+    release = judge_release(tmp_path)
+    run_id = judged_run(tmp_path, release, "oracle", "confirmation")
+    with pytest.raises(ValueError, match="judge objective differs"):
+        freeze_run(tmp_path / "active", "pid", "E3", run_id, release=release, protocol=PROTOCOL)
