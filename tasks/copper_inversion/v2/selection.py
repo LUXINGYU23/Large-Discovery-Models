@@ -12,10 +12,14 @@ from ldm_tts.contracts import RawProposal,CandidateRejection
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.candidate import seal,validate_source
 from ..core.execution import Execution,digest,source_identity
-from .suite import SuiteEvaluator,load_manifest,file_hash,release_tiers,manifest_tiers
+from .suite import SuiteEvaluator,load_manifest,file_hash,release_tiers,manifest_tiers,OBJECTIVES
 from .domain import CheckedDomain
 from .interface_checks import InterfaceChecks
 from .training_receipts import eligible
+
+
+SELECTION_RULES={"confirmation":"minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)",
+    "oracle_iou":"minimum (1 - validation IoU, -legal_rate, mean_solver_wall_seconds, source_sha256)"}
 
 
 @contextmanager
@@ -37,8 +41,10 @@ def selection_seconds(training_manifest,training,manifests,loaded):
     return {tiers[name]["solver_seconds"] for name in names}
 
 
-def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest):
+def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation"):
+    """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
+    if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
     if not 1<=len(sources)<=3:raise ValueError("freeze one to three candidates before validation")
     if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
     manifests=[Path(validation).resolve(),*[Path(p).resolve() for p in tests]]
@@ -73,8 +79,8 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
         training=dict(manifest_path=str(Path(training_manifest).resolve()),manifest_sha256=file_hash(training_manifest),
             run=str(Path(training_run).resolve()),selected_receipts={s:admissible[s] for s in source_ids}),
         manifests=[dict(path=str(p),sha256=file_hash(p),contents_sha256=digest(m)) for p,m in zip(manifests,loaded)],
-        implementation_sha256=source_identity(),image=image,seconds=seconds,
-        selection_rule="minimum (confirmation_loss, -legal_rate, mean_solver_wall_seconds, source_sha256)")
+        implementation_sha256=source_identity(),image=image,seconds=seconds,selection_objective=objective,
+        selection_rule=SELECTION_RULES[objective])
     atomic_json_write(root/"frozen.json",frozen)
     atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
     return frozen
@@ -138,12 +144,16 @@ def run(root,phase):
                     rows.append(dict(source_sha256=payload["sha256"],split=split,interface_rejected=True,
                         metrics=dict(loss_total=1.,mean_iou=0.,legal_rate=0.,mean_solver_wall_seconds=0.)))
                     continue
-                evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"])
+                # Validation uses the judge's objective; sealed tests always use the
+                # standard scoring, whose receipts carry the IoU outcome for every judge.
+                objective=frozen.get("selection_objective","confirmation") if phase=="validation" else "confirmation"
+                options={} if objective=="confirmation" else {"objective":objective}
+                evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
                 result=evaluator.evaluate(candidate)
                 rows.append(dict(source_sha256=payload["sha256"],split=split,metrics=dict(result.metrics)))
         if phase=="validation":
             report=dict(selected_sha256=min(rows,key=ranking)["source_sha256"],candidates=rows,
-                rule=frozen["selection_rule"])
+                rule=frozen["selection_rule"],objective=frozen.get("selection_objective","confirmation"))
             atomic_json_write(root/"selection.json",report)
             atomic_json_write(root/"state.json",dict(phase="selected",frozen_sha256=digest(frozen),selection_sha256=digest(report)))
         else:
