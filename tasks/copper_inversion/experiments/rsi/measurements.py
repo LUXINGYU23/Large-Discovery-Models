@@ -13,8 +13,9 @@ MODALITIES = ("drill", "drill_outcrop")
 ASSIGNMENT_RULE = "alternate-within-family-v1"
 SHORT_TIER_RULE = "first-n-per-family-by-plan-index-noise-mixed-v1"
 THINNING_RULE = "whole-drill-holes-and-outcrop-spatial-cells-quarter-v1"
-# Pending author decision (gap audit §2.9): the plan's policy fails the release on
-# any overlap; the prototype redraws up to 16 presampled confirmation streams.
+# Author decision (2026-11-15): redraw each body's confirmation from its 16
+# presampled streams until the whole-hole audit passes. Failing the release on
+# any overlap (the original plan) remains available as the alternative.
 CONFIRMATION_POLICIES = {
     "fail_release": "first presampled stream only; any overlapping whole hole fails the release",
     "resample_until_separated": "first of 16 presampled streams with no overlapping whole holes",

@@ -14,15 +14,14 @@ import numpy as np
 import pytest
 
 from tasks.copper_inversion.experiments.rsi import plan as rsiplan
-from tasks.copper_inversion.experiments.rsi.measurements import (FAMILIES, MODALITIES, confirmation_streams,
+from tasks.copper_inversion.experiments.rsi.measurements import (FAMILIES, MODALITIES,
                                                                  modality_balance, spatial_groups)
-from tasks.copper_inversion.experiments.rsi.release import build
+from tasks.copper_inversion.experiments.rsi.release import build, load_suite
 from tasks.copper_inversion.experiments.rsi.release_dev import release as release_dev
 from tasks.copper_inversion.experiments.v2.generate_pilot import make_plan
 from tasks.copper_inversion.v2.data import read_problem, save_problem
 from tasks.copper_inversion.v2.geological_policy import POLICY_VERSION, public_priors
 from tasks.copper_inversion.v2.qualification import TIER_KEYS, load_tiers, verify_release, verify_tiers
-from tasks.copper_inversion.v2.suite import load_manifest
 
 SOURCE = Path(__file__).parents[1] / "experiments" / "v2"
 SHAPE = (8, 8, 6)
@@ -74,8 +73,16 @@ def pack(directory, digest, seed, holes, shift, mask):
     (directory / "private-manifest.json").write_text(json.dumps(manifest))
 
 
-def dataset(root, release="rsi-r1", counts=SMALL, per_family=2, policy="fail_release", historical=None,
-            overlap=(), formal_inputs=True):
+def attempt(seed, holes, status):
+    """A generation-time audit receipt row, as generate_confirmation writes it."""
+    distances = [0. if hole in PUBLIC_HOLES else 2. for hole in holes]
+    return dict(seed=seed, status=status, confirmation_holes=len(holes), overlapping_holes=distances.count(0.),
+                transition_scale=.5, nearest_hole_distances=distances, nearest_hole_distance_min=min(distances),
+                nearest_hole_distance_median=float(np.median(distances)))
+
+
+def dataset(root, release="rsi-r1", counts=SMALL, per_family=2, policy="resample_until_separated", historical=None,
+            overlap=(), redraw=(), formal_inputs=True):
     """A generated population, written in the order the real pipeline writes it."""
     rsi = rsiplan.make_generation_plan(release, 7, policy, historical, counts=counts, short_per_family=per_family)
     sha = rsiplan.write_generation_plan(root, rsi)
@@ -96,12 +103,15 @@ def dataset(root, release="rsi-r1", counts=SMALL, per_family=2, policy="fail_rel
             np.savez(parent / "geology.npz", truth=mask, forbidden_mask=forbidden())
             digest = hashlib.sha256(f"{part}:{name}".encode()).hexdigest()
             pack(base / "packs" / name, digest, entry["observation_seed"], PUBLIC_HOLES, 0., mask)
-            seed = confirmation_streams(entry, policy)[0]
+            streams = entry["confirmation_seeds"]
             hidden = HIDDEN_HOLES + ([PUBLIC_HOLES[0]] if name in overlap else [])
-            pack(base / "confirmation" / name, digest, seed, hidden, .25, mask)
+            # A redrawn body's first stream overlapped; the second one is used.
+            attempts = ([attempt(streams[0], HIDDEN_HOLES + [PUBLIC_HOLES[1]], "failed")] if name in redraw else [])
+            attempts.append(attempt(streams[len(attempts)], hidden, "passed"))
+            pack(base / "confirmation" / name, digest, attempts[-1]["seed"], hidden, .25, mask)
             audits = base / "confirmation-audits"
             audits.mkdir(exist_ok=True)
-            (audits / f"{name}.json").write_text(json.dumps(dict(attempts=[dict(seed=seed, status="passed")])))
+            (audits / f"{name}.json").write_text(json.dumps(dict(attempts=attempts)))
             records.append(dict(parent=name, status="accepted", parent_directory=f"parents/{name}-0"))
         (base / "progress.json").write_text(json.dumps(dict(records=records)))
         (base / "completion.json").write_text("{}")
@@ -201,7 +211,8 @@ def test_formal_release_qualification_covers_every_manifest(tmp_path):
                           "train_q1_both/manifest.json"}
     for path in found:
         assert verify_release(out / path) == record
-        assert load_manifest(out / path)["stage"] == "formal"
+        packs = record["layout"]["packs_per_body_by_manifest"].get(path, record["layout"]["packs_per_body"])
+        assert load_suite(out / path, packs)["stage"] == "formal"
     # The tier table has exactly the contracts §2.1 shape.
     assert record["tiers"] == {
         "S": {"solver_seconds": 30, "train_manifest": "train_s/manifest.json", "train_bodies": 8,
@@ -212,7 +223,10 @@ def test_formal_release_qualification_covers_every_manifest(tmp_path):
               "sealed_manifests": ["test_id/manifest.json", "test_ood/manifest.json"], "slots": 321}}
     assert load_tiers(out) == record["tiers"]
     assert record["layout"] == {"packs_per_body": 1, "execution_seeds": [47], "assignment_rule": "alternate-within-family-v1",
-                                "sealed_bodies": {"test_id": 4, "test_ood": 4}}
+                                "sealed_bodies": {"test_id": 4, "test_ood": 4},
+                                "packs_per_body_by_manifest": {"train_q1_both/manifest.json": 2}}
+    assert record["q1"] == {"execution_seeds": [47, 48, 49], "execution_seeds_manifest": "train_s_q1seeds/manifest.json",
+                            "both_packs_manifest": "train_q1_both/manifest.json", "solver_seconds": 30}
     assert record["judges"]["q25"] == {"objective": "confirmation", "train_manifest": "train_s_q25/manifest.json",
                                        "validation_manifest": "validation_q25/manifest.json"}
     assert found["train_s_q1seeds/manifest.json"]["seeds"] == [47, 48, 49]
@@ -265,16 +279,43 @@ def test_weak_judge_keeps_whole_holes_and_public_files(tmp_path):
                     assert np.count_nonzero(groups == group) == np.count_nonzero(all_groups == group)
 
 
-def test_copied_public_hole_fails_the_release(tmp_path):
-    """AT-22 negative control: one public hole copied into one confirmation."""
+def test_resampled_confirmation_records_streams_and_attempts(tmp_path):
+    """Default policy: per-body redraws are allowed and fully recorded."""
+    rsi, root, out, _ = formal(tmp_path, redraw=("train-03", "test_ood-02"))
+    assert rsi["confirmation_policy"]["mode"] == "resample_until_separated"
+    hole = json.loads((out / "evidence" / "hole_audit.json").read_text())
+    assert hole["policy"] == "resample_until_separated" and hole["redrawn_parents"] == ["test_ood-02", "train-03"]
+    assert hole["attempts_per_parent"] == {"1": sum(SMALL.values()) - 2, "2": 2}
+    rows = {row["parent"]: row for row in hole["confirmation_streams"]}
+    assert len(rows) == sum(SMALL.values()) and rows["train-03"]["stream_index"] == 1
+    assert [a["status"] for a in rows["train-03"]["attempts"]] == ["failed", "passed"]
+    assert rows["train-03"]["selected_stream"] == rows["train-03"]["attempts"][-1]["seed"]
+    # The unconditioned first-stream distances include the rejected overlaps.
+    assert hole["first_stream_nearest_hole_distance"]["distance"][0] == 0.
+    assert hole["nearest_hole_distance"]["distance"][0] > 0.
+
+
+def test_redraw_is_refused_under_the_fail_release_policy(tmp_path):
     root = tmp_path / "dataset"
-    _, inputs = dataset(root, historical=historical(tmp_path), overlap=("validation-01",))
+    _, inputs = dataset(root, historical=historical(tmp_path), policy="fail_release", redraw=("train-03",))
+    with pytest.raises(ValueError, match="redrawn"):
+        build(root, tmp_path / "release", inputs["calibration"], inputs["isolation"], inputs["geological_constraints"])
+
+
+@pytest.mark.parametrize("policy", ["fail_release", "resample_until_separated"])
+def test_copied_public_hole_fails_the_release(tmp_path, policy):
+    """AT-22 negative control: one public hole copied into one confirmation.
+
+    Under resampling the generator would have redrawn this body; a receipt that
+    claims a pass is still caught by the release's own audit."""
+    root = tmp_path / "dataset"
+    _, inputs = dataset(root, historical=historical(tmp_path), overlap=("validation-01",), policy=policy)
     with pytest.raises(ValueError, match="hole overlap in 1 parents.*validation-01"):
         build(root, tmp_path / "release", inputs["calibration"], inputs["isolation"], inputs["geological_constraints"])
     assert not (tmp_path / "release").exists()
     report = json.loads((root / "hole-audit.json").read_text())
     assert report["status"] == "failed" and report["overlapping_parents"] == ["validation-01"]
-    assert report["policy"] == "fail_release" and report["nearest_hole_distance"]["distance"][0] == 0.
+    assert report["policy"] == policy and report["nearest_hole_distance"]["distance"][0] == 0.
 
 
 def test_plan_hash_must_precede_geology_and_plans_cannot_change(tmp_path):

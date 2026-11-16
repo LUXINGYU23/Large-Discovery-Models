@@ -49,7 +49,7 @@ def _receipt(path, **extra):
     return dict(sha256=file_hash(path), recorded_at=datetime.now(timezone.utc).isoformat(), **extra)
 
 
-def make_generation_plan(release, master_seed, confirmation_policy="fail_release", historical=None,
+def make_generation_plan(release, master_seed, confirmation_policy="resample_until_separated", historical=None,
                          counts=None, short_per_family="preset", tiers=None):
     if type(master_seed) is not int or master_seed < 0:
         raise ValueError("a nonnegative master seed is required")

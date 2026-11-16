@@ -10,6 +10,7 @@ every evaluation manifest (except the optional Q1 both-pack training manifest).
 """
 
 import argparse
+import inspect
 import json
 import os
 import shutil
@@ -34,6 +35,13 @@ SPLITS = ("train", "validation", "test_id", "test_ood")
 FILES = ("problem.json", "problem.npz", "truth.npy", "confirmation/problem.json", "confirmation/problem.npz")
 OVERLAP = ("a confirmation hole overlaps when at least half of its samples lie within one confirmation "
            "transition_scale of the samples of a single public hole")
+
+
+def load_suite(path, packs):
+    """load_manifest with the layout given explicitly while the record does not exist yet."""
+    if "packs_per_body" in inspect.signature(load_manifest).parameters:
+        return load_manifest(path, packs_per_body=packs)
+    return load_manifest(path)
 
 
 def collect(dataset):
@@ -78,7 +86,10 @@ def collect(dataset):
                                        hidden=confirmation / hidden_case["case_id"], truth=pack / case["truth"])
             bodies.append(dict(name=name, part=part, split=entry["split"], family=entry["family"],
                                index=entry["index"], noisy=entry["noisy"], selected=entry["selected_modality"],
-                               parent_id=manifest["parent_digest"], cases=cases))
+                               parent_id=manifest["parent_digest"], cases=cases,
+                               stream=dict(seed=hidden["observation_seed"],
+                                           index=entry["confirmation_seeds"].index(hidden["observation_seed"]),
+                                           attempts=receipt["attempts"])))
     bodies.sort(key=lambda body: (SPLITS.index(body["split"]), body["index"]))
     return rsi, rsi_sha, parts, plans, bodies
 
@@ -97,12 +108,26 @@ def audit_release(dataset, bodies, mode):
                              **{k: v for k, v in result.items() if k != "nearest_hole_distances"}))
     overlapping = sorted({row["parent"] for row in rows if row["status"] != "passed"})
     audits = list(selected.values())
+    # Which presampled stream each body uses and every generation-time audit
+    # attempt, so the appendix can state the confirmation rule and its effect.
+    streams = [dict(parent=body["name"], split=body["split"], selected_stream=body["stream"]["seed"],
+                    stream_index=body["stream"]["index"], attempts=[
+                        {k: v for k, v in attempt.items() if k != "nearest_hole_distances"}
+                        for attempt in body["stream"]["attempts"]]) for body in bodies]
+    first = [a for a in (body["stream"]["attempts"][0] for body in bodies)
+             if "nearest_hole_distances" in a and "transition_scale" in a]
+    attempts = {}
+    for row in streams:
+        attempts[str(len(row["attempts"]))] = attempts.get(str(len(row["attempts"])), 0) + 1
     report = dict(status="failed" if overlapping else "passed", criterion=OVERLAP, policy=mode,
                   policy_rule=CONFIRMATION_POLICIES[mode], packs=rows, overlapping_parents=overlapping,
                   nearest_hole_distance=hole_distance_summary(audits),
                   nearest_hole_distance_by_split={split: hole_distance_summary([a for a in audits if a["split"] == split])
                                                   for split in sorted({a["split"] for a in audits})},
-                  distance_definition="closest approach of each selected-pack confirmation hole to any public hole")
+                  distance_definition="closest approach of each selected-pack confirmation hole to any public hole",
+                  confirmation_streams=streams, attempts_per_parent=attempts,
+                  redrawn_parents=sorted(row["parent"] for row in streams if row["stream_index"]),
+                  first_stream_nearest_hole_distance=hole_distance_summary(first) if len(first) == len(bodies) else None)
     (Path(dataset) / "hole-audit.json").write_text(json.dumps(report, sort_keys=True, indent=2) + "\n")
     if overlapping:
         raise ValueError(f"confirmation hole overlap in {len(overlapping)} parents; release not created: "
@@ -129,7 +154,7 @@ def write_manifest(out, name, split, stage, seeds, cases):
     path = out / name / "manifest.json"
     path.write_text(json.dumps({"schema": "copper-suite-v2", "stage": stage, "split": split, "seeds": list(seeds),
                                 "cases": cases}, sort_keys=True, indent=2) + "\n")
-    load_manifest(path)
+    load_suite(path, 2 if any(sum(c["parent_id"] == r["parent_id"] for c in cases) > 1 for r in cases) else 1)
     verify_geological_constraints(path)
     return str(path.relative_to(out))
 
@@ -234,6 +259,9 @@ def build(dataset, output, calibration=None, isolation=None, geological_constrai
              "F": dict(solver_seconds=rsi["tiers"]["F"]["solver_seconds"], train_manifest=manifests["train"],
                        train_bodies=len(by_split["train"]), slots=rsi["tiers"]["F"]["slots"], **common)}
     layout = {key: rsi["layout"][key] for key in ("packs_per_body", "execution_seeds", "assignment_rule", "sealed_bodies")}
+    # Exceptions to packs_per_body, read per manifest by the evaluator (Q1 only).
+    layout["packs_per_body_by_manifest"] = {q1["both_packs_manifest"]: 2} if q1["both_packs_manifest"] else {}
+    q1["solver_seconds"] = rsi["tiers"]["S"]["solver_seconds"]
     judges = {"standard": {"objective": "confirmation"},
               "q25": {"objective": "confirmation", "train_manifest": manifests["train_s_q25"],
                       "validation_manifest": manifests["validation_q25"]},
@@ -292,7 +320,7 @@ def main():
     plan.add_argument("--root", type=Path, required=True)
     plan.add_argument("--release", choices=sorted(PRESETS), required=True)
     plan.add_argument("--master-seed", type=int, required=True)
-    plan.add_argument("--confirmation-policy", choices=sorted(CONFIRMATION_POLICIES), default="fail_release")
+    plan.add_argument("--confirmation-policy", choices=sorted(CONFIRMATION_POLICIES), default="resample_until_separated")
     plan.add_argument("--historical", nargs="*", default=[], metavar="LABEL=PATH",
                       help="prior releases or generator archives; rsi-r1 requires legacy_release and rsi_dev")
     plan.add_argument("--no-q1-both-packs", action="store_true")
