@@ -153,6 +153,7 @@ class RecordingAgent(ScriptedAgent):
     """Scripted researcher that preserves each message as a provider request file."""
 
     def __init__(self, rejected_branch=None, failing_branch=None):
+        super().__init__()
         self.rejected_branch, self.failing_branch = rejected_branch, failing_branch
 
     def propose(self, *, branch, round_index, count, turn_root, message, **rest):

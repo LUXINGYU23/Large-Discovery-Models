@@ -77,7 +77,7 @@ def run_id(experiment, arm, judge, seed):
     return f"{arm}-{judge}-s{seed}" if experiment == "E3" else f"{arm}-s{seed}"
 
 
-def build_config(protocol, arm, tier, seed):
+def build_config(protocol, arm, tier, seed, solver_seconds=None):
     """Controller settings from the protocol.
 
     Uses ``Config.from_protocol`` when the controller provides it. Otherwise
@@ -86,6 +86,11 @@ def build_config(protocol, arm, tier, seed):
     """
     if hasattr(Config, "from_protocol"):
         factory = Config.from_protocol
+        if "tiers" not in protocol:
+            # A legacy release has no tier table; give the controller the one tier it runs.
+            loop = protocol["loop"]
+            protocol = {**protocol, "tiers": {tier: {"solver_seconds": solver_seconds,
+                                                     "slots": 1 + loop["rounds"] * loop["batch"]}}}
         if "seed" in inspect.signature(factory).parameters:
             return factory(protocol, arm, tier, seed=seed)
         return dataclasses.replace(factory(protocol, arm, tier), seed=seed)
@@ -155,7 +160,7 @@ def prepare(args):
     name = run_id(args.experiment, args.arm, args.judge, args.seed)
     if args.out_dir.name != name:
         raise ValueError("run directory must be named " + name)
-    config = build_config(protocol, args.arm, tier, args.seed)
+    config = build_config(protocol, args.arm, tier, args.seed, solver_seconds)
     if getattr(config, "arm", args.arm) != args.arm or config.seed != args.seed:
         raise ValueError("controller settings differ from the requested arm or seed")
     if "tiers" in protocol and config.slots != protocol["tiers"][tier]["slots"]:
