@@ -4,7 +4,6 @@ from typing import Optional, Any, Literal
 
 import numpy as np
 import torch
-from botorch.fit import fit_gpytorch_model
 from gpytorch.constraints import Interval
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import ScaleKernel, RBFKernel, CosineKernel, MaternKernel
@@ -149,6 +148,8 @@ def train_gp(train_x: torch.tensor, train_y: torch.tensor, use_ard: bool, num_st
     mll = ExactMarginalLogLikelihood(likelihood, model)
 
     if search_strategy in ['glocal', 'global', 'batch_local']:
+        from botorch.fit import fit_gpytorch_model
+
         if hypers:
             model.load_state_dict(hypers)
         fit_gpytorch_model(mll)

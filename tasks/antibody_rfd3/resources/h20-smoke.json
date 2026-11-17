@@ -1,0 +1,183 @@
+{
+  "case": "1N8Z B1-120, Kabat H3 B99-B109",
+  "antigen": "1ADQ_A",
+  "date_local": "2026-11-17",
+  "seed": 42,
+  "oracle": "mock-v1 (deterministic sequence hash; no binding energy measured)",
+  "run_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3",
+  "campaigns": [
+    {
+      "method": "ldm_harness",
+      "run": "qwen3-ldm_harness_3",
+      "observations": [
+        {
+          "round": 0,
+          "h3": "SNGKDGSPGVY",
+          "backbone_id": "job-00000",
+          "mock_energy": -0.6634765332564712
+        },
+        {
+          "round": 1,
+          "h3": "TSGGPGAPGTH",
+          "backbone_id": "job-00000",
+          "mock_energy": -0.9467799111735076
+        }
+      ],
+      "events_sha256": "d7ac2ff4db086784f1431d98f051c57f5f2cd716fbd9fa05eb28afe8bf3c91f0",
+      "summary_sha256": "12038a0aed347b97e0bb1d0e13328640151c104fe54384f5b0d0a2102cd2d75b",
+      "budget": {
+        "expensive_evaluation_attempts": 2,
+        "successful_evaluations": 2,
+        "backbones_requested": 2,
+        "sequences_requested": 48,
+        "harness_provider_calls": 10,
+        "harness_tool_calls": 8
+      },
+      "tools_per_turn": [
+        {
+          "read": 1,
+          "design_h3": 1,
+          "submit_designs": 1
+        },
+        {
+          "design_h3": 1,
+          "sequence_h3": 1,
+          "submit_designs": 3
+        }
+      ],
+      "gp_round_1_expected_improvement": {
+        "SDGSPGSPGTV": 0.36316168308258057,
+        "TSGGPGAPGTH": 0.3988158106803894
+      },
+      "trace": {
+        "first_tool_read": "/workspace/.ldm-resources/skills/0/cdrh3-design/SKILL.md",
+        "second_round_input_history": [
+          {
+            "round": 0,
+            "sequence": "SNGKDGSPGVY",
+            "backbone_id": "job-00000",
+            "energy": -0.6634765332564712,
+            "oracle": "mock"
+          }
+        ],
+        "session_log": "harness/sessions/cdrh3_research/pi-session/2026-11-17T09-33-39-530Z_01a1e8da-db49-76ff-b7b3-d5880022636c.jsonl",
+        "session_log_sha256": "e9fd201d4bf477fbd422ba1a24e1ea07596e990f13e3a476dac32fc8ba8678b2"
+      }
+    },
+    {
+      "method": "harness",
+      "run": "qwen3-harness",
+      "observations": [
+        {
+          "round": 0,
+          "h3": "SNGKDGSPGVY",
+          "backbone_id": "job-00000",
+          "mock_energy": -0.6634765332564712
+        },
+        {
+          "round": 1,
+          "h3": "DPNGDGKTYSN",
+          "backbone_id": "job-00001",
+          "mock_energy": -0.30247538490220904
+        }
+      ],
+      "events_sha256": "4ab9dc4e232ba95de0121c48b51c216100b9126b4cc86b5eacff5541bb039300",
+      "summary_sha256": "ce41a7cb7d804a12149f078e6033cd3e4bfe1c65ee8219010e6f8130a15cceb6",
+      "budget": {
+        "expensive_evaluation_attempts": 2,
+        "successful_evaluations": 2,
+        "backbones_requested": 2,
+        "sequences_requested": 32,
+        "harness_provider_calls": 7,
+        "harness_tool_calls": 5
+      },
+      "tools_per_turn": [
+        {
+          "read": 1,
+          "design_h3": 1,
+          "submit_designs": 1
+        },
+        {
+          "design_h3": 1,
+          "submit_designs": 1
+        }
+      ]
+    },
+    {
+      "method": "fixed",
+      "run": "paired-fixed",
+      "observations": [
+        {
+          "round": 0,
+          "h3": "SNGKDGSPGVY",
+          "backbone_id": "job-00000",
+          "mock_energy": -0.6634765332564712
+        },
+        {
+          "round": 1,
+          "h3": "DPNGDGKTYSN",
+          "backbone_id": "job-00001",
+          "mock_energy": -0.30247538490220904
+        }
+      ],
+      "events_sha256": "8699a95ae15b01b4355b2f9322972413ed9de0b346b5ed460ae5df391e65daca",
+      "summary_sha256": "e63610ff8ff2c7bdb4d4e5768547c2854687d7a888ecf25232e4d8e260cbe2d2",
+      "budget": {
+        "expensive_evaluation_attempts": 2,
+        "successful_evaluations": 2,
+        "backbones_requested": 2,
+        "sequences_requested": 32,
+        "harness_provider_calls": 0,
+        "harness_tool_calls": 0
+      }
+    },
+    {
+      "method": "antbo",
+      "run": "paired-antbo",
+      "observations": [
+        {
+          "round": 0,
+          "h3": "SNGKDGSPGVY",
+          "backbone_id": "job-00000",
+          "mock_energy": -0.6634765332564712
+        },
+        {
+          "round": 1,
+          "h3": "WACHARTTFLS",
+          "backbone_id": null,
+          "mock_energy": -0.3378829115536064
+        }
+      ],
+      "events_sha256": "cef708d1e1914e8ababb88a7dcac7775818c29c166658af95d4353aae89e099a",
+      "summary_sha256": "d0706b2f1809d48fe375bf4c8b02a8a4efe987299a56c28a0bb9fd6e1780ac2c",
+      "budget": {
+        "expensive_evaluation_attempts": 2,
+        "successful_evaluations": 2,
+        "backbones_requested": 1,
+        "sequences_requested": 16,
+        "harness_provider_calls": 0,
+        "harness_tool_calls": 0
+      }
+    }
+  ],
+  "agent_runtime": {
+    "provider": "Qwen3-8B",
+    "backend": "vLLM 0.11.2 Chat Completions behind a Pi Responses protocol adapter",
+    "guest": {
+      "imageRef": "ldm/antibody-rfd3-research:4aa40facac80",
+      "recipeSha256": "4aa40facac809bcd629d444644a629a821025652fadcfca1715d540fe5c7082a",
+      "buildId": "0a777279-8b69-505b-a8ae-e4415204a430",
+      "manifestSha256": "eeb89479ce262be1c6cefe98dff0df273b6ce17fc8252dfc4bbb59689bba53bf",
+      "architecture": "x86_64",
+      "rootfsSize": "2G",
+      "installPolicy": "session_overlay"
+    },
+    "sidecar": "ldm-copper-pi:main-3580273b",
+    "gpu": 0,
+    "worker_cpu_limit": 2,
+    "generation_caps_per_round": {
+      "backbones": 2,
+      "sequences": 32
+    }
+  }
+}

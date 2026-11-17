@@ -1,0 +1,12 @@
+name: antibody_rfd3_ldm_harness
+task: antibody_rfd3
+algorithm: ldm_harness
+mode: real
+description: Two-round ldm_harness campaign with a deterministic sequence-hash mock oracle.
+args:
+  method: ldm_harness
+  oracle: mock
+  iterations: 2
+  pool-size: 2
+  seed: 42
+  out-dir: runs/ldm_harness

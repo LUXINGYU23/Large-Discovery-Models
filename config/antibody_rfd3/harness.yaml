@@ -1,0 +1,12 @@
+name: antibody_rfd3_harness
+task: antibody_rfd3
+algorithm: harness
+mode: real
+description: Two-round harness campaign with a deterministic sequence-hash mock oracle.
+args:
+  method: harness
+  oracle: mock
+  iterations: 2
+  pool-size: 2
+  seed: 42
+  out-dir: runs/harness

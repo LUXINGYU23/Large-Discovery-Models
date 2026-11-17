@@ -1,0 +1,364 @@
+{
+  "status": "success",
+  "validated_on": "2026-11-16",
+  "timezone": "Asia/Shanghai",
+  "host": "h20-117",
+  "branch": "antibody-poc-rsd3",
+  "base_commit": "3580273bf57e8e1bdb734b9e0316dc84e0f4a6ad",
+  "tests": {
+    "returncode": 0,
+    "summary": "........................................                                 [100%]\n40 passed in 0.53s"
+  },
+  "dependency_checks": {
+    "rfd3": {
+      "pip_check": "No broken requirements found.",
+      "lockfile_dry_run": "passed"
+    },
+    "proteinmpnn": {
+      "pip_check": "No broken requirements found.",
+      "lockfile_dry_run": "passed"
+    }
+  },
+  "run_directory": "/Aidata/shared/ldm/antibody-poc/runs/structure_design/pipeline-gpu-002",
+  "run": {
+    "status": "success",
+    "command": "pipeline",
+    "device": "cuda",
+    "started_at_utc": "2026-11-16T09:15:28.457876+00:00",
+    "finished_at_utc": "2026-11-16T09:16:21.870626+00:00",
+    "elapsed_seconds": 53.41276882123202
+  },
+  "physical_gpu": {
+    "physical_gpu_index": 1
+  },
+  "parameters": {
+    "num_timesteps": 200,
+    "batch_size": 1,
+    "num_designs": 1,
+    "sequences_per_design": 1,
+    "seed": 42,
+    "allocator_cap_gib": 24,
+    "gpu_shared": true
+  },
+  "candidate": {
+    "candidate_id": "pipeline-gpu-002/mpnn-0000-0000",
+    "parent_design": "pipeline-gpu-002/rfd3-0000",
+    "heavy_chain": "B",
+    "h3_definition": "Kabat; 1N8Z source author residues B99-B109",
+    "h3": "SNGDWGSPGTV",
+    "full_sequences": {
+      "A": "EVQLVESGGGLVQPGGSLRLSCAASGFNIKDTYIHWVRQAPGKGLEWVARIYPTNGYTRYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCSRSNGDWGSPGTVWGQGTLVTVSS"
+    },
+    "h3_mapping": [
+      {
+        "source": {
+          "chain": "B",
+          "number": 99,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 99,
+        "input_aa": "W",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 99,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 100,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 100,
+        "input_aa": "G",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 100,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 101,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 101,
+        "input_aa": "G",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 101,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 102,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 102,
+        "input_aa": "D",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 102,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 103,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 103,
+        "input_aa": "G",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 103,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 104,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 104,
+        "input_aa": "F",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 104,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 105,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 105,
+        "input_aa": "Y",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 105,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 106,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 106,
+        "input_aa": "A",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 106,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 107,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 107,
+        "input_aa": "M",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 107,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 108,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 108,
+        "input_aa": "D",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 108,
+          "insertion_code": ""
+        }
+      },
+      {
+        "source": {
+          "chain": "B",
+          "number": 109,
+          "insertion_code": ""
+        },
+        "sequence_chain": "A",
+        "sequence_position": 109,
+        "input_aa": "Y",
+        "designed": true,
+        "generated": {
+          "chain": "A",
+          "number": 109,
+          "insertion_code": ""
+        }
+      }
+    ],
+    "fixed_framework": {
+      "fixed_backbone_rmsd_angstrom": 0.021694705785802623,
+      "fixed_backbone_max_error_angstrom": 0.05838040962513603,
+      "fixed_backbone_max_error_limit_angstrom": 0.1,
+      "fixed_backbone_rmsd_limit_angstrom": 0.05
+    },
+    "sequence_structure_semantics": "new sequence on supplied backbone; sidechains have NOT been repacked or relaxed"
+  },
+  "models": {
+    "rfd3_python": {
+      "executable": "/Aidata/shared/ldm/antibody-poc/env/rfd3/bin/python",
+      "packages": {
+        "torch": "2.6.0",
+        "numpy": "1.26.4",
+        "rc-foundry": "0.2.0",
+        "atomworks": "2.1.1"
+      }
+    },
+    "proteinmpnn_python": {
+      "executable": "/Aidata/shared/ldm/antibody-poc/env/proteinmpnn/bin/python",
+      "packages": {
+        "torch": "2.6.0",
+        "numpy": "1.26.4"
+      }
+    },
+    "rfd3_checkpoint": {
+      "url": "https://files.ipd.uw.edu/pub/rfd3/rfd3_foundry_2025_12_01_remapped.ckpt",
+      "downloaded_at": "2026-11-16T08:24:43.931070+00:00",
+      "sha256": "9b3f85923e0d51e9453e15cdd2f8c666e7ce096a60577f57d11bbc54ae6d67c1",
+      "bytes": 2690316669,
+      "integrity": "locally recorded SHA256; upstream supplies no trusted digest",
+      "path": "/mnt/cephfs/xingyu/ldm/archive/antibody-poc/models/rfd3/2025-12-01/rfd3.ckpt"
+    },
+    "proteinmpnn_checkpoint": {
+      "url": "https://raw.githubusercontent.com/dauparas/ProteinMPNN/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/vanilla_model_weights/v_48_020.pt",
+      "downloaded_at": "2026-11-16T08:45:18.213159+00:00",
+      "sha256": "c9cb4a671d79604111231f8dbfc7c590e06f1197453b7a6854ac6661a642f5bd",
+      "bytes": 6681301,
+      "integrity": "locally recorded SHA256; upstream supplies no trusted digest",
+      "path": "/mnt/cephfs/xingyu/ldm/archive/antibody-poc/models/proteinmpnn/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/v_48_020.pt"
+    },
+    "proteinmpnn_source": {
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "files": {
+        "protein_mpnn_run.py": "61f2c519a7f73fa12da9eb90da97b97ec2f8d5f31d42605639c7600cbd321cbe",
+        "protein_mpnn_utils.py": "74c8f9b7553422a7a0bbd705874844ee103c8926c2c96f154a87e0b824071e1b",
+        "helper_scripts/parse_multiple_chains.py": "3d68c7fcc37c0763c42bfaf6099b4b2f5dd30710f9870b6b38d7a9e1ac18b790",
+        "LICENSE": "82009d25ce585631f452b2b24589bdb29c559ccfefa2f200ef312ed5b501a586"
+      }
+    }
+  },
+  "tool_source_sha256": {
+    "worker.py": "825b13bcdb1035f9c4d1ab40b03c29078d5e0b865e8c9239da1b2c644bb7abbe",
+    "__init__.py": "ccf4788b950612ca21d695404b30e53c4b9ad392176173080929cd2dbc848852",
+    "__main__.py": "ff6a004b6522eb15c2fc9eb70cd27728bd65ac3341b86585d0ab3f462d4c134e",
+    "gpu_runner.py": "cf6a213ca7634e448ed57b40d9eb4b069dacb4226c79c589a1ba1693f4d8a4b3",
+    "bootstrap.py": "23177949cf4139c9bf879fdeef663221676a1bd51097754f592709ad47c7d446",
+    "common.py": "b2d8b737fc2c2dd756a8c78fa57c242aa6f56f88ac2b52cb731209d09d533002"
+  },
+  "cost": {
+    "end_to_end_seconds": 53.41276882123202,
+    "rfd3_process_seconds": 45.710471116006374,
+    "rfd3_inference_seconds": 30.41,
+    "rfd3_sampled_peak_process_gpu_memory_mib": 2688,
+    "proteinmpnn_process_seconds": 3.790399868041277,
+    "proteinmpnn_sampled_peak_process_gpu_memory_mib": 414,
+    "sampling_interval_seconds": 1
+  },
+  "rfd3_diagnostics": {
+    "max_ca_deviation": 0.08871078491210938,
+    "n_chainbreaks": 0,
+    "n_clashing.interresidue_clashes_w_sidechain": 0,
+    "n_clashing.interresidue_clashes_w_backbone": 0,
+    "non_loop_fraction": 0.0,
+    "loop_fraction": 1.0,
+    "helix_fraction": 0.0,
+    "sheet_fraction": 0.0,
+    "num_ss_elements": 0,
+    "radius_of_gyration": 5.630073876913875,
+    "alanine_content": 0.11666666666666667,
+    "glycine_content": 0.11666666666666667,
+    "num_residues": 120,
+    "diffused_com": [
+      11.898633003234863,
+      7.09476900100708,
+      -2.524611473083496
+    ],
+    "fixed_com": [
+      -0.000358307093847543,
+      0.0003806281019933522,
+      5.0935814215335995e-05
+    ]
+  },
+  "other_successful_runs": {
+    "doctor-gpu-001": {
+      "status": "success",
+      "command": "doctor",
+      "device": "cuda",
+      "started_at_utc": "2026-11-16T09:11:34.121843+00:00",
+      "finished_at_utc": "2026-11-16T09:11:45.806805+00:00",
+      "elapsed_seconds": 11.684983342885971
+    },
+    "sequence-cpu-002": {
+      "status": "success",
+      "device": "cpu",
+      "command": "sequence",
+      "elapsed_seconds": 6.023184277117252
+    },
+    "sequence-gpu-001": {
+      "status": "success",
+      "command": "sequence",
+      "device": "cuda",
+      "started_at_utc": "2026-11-16T09:18:50.366699+00:00",
+      "finished_at_utc": "2026-11-16T09:18:58.883606+00:00",
+      "elapsed_seconds": 8.516945726238191
+    },
+    "extract-h3-001": {
+      "status": "success",
+      "command": "extract-h3",
+      "device": "none",
+      "started_at_utc": "2026-11-16T09:18:59.031517+00:00",
+      "finished_at_utc": "2026-11-16T09:18:59.066273+00:00",
+      "elapsed_seconds": 0.03480949439108372
+    }
+  },
+  "default_h3_extraction": "off_verified_by_standalone_sequence",
+  "binding_energy_evaluated": false,
+  "interpretation": "One VH smoke case on a shared GPU; sampled memory peaks, not universal resource requirements. No Pi, LDM, GP or oracle execution.",
+  "source_archive": {
+    "path": "/Aidata/shared/ldm/antibody-poc/runs/structure_design/pipeline-gpu-002/tool-source.tar.gz",
+    "sha256": "870249d880f2a8c53f8a622409ff181e908c9fa8ea50d37abeebc4a24a15d075",
+    "runtime_source_hashes_verified": true
+  },
+  "deployment_note": "After runtime validation, installer lock export was normalized to portable exact package versions. The verified archive preserves the sources used for the measured run; scientific runtime code is unchanged."
+}
