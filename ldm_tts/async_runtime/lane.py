@@ -157,6 +157,10 @@ class InlineExecutor:
         if isinstance(self.done.get(generation), BaseException):
             del self.done[generation]
 
+    def discard(self, generation) -> None:
+        self.jobs.pop(generation, None)
+        self.done.pop(generation, None)
+
     def has(self, generation) -> bool:
         return generation in self.jobs or generation in self.done
 
@@ -194,6 +198,7 @@ class ThreadExecutor:
         self.done: dict[int, Any] = {}
         self._lock = threading.Lock()
         self._closed = False
+        self._discarded: set[int] = set()
 
     def submit(self, generation, job, round_input, started_at, *, immediate=False):
         def work():
@@ -207,8 +212,9 @@ class ThreadExecutor:
             finally:  # never leave the executor busy for ever
                 with self._lock:
                     self.running.discard(generation)
-                    if not self._closed:
+                    if not self._closed and generation not in self._discarded:
                         self.done[generation] = result
+                    self._discarded.discard(generation)
                     notify = self.on_done
                 if notify is not None:
                     notify()
@@ -227,6 +233,12 @@ class ThreadExecutor:
         with self._lock:
             if isinstance(self.done.get(generation), BaseException):
                 del self.done[generation]
+
+    def discard(self, generation) -> None:
+        with self._lock:
+            self.done.pop(generation, None)
+            if generation in self.running:
+                self._discarded.add(generation)
 
     def busy(self) -> bool:
         with self._lock:
@@ -532,6 +544,8 @@ class ResearchLane:
             if discard is not None:
                 discard(generation)
             self.recover()
+        else:
+            self.executor.discard(generation)
         return True
 
     def eligible(self, db) -> int:

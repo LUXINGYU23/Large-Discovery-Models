@@ -285,7 +285,7 @@ def test_batch_budget_and_frozen_identity_are_checked(tmp_path):
 
 
 def test_antibody_scientific_batch_configuration_and_rejections():
-    options = ["--method", "ldm_harness", "--iterations", "640", "--research-rounds", "20",
+    options = ["--method", "ldm_harness", "--pacing-mode", "barrier", "--iterations", "640", "--research-rounds", "20",
                "--batch-size", "32", "--research-candidates-per-role", "32", "--pool-size", "64",
                "--sequences-per-round", "512", "--backbones-per-round", "16", "--samples-per-call", "32",
                "--concurrency", "4", "--cpu-limit", "8"]

@@ -127,12 +127,22 @@ def test_policy_readiness_does_not_block_ingest_or_old_policy_dispatch(tmp_path)
             assert spin(h, lambda: policy.entered.is_set() and ctrl.view().outstanding == 32)
             assert ctrl.generations()[1]["state"] == "running"
             old_application = policy.current().application_id
-            h.clock.advance_to(h.es.service.next_event_time())
-            assert spin(h, lambda: len(ctrl.observations()) == 1 and len(ctrl.decisions()) == 33)
-            decision = ctrl.decisions()[-1]["snapshot"]
-            assert decision["head_ingest_seq"] == 1 and len(decision["inputs"]["pending"]) == 31
-            assert decision["inputs"]["prior_application_id"] == old_application
-            assert ctrl.view().outstanding == 32 and not ctrl.view().paused
+            for head in range(1, 4):
+                h.clock.advance_to(h.es.service.next_event_time())
+                assert spin(h, lambda: len(ctrl.observations()) == head and len(ctrl.decisions()) == 32 + head)
+                decision = ctrl.decisions()[-1]["snapshot"]
+                assert decision["head_ingest_seq"] == head and len(decision["inputs"]["pending"]) == 31
+                assert decision["inputs"]["prior_application_id"] == old_application
+                assert ctrl.view().outstanding == 32 and not ctrl.view().paused
+            policy.release.set()
+            assert spin(h, lambda: ctrl.generations()[1]["state"] == "ready")
+            current = policy.current()
+            assert current.generation == 2 and current.application_id != old_application
+            assert current.head_ingest_seq < ctrl.view().head_ingest_seq == 3
+            assert all(current.covers(key) for key in ctrl.view().pending_keys)
+            assert all(current.covers(item.canonical_key) for item in ctrl.observations())
+            assert all(current.covers(item.canonical_key) for item in ctrl.view().reservoir.candidates)
+            assert policy.check() == []
         finally:
             policy.release.set()
 
@@ -161,6 +171,22 @@ def test_degraded_policy_turn_is_never_applied(tmp_path):
         assert h.drive(until=lambda: ctrl.view().lane.state == "blocked")
         assert "policy turn failed" in ctrl.generations()[0]["error"]
         assert not ctrl.decisions() and policy.current() is None
+
+
+def test_abandoned_timed_out_job_does_not_block_next_generation(tmp_path):
+    source = Source()
+    pacing = PacingConfig.balanced(concurrency=4, reservoir_size=64, half_life=32,
+        theta=0.75, dispatch_during_research="continue", research_timeout_seconds=5)
+    with Harness(tmp_path, budget=4, concurrency=4) as h:
+        h.start_es()
+        h.config = CampaignConfig(CAMPAIGN, budget=4, concurrency=4, extra=campaign_extra(pacing))
+        executor = InlineExecutor(h.clock, lambda data: 20 if data["generation"] == 1 else 0)
+        ctrl = open_stream(h, source, executor=executor)
+        assert h.drive(until=lambda: ctrl.view().lane.state == "blocked")
+        assert ctrl.resolve_lane("abandon", "test")
+        assert h.drive(until=lambda: len(ctrl.generations()) >= 2 and bool(ctrl.decisions()))
+        assert ctrl.generations()[0]["state"] == "abandoned"
+        assert ctrl.generations()[1]["state"] == "ready" and source.calls == [(2, 0, ())]
 
 
 def test_interrupted_supplement_restarts_and_covers_added_candidate(tmp_path):
