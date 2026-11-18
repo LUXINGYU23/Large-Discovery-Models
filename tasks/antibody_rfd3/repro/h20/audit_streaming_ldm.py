@@ -38,6 +38,122 @@ def _length(spans):
     return math.fsum(end - start for start, end in spans)
 
 
+def _intersection(left, right):
+    return [(max(a, c), min(b, d)) for a, b in left for c, d in right
+            if min(b, d) > max(a, c)]
+
+
+def _timestamp(value):
+    stamp = datetime.fromisoformat(value)
+    if stamp.utcoffset() is None:
+        raise ValueError("launcher timestamp has no timezone")
+    return stamp.timestamp()
+
+
+def runner_intervals(root, launch, start, end):
+    """Intervals covered by actual launcher cases, including unsuccessful cases."""
+    recoveries = launch.get("recoveries", [])
+    if recoveries:
+        first = read_json(root.parent / "recoveries" / "attempt-001" / "launch-before.json")
+        cases = [first["case"], *(entry["case"] for entry in recoveries)]
+    else:
+        cases = [launch["case"]]
+    spans = [(_timestamp(case["started_at"]), _timestamp(case["finished_at"])) for case in cases]
+    merged = _intervals(spans)
+    if not math.isclose(_length(merged), _length(spans), abs_tol=1e-6):
+        raise ValueError("launcher case intervals overlap")
+    return _intersection(merged, [(start, end)])
+
+
+def research_intervals(db, generations, active):
+    """Use append-only events so retries do not erase the first research attempt."""
+    result = []
+    for row in generations:
+        number = row["generation"]
+        events = db.rows("""SELECT seq,type,payload_json,created_at FROM events WHERE subject_id=?
+            AND type IN ('generation.started','generation.blocked') ORDER BY seq""", (str(number),))
+        begin = None
+        previous = None
+        for event in events:
+            if event["type"] == "generation.started":
+                if begin is not None or (previous is not None and previous != "generation.blocked"):
+                    raise ValueError(f"generation {number}: invalid start event sequence")
+                begin = event["created_at"]
+            else:
+                if begin is None:
+                    raise ValueError(f"generation {number}: block without a start")
+                for a, b in _intersection(_intervals([(begin, event["created_at"])]), active):
+                    result.append({"generation": number, "state": row["state"], "started_at": a, "finished_at": b})
+                begin = None
+            previous = event["type"]
+        if begin is None or row["finished_at"] is None:
+            raise ValueError(f"generation {number}: missing terminal research interval")
+        for a, b in _intersection(_intervals([(begin, row["finished_at"])]), active):
+            result.append({"generation": number, "state": row["state"], "started_at": a, "finished_at": b})
+    return result
+
+
+def scoring_intervals(root, attempts):
+    """Result file mtime estimates completion; ES end can be recorded after downtime."""
+    spans, delayed = [], []
+    for attempt in attempts:
+        start, end = attempt["started_at"], attempt["ended_at"]
+        if not finite(start) or not finite(end) or end <= start:
+            raise ValueError("invalid scoring service interval")
+        result = root / "absolut-attempts" / attempt["executor_ref"] / "result.json"
+        stamp = result.stat().st_mtime
+        if not finite(stamp) or stamp <= start:
+            raise ValueError(f"invalid scoring result timestamp: {result}")
+        # Filesystem timestamp precision may be coarser than the service clock.
+        finish = min(end, stamp)
+        spans.append(dict(attempt, ended_at=finish))
+        if end > stamp:
+            delayed.append(end - stamp)
+    return spans, delayed
+
+
+def scoring_attempt_problems(root, service, sequence, energy, attempts, asset_names):
+    """Only a proven stopped infrastructure retry may precede one successful score."""
+    eid = service["experiment_id"]
+    problems = []
+    attempts = sorted(attempts, key=lambda item: item["idx"])
+    if [item["idx"] for item in attempts] != list(range(1, len(attempts) + 1)) or not attempts:
+        problems.append(f"{eid}: missing or noncontiguous scoring attempts")
+    successes = 0
+    for attempt in attempts:
+        reference = hashlib.sha256(json.dumps([eid, attempt["idx"]], separators=(",", ":")).encode()).hexdigest()
+        base = root / "absolut-attempts" / reference
+        request, result, worker = (read_json(base / name) for name in ("request.json", "result.json", "worker.json"))
+        outcome = read_json_value(attempt["outcome"])
+        if not (attempt["state"] == "ended" and attempt["executor_ref"] == reference and
+                finite(attempt["started_at"]) and finite(attempt["ended_at"]) and
+                attempt["ended_at"] > attempt["started_at"]):
+            problems.append(f"{eid}: invalid scoring attempt {attempt['idx']}")
+        if not (request.get("sequence") == sequence and request.get("antigen") == "1N8Z_C" and
+                request.get("oracle") == "absolut" and
+                Path(request.get("absolut_path", "")).resolve() == (root.parent / "absolut").resolve() and
+                all(worker.get(k) is not None for k in ("pid", "start", "boot_id")) and
+                (base / "worker.log").is_file()):
+            problems.append(f"{eid}: worker receipt differs for attempt {attempt['idx']}")
+        for name in asset_names:
+            link = base / "absolut" / name
+            if not link.is_symlink() or link.resolve() != (root.parent / "absolut" / name).resolve():
+                problems.append(f"{eid}: input link differs: {name}")
+        if outcome.get("state") == "succeeded":
+            successes += 1
+            if not (attempt is attempts[-1] and result.get("state") == "succeeded" and
+                    result.get("metrics", {}).get("absolut_energy") == energy):
+                problems.append(f"{eid}: successful scoring receipt differs")
+        elif not (outcome == {"state": "stopped", "failure_class": "infrastructure",
+                              "message": "executor stopped the attempt without a request"} and
+                  result.get("state") == "stopped" and service["cancel_requested_at"] is None and
+                  all(attempt[k] is None for k in ("cancel_attempted_at", "cancel_acknowledged_at", "timeout_at"))):
+            problems.append(f"{eid}: attempt {attempt['idx']} is not a proven infrastructure stop")
+    if successes != 1:
+        problems.append(f"{eid}: expected exactly one successful scoring attempt")
+    return problems
+
+
 def timing(research_spans, scoring_spans, start, end, workers):
     """Wall-clock union/intersection and worker-seconds, on half-open intervals."""
     if not finite(start) or not finite(end) or end <= start or not isinstance(workers, int) or workers < 1:
@@ -102,7 +218,10 @@ def decision_timeline(decisions, experiments, observations, generations, attempt
     if sorted(obs_by_seq) != list(range(1, len(observations) + 1)):
         problems.append("observation sequence is not contiguous")
     experiment_by_decision = {x["decision_id"]: x for x in experiments}
-    starts_by_id = {x["experiment_id"]: x["started_at"] for x in attempts}
+    starts_by_id = {}
+    for attempt in attempts:
+        eid, stamp = attempt["experiment_id"], attempt["started_at"]
+        starts_by_id[eid] = min(stamp, starts_by_id.get(eid, stamp))
     for row in decisions:
         number, stamp = row["decision_id"], row["created_at"]
         snapshot = read_json_value(row["snapshot_json"])
@@ -164,15 +283,89 @@ def _usage(sessions):
         calls = [item.get("providerCalls") for item in entries]
         tokens = [item.get("tokens") for item in entries]
         keys = ("input", "cachedInput", "output", "reasoning")
-        complete_calls = bool(entries) and all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in calls)
+        valid = lambda n: isinstance(n, int) and not isinstance(n, bool) and n >= 0
+        complete_calls = bool(entries) and all(valid(n) for n in calls)
         complete_tokens = bool(entries) and all(isinstance(t, dict) and all(
-            isinstance(t.get(k), int) and not isinstance(t.get(k), bool) and t[k] >= 0 for k in keys) for t in tokens)
+            valid(t.get(k)) for k in keys) for t in tokens)
         result[role] = {"turns": len(entries), "provider_calls": sum(calls) if complete_calls else None,
+                        "known_provider_calls": sum(n for n in calls if valid(n)),
                         "tokens": {k: sum(t[k] for t in tokens) for k in keys} if complete_tokens else None,
+                        "known_tokens": {k: sum(t[k] for t in tokens if isinstance(t, dict) and valid(t.get(k)))
+                                         for k in keys},
                         "token_usage_missing_turns": sum(not isinstance(t, dict) or any(
-                            not isinstance(t.get(k), int) or isinstance(t.get(k), bool) or t[k] < 0 for k in keys)
-                            for t in tokens)}
+                            not valid(t.get(k)) for k in keys) for t in tokens)}
     return result
+
+
+def policy_retry_results(root, db, generations):
+    """Verify retry archives and return every failed policy result for cost accounting."""
+    retries = defaultdict(list)
+    for row in generations:
+        number = row["generation"]
+        path = root / "policy_harness" / "rounds" / f"round_{number:03d}"
+        events = db.rows("""SELECT seq,type,payload_json FROM events WHERE subject_id=?
+            AND type IN ('generation.started','generation.blocked') ORDER BY seq""", (str(number),))
+        starts = [event for event in events if event["type"] == "generation.started"]
+        expected = set()
+        for event in starts[1:]:
+            payload = read_json_value(event["payload_json"])
+            previous = next((item for item in reversed(events) if item["seq"] < event["seq"]), None)
+            if (not payload.get("policy_retry") or payload.get("resolution") != "retry" or
+                    previous is None or previous["type"] != "generation.blocked" or
+                    "status=runtime_fallback, degraded=True" not in read_json_value(previous["payload_json"]).get("error", "")):
+                raise ValueError(f"generation {number}: undocumented or unsupported research retry")
+            expected.add(f"event-{event['seq']:012d}")
+            archive = path / "retries" / f"event-{event['seq']:012d}"
+            marker = read_json(archive / "prepared.json")
+            archived = read_json(archive / "outcome.json")
+            result = read_json(archive / "result.json")
+            manifest = read_json(path / "manifest.json")
+            names = ("outcome.json", "result.json", "compiled.npz")
+            if not (marker.get("generation") == number and marker.get("retry_event_seq") == event["seq"] and
+                    marker.get("research_input_sha256") == row["input_digest"] == archived.get("input_digest") and
+                    marker.get("policy_input_sha256") == result.get("input_sha256") == manifest.get("input_sha256") and
+                    marker.get("files") == {name: file_sha256(archive / name) for name in names} and
+                    result.get("compiled_arrays_sha256") == file_sha256(archive / "compiled.npz") and
+                    result.get("status") == "runtime_fallback" and result.get("degraded") is True and
+                    not result.get("harness_turn")):
+                raise ValueError(f"generation {number}: invalid failed policy retry archive")
+            original = archived["outcome"]
+            original_policy = original.get("metadata", {}).get("policy_round", {})
+            final = read_json_value(row["outcome_json"])
+            # The research panel is reused; only policy metadata and merge fields change.
+            def panel(value):
+                return {**{k: v for k, v in value.items() if k not in ("metadata", "merge", "eligible")},
+                        "metadata": {k: v for k, v in value.get("metadata", {}).items() if k != "policy_round"}}
+            if not (original_policy.get("status") == "runtime_fallback" and original_policy.get("degraded") is True
+                    and panel(original) == panel(final)):
+                raise ValueError(f"generation {number}: failed policy result or preserved panel differs")
+            retries[number].append(result)
+        archives = {p.name for p in (path / "retries").glob("event-*") if p.is_dir()}
+        if archives != expected:
+            raise ValueError(f"generation {number}: retry events and archives differ")
+    return retries
+
+
+def cumulative_usage(final, failed):
+    """A retried policy turn reports cumulative usage, not independent attempt totals."""
+    valid = lambda n: isinstance(n, int) and not isinstance(n, bool) and n >= 0
+    snapshots = [*failed, final]
+    known = {}
+    for key in ("providerCalls", "input", "cachedInput", "output", "reasoning"):
+        values = []
+        for snapshot in snapshots:
+            value = (snapshot.get(key) if key == "providerCalls"
+                     else (snapshot.get("tokens") or {}).get(key))
+            if valid(value):
+                values.append(value)
+        if values != sorted(values):
+            raise ValueError(f"cumulative policy usage decreased for {key}")
+        if values:
+            if key == "providerCalls":
+                known[key] = values[-1]
+            else:
+                known.setdefault("tokens", {})[key] = values[-1]
+    return known
 
 
 def proposal_matches_source(proposal, issued, receipt, generation):
@@ -193,7 +386,7 @@ def decision_uses_gp_on_fresh_head(decision_id, chosen, pending, refreshed_ids):
 
 
 def efficiency(root: Path, db, es, workers: int):
-    """Compute the same unadjusted measurements for streaming and barrier campaigns."""
+    """Compute comparable end-to-end and evidenced activity measurements."""
     campaign = db.row("SELECT * FROM campaign WHERE singleton=1")
     stopped = db.row("SELECT created_at FROM events WHERE type='campaign.stopped' ORDER BY seq DESC LIMIT 1")
     if stopped is None:
@@ -201,15 +394,30 @@ def efficiency(root: Path, db, es, workers: int):
     start, end = campaign["created_at"], stopped["created_at"]
     generations = db.rows("SELECT * FROM generations ORDER BY generation")
     attempts = es.rows("SELECT * FROM attempts ORDER BY started_at")
-    spans = [(r["started_at"], r["finished_at"]) for r in generations if r["finished_at"] is not None]
-    if len(spans) != len(generations):
-        raise ValueError("research span missing an end time")
-    scoring = [(r["started_at"], r["ended_at"]) for r in attempts]
+    launch = read_json(root.parent / "launch.json")
+    active = runner_intervals(root, launch, start, end)
+    research = research_intervals(db, generations, active)
+    spans = [(r["started_at"], r["finished_at"]) for r in research]
+    measured, delayed = scoring_intervals(root, attempts)
+    scoring = [(r["started_at"], r["ended_at"]) for r in measured]
     metrics = timing(spans, scoring, start, end, workers)
+    active_seconds = _length(active)
+    active_scoring = _length(_intersection(scoring, active))
+    metrics["campaign_runner_active_seconds"] = active_seconds
+    metrics["campaign_outside_runner_seconds"] = metrics["campaign_wall_seconds"] - active_seconds
+    metrics["scoring_worker_seconds_during_runner"] = active_scoring
+    metrics["scoring_worker_seconds_outside_runner"] = metrics["scoring_worker_seconds"] - active_scoring
+    metrics["scoring_worker_utilization_during_runner"] = (active_scoring / (workers * active_seconds)
+                                                           if active_seconds else None)
+    metrics["scoring_service_recorded_worker_seconds"] = _length(
+        [(r["started_at"], r["ended_at"]) for r in attempts])
+    metrics["scoring_service_recorded_peak_concurrency"] = peak_intervals(
+        [{"start": r["started_at"], "end": r["ended_at"]} for r in attempts])
+    metrics["scoring_results_recorded_before_service_end"] = len(delayed)
+    metrics["scoring_result_to_service_end_seconds_sum"] = math.fsum(delayed)
     metrics["successful_scores"] = db.value("SELECT COUNT(*) FROM observations WHERE status='succeeded'")
     metrics["successful_scores_per_hour"] = 3600 * metrics["successful_scores"] / metrics["campaign_wall_seconds"]
-    launch = read_json(root.parent / "launch.json")
-    metrics["launcher_case_wall_seconds"] = launch.get("case", {}).get("elapsed_seconds")
+    metrics["launcher_latest_case_wall_seconds"] = launch.get("case", {}).get("elapsed_seconds")
     metrics["launcher_wall_seconds"] = (datetime.fromisoformat(launch["finished_at"]) -
                                          datetime.fromisoformat(launch["started_at"])).total_seconds()
     jobs = [read_json(path) for path in (root / "design_jobs").glob("job-*/receipt.json")]
@@ -233,6 +441,8 @@ def efficiency(root: Path, db, es, workers: int):
     metrics["model_execution_seconds"] = model
     metrics["model_scoring_overlap_seconds"] = None
     sessions = {role: [] for role in (*ROLES, "policy_architect")}
+    policy_bounds, retry_usage = [], []
+    retries = policy_retry_results(root, db, generations)
     for row in generations:
         outcome = read_json_value(row["outcome_json"] or "{}")
         generation_sessions = outcome.get("metadata", {}).get("sessions") or {}
@@ -240,14 +450,23 @@ def efficiency(root: Path, db, es, workers: int):
             # A missing session/usage is unknown, including for incomplete generations.
             sessions[role].append((generation_sessions.get(role) or {}).get("usage") or {})
         path = root / "policy_harness" / "rounds" / f"round_{row['generation']:03d}" / "result.json"
+        usage = {}
         if path.is_file():
             result = read_json(path)
             turn = result.get("harness_turn")
             usage = (turn or {}).get("usage") if turn else result.get("failed_harness_usage")
-            sessions["policy_architect"].append(usage or {})
-        else:
-            sessions["policy_architect"].append({})
+        usage = usage or {}
+        failed = [item.get("failed_harness_usage") or {} for item in retries[row["generation"]]]
+        sessions["policy_architect"].append(usage)
+        policy_bounds.append(cumulative_usage(usage, failed))
+        if failed:
+            retry_usage.append({"generation": row["generation"], "failed_cumulative_snapshots": failed,
+                                "final_cumulative_usage": usage})
     metrics["llm_usage_by_role"] = _usage(sessions)
+    policy_known = _usage({"policy": policy_bounds})["policy"]
+    metrics["llm_usage_by_role"]["policy_architect"].update(
+        known_provider_calls=policy_known["known_provider_calls"], known_tokens=policy_known["known_tokens"])
+    metrics["policy_retry_cumulative_usage"] = retry_usage
     usages = list(metrics["llm_usage_by_role"].values())
     calls = [value["provider_calls"] for value in usages]
     token_values = [value["tokens"] for value in usages]
@@ -257,12 +476,22 @@ def efficiency(root: Path, db, es, workers: int):
                     if all(value is not None for value in token_values) else None)
     count = metrics["successful_scores"]
     metrics["llm_usage_total"] = {"provider_calls": total_calls, "tokens": total_tokens,
+                                  "known_provider_calls": sum(value["known_provider_calls"] for value in usages),
+                                  "known_tokens": {k: sum(value["known_tokens"][k] for value in usages) for k in
+                                                   ("input", "cachedInput", "output", "reasoning")},
                                   "provider_calls_per_success": total_calls / count if count and total_calls is not None else None,
                                   "tokens_per_success": {k: v / count for k, v in total_tokens.items()}
                                   if count and total_tokens is not None else None}
-    metrics["timing_scope"] = ("controller creation through campaign.stopped; model times are summed execution "
-                               "durations without absolute timestamps, so model/scoring overlap is unavailable; "
-                               "research/scoring overlap is the union of research-lane/attempt intersections")
+    metrics["policy_retry_count"] = sum(len(items) for items in retries.values())
+    metrics["timing_scope"] = ("Campaign wall includes all gaps from controller creation through campaign.stopped. "
+                               "Runner activity is clipped to recorded launcher case intervals; workers may run outside "
+                               "those intervals. Research uses each started-to-blocked or finished event interval, clipped "
+                               "to runner activity. Scoring ends at the earlier of the service end and result.json mtime; "
+                               "mtime is a proxy for writing the result, not a confirmed process-group exit. Raw service "
+                               "attempt durations are retained and can include downtime. Model execution durations have "
+                               "no absolute timestamps, so model/scoring overlap is unavailable. Same-turn policy retry "
+                               "usage snapshots are cumulative and counted once. LLM counts are source-reported; missing "
+                               "receipts are unknown and provider responses without usage may not be counted.")
     return metrics
 
 
@@ -333,8 +562,8 @@ class StreamingAudit(Audit):
         self.require(len(self.generations) >= 2 and
                      [r["generation"] for r in self.generations] == list(range(1, len(self.generations) + 1)),
                      "fewer than two or noncontiguous research generations")
-        self.require(len(self.experiments) == len(self.decisions) == len(self.observation_rows) == len(attempts) ==
-                     self.minimum_evaluations, "evaluations, decisions, observations or scoring attempts differ")
+        self.require(len(self.experiments) == len(self.decisions) == len(self.observation_rows) ==
+                     self.minimum_evaluations, "evaluations, decisions or observations differ")
         self.require({r["experiment_id"] for r in self.experiments} == set(remote),
                      "controller and service experiment IDs differ")
         self.require(len({r["canonical_key"] for r in self.experiments}) == self.minimum_evaluations,
@@ -347,14 +576,15 @@ class StreamingAudit(Audit):
         by_attempt = defaultdict(list)
         for item in attempts:
             by_attempt[item["experiment_id"]].append(item)
+        self.require(set(by_attempt) == set(remote), "scoring attempts and service experiment IDs differ")
         for row in self.experiments:
             eid = row["experiment_id"]
             service, observation, linked = remote.get(eid), self.observations.get(eid), by_attempt[eid]
             self.require(row["submit_state"] == "ACKED" and row["es_state"] == "SUCCEEDED" and
                          row["budget_state"] == "CONSUMED" and not row["pending"] and row["disposition"] == "ingested" and
-                         service is not None and observation is not None and len(linked) == 1,
-                         f"{eid}: unsettled, missing, or repeated real scoring attempt")
-            if service is None or observation is None or len(linked) != 1:
+                         service is not None and observation is not None and bool(linked),
+                         f"{eid}: unsettled or missing real scoring attempt")
+            if service is None or observation is None or not linked:
                 continue
             candidate, evaluation = observation["candidate"], observation["evaluation"]
             sequence = candidate["payload"]["sequence"]
@@ -369,30 +599,14 @@ class StreamingAudit(Audit):
                          {"antigen": "1N8Z_C", "oracle": "absolut", "sequence": sequence} and
                          result.get("absolut_energy") == energy and service["result_digest"] == row["es_result_digest"],
                          f"{eid}: service result differs from observation")
-            attempt = linked[0]
-            reference = hashlib.sha256(json.dumps([eid, attempt["idx"]], separators=(",", ":")).encode()).hexdigest()
-            self.require(attempt["state"] == "ended" and attempt["executor_ref"] == reference and
-                         read_json_value(attempt["outcome"]).get("state") == "succeeded" and
-                         finite(attempt["started_at"]) and finite(attempt["ended_at"]) and
-                         attempt["ended_at"] > attempt["started_at"], f"{eid}: invalid real scoring attempt")
-            base = self.root / "absolut-attempts" / reference
-            request, result_file, worker = (read_json(base / name) for name in ("request.json", "result.json", "worker.json"))
-            self.require(request.get("sequence") == sequence and request.get("antigen") == "1N8Z_C" and
-                         request.get("oracle") == "absolut" and
-                         Path(request.get("absolut_path", "")).resolve() == Path(self.config["absolut_path"]).resolve() and
-                         result_file.get("state") == "succeeded" and
-                         result_file.get("metrics", {}).get("absolut_energy") == energy and
-                         all(worker.get(k) is not None for k in ("pid", "start", "boot_id")) and
-                         (base / "worker.log").is_file(), f"{eid}: real worker receipts differ")
-            for name in self.asset_names:
-                link = base / "absolut" / name
-                self.require(link.is_symlink() and link.resolve() == (self.root.parent / "absolut" / name).resolve(),
-                             f"{eid}: input link differs: {name}")
-        spans = [{"start": a["started_at"], "end": a["ended_at"]} for a in attempts]
+            self.problems.extend(scoring_attempt_problems(self.root, service, sequence, energy, linked, self.asset_names))
+        measured, _ = scoring_intervals(self.root, attempts)
+        spans = [{"start": a["started_at"], "end": a["ended_at"]} for a in measured]
         peak = peak_intervals(spans)
-        self.require(peak <= self.workers, "actual scoring concurrency exceeded the physical worker limit")
+        self.require(peak <= self.workers, "estimated scoring concurrency exceeded the physical worker limit")
         self.report["evaluations"] = {"unique_successful": len(self.observations), "attempts": len(attempts),
-                                      "peak_scoring_concurrency": peak}
+                                      "interrupted_attempts": sum(len(items) - 1 for items in by_attempt.values()),
+                                      "peak_estimated_scoring_concurrency": peak}
 
     def designs(self):
         from tasks.antibody.tools.structure_design.common import extract_h3
@@ -581,8 +795,16 @@ class StreamingAudit(Audit):
         peak_pending = peak_intervals(pending)
         self.require(peak_pending <= self.window, "evaluation window exceeded its maximum")
         attempts = self.es.rows("SELECT * FROM attempts ORDER BY started_at")
+        attempts, _ = scoring_intervals(self.root, attempts)
+        campaign = self.db.row("SELECT created_at FROM campaign WHERE singleton=1")
+        stopped = self.db.row("SELECT created_at FROM events WHERE type='campaign.stopped' ORDER BY seq DESC LIMIT 1")
+        if stopped is None:
+            raise ValueError("campaign has no completed stop event")
+        active = runner_intervals(self.root, read_json(self.root.parent / "launch.json"),
+                                  campaign["created_at"], stopped["created_at"])
+        generations = research_intervals(self.db, self.generations, active)
         problems, evidence = decision_timeline(self.decisions, self.experiments, self.observation_rows,
-                                                self.generations, attempts)
+                                                generations, attempts)
         self.problems.extend(problems)
         self.require(bool(evidence), "no result was ingested and used by a new decision during overlapping research")
         self._refreshed_decisions = {item["decision_id"] for item in evidence}
@@ -595,6 +817,8 @@ class StreamingAudit(Audit):
         from ldm_tts.async_runtime.selectors import decision_choice
 
         root = self.root / "policy_harness"
+        retries = policy_retry_results(self.root, self.db, self.generations)
+        self.report["policy_retry_attempts"] = {str(number): len(items) for number, items in retries.items() if items}
         manifest = read_json(root / "manifest.json")
         profiles, launch = manifest["profiles"], read_json(self.root.parent / "launch.json")
         self.require(manifest.get("model") == launch.get("model") and len(profiles) == 1 and
