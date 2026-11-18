@@ -417,12 +417,7 @@ class ExperimentService:
             return self._condition(r, "executor_unavailable")
         if r["attempt_state"] == "dispatching":
             return self._start(executor, r) if executor.capabilities.dispatch == "idempotent" else 0
-        ref, now = r["executor_ref"], self.clock.now()
-        limit = json.loads(r["limits"]).get("max_runtime_seconds")
-        if limit is not None and r["timeout_at"] is None and now >= r["attempt_started_at"] + limit:
-            deadline = r["attempt_started_at"] + limit
-            self._mark(r, "timeout_at", deadline)
-            r["timeout_at"] = deadline
+        ref = r["executor_ref"]
         try:
             status = executor.poll(ref)
             if not isinstance(status, AttemptStatus):
@@ -430,6 +425,14 @@ class ExperimentService:
         except Exception as exc:  # noqa: BLE001 - the ES does not know the attempt's state
             status = AttemptStatus.unreachable(f"poll failed: {type(exc).__name__}: {exc}")
         if not status.terminal:
+            # An attempt may have stopped while the service was offline. Do not
+            # infer a timeout from the time at which that stop is discovered.
+            now = self.clock.now()
+            limit = json.loads(r["limits"]).get("max_runtime_seconds")
+            if limit is not None and r["timeout_at"] is None and now >= r["attempt_started_at"] + limit:
+                deadline = r["attempt_started_at"] + limit
+                self._mark(r, "timeout_at", deadline)
+                r["timeout_at"] = deadline
             if self._stop_requested(r):
                 return self._advance_cancel(executor, r, status, now)
             return self._condition(r, "unreachable" if status.state == "unreachable" else None)
@@ -579,15 +582,16 @@ class ExperimentService:
     def _infra(self, executor, r, message, status=None):
         """Retry a confirmed infrastructure failure only while no stop has been requested."""
         if not self._stop_requested(r) and executor.capabilities.retry_safe and r["idx"] <= self.max_infra_retries:
-            retry = self._reserve_retry(r, message)
+            retry = self._reserve_retry(r, message, status)
             if retry is not None:
                 self._start(executor, retry)
                 return 1
         return self._finish(r, "FAILED", failure={"class": "infrastructure", "message": message}, status=status)
 
-    def _reserve_retry(self, r, message):
+    def _reserve_retry(self, r, message, status):
         now = self.clock.now()
-        outcome = canonical({"state": "failed", "failure_class": "infrastructure", "message": message})
+        outcome = canonical({"state": status.state if status is not None else "failed",
+                             "failure_class": "infrastructure", "message": message})
         with self.store.tx() as db:
             # HTTP can record cancellation while the scheduler is blocked in executor.poll().
             latest = db.execute("SELECT cancel_requested_at FROM experiments WHERE experiment_id=?",
@@ -621,13 +625,19 @@ class ExperimentService:
                 usage["reported"] = dict(status.usage)
             except (TypeError, ValueError):
                 usage["reported_invalid"] = True
-        outcome = {"state": status.state if status else "abandoned"}
-        if failure:
-            outcome.update(failure_class=failure["class"], message=failure.get("message"))
         with self.store.tx() as db:
-            current = db.execute("SELECT state FROM experiments WHERE experiment_id=?", (r["experiment_id"],)).fetchone()
+            current = db.execute("SELECT state, cancel_requested_at FROM experiments WHERE experiment_id=?",
+                                 (r["experiment_id"],)).fetchone()
             if current[0] != "RUNNING":
                 return 0
+            # Cancellation can arrive after the scheduler's row was read but
+            # before poll returned a stopped attempt. Honor it atomically.
+            if (status is not None and status.state == "stopped" and failure is not None and
+                    failure["class"] == "infrastructure" and current["cancel_requested_at"] is not None):
+                state, failure = "CANCELED", None
+            outcome = {"state": status.state if status else "abandoned"}
+            if failure:
+                outcome.update(failure_class=failure["class"], message=failure.get("message"))
             db.execute("UPDATE attempts SET state='ended', ended_at=?, outcome=? WHERE experiment_id=? AND idx=?",
                        (now, canonical(outcome), r["experiment_id"], r["idx"]))
             for a in artifacts:

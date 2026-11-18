@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from experiment_service import AttemptContext
+from experiment_service import AttemptContext, ExperimentService, VirtualClock
 from tasks.antibody_rfd3.core import experiments as exp
 
 
@@ -121,6 +121,100 @@ def test_result_is_separate_from_noisy_stdout_and_recoverable(tmp_path, monkeypa
     restarted = exp.AbsolutExecutor(worker.base, worker.work_dir, SPEC["antigen"], lambda _spec: [])
     assert restarted.find("campaign.d1.s0", 1) == ref
     assert restarted.poll(ref) == result
+
+
+def test_service_recovers_completed_and_shutdown_attempts_after_long_offline_gap(tmp_path, monkeypatch):
+    source, attempts = tmp_path / "inputs", tmp_path / "attempts"
+    source.mkdir()
+    prepare_assets(source)
+    processes, directories, alive, launches = {}, {}, {}, []
+
+    def spawn(command, **_kwargs):
+        directory = Path(command[-1])
+        process = FakeProcess(pid=1000 + len(launches))
+        processes[process.pid] = process
+        directories[process.pid] = directory
+        alive[process.pid] = True
+        launches.append(directory.name)
+        exp._write_json(directory / "worker.json", {"pid": process.pid, "start": 77, "boot_id": "boot"})
+        return process
+
+    def kill_group(pid, sig):
+        assert sig == signal.SIGTERM
+        exp._write_json(directories[pid] / "result.json", {"state": "stopped"})
+        processes[pid].returncode = -sig
+        alive[pid] = False
+
+    monkeypatch.setattr(exp.subprocess, "Popen", spawn)
+    monkeypatch.setattr(exp.os, "killpg", kill_group)
+    monkeypatch.setattr(exp, "_group_alive", lambda identity: alive[identity["pid"]])
+    clock = VirtualClock(start=1000)
+    database = tmp_path / "es.sqlite3"
+    worker = exp.AbsolutExecutor(source, attempts, SPEC["antigen"], lambda _spec: [])
+    assert worker.capabilities.retry_safe
+    service = ExperimentService(database, [worker], pools={"default": 4}, clock=clock)
+    names = ("complete", "interrupted", "canceled", "timeout")
+    try:
+        for name in names:
+            service.submit(name, {"campaign_id": "campaign", "kind": exp.KIND, "kind_version": exp.VERSION,
+                                  "spec": SPEC, "limits": {"max_runtime_seconds": 1 if name == "timeout" else 10}})
+        service.tick()
+        assert len(launches) == 4
+        clock.advance(1)
+        service.tick()  # Persist and send the timeout before shutting down.
+        assert service.store.row("SELECT timeout_at FROM attempts WHERE experiment_id='timeout'")["timeout_at"] == 1001
+        service.cancel("canceled")  # Persist an explicit cancel independently of executor shutdown.
+
+        complete_ref = worker._ref("complete", 1)
+        complete_dir = attempts / complete_ref
+        complete_pid = json.loads((complete_dir / "worker.json").read_text())["pid"]
+        exp._write_json(complete_dir / "result.json", {"state": "succeeded", "metrics": {"absolut_energy": -74.7}})
+        processes[complete_pid].returncode = 0
+        alive[complete_pid] = False
+    finally:
+        service.close()  # Stops the other unfinished process groups.
+
+    interrupted_ref = worker._ref("interrupted", 1)
+    interrupted_dir = attempts / interrupted_ref
+    evidence = {name: (interrupted_dir / name).read_bytes()
+                for name in ("request.json", "worker.json", "cancel.json", "result.json", "worker.log")}
+    assert json.loads(evidence["result.json"])["state"] == "stopped"
+
+    clock.advance(100)  # The old attempts' deadlines pass while ES is down.
+    recovered = exp.AbsolutExecutor(source, attempts, SPEC["antigen"], lambda _spec: [])
+    service = ExperimentService(database, [recovered], pools={"default": 4}, clock=clock)
+    try:
+        service.tick()
+        completed = service.get("complete")
+        assert completed["state"] == "SUCCEEDED" and completed["result"] == {"absolut_energy": -74.7}
+        assert [attempt["index"] for attempt in completed["attempts"]] == [1]
+
+        interrupted = service.get("interrupted")
+        assert interrupted["state"] == "RUNNING"
+        assert [attempt["index"] for attempt in interrupted["attempts"]] == [1, 2]
+        assert interrupted["attempts"][0]["outcome"] == {
+            "state": "stopped", "failure_class": "infrastructure",
+            "message": "executor stopped the attempt without a request"}
+        assert all((interrupted_dir / name).read_bytes() == data for name, data in evidence.items())
+
+        canceled = service.get("canceled")
+        assert canceled["state"] == "CANCELED" and len(canceled["attempts"]) == 1
+        timed_out = service.get("timeout")
+        assert timed_out["state"] == "FAILED" and timed_out["failure"]["class"] == "timeout"
+        assert len(timed_out["attempts"]) == 1
+        assert launches == [worker._ref(name, 1) for name in names] + [worker._ref("interrupted", 2)]
+
+        retry_dir = attempts / worker._ref("interrupted", 2)
+        retry_pid = json.loads((retry_dir / "worker.json").read_text())["pid"]
+        exp._write_json(retry_dir / "result.json", {"state": "succeeded", "metrics": {"absolut_energy": -71.2}})
+        processes[retry_pid].returncode = 0
+        alive[retry_pid] = False
+        service.tick()
+        result = service.get("interrupted")
+        assert result["state"] == "SUCCEEDED" and result["result"] == {"absolut_energy": -71.2}
+        assert [attempt["outcome"]["state"] for attempt in result["attempts"]] == ["stopped", "succeeded"]
+    finally:
+        service.close()
 
 
 def test_cancel_waits_for_process_group_and_escalates(tmp_path, monkeypatch):

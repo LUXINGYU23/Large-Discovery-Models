@@ -241,6 +241,52 @@ def test_cancel_during_poll_prevents_retrying_a_failed_attempt(tmp_path):
 
 
 @pytest.mark.parametrize("retry_safe", [True, False])
+def test_cancel_during_poll_of_a_stopped_attempt_is_honored(tmp_path, retry_safe):
+    clock = VirtualClock()
+
+    class StopsDuringCancel(SimulatedExecutor):
+        def poll(self, ref):
+            # The scheduler has read the attempt, but the stop and the HTTP
+            # cancellation both arrive before the poll completes.
+            assert service.cancel("active")[0] == 202
+            return AttemptStatus.stopped()
+
+    executor = StopsDuringCancel(clock, retry_safe=retry_safe)
+    service = open_service(tmp_path, [executor], clock)
+    try:
+        submit(service, "active", 1)
+        service.run_until_idle()
+        final = service.get("active")
+        assert final["state"] == "CANCELED" and final["failure"] is None
+        assert final["attempts"][0]["outcome"] == {"state": "stopped"}
+        assert executor.launches == [("active", 1)]
+    finally:
+        service.close()
+
+
+def test_unexpected_stop_discovered_after_offline_deadline_is_retried(tmp_path):
+    clock = VirtualClock()
+    executor = SimulatedExecutor(clock, duration=100, cancel_delay=0, retry_safe=True)
+    service = open_service(tmp_path, [executor], clock)
+    submit(service, "active", 1, limits={"max_runtime_seconds": 5})
+    service.run_until_idle()
+    executor.cancel("sim:active#1")  # Out-of-band stop, not an ES cancel request.
+    service.close()
+
+    clock.advance(10)
+    service = open_service(tmp_path, [executor], clock)
+    try:
+        service.tick()
+        active = service.get("active")
+        assert active["state"] == "RUNNING" and executor.launches == [("active", 1), ("active", 2)]
+        assert active["attempts"][0]["outcome"] == {
+            "state": "stopped", "failure_class": "infrastructure",
+            "message": "executor stopped the attempt without a request"}
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("retry_safe", [True, False])
 def test_infrastructure_failures_retry_only_when_declared(tmp_path, retry_safe):
     clock = VirtualClock()
     executor = SimulatedExecutor(clock, retry_safe=retry_safe,

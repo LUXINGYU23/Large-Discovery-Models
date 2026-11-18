@@ -248,7 +248,9 @@ class AbsolutExecutor:
     """External process groups with durable references and confirmed cancellation."""
 
     kind, kind_version = KIND, VERSION
-    capabilities = ExecutorCapabilities(cancel_running="cooperative", dispatch="lookup", retry_safe=False,
+    # Attempts use isolated workspaces and immutable inputs, so a confirmed
+    # infrastructure failure can be retried without repeating external effects.
+    capabilities = ExecutorCapabilities(cancel_running="cooperative", dispatch="lookup", retry_safe=True,
                                         in_process=False, cancel_idempotent=True)
 
     def __init__(self, base, work_dir, antigen, validate):
