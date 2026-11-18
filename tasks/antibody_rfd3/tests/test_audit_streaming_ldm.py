@@ -143,8 +143,8 @@ def test_efficiency_uses_persisted_events_and_complete_token_receipts(tmp_path):
                                       for role in ("explorer", "refiner", "evidence_reviewer")}}}
     connection = sqlite3.connect(root / "controller.sqlite3")
     connection.executescript("""
-        CREATE TABLE campaign(created_at REAL);
-        INSERT INTO campaign VALUES(0);
+        CREATE TABLE campaign(singleton INTEGER PRIMARY KEY, created_at REAL);
+        INSERT INTO campaign VALUES(1, 0);
         CREATE TABLE events(seq INTEGER, type TEXT, created_at REAL);
         INSERT INTO events VALUES(1, 'campaign.stopped', 20);
         CREATE TABLE generations(generation INTEGER, state TEXT, started_at REAL, finished_at REAL, outcome_json TEXT);
