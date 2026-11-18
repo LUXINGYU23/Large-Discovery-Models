@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import replace
+import importlib.util
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pytest
@@ -85,22 +87,42 @@ def test_feedback_uses_decision_and_candidate_not_duplicate_or_completion_order(
     assert found[("d000004", "a")]["measured_utility"] == 9.0
 
 
+POLICY_SOURCE = '''import numpy as np
+POLICY_API_VERSION = 1
+CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}
+
+def compute_prior_mean(history_features, history_utilities, query_features, context):
+    return query_features[:, 0] * 0.5
+
+def choose_ldm_weights(context):
+    count = context["optimization_progress"]["measured_count"]
+    feedback_count = context["prediction_feedback"]["summary"]["count"]
+    return {"stage": f"measured-{count}-feedback-{feedback_count}",
+            "alpha": 1.0 + count * 0.25, "eta": 1.0 + feedback_count * 0.5}
+'''
+
+
 class PolicyExecutor:
-    """Test-only deterministic executor; the production path remains Docker-isolated."""
+    """Test-only in-process runner for a fixed trusted artifact; production uses Docker."""
 
     def __init__(self):
         self.calls = []
+        path = Path(__file__).resolve().parents[3] / "harnesses/pi/policy_runner.py"
+        spec = importlib.util.spec_from_file_location("antibody_test_policy_runner", path)
+        self.runner = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = self.runner
+        spec.loader.exec_module(self.runner)
 
     def execute(self, artifact_path, input_directory, output_directory):
-        del artifact_path, output_directory
         input_directory = Path(input_directory)
         context = json.loads((input_directory / "input.json").read_text())
         self.calls.append((context.get("application", "validation"), context["round_index"]))
-        with np.load(input_directory / "arrays.npz", allow_pickle=False) as arrays:
-            history = np.asarray(arrays["history_features"])
-            query = np.asarray(arrays["query_features"])
-        return PolicyExecutionResult(history[:, 0] * 0.5, query[:, 0] * 0.5,
-                                     "test-policy", 1.5, 1.25, 0)
+        metadata = self.runner.execute_artifact(Path(artifact_path), input_directory, Path(output_directory))
+        with np.load(Path(output_directory) / "arrays.npz", allow_pickle=False) as arrays:
+            history = arrays["history_prior_mean"].copy()
+            query = arrays["query_prior_mean"].copy()
+        return PolicyExecutionResult(history, query, metadata["stage"], metadata["alpha"], metadata["eta"],
+                                     metadata["prior_clip_count"])
 
 
 class PolicyClient:
@@ -115,7 +137,7 @@ class PolicyClient:
         if turn.round_index == 1:
             path = self.root / "snapshots" / f"{turn.turn_id}.py"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("# Test executor supplies deterministic outputs.\n", encoding="utf-8")
+            path.write_text(POLICY_SOURCE, encoding="utf-8")
             descriptor = HarnessSubmittedArtifact(path_pointer="/artifact_path",
                 relative_path="optimization_policy.py", snapshot_path=path.relative_to(self.root).as_posix(),
                 sha256=file_sha256(path), size_bytes=path.stat().st_size)
@@ -155,6 +177,7 @@ class Lifecycle:
             dispatch_during_research="continue", research_timeout_seconds=100)
         self.config = CampaignConfig("policy-lifecycle", budget=8, concurrency=2, seed=42,
                                      extra=campaign_extra(self.pacing))
+        self.research_seconds = 2.0
         self.ctrl = None
 
     def open(self, faults=None):
@@ -166,7 +189,7 @@ class Lifecycle:
             prepare_turn=lambda round_input, info: prepare_policy_turn(selector, round_input, info))
         self.ctrl = PacedController(self.root / "controller.sqlite3", self.config,
             codec=AntibodyCodec("test", "mock", utility=True), client=ESClient(self.service.base_url),
-            clock=self.clock, research=self.panel, lane_executor=InlineExecutor(self.clock, 2.0),
+            clock=self.clock, research=self.panel, lane_executor=InlineExecutor(self.clock, self.research_seconds),
             selector=selector, policy=policy, faults=faults,
             objectives=ObjectiveSet.from_specs([ObjectiveSpec("mock_energy", "minimize")]),
             options=RuntimeOptions(anti_entropy_interval=20, long_poll_seconds=0))
@@ -243,6 +266,59 @@ def test_real_policy_prior_collects_decision_feedback_for_later_turns(lifecycle)
     assert len(checked) >= 2
     assert ctrl.policy.check() == []
     assert all(ctrl.audit(d["decision_id"]) == [] for d in ctrl.decisions())
+
+
+def test_application_weights_use_frozen_history_arriving_during_research(lifecycle):
+    rig = lifecycle
+    rig.research_seconds = 15.0
+    rig.pacing = PacingConfig.balanced(concurrency=2, reservoir_size=6, research_budget=10,
+        theta=1.0, dispatch_during_research="continue", research_timeout_seconds=100)
+    rig.config = CampaignConfig("policy-lifecycle", budget=8, concurrency=2, seed=42,
+                                extra=campaign_extra(rig.pacing))
+    ctrl = rig.open()
+    assert ctrl.policy.describe()["version"] == "2"
+    rig.drive()
+    generations = {g["generation"]: g for g in ctrl.generations()}
+    applications = ctrl.policy.applications()
+    initial = next(app for app in applications if app["generation"] == 1 and app["trigger"] == "generation")
+    assert initial["head_ingest_seq"] == 0
+    assert (initial["stage"], initial["alpha"], initial["eta"]) == ("measured-0-feedback-0", 1.0, 1.0)
+    advanced = [app for app in applications if app["trigger"] == "generation" and app["epoch_id"]
+                and app["head_ingest_seq"] > generations[app["generation"]]["base_ingest_seq"]]
+    assert advanced, "an evaluation must finish after a policy turn's frozen research baseline"
+    app = advanced[0]
+    index, head = app["generation"], app["head_ingest_seq"]
+    round_root = rig.root / "policy_harness" / "rounds" / f"round_{index:03d}"
+    round_input = json.loads((round_root / "input.json").read_text())
+    research_weights = round_input["execution_context"]["weight_context"]
+    assert research_weights["optimization_progress"]["measured_count"] < head
+    application_root = (rig.root / "controller.sqlite3.policy" / "applications" /
+                        app["input_digest"].split(":", 1)[1][:16])
+    app_input = json.loads((application_root / "input/input.json").read_text())
+    weights = app_input["execution_context"]["weight_context"]
+    frozen = {item.decision_id: item for item in ctrl.observations()
+              if item.metadata["ingest_seq"] <= head and item.evaluation.succeeded}
+    assert any(item.metadata["ingest_seq"] > head for item in ctrl.observations())
+    feedback = weights["prediction_feedback"]
+    assert weights["optimization_progress"]["measured_count"] == len(frozen) == head
+    assert feedback["summary"]["count"] == len(frozen)
+    assert {item["decision_id"] for item in feedback["measurements"]} == set(frozen)
+    for item in feedback["measurements"]:
+        observation = frozen[item["decision_id"]]
+        record, inputs, step = decision_choice(ctrl.store, int(item["decision_id"][1:]))
+        assert item["candidate_id"] == observation.candidate_id == record["predictions"][step]["candidate_id"]
+        assert item["application_id"] == inputs["prior_application_id"]
+        assert item["measured_utility"] == observation.metrics[ENERGY_UTILITY]
+    assert app["stage"] == f"measured-{len(frozen)}-feedback-{len(frozen)}"
+    assert app["alpha"] == 1.0 + len(frozen) * 0.25
+    assert app["eta"] == 1.0 + len(frozen) * 0.5
+    used = [decision for decision in ctrl.decisions()
+            if decision["snapshot"]["inputs"]["prior_application_id"] == app["application_id"]]
+    assert used, "a decision must use the updated application"
+    for decision in used:
+        parameters = decision["snapshot"]["record"]["selection"]["parameters"]
+        assert (parameters["alpha"], parameters["eta"]) == (app["alpha"], app["eta"])
+        assert ctrl.audit(decision["decision_id"]) == []
 
 
 @pytest.mark.parametrize("point", ["policy_turn.after_panel", "generation_end.after_commit"])

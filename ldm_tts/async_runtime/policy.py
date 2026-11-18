@@ -214,6 +214,19 @@ class PolicyPrior:
 
     # ---- policy turn (research job) ---------------------------------------------------------------------
 
+    def prediction_records(self, db, head: int) -> list[dict]:
+        """Decision-keyed predictions for successful observations through a frozen ingest head."""
+        feedback = []
+        for row in db.execute("SELECT decision_id FROM observations WHERE status='succeeded' AND ingest_seq <= ? "
+                              "ORDER BY ingest_seq", (head,)).fetchall():
+            record, inputs, step = decision_choice(self.store, row[0])
+            predictions = record.get("predictions") or []
+            if step < len(predictions):
+                feedback.append({"decision_id": decision_label(row[0]),
+                                 "application_id": inputs.get("prior_application_id"),
+                                 "predictions": [predictions[step]]})
+        return feedback
+
     def turn_extras(self, db, generation: int) -> dict:
         """Frozen at generation start (inside the round input file): the reservoir and pending candidates the turn
         will act on, the round baselines of earlier generations and decision-keyed prediction records."""
@@ -228,15 +241,7 @@ class PolicyPrior:
                    db.execute("SELECT candidate_json FROM experiments WHERE pending=1 ORDER BY decision_id").fetchall()]
         bases = [[r[0], r[1]] for r in
                  db.execute("SELECT generation, base_ingest_seq FROM generations ORDER BY generation").fetchall()]
-        feedback = []
-        for row in db.execute("SELECT decision_id FROM observations WHERE status='succeeded' ORDER BY ingest_seq"
-                              ).fetchall():
-            record, inputs, step = decision_choice(self.store, row[0])
-            predictions = record.get("predictions") or []
-            if step < len(predictions):
-                feedback.append({"decision_id": decision_label(row[0]),
-                                 "application_id": inputs.get("prior_application_id"),
-                                 "predictions": [predictions[step]]})
+        feedback = self.prediction_records(db, results_booked(db))
         return {"reservoir": reservoir, "pending": pending, "generation_bases": bases, "feedback": feedback}
 
     def research(self, inner, round_input, history) -> ResearchOutcome:
@@ -317,6 +322,11 @@ class PolicyPrior:
                                    "default_alpha": float(self.contract.default_alpha),
                                    "default_eta": float(self.contract.default_eta)}}
 
+    def application_context(self, generation: int, location: float, scale: float, *, history, head_ingest_seq: int,
+                            generation_bases, feedback) -> dict:
+        """Task hook for a context derived only from the application's frozen history and decisions."""
+        return self.context(generation, location, scale)
+
     def location_scale(self, rows) -> tuple[float, float]:
         """The authoritative GP's target standardization on these rows (the conversion constants of m_A); a GP
         that is not ready yet uses (mean, 1), which converts exactly as well and is never applied before it is."""
@@ -387,6 +397,11 @@ class PolicyPrior:
         with self.store.lock:
             db = self.store.db
             head = results_booked(db)
+            history = tuple(o for o in self.ledger.observations(0, head)
+                            if o.evaluation.succeeded and self.selector.objective_name in o.metrics)
+            bases = tuple(r[0] for r in db.execute(
+                "SELECT base_ingest_seq FROM generations ORDER BY generation").fetchall())
+            feedback = self.prediction_records(db, head)
             dedup = self.ledger.dedup_keys(db)
             live = self.keeper.live(db)
             occurrence_head = db.execute("SELECT COALESCE(MAX(id),0) FROM occurrences").fetchone()[0]
@@ -394,7 +409,7 @@ class PolicyPrior:
                 "SELECT candidate_json FROM experiments WHERE pending=1 ORDER BY decision_id").fetchall()]
             previous = db.execute("SELECT epoch_id, artifact_sha256, degraded FROM prior_applications "
                                   "ORDER BY seq DESC LIMIT 1").fetchone()
-        rows, keys = self.selector.training_rows(self.ledger.observations(0, head))
+        rows, keys = self.selector.training_rows(history)
         query: dict[str, Candidate] = {}
         for candidate in [*(o.candidate for _, o in live), *(p.candidate for p in proposals)]:
             if candidate.canonical_key not in dedup:
@@ -410,7 +425,8 @@ class PolicyPrior:
         else:
             epoch, artifact_sha, degraded = None, None, False
         utilities = [r.scalar_score for r in rows]
-        context = self.context(generation, location, scale)
+        context = self.application_context(generation, location, scale, history=history, head_ingest_seq=head,
+                                           generation_bases=bases, feedback=feedback)
         prepared = {"trigger": trigger, "generation": generation, "epoch_id": epoch, "artifact_sha256": artifact_sha,
                     "location": location, "scale": scale, "head_ingest_seq": head, "occurrence_head": occurrence_head,
                     "history_keys": keys, "query_keys": query_keys, "degraded": degraded, "error": None,

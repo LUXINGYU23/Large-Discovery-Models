@@ -8,14 +8,14 @@ from pathlib import Path
 
 import numpy as np
 
-from ldm_tts.async_runtime.policy import PolicyPrior
+from ldm_tts.async_runtime.policy import PolicyPrior, arrival_generations
 from ldm_tts.async_runtime.selectors import ReferenceSelector
 from ldm_tts.harness import (DockerPolicyExecutor, HarnessClient, HarnessLimits, HarnessProfile,
                              HarnessSubmissionError, PolicyCapabilityContract, PolicyResearchController,
                              directory_sha256, file_sha256, policy_submission_contract)
 from ldm_tts.harness.container import pi_sidecar_command, resolve_container_user
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime, policy_mcp_server
-from ldm_tts.harness.ucb_diagnostics import with_feedback
+from ldm_tts.harness.ucb_diagnostics import optimization_progress, prediction_feedback, with_feedback
 from ldm_tts.optimization.gp import RBFGPSurrogate
 from ldm_tts.optimization.pending import SelectionRule
 
@@ -74,6 +74,8 @@ class AntibodyPolicyAdapter:
 class AntibodyPolicyPrior(PolicyPrior):
     """Use the same utility and immutable feature contract in turns and applications."""
 
+    version = "2"
+
     def context(self, generation, location, scale):
         context = super().context(generation, location, scale)
         context["mean_context"].update({"feature_version": FEATURE_VERSION,
@@ -82,6 +84,19 @@ class AntibodyPolicyPrior(PolicyPrior):
         context["weight_context"].update({"objective": ENERGY_UTILITY,
             "target_definition": "energy_utility = -energy; maximize utility, equivalently minimize energy",
             "acquisition": "pending-aware upper confidence bound on utility"})
+        return context
+
+    def application_context(self, generation, location, scale, *, history, head_ingest_seq, generation_bases, feedback):
+        context = super().application_context(generation, location, scale, history=history,
+            head_ingest_seq=head_ingest_seq, generation_bases=generation_bases, feedback=feedback)
+        rounds = arrival_generations([o.metadata["ingest_seq"] for o in history],
+                                     [*generation_bases, head_ingest_seq])
+        utilities = [float(o.metrics[ENERGY_UTILITY]) for o in history]
+        context["weight_context"].update({
+            "optimization_progress": optimization_progress(rounds, utilities),
+            "prediction_feedback": prediction_feedback([o.candidate_id for o in history], rounds, utilities,
+                                                       feedback, [o.decision_id for o in history]),
+        })
         return context
 
 

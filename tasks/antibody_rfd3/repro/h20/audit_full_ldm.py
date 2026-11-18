@@ -9,6 +9,7 @@ tests when the corresponding events did not occur in the campaign.
 from __future__ import annotations
 
 import argparse
+from bisect import bisect_left
 from collections import Counter, defaultdict
 import hashlib
 import json
@@ -473,6 +474,11 @@ class Audit:
         self.require(bool(applications), "no frozen policy applications")
         self.require(not any(a["degraded"] for a in applications), "one or more policy applications degraded")
         self.problems.extend(check_prior_invariants(self.db, UTILITY))
+        application_contexts = []
+        for application in applications:
+            label = f"application {application['application_id']} context"
+            self.section(label, lambda a=application: application_contexts.append(
+                self.check_application_context(a, decision_choice)))
         epoch_manifests = {}
         rounds = []
         for row in self.generations:
@@ -609,10 +615,112 @@ class Audit:
         self.report["policy"] = {"rounds": rounds, "applications": len(applications),
             "verified_epochs": sorted(epoch_manifests), "used_epochs": sorted(used_epochs),
             "prior_fitted_decisions": prior_fitted_decisions, "pending_decisions": pending_decisions,
-            "pending_conditioned_decisions": pending_conditioned}
+            "pending_conditioned_decisions": pending_conditioned, "application_contexts": application_contexts}
         self.report["coverage"]["pending_at_decision_in_campaign"] = "exercised" if pending_decisions else "not_exercised"
         self.report["coverage"]["pending_conditioned_in_campaign"] = "exercised" if pending_conditioned else "not_exercised"
         self.replay_decisions(replay_inputs, by_id, PriorApplication)
+
+    def check_application_context(self, application, decision_choice):
+        """Match an execution-time context to the observations frozen at that application's head."""
+        aid, head = application["application_id"], application["head_ingest_seq"]
+        history_keys = read_json_value(application["history_keys_json"])
+        query_keys = read_json_value(application["query_keys_json"])
+        summary = {"application_id": aid, "head_ingest_seq": head, "context_checked": False}
+        # These applications do not call the artifact executor, so have no execution input to audit.
+        if application["prior_free"] or (not history_keys and not query_keys):
+            summary["reason"] = "no_artifact_execution"
+            return summary
+        digest = application["input_digest"]
+        if not digest.startswith("sha256:") or len(digest) != 71:
+            raise ValueError("invalid application input digest")
+        path = self.root / "controller.sqlite3.policy" / "applications" / digest[7:23] / "input"
+        document = read_json(path / "input.json")
+        self.require(document.get("round_index") == application["generation"] and
+                     document.get("application") == application["trigger"],
+                     f"application {aid}: execution input identity differs")
+        context = document.get("execution_context") or {}
+        weight = context.get("weight_context") or {}
+        progress, feedback = weight.get("optimization_progress"), weight.get("prediction_feedback")
+        if not isinstance(progress, dict) or not isinstance(feedback, dict):
+            self.require(False, f"application {aid}: weight context lacks frozen progress or prediction feedback")
+            return summary
+        mean = context.get("mean_context") or {}
+        self.require(mean.get("target_location") == application["location"] and
+                     mean.get("target_scale") == application["scale"],
+                     f"application {aid}: target standardization differs")
+        rows = self.db.rows("SELECT * FROM observations WHERE ingest_seq <= ? AND status='succeeded' "
+                            "ORDER BY ingest_seq", (head,))
+        observations = []
+        for row in rows:
+            observation = read_json_value(row["observation_json"])
+            if UTILITY in observation["evaluation"]["metrics"]:
+                observations.append((row, observation))
+        self.require([row["canonical_key"] for row, _ in observations] == history_keys,
+                     f"application {aid}: history keys differ from successful observations through head {head}")
+        self.require(progress.get("measured_count") == len(observations),
+                     f"application {aid}: measured_count differs from successful observations through head {head}")
+        with np.load(path / "arrays.npz", allow_pickle=False) as arrays:
+            features, utilities = arrays["history_features"], arrays["history_utilities"]
+            self.require(features.shape == (len(observations), 220) and utilities.shape == (len(observations),),
+                         f"application {aid}: frozen history arrays have incorrect shape")
+            for index, (_, observation) in enumerate(observations):
+                metrics = observation["evaluation"]["metrics"]
+                self.require(np.array_equal(features[index], onehot(observation["candidate"]["payload"]["sequence"])) and
+                             math.isclose(float(utilities[index]), metrics[UTILITY], rel_tol=0, abs_tol=1e-9),
+                             f"application {aid}: frozen feature or utility differs at history row {index}")
+        bases = [r["base_ingest_seq"] for r in self.generations if r["started_at"] <= application["created_at"]]
+        bases.append(head)
+        self.require(all(a <= b for a, b in zip(bases, bases[1:])),
+                     f"application {aid}: generation baselines are inconsistent with its frozen head")
+        grouped = defaultdict(list)
+        for row, observation in observations:
+            grouped[bisect_left(bases, row["ingest_seq"])].append(observation["evaluation"]["metrics"][UTILITY])
+        reported_rounds = progress.get("rounds")
+        self.require(isinstance(reported_rounds, list) and len(reported_rounds) == len(grouped),
+                     f"application {aid}: progress rounds do not match its frozen observations")
+        if isinstance(reported_rounds, list) and len(reported_rounds) == len(grouped):
+            best = None
+            for reported, (round_index, values) in zip(reported_rounds, sorted(grouped.items())):
+                current = max(values)
+                improvement = None if best is None else max(0.0, current - best)
+                best = current if best is None else max(best, current)
+                self.require(reported.get("round_index") == round_index and reported.get("count") == len(values) and
+                             math.isclose(reported.get("batch_best"), current, rel_tol=0, abs_tol=1e-9) and
+                             math.isclose(reported.get("batch_mean"), math.fsum(values) / len(values),
+                                          rel_tol=0, abs_tol=1e-9) and
+                             math.isclose(reported.get("best_so_far"), best, rel_tol=0, abs_tol=1e-9) and
+                             (reported.get("improvement") is None if improvement is None else
+                              math.isclose(reported.get("improvement"), improvement, rel_tol=0, abs_tol=1e-9)),
+                             f"application {aid}: progress for arrival generation {round_index} differs")
+        measurements = feedback.get("measurements")
+        if not isinstance(measurements, list):
+            self.require(False, f"application {aid}: prediction feedback measurements are missing")
+            return summary
+        by_decision = {item.get("decision_id"): item for item in measurements}
+        self.require(len(by_decision) == len(measurements) == len(observations) and
+                     (feedback.get("summary") or {}).get("count") == len(observations),
+                     f"application {aid}: prediction feedback does not match the frozen history count")
+        for row, observation in observations:
+            decision_id = observation["decision_id"]
+            matched = by_decision.get(decision_id)
+            record, inputs, step = decision_choice(self.db, row["decision_id"])
+            predictions = record.get("predictions") or []
+            if matched is None or step >= len(predictions):
+                self.require(False, f"application {aid}: missing prediction feedback for {decision_id}")
+                continue
+            prediction = predictions[step]
+            self.require(matched.get("candidate_id") == observation["candidate"]["candidate_id"] and
+                         matched.get("application_id") == inputs.get("prior_application_id") and
+                         matched.get("canonical_key") == row["canonical_key"] and
+                         matched.get("step") == prediction.get("step") and
+                         math.isclose(matched.get("measured_utility"), observation["evaluation"]["metrics"][UTILITY],
+                                      rel_tol=0, abs_tol=1e-9) and
+                         all(math.isclose(matched.get(field), prediction[field], rel_tol=0, abs_tol=1e-9) for field in
+                             ("active_mean", "active_std", "baseline_mean", "baseline_std", "q0",
+                              "selection_probability")),
+                         f"application {aid}: prediction feedback differs for {decision_id}")
+        summary.update(context_checked=True, measured_count=len(observations), feedback_count=len(measurements))
+        return summary
 
     def replay_decisions(self, replay_inputs, by_id, application_type):
         # The framework replay consumes immutable rows and frozen tables, never policy code.

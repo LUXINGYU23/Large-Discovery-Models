@@ -25,10 +25,13 @@ exactly `{"stage": string, "alpha": nonnegative finite number, "eta":
 nonnegative finite number}`. At selection the host samples with logits
 `alpha * log(q0) + eta * robust_z(utility_mean + beta * utility_std)` and
 conditions on pending experiments. The application context contains the
-generation, target definition and defaults; it does not contain the eventual
-reservoir's q0 or future measurements. Encode any justified research decision
-in the artifact. Avoid overinterpreting very small histories or selected-point
-feedback. Default weights are alpha 1 and eta 1.
+generation, target definition, defaults, `optimization_progress`, and
+decision-keyed `prediction_feedback`. These are frozen from observations
+available at that application, which may include results arriving after the
+research snapshot. Pending experiments are not measurements. The context does
+not contain the eventual reservoir's q0 or future measurements. Encode any
+justified research decision in the artifact. Avoid overinterpreting very small
+histories or selected-point feedback. Default weights are alpha 1 and eta 1.
 
 Use NumPy and the standard library only. Set `POLICY_API_VERSION = 1` and
 `CAPABILITIES = {"prior_mean": 1, "ldm_weights": 1}` for the two enabled
