@@ -99,8 +99,10 @@ score and reused the first backbone with ProteinMPNN. The GP compared two
 eligible submissions. The original run directories, including CIFs, full
 sequences and event logs, are under the H20 path recorded in the JSON.
 
-`tests/pi_transport_smoke.py <fresh-output-dir>` is a Linux integration check
-with a **scripted Responses provider**. It uses the real sidecar, real GPU tools
-and the mock oracle. It verifies that the skill was read and the second turn
-received the first measurement. Run a configured LLM endpoint for agent
-performance experiments.
+The full asynchronous panel is exercised by `repro/h20/run_full_ldm.py` and
+independently checked by `repro/h20/audit_full_ldm.py`. This uses the configured
+LLM endpoint, real generation, and HER2 Absolut scoring. See
+[`poc-full-ldm-harness.md`](../../docs/poc-full-ldm-harness.md) for the configuration
+and H20 preparation. Role budgets, history replay, pending conditioning and
+policy recovery also have provider-free tests under `tests/`; these tests are
+run on H20. The obsolete synchronous scripted-provider smoke has been removed.

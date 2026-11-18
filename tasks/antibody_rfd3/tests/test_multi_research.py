@@ -46,7 +46,7 @@ def test_own_candidates_and_catalog_are_enforced(tmp_path):
     args = panel_args()
     worker = DesignWorker(tmp_path, args)
     worker.round = 1
-    explorer_rows = worker.eligible(worker.execute("design_h3", 8, 0.5, profile_id="explorer"))
+    explorer_rows = worker.eligible(worker.execute("design_h3", 16, 0.5, profile_id="explorer"))
     own = explorer_rows[0]
     other = next(r for r in worker.execute("design_h3", 8, 0.5, profile_id="refiner") if not r["violations"])
     log = HistoryLog()
