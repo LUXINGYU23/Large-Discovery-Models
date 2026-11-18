@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ldm-es:contract:v1",
+  "title": "Experiment Service wire contract",
+  "description": "JSON bodies of the Experiment Service HTTP API (design 3.2, 3.9). Validated by experiment_service/contract/validator.py, which supports exactly the keywords used here (type, required, properties, enum, pattern, items, additionalProperties, minLength, minimum, local $ref). Request schemas describe what a client may send; the server ignores unknown request keys today, but they are not part of the contract. Response schemas are exact: every property is listed and additionalProperties is false, so the service and this file cannot drift apart silently.",
+  "x-contract-version": "1",
+  "x-conventions": {
+    "revision": "16-digit zero-padded decimal string; compare as text or as integer. Globally monotonic across campaigns, so values within one campaign are increasing but not contiguous.",
+    "cursor": "Same format as revision; '' (empty) as changed_after means 'from the beginning'. The cursor of a page is the revision of its last item, or the unchanged changed_after when the page is empty.",
+    "timestamp": "ISO 8601 UTC with microseconds and a '+00:00' suffix, taken from the ES clock.",
+    "experiment_not_found": "A GET of a well-formed but unknown experiment id answers 404 with content type application/problem+json and a body whose `type` is exactly 'urn:ldm-es:problem:experiment-not-found'. A 404 for an unknown route has `type` 'urn:ldm-es:problem:route-not-found'. Clients must dispatch on `type`, never on `title` or `detail`. A malformed experiment id is a 400, not a 404. An id that was canceled before it was ever submitted is a tombstone: GET answers 200 with tombstone=true.",
+    "problem_types": "about:blank for problems that have no dedicated type (the HTTP status is the discriminator); urn:ldm-es:problem:<name> for the stable identifiers listed in $defs/Problem."
+  },
+  "x-operations": {
+    "putExperiment": {
+      "method": "PUT", "path": "/v1/experiments/{experiment_id}", "request": "PutRequest",
+      "responses": {
+        "200": {"schema": "Experiment", "description": "duplicate request or tombstone"},
+        "201": {"schema": "Experiment", "headers": ["Location"], "description": "newly accepted"},
+        "409": {"schema": "Problem"}, "422": {"schema": "Problem"},
+        "429": {"schema": "Problem", "headers": ["Retry-After"]}
+      }
+    },
+    "getExperiment": {
+      "method": "GET", "path": "/v1/experiments/{experiment_id}",
+      "responses": {"200": {"schema": "Experiment"}, "404": {"schema": "Problem", "problemType": "urn:ldm-es:problem:experiment-not-found"}}
+    },
+    "listChanges": {
+      "method": "GET", "path": "/v1/experiments?campaign_id=&changed_after=&limit=&wait_seconds=",
+      "responses": {"200": {"schema": "ChangePage"}}
+    },
+    "cancelExperiment": {
+      "method": "POST", "path": "/v1/experiments/{experiment_id}:cancel", "request": "CancelRequest", "requestOptional": true,
+      "responses": {"200": {"schema": "Experiment"}, "202": {"schema": "Experiment", "description": "RUNNING: stop requested"}}
+    },
+    "getArtifact": {
+      "method": "GET", "path": "/v1/experiments/{experiment_id}/artifacts/{name}",
+      "responses": {"200": {"schema": null, "headers": ["ETag", "Content-Type"], "description": "raw bytes; ETag is \"sha256:<hex>\" of the content"},
+                    "404": {"schema": "Problem", "problemType": "urn:ldm-es:problem:artifact-not-found"}}
+    },
+    "listKinds": {
+      "method": "GET", "path": "/v1/kinds", "responses": {"200": {"schema": "KindList"}}
+    },
+    "getKind": {
+      "method": "GET", "path": "/v1/kinds/{kind}",
+      "responses": {"200": {"schema": "Kind"}, "404": {"schema": "Problem", "problemType": "urn:ldm-es:problem:kind-not-found"}}
+    },
+    "getContract": {
+      "method": "GET", "path": "/v1/contract", "responses": {"200": {"schema": null, "description": "this document, content type application/schema+json"}}
+    }
+  },
+  "x-common-errors": {
+    "400": "malformed request", "401": "missing or invalid bearer token (WWW-Authenticate: Bearer)", "404": "unknown route (type urn:ldm-es:problem:route-not-found) or the typed 404s of the operations",
+    "405": "method not allowed on a known route", "413": "request body too large", "500": "internal error", "503": "service shutting down"
+  },
+  "$defs": {
+    "ExperimentId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._~-]{0,199}$"},
+    "Revision": {"type": "string", "pattern": "^[0-9]{16}$"},
+    "Timestamp": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}\\+00:00$"},
+    "NullableTimestamp": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}\\+00:00$"},
+    "Digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "FailureClass": {"type": "string", "enum": ["infeasible", "execution_error", "timeout", "infrastructure"]},
+    "Limits": {
+      "type": ["object", "null"],
+      "properties": {"max_runtime_seconds": {"type": "number", "minimum": 0}},
+      "additionalProperties": false,
+      "description": "max_runtime_seconds must be a positive number, counted from the dispatch of each attempt. null/absent in a request means no limits; resources show {} for it (null only on a tombstone)."
+    },
+    "PutRequest": {
+      "type": "object",
+      "required": ["campaign_id", "kind", "kind_version", "spec"],
+      "properties": {
+        "campaign_id": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "kind_version": {"type": "string", "minLength": 1},
+        "spec": {"type": "object"},
+        "limits": {"$ref": "#/$defs/Limits"},
+        "client": {"type": ["object", "null"], "description": "opaque annotation echoed back; not part of the idempotency comparison"},
+        "spec_digest": {"$ref": "#/$defs/Digest"}
+      },
+      "additionalProperties": false
+    },
+    "CancelRequest": {
+      "type": "object",
+      "properties": {"campaign_id": {"type": "string", "minLength": 1}},
+      "additionalProperties": false,
+      "description": "The whole body is optional. Controllers should always send campaign_id so a tombstone appears in that campaign's change feed."
+    },
+    "Failure": {
+      "type": ["object", "null"],
+      "description": "set exactly when state is FAILED",
+      "required": ["class", "message"],
+      "properties": {"class": {"$ref": "#/$defs/FailureClass"}, "message": {"type": ["string", "null"]}},
+      "additionalProperties": false
+    },
+    "AttemptOutcome": {
+      "type": ["object", "null"],
+      "required": ["state"],
+      "properties": {
+        "state": {"type": "string", "enum": ["succeeded", "failed", "stopped", "abandoned"]},
+        "failure_class": {"$ref": "#/$defs/FailureClass"},
+        "message": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "Attempt": {
+      "type": "object",
+      "required": ["index", "executor_ref", "started_at", "ended_at", "outcome"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 1},
+        "executor_ref": {"type": ["string", "null"]},
+        "started_at": {"$ref": "#/$defs/Timestamp"},
+        "ended_at": {"$ref": "#/$defs/NullableTimestamp"},
+        "outcome": {"$ref": "#/$defs/AttemptOutcome"}
+      },
+      "additionalProperties": false
+    },
+    "ArtifactEntry": {
+      "type": "object",
+      "required": ["name", "media_type", "size", "sha256", "href"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "media_type": {"type": "string", "minLength": 1},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "href": {"type": "string", "pattern": "^/v1/experiments/[^/]+/artifacts/[^/]+$"}
+      },
+      "additionalProperties": false
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "pool": {"type": "string"}, "units": {"type": "integer", "minimum": 1},
+        "runtime_seconds": {"type": "number", "minimum": 0}, "unit_seconds": {"type": "number", "minimum": 0},
+        "reported": {"type": "object"}, "reported_invalid": {"type": "boolean"}
+      },
+      "additionalProperties": false,
+      "description": "{} until the experiment is terminal; then pool, units, runtime_seconds and unit_seconds are present (reported only when the executor reported usage)."
+    },
+    "Experiment": {
+      "type": "object",
+      "required": ["experiment_id", "campaign_id", "kind", "kind_version", "spec", "spec_digest", "limits", "client", "state",
+                   "revision", "tombstone", "accepted_at", "started_at", "finished_at", "cancel_requested_at", "condition",
+                   "attempts", "failure", "result", "result_digest", "artifacts", "usage"],
+      "properties": {
+        "experiment_id": {"$ref": "#/$defs/ExperimentId"},
+        "campaign_id": {"type": ["string", "null"], "description": "null only for a tombstone canceled without a campaign_id"},
+        "kind": {"type": ["string", "null"]},
+        "kind_version": {"type": ["string", "null"]},
+        "spec": {"type": ["object", "null"], "description": "null only for a tombstone"},
+        "spec_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "limits": {"$ref": "#/$defs/Limits"},
+        "client": {"type": ["object", "null"]},
+        "state": {"type": "string", "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELED"]},
+        "revision": {"$ref": "#/$defs/Revision"},
+        "tombstone": {"type": "boolean"},
+        "accepted_at": {"$ref": "#/$defs/NullableTimestamp"},
+        "started_at": {"$ref": "#/$defs/NullableTimestamp"},
+        "finished_at": {"$ref": "#/$defs/NullableTimestamp"},
+        "cancel_requested_at": {"$ref": "#/$defs/NullableTimestamp"},
+        "condition": {"type": ["string", "null"], "enum": [null, "unreachable", "dispatch_unconfirmed", "executor_unavailable",
+                      "cancel_unconfirmed", "cancel_pending"],
+                      "description": "Only while RUNNING. cancel_unconfirmed: delivery of a stop request is uncertain. cancel_pending: the executor acknowledged the request and has not reported a terminal outcome."},
+        "attempts": {"type": "array", "items": {"$ref": "#/$defs/Attempt"}},
+        "failure": {"$ref": "#/$defs/Failure"},
+        "result": {"type": ["object", "null"], "description": "set exactly when state is SUCCEEDED"},
+        "result_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "artifacts": {"type": "array", "items": {"$ref": "#/$defs/ArtifactEntry"}},
+        "usage": {"$ref": "#/$defs/Usage"}
+      },
+      "additionalProperties": false
+    },
+    "ChangePage": {
+      "type": "object",
+      "required": ["items", "cursor", "more"],
+      "properties": {
+        "items": {"type": "array", "items": {"$ref": "#/$defs/Experiment"}},
+        "cursor": {"$ref": "#/$defs/Revision"},
+        "more": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "Problem": {
+      "type": "object",
+      "required": ["type", "title", "status"],
+      "properties": {
+        "type": {"type": "string", "enum": ["about:blank", "urn:ldm-es:problem:experiment-not-found", "urn:ldm-es:problem:kind-not-found",
+                                            "urn:ldm-es:problem:artifact-not-found", "urn:ldm-es:problem:route-not-found"],
+                 "description": "Stable identifier. experiment-not-found: GET of an unknown experiment id (the id is well formed but was never submitted or canceled). kind-not-found: unknown kind in GET /v1/kinds/{kind}. artifact-not-found: no such artifact on the experiment (or the experiment is unknown). route-not-found: no such route."},
+        "title": {"type": "string"},
+        "status": {"type": "integer", "minimum": 400},
+        "detail": {"type": "string"},
+        "problems": {"type": "array", "items": {"type": ["string", "object"]}, "description": "422 only: validation problems of the spec or limits"}
+      },
+      "additionalProperties": false
+    },
+    "Capabilities": {
+      "type": "object",
+      "required": ["cancel_running", "dispatch", "retry_safe", "pool", "units", "in_process", "cancel_idempotent"],
+      "properties": {
+        "cancel_running": {"type": "string", "enum": ["none", "cooperative", "immediate"]},
+        "cancel_idempotent": {"type": "boolean", "description": "Repeating a stop request for the same executor reference is safe."},
+        "dispatch": {"type": "string", "enum": ["at_most_once", "lookup", "idempotent"]},
+        "retry_safe": {"type": "boolean"},
+        "pool": {"type": "string", "minLength": 1},
+        "units": {"type": "integer", "minimum": 1},
+        "in_process": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "Kind": {
+      "type": "object",
+      "required": ["kind", "kind_version", "capabilities", "pool", "schema"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "kind_version": {"type": "string", "minLength": 1},
+        "capabilities": {"$ref": "#/$defs/Capabilities"},
+        "pool": {"type": "object", "required": ["name", "capacity"],
+                 "properties": {"name": {"type": "string", "minLength": 1}, "capacity": {"type": "integer", "minimum": 1}},
+                 "additionalProperties": false},
+        "schema": {"type": ["object", "null"], "description": "optional executor-supplied description of spec and result; free-form"}
+      },
+      "additionalProperties": false
+    },
+    "KindList": {
+      "type": "object",
+      "required": ["kinds"],
+      "properties": {"kinds": {"type": "array", "items": {"$ref": "#/$defs/Kind"}}},
+      "additionalProperties": false
+    }
+  }
+}

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
-HARNESS_PROTOCOL_VERSION = "0.3.0"
+HARNESS_PROTOCOL_VERSION = "0.4.0"
 
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
@@ -333,6 +333,45 @@ class HarnessNetworkPolicy:
         }
 
 
+@dataclass(frozen=True)
+class HarnessHistoryConfig:
+    """Shared experiment-history component of the sidecar (design 5.8); absent means disabled."""
+
+    tool_name: str = "experiment_history"
+    fields: tuple[Mapping[str, Any], ...] = ()
+    objective: str | None = None
+    page_size_default: int = 20
+    page_size_max: int = 100
+    response_max_bytes: int = 32_768
+    inline_limit: int = 3
+    max_cas_retries: int = 2
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[a-z][a-z0-9_]*", self.tool_name) is None:
+            raise ValueError("harness history tool_name must be a lowercase identifier")
+        if not 1 <= self.page_size_default <= self.page_size_max or self.response_max_bytes < 1024:
+            raise ValueError("harness history page and byte limits are invalid")
+        if self.inline_limit < 0 or self.max_cas_retries < 0:
+            raise ValueError("harness history inline_limit and max_cas_retries must be non-negative")
+        try:
+            fields = tuple(json.loads(json.dumps(dict(item))) for item in self.fields)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("harness history fields must be JSON objects") from exc
+        object.__setattr__(self, "fields", fields)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "toolName": self.tool_name,
+            "fields": [dict(item) for item in self.fields],
+            "objective": self.objective,
+            "pageSizeDefault": self.page_size_default,
+            "pageSizeMax": self.page_size_max,
+            "responseMaxBytes": self.response_max_bytes,
+            "inlineLimit": self.inline_limit,
+            "maxCasRetries": self.max_cas_retries,
+        }
+
+
 @dataclass(frozen=True, kw_only=True)
 class HarnessPoolConfig:
     artifact_root: Path
@@ -343,8 +382,11 @@ class HarnessPoolConfig:
     seed: int
     submission_contract: HarnessSubmissionContract
     limits: HarnessLimits = field(default_factory=HarnessLimits)
+    history: HarnessHistoryConfig | None = None
 
     def __post_init__(self) -> None:
+        if self.history is not None and self.history.tool_name == self.submission_contract.tool_name:
+            raise ValueError("harness history tool conflicts with the terminal tool")
         if not self.campaign_id.strip() or not self.task_id.strip() or not self.case_id.strip():
             raise ValueError("harness campaign, task, and case identities are required")
         if isinstance(self.seed, bool) or self.seed < 0:
@@ -369,6 +411,7 @@ class HarnessPoolConfig:
             "profileSetSha256": self.profile_set_sha256,
             "profiles": [profile.to_dict() for profile in self.profiles],
             "limits": self.limits.to_dict(),
+            **({"history": self.history.to_dict()} if self.history is not None else {}),
         }
 
     def bootstrap_secrets(self) -> dict[str, str]:
@@ -505,6 +548,10 @@ class HarnessTurnResult:
     usage: dict[str, Any]
     tool_budget: dict[str, dict[str, int]]
     artifacts: dict[str, str]
+    visible_seq: int | None = None
+    # History protocol: ids of task messages (``task_message`` frames) that the persisted session shows were
+    # delivered to this turn between steps. They are hints, not history: no watermark, no validation effect.
+    task_messages: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -532,6 +579,10 @@ class HarnessSubmissionRequest:
     submission: Mapping[str, Any]
     artifacts: tuple[HarnessSubmittedArtifact, ...] = ()
     submission_digest: str | None = None
+    # With the history component: the session's visibility watermark and the watermark recorded for this
+    # attempt. A validator must be a pure function of the submission and ``history_seq`` (design 5.5 rule 3).
+    visible_seq: int | None = None
+    history_seq: int | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_id or not self.turn_id:
@@ -561,10 +612,13 @@ class HarnessSubmissionRequest:
 class HarnessSubmissionValidation:
     decision: Literal["accept", "retry", "reject_turn"] = "accept"
     errors: tuple[HarnessSubmissionError, ...] = ()
+    receipt: str = ""
 
     def __post_init__(self) -> None:
         if self.decision not in {"accept", "retry", "reject_turn"}:
             raise ValueError("unsupported harness submission decision")
+        if self.receipt and self.decision != "accept":
+            raise ValueError("only accepted harness submissions carry a receipt")
         if self.decision == "accept" and self.errors:
             raise ValueError("accepted harness submissions cannot contain errors")
         if self.decision != "accept" and not self.errors:
@@ -574,12 +628,14 @@ class HarnessSubmissionValidation:
         return {
             "decision": self.decision,
             "errors": [error.to_dict() for error in self.errors],
+            **({"receipt": self.receipt} if self.receipt else {}),
         }
 
 
 __all__ = [
     "HarnessError",
     "HarnessArtifactRule",
+    "HarnessHistoryConfig",
     "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",

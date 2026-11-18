@@ -20,6 +20,7 @@ from ldm_tts.harness.policy_execution import (
 from ldm_tts.harness.protocol import (
     HarnessError,
     HarnessArtifactRule,
+    HarnessHistoryConfig,
     HarnessLimits,
     HarnessMcpServer,
     HarnessMcpValue,
@@ -49,6 +50,7 @@ __all__ = [
     "HarnessArtifactRule",
     "HarnessClient",
     "HarnessError",
+    "HarnessHistoryConfig",
     "HarnessLimits",
     "HarnessMcpServer",
     "HarnessMcpValue",

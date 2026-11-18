@@ -51,7 +51,7 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count, temperature, backbone_id=None):
+    def execute(self, action, count, temperature, backbone_id=None, call_id=None):
         if action not in ("design_h3", "sequence_h3"):
             raise ValueError("Unknown generation action")
         if type(count) is not int or count < 1:
@@ -60,6 +60,24 @@ class DesignWorker:
             raise ValueError("temperature must be in [0.01,1]")
         if (action == "sequence_h3") != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
+        if call_id is not None and (not isinstance(call_id, str) or not call_id):
+            raise ValueError("call_id must be a non-empty string")
+        jobs = [row for row in self.records() if row["round"] == self.round]
+        if call_id is not None:
+            matches = [row for row in jobs if row.get("call_id") == call_id]
+            if len(matches) > 1:
+                raise RuntimeError("Repeated generation call ID in design receipts")
+            if matches:
+                receipt = matches[0]
+                fields = {"action": action, "count": count, "temperature": temperature,
+                          "requested_backbone_id": backbone_id}
+                if any(receipt.get(key) != value for key, value in fields.items()):
+                    raise RuntimeError("Generation call ID was reused with different parameters")
+                if receipt["status"] != "succeeded":
+                    raise RuntimeError("Generation outcome is not safely replayable; inspect its receipt")
+                return receipt["candidates"]
+            if any(row["status"] != "succeeded" for row in jobs):
+                raise RuntimeError("Generation has an unresolved or failed receipt; inspect it before retrying")
         if self.round == 0 and (action != "design_h3" or temperature != self.args.temperature or
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
             raise ValueError(f"Shared initialization uses design_h3, count={self.args.samples_per_call}, temperature={self.args.temperature}")
@@ -75,6 +93,7 @@ class DesignWorker:
         backbone = backbone_id or job.name
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature,
+                       call_id=call_id, requested_backbone_id=backbone_id,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
                        status="started")
         path = job / "receipt.json"

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from collections.abc import Mapping
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol, Sequence, runtime_checkable
 
 from ldm_tts.contracts import AcquisitionSpec, Candidate, Observation, SurrogateSpaceSpec
 
@@ -192,4 +193,118 @@ class AcquisitionSelector(Protocol):
         count: int = 1,
         round_idx: int = 0,
     ) -> BOSelectionResult:
+        ...
+
+
+@dataclass(frozen=True)
+class PendingExperiment:
+    """One in-flight experiment as seen by a selector.
+
+    PLANNED, QUEUED, RUNNING and cancel-requested experiments are conditioned on
+    identically; ``status`` is informational only.
+    """
+
+    candidate: Candidate
+    feature: SurrogateVector
+    status: str = "pending"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SelectionSeed:
+    """Seed material; step j draws from a stream derived from (campaign_seed, decision_id, j)."""
+
+    campaign_seed: int
+    decision_id: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.campaign_seed, bool) or not isinstance(self.campaign_seed, int):
+            raise ValueError("campaign_seed must be an integer")
+        if not str(self.decision_id).strip():
+            raise ValueError("decision_id must not be empty")
+
+
+@dataclass(frozen=True)
+class SelectionStep:
+    """Complete probability table of one conditional selection step.
+
+    Arrays are aligned with ``candidate_ids`` (the eligible set E_j); ``probability``
+    is pi_j and ``selected_probability`` is the step propensity pi_j(x_j).
+    """
+
+    index: int
+    candidate_ids: tuple[str, ...]
+    canonical_keys: tuple[str, ...]
+    pending_keys: tuple[str, ...]
+    mean: tuple[float, ...]
+    std: tuple[float, ...]
+    acquisition: tuple[float, ...]
+    normalized_acquisition: tuple[float, ...]
+    q0: tuple[float, ...]
+    probability: tuple[float, ...]
+    selected_candidate_id: str
+    selected_probability: float
+    uniform: float
+    beta: float
+    effective_sample_size: float
+    max_rho: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PendingAwareSelection:
+    """Ordered selections with per-step conditional propensities (no marginal claim)."""
+
+    selected_candidate_ids: tuple[str, ...]
+    steps: tuple[SelectionStep, ...]
+    parameters: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def log_propensity(self) -> float:
+        return float(sum(math.log(step.selected_probability) for step in self.steps))
+
+    @property
+    def propensity(self) -> float:
+        return math.exp(self.log_propensity)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**asdict(self), "log_propensity": self.log_propensity}
+
+
+@runtime_checkable
+class PendingAwareSelector(Protocol):
+    """Optional selector capability: condition on in-flight experiments.
+
+    ``describe().parameters["pending_handling"]`` declares how pending experiments are
+    treated. ``prior`` is a raw-unit prior table indexed by canonical key (one policy
+    application); ``q0`` is indexed by canonical key. Selectors lacking this protocol
+    keep working through :class:`AcquisitionSelector` with framework-level dedup only.
+    """
+
+    def describe(self) -> AcquisitionSpec:
+        ...
+
+    def fit(
+        self,
+        history: Sequence[BOObservation],
+        *,
+        history_keys: Sequence[str] | None = None,
+        prior: Mapping[str, float] | None = None,
+    ) -> None:
+        ...
+
+    def select_with_pending(
+        self,
+        candidates: Sequence[Candidate],
+        representations: Mapping[str, SurrogateVector],
+        *,
+        pending: Sequence[PendingExperiment],
+        seed: SelectionSeed,
+        count: int = 1,
+        q0: Mapping[str, float] | None = None,
+    ) -> PendingAwareSelection:
         ...

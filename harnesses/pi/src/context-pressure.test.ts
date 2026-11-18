@@ -106,7 +106,7 @@ test(`actual Pi SDK preserves/recalls evidence (SoL-Pi=${withSolPi}, pressure=${
 		const controller = new ContextPressureController(join(agentDir, "web-evidence"), 1000);
 		const path = `${WEB_EVIDENCE_GUEST}/${sha256(body)}.md`;
 		faux.setResponses([
-			fauxAssistantMessage(fauxToolCall("web_fetch", { url: "https://nature.com/paper" }), { stopReason: "toolUse" }),
+			fauxAssistantMessage(fauxToolCall("web_fetch", { url: "https://example.net/paper" }), { stopReason: "toolUse" }),
 			(context) => {
 				const web = context.messages.find((message) => message.role === "toolResult" && message.toolName === "web_fetch");
 				assert(web);

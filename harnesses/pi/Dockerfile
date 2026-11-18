@@ -1,11 +1,13 @@
 FROM node:24.7.0-bookworm-slim AS dependencies
 
 ARG NPM_REGISTRY=https://registry.npmjs.org
+# A commit SHA pins the build to the revision the lockfile was tested with; "main" follows upstream.
+ARG SOL_PI_REF=main
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY resolve-sol-pi.mjs ./
 # ADD revalidates this remote revision on each build; the image records its exact pair.
-ADD https://api.github.com/repos/NVlabs/SoL-Pi/commits/main /tmp/sol-pi-head.json
+ADD https://api.github.com/repos/NVlabs/SoL-Pi/commits/${SOL_PI_REF} /tmp/sol-pi-head.json
 RUN node resolve-sol-pi.mjs /tmp/sol-pi-head.json ${NPM_REGISTRY}
 RUN npm ci --registry=${NPM_REGISTRY}
 

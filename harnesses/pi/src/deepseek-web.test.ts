@@ -6,7 +6,7 @@ import type { NetworkPolicy } from "./protocol.js";
 import { EXTERNAL_WEB_CONTENT_NOTICE as notice } from "./vendor/deepseek-web/contract.js";
 
 const policy: NetworkPolicy = { allowedHosts: [], deniedHosts: [], forbiddenQueryPatterns: [] };
-const source = { title: "Paper", url: "https://nature.com/paper", snippet: "Short", date: "2026-10-18",
+const source = { title: "Paper", url: "https://example.net/paper", snippet: "Short", date: "2026-10-18",
 	summary: "Not for model", content: "Full page excluded", rerank_score: 2.4, authority: 3 };
 function execute(name: string, input: Record<string, unknown>, options: {
 	signal?: AbortSignal; policy?: NetworkPolicy; question?: string; key?: string;
@@ -30,15 +30,15 @@ test("official request projection and rendered sources omit API summaries and fu
 		assert.equal(init.redirect, "error");
 		assert.equal((init.headers as Record<string, string>).authorization, "Bearer search-secret");
 		assert.deepEqual(JSON.parse(init.body as string), {
-			query: "reaction design", count: 8, need_content: false, ori_question: "How does it work?",
+			query: "numeric optimization", count: 8, need_content: false, ori_question: "How does it work?",
 		});
-		return Response.json({ results: [source, { ...source, url: "https://blocked.nature.com/secret" },
+		return Response.json({ results: [source, { ...source, url: "https://blocked.example.net/secret" },
 			{ ...source, url: "https://other.org/paper" }] });
 	});
-	const result = await execute("web_search", { queries: ["reaction design"] }, {
-		question: "  How\n does it work? ", policy: { ...policy, allowedHosts: ["nature.com"], deniedHosts: ["blocked.nature.com"] },
+	const result = await execute("web_search", { queries: ["numeric optimization"] }, {
+		question: "  How\n does it work? ", policy: { ...policy, allowedHosts: ["example.net"], deniedHosts: ["blocked.example.net"] },
 	});
-	assert.equal(text(result), `${notice}\n\nSources:\n- [Paper](https://nature.com/paper) — Short (2026-10-18)\n\nCite the relevant URLs above as markdown links in your answer.`);
+	assert.equal(text(result), `${notice}\n\nSources:\n- [Paper](https://example.net/paper) — Short (2026-10-18)\n\nCite the relevant URLs above as markdown links in your answer.`);
 	assert.deepEqual(metadata(result), { sources: [{ title: "Paper", url: source.url, snippet: "Short", publishedAt: source.date }], truncated: false });
 });
 
@@ -52,12 +52,12 @@ test("queries run concurrently, exact duplicates collapse, merge is round-robin 
 		if (++calls === 2) release();
 		await bothStarted;
 		return Response.json({ results: Array.from({ length: 8 }, (_, i) => ({ ...source,
-			url: i === 0 ? "https://nature.com/shared" : `https://nature.com/${body.query}/${i}` })) });
+			url: i === 0 ? "https://example.net/shared" : `https://example.net/${body.query}/${i}` })) });
 	});
 	const result = await execute("web_search", { queries: ["a", "b", "a"] });
 	assert.equal(calls, 2);
 	assert.deepEqual((result.details as { sources: { url: string }[] }).sources.map((item) => item.url),
-		["shared", "a/1", "b/1", "a/2", "b/2", "a/3", "b/3", "a/4"].map((path) => `https://nature.com/${path}`));
+		["shared", "a/1", "b/1", "a/2", "b/2", "a/3", "b/3", "a/4"].map((path) => `https://example.net/${path}`));
 	assert.match(text(result), /Showing the first 8 sources/);
 });
 
@@ -87,10 +87,10 @@ test("schema and query-count errors never reach API; bound precedes deduplicatio
 		assert.doesNotThrow(() => validateToolCall(tools, { type: "toolCall", id: "valid", name: "web_search",
 			arguments: { queries: Array(count).fill("research") } }));
 	}
-	for (const url of [" ", "file:///etc/passwd", "https://user:pass@nature.com", "relative"]) {
+	for (const url of [" ", "file:///etc/passwd", "https://user:pass@example.net", "relative"]) {
 		await assert.rejects(execute("web_fetch", { url }));
 	}
-	await assert.rejects(execute("web_fetch", { url: source.url }, { policy: { ...policy, deniedHosts: ["nature.com"] } }));
+	await assert.rejects(execute("web_fetch", { url: source.url }, { policy: { ...policy, deniedHosts: ["example.net"] } }));
 	await assert.rejects(execute("web_search", { queries: ["a"] }, { key: "" }), /DEEPSEEK_API_KEY/);
 	await assert.rejects(execute("web_search", { queries: ["a"] }, { signal: AbortSignal.abort() }), /abort/i);
 	assert.equal(mock.mock.callCount(), 0);
@@ -174,7 +174,7 @@ test("malformed payloads fail while optional API fields are not required", async
 		mock.mock.restore();
 	}
 	t.mock.method(globalThis, "fetch", async () => Response.json({ results: [{ url: source.url, title: "", snippet: "", date: null }] }));
-	assert.match(text(await execute("web_search", { queries: ["a"] })), /\[nature.com\]/);
+	assert.match(text(await execute("web_search", { queries: ["a"] })), /\[example.net\]/);
 });
 
 test("fetch renders Markdown unchanged and caps the complete output including footer", async (t) => {

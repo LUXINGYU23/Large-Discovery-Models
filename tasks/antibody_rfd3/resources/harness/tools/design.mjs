@@ -1,7 +1,7 @@
 import { request } from "node:http";
 
-function generate(action, params) {
-  const body = JSON.stringify({action, ...params});
+function generate(action, params, callId) {
+  const body = JSON.stringify({action, ...params, call_id: callId});
   return new Promise((resolve, reject) => {
     const req = request({socketPath: "/worker/design.sock", path: "/", method: "POST",
       headers: {"Content-Length": Buffer.byteLength(body)}}, res => {
@@ -25,6 +25,6 @@ export default function register(pi) {
       ? "Generate a new RFD3 H3 backbone, then sample sequences on it."
       : "Sample ProteinMPNN sequences on a previously generated backbone.",
     parameters: {type: "object", properties, required: Object.keys(properties), additionalProperties: false},
-    execute: (_id, params) => generate(name, params)});
+    execute: (id, params) => generate(name, params, id)});
   }
 }

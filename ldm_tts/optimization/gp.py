@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Sequence
 
 import numpy as np
@@ -18,6 +19,23 @@ from ldm_tts.optimization.records import (
 from ldm_tts.contracts import AcquisitionSpec, Candidate
 
 
+@dataclass(frozen=True)
+class GPStandardization:
+    """Feature and target standardization constants of one authoritative GP fit."""
+
+    x_mean: tuple[float, ...]
+    x_std: tuple[float, ...]
+    y_mean: float
+    y_std: float
+
+    def __post_init__(self) -> None:
+        values = (*self.x_mean, *self.x_std, self.y_mean, self.y_std)
+        if (len(self.x_mean) != len(self.x_std) or not self.x_mean
+                or not all(math.isfinite(value) for value in values)
+                or min(self.x_std) <= 0 or self.y_std <= 0):
+            raise ValueError("GP standardization must be finite with positive scales")
+
+
 class RBFGPSurrogate:
     """Standardized exact GP with a stable prior/fallback for sparse history.
 
@@ -25,6 +43,8 @@ class RBFGPSurrogate:
     of the residual mean. None floors use std-plus-epsilon scaling;
     explicit floors use max(measured std, floor).
     """
+
+    JITTER = 1.0e-8
 
     def __init__(
         self,
@@ -39,7 +59,13 @@ class RBFGPSurrogate:
         min_training_observations: int = 2,
         feature_scale_floor: float | None = None,
         target_scale_floor: float | None = None,
+        standardization: GPStandardization | None = None,
     ) -> None:
+        """``standardization`` freezes the scaling constants instead of recomputing them.
+
+        It is the construction path for temporary models (Kriging Believer): the
+        constants of the authoritative fit are reused so added rows cannot rescale it.
+        """
         self.observations = list(observations)
         for item in self.observations:
             if len(item.objectives) != 1:
@@ -69,6 +95,8 @@ class RBFGPSurrogate:
             or not np.isfinite(self.residual_prior_mean).all()
         ):
             raise ValueError("residual prior must align with finite measured history")
+        self.frozen_standardization = standardization
+        self.fantasy_count = 0
         self.ready = False
         self.fit_status = "prior" if not observations else "fallback"
         self._fit()
@@ -81,22 +109,30 @@ class RBFGPSurrogate:
             raise ValueError("GP observations have inconsistent feature dimensions")
         self.X = np.asarray([item.feature_vector for item in self.observations], dtype=float)
         self.y = np.asarray([item.scalar_score for item in self.observations], dtype=float)
-        self.x_mean = self.X.mean(axis=0)
-        self.x_std = self.X.std(axis=0) + 1.0e-8
-        if self.feature_scale_floor is not None:
-            self.x_std = np.maximum(self.X.std(axis=0), self.feature_scale_floor)
+        frozen = self.frozen_standardization
+        if frozen is None:
+            self.x_mean = self.X.mean(axis=0)
+            self.x_std = self.X.std(axis=0) + 1.0e-8
+            if self.feature_scale_floor is not None:
+                self.x_std = np.maximum(self.X.std(axis=0), self.feature_scale_floor)
+            self.y_mean = float(self.y.mean())
+            self.y_std = float(self.y.std() + 1.0e-9)
+            if self.target_scale_floor is not None:
+                self.y_std = max(float(self.y.std()), self.target_scale_floor)
+        else:
+            if len(frozen.x_mean) != self.X.shape[1]:
+                raise ValueError("frozen GP standardization does not match feature dimension")
+            self.x_mean = np.asarray(frozen.x_mean, dtype=float)
+            self.x_std = np.asarray(frozen.x_std, dtype=float)
+            self.y_mean, self.y_std = float(frozen.y_mean), float(frozen.y_std)
         self.Xz = (self.X - self.x_mean) / self.x_std
-        self.y_mean = float(self.y.mean())
-        self.y_std = float(self.y.std() + 1.0e-9)
-        if self.target_scale_floor is not None:
-            self.y_std = max(float(self.y.std()), self.target_scale_floor)
         yz = (self.y - self.y_mean) / self.y_std
         if self.residual_prior_mean is not None:
             yz = yz - self.residual_prior_mean
         kernel = _rbf_kernel(self.Xz, self.Xz, self.lengthscale)
         kernel = kernel + self.noise * np.eye(len(self.Xz))
         try:
-            self.L = np.linalg.cholesky(kernel + 1.0e-8 * np.eye(len(self.Xz)))
+            self.L = np.linalg.cholesky(kernel + self.JITTER * np.eye(len(self.Xz)))
             self.alpha = np.linalg.solve(self.L.T, np.linalg.solve(self.L, yz))
         except np.linalg.LinAlgError:
             return
@@ -161,9 +197,78 @@ class RBFGPSurrogate:
             "location_scale": np.asarray([self.y_mean, self.y_std]),
         }
 
+    @property
+    def observation_noise(self) -> float:
+        """Diagonal added to each training row (noise plus jitter), in latent units."""
+        return self.noise + self.JITTER
+
+    def standardization(self) -> GPStandardization:
+        if not self.ready:
+            raise ValueError("standardization requires a fitted GP")
+        return GPStandardization(
+            tuple(float(v) for v in self.x_mean), tuple(float(v) for v in self.x_std),
+            float(self.y_mean), float(self.y_std),
+        )
+
+    def latent_posterior(self, vectors) -> tuple[np.ndarray, np.ndarray]:
+        """Residual latent mean and joint covariance in standardized target units."""
+        qz = (self._query(vectors) - self.x_mean) / self.x_std
+        cross = _rbf_kernel(qz, self.Xz, self.lengthscale)
+        v = np.linalg.solve(self.L, cross.T)
+        return cross @ self.alpha, _rbf_kernel(qz, qz, self.lengthscale) - v.T @ v
+
+    def with_fantasies(self, vectors, *, query_prior_means=None) -> "RBFGPSurrogate":
+        """Kriging Believer temporary model: fantasies at the current posterior mean.
+
+        Kernel, noise and standardization are frozen, so by the zero-innovation
+        argument the mean is unchanged and the variance shrinks by a Schur complement.
+        Fantasy rows exist only in the returned object and are excluded from summary().
+        """
+        query = self._query(vectors)
+        prior = np.zeros(len(query)) if query_prior_means is None else np.asarray(query_prior_means, dtype=float)
+        if prior.shape != (len(query),) or not np.isfinite(prior).all():
+            raise ValueError("fantasy priors must align with finite fantasy features")
+        if prior.any() and self.residual_prior_mean is None:
+            raise ValueError("query prior requires a fitted residual GP")
+        mean_z, _ = self.latent_posterior(query)
+        fantasies = [
+            BOObservation.scalar(
+                f"fantasy:{self.fantasy_count + index}", self.y_mean + self.y_std * (p + m), vector,
+                feature_version=self.feature_version, metadata={"fantasy": True},
+            )
+            for index, (vector, p, m) in enumerate(zip(query.tolist(), prior, mean_z))
+        ]
+        model = RBFGPSurrogate(
+            self.observations + fantasies,
+            lengthscale=self.lengthscale,
+            noise=self.noise,
+            prior_mean=self.prior_mean,
+            prior_std=self.prior_std,
+            feature_version=self.feature_version,
+            residual_prior_mean=(
+                None if self.residual_prior_mean is None
+                else np.concatenate([self.residual_prior_mean, prior])
+            ),
+            min_training_observations=self.min_training_observations,
+            feature_scale_floor=self.feature_scale_floor,
+            target_scale_floor=self.target_scale_floor,
+            standardization=self.standardization(),
+        )
+        model.fantasy_count = self.fantasy_count + len(fantasies)
+        return model
+
+    def _query(self, vectors) -> np.ndarray:
+        query = np.asarray(vectors, dtype=float)
+        if not self.ready:
+            raise ValueError("posterior queries require a fitted GP")
+        if query.ndim != 2 or query.shape[1] != self.X.shape[1] or not np.isfinite(query).all():
+            raise ValueError("posterior queries must align with finite GP features")
+        return query
+
     def summary(self) -> dict[str, Any]:
-        scores = [item.scalar_score for item in self.observations]
-        return {
+        measured = self.observations[:len(self.observations) - self.fantasy_count]
+        scores = [item.scalar_score for item in measured]
+        summary = {
             "feature_version": self.feature_version,
             "fit_status": self.fit_status,
             "ready": self.ready,
@@ -171,6 +276,9 @@ class RBFGPSurrogate:
             "best_observed": max(scores) if scores else None,
             "mean_observed": float(np.mean(scores)) if scores else None,
         }
+        if self.fantasy_count:
+            summary["fantasy_count"] = self.fantasy_count
+        return summary
 
 
 class RBFGPUCBSelector:
@@ -285,6 +393,7 @@ def _rbf_kernel(left: np.ndarray, right: np.ndarray, lengthscale: float) -> np.n
 
 
 __all__ = [
+    "GPStandardization",
     "RBFGPUCBSelector",
     "RBFGPSurrogate",
     "select_max_ucb_record",

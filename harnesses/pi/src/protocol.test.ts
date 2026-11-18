@@ -37,13 +37,13 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		model: "model",
 		thinking: "max",
 		providerRequestBody: { temperature: 0.5, reasoning: { effort: "max" } },
-		taskId: "synthonbench",
+		taskId: "numeric-search",
 		caseId: "surrogate:1M:kif11",
 		seed: 1,
 		submissionContractJson,
 		submissionContractSha256: sha256(submissionContractJson),
 		guestRuntime: {
-			imageRef: "ldm/synthonbench-research:aaaaaaaaaaaa",
+			imageRef: "ldm/numeric-search-research:aaaaaaaaaaaa",
 			recipeSha256: "a".repeat(64),
 			rootfsSize: "8G",
 			installPolicy: "session_overlay",
@@ -71,7 +71,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 			tools: ["search"],
 			configSha256: "d".repeat(64),
 		}],
-		networkPolicy: { allowedHosts: ["pubmed.ncbi.nlm.nih.gov"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
+		networkPolicy: { allowedHosts: ["docs.example.org"], deniedHosts: ["example.invalid"], forbiddenQueryPatterns: ["benchmark score"] },
 		limits: { wallTimeSeconds: 60, toolCallBudgets: { web_search: 4 } },
 		context7Enabled: true,
 	};
@@ -81,7 +81,7 @@ test("parseFrame accepts the explicit responses configuration", () => {
 		assert.equal(frame.thinking, "max");
 		assert.deepEqual(frame.providerRequestBody, { temperature: 0.5, reasoning: { effort: "max" } });
 		assert.deepEqual(frame.submissionContract, submissionContract);
-		assert.equal(frame.guestRuntime.imageRef, "ldm/synthonbench-research:aaaaaaaaaaaa");
+		assert.equal(frame.guestRuntime.imageRef, "ldm/numeric-search-research:aaaaaaaaaaaa");
 		assert.equal(frame.mcpServers[0]?.serverId, "literature");
 	}
 	const { providerRequestBody: _options, ...withoutOptions } = input;
@@ -136,7 +136,7 @@ test("parseFrame rejects a submission contract with a changed digest", () => {
 			},
 			profileSetSha256: "c".repeat(64),
 			profiles: [{
-				profileId: "chemist",
+				profileId: "researcher",
 				agentsPath: "/resources/AGENTS.md",
 				agentsSha256: "a".repeat(64),
 				skillDirs: [],

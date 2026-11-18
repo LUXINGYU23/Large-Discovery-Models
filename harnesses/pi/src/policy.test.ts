@@ -8,8 +8,8 @@ import { assertAllowedUrl, PolicyController } from "./policy.js";
 import { httpError } from "./web-runtime.js";
 
 const networkPolicy = {
-	allowedHosts: ["nih.gov", "nature.com"],
-	deniedHosts: ["blocked.nih.gov"],
+	allowedHosts: ["example.org", "example.net"],
+	deniedHosts: ["blocked.example.org"],
 	forbiddenQueryPatterns: [],
 };
 
@@ -40,8 +40,8 @@ function call(toolName: string, input: Record<string, unknown> = {}): ToolCallEv
 }
 
 test("URL policy allows declared domains and rejects unsafe URLs", () => {
-	assert.doesNotThrow(() => assertAllowedUrl("https://pubmed.ncbi.nlm.nih.gov/123", networkPolicy));
-	assert.throws(() => assertAllowedUrl("https://blocked.nih.gov/private", networkPolicy));
+	assert.doesNotThrow(() => assertAllowedUrl("https://docs.example.org/123", networkPolicy));
+	assert.throws(() => assertAllowedUrl("https://blocked.example.org/private", networkPolicy));
 	assert.throws(() => assertAllowedUrl("https://example.com", networkPolicy));
 	assert.throws(() => assertAllowedUrl("/mnt/data/oracle.csv", networkPolicy));
 });
@@ -51,13 +51,13 @@ test("network policy filters search results", async () => {
 	const owner = controller();
 	const ownerHandlers = policyHandlers(owner);
 	try {
-		await owner.begin(["synthonbench"], join(root, "owner.json"));
+		await owner.begin(["numeric-search"], join(root, "owner.json"));
 		const hidden = await ownerHandlers.result({
 			type: "tool_result",
 			toolCallId: "hidden",
 			toolName: "web_search",
-			input: { queries: ["reaction design"] },
-			content: [{ type: "text", text: "Hidden SynthonBench answer" }],
+			input: { queries: ["numeric optimization"] },
+			content: [{ type: "text", text: "Hidden numeric-search answer" }],
 			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
@@ -67,8 +67,8 @@ test("network policy filters search results", async () => {
 			type: "tool_result",
 			toolCallId: "allowed",
 			toolName: "web_search",
-			input: { queries: ["reaction design"] },
-			content: [{ type: "text", text: "https://www.nature.com/articles/example" }],
+			input: { queries: ["numeric optimization"] },
+			content: [{ type: "text", text: "https://www.example.net/articles/example" }],
 			details: { provider: "deepseek" },
 			isError: false,
 		} as ToolResultEvent);
@@ -100,18 +100,18 @@ test("invalid search inputs are rejected before usage is reserved", async () => 
 	try {
 		await subject.begin(["forbidden-original-question", "private benchmark"], join(root, "budget.json"));
 		const rejected = await handlers.call(call("web_search", {
-			queries: ["reaction design", "forbidden-original-question"],
+			queries: ["numeric optimization", "forbidden-original-question"],
 		}));
 		assert.equal(rejected?.block, true);
 		assert.match(rejected?.reason ?? "", /benchmark identifier/);
 		assert.equal(subject.snapshot().toolCalls.web_search, undefined);
 
-		assert.equal(subject.searchContext("reaction design"), "reaction design");
+		assert.equal(subject.searchContext("numeric optimization"), "numeric optimization");
 		assert.equal(subject.searchContext("forbidden-original-question"), undefined);
 		assert.equal(subject.searchContext("private\nbenchmark"), undefined);
-		const allowed = call("web_search", { queries: ["reaction design"] });
+		const allowed = call("web_search", { queries: ["numeric optimization"] });
 		assert.equal(await handlers.call(allowed), undefined);
-		assert.deepEqual(allowed.input, { queries: ["reaction design"] });
+		assert.deepEqual(allowed.input, { queries: ["numeric optimization"] });
 	} finally {
 		subject.end();
 		await rm(root, { recursive: true, force: true });

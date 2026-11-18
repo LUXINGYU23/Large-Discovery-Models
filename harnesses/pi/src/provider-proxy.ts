@@ -2,10 +2,10 @@ import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage,
 import { request as httpsRequest } from "node:https";
 import { createServer, type Server } from "node:http";
 import { createHash } from "node:crypto";
-import { readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Redactor, TraceWriter, safeHeaders, sha256 } from "./trace.js";
-import type { ProviderAuthorizer } from "./protocol.js";
+import type { ProviderAuthorizer, ProviderTokens } from "./protocol.js";
 
 interface ActiveTurn {
 	profileId: string;
@@ -21,6 +21,7 @@ interface ActiveTurn {
 export interface ProviderTurnSummary {
 	providerCalls: number;
 	artifactBytes: number;
+	tokens: ProviderTokens;
 }
 
 function joinTargetUrl(baseUrl: URL, suffix: string, search: string): URL {
@@ -104,15 +105,17 @@ export class ProviderProxy {
 
 	async recoveredTurnSummary(turnRoot: string, turnId: string): Promise<ProviderTurnSummary> {
 		const recovered = await existingTrace(turnRoot, turnId);
-		return { providerCalls: recovered.authorizedCount, artifactBytes: recovered.artifactBytes };
+		return { providerCalls: recovered.authorizedCount, artifactBytes: recovered.artifactBytes,
+			tokens: await providerTokens(turnRoot, turnId) };
 	}
 
 	async endTurn(profileId: string): Promise<ProviderTurnSummary> {
 		const active = this.activeTurns.get(profileId);
-		if (!active) return { providerCalls: 0, artifactBytes: 0 };
+		if (!active) return { providerCalls: 0, artifactBytes: 0, tokens: zeroTokens() };
 		this.activeTurns.delete(profileId);
 		await active.trace.flush();
-		return { providerCalls: active.authorizedCount, artifactBytes: active.trace.bytes };
+		return { providerCalls: active.authorizedCount, artifactBytes: active.trace.bytes,
+			tokens: await providerTokens(active.turnRoot, active.turnId) };
 	}
 
 	async close(): Promise<void> {
@@ -277,6 +280,62 @@ export class ProviderProxy {
 			else response.destroy(error as Error);
 		}
 	}
+}
+
+export function zeroTokens(): ProviderTokens {
+	return { input: 0, cachedInput: 0, output: 0, reasoning: 0 };
+}
+
+function count(value: unknown): number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+/** The ``usage`` of a Responses API body: the terminal stream event (or a plain JSON response) carries it. */
+export function responseTokens(body: string): ProviderTokens {
+	const tokens = zeroTokens();
+	const payloads = body.includes("\ndata:") || body.startsWith("data:") || body.startsWith("event:")
+		? body.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim())
+		: [body];
+	let usage: Record<string, unknown> | undefined;
+	for (const text of payloads) {
+		if (!text.includes("\"usage\"")) continue;
+		try {
+			const value = JSON.parse(text) as { usage?: unknown; response?: { usage?: unknown } };
+			const candidate = value.response?.usage ?? value.usage;
+			if (candidate && typeof candidate === "object") usage = candidate as Record<string, unknown>;
+		} catch {
+			// A truncated or non-JSON chunk carries no usable count.
+		}
+	}
+	if (!usage) return tokens;
+	const input = usage.input_tokens_details as Record<string, unknown> | undefined;
+	const output = usage.output_tokens_details as Record<string, unknown> | undefined;
+	tokens.input = count(usage.input_tokens);
+	tokens.cachedInput = count(input?.cached_tokens);
+	tokens.output = count(usage.output_tokens);
+	tokens.reasoning = count(output?.reasoning_tokens);
+	return tokens;
+}
+
+/** Summed from the persisted responses, so a recovered turn reports the same counts as the live one. */
+async function providerTokens(turnRoot: string, turnId: string): Promise<ProviderTokens> {
+	const total = zeroTokens();
+	const providerRoot = join(turnRoot, "provider");
+	let names: string[] = [];
+	try {
+		names = await readdir(providerRoot);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+	}
+	for (const name of names) {
+		if (!name.startsWith(`${turnId}-provider-`) || !name.endsWith(".response.bin")) continue;
+		const tokens = responseTokens(await readFile(join(providerRoot, name), "utf8"));
+		total.input += tokens.input;
+		total.cachedInput += tokens.cachedInput;
+		total.output += tokens.output;
+		total.reasoning += tokens.reasoning;
+	}
+	return total;
 }
 
 async function existingTrace(turnRoot: string, turnId: string): Promise<{

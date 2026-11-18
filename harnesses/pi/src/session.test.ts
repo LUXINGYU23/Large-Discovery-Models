@@ -2,18 +2,58 @@ import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
 import test from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PiSessionPool, PersistentProfileSession } from "./session.js";
 import { TurnExecutionError } from "./protocol.js";
 import { HistoryController, HistoryRecoveryError } from "./history.js";
+import { canonicalJson, sha256 } from "./trace.js";
+
+test("history recovery orders same-round commits and rejects corrupt chains", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-history-cursor-"));
+	const profile = Object.assign(Object.create(PersistentProfileSession.prototype), {
+		config: { artifactRoot: root }, profile: { profileId: "research" },
+	}) as { recoverHistoryCursor(): Promise<number> };
+	const body = "verified artifact";
+	const artifact = { pathPointer: "/artifact", relativePath: "artifact.txt", snapshotPath: "artifact.txt", sha256: sha256(body), sizeBytes: Buffer.byteLength(body) };
+	const submission = { artifact: "artifact.txt" };
+	const submissionJson = canonicalJson({ artifacts: [artifact], submission });
+	const record = { profileId: "research", roundIndex: 1, submissionStatus: "accepted", submission,
+		submittedArtifacts: [artifact], validationErrors: [], submissionJson, submissionDigest: sha256(submissionJson) };
+	const run = async (chain: Array<[number, number, number]>, expected: number | RegExp, corrupt = false) => {
+		await rm(join(root, "turns"), { recursive: true, force: true });
+		// Reverse names ensure directory enumeration cannot determine chain order.
+		for (const [index, [roundIndex, historyFromSeq, historyToSeq]] of chain.entries()) {
+			const dir = join(root, "turns", String(chain.length - index).padStart(3, "0"));
+			await mkdir(dir, { recursive: true });
+			await writeFile(join(dir, "turn_committed.json"), JSON.stringify({ ...record, roundIndex, historyFromSeq, historyToSeq,
+				...(corrupt && index === 0 ? { submissionDigest: "0".repeat(64) } : {}) }));
+		}
+		if (typeof expected === "number") assert.equal(await profile.recoverHistoryCursor(), expected);
+		else await assert.rejects(profile.recoverHistoryCursor(), expected);
+	};
+	try {
+		await writeFile(join(root, "artifact.txt"), body);
+		for (const chain of [
+			[[1, 0, 0], [1, 0, 16], [1, 16, 16]],
+			[[1, 16, 16], [1, 0, 16], [1, 0, 0]],
+			[[1, 0, 16], [1, 16, 16], [1, 16, 32], [2, 32, 32]],
+		] as Array<Array<[number, number, number]>>) await run(chain, chain.length === 4 ? 32 : 16);
+		await run([[1, 0, 16], [1, 17, 32]], /invalid committed history chain/);
+		await run([[1, 0, 16], [1, 15, 32]], /invalid committed history chain/);
+		await run([[1, 0, 16], [1, 0, 16]], /invalid committed history chain/);
+		await run([[1, 0, 16]], /terminal submission digest mismatch/, true);
+		await rm(join(root, "artifact.txt"));
+		await run([[1, 0, 16]], /ENOENT/);
+	} finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test("a failed parallel turn drains other sessions before recovery", async () => {
 	const pool = new PiSessionPool({ baseUrl: "https://example.test", campaignId: "test" } as never, "test");
 	const sessions = (pool as unknown as { sessions: Map<string, { runTurn: () => Promise<unknown> }> }).sessions;
 	let first = true;
-	const usage = { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120 };
+	const usage = { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120, tokens: { input: 0, cachedInput: 0, output: 0, reasoning: 0 } };
 	let release!: () => void;
 	const pending = new Promise<void>((resolve) => { release = resolve; });
 	sessions.set("a", { runTurn: async () => {
@@ -65,7 +105,7 @@ test("partial-turn continuation keeps history and classifies execution failures"
 			session: { sessionManager: { getSessionId: () => "session-1" } }, historyCursor: 0,
 			policy: { begin: async () => {}, budgetMessage: () => "", end: () => ({ toolCalls: { bash: 2 } }) },
 			submissions: { begin: async () => {} },
-			proxy: { beginTurn: async () => {}, endTurn: async () => ({ providerCalls: 3, artifactBytes: 120 }) },
+			proxy: { beginTurn: async () => {}, endTurn: async () => ({ providerCalls: 3, artifactBytes: 120, tokens: { input: 9, cachedInput: 4, output: 2, reasoning: 1 } }) },
 			promptWithTimeout: async (message: string) => {
 				messages.push(message);
 				throw new Error(failures[messages.length - 1]);
@@ -77,7 +117,8 @@ test("partial-turn continuation keeps history and classifies execution failures"
 			assert.ok(error instanceof TurnExecutionError);
 			assert.equal(error.retryable, true);
 			assert.deepEqual(error.turnUsage, [{ profileId: "research", turnId: "turn-1",
-				usage: { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120 } }]);
+				usage: { providerCalls: 3, toolCalls: { bash: 2 }, artifactBytes: 120,
+					tokens: { input: 9, cachedInput: 4, output: 2, reasoning: 1 } } }]);
 			return true;
 		});
 		for (let index = 1; index < failures.length; index += 1) {

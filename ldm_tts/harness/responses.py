@@ -19,7 +19,17 @@ def parse_turn_result(value: Any) -> HarnessTurnResult:
         "historyToSeq", "historyDigest", "inputDigest", "replayed",
         "submissionStatus", "submissionId", "submissionJson", "submissionDigest", "submission",
         "submittedArtifacts", "validationErrors", "usage", "toolBudget", "artifacts",
+        *(("visibleSeq",) if "visibleSeq" in value else ()),
+        *(("taskMessages",) if "taskMessages" in value else ()),
     })
+    visible_seq = (_required_nonnegative_int(value["visibleSeq"], "visibleSeq")
+                   if "visibleSeq" in value else None)
+    task_messages = value.get("taskMessages", [])
+    if not isinstance(task_messages, list) or len(set(map(str, task_messages))) != len(task_messages) or any(
+            not isinstance(item, str) or not item for item in task_messages):
+        raise HarnessError("committed harness turn has invalid taskMessages")
+    if task_messages and visible_seq is None:
+        raise HarnessError("task messages belong to the history protocol")
     submission = value.get("submission")
     usage = value.get("usage")
     artifacts = value.get("artifacts")
@@ -72,16 +82,29 @@ def parse_turn_result(value: Any) -> HarnessTurnResult:
         usage=usage,
         tool_budget=tool_budget,
         artifacts={str(key): str(item) for key, item in artifacts.items() if item is not None},
+        visible_seq=visible_seq,
+        task_messages=tuple(task_messages),
     )
 
 
+TOKEN_KEYS = ("input", "cachedInput", "output", "reasoning")
+
+
 def parse_usage(value: Any) -> dict[str, Any]:
-    assert_response_keys(value, {"providerCalls", "toolCalls", "artifactBytes"})
-    return {
+    """Turn usage; ``tokens`` (summed from the provider responses) is reported by sidecars since 0.4.0."""
+    base = {"providerCalls", "toolCalls", "artifactBytes"}
+    assert_response_keys(value, base | ({"tokens"} if isinstance(value, dict) and "tokens" in value else set()))
+    usage = {
         "providerCalls": _required_nonnegative_int(value["providerCalls"], "providerCalls"),
         "toolCalls": _nonnegative_int_mapping(value["toolCalls"], "toolCalls"),
         "artifactBytes": _required_nonnegative_int(value["artifactBytes"], "artifactBytes"),
     }
+    if "tokens" in value:
+        if not isinstance(value["tokens"], dict):
+            raise HarnessError("harness sidecar returned invalid tokens")
+        assert_response_keys(value["tokens"], set(TOKEN_KEYS))
+        usage["tokens"] = {k: _required_nonnegative_int(value["tokens"][k], f"tokens.{k}") for k in TOKEN_KEYS}
+    return usage
 
 
 def verify_submission_json(

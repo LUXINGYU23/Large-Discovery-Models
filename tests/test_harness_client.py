@@ -309,7 +309,7 @@ def test_provider_authorization_checks_turn_identity_before_reply(tmp_path, monk
         assert requests[0].provider_request_id == "turn-1-provider-1"
 
 
-@pytest.mark.parametrize("version", ["0.2.0", "0.4.0", "invalid"])
+@pytest.mark.parametrize("version", ["0.3.0", "0.5.0", "invalid"])
 def test_protocol_mismatch_rejected_before_sending_secrets(tmp_path, monkeypatch, version):
     monkeypatch.setenv("HARNESS_TEST_RELEASE", version)
     config = HarnessPoolConfig(

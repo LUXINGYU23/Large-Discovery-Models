@@ -81,9 +81,12 @@ class PiHarnessConfig(HarnessPoolConfig):
             raise ValueError("harness MCP tool names must be unique")
         if set(tool_names) & set(mcp_tool_names):
             raise ValueError("harness task and MCP tool names must not conflict")
+        if self.history is not None and self.history.tool_name in {*tool_names, *mcp_tool_names}:
+            raise ValueError("harness history tool conflicts with another tool")
         ordinary_tools = {
             "read", "write", "bash", "web_search", "web_fetch",
             *tool_names, *mcp_tool_names,
+            *((self.history.tool_name,) if self.history is not None else ()),
         }
         if self.context7_enabled:
             ordinary_tools.update(("resolve-library-id", "query-docs"))

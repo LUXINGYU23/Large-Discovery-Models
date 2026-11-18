@@ -96,7 +96,9 @@ class ReservoirBuilder:
 
     The adapter decides scientific validity and canonical identity. The builder
     owns run-level policy: history exclusion, within-reservoir deduplication,
-    capacity enforcement, and rejection aggregation.
+    capacity enforcement, and rejection aggregation. ``pending_keys`` (optional)
+    are canonical keys with an in-flight experiment; they are rejected as
+    ``already_pending`` after the ``already_evaluated`` check.
     """
 
     def __init__(self, adapter: CandidateDomainAdapter) -> None:
@@ -107,6 +109,7 @@ class ReservoirBuilder:
         proposals: Iterable[RawProposal],
         *,
         evaluated_keys: Iterable[str] = (),
+        pending_keys: Iterable[str] | None = None,
         max_size: int | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> ReservoirBuildResult:
@@ -114,6 +117,7 @@ class ReservoirBuilder:
             raise ValueError("reservoir max_size must be positive when provided")
 
         evaluated = {str(key) for key in evaluated_keys}
+        pending = {str(key) for key in pending_keys or ()}
         admitted: list[Candidate] = []
         rejections: list[CandidateRejection] = []
         seen: dict[str, Candidate] = {}
@@ -134,6 +138,16 @@ class ReservoirBuilder:
                     CandidateRejection(
                         reason="already_evaluated",
                         message="candidate identity is already present in observation history",
+                        source=result.source or proposal.source,
+                        metadata={"canonical_key": key, "candidate_id": result.candidate_id},
+                    )
+                )
+                continue
+            if key in pending:
+                rejections.append(
+                    CandidateRejection(
+                        reason="already_pending",
+                        message="candidate identity has a non-terminal in-flight experiment",
                         source=result.source or proposal.source,
                         metadata={"canonical_key": key, "candidate_id": result.candidate_id},
                     )

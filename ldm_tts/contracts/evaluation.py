@@ -84,6 +84,9 @@ class Observation:
     surrogate: Any = None
     round_idx: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    experiment_id: str = ""
+    decision_id: str = ""
+    lineage: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.candidate.candidate_id != self.evaluation.candidate_id:
@@ -92,6 +95,12 @@ class Observation:
             )
         if self.round_idx is not None and self.round_idx < 0:
             raise ValueError("observation round_idx must be non-negative when provided")
+        for name in ("experiment_id", "decision_id"):
+            if not isinstance(getattr(self, name), str):
+                raise ValueError(f"observation {name} must be a string")
+        if not isinstance(self.lineage, Mapping):
+            raise ValueError("observation lineage must be a mapping")
+        object.__setattr__(self, "lineage", dict(self.lineage))
 
     @property
     def candidate_id(self) -> str:
@@ -111,13 +120,22 @@ class Observation:
             surrogate = surrogate.to_dict()
         elif surrogate is not None and is_dataclass(surrogate):
             surrogate = asdict(surrogate)
-        return {
+        payload = {
             "candidate": self.candidate.to_dict(),
             "evaluation": self.evaluation.to_dict(),
             "surrogate": surrogate,
             "round_idx": self.round_idx,
             "metadata": dict(self.metadata),
         }
+        # Async identity keys are written only when set, so synchronous
+        # checkpoints and event payloads stay byte-identical.
+        if self.experiment_id:
+            payload["experiment_id"] = self.experiment_id
+        if self.decision_id:
+            payload["decision_id"] = self.decision_id
+        if self.lineage:
+            payload["lineage"] = dict(self.lineage)
+        return payload
 
 
 @runtime_checkable

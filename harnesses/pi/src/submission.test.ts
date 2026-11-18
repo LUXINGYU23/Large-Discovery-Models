@@ -95,18 +95,18 @@ test("submission JSON orders mixed-case condition keys deterministically", () =>
 			artifacts: [],
 			submission: {
 				candidates: [{
-					dataset_id: "reductive_amination",
+					dataset_id: "numeric_grid",
 					conditions: {
-						substrate: "S1",
-						solvent: "NMP",
-						reaction_concentration_mM: 100,
-						TTIP_equiv: 2,
-						AcOH_equiv: 1,
+						slot: "S1",
+						setting: "default",
+						rate: 100,
+						T_weight: 2,
+						A_weight: 1,
 					},
 				}],
 			},
 		}),
-		'{"artifacts":[],"submission":{"candidates":[{"conditions":{"AcOH_equiv":1,"TTIP_equiv":2,"reaction_concentration_mM":100,"solvent":"NMP","substrate":"S1"},"dataset_id":"reductive_amination"}]}}',
+		'{"artifacts":[],"submission":{"candidates":[{"conditions":{"A_weight":1,"T_weight":2,"rate":100,"setting":"default","slot":"S1"},"dataset_id":"numeric_grid"}]}}',
 	);
 });
 

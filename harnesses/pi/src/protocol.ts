@@ -91,8 +91,68 @@ export interface ForkSource {
 	historyCursor: number;
 }
 
+/** Shared experiment-history component (design 5.8). Absent: the component is disabled. */
+export interface HarnessHistoryConfig {
+	toolName: string;
+	fields: Record<string, unknown>[];
+	objective: string | null;
+	pageSizeDefault: number;
+	pageSizeMax: number;
+	responseMaxBytes: number;
+	inlineLimit: number;
+	maxCasRetries: number;
+}
+
+/** Host-rendered bounded notice of the log slice (fromSeq, toSeq]; agent-facing keys are snake_case. */
+export interface HistoryNotice {
+	from_seq: number;
+	to_seq: number;
+	count: number;
+	text: string;
+	[key: string]: unknown;
+}
+
+export interface HistoryHeadAdvancedFrame extends CommonFrame {
+	type: "history_head_advanced";
+	headSeq: number;
+}
+
+/**
+ * One-way task message (design 5.9 ``notify_agents``): a hint from the task, not a measurement. Never part of
+ * the experiment history, its queries, watermarks or submission checks. Resending an id is harmless.
+ */
+export interface TaskMessageFrame extends CommonFrame {
+	type: "task_message";
+	messageId: string;
+	text: string;
+	source: string;
+}
+
+export interface HistoryQueryAnswer {
+	headSeq: number;
+	result: Record<string, unknown> | null;
+	notice: HistoryNotice | null;
+	error: { code: string; message: string } | null;
+}
+
+export interface HistoryQueryResultFrame extends CommonFrame, HistoryQueryAnswer {
+	type: "history_query_result";
+	queryId: string;
+}
+
+export interface HistoryQueryRequest {
+	profileId: string;
+	turnId: string;
+	operation: "query" | "notify" | "head";
+	query: Record<string, unknown> | null;
+	visibleSeq: number;
+}
+
+export type HistoryQuerier = (request: HistoryQueryRequest) => Promise<HistoryQueryAnswer>;
+
 export interface InitializeFrame extends CommonFrame {
 	type: "initialize";
+	history?: HarnessHistoryConfig;
 	artifactRoot: string;
 	baseUrl: string;
 	wireApi: "responses";
@@ -149,12 +209,10 @@ export interface SubmissionError {
 	hint: string;
 }
 
-export interface SubmissionValidationResultFrame extends CommonFrame {
+export interface SubmissionValidationResultFrame extends CommonFrame, SubmissionValidationDecision {
 	type: "submission_validation_result";
 	validationId: string;
 	submissionDigest: string;
-	decision: "accept" | "retry" | "reject_turn";
-	errors: SubmissionError[];
 }
 
 export interface ProviderAuthorizationRequest {
@@ -182,11 +240,19 @@ export interface SubmissionValidationRequest {
 	artifacts: SubmittedArtifact[];
 	submissionJson: string;
 	submissionDigest: string;
+	/** With the history component: the session's visibility watermark and consecutive stale answers. */
+	visibleSeq?: number;
+	casRetries?: number;
 }
 
 export interface SubmissionValidationDecision {
-	decision: "accept" | "retry" | "reject_turn";
+	/** "stale": the host log head is ahead of visibleSeq; not validated, not counted (design 5.8 CAS). */
+	decision: "accept" | "retry" | "reject_turn" | "stale";
 	errors: SubmissionError[];
+	historySeq?: number;
+	receipt?: string;
+	headSeq?: number;
+	notice?: HistoryNotice;
 }
 
 export type SubmissionValidator = (
@@ -203,13 +269,31 @@ export type InputFrame =
 	| RunTurnFrame
 	| SubmissionValidationResultFrame
 	| ProviderAuthorizationResultFrame
+	| HistoryHeadAdvancedFrame
+	| HistoryQueryResultFrame
+	| TaskMessageFrame
 	| CloseFrame;
+
+/** Token counts summed from the persisted provider responses of one turn (Responses API ``usage``). */
+export interface ProviderTokens {
+	input: number;
+	cachedInput: number;
+	output: number;
+	reasoning: number;
+}
+
+export interface TurnUsage {
+	providerCalls: number;
+	toolCalls: Record<string, number>;
+	artifactBytes: number;
+	tokens: ProviderTokens;
+}
 
 export class TurnExecutionError extends Error {
 	constructor(message: string, readonly turnUsage: Array<{
 		profileId: string;
 		turnId: string;
-		usage: { providerCalls: number; toolCalls: Record<string, number>; artifactBytes: number };
+		usage: TurnUsage;
 	}>, readonly retryable = false) {
 		super(message);
 	}
@@ -509,6 +593,39 @@ function parseMcpServers(value: unknown): McpServerConfig[] {
 	return servers;
 }
 
+function parseNotice(value: unknown): HistoryNotice {
+	const data = record(value, "notice");
+	const fromSeq = nonnegativeInteger(data.from_seq, "notice.from_seq");
+	const toSeq = nonnegativeInteger(data.to_seq, "notice.to_seq");
+	if (toSeq <= fromSeq) throw new ProtocolError("invalid_frame", "notice must cover a non-empty range");
+	return { ...data, from_seq: fromSeq, to_seq: toSeq, count: nonnegativeInteger(data.count, "notice.count"),
+		text: string(data.text, "notice.text") };
+}
+
+function parseHistory(value: unknown): HarnessHistoryConfig {
+	const data = record(value, "history");
+	exactKeys(data, ["toolName", "fields", "objective", "pageSizeDefault", "pageSizeMax", "responseMaxBytes",
+		"inlineLimit", "maxCasRetries"], "history");
+	const toolName = string(data.toolName, "history.toolName");
+	if (!/^[a-z][a-z0-9_]*$/.test(toolName)) {
+		throw new ProtocolError("invalid_frame", "history.toolName must be a lowercase identifier");
+	}
+	if (!Array.isArray(data.fields)) throw new ProtocolError("invalid_frame", "history.fields must be an array");
+	const pageSizeDefault = positiveInteger(data.pageSizeDefault, "history.pageSizeDefault");
+	const pageSizeMax = positiveInteger(data.pageSizeMax, "history.pageSizeMax");
+	if (pageSizeDefault > pageSizeMax) throw new ProtocolError("invalid_frame", "history page sizes are inconsistent");
+	return {
+		toolName,
+		fields: data.fields.map((item, index) => record(item, `history.fields[${index}]`)),
+		objective: data.objective === null ? null : string(data.objective, "history.objective"),
+		pageSizeDefault,
+		pageSizeMax,
+		responseMaxBytes: positiveInteger(data.responseMaxBytes, "history.responseMaxBytes"),
+		inlineLimit: nonnegativeInteger(data.inlineLimit, "history.inlineLimit"),
+		maxCasRetries: nonnegativeInteger(data.maxCasRetries, "history.maxCasRetries"),
+	};
+}
+
 function common(data: Record<string, unknown>): Omit<CommonFrame, "type"> & { type: string } {
 	if (data.protocolVersion !== SIDECAR_RELEASE_VERSION) {
 		throw new ProtocolError("protocol_mismatch", `expected protocol ${SIDECAR_RELEASE_VERSION}`);
@@ -550,17 +667,72 @@ export function parseFrame(line: string): InputFrame {
 		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId"], "frame");
 		return { ...identity, type: "close" };
 	}
+	if (identity.type === "history_head_advanced") {
+		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "headSeq"], "frame");
+		return { ...identity, type: "history_head_advanced", headSeq: nonnegativeInteger(data.headSeq, "headSeq") };
+	}
+	if (identity.type === "task_message") {
+		exactKeys(data, ["type", "requestId", "protocolVersion", "campaignId", "messageId", "text", "source"], "frame");
+		const messageId = string(data.messageId, "messageId");
+		if (messageId.length > 200) throw new ProtocolError("invalid_frame", "messageId is too long");
+		if (typeof data.source !== "string") throw new ProtocolError("invalid_frame", "source must be a string");
+		return { ...identity, type: "task_message", messageId, text: string(data.text, "text"), source: data.source };
+	}
+	if (identity.type === "history_query_result") {
+		exactKeys(data, [
+			"type", "requestId", "protocolVersion", "campaignId", "queryId", "headSeq", "result", "notice", "error",
+		], "frame");
+		let error: HistoryQueryAnswer["error"] = null;
+		if (data.error !== null) {
+			const raw = record(data.error, "error");
+			exactKeys(raw, ["code", "message"], "error");
+			error = { code: string(raw.code, "error.code"), message: string(raw.message, "error.message") };
+		}
+		return {
+			...identity,
+			type: "history_query_result",
+			queryId: string(data.queryId, "queryId"),
+			headSeq: nonnegativeInteger(data.headSeq, "headSeq"),
+			result: data.result === null ? null : record(data.result, "result"),
+			notice: data.notice === null ? null : parseNotice(data.notice),
+			error,
+		};
+	}
 	if (identity.type === "submission_validation_result") {
+		const optional = ["historySeq", "receipt", "headSeq", "notice"].filter((key) => data[key] !== undefined);
 		exactKeys(data, [
 			"type", "requestId", "protocolVersion", "campaignId", "validationId",
-			"submissionDigest", "decision", "errors",
+			"submissionDigest", "decision", "errors", ...optional,
 		], "frame");
 		if (!Array.isArray(data.errors)) {
 			throw new ProtocolError("invalid_frame", "errors must be an array");
 		}
 		const decision = string(data.decision, "decision");
-		if (!["accept", "retry", "reject_turn"].includes(decision)) {
+		if (!["accept", "retry", "reject_turn", "stale"].includes(decision)) {
 			throw new ProtocolError("invalid_frame", "unsupported submission validation decision");
+		}
+		const stale = decision === "stale";
+		if (stale !== (data.headSeq !== undefined && data.notice !== undefined)
+			|| (stale && (data.historySeq !== undefined || data.receipt !== undefined))
+			|| (data.receipt !== undefined && decision !== "accept")) {
+			throw new ProtocolError("invalid_frame", "submission validation history fields are inconsistent");
+		}
+		const extra: Partial<SubmissionValidationDecision> = {};
+		if (data.historySeq !== undefined) extra.historySeq = nonnegativeInteger(data.historySeq, "historySeq");
+		if (data.receipt !== undefined) {
+			if (typeof data.receipt !== "string") throw new ProtocolError("invalid_frame", "receipt must be a string");
+			extra.receipt = data.receipt;
+		}
+		if (stale) {
+			extra.headSeq = nonnegativeInteger(data.headSeq, "headSeq");
+			extra.notice = parseNotice(data.notice);
+			if (data.errors.length !== 0) throw new ProtocolError("invalid_frame", "stale submission results carry no errors");
+			return {
+				...identity, type: "submission_validation_result",
+				validationId: string(data.validationId, "validationId"),
+				submissionDigest: digest(data.submissionDigest, "submissionDigest"),
+				decision: "stale", errors: [], ...extra,
+			};
 		}
 		const errors = data.errors.map((item, index) => {
 			const name = `errors[${index}]`;
@@ -593,6 +765,7 @@ export function parseFrame(line: string): InputFrame {
 			submissionDigest: digest(data.submissionDigest, "submissionDigest"),
 			decision: decision as "accept" | "retry" | "reject_turn",
 			errors,
+			...extra,
 		};
 	}
 	if (identity.type === "provider_authorization_result") {
@@ -662,7 +835,9 @@ export function parseFrame(line: string): InputFrame {
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
 		...(data.forkSources === undefined ? [] : ["forkSources"]),
+		...(data.history === undefined ? [] : ["history"]),
 	], "frame");
+	const history = data.history === undefined ? undefined : parseHistory(data.history);
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
 	if (sha256(submissionContractJson) !== submissionContractSha256) {
@@ -736,6 +911,12 @@ export function parseFrame(line: string): InputFrame {
 		...(solPi?.observationPack ? ["obs_recall"] : []),
 		...(solPi?.onlineContextCompact ? ["update_plan"] : []),
 	]);
+	if (history) {
+		if (availableTools.has(history.toolName)) {
+			throw new ProtocolError("invalid_frame", "history tool conflicts with another available tool");
+		}
+		availableTools.add(history.toolName);
+	}
 	if (availableTools.has(submissionContract.toolName)) {
 		throw new ProtocolError("invalid_frame", "terminal tool conflicts with another available tool");
 	}
@@ -759,6 +940,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
 		...(solPi === undefined ? {} : { solPi }),
 		...(forkSources === undefined ? {} : { forkSources }),
+		...(history === undefined ? {} : { history }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

@@ -2,11 +2,10 @@ name: antibody_rfd3_mock
 task: antibody_rfd3
 algorithm: fixed
 mode: mock
-description: Two-evaluation offline fixture over the asynchronous HTTP scheduler.
+description: Two-evaluation sequence campaign with deterministic generation and oracle.
 args:
   method: fixed
   oracle: mock
-  scheduler: async
   concurrency: 2
   iterations: 2
   pool-size: 2

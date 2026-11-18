@@ -1,5 +1,10 @@
 """Task discovery and registration interface."""
 
+from ldm_tts.registration.async_manifest import (
+    AsyncHookDeclaration, AsyncManifest, AsyncManifestError, HookLoadError,
+    load_hook, parse_async_manifest,
+)
+
 from ldm_tts.registration.registry import (
     TaskDefinition,
     TaskRegistrationError,
@@ -14,6 +19,8 @@ from ldm_tts.registration.qualification import (
 )
 
 __all__ = [
+    "AsyncHookDeclaration", "AsyncManifest", "AsyncManifestError", "HookLoadError",
+    "load_hook", "parse_async_manifest",
     "TaskDefinition",
     "TaskRegistrationError",
     "QUALIFICATION_STAGES",

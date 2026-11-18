@@ -8,6 +8,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ldm_tts.registration.async_manifest import (
+    AsyncManifest,
+    AsyncManifestError,
+    parse_async_manifest,
+)
 from ldm_tts.registration.experiment import (
     EXPERIMENT_CONTRACT_NAME,
     ExperimentContractError,
@@ -42,6 +47,7 @@ class TaskDefinition:
     dependency_checker: str | None = None
     experiment_contract_path: Path | None = None
     pilot_evaluation: dict = field(default_factory=dict)
+    async_manifest: AsyncManifest | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,7 @@ def load_task_manifest(
         "description",
         "dependency_checker",
         "pilot_evaluation",
+        "async",
     }
     unknown = sorted(str(key) for key in data if key not in allowed_keys)
     if unknown:
@@ -152,6 +159,12 @@ def load_task_manifest(
     hook = pilot.get("submission_adapter")
     if hook is not None and (not isinstance(hook, str) or not HOOK_PATTERN.fullmatch(hook)):
         raise TaskRegistrationError("pilot submission_adapter must be 'python.module:function'")
+    async_manifest = None
+    if data.get("async") is not None:
+        try:
+            async_manifest = parse_async_manifest(data["async"])
+        except AsyncManifestError as exc:
+            raise TaskRegistrationError(f"Invalid async section in {manifest_path}: {exc}") from exc
     relative_root = Path("tasks") / task_id
     contract_path = relative_root / EXPERIMENT_CONTRACT_NAME
     return TaskDefinition(
@@ -162,6 +175,7 @@ def load_task_manifest(
         manifest_path=relative_root / TASK_MANIFEST_NAME,
         dependency_checker=dependency_checker,
         pilot_evaluation=pilot,
+        async_manifest=async_manifest,
         experiment_contract_path=(
             contract_path if (repository_root / contract_path).is_file() else None
         ),

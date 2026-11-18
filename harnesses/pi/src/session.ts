@@ -29,7 +29,8 @@ import type {
 	SubmissionValidator,
 } from "./protocol.js";
 import { ProviderProxy, type ProviderTurnSummary } from "./provider-proxy.js";
-import type { ProviderAuthorizer } from "./protocol.js";
+import type { HistoryQuerier, ProviderAuthorizer, TurnUsage } from "./protocol.js";
+import { ExperimentHistory, STEERING_MODE, type TaskMessage } from "./experiment-history.js";
 import {
 	SubmissionController,
 	verifySubmissionRecord,
@@ -75,16 +76,16 @@ export interface CommittedTurn {
 	submission: Record<string, unknown>;
 	submittedArtifacts: SubmittedArtifact[];
 	validationErrors: SubmissionError[];
-	usage: {
-		providerCalls: number;
-		toolCalls: Record<string, number>;
-		artifactBytes: number;
-	};
+	usage: TurnUsage;
 	toolBudget: ToolUsageSnapshot["toolBudget"];
 	artifacts: {
 		turn: string;
 		session: string | undefined;
 	};
+	/** Final visibility watermark (history component only); the next turn header counts from it. */
+	visibleSeq?: number;
+	/** Task messages the persisted session shows were delivered in this turn (history component only). */
+	taskMessages?: string[];
 }
 
 function isInside(root: string, value: string): boolean {
@@ -135,6 +136,7 @@ function sessionTools(
 	terminalTool: string,
 	mcpTools: string[] = [],
 	solPi?: Record<string, unknown>,
+	historyTool?: string,
 ): string[] {
 	return [
 		"read",
@@ -146,6 +148,7 @@ function sessionTools(
 		...taskTools,
 		...mcpTools,
 		...solPiTools(solPi),
+		...(historyTool ? [historyTool] : []),
 		terminalTool,
 	];
 }
@@ -154,6 +157,11 @@ function configuredMcpToolNames(servers: InitializeFrame["mcpServers"]): string[
 	return servers.flatMap((server) =>
 		server.tools.map((tool) => "mcp__" + server.serverId + "__" + tool),
 	);
+}
+
+/** Shutdown progress on stderr: an orphaned sidecar that does not exit shows which step it waits on. */
+function shutdownTrace(step: string): void {
+	process.stderr.write(`sidecar shutdown ${new Date().toISOString()} ${step}\n`);
 }
 
 export class PersistentProfileSession {
@@ -167,6 +175,7 @@ export class PersistentProfileSession {
 	private readonly gondolin: GondolinController;
 	private readonly mcp: McpToolBridge;
 	private readonly submissions: SubmissionController;
+	readonly experimentHistory: ExperimentHistory | undefined;
 	private session: AgentSession | undefined;
 	private historyCursor = 0;
 	private readonly history = new HistoryController();
@@ -205,7 +214,8 @@ export class PersistentProfileSession {
 			namedSecrets,
 			`ldm-pi-${config.campaignId}-${profile.profileId}`,
 		);
-		this.submissions = new SubmissionController(config, this.workspace);
+		this.experimentHistory = config.history ? new ExperimentHistory(config.history) : undefined;
+		this.submissions = new SubmissionController(config, this.workspace, this.experimentHistory);
 	}
 
 	async initialize(): Promise<void> {
@@ -282,6 +292,7 @@ export class PersistentProfileSession {
 		const settings = SettingsManager.inMemory({
 			compaction: COMPACTION_SETTINGS,
 			retry: { enabled: false },
+			steeringMode: STEERING_MODE,
 		});
 		const extensionPaths: string[] = [];
 		if (this.config.context7Enabled) {
@@ -302,6 +313,7 @@ export class PersistentProfileSession {
 				this.gondolin.createExtension(!this.config.solPi?.actionFusion),
 				this.policy.createExtension(),
 				this.submissions.createExtension(),
+				...(this.experimentHistory ? [this.experimentHistory.createExtension()] : []),
 				...(solPi ? [solPi] : []),
 				this.contextPressure.createExtension(() => this.session?.messages ?? []),
 				// Project evidence or cancel threshold compaction before generating a summary.
@@ -354,13 +366,15 @@ export class PersistentProfileSession {
 				const question = typeof message.content === "string" ? message.content
 					: message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
 				return this.policy.searchContext(question);
-			}), ...this.mcp.toolDefinitions(), this.submissions.tool()],
+			}), ...this.mcp.toolDefinitions(), ...(this.experimentHistory ? [this.experimentHistory.tool()] : []),
+			this.submissions.tool()],
 			tools: sessionTools(
 				this.config.context7Enabled,
 				this.config.toolExtensions.flatMap((extension) => extension.toolNames),
 				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
 				this.config.solPi,
+				this.config.history?.toolName,
 			),
 		});
 		this.session = session;
@@ -387,7 +401,8 @@ export class PersistentProfileSession {
 		return skillDirectories;
 	}
 
-	async runTurn(input: SessionTurnInput, validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn> {
+	async runTurn(input: SessionTurnInput, validate: SubmissionValidator, authorize: ProviderAuthorizer,
+		query?: HistoryQuerier): Promise<CommittedTurn> {
 		if (!this.session) throw new Error("profile session is not initialized");
 		const turnRoot = join(this.profileRoot, "turns", input.turnId);
 		const commitPath = join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json");
@@ -415,11 +430,18 @@ export class PersistentProfileSession {
 			throw new Error(`partial turn digest mismatch: ${input.turnId}`);
 		}
 		if (!priorInput) await atomicJson(inputPath, input);
+		if (this.experimentHistory) {
+			if (!query) throw new Error("history-enabled turns require a host history querier");
+			// Resume rebuilds the watermark from notices the persisted session contains, then asks for the head.
+			await this.experimentHistory.begin(this.profile.profileId, input.turnId, input.historyToSeq, turnRoot, query,
+				this.session.sessionManager.getBranch());
+		}
 
 		const submissionPath = join(turnRoot, "submission.json");
 		const savedSubmission = await optionalJson<SavedSubmission>(submissionPath);
 		if (savedSubmission) {
 			const provider = await this.proxy.recoveredTurnSummary(turnRoot, input.turnId);
+			await this.experimentHistory?.end();
 			return this.commit(input, savedSubmission.submission, provider, savedSubmission.toolUsage, true);
 		}
 		await this.policy.begin(input.forbiddenQueryTerms, join(turnRoot, "tool-budget.json"));
@@ -451,6 +473,8 @@ export class PersistentProfileSession {
 		let failure: Error | undefined;
 		try {
 			await this.history.begin(turnRoot, this.session.sessionManager);
+			// Results booked after the frozen base (or notices lost in a crash) reach the agent before its first call.
+			await this.experimentHistory?.deliverAtStart();
 			await this.promptWithTimeout(
 				`${priorInput
 					? `Continue the interrupted turn from your existing research and files. The history and submission contract are unchanged. Your previous submission was not accepted; repair any reported errors and call ${this.config.submissionContract.toolName} with the complete result. Tool budgets have not reset.`
@@ -472,6 +496,7 @@ export class PersistentProfileSession {
 		} finally {
 			providerSummary = await this.proxy.endTurn(this.profile.profileId);
 			policySummary = this.policy.end();
+			await this.experimentHistory?.end();
 		}
 		if (failure) {
 			throw new TurnExecutionError(failure.message, [{
@@ -481,6 +506,7 @@ export class PersistentProfileSession {
 					providerCalls: providerSummary.providerCalls,
 					toolCalls: policySummary.toolCalls,
 					artifactBytes: providerSummary.artifactBytes,
+					tokens: providerSummary.tokens,
 				},
 			}], !(failure instanceof HistoryRecoveryError) && /context_length_exceeded|stream_read_error|stream ended before a terminal response event|^provider response failed: terminated$|\b(?:server_error|internal_server_error|overloaded_error|rate_limit_exceeded|request_timeout|408|429|500|502|503|504)\b|ECONNRESET|ETIMEDOUT|fetch failed/i.test(failure.message));
 		}
@@ -510,10 +536,12 @@ export class PersistentProfileSession {
 	}
 
 	async close(): Promise<void> {
+		const step = (name: string) => shutdownTrace(`${this.profile.profileId} ${name}`);
 		try {
 			if (this.session) {
 				this.session.abortCompaction();
 				await this.session.abort();
+				step("session aborted");
 				this.session.dispose();
 				this.session = undefined;
 			}
@@ -528,10 +556,13 @@ export class PersistentProfileSession {
 					error: (error as Error).message,
 				});
 			} finally {
+				step("environment snapshot written");
 				try {
 					await this.gondolin.close();
+					step("guest closed");
 				} finally {
 					await this.mcp.close();
+					step("mcp closed");
 				}
 			}
 		}
@@ -629,12 +660,17 @@ export class PersistentProfileSession {
 				providerCalls: provider.providerCalls,
 				toolCalls: toolUsage.toolCalls,
 				artifactBytes: provider.artifactBytes,
+				tokens: provider.tokens,
 			},
 			toolBudget: toolUsage.toolBudget,
 			artifacts: {
 				turn: relative(this.config.artifactRoot, join(this.profileRoot, "turns", input.turnId)),
 				session: sessionFile ? relative(this.config.artifactRoot, sessionFile) : undefined,
 			},
+			...(this.experimentHistory ? {
+				visibleSeq: this.experimentHistory.visibleSeq,
+				taskMessages: this.experimentHistory.taskMessagesFor(input.turnId, this.session.sessionManager.getBranch()),
+			} : {}),
 		};
 		await atomicJson(join(this.config.artifactRoot, "turns", input.turnId, "turn_committed.json"), commit);
 		this.historyCursor = input.historyToSeq;
@@ -662,7 +698,7 @@ export class PersistentProfileSession {
 			await Promise.all(names.map((name) => optionalJson<CommittedTurn>(join(turnRoot, name, "turn_committed.json"))))
 		)
 			.filter((value): value is CommittedTurn => value?.profileId === this.profile.profileId)
-			.sort((left, right) => left.roundIndex - right.roundIndex);
+			.sort((left, right) => left.roundIndex - right.roundIndex || left.historyFromSeq - right.historyFromSeq || left.historyToSeq - right.historyToSeq);
 		let cursor = this.forkSource?.historyCursor ?? 0;
 		for (const commit of commits) {
 			await verifySubmissionRecord(commit, this.config.artifactRoot);
@@ -771,7 +807,9 @@ export class PiSessionPool {
 				this.config.submissionContract.toolName,
 				configuredMcpToolNames(this.config.mcpServers),
 				this.config.solPi,
+				this.config.history?.toolName,
 			),
+			...(this.config.history ? { experimentHistory: this.config.history } : {}),
 			toolExtensions: this.config.toolExtensions,
 			mcpServers: [...this.sessions.values()].flatMap((session) => session.mcpManifest()),
 			topology: {
@@ -782,7 +820,16 @@ export class PiSessionPool {
 		});
 	}
 
-	async runTurns(inputs: SessionTurnInput[], validate: SubmissionValidator, authorize: ProviderAuthorizer): Promise<CommittedTurn[]> {
+	advanceHistoryHead(headSeq: number): void {
+		for (const session of this.sessions.values()) session.experimentHistory?.advanceHead(headSeq);
+	}
+
+	queueTaskMessage(message: TaskMessage): void {
+		for (const session of this.sessions.values()) session.experimentHistory?.queueTaskMessage(message);
+	}
+
+	async runTurns(inputs: SessionTurnInput[], validate: SubmissionValidator, authorize: ProviderAuthorizer,
+		query?: HistoryQuerier): Promise<CommittedTurn[]> {
 		const expected = new Set(this.sessions.keys());
 		if (inputs.length !== expected.size || new Set(inputs.map((input) => input.profileId)).size !== inputs.length) {
 			throw new Error("run_turn must contain exactly one input for every profile");
@@ -791,7 +838,7 @@ export class PiSessionPool {
 			if (!expected.delete(input.profileId)) throw new Error(`unknown or duplicate profile: ${input.profileId}`);
 		}
 		const results = await Promise.allSettled(inputs.map(
-			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate, authorize) as Promise<CommittedTurn>,
+			(input) => this.sessions.get(input.profileId)?.runTurn(input, validate, authorize, query) as Promise<CommittedTurn>,
 		));
 		const failed = results.find((result) => result.status === "rejected"
 			&& !(result.reason instanceof TurnExecutionError && result.reason.retryable))
@@ -813,9 +860,11 @@ export class PiSessionPool {
 	}
 
 	async close(): Promise<void> {
-		const proxyClose = this.proxy.close();
+		shutdownTrace("pool closing");
+		const proxyClose = this.proxy.close().finally(() => shutdownTrace("provider proxy closed"));
 		await Promise.allSettled([...this.sessions.values()].map((session) => session.close()));
 		this.sessions.clear();
 		await proxyClose;
+		shutdownTrace("pool closed");
 	}
 }

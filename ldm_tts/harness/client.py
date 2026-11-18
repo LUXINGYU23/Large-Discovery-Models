@@ -12,7 +12,8 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from dataclasses import replace
+from typing import TYPE_CHECKING, Any
 
 from ldm_tts.harness import responses
 from ldm_tts.harness.protocol import (
@@ -24,7 +25,11 @@ from ldm_tts.harness.protocol import (
     HarnessSubmissionValidation,
     HarnessTurn,
     HarnessTurnResult,
+    canonical_sha256,
 )
+
+if TYPE_CHECKING:
+    from ldm_tts.harness.history_host import HistoryService
 
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
 ProviderAuthorizer = Callable[[HarnessProviderAuthorizationRequest], bool]
@@ -39,9 +44,12 @@ class HarnessClient:
         config: HarnessPoolConfig,
         named_secrets: Mapping[str, str] | None = None,
         response_timeout_seconds: float = 2100,
+        history: HistoryService | None = None,
     ) -> None:
         if not command:
             raise ValueError("harness command must not be empty")
+        if (history is None) != (config.history is None):
+            raise ValueError("a harness history service requires history configuration and vice versa")
         if not api_key:
             raise ValueError("harness API key must not be empty")
         if response_timeout_seconds <= 0:
@@ -58,6 +66,51 @@ class HarnessClient:
         self._stderr: deque[str] = deque(maxlen=40)
         self._request_index = 0
         self._protocol_version: str | None = None
+        self.history = history
+        self._write_lock = threading.Lock()
+        self._active_turn: tuple[str, frozenset[tuple[str, str]]] | None = None
+
+    def publish_history_head(self, head_seq: int) -> bool:
+        """Send the one-way "log head advanced" hint to a sidecar that is running a turn (thread-safe).
+
+        Returns False when no turn is running: idle sessions learn the head from the next turn input."""
+        if self.history is None or isinstance(head_seq, bool) or not isinstance(head_seq, int) or head_seq < 0:
+            raise ValueError("history head hints require a history service and a non-negative seq")
+        with self._write_lock:
+            active = self._active_turn
+            if active is None or self._process is None or self._process.poll() is not None:
+                return False
+            frame = self._frame(active[0], "history_head_advanced", {"headSeq": head_seq})
+            try:
+                self._write(frame)
+            except HarnessError:
+                return False  # a hint; the sidecar recovers the head from queries and submission CAS
+        return True
+
+    def publish_task_message(self, message_id: str, text: str, *, source: str = "task") -> bool:
+        """Send a task message (design 5.9 ``notify_agents``) to a sidecar that is running a turn (thread-safe).
+
+        A separate frame, never part of the history log, queries or submission checks. The sidecar ignores an
+        id it has already queued or delivered, so resending is safe; delivery is confirmed only by the turn
+        result (``HarnessTurnResult.task_messages``). Returns False when no turn is running."""
+        if self.history is None:
+            raise ValueError("task messages require the history protocol")
+        if not isinstance(message_id, str) or not message_id or not isinstance(text, str) or not text.strip() \
+                or not isinstance(source, str):
+            raise ValueError("task messages require a non-empty id and text")
+        with self._write_lock:
+            active = self._active_turn
+            if active is None or self._process is None or self._process.poll() is not None:
+                return False
+            try:
+                self._write(self._frame(active[0], "task_message",
+                                        {"messageId": message_id, "text": text, "source": source}))
+            except HarnessError:
+                return False  # the host resends undelivered messages, or puts them in the next turn input
+        for profile_id, turn_id in sorted(active[1]):
+            self.history.record(profile_id, turn_id, "task_message_sent", message_id=message_id,
+                                text_sha256=canonical_sha256(text))
+        return True
 
     def start(self) -> None:
         if self._process is not None:
@@ -141,6 +194,12 @@ class HarnessClient:
             if validation.decision != "retry":
                 status = "accepted" if validation.decision == "accept" else "rejected"
                 terminal_validations[request.profile_id] = (status, request.digest)
+                if self.history is not None:
+                    # Durable before the answer leaves: without this record the sidecar cannot have committed
+                    # the turn (the asynchronous lane uses it after abandoning a generation).
+                    self.history.record(request.profile_id, request.turn_id, "decision",
+                                        attempt=request.attempt_index, decision=validation.decision,
+                                        submission_digest=request.digest)
             return validation
 
         def authorize(request: HarnessProviderAuthorizationRequest) -> bool:
@@ -222,6 +281,14 @@ class HarnessClient:
                     "harness committed a submission without matching task validation: "
                     + result.profile_id
                 )
+            if (self.history is None) != (result.visible_seq is None) or (
+                    result.visible_seq is not None
+                    and not result.history_to_seq <= result.visible_seq <= self.history.log.head):
+                raise HarnessError("harness turn result has an invalid final visibility watermark")
+        if self.history is not None:
+            for result in results:
+                self.history.turn_end(result.profile_id, result.turn_id, result.visible_seq, replayed=result.replayed,
+                                      task_messages=result.task_messages)
         return results
 
     def close(self) -> None:
@@ -274,6 +341,25 @@ class HarnessClient:
         provider_authorizer: ProviderAuthorizer | None = None,
     ) -> dict[str, Any]:
         frame = self._frame(self._next_request_id(), frame_type, fields)
+        if frame_type != "run_turn":
+            return self._exchange(frame, expected_type, timeout_seconds, submission_validator, provider_authorizer)
+        with self._write_lock:
+            self._active_turn = (frame["requestId"], frozenset(
+                (turn["profileId"], turn["turnId"]) for turn in frame["turns"]))
+        try:
+            return self._exchange(frame, expected_type, timeout_seconds, submission_validator, provider_authorizer)
+        finally:
+            with self._write_lock:
+                self._active_turn = None
+
+    def _exchange(
+        self,
+        frame: dict[str, Any],
+        expected_type: str,
+        timeout_seconds: float | None,
+        submission_validator: SubmissionValidator | None,
+        provider_authorizer: ProviderAuthorizer | None,
+    ) -> dict[str, Any]:
         process = self._process
         if process is None or process.stdin is None:
             raise HarnessError("harness client is not started")
@@ -312,6 +398,16 @@ class HarnessClient:
                     raise HarnessError("harness requested provider authorization outside run_turn")
                 try:
                     self._answer_provider_authorization(response, provider_authorizer)
+                except BaseException:
+                    _terminate(process)
+                    raise
+                continue
+            if response.get("type") == "history_query_requested":
+                if self.history is None or submission_validator is None:
+                    _terminate(process)
+                    raise HarnessError("harness requested experiment history outside a history-enabled run_turn")
+                try:
+                    self._answer_history_query(response)
                 except BaseException:
                     _terminate(process)
                     raise
@@ -393,6 +489,7 @@ class HarnessClient:
             "type", "requestId", "protocolVersion", "campaignId", "validationId",
             "profileId", "turnId", "attemptIndex", "submission", "artifacts",
             "submissionJson", "submissionDigest",
+            *(("visibleSeq", "casRetries") if self.history is not None else ()),
         })
         submission = response["submission"]
         if not isinstance(submission, dict):
@@ -413,14 +510,56 @@ class HarnessClient:
             artifacts=artifacts,
             submission_digest=submission_digest,
         )
+        validation_id = responses.required_string(response["validationId"], "validationId")
+        history_fields: dict[str, Any] = {}
+        if self.history is not None:
+            visible = _nonnegative_int(response["visibleSeq"], "visibleSeq")
+            admission = self.history.admit(request.profile_id, request.turn_id, request.attempt_index, visible,
+                                           _nonnegative_int(response["casRetries"], "casRetries"))
+            if admission.stale:
+                # Look first, then submit: no validator call, not counted as a validation attempt.
+                self._send_frame({
+                    **self._frame(response["requestId"], "submission_validation_result"),
+                    "validationId": validation_id, "submissionDigest": submission_digest,
+                    "decision": "stale", "errors": [], "headSeq": admission.head_seq,
+                    "notice": dict(admission.notice or {}),
+                })
+                return
+            request = replace(request, visible_seq=visible, history_seq=admission.history_seq)
+            history_fields = {"historySeq": admission.history_seq}
         validation = validator(request)
         if not isinstance(validation, HarnessSubmissionValidation):
             raise HarnessError("submission validator returned an invalid result")
+        decision = validation.to_dict()
+        if self.history is None:
+            # Receipts belong to the history protocol; sidecars without it reject unknown keys.
+            decision.pop("receipt", None)
         self._send_frame({
             **self._frame(response["requestId"], "submission_validation_result"),
-            "validationId": responses.required_string(response["validationId"], "validationId"),
+            "validationId": validation_id,
             "submissionDigest": submission_digest,
-            **validation.to_dict(),
+            **decision,
+            **history_fields,
+        })
+
+    def _answer_history_query(self, response: dict[str, Any]) -> None:
+        responses.assert_response_keys(response, {
+            "type", "requestId", "protocolVersion", "campaignId", "queryId", "profileId", "turnId",
+            "operation", "query", "visibleSeq",
+        })
+        active = self._active_turn
+        identity = (response["profileId"], response["turnId"])
+        if active is None or response["requestId"] != active[0] or identity not in active[1]:
+            raise HarnessError("harness history query does not match the turn batch")
+        query = response["query"]
+        if query is not None and not isinstance(query, dict):
+            raise HarnessError("harness history query must be an object or null")
+        answer = self.history.handle(identity[0], identity[1], responses.required_string(
+            response["operation"], "operation"), query, _nonnegative_int(response["visibleSeq"], "visibleSeq"))
+        self._send_frame({
+            **self._frame(response["requestId"], "history_query_result"),
+            "queryId": responses.required_string(response["queryId"], "queryId"),
+            **answer,
         })
 
     def _frame(
@@ -466,6 +605,10 @@ class HarnessClient:
         return version
 
     def _send_frame(self, frame: dict[str, Any]) -> None:
+        with self._write_lock:
+            self._write(frame)
+
+    def _write(self, frame: dict[str, Any]) -> None:
         process = self._process
         if process is None or process.stdin is None or process.poll() is not None:
             raise self._process_error("harness sidecar is not running")
@@ -498,6 +641,12 @@ class HarnessClient:
         with stream:
             for line in stream:
                 stderr.append(line)
+
+
+def _nonnegative_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise HarnessError(f"harness frame has invalid {name}")
+    return value
 
 
 def _terminate(process: subprocess.Popen[str]) -> None:

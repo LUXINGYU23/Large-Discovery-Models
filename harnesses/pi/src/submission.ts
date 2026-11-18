@@ -10,6 +10,7 @@ import type {
 	SubmittedArtifact,
 } from "./protocol.js";
 import { atomicJson, canonicalJson, sha256 } from "./trace.js";
+import type { ExperimentHistory } from "./experiment-history.js";
 
 export interface TerminalSubmission {
 	submissionStatus: "accepted" | "rejected";
@@ -35,6 +36,7 @@ export class SubmissionController {
 	constructor(
 		private readonly config: InitializeFrame,
 		private readonly workspace: string,
+		private readonly history?: ExperimentHistory,
 	) {
 		this.parameters = Type.Unsafe<Record<string, unknown>>(
 			config.submissionContract.payloadSchema,
@@ -122,6 +124,7 @@ export class SubmissionController {
 				}
 				const submissionJson = canonicalJson({ artifacts, submission });
 				const submissionDigest = sha256(submissionJson);
+				const watermark = this.history?.submissionWatermark();
 				const decision = await this.validate({
 					profileId: this.profileId,
 					turnId: this.turnId,
@@ -130,10 +133,27 @@ export class SubmissionController {
 					artifacts,
 					submissionJson,
 					submissionDigest,
+					...watermark,
 				});
+				if (decision.decision === "stale") {
+					// Look first, then submit: neither validated nor counted against the attempt limit.
+					if (!this.history) throw new Error("stale submission answer without the history component");
+					await rm(attemptRoot, { recursive: true, force: true });
+					this.attemptIndex -= 1;
+					const notice = await this.history.stale(decision);
+					// An ordinary result (not a thrown error) so that the notice is persisted with its details.
+					return {
+						content: [{ type: "text", text:
+							"Not submitted yet: new experiment history arrived before this submission could be checked. "
+							+ "It was not validated and does not count as a validation attempt.\n\n" + notice.text
+							+ `\n\nReview the new entries, then call ${toolName} again (resubmitting unchanged is allowed).` }],
+						details: { status: "stale", ...notice.details },
+					};
+				}
 				if ((decision.decision === "accept") !== (decision.errors.length === 0)) {
 					throw new Error("submission validator returned an inconsistent decision");
 				}
+				if (this.history) await this.history.validated(decision.historySeq);
 				await atomicJson(join(attemptRoot, "validation.json"), {
 					attemptIndex: this.attemptIndex,
 					decision: decision.decision,
@@ -142,6 +162,7 @@ export class SubmissionController {
 					submissionJson,
 					submissionDigest,
 					artifacts,
+					...(watermark ? { ...watermark, historySeq: decision.historySeq } : {}),
 				});
 				if (decision.decision === "retry") {
 					throw new Error(
@@ -161,11 +182,21 @@ export class SubmissionController {
 				if (!this.persist) throw new Error("submission turn is not initialized");
 				await this.persist(terminal);
 				this.value = terminal;
+				this.history?.closeTurn();
+				const accepted = !this.history
+					? "Submission accepted. End this turn now."
+					: [
+						"Submission accepted: your proposals are recorded.",
+						decision.receipt ?? "",
+						"A proposal is not an experiment: whether and when any of them is measured is decided by the "
+						+ "campaign's selection, so no experiment identifiers exist for them. Their outcome will be "
+						+ `visible in the proposals view of ${this.config.history?.toolName}. End this turn now.`,
+					].filter(Boolean).join(" ");
 				return {
 					content: [{
 						type: "text",
 						text: decision.decision === "accept"
-							? "Submission accepted. End this turn now."
+							? accepted
 							: "Submission rejected and the turn is closed.",
 					}],
 					details: {

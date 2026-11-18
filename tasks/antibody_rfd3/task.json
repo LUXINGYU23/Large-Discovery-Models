@@ -2,5 +2,12 @@
   "schema_version": 1,
   "task_id": "antibody_rfd3",
   "description": "Generate fixed-framework CDRH3 designs and optimize sequence binding energy.",
-  "dependency_checker": "tasks.antibody_rfd3.ldm_task.dependencies:check_dependencies"
+  "dependency_checker": "tasks.antibody_rfd3.ldm_task.dependencies:check_dependencies",
+  "async": {
+    "experiment_codec": "tasks.antibody_rfd3.core.experiments:AntibodyCodec",
+    "history_projection": "tasks.antibody_rfd3.core.experiments:history_projection",
+    "executors": {
+      "antibody_rfd3.energy": "tasks.antibody_rfd3.core.experiments:make_executor"
+    }
+  }
 }

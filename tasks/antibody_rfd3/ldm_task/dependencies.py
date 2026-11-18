@@ -13,19 +13,10 @@ def check_dependencies(plan, *, include_optional=True):
         checks.append((ok if condition else fail)(task, name, explanation))
 
     if args.get("mock"):
-        if args.get("scheduler") == "async":
-            from ldm_tts.async_release import read_runtime_pin
-
-            archive = Path(read_runtime_pin()["archive"])
-            offline = not args.get("initialization-run") and args.get("oracle", "mock") == "mock"
-            check("Offline fixtures", offline, "Async fixtures require the mock oracle and no initialization run")
-            check("Pinned async runtime", archive.is_file(), f"Runtime archive on H20: {archive}")
-        else:
-            check("Offline fixtures", True, "Deterministic generator and mock oracle")
-        return checks
+        check("Generator fixtures", not args.get("initialization-run"), "Deterministic generator fixtures")
     root = Path(args.get("root", "/Aidata/shared/ldm/antibody-poc"))
     method = args.get("method", "ldm_harness")
-    if method != "antbo" or not args.get("initialization-run"):
+    if not args.get("mock") and (method != "antbo" or not args.get("initialization-run")):
         for name in ("rfd3", "proteinmpnn"):
             check(name, os.access(root / "env" / name / "bin/python", os.X_OK), f"Model environment under {root}/env")
     if method == "ldm_harness":

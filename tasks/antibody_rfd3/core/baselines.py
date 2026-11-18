@@ -10,13 +10,18 @@ from tasks.antibody.core.engine_adapters import _sequence_violations
 from tasks.antibody.core.ldm_light.ldm_acq import indices_to_seqs, seqs_to_indices
 
 
+def prepare_antbo_source():
+    source = Path(os.environ.get("ANTBO_HOME", "")).resolve()
+    if not (source / "bo/optimizer.py").is_file():
+        raise ValueError("Set ANTBO_HOME to the upstream HEBO/AntBO directory")
+    if str(source) not in sys.path:
+        sys.path.insert(0, str(source))
+
+
 class NativeAntBO:
     def __init__(self, seed):
         import torch
-        source = Path(os.environ.get("ANTBO_HOME", "")).resolve()
-        if not (source / "bo/optimizer.py").is_file():
-            raise ValueError("Set ANTBO_HOME to the upstream HEBO/AntBO directory")
-        sys.path.insert(0, str(source))
+        prepare_antbo_source()
         from bo.optimizer import Optimizer
 
         np.random.seed(seed)
@@ -33,12 +38,12 @@ class NativeAntBO:
         self.optimizer.x_init = self.optimizer.x_init.reshape(-1, 11)
         self.seen = 0
 
-    def propose(self, history):
+    def propose(self, history, pending=()):
         import torch
         for row in history[self.seen:]:
             self.optimizer.observe(seqs_to_indices([row["sequence"]]), torch.tensor([row["energy"]]))
         self.seen = len(history)
-        evaluated = {row["sequence"] for row in history}
+        evaluated = {row["sequence"] for row in history} | set(pending)
         for _ in range(32):
             seq, = indices_to_seqs(self.optimizer.suggest(1))
             if seq not in evaluated and not _sequence_violations(seq, 11):

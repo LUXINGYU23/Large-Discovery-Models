@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { ProviderProxy } from "./provider-proxy.js";
+import { ProviderProxy, responseTokens } from "./provider-proxy.js";
 import { Redactor } from "./trace.js";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-responses";
 
@@ -75,6 +75,50 @@ test("provider proxy captures raw stream chunks while redacting credentials", as
 		await proxy.close();
 		await new Promise<void>((resolve, reject) => upstream.close((error) => (error ? reject(error) : resolve())));
 	}
+});
+
+test("turn token counts come from the persisted responses and survive recovery", async () => {
+	let calls = 0;
+	const upstream = createServer(async (request, response) => {
+		for await (const _ of request) { /* drain */ }
+		calls += 1;
+		response.writeHead(200, { "content-type": "text/event-stream" });
+		response.write(`event: response.created\ndata: {"type":"response.created","response":{"usage":null}}\n\n`);
+		response.end(`event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: { usage: {
+			input_tokens: 100 * calls, input_tokens_details: { cached_tokens: 60 }, output_tokens: 7 * calls,
+			output_tokens_details: { reasoning_tokens: 3 }, total_tokens: 107 * calls } } })}\n\n`);
+	});
+	await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+	const address = upstream.address();
+	assert(address && typeof address !== "string");
+	const root = await mkdtemp(join(tmpdir(), "ldm-provider-tokens-"));
+	const proxy = new ProviderProxy(`http://127.0.0.1:${address.port}/v1`, "token-test-secret", "campaign-1");
+	const post = async () => (await fetch(`${proxy.baseUrl("p")}/responses`, { method: "POST", body: "{}" })).text();
+	try {
+		await proxy.start();
+		await proxy.beginTurn("p", "s", "t1", root, async () => true);
+		await post();
+		assert.deepEqual((await proxy.endTurn("p")).tokens, { input: 100, cachedInput: 60, output: 7, reasoning: 3 });
+		await proxy.beginTurn("p", "s", "t1", root, async () => true);
+		await post();
+		const expected = { input: 300, cachedInput: 120, output: 21, reasoning: 6 };
+		assert.deepEqual((await proxy.endTurn("p")).tokens, expected);
+		assert.deepEqual((await proxy.recoveredTurnSummary(root, "t1")).tokens, expected);
+		assert.deepEqual((await proxy.recoveredTurnSummary(root, "other")).tokens,
+			{ input: 0, cachedInput: 0, output: 0, reasoning: 0 });
+	} finally {
+		await proxy.close();
+		await new Promise<void>((resolve, reject) => upstream.close((error) => (error ? reject(error) : resolve())));
+	}
+});
+
+test("response token parsing reads plain JSON and ignores errors and truncated streams", () => {
+	assert.deepEqual(responseTokens(JSON.stringify({ usage: { input_tokens: 5, output_tokens: 2 } })),
+		{ input: 5, cachedInput: 0, output: 2, reasoning: 0 });
+	assert.deepEqual(responseTokens(`{"error":{"message":"bad request"}}`),
+		{ input: 0, cachedInput: 0, output: 0, reasoning: 0 });
+	assert.deepEqual(responseTokens(`event: response.completed\ndata: {"type":"response.completed","response":{"usage":{"inp`),
+		{ input: 0, cachedInput: 0, output: 0, reasoning: 0 });
 });
 
 test("stream redaction handles credentials split at every byte boundary", () => {
