@@ -58,3 +58,25 @@ H20 独立工作树为 `/Aidata/shared/ldm/antibody-poc/streaming-code`。真实
 验收入口为 `tasks.antibody_rfd3.repro.h20.audit_streaming_ldm <campaign目录> --evaluations 96`。必须证明研究与实际评分区间正交叠，且交叠期间有结果入库、后续 GP/BO 使用更新的历史和在途集合；同时逐个重放决策，检查窗口、候选池、角色提案来源和真实评分回执。正式 640 次完成后以同一审计加 `--baseline /Aidata/shared/ldm/antibody-poc/runs/her2-batch-20r-8dd9645b/campaign` 统计两边效率。
 
 效率报告区分墙钟时间、研究时间、评分工时与工作槽利用率、交叠秒数、评分吞吐量、实际研究代数、原始生成量及 LLM token 用量。流式模式每代实际评估数不固定，两种模式的研究工作量可能不同，所以总耗时比不能解释成纯调度加速。现有生成 receipt 缺少绝对起止时间，报告不声称测得 GPU 模型执行与评分的精确交叠，仅统计可验证的研究 lane 与评分 attempt 交叠。
+
+### 96 次真实验收结果与正式启动
+
+上述 `a96c350c` 试跑已完成，`audit-streaming.json` 的 `passed=true`、`problems=[]`，退出原因为 `budget_exhausted`。96 个唯一候选各有一次成功的真实评分，96 次独立 BO 决策全部重放通过；没有 barrier 选择计划。实际候选池峰值 64、评估窗口峰值 32、评分并发峰值 4。研究期间有 32 次决策使用新回流结果，其中 31 次同时具备已拟合 GP 和 pending-aware 条件选择；63 次决策使用了拟合后的自定义先验。实际 CAS 过期及刷新也有回执。
+
+| 96 次验收指标 | 实测值 |
+| --- | ---: |
+| 控制器启动至停止 | 1,990.92 秒（33.18 分钟） |
+| 启动器全程，含准备和清理 | 2,033.58 秒（33.89 分钟） |
+| 研究与评分交叠 | 976.32 秒（16.27 分钟） |
+| 评分活跃区间并集 | 976.85 秒 |
+| 四个评分工作槽利用率，含全部等待 | 48.88% |
+| 成功评分吞吐 | 173.59 次/小时 |
+| 实际研究轮数 / 原始生成量 | 3 / 948 |
+
+中途生成任务 `job-00014` 在对 Ceph 归档 RFD3 checkpoint 做全量校验时发生长时间页读取等待（观察为 D / `folio_wait_bit_common`），旧 barrier 也出现同类等待。随后存储恢复，任务成功继续；没有跳过失败或篡改运行配置。这些等待和第三轮研究收尾均计入上表，不能用该试跑与一个短 barrier 试跑的吞吐比来声称异步加速。原始审计的本地副本在 `runs/her2-stream-pilot-a96c350c/audit-streaming.json`。
+
+正式运行前，把同一份 RFD3、ProteinMPNN 权重和完整 1N8Z 输入结构复制到 `/Aidata/shared/ldm/cache/streaming-models/`。三份文件均与原始 provenance 的 SHA256 完全一致，设为只读；原生工具的全量 provenance 校验用时 2.58 秒，记录为该目录的 `validation.json`。配置显式使用本地路径，不更换模型或科学参数。
+
+正式 640 次流式运行于北京时间 2026-11-18 21:28 启动，提交 `d8808f4d`，工作树 `/Aidata/shared/ldm/antibody-poc/streaming-cache-code`，运行目录 `/Aidata/shared/ldm/antibody-poc/runs/her2-stream-640-d8808f4d`，后台启动 PID `214263`。完成后自动保存全量审计及同为 640 次成功评分的 barrier 效率比较到 `audit-streaming.json`。如果 baseline 未完整成功，比较明确标为 unavailable。此记录不表示 640 次已完成。
+
+旧 barrier 未停止、未修改；正式流式启动时它已完成 420/640 次成功评分。最终比较须另外说明：新运行使用本地缓存，旧运行使用 Ceph 归档，这一存储差异也会影响总耗时，不能把全部差异归因于调度。所有开发、测试和运行未同步到 Claude 工作区。
