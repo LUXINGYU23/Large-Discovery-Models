@@ -38,8 +38,8 @@ def profile(role="cdrh3_research"):
                           file_sha256(RESOURCES / agents), tuple(directory_sha256(RESOURCES / p) for p in skills))
 
 
-def submission_contract(count, *, review=False):
-    properties = {"design_ids": {"type": "array", "minItems": 1, "maxItems": count,
+def submission_contract(count, *, review=False, minimum=1):
+    properties = {"design_ids": {"type": "array", "minItems": minimum, "maxItems": count,
                                   "items": {"type": "string"}}}
     required = ["design_ids"]
     if review:
@@ -52,7 +52,7 @@ def submission_contract(count, *, review=False):
 
 
 @contextmanager
-def worker_socket(worker):
+def worker_socket(worker, *, workspaces):
     from socketserver import UnixStreamServer
 
     class Handler(BaseHTTPRequestHandler):
@@ -63,13 +63,36 @@ def worker_socket(worker):
                     raise ValueError("Invalid design request")
                 request = json.loads(self.rfile.read(length))
                 rows = worker.execute(**request)
+                role = request.get("profile_id")
                 eligible = worker.eligible(rows)
-                data = {"backbone_id": rows[0]["backbone_id"], "candidates": eligible,
-                        "sampled": len(rows), "eligible_unique_new": len(eligible),
+                data = {"backbone_id": rows[0]["backbone_id"], "sampled": len(rows),
+                        "eligible_unique_new": len(eligible),
                         "remaining": worker.remaining(),
-                        "role_remaining": worker.role_remaining(request.get("profile_id"))}
-                if not eligible:
-                    data["next_action"] = "Choose an earlier eligible ID or sample another design."
+                        "role_remaining": worker.role_remaining(role)}
+                if worker.args.method == "ldm_harness" and getattr(worker.args, "research_candidates_per_role", 0):
+                    if role not in ("explorer", "refiner"):
+                        raise ValueError("Only generation roles have candidate catalogs")
+                    # Rebuild from durable receipts, so a replay never resamples or loses earlier calls.
+                    available = worker.eligible(row for job in worker.records()
+                        if job["round"] == worker.round and job.get("profile_id") == role
+                        and job.get("status") == "succeeded" for row in job.get("candidates", ()))
+                    compact = [{key: row[key] for key in ("design_id", "sequence", "backbone_id")}
+                               for row in available]
+                    relative = Path("generated") / f"g{worker.round + 1:06d}.json"
+                    atomic_json_write(workspaces[role] / relative,
+                                      {"generation": worker.round + 1, "role": role, "candidates": compact})
+                    data.update(candidate_catalog=f"/workspace/{relative.as_posix()}",
+                                total_eligible_unique_new=len(compact))
+                    if len(compact) < worker.args.research_candidates_per_role:
+                        data["next_action"] = ("Generate more within the remaining role budget. If it is exhausted, "
+                                               "submit the available IDs; if asked to retry, resubmit them until "
+                                               "the host closes the turn as a rejected shortfall.")
+                    else:
+                        data["next_action"] = "Read the candidate catalog and submit the exact required count."
+                else:
+                    data["candidates"] = eligible
+                    if not eligible:
+                        data["next_action"] = "Choose an earlier eligible ID or sample another design."
                 status = 200
             except (TypeError, ValueError, RuntimeError, OSError) as exc:
                 status, data = 400, {"error": str(exc)}
@@ -96,7 +119,7 @@ def worker_socket(worker):
 class AntibodyPiResearch(PiResearchSource):
     """One profile's persistent session, proposal validator, and watermark chain."""
 
-    version = "2"
+    version = "3"
 
     def __init__(self, client, service, worker, args, *, workspace=None):
         self.worker, self.args = worker, args
@@ -116,31 +139,41 @@ class AntibodyPiResearch(PiResearchSource):
         generation_round = getattr(self.worker, "round", 0)
         role = getattr(self, "role", "cdrh3_research")
         peer_ids = None if getattr(self, "peer_ids", None) is None else frozenset(self.peer_ids)
-        peer_only = role == "evidence_reviewer" or (role == "refiner" and
+        batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))
+        peer_only = role == "evidence_reviewer" or (not batch and role == "refiner" and
             (generation_round == 0 or self.worker.role_budget(role)["sequences"] == 0))
+        peer_sequences = frozenset()
+        if batch and role == "refiner" and peer_ids is not None:
+            catalog = self.worker.candidates()
+            peer_sequences = frozenset(catalog[key]["sequence"] for key in peer_ids)
         required = self.required
 
         def admit(design_id):
             if not isinstance(design_id, str):
                 return None
-            catalog = self.worker.candidates()
+            jobs = tuple(self.worker.records())
+            catalog = {row["design_id"]: row for job in jobs for row in job.get("candidates", ())}
             row = catalog.get(design_id)
             if row is None or row.get("violations"):
                 return None
             if peer_only and (peer_ids is None or design_id not in peer_ids):
                 return None
+            if batch and role == "refiner" and row["sequence"] in peer_sequences:
+                return None
             if role in ("explorer", "refiner") and not peer_only:
                 if not any(j.get("profile_id") == role and j["backbone_id"] and
+                           (not batch or j["round"] == generation_round) and
                            any(r["design_id"] == design_id for r in j.get("candidates", ()))
-                           for j in self.worker.records() if j.get("status") == "succeeded"):
+                           for j in jobs if j.get("status") == "succeeded"):
                     return None
-            if generation_round == 0 and row != next((r for r in catalog.values() if not r["violations"]), None):
+            if not batch and generation_round == 0 and row != next((r for r in catalog.values() if not r["violations"]), None):
                 return None
             result = AntibodyCandidateDomain(11).admit(RawProposal(row, self.args.method))
             return None if isinstance(result, CandidateRejection) else result
 
-        minimum = required if role == "cdrh3_research" else 1
-        return ProposalContract(submission_contract(required, review=role == "evidence_reviewer"), admit,
+        minimum = required if role == "cdrh3_research" or (batch and not peer_only) else 1
+        schema_minimum = 0 if batch and role in ("explorer", "refiner") else minimum
+        return ProposalContract(submission_contract(required, review=role == "evidence_reviewer", minimum=schema_minimum), admit,
                                 (minimum, required), "design_ids")
 
     def message(self, round_input, header):
@@ -153,7 +186,18 @@ class AntibodyPiResearch(PiResearchSource):
             details["role_remaining"] = self.worker.role_remaining(self.role)
         if self.peer_catalog:
             details["peer_catalog"] = self.peer_catalog
-        if self.worker.round == 0:
+        batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))
+        if batch and self.role in ("explorer", "refiner"):
+            details["generation_instructions"] = (
+                f"Generate your own candidates, starting with count={self.args.samples_per_call}, "
+                "and read the candidate_catalog returned by the tool. It lists eligible unique sequences "
+                "from all your calls this generation, excluding measured and pending "
+                "sequences and, for refiner, explorer's submitted sequences. Continue generating within "
+                "role_remaining until the exact minimum is available. If the budget is exhausted first, "
+                "submit the available IDs, even an empty list, so the shortfall is recorded as a failed turn; "
+                "if validation requests a retry, repeat this submission until the host closes the turn. "
+                "Do not substitute older or peer candidates.")
+        elif self.worker.round == 0:
             if self.role in ("explorer", "cdrh3_research"):
                 details["initialization"] = (f"Read the skill, then call design_h3 with count={self.args.samples_per_call} "
                     f"and temperature={self.args.temperature}. Submit the first eligible design ID.")
@@ -212,10 +256,24 @@ class AntibodyPiResearch(PiResearchSource):
     def research(self, round_input, history):
         self.worker.round = round_input["generation"] - 1
         self.worker.evaluated = {o.canonical_key for o in history} | set(round_input.get("pending_keys", ()))
+        if self.args.method == "ldm_harness" and getattr(self.args, "research_candidates_per_role", 0):
+            if self.role == "refiner" and self.peer_ids is not None:
+                catalog = self.worker.candidates()
+                self.worker.evaluated.update(catalog[key]["sequence"] for key in self.peer_ids)
         if self.role == "cdrh3_research":
             self.required = 1
         self.contract = self.make_contract()
-        return super().research(round_input, history)
+        outcome = super().research(round_input, history)
+        if (self.args.method == "ldm_harness" and getattr(self.args, "research_candidates_per_role", 0)
+                and self.role in ("explorer", "refiner") and outcome.status != "committed"):
+            rows = (row for job in self.worker.records()
+                    if job["round"] == self.worker.round and job.get("profile_id") == self.role
+                    and job.get("status") == "succeeded" for row in job.get("candidates", ()))
+            count = len(self.worker.eligible(rows))
+            reason = (f"{self.role}: {count} eligible unique new candidates available; "
+                      f"{self.required} required; role remaining {self.worker.role_remaining(self.role)}")
+            return replace(outcome, reason=f"{reason}; {outcome.reason}")
+        return outcome
 
 
 class RecordingClient:
@@ -236,7 +294,7 @@ class RecordingClient:
 class AntibodyResearchPanel:
     """Generate with two lineages, then independently review their submitted designs."""
 
-    version = "2"
+    version = "3"
 
     def __init__(self, sources, worker, args, root):
         self.sources, self.worker, self.args, self.root = sources, worker, args, Path(root)
@@ -272,7 +330,8 @@ class AntibodyResearchPanel:
     def research(self, round_input, history):
         generation = int(round_input["generation"])
         self.worker.round = generation - 1
-        outputs, proposals, catalogs = [], [], {}
+        batch = bool(getattr(self.args, "research_candidates_per_role", 0))
+        outputs, proposals, catalogs, by_role = [], [], {}, {}
         for role in PANEL:
             source = self.sources[role]
             source.peer_catalog, source.peer_ids = None, None
@@ -282,7 +341,10 @@ class AntibodyResearchPanel:
                 source.peer_catalog, source.peer_ids = self.catalog(
                     role, generation, round_input["watermarks"]["base_history_seq"], proposals)
                 catalogs[role] = source.peer_catalog
-            if generation == 1:
+            if batch:
+                source.required = (self.args.research_candidates_per_role if role != "evidence_reviewer"
+                                   else min(self.args.pool_size, len(source.peer_ids)))
+            elif generation == 1:
                 source.required = 1
             elif role == "explorer":
                 source.required = max(1, (self.args.pool_size + 1) // 2)
@@ -292,7 +354,9 @@ class AntibodyResearchPanel:
                 source.required = min(self.args.pool_size, len(source.peer_ids))
             outcome = source.research(round_input, history)
             outputs.append(outcome)
-            proposals.extend(outcome.proposals)
+            by_role[role] = outcome.proposals
+            if not batch or role != "evidence_reviewer":
+                proposals.extend(outcome.proposals)
         sessions, settled = {}, {}
         for outcome in outputs:
             sessions.update(outcome.metadata.get("sessions") or {})
@@ -302,7 +366,18 @@ class AntibodyResearchPanel:
             delivered.intersection_update(outcome.metadata.get("task_messages") or ())
         metadata = {"sessions": sessions, "task_messages": sorted(delivered),
                     "base_history_seq": round_input["watermarks"]["base_history_seq"],
-                    "bootstrap": generation == 1, "peer_catalogs": catalogs}
+                    "bootstrap": generation == 1 and not batch, "peer_catalogs": catalogs}
+        pool_error = ""
+        if batch:
+            role_keys = {role: [p.candidate.canonical_key for p in by_role.get(role, ())]
+                         for role in ("explorer", "refiner")}
+            metadata["candidate_counts"] = {role: len(keys) for role, keys in role_keys.items()}
+            expected = self.args.research_candidates_per_role
+            pool = set(role_keys["explorer"]) | set(role_keys["refiner"])
+            if (any(len(keys) != expected or len(set(keys)) != expected for keys in role_keys.values()) or
+                    set(role_keys["explorer"]) & set(role_keys["refiner"]) or len(pool) != self.args.pool_size):
+                pool_error = (f"batch requires {expected} unique new candidates from each generating role "
+                              f"and a {self.args.pool_size}-sequence union")
         if settled:
             metadata["settled"] = settled
         reviewer = self.sources["evidence_reviewer"].client
@@ -311,8 +386,10 @@ class AntibodyResearchPanel:
             if result.submission_status == "accepted":
                 metadata["review"] = dict(result.submission)
         failed = [role for role in PANEL if sessions.get(role, {}).get("submission_status") != "accepted"]
-        accepted = bool(proposals) and not failed
+        accepted = bool(proposals) and not failed and not pool_error
         reasons = [o.reason for o in outputs if o.reason]
+        if pool_error:
+            reasons.insert(0, pool_error)
         if failed:
             reasons.insert(0, "panel roles missing an accepted submission: " + ", ".join(failed))
         if not proposals:
@@ -336,7 +413,10 @@ def open_agent(args, directory, worker, bridge, campaign_id):
     root.mkdir(exist_ok=True)
     extension = "tools/design.mjs"
     roles = PANEL if args.method == "ldm_harness" else ("cdrh3_research",)
-    with worker_socket(worker) as socket_dir, ExitStack() as stack:
+    batch = args.method == "ldm_harness" and bool(getattr(args, "research_candidates_per_role", 0))
+    workspaces = {role: (root / role if len(roles) > 1 else root) / "sessions" / role / "workspace"
+                  for role in roles}
+    with worker_socket(worker, workspaces=workspaces) as socket_dir, ExitStack() as stack:
         sources = {}
         for role in roles:
             artifact_root = root / role if len(roles) > 1 else root
@@ -344,11 +424,16 @@ def open_agent(args, directory, worker, bridge, campaign_id):
             budgets = {"web_search": 0, "web_fetch": 0, "write": 0, "bash": 0}
             if role == "evidence_reviewer":
                 budgets.update(design_h3=0, sequence_h3=0)
+            count = (args.research_candidates_per_role if batch and role != "evidence_reviewer"
+                     else args.pool_size if role in PANEL else 1)
+            # Allow a shortfall report through the tool schema; the host contract rejects partial batches.
+            minimum = 0 if batch and role != "evidence_reviewer" else 1
+            wall_time = (1800 if role == "evidence_reviewer" else 9000) if batch else 900
+            response_timeout = wall_time + 300 if batch else 2100
             config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile(role),),
                 campaign_id=campaign_id, task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed,
-                submission_contract=submission_contract(args.pool_size if role in PANEL else 1,
-                                                        review=role == "evidence_reviewer"),
-                limits=HarnessLimits(wall_time_seconds=900, tool_call_budgets=budgets),
+                submission_contract=submission_contract(count, review=role == "evidence_reviewer", minimum=minimum),
+                limits=HarnessLimits(wall_time_seconds=wall_time, tool_call_budgets=budgets),
                 base_url=url.removesuffix("/responses"), model=model,
                 thinking=os.environ.get("LLM_REASONING_EFFORT", "off"), context7_enabled=False,
                 force_first_tool_call=False, guest_runtime=load_pi_guest_runtime("antibody_rfd3", RESOURCES / "image"),
@@ -356,10 +441,11 @@ def open_agent(args, directory, worker, bridge, campaign_id):
                                  file_sha256(RESOURCES / extension), TOOLS),), history=bridge.service.config)
             cmd = pi_sidecar_command(artifact_root, args.sidecar_image, cache_root=args.guest_cache,
                                      mounts=((RESOURCES, "/resources", True), (socket_dir, "/worker", True)))
-            client = stack.enter_context(HarnessClient(cmd, api_key=key, config=config, history=bridge.service))
+            client = stack.enter_context(HarnessClient(cmd, api_key=key, config=config, history=bridge.service,
+                                                       response_timeout_seconds=response_timeout))
             bridge.add_client(client)
             wrapped = RecordingClient(client) if len(roles) > 1 else client
-            workspace = artifact_root / "sessions" / role / "workspace"
+            workspace = workspaces[role]
             sources[role] = AntibodyPiResearch(wrapped, bridge.service, worker, args, workspace=workspace)
         if len(roles) == 1:
             yield sources[roles[0]]

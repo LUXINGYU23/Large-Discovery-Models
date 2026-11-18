@@ -232,7 +232,9 @@ class PolicyPrior:
         will act on, the round baselines of earlier generations and decision-keyed prediction records."""
         dedup = self.ledger.dedup_keys(db)
         reservoir, seen = [], set()
-        for _, occurrence in self.keeper.live(db):
+        retained = (self.keeper.live(db) if self.controller.pacing_config.reservoir != "generation_replacement"
+                    else ())
+        for _, occurrence in retained:
             key = occurrence.candidate.canonical_key
             if key not in dedup and key not in seen:
                 seen.add(key)
@@ -403,7 +405,8 @@ class PolicyPrior:
                 "SELECT base_ingest_seq FROM generations ORDER BY generation").fetchall())
             feedback = self.prediction_records(db, head)
             dedup = self.ledger.dedup_keys(db)
-            live = self.keeper.live(db)
+            live = (() if trigger == "generation" and
+                    self.controller.pacing_config.reservoir == "generation_replacement" else self.keeper.live(db))
             occurrence_head = db.execute("SELECT COALESCE(MAX(id),0) FROM occurrences").fetchone()[0]
             pending = [candidate_from_json(r[0]) for r in db.execute(
                 "SELECT candidate_json FROM experiments WHERE pending=1 ORDER BY decision_id").fetchall()]

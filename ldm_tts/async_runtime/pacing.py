@@ -28,6 +28,7 @@ class PacingConfig:
 
     reservoir_size: int  # R, the nominal reservoir size (capacity in distinct candidates)
     half_life: float  # h, in booked results
+    selection_batch_size: int = 1  # number chosen in one immutable barrier plan
     mode: str = "streaming"
     preset: str = "custom"
     theta: float = 0.5
@@ -52,7 +53,8 @@ class PacingConfig:
             if isinstance(value, bool) or not isinstance(value, int) or value < low:
                 raise ValueError(f"pacing {name} must be an integer >= {low}")
 
-        for name, low in (("reservoir_size", 1), ("max_empty_reservoir_rounds", 1), ("runtime_window", 1),
+        for name, low in (("reservoir_size", 1), ("selection_batch_size", 1),
+                          ("max_empty_reservoir_rounds", 1), ("runtime_window", 1),
                           ("breaker_window", 1), ("breaker_unstarted_failures", 1), ("max_message_chars", 1),
                           ("max_messages_per_round", 1)):
             integer(name, low)
@@ -60,6 +62,12 @@ class PacingConfig:
             integer("research_budget", 0)
         if self.mode not in MODES or self.dispatch_during_research not in HOLDS or self.reservoir not in RESERVOIRS:
             raise ValueError("unknown pacing mode, dispatch_during_research or reservoir maintenance")
+        if self.selection_batch_size > self.reservoir_size:
+            raise ValueError("selection_batch_size cannot exceed reservoir_size")
+        if self.mode == "streaming" and self.selection_batch_size != 1:
+            raise ValueError("streaming pacing requires selection_batch_size=1")
+        if self.mode == "barrier" and self.reservoir != "generation_replacement":
+            raise ValueError("barrier pacing requires generation replacement")
         for name in ("half_life", "theta", "kappa", "research_timeout_seconds", "breaker_failure_rate", "min_weight"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -255,10 +263,10 @@ class StreamingPacing:
 
 class BarrierPacing:
     """Synchronous baseline (5.4): D only at O = 0 and once per generation (the controller then draws a batch of
-    ``concurrency`` in one stepwise selection); R only at O = 0 once that generation's batch is done."""
+    ``selection_batch_size`` in one stepwise selection); R only once that generation's batch is settled."""
 
     name = "barrier"
-    version = "1"
+    version = "2"
 
     def decide(self, view: CampaignView) -> PacingDecision:
         reason = _gate(view)
@@ -268,10 +276,10 @@ class BarrierPacing:
             return PacingDecision("wait", "barrier")
         if view.lane.state != "idle" and view.has_research:
             return PacingDecision("wait", f"lane_{view.lane.state}")
-        if view.eligible == 0 or view.state.budget.free < 1:
-            return PacingDecision("wait", "reservoir_exhausted" if view.eligible == 0 else "budget")
         if view.has_research and view.batch_generation is not None and view.batch_generation >= view.current_generation:
             return PacingDecision("wait", "batch_done")
+        if view.eligible == 0 or view.state.budget.free < 1:
+            return PacingDecision("wait", "reservoir_exhausted" if view.eligible == 0 else "budget")
         if view.state.backoff_until is not None:
             return PacingDecision("wait", "es_backoff")
         return PacingDecision("dispatch")

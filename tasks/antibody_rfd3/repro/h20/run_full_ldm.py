@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare an isolated Absolut directory and run the real three-generation panel.
+"""Prepare an isolated Absolut directory and run a configured real research panel.
 
 Credentials are loaded by the caller on H20 and never written to the manifest.
 Run from a clean, committed checkout. Every invocation requires a new run root.
@@ -32,6 +32,10 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--config", type=Path,
+                        default=REPO / "config/antibody_rfd3/her2_ldm_research.yaml")
+    parser.add_argument("--rounds", type=int,
+                        help="Override batch research rounds and set evaluation budget to rounds * batch-size")
     parser.add_argument("--absolut-source", type=Path, required=True,
                         help="Prepared HER2 cache directory with a sibling launch.json asset manifest")
     parser.add_argument("--timeout", type=int, default=18000)
@@ -55,13 +59,19 @@ def main():
         parser.error("Asset manifest must identify HER2 (1N8Z_C)")
     if not (source / "src/bin/Absolut").is_file():
         parser.error("Absolut source must contain src/bin/Absolut")
-    config = REPO / "config/antibody_rfd3/her2_ldm_research.yaml"
+    config = args.config.resolve()
     effective = {key.replace("-", "_"): value
                  for key, value in yaml.safe_load(config.read_text())["args"].items()}
+    overrides = ["out_dir", "absolut_path"]
+    if args.rounds is not None:
+        if args.rounds < 1 or effective.get("batch_size", 1) <= 1:
+            parser.error("--rounds requires a positive count and a configured batch-size greater than one")
+        effective.update(research_rounds=args.rounds, iterations=args.rounds * effective["batch_size"])
+        overrides.extend(("research_rounds", "iterations"))
     effective.update(out_dir=str(root / "campaign"), absolut_path=str(root / "absolut"))
     cpus = ",".join(map(str, sorted(os.sched_getaffinity(0))[:effective["cpu_limit"]]))
     command = ["taskset", "-c", cpus, str(CAMPAIGN_PYTHON), "scripts/run_ldm_tts.py", str(config)]
-    for key in ("out_dir", "absolut_path"):
+    for key in overrides:
         command.extend(("--set", f"args.{key.replace('_', '-')}={json.dumps(effective[key])}"))
     image = effective["sidecar_image"]
     image_id = subprocess.check_output(["docker", "image", "inspect", "--format", "{{.Id}}", image], text=True).strip()
@@ -93,6 +103,10 @@ def main():
                 raise RuntimeError(f"Copy verification failed: {relative}")
             manifest["assets"].append({"name": str(relative), "bytes": destination.stat().st_size,
                                        "sha256": checksum})
+            destination.chmod(0o555 if relative == Path("src/bin/Absolut") else 0o444)
+        save_summary(target / "assets.json", {"schema_version": 1, "antigen": effective["antigen"],
+                                              "assets": manifest["assets"]})
+        (target / "assets.json").chmod(0o444)
         save()
         env = dict(os.environ, OMP_NUM_THREADS="2", OPENBLAS_NUM_THREADS="2", MKL_NUM_THREADS="2",
                    HF_HUB_OFFLINE="1", TOKENIZERS_PARALLELISM="false")

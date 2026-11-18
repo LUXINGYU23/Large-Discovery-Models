@@ -7,7 +7,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -177,6 +180,70 @@ def _lock_path(base, antigen):
     return Path(base) / f".antbo_llm_acq_{antigen}.lock"
 
 
+def _assets(base, antigen):
+    """Validate the run's immutable, explicitly listed Absolut inputs once."""
+    if not re.fullmatch(r"[A-Za-z0-9_]+", antigen):
+        raise ValueError("invalid Absolut antigen name")
+    manifest_path = base / "assets.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError("Absolut assets.json is required")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != 1 or manifest.get("antigen") != antigen:
+        raise ValueError("Absolut asset manifest version or antigen does not match")
+    records = manifest.get("assets")
+    if not isinstance(records, list) or not records:
+        raise ValueError("Absolut asset manifest must contain an asset list")
+    names = set()
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError("invalid Absolut asset record")
+        name, size, checksum = record.get("name"), record.get("bytes"), record.get("sha256")
+        if not isinstance(name, str) or not name:
+            raise ValueError("invalid Absolut asset name")
+        relative = Path(name)
+        if (relative.is_absolute() or ".." in relative.parts or relative.as_posix() != name or
+                (relative.parent != Path(".") and name != "src/bin/Absolut") or name in names):
+            raise ValueError(f"invalid or duplicate Absolut asset name: {name}")
+        if (name == "assets.json" or name.startswith(f".antbo_llm_acq_{antigen}.lock") or
+                name.startswith(f"TempCDR3_{antigen}_") or name.startswith(f"TempBindingsFor{antigen}_") or
+                name.startswith(f"{antigen}FinalBindings_")):
+            raise ValueError(f"Absolut asset conflicts with a runtime output: {name}")
+        if (not isinstance(size, int) or isinstance(size, bool) or size < 0 or
+                not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum)):
+            raise ValueError(f"invalid Absolut asset metadata: {name}")
+        path = base / relative
+        part = path
+        while part != base:
+            if part.is_symlink():
+                raise ValueError(f"Absolut assets must not contain symlinks: {name}")
+            part = part.parent
+        try:
+            info = path.stat()
+        except FileNotFoundError as exc:
+            raise ValueError(f"missing Absolut asset: {name}") from exc
+        if (not stat.S_ISREG(info.st_mode) or info.st_size != size or info.st_mode & 0o222 or
+                os.access(path, os.W_OK)):
+            raise ValueError(f"Absolut asset must be a read-only regular file of the recorded size: {name}")
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            for block in iter(lambda: source.read(8 * 1024 * 1024), b""):
+                digest.update(block)
+        if digest.hexdigest() != checksum:
+            raise ValueError(f"Absolut asset checksum differs: {name}")
+        names.add(name)
+    if "src/bin/Absolut" not in names or not os.access(base / "src/bin/Absolut", os.X_OK):
+        raise ValueError("Absolut manifest must include an executable src/bin/Absolut")
+    # The native repertoire command otherwise regenerates caches in its working
+    # directory. Require the matching structure, detailed and compact inputs.
+    compact = (re.fullmatch(r"(.+)\+(.+)-10-11-(.+)Compact\.txt", name) for name in names)
+    if ("selfFoldingsL=10minI=11Compact.txt" not in names or not any(
+            match and f"{match.group(1)}-10-11-{match.group(3)}Structures.txt" in names and
+            f"{match.group(1)}+{match.group(2)}-10-11-{match.group(3)}.txt" in names
+            for match in compact)):
+        raise ValueError("Absolut manifest does not contain a complete precomputed cache")
+    return tuple(sorted(names))
+
+
 class AbsolutExecutor:
     """External process groups with durable references and confirmed cancellation."""
 
@@ -185,7 +252,10 @@ class AbsolutExecutor:
                                         in_process=False, cancel_idempotent=True)
 
     def __init__(self, base, work_dir, antigen, validate):
-        self.base, self.work_dir, self.antigen, self._validate = base, work_dir.resolve(), antigen, validate
+        self.base, self.work_dir, self.antigen, self._validate = Path(base).resolve(), work_dir.resolve(), antigen, validate
+        if self.work_dir == self.base or self.work_dir.is_relative_to(self.base):
+            raise ValueError("Absolut attempt directory must be outside the input library")
+        self.assets = _assets(self.base, antigen)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.processes = {}
 
@@ -205,21 +275,28 @@ class AbsolutExecutor:
             if self.find(attempt.experiment_id, attempt.attempt_index):
                 return ref
             raise DispatchUncertain("attempt directory exists but its launch was not confirmed")
-        _write_json(directory / "request.json", {**dict(attempt.spec), "absolut_path": str(self.base),
-                                                   "attempt_id": uuid.uuid4().hex})
-        env = {key: value for key, value in os.environ.items()
-               if not any(key.upper().endswith(suffix) for suffix in ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD"))}
+        process = None
         try:
+            workspace = directory / "absolut"
+            workspace.mkdir()
+            for name in self.assets:
+                target = workspace / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.symlink_to(self.base / name)
+            _write_json(directory / "request.json", {**dict(attempt.spec), "absolut_path": str(self.base),
+                                                       "attempt_id": uuid.uuid4().hex})
+            env = {key: value for key, value in os.environ.items()
+                   if not any(key.upper().endswith(suffix) for suffix in ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD"))}
             with (directory / "worker.log").open("ab") as log:
                 process = subprocess.Popen([sys.executable, "-m", "tasks.antibody_rfd3.core.experiments",
                                             "absolut", str(directory)], stdout=log, stderr=subprocess.STDOUT,
                                            env=env, start_new_session=True)
-        except Exception:
-            # Nothing was launched; don't turn a definite launch error into a
-            # permanent ambiguous directory on an infrastructure retry.
-            (directory / "request.json").unlink(missing_ok=True)
-            (directory / "worker.log").unlink(missing_ok=True)
-            directory.rmdir()
+        except Exception as exc:
+            if process is not None:
+                self.processes[ref] = process
+                raise DispatchUncertain("worker launched but dispatch confirmation failed") from exc
+            # Nothing was launched, so cleanup cannot affect a live worker.
+            shutil.rmtree(directory)
             raise
         self.processes[ref] = process
         return ref
@@ -285,7 +362,7 @@ class AbsolutExecutor:
                 self._signal(ref, signal.SIGKILL)
         if alive:
             return AttemptStatus.active("stopping" if cancel.exists() else "running")
-        _remove_stale_lock(_lock_path(self.base, self.antigen), expected=identity)
+        _remove_stale_lock(_lock_path(directory / "absolut", self.antigen), expected=identity)
         result_path = directory / "result.json"
         if result_path.is_file():
             result = json.loads(result_path.read_text(encoding="utf-8"))
@@ -364,7 +441,8 @@ def _run_absolut(directory):
         request = json.loads((directory / "request.json").read_text(encoding="utf-8"))
         cpus = sorted(os.sched_getaffinity(0))
         evaluator = AntibodyEvaluator(ManagedAbsolut({"antigen": request["antigen"], "process": 1,
-            "startTask": cpus[0], "path": request["absolut_path"]}, request["attempt_id"]))
+            "startTask": cpus[0], "cpu_affinity": cpus, "path": str(directory / "absolut")},
+            request["attempt_id"]))
         candidate = AntibodyCandidateDomain(11).admit(RawProposal({"sequence": request["sequence"]}, "experiment"))
         result = evaluator.evaluate(candidate)
         if not result.succeeded:

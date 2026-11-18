@@ -161,7 +161,7 @@ def test_baseline_settings_and_contract_require_one_candidate(tmp_path):
     service = HistoryService(HistoryLog(), HistoryProjection(()))
     client = SimpleNamespace(config=SimpleNamespace(profiles=(profile(),)), history=service)
     source = AntibodyPiResearch(client, service, worker, args)
-    assert source.version == "2"
+    assert source.version == "3"
     settings = json.loads(source.message(round_input(1), {}).rsplit("\n\nTask settings: ", 1)[1])
     assert "required_candidates" not in settings
     assert settings["candidate_count"] == {"minimum": 1, "maximum": 1}
@@ -171,7 +171,7 @@ def test_baseline_settings_and_contract_require_one_candidate(tmp_path):
 
 def test_panel_bootstrap_review_and_exact_generation_replay(tmp_path):
     panel, clients, service = make_panel(tmp_path)
-    assert panel.version == "2"
+    assert panel.version == "3"
     first = panel.research(round_input(1), [])
     assert first.status == "committed" and first.metadata["bootstrap"]
     for client in clients.values():

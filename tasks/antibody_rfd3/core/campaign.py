@@ -143,9 +143,16 @@ def _run_locked(args, task_spec, directory):
     worker = DesignWorker(directory, args)
     bridge = HistoryBridge(directory / "history", history_projection(metric))
     dynamic_policy = args.method == "ldm_harness"
-    pacing = PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size,
-                                   dispatch_during_research="continue", research_budget=args.research_rounds,
-                                   research_timeout_seconds=3900 if dynamic_policy else 1200)
+    batch = args.batch_size > 1
+    if batch:
+        # Sequential response limits: two generators at 9300s each, reviewer and policy at 2100s each,
+        # plus 600s for panel and policy bookkeeping. Each generator may make multiple 900s model calls.
+        pacing = PacingConfig.barrier(reservoir_size=args.pool_size, selection_batch_size=args.batch_size,
+                                      research_budget=args.research_rounds, research_timeout_seconds=23400)
+    else:
+        pacing = PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size,
+                                       dispatch_during_research="continue", research_budget=args.research_rounds,
+                                       research_timeout_seconds=3900 if dynamic_policy else 1200)
     config = CampaignConfig("antibody_rfd3", budget=args.iterations, concurrency=args.concurrency,
                             seed=args.seed, extra=campaign_extra(pacing, task=scientific))
     objectives = ObjectiveSet.from_specs([ObjectiveSpec(metric, "minimize")])
@@ -167,7 +174,8 @@ def _run_locked(args, task_spec, directory):
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
             codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
             research=research, history=bridge, selector=selector, policy=policy,
-            pacing=PolicyRoundPacing() if dynamic_policy else InitializationPacing(), objectives=objectives,
+            pacing=None if batch else (PolicyRoundPacing() if dynamic_policy else InitializationPacing()),
+            objectives=objectives,
             options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30)))
         error = None
         try:
@@ -220,6 +228,7 @@ def _run_locked(args, task_spec, directory):
                     harness_usage["tool_calls"] += sum(usage.get("toolCalls", {}).values())
             policy_summary = None
             if policy is not None:
+                from ldm_tts.async_runtime.selectors import decision_choice
                 rounds = []
                 for generation in generations:
                     outcome = json.loads(generation.get("outcome_json") or "{}")
@@ -235,21 +244,29 @@ def _run_locked(args, task_spec, directory):
                 applications = policy.applications()
                 decisions = ctrl.decisions()
                 by_application = {a["application_id"]: a for a in applications}
-                used_generations = set()
+                used_generations, audited_plans = set(), set()
                 decision_records = []
                 for decision in decisions:
                     snapshot = decision["snapshot"]
-                    app_id = snapshot.get("inputs", {}).get("prior_application_id")
+                    record, inputs, step = decision_choice(ctrl.store, decision["decision_id"])
+                    app_id = inputs.get("prior_application_id")
                     application = by_application.get(app_id)
                     if application is not None:
                         used_generations.add(application["generation"])
+                    selection = record.get("selection", {})
+                    steps = selection.get("steps", [])
+                    selection_step = steps[step] if step < len(steps) else {}
                     decision_records.append({"decision_id": decision["decision_id"], "application_id": app_id,
                                              "generation": application["generation"] if application else None,
                                              "probability": snapshot.get("probability"),
-                                             "weights": (snapshot.get("record", {}).get("selection", {})
-                                                         .get("parameters", {}))})
-                    problems.extend(f"decision {decision['decision_id']}: {problem}"
-                                    for problem in ctrl.audit(decision["decision_id"]))
+                                             "gp_ready": selection_step.get("metadata", {}).get("gp_ready"),
+                                             "weights": selection.get("parameters", {})})
+                    plan_id = snapshot.get("plan", {}).get("id")
+                    if plan_id is None or plan_id not in audited_plans:
+                        problems.extend(f"decision {decision['decision_id']}: {problem}"
+                                        for problem in ctrl.audit(decision["decision_id"]))
+                        if plan_id is not None:
+                            audited_plans.add(plan_id)
                 problems.extend(policy.check())
                 expected = set(range(1, args.research_rounds + 1))
                 if {r["generation"] for r in rounds if r["state"] == "ready" and r.get("status") == "accepted"} != expected:
@@ -258,7 +275,52 @@ def _run_locked(args, task_spec, directory):
                     problems.append("not every requested generation's policy application was used by a decision")
                 if any(a["degraded"] for a in applications):
                     problems.append("one or more policy applications degraded to the default")
+                batch_records = []
+                if batch:
+                    decisions_by_plan = {}
+                    for row in ctrl.store.rows("""SELECT d.snapshot_json, e.es_state, e.disposition
+                            FROM decisions d JOIN experiments e ON e.decision_id=d.decision_id"""):
+                        plan_id = json.loads(row["snapshot_json"]).get("plan", {}).get("id")
+                        decisions_by_plan.setdefault(plan_id, []).append(row)
+                    for generation in generations:
+                        if generation["state"] != "ready":
+                            continue
+                        outcome = json.loads(generation.get("outcome_json") or "{}")
+                        counts = outcome.get("metadata", {}).get("candidate_counts")
+                        if counts != {"explorer": args.research_candidates_per_role,
+                                      "refiner": args.research_candidates_per_role}:
+                            problems.append(f"generation {generation['generation']}: incorrect role candidate counts")
+                        if generation["base_ingest_seq"] != (generation["generation"] - 1) * args.batch_size:
+                            problems.append(f"generation {generation['generation']}: incomplete prior batch feedback")
+                    for plan in ctrl.plans():
+                        inputs = json.loads(plan["inputs_json"])
+                        candidates = inputs.get("candidates", [])
+                        selected = json.loads(plan["keys_json"])
+                        record = json.loads(plan["record_json"]).get("selection", {})
+                        steps = record.get("steps", [])
+                        probabilities = json.loads(plan["probabilities_json"])
+                        plan_decisions = decisions_by_plan.get(plan["plan_id"], [])
+                        successes = sum(row["es_state"] == "SUCCEEDED" and row["disposition"] == "ingested"
+                                        for row in plan_decisions)
+                        if (len(candidates) != args.pool_size or
+                                len({item["canonical_key"] for item in candidates}) != args.pool_size):
+                            problems.append(f"plan {plan['plan_id']}: selection did not use the complete candidate pool")
+                        if (plan["count"] != args.batch_size or plan["consumed"] != args.batch_size or
+                                plan["closed_reason"] != "complete" or successes != args.batch_size):
+                            problems.append(f"plan {plan['plan_id']}: batch did not finish with all valid scores")
+                        if (len(selected) != len(steps) or len(steps) != len(probabilities) or
+                                any(item["candidate_id"] != step["selected_candidate_id"] or
+                                    probability != step["selected_probability"]
+                                    for item, step, probability in zip(selected, steps, probabilities))):
+                            problems.append(f"plan {plan['plan_id']}: selected candidates differ from the audited draw")
+                        batch_records.append({"generation": plan["generation"], "candidate_count": len(candidates),
+                                              "selected_count": len(selected), "successful_count": successes,
+                                              "history_count": inputs.get("head_ingest_seq"),
+                                              "gp_ready": steps[0].get("metadata", {}).get("gp_ready") if steps else None})
                 policy_summary = {"research_budget": args.research_rounds, "evaluation_budget": args.iterations,
+                                  "selection_batch_size": args.batch_size,
+                                  "candidate_pool_size": args.pool_size,
+                                  "batches": batch_records,
                                   "rounds": rounds, "applications": applications, "decisions": decision_records,
                                   "accepted_turns": sum(r.get("status") == "accepted" for r in rounds),
                                   "fallback_turns": sum(r.get("action") == "fallback" for r in rounds)}

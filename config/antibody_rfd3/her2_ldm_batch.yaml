@@ -1,0 +1,26 @@
+name: antibody_rfd3_her2_ldm_batch
+task: antibody_rfd3
+algorithm: ldm_harness
+mode: real
+description: Twenty research batches with 32 proposals per researcher, a 64-candidate BO pool, and 32 evaluations per batch.
+args:
+  method: ldm_harness
+  oracle: absolut
+  antigen: 1N8Z_C
+  iterations: 640
+  research-rounds: 20
+  batch-size: 32
+  research-candidates-per-role: 32
+  concurrency: 4
+  pool-size: 64
+  backbones-per-round: 16
+  sequences-per-round: 512
+  samples-per-call: 32
+  temperature: 0.5
+  seed: 42
+  gpu: 1
+  share-gpu: true
+  cpu-limit: 8
+  sidecar-image: ldm-copper-pi:antibody-async-20261118
+  guest-cache: /Aidata/shared/ldm/antibody-poc/cache/gondolin
+  out-dir: runs/her2_ldm_batch

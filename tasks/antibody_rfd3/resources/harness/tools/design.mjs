@@ -23,8 +23,8 @@ export default function register(pi) {
       temperature: {type: "number", minimum: 0.01, maximum: 1}};
     if (name === "sequence_h3") properties.backbone_id = {type: "string"};
     pi.registerTool({name, label: name, description: name === "design_h3"
-      ? "Generate a new RFD3 H3 backbone, then sample sequences on it."
-      : "Sample ProteinMPNN sequences on a previously generated backbone.",
+      ? "Generate a new RFD3 H3 backbone, then sample sequences on it; in batch mode read the returned candidate_catalog."
+      : "Sample ProteinMPNN sequences on a previously generated backbone; in batch mode read the returned candidate_catalog.",
     parameters: {type: "object", properties, required: Object.keys(properties), additionalProperties: false},
     execute: (id, params, _signal, _onUpdate, ctx) =>
       generate(name, params, id, basename(dirname(ctx.cwd)))});

@@ -8,7 +8,7 @@ and replaces the selection stage:
 
 Candidates come from the resident reservoir (``ReservoirKeeper``), selection from a reservoir selector
 (``ReferenceSelector`` = Kriging Believer by default, or a controller-core ``Selector`` labelled dedup-only).
-Streaming decisions select one candidate each; a barrier batch is one stepwise selection of ``concurrency``
+Streaming decisions select one candidate each; a barrier batch is one stepwise selection of ``selection_batch_size``
 candidates stored as a plan and turned into intents one at a time (each its own decision).
 """
 from __future__ import annotations
@@ -125,6 +125,8 @@ class PacedController(Controller):
         if policy is not None and research is not None:
             research = policy.wrap(research)
         self.pacing_config = PacingConfig.from_json(config.extra["pacing"])
+        if self.pacing_config.mode == "barrier" and config.budget % self.pacing_config.selection_batch_size:
+            raise ValueError("barrier evaluation budget must be a multiple of selection_batch_size")
         if self.pacing_config.research_budget is None and any(
                 getattr(h, "kind", "") == "action" and "request_research" in getattr(h, "actions", ()) for h in hooks):
             raise ValueError("an action hook may request research only with a finite pacing research_budget (5.9)")
@@ -221,6 +223,8 @@ class PacedController(Controller):
             progressed |= lane.poll()
         if self.policy is not None:
             progressed |= self.policy.step()  # supplementary / lifetime re-applications
+        if self.pacing_config.mode == "barrier" and not self.collect_only:
+            progressed |= self._check_batch()
         progressed |= self._abort_step()
         progressed |= self._select()
         progressed |= self._research()
@@ -253,9 +257,12 @@ class PacedController(Controller):
     def _select(self) -> bool:
         made = 0
         for _ in range(self.options.max_intents_per_step):
+            view = self.view()
+            if view.open_plan is not None and view.draining is not None:
+                self._consume_plan(view, view.open_plan)
+                break
             if self.ledger.dispatch_blockers():
                 break
-            view = self.view()
             if view.open_plan is not None:
                 if not self._consume_plan(view, view.open_plan):
                     break
@@ -269,10 +276,10 @@ class PacedController(Controller):
             candidates, uncovered = view.reservoir.candidates, ()
             if self.policy is not None:  # candidates the active application does not cover wait for a supplement
                 candidates, uncovered = self.policy.covered(candidates)
-                if not candidates:
+                if not candidates or (self.pacing_config.mode == "barrier" and uncovered):
                     break
             barrier = self.pacing_config.mode == "barrier"
-            count = min(self.config.concurrency, view.budget.free, view.eligible) if barrier else 1
+            count = self.pacing_config.selection_batch_size if barrier else 1
             decision_id = self.ledger.next_decision_id()
             plan_id = self.store.value("SELECT COALESCE(MAX(plan_id),0)+1 FROM plans")
             label = f"plan{plan_id:06d}" if barrier else decision_label(decision_id)
@@ -287,15 +294,17 @@ class PacedController(Controller):
                     self.ledger.anomaly(db, "selector_failed", label, {"error": f"{type(exc).__name__}: {exc}"},
                                         pause=True)
                 break
-            if choice is None:
+            if choice is None and not barrier:
                 self._exhausted = True
                 break
             eligible = {c.canonical_key: c for c in candidates}
-            if len(set(choice.keys)) != len(choice.keys) or any(k not in eligible for k in choice.keys):
+            if (choice is None or len(choice.keys) != count or len(choice.probabilities) != count
+                    or len(set(choice.keys)) != len(choice.keys) or any(k not in eligible for k in choice.keys)):
                 with self.store.tx("selection") as db:
                     self.ledger.anomaly(db, "selector_violation", label,
                                         {"selector": plugin_identity(self.reservoir_selector, "selector"),
-                                         "keys": list(choice.keys)}, pause=True)
+                                         "expected_count": count,
+                                         "keys": [] if choice is None else list(choice.keys)}, pause=True)
                 break
             candidates = [eligible[k] for k in choice.keys]
             if barrier:
@@ -311,6 +320,58 @@ class PacedController(Controller):
                 break
             made += 1
         return made > 0
+
+    def _check_batch(self) -> bool:
+        """Fail closed on incomplete research, plans, or unsuccessful evaluations."""
+        view = self.view()
+        if view.draining is not None:
+            return False  # the plan is explicitly abandoned by _consume_plan during drain/abort
+        with self.store.lock:
+            db = self.store.db
+            generation = db.execute("SELECT * FROM generations ORDER BY generation DESC LIMIT 1").fetchone()
+            plan = db.execute("SELECT * FROM plans ORDER BY plan_id DESC LIMIT 1").fetchone()
+            problem, detail, subject = None, {}, ""
+            if plan is not None:
+                subject = str(plan["plan_id"])
+                if plan["closed_reason"] and plan["closed_reason"] != "complete":
+                    problem = "batch_plan_incomplete"
+                    detail = {"reason": plan["closed_reason"], "consumed": plan["consumed"], "count": plan["count"]}
+                elif view.budget.free < plan["count"] - plan["consumed"]:
+                    problem = "batch_budget_insufficient"
+                    detail = {"free": view.budget.free, "remaining": plan["count"] - plan["consumed"]}
+                else:
+                    rows = db.execute("""SELECT e.experiment_id, e.es_state, e.disposition, e.written_off_at
+                        FROM decisions d JOIN experiments e ON e.decision_id=d.decision_id
+                        WHERE json_extract(d.snapshot_json, '$.plan.id')=?""", (plan["plan_id"],)).fetchall()
+                    bad = [r["experiment_id"] for r in rows if r["written_off_at"] is not None
+                           or r["es_state"] in ("CANCELED", "FAILED")
+                           or (r["es_state"] == "SUCCEEDED" and r["disposition"] != "ingested")]
+                    if bad:
+                        problem, detail = "batch_evaluation_incomplete", {"experiment_ids": bad}
+            if problem is None and generation is not None:
+                number = generation["generation"]
+                planned = plan is not None and plan["generation"] == number
+                subject = str(number)
+                if generation["state"] in ("rejected", "abandoned"):
+                    problem = "batch_research_incomplete"
+                    detail = {"state": generation["state"], "error": generation["error"]}
+                elif generation["state"] == "ready" and not planned:
+                    required = self.pacing_config.selection_batch_size
+                    capacity = self.pacing_config.reservoir_size
+                    distinct = db.execute("SELECT COUNT(DISTINCT canonical_key) FROM occurrences WHERE generation=?",
+                                          (number,)).fetchone()[0]
+                    if distinct > capacity or view.eligible < required:
+                        problem = "batch_candidates_incomplete"
+                        detail = {"required": required, "capacity": capacity, "proposals": generation["proposal_count"],
+                                  "distinct": distinct, "admitted": generation["admitted"],
+                                  "eligible": view.eligible}
+                    elif view.budget.free < self.pacing_config.selection_batch_size:
+                        problem = "batch_budget_insufficient"
+                        detail = {"free": view.budget.free, "required": self.pacing_config.selection_batch_size}
+        if problem is None:
+            return False
+        with self.store.tx("batch_check") as db:
+            return self.ledger.anomaly(db, problem, subject, detail, pause=True)
 
     def _snapshot(self, view: CampaignView, eligible: int) -> dict:
         return {"proposer": "reservoir@1", "selector": plugin_identity(self.reservoir_selector, "selector"),
@@ -370,7 +431,9 @@ class PacedController(Controller):
             return False
         view = self.view()
         request = view.research_requested
-        if request is not None and research_guards(view) is None:
+        barrier_ready = (self.pacing_config.mode != "barrier" or
+                         self.pacing.research(view).action == "research")
+        if request is not None and research_guards(view) is None and barrier_ready:
             return self.lane.start(f"hook:{request['request_id']}", request.get("note", "")) is not None
         if getattr(self.pacing, "research", None) is not None and self.pacing.research(view).action == "research":
             return self.lane.start("rule_r") is not None

@@ -691,6 +691,9 @@ class AbsolutEvaluator:
         absolut_path = self.bbox["path"]
         n_proc = int(self.bbox["process"])
         start_task = int(self.bbox["startTask"])
+        cpu_affinity = self.bbox.get("cpu_affinity")
+        taskset_cpus = (",".join(map(str, cpu_affinity)) if cpu_affinity is not None
+                        else f"{start_task}-{start_task + n_proc}")
         tmp = f"TempCDR3_{antigen}_{self.run_id}.txt"
         out = f"{antigen}FinalBindings_Process_1_Of_1.txt"
         cwd = os.getcwd()
@@ -709,7 +712,7 @@ class AbsolutEvaluator:
                 [
                     "taskset",
                     "-c",
-                    f"{start_task}-{start_task + n_proc}",
+                    taskset_cpus,
                     "./src/bin/Absolut",
                     "repertoire",
                     antigen,

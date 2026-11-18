@@ -28,7 +28,7 @@ def test_reasoning_effort_reaches_pi_configuration(tmp_path, monkeypatch, effort
             preflights.append(True)
 
     class FakeClient:
-        def __init__(self, command, *, api_key, config, history):
+        def __init__(self, command, *, api_key, config, history, response_timeout_seconds):
             self.config, self.history = config, history
             clients.append(self)
 
@@ -39,7 +39,7 @@ def test_reasoning_effort_reaches_pi_configuration(tmp_path, monkeypatch, effort
             pass
 
     @contextmanager
-    def fake_worker_socket(worker):
+    def fake_worker_socket(worker, *, workspaces):
         yield tmp_path
 
     monkeypatch.setattr(harness, "OpenAICompatibleProposalClient", FakeProbe)

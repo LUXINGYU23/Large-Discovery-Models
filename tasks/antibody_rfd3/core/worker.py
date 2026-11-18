@@ -48,7 +48,7 @@ class DesignWorker:
             return {"backbones": self.args.backbones_per_round, "sequences": self.args.sequences_per_round}
         if profile_id not in ("explorer", "refiner", "evidence_reviewer"):
             raise ValueError("Unknown panel role")
-        if self.round == 0:
+        if self.round == 0 and not getattr(self.args, "research_candidates_per_role", 0):
             limits = {"backbones": 1, "sequences": self.args.samples_per_call} if profile_id == "explorer" else {
                 "backbones": 0, "sequences": 0}
         elif profile_id == "evidence_reviewer":
@@ -101,7 +101,8 @@ class DesignWorker:
                 return receipt["candidates"]
             if any(row["status"] != "succeeded" for row in jobs):
                 raise RuntimeError("Generation has an unresolved or failed receipt; inspect it before retrying")
-        if self.round == 0 and (action != "design_h3" or temperature != self.args.temperature or
+        if self.round == 0 and not getattr(self.args, "research_candidates_per_role", 0) and (
+                                action != "design_h3" or temperature != self.args.temperature or
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
             raise ValueError(f"Shared initialization uses design_h3, count={self.args.samples_per_call}, temperature={self.args.temperature}")
         known = {r["backbone_id"] for r in self.candidates().values()}
