@@ -22,7 +22,7 @@ from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOLS = ("design_h3", "sequence_h3")
+TOOLS = ("design_h3", "sequence_h3", "candidate_catalog")
 PANEL = ("explorer", "refiner", "evidence_reviewer")
 
 
@@ -62,13 +62,20 @@ def worker_socket(worker, *, workspaces):
                 if self.path != "/" or not 0 < length <= 4096:
                     raise ValueError("Invalid design request")
                 request = json.loads(self.rfile.read(length))
-                rows = worker.execute(**request)
                 role = request.get("profile_id")
+                refresh = request.get("action") == "candidate_catalog"
+                if refresh:
+                    if set(request) != {"action", "call_id", "profile_id"}:
+                        raise ValueError("Invalid catalog request")
+                    rows = ()
+                else:
+                    rows = worker.execute(**request)
                 eligible = worker.eligible(rows)
-                data = {"backbone_id": rows[0]["backbone_id"], "sampled": len(rows),
-                        "eligible_unique_new": len(eligible),
-                        "remaining": worker.remaining(),
+                data = {"remaining": worker.remaining(),
                         "role_remaining": worker.role_remaining(role)}
+                if rows:
+                    data.update(backbone_id=rows[0]["backbone_id"], sampled=len(rows),
+                                eligible_unique_new=len(eligible))
                 if worker.args.method == "ldm_harness" and getattr(worker.args, "research_candidates_per_role", 0):
                     if role not in ("explorer", "refiner"):
                         raise ValueError("Only generation roles have candidate catalogs")
@@ -90,6 +97,8 @@ def worker_socket(worker, *, workspaces):
                     else:
                         data["next_action"] = "Read the candidate catalog and submit the exact required count."
                 else:
+                    if refresh:
+                        raise ValueError("Candidate catalogs require exact role proposals")
                     data["candidates"] = eligible
                     if not eligible:
                         data["next_action"] = "Choose an earlier eligible ID or sample another design."
@@ -130,6 +139,8 @@ class AntibodyPiResearch(PiResearchSource):
         self.required = 1
         self.peer_catalog = None
         self.peer_ids = None
+        self.excluded_pool = frozenset()
+        worker.history_log = service.log
         super().__init__(client, service, self.make_contract(), name=f"antibody-{args.method}", instructions=(
             "Read the cdrh3-design skill, use experiment_history to inspect measured and pending sequences, "
             "then submit issued eligible design IDs. Lower energy is better. A proposal is not a measurement."))
@@ -139,6 +150,7 @@ class AntibodyPiResearch(PiResearchSource):
         generation_round = getattr(self.worker, "round", 0)
         role = getattr(self, "role", "cdrh3_research")
         peer_ids = None if getattr(self, "peer_ids", None) is None else frozenset(self.peer_ids)
+        excluded_pool = frozenset(getattr(self, "excluded_pool", ()))
         batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))
         peer_only = role == "evidence_reviewer" or (not batch and role == "refiner" and
             (generation_round == 0 or self.worker.role_budget(role)["sequences"] == 0))
@@ -159,6 +171,8 @@ class AntibodyPiResearch(PiResearchSource):
             if peer_only and (peer_ids is None or design_id not in peer_ids):
                 return None
             if batch and role == "refiner" and row["sequence"] in peer_sequences:
+                return None
+            if batch and role in ("explorer", "refiner") and row["sequence"] in excluded_pool:
                 return None
             if role in ("explorer", "refiner") and not peer_only:
                 if not any(j.get("profile_id") == role and j["backbone_id"] and
@@ -188,11 +202,14 @@ class AntibodyPiResearch(PiResearchSource):
             details["peer_catalog"] = self.peer_catalog
         batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))
         if batch and self.role in ("explorer", "refiner"):
+            details["excluded_live_sequences"] = sorted(self.excluded_pool)
             details["generation_instructions"] = (
                 f"Generate your own candidates, starting with count={self.args.samples_per_call}, "
                 "and read the candidate_catalog returned by the tool. It lists eligible unique sequences "
-                "from all your calls this generation, excluding measured and pending "
-                "sequences and, for refiner, explorer's submitted sequences. Continue generating within "
+                "from all your calls this generation, excluding measured, pending, and the live sequences "
+                "listed at the start of this generation, plus explorer's submissions for refiner. Call "
+                "candidate_catalog before submitting to refresh measured and pending exclusions. "
+                "Continue generating within "
                 "role_remaining until the exact minimum is available. If the budget is exhausted first, "
                 "submit the available IDs, even an empty list, so the shortfall is recorded as a failed turn; "
                 "if validation requests a retry, repeat this submission until the host closes the turn. "
@@ -241,21 +258,25 @@ class AntibodyPiResearch(PiResearchSource):
             if sent is not None and self.service.terminal_decision(role, turn_id) is not None:
                 settings = json.loads(sent["message"].rsplit("\n\nTask settings: ", 1)[1])
                 previous = (int(generation) - 1, int(settings["candidate_count"]["maximum"]),
-                            self._catalog_ids(settings.get("peer_catalog")))
+                            self._catalog_ids(settings.get("peer_catalog")),
+                            frozenset(settings.get("excluded_live_sequences", ())))
                 break
         if previous is None:
             return super().settle(round_input)
-        current = (self.worker.round, self.required, self.peer_ids, self.contract)
+        current = (self.worker.round, self.required, self.peer_ids, self.excluded_pool, self.contract)
         try:
-            self.worker.round, self.required, self.peer_ids = previous
+            self.worker.round, self.required, self.peer_ids, self.excluded_pool = previous
             self.contract = self.make_contract()
             return super().settle(round_input)
         finally:
-            self.worker.round, self.required, self.peer_ids, self.contract = current
+            self.worker.round, self.required, self.peer_ids, self.excluded_pool, self.contract = current
 
     def research(self, round_input, history):
         self.worker.round = round_input["generation"] - 1
-        self.worker.evaluated = {o.canonical_key for o in history} | set(round_input.get("pending_keys", ()))
+        self.excluded_pool = frozenset(candidate["canonical_key"] for candidate in
+                                       (round_input.get("policy") or {}).get("reservoir", ()))
+        self.worker.evaluated = ({o.canonical_key for o in history} | set(round_input.get("pending_keys", ())) |
+                                 self.excluded_pool)
         if self.args.method == "ldm_harness" and getattr(self.args, "research_candidates_per_role", 0):
             if self.role == "refiner" and self.peer_ids is not None:
                 catalog = self.worker.candidates()
@@ -422,8 +443,10 @@ def open_agent(args, directory, worker, bridge, campaign_id):
             artifact_root = root / role if len(roles) > 1 else root
             artifact_root.mkdir(exist_ok=True)
             budgets = {"web_search": 0, "web_fetch": 0, "write": 0, "bash": 0}
+            if not batch:
+                budgets["candidate_catalog"] = 0
             if role == "evidence_reviewer":
-                budgets.update(design_h3=0, sequence_h3=0)
+                budgets.update(design_h3=0, sequence_h3=0, candidate_catalog=0)
             count = (args.research_candidates_per_role if batch and role != "evidence_reviewer"
                      else args.pool_size if role in PANEL else 1)
             # Allow a shortfall report through the tool schema; the host contract rejects partial batches.

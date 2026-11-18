@@ -9,6 +9,7 @@ args:
   antigen: 1N8Z_C
   iterations: 640
   research-rounds: 20
+  pacing-mode: barrier
   batch-size: 32
   research-candidates-per-role: 32
   concurrency: 4

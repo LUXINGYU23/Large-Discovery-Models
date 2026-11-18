@@ -10,7 +10,6 @@ import tempfile
 import numpy as np
 
 from ldm_tts.async_runtime import PacingDecision, Proposal, ResearchOutcome, StreamingPacing
-from ldm_tts.async_runtime.pacing import research_guards
 from ldm_tts.contracts import CandidateRejection, RawProposal
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
@@ -23,41 +22,6 @@ class InitializationPacing(StreamingPacing):
     def research(self, view):
         if view.head_ingest_seq == 0 and view.outstanding:
             return PacingDecision("wait", "initial_measurement_pending")
-        return super().research(view)
-
-
-class PolicyRoundPacing(InitializationPacing):
-    """Reserve one evaluation for each unfinished research/policy generation.
-
-    Extra evaluation slots remain streaming and can run while research is in
-    progress. When exactly one slot per generation remains, wait for the new
-    generation's application and for a measurement from every previous round.
-    """
-
-    name = "antibody-policy-rounds"
-
-    @staticmethod
-    def reserved(view):
-        return max(0, view.pacing.research_budget - view.current_generation)
-
-    def decide(self, view):
-        decision = super().decide(view)
-        if decision.action == "dispatch" and view.budget.free <= self.reserved(view):
-            return PacingDecision("wait", "reserved_for_research")
-        return decision
-
-    def research(self, view):
-        reason = research_guards(view)
-        if reason:
-            return PacingDecision("wait", reason)
-        if view.head_ingest_seq == 0 and view.outstanding:
-            return PacingDecision("wait", "initial_measurement_pending")
-        needs_round = (view.current_generation > 0 and view.selected_since_ready > 0
-                       and view.budget.free <= self.reserved(view))
-        if needs_round:
-            if view.head_ingest_seq < view.current_generation:
-                return PacingDecision("wait", "round_measurement_pending")
-            return PacingDecision("research")
         return super().research(view)
 
 

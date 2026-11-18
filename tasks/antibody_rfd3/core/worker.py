@@ -28,6 +28,7 @@ class DesignWorker:
         self.round = 0
         self.runtime = None
         self.evaluated = set()
+        self.history_log = None
 
     def records(self):
         for path in sorted(self.jobs.glob("job-*/receipt.json")):
@@ -67,6 +68,9 @@ class DesignWorker:
 
     def eligible(self, rows):
         seen = set(self.evaluated)
+        if self.history_log is not None:
+            current = self.history_log.view()
+            seen.update(current.measured_keys | current.pending_keys)
         available = []
         for row in rows:
             if not row["violations"] and row["sequence"] not in seen:

@@ -6,9 +6,6 @@ import json
 import numpy as np
 import pytest
 
-from ldm_tts.async_runtime.ledger import Budget, StateView
-from ldm_tts.async_runtime.pacing import CampaignView, LaneStatus, PacingConfig
-from ldm_tts.async_runtime.reservoir import ReservoirView
 from ldm_tts.async_runtime.selection import SelectionContext
 from ldm_tts.contracts import Candidate, EvaluationResult, Observation
 from ldm_tts.harness import PolicyResearchController, PolicyRoundInput
@@ -19,7 +16,6 @@ from ldm_tts.optimization.records import SelectionSeed
 from tasks.antibody_rfd3.core.experiments import AntibodyCodec, ENERGY_UTILITY
 from tasks.antibody_rfd3.core.policy import (AMINO_ACIDS, FEATURE_NAMES, FEATURE_VERSION,
     AntibodyPolicyAdapter, featurize, make_selector)
-from tasks.antibody_rfd3.core.research import PolicyRoundPacing
 from tasks.antibody_rfd3.core.workflow import describe_ldm_task, parse_args
 
 
@@ -111,38 +107,6 @@ def test_async_feedback_reaches_policy_controller_and_is_persisted(tmp_path):
     assert prediction_feedback["measurements"][0]["measured_utility"] == 9.0
 
 
-def view(generation, *, free, head, outstanding=0, selected=1, running=False, total=3):
-    pacing = PacingConfig.balanced(concurrency=2, reservoir_size=6, research_budget=3,
-                                   dispatch_during_research="continue")
-    state = StateView(now=0, campaign_id="test", status="active", stop_reason=None,
-        budget=Budget(limit=total, held=outstanding, consumed=total - free - outstanding, refunded=0, started=0),
-        pending=(), unstarted=0, outstanding=outstanding, dedup_keys=frozenset(), observation_count=head,
-        head_ingest_seq=head, paused=(), backoff_until=None, collect_only=False, slot_available=True)
-    item = candidate("AAAAAAAAAAA")
-    reservoir = ReservoirView((item,), (1.0,), (1.0,), 1.0, head, 1)
-    return CampaignView(state=state, reservoir=reservoir, stale=False,
-        lane=LaneStatus("running", generation + 1, 0, 100) if running else LaneStatus(),
-        delta=1, selected_since_ready=selected, runtime_median=None, observed_running=outstanding,
-        empty_rounds=0, research_used=generation + int(running), research_requested=None, draining=None,
-        current_generation=generation, batch_generation=None, open_plan=None, pacing=pacing)
-
-
-def test_each_reserved_generation_is_applied_before_its_evaluation():
-    pacing = PolicyRoundPacing()
-    first_pending = view(1, free=2, head=0, outstanding=1)
-    assert pacing.decide(first_pending).reason == "reserved_for_research"
-    assert pacing.research(first_pending).reason == "initial_measurement_pending"
-    assert pacing.research(view(1, free=2, head=1)).action == "research"
-    second_pending = view(2, free=1, head=1, outstanding=1)
-    assert pacing.decide(second_pending).reason == "reserved_for_research"
-    assert pacing.research(second_pending).reason == "round_measurement_pending"
-    assert pacing.research(view(2, free=1, head=2)).action == "research"
-    assert pacing.decide(view(2, free=1, head=2, running=True)).reason == "reserved_for_research"
-    assert pacing.decide(view(3, free=1, head=2)).action == "dispatch"
-    # Extra evaluations may dispatch while another research generation runs.
-    assert pacing.decide(view(1, free=3, head=1, running=True, total=4)).action == "dispatch"
-
-
 def test_research_and_evaluation_budgets_are_independent():
     args = parse_args(["--method", "ldm_harness", "--iterations", "5", "--research-rounds", "3"])
     task = describe_ldm_task(args)
@@ -150,5 +114,20 @@ def test_research_and_evaluation_budgets_are_independent():
     assert task.objectives[0].direction == "minimize"
     assert task.acquisition.objective_names == (ENERGY_UTILITY,)
     assert task.surrogate.dimension == 220
+    assert parse_args(["--method", "ldm_harness", "--iterations", "2", "--research-rounds", "3"]).research_rounds == 3
+
+
+def test_streaming_window_and_exact_roles_are_independent_of_research_budget():
+    from tasks.antibody_rfd3.core.campaign import pacing_config
+
+    args = parse_args(["--method", "ldm_harness", "--iterations", "96", "--research-rounds", "64",
+        "--pacing-mode", "streaming", "--evaluation-window", "32", "--concurrency", "4", "--pool-size", "64",
+        "--research-candidates-per-role", "32", "--sequences-per-round", "512", "--backbones-per-round", "16"])
+    pacing = pacing_config(args)
+    assert (args.iterations, args.research_rounds, args.evaluation_window - args.concurrency) == (96, 64, 28)
+    assert (pacing.mode, pacing.selection_batch_size, pacing.reservoir_size) == ("streaming", 1, 64)
+    assert (pacing.half_life, pacing.theta, pacing.dispatch_during_research) == (32, 0.75, "continue")
     with pytest.raises(SystemExit):
-        parse_args(["--method", "ldm_harness", "--iterations", "2", "--research-rounds", "3"])
+        parse_args(["--method", "ldm_harness", "--batch-size", "32"])
+    with pytest.raises(SystemExit):
+        parse_args(["--evaluation-window", "1", "--concurrency", "4"])

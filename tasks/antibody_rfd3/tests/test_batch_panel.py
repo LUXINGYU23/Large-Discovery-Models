@@ -1,6 +1,7 @@
 """Batch panel contracts, durable generation budgets, catalogs and recovery."""
 import http.client
 import json
+import random
 import socket
 from contextlib import contextmanager
 from pathlib import Path
@@ -24,7 +25,7 @@ from tasks.antibody_rfd3.tests.test_multi_research import FakeClient, Result, ro
 
 def batch_args():
     return parse_args(["--method", "ldm_harness", "--mock", "--iterations", "64", "--research-rounds", "2",
-                       "--batch-size", "32", "--pool-size", "64", "--research-candidates-per-role", "32",
+                       "--pacing-mode", "barrier", "--batch-size", "32", "--pool-size", "64", "--research-candidates-per-role", "32",
                        "--backbones-per-round", "16", "--sequences-per-round", "512", "--samples-per-call", "32"])
 
 
@@ -119,7 +120,7 @@ def test_batch_profile_schema_and_timeouts(tmp_path, monkeypatch):
     monkeypatch.setattr(harness, "HarnessClient", Client)
     monkeypatch.setattr(harness, "worker_socket", fake_socket)
     monkeypatch.setattr(harness, "pi_sidecar_command", lambda *args, **kwargs: ("sidecar",))
-    service = SimpleNamespace(config=HarnessHistoryConfig(), lineage_of=lambda role: role)
+    service = SimpleNamespace(config=HarnessHistoryConfig(), lineage_of=lambda role: role, log=HistoryLog())
     bridge = SimpleNamespace(service=service, add_client=lambda _client: None)
     args = batch_args()
     worker = DesignWorker(tmp_path, args)
@@ -173,6 +174,25 @@ def test_recovery_rejects_a_modified_peer_catalog(tmp_path):
     path.write_text('{"candidates": []}\n')
     with pytest.raises(ValueError, match="Peer catalog differs"):
         source._catalog_ids(info)
+
+
+def test_streaming_panel_excludes_live_pool_and_replays_contract(tmp_path):
+    panel, clients, _service = make_batch_panel(tmp_path)
+    panel.args.pacing_mode = "streaming"
+    rng = random.Random(panel.args.seed)
+    sampled = ["".join(rng.choices("AGSPDTYN", k=11)) for _ in range(panel.args.samples_per_call)]
+    from tasks.antibody.core.engine_adapters import _sequence_violations
+    live = next(sequence for sequence in sampled if not _sequence_violations(sequence, 11))
+    frozen = round_input(1)
+    frozen["policy"] = {"reservoir": [{"canonical_key": live}]}
+    result = panel.research(frozen, [])
+    assert result.status == "committed" and result.metadata["candidate_counts"] == {"explorer": 32, "refiner": 32}
+    assert live not in {proposal.candidate.canonical_key for proposal in result.proposals}
+    for role in ("explorer", "refiner"):
+        settings = json.loads(clients[role].sent_messages[-1].rsplit("\n\nTask settings: ", 1)[1])
+        assert settings["excluded_live_sequences"] == [live]
+    replay = panel.research(frozen, [])
+    assert replay.status == "committed" and all(s["replayed"] for s in replay.metadata["sessions"].values())
 
 
 def test_exact_contract_enforces_own_current_issuance_and_sequence_collisions(tmp_path):
@@ -262,6 +282,7 @@ def test_tool_catalog_rebuilds_from_receipts_and_filters_peer_sequences(tmp_path
     args = batch_args()
     args.mock = False
     worker = DesignWorker(tmp_path, args)
+    worker.history_log = HistoryLog()
     a, b, c = "AGSPDTYAGSP", "GSPDTYAGSPA", "PDTYAGSPTGA"
     batches = iter(([a, a, "AAAAAAAAAAA"], [a, b, c]))
     monkeypatch.setattr(worker, "run_models", lambda *_: next(batches))
@@ -288,6 +309,16 @@ def test_tool_catalog_rebuilds_from_receipts_and_filters_peer_sequences(tmp_path
         replay = request(path, "explorer", "first")
         assert json.loads(catalog.read_text()) == snapshot and replay == first
         assert len(list(worker.records())) == 1
+        worker.history_log.append([HistoryRecord("selected", "live", a, "live", "selected")])
+        connection = UnixConnection(path / "design.sock")
+        connection.request("POST", "/", json.dumps({"action": "candidate_catalog", "profile_id": "explorer",
+                                                      "call_id": "refresh"}))
+        response = connection.getresponse()
+        refreshed = json.loads(response.read())
+        connection.close()
+        assert response.status == 200
+        assert refreshed["total_eligible_unique_new"] == 0 and refreshed["role_remaining"] == first["role_remaining"]
+        assert json.loads(catalog.read_text())["candidates"] == [] and len(list(worker.records())) == 1
         worker.evaluated.add(a)
         result = request(path, "refiner", "first")
         rows = json.loads((workspaces["refiner"] / "generated/g000001.json").read_text())["candidates"]

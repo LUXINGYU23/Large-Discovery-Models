@@ -17,7 +17,7 @@ from ldm_tts.contracts import ObjectiveSet, ObjectiveSpec
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir
 from ldm_tts.registration.experiment import load_active_experiment_contract
 from .experiments import AntibodyCodec, KIND, history_projection
-from .research import InitializationPacing, NativeResearch, PolicyRoundPacing
+from .research import InitializationPacing, NativeResearch
 from .worker import DesignWorker
 
 REPOSITORY = Path(__file__).resolve().parents[3]
@@ -122,6 +122,18 @@ def run(args, task_spec):
         return _run_locked(args, task_spec, directory)
 
 
+def pacing_config(args):
+    exact_roles = bool(args.research_candidates_per_role)
+    if args.pacing_mode == "barrier":
+        return PacingConfig.barrier(reservoir_size=args.pool_size, selection_batch_size=args.batch_size,
+                                    research_budget=args.research_rounds, research_timeout_seconds=23400)
+    options = {"dispatch_during_research": "continue", "research_budget": args.research_rounds,
+               "research_timeout_seconds": 23400 if exact_roles else 3900 if args.method == "ldm_harness" else 1200}
+    if exact_roles:
+        options.update(theta=0.75, half_life=float(args.evaluation_window))
+    return PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size, **options)
+
+
 def _run_locked(args, task_spec, directory):
     config_data = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     ignored = {"out_dir", "dry_run", "resume_run"}
@@ -143,17 +155,10 @@ def _run_locked(args, task_spec, directory):
     worker = DesignWorker(directory, args)
     bridge = HistoryBridge(directory / "history", history_projection(metric))
     dynamic_policy = args.method == "ldm_harness"
-    batch = args.batch_size > 1
-    if batch:
-        # Sequential response limits: two generators at 9300s each, reviewer and policy at 2100s each,
-        # plus 600s for panel and policy bookkeeping. Each generator may make multiple 900s model calls.
-        pacing = PacingConfig.barrier(reservoir_size=args.pool_size, selection_batch_size=args.batch_size,
-                                      research_budget=args.research_rounds, research_timeout_seconds=23400)
-    else:
-        pacing = PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size,
-                                       dispatch_during_research="continue", research_budget=args.research_rounds,
-                                       research_timeout_seconds=3900 if dynamic_policy else 1200)
+    batch = args.pacing_mode == "barrier"
+    pacing = pacing_config(args)
     config = CampaignConfig("antibody_rfd3", budget=args.iterations, concurrency=args.concurrency,
+                            buffer_depth=args.evaluation_window - args.concurrency,
                             seed=args.seed, extra=campaign_extra(pacing, task=scientific))
     objectives = ObjectiveSet.from_specs([ObjectiveSpec(metric, "minimize")])
     with ExitStack() as stack:
@@ -174,9 +179,10 @@ def _run_locked(args, task_spec, directory):
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
             codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
             research=research, history=bridge, selector=selector, policy=policy,
-            pacing=None if batch else (PolicyRoundPacing() if dynamic_policy else InitializationPacing()),
+            pacing=None if batch or args.research_candidates_per_role else InitializationPacing(),
             objectives=objectives,
-            options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30)))
+            options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30,
+                                   max_intents_per_step=16 if batch else 1)))
         error = None
         try:
             while not ctrl.finished:
@@ -268,14 +274,29 @@ def _run_locked(args, task_spec, directory):
                         if plan_id is not None:
                             audited_plans.add(plan_id)
                 problems.extend(policy.check())
-                expected = set(range(1, args.research_rounds + 1))
-                if {r["generation"] for r in rounds if r["state"] == "ready" and r.get("status") == "accepted"} != expected:
-                    problems.append("not every requested research generation has an accepted policy turn")
-                if used_generations != expected:
-                    problems.append("not every requested generation's policy application was used by a decision")
+                ready = {r["generation"] for r in rounds if r["state"] == "ready"}
+                accepted = {r["generation"] for r in rounds if r["state"] == "ready" and r.get("status") == "accepted"}
+                if accepted != ready:
+                    problems.append("one or more ready generations lack an accepted policy turn")
+                if batch:
+                    expected = set(range(1, args.research_rounds + 1))
+                    if accepted != expected:
+                        problems.append("not every requested research generation has an accepted policy turn")
+                    if used_generations != expected:
+                        problems.append("not every requested generation's policy application was used by a decision")
+                elif not used_generations <= ready:
+                    problems.append("a decision used a policy from a generation that is not ready")
                 if any(a["degraded"] for a in applications):
                     problems.append("one or more policy applications degraded to the default")
                 batch_records = []
+                if args.research_candidates_per_role:
+                    for generation in generations:
+                        if generation["state"] == "ready":
+                            outcome = json.loads(generation.get("outcome_json") or "{}")
+                            if outcome.get("metadata", {}).get("candidate_counts") != {
+                                    "explorer": args.research_candidates_per_role,
+                                    "refiner": args.research_candidates_per_role}:
+                                problems.append(f"generation {generation['generation']}: incorrect role candidate counts")
                 if batch:
                     decisions_by_plan = {}
                     for row in ctrl.store.rows("""SELECT d.snapshot_json, e.es_state, e.disposition
@@ -285,11 +306,6 @@ def _run_locked(args, task_spec, directory):
                     for generation in generations:
                         if generation["state"] != "ready":
                             continue
-                        outcome = json.loads(generation.get("outcome_json") or "{}")
-                        counts = outcome.get("metadata", {}).get("candidate_counts")
-                        if counts != {"explorer": args.research_candidates_per_role,
-                                      "refiner": args.research_candidates_per_role}:
-                            problems.append(f"generation {generation['generation']}: incorrect role candidate counts")
                         if generation["base_ingest_seq"] != (generation["generation"] - 1) * args.batch_size:
                             problems.append(f"generation {generation['generation']}: incomplete prior batch feedback")
                     for plan in ctrl.plans():
@@ -318,6 +334,7 @@ def _run_locked(args, task_spec, directory):
                                               "history_count": inputs.get("head_ingest_seq"),
                                               "gp_ready": steps[0].get("metadata", {}).get("gp_ready") if steps else None})
                 policy_summary = {"research_budget": args.research_rounds, "evaluation_budget": args.iterations,
+                                  "pacing_mode": args.pacing_mode, "evaluation_window": args.evaluation_window,
                                   "selection_batch_size": args.batch_size,
                                   "candidate_pool_size": args.pool_size,
                                   "batches": batch_records,

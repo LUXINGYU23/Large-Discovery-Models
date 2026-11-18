@@ -23,12 +23,15 @@ def parse_args(argv=None):
     p.add_argument("--mock", action="store_true", help="Use deterministic sequence generator fixtures")
     p.add_argument("--concurrency", type=int, default=2, help="Maximum concurrent evaluations")
     p.add_argument("--iterations", type=int, default=2, help="Total evaluation budget")
+    p.add_argument("--pacing-mode", choices=("streaming", "barrier"), default="streaming")
+    p.add_argument("--evaluation-window", type=int,
+                   help="Maximum queued and running evaluations (default: concurrency)")
     p.add_argument("--batch-size", type=int, default=1,
-                   help="Selections per research round; 1 uses streaming, larger values use a batch barrier")
+                   help="Selections per research generation in barrier mode")
     p.add_argument("--research-rounds", type=int,
                    help="Research generation budget (default: evaluation budget)")
     p.add_argument("--research-candidates-per-role", type=int, default=0,
-                   help="Unique new proposals required from each generating role in batch mode")
+                   help="Unique new proposals required from each generating role")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--initialization-run", type=Path,
                    help="Replay initial design jobs from a real-generator campaign for paired comparisons")
@@ -53,28 +56,33 @@ def parse_args(argv=None):
         a.method = "fixed" if a.mock else "ldm_harness"
     if a.research_rounds is None:
         a.research_rounds = a.iterations
+    if a.evaluation_window is None:
+        a.evaluation_window = a.concurrency
     if min(a.iterations, a.concurrency, a.batch_size, a.cpu_limit, a.pool_size,
-           a.samples_per_call, a.backbones_per_round) < 1 or a.research_candidates_per_role < 0:
+           a.samples_per_call, a.backbones_per_round, a.evaluation_window) < 1 or a.research_candidates_per_role < 0:
         p.error("iterations, concurrency, CPU and generation limits must be positive")
-    if not 1 <= a.research_rounds <= a.iterations:
-        p.error("research-rounds must be positive and cannot exceed the evaluation budget")
+    if a.research_rounds < 1:
+        p.error("research-rounds must be positive")
+    if a.evaluation_window < a.concurrency:
+        p.error("evaluation-window cannot be smaller than concurrency")
     if a.pool_size > a.sequences_per_round or a.samples_per_call > a.sequences_per_round:
         p.error("pool-size and samples-per-call must fit the sequence budget")
-    if a.batch_size > 1:
-        if a.method != "ldm_harness":
-            p.error("batch mode requires --method ldm_harness")
-        if a.research_candidates_per_role < 1 or a.pool_size != 2 * a.research_candidates_per_role:
-            p.error("batch pool-size must equal twice research-candidates-per-role")
+    if a.research_candidates_per_role:
+        if a.method != "ldm_harness" or a.pool_size != 2 * a.research_candidates_per_role:
+            p.error("exact role proposals require ldm_harness and pool-size twice research-candidates-per-role")
+        if a.sequences_per_round < 4 * a.research_candidates_per_role or a.backbones_per_round < 2:
+            p.error("exact role proposals need at least twice the requested sequences per role and two backbones")
+        if a.initialization_run:
+            p.error("exact role proposals cannot replay a shared initialization run")
+    if a.pacing_mode == "barrier":
+        if a.method != "ldm_harness" or not a.research_candidates_per_role or a.batch_size < 2:
+            p.error("barrier mode requires ldm_harness, exact role proposals and batch-size greater than one")
         if a.batch_size > a.pool_size:
             p.error("batch-size cannot exceed pool-size")
         if a.iterations != a.research_rounds * a.batch_size:
             p.error("batch evaluation budget must equal research-rounds times batch-size")
-        if a.sequences_per_round < 4 * a.research_candidates_per_role or a.backbones_per_round < 2:
-            p.error("batch generation needs at least twice the requested sequences per role and two backbones")
-        if a.initialization_run:
-            p.error("batch mode cannot replay a shared initialization run")
-    elif a.research_candidates_per_role:
-        p.error("research-candidates-per-role requires batch-size greater than 1")
+    elif a.batch_size != 1:
+        p.error("streaming mode requires batch-size 1")
     if a.seed < 0 or a.gpu < 0 or not 0.01 <= a.temperature <= 1:
         p.error("seed and GPU index must be nonnegative and temperature in [0.01,1]")
     if a.mock and a.initialization_run:
@@ -109,6 +117,7 @@ def describe_ldm_task(args):
                            version=FEATURE_VERSION) if gp else SurrogateSpaceSpec("none", "no campaign GP", "none"),
         ProposalSearchSpec(args.method, parameters={"oracle": args.oracle, "mock_generator": args.mock,
                            "concurrency": args.concurrency, "research_rounds": args.research_rounds,
+                           "pacing_mode": args.pacing_mode, "evaluation_window": args.evaluation_window,
                            "batch_size": args.batch_size,
                            "research_candidates_per_role": args.research_candidates_per_role,
                            "skill_ids": skills, "roles": roles}),

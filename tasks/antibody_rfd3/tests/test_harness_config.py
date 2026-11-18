@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from ldm_tts.harness import HarnessHistoryConfig
+from ldm_tts.harness.history import HistoryLog
 from tasks.antibody_rfd3.core import harness
 
 
@@ -46,12 +47,12 @@ def test_reasoning_effort_reaches_pi_configuration(tmp_path, monkeypatch, effort
     monkeypatch.setattr(harness, "HarnessClient", FakeClient)
     monkeypatch.setattr(harness, "worker_socket", fake_worker_socket)
     monkeypatch.setattr(harness, "pi_sidecar_command", lambda *args, **kwargs: ("fake-sidecar",))
-    service = SimpleNamespace(config=HarnessHistoryConfig(), lineage_of=lambda profile: profile)
+    service = SimpleNamespace(config=HarnessHistoryConfig(), lineage_of=lambda profile: profile, log=HistoryLog())
     bridge = SimpleNamespace(service=service, add_client=lambda client: None)
     args = SimpleNamespace(pool_size=2, antigen="1ADQ_A", seed=42, sidecar_image="fake-image",
                            guest_cache=None, method="harness")
 
-    with harness.open_agent(args, tmp_path, object(), bridge, "test-campaign") as agent:
+    with harness.open_agent(args, tmp_path, SimpleNamespace(), bridge, "test-campaign") as agent:
         assert agent.client is clients[0]
         assert agent.client.config.thinking == expected
         assert agent.client.config.initialize_payload()["thinking"] == expected
