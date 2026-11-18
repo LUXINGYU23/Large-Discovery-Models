@@ -46,7 +46,8 @@ def test_own_candidates_and_catalog_are_enforced(tmp_path):
     args = panel_args()
     worker = DesignWorker(tmp_path, args)
     worker.round = 1
-    own = next(r for r in worker.execute("design_h3", 8, 0.5, profile_id="explorer") if not r["violations"])
+    explorer_rows = worker.eligible(worker.execute("design_h3", 8, 0.5, profile_id="explorer"))
+    own = explorer_rows[0]
     other = next(r for r in worker.execute("design_h3", 8, 0.5, profile_id="refiner") if not r["violations"])
     log = HistoryLog()
     source = object.__new__(AntibodyPiResearch)
@@ -58,9 +59,14 @@ def test_own_candidates_and_catalog_are_enforced(tmp_path):
                                                   {"design_ids": list(ids)}, history_seq=0)).decision
     assert validate(other["design_id"]) == "accept"
     assert validate(own["design_id"]) == "retry"
-    source.role, source.peer_ids = "evidence_reviewer", {own["design_id"]}
-    validator = proposal_validator(source.make_contract(), log, generation=2)
+    source.role, source.peer_ids = "evidence_reviewer", {row["design_id"] for row in explorer_rows[:4]}
+    contract = source.make_contract()
+    assert contract.count == (1, 3)
+    validator = proposal_validator(contract, log, generation=2)
     assert validate(own["design_id"]) == "accept"
+    assert len(source.peer_ids) == 4
+    assert validate(*(row["design_id"] for row in explorer_rows[:3])) == "accept"
+    assert validate(*(row["design_id"] for row in explorer_rows[:4])) == "retry"
     assert validate(other["design_id"]) == "retry"
     schema = submission_contract(6, review=True).payload_schema
     assert set(schema["required"]) == {"design_ids", "evidence", "hypotheses"}
@@ -89,11 +95,11 @@ class FakeClient:
         if self.role == "explorer" or (self.role == "refiner" and turn.round_index > 1):
             count = 16
             rows = self.worker.execute("design_h3", count, 0.5, call_id="same-call", profile_id=self.role)
-            ids = [row["design_id"] for row in self.worker.eligible(rows)][:settings["required_candidates"]]
+            ids = [row["design_id"] for row in self.worker.eligible(rows)][:settings["candidate_count"]["maximum"]]
         else:
             path = self.workspace / Path(settings["peer_catalog"]["path"]).relative_to("/workspace")
             catalog = json.loads(path.read_text())
-            ids = [row["design_id"] for row in catalog["candidates"]][:settings["required_candidates"]]
+            ids = [row["design_id"] for row in catalog["candidates"]][:settings["candidate_count"]["maximum"]]
         submission = {"design_ids": ids}
         if self.role == "evidence_reviewer":
             submission.update(evidence="Catalog proposals and history, with no invented energy.", hypotheses="none")
@@ -149,10 +155,29 @@ def round_input(generation, *, base=0, sessions=None, unsettled=()):
             "sessions": sessions or {}, "unsettled": unsettled}
 
 
+def test_baseline_settings_and_contract_require_one_candidate(tmp_path):
+    args = parse_args(["--method", "harness", "--mock", "--pool-size", "6"])
+    worker = DesignWorker(tmp_path, args)
+    service = HistoryService(HistoryLog(), HistoryProjection(()))
+    client = SimpleNamespace(config=SimpleNamespace(profiles=(profile(),)), history=service)
+    source = AntibodyPiResearch(client, service, worker, args)
+    assert source.version == "2"
+    settings = json.loads(source.message(round_input(1), {}).rsplit("\n\nTask settings: ", 1)[1])
+    assert "required_candidates" not in settings
+    assert settings["candidate_count"] == {"minimum": 1, "maximum": 1}
+    assert source.contract.count == (1, 1)
+    assert source.contract.submission.payload_schema["properties"]["design_ids"]["maxItems"] == 1
+
+
 def test_panel_bootstrap_review_and_exact_generation_replay(tmp_path):
     panel, clients, service = make_panel(tmp_path)
+    assert panel.version == "2"
     first = panel.research(round_input(1), [])
     assert first.status == "committed" and first.metadata["bootstrap"]
+    for client in clients.values():
+        settings = json.loads(client.sent_messages[-1].rsplit("\n\nTask settings: ", 1)[1])
+        assert "required_candidates" not in settings
+        assert settings["candidate_count"] == {"minimum": 1, "maximum": 1}
     assert set(first.metadata["sessions"]) == set(PANEL)
     assert len({p.candidate.canonical_key for p in first.proposals}) == 1
     assert {p.lineage for p in first.proposals} == set(PANEL)
@@ -170,6 +195,11 @@ def test_panel_bootstrap_review_and_exact_generation_replay(tmp_path):
     assert set(second.metadata["sessions"]) == set(PANEL)
     assert [j["profile_id"] for j in panel.worker.records()] == ["explorer", "explorer", "refiner"]
     reviewer_input = json.loads((tmp_path / second.metadata["peer_catalogs"]["evidence_reviewer"]["record"]).read_text())
+    for role, client in clients.items():
+        settings = json.loads(client.sent_messages[-1].rsplit("\n\nTask settings: ", 1)[1])
+        assert "required_candidates" not in settings
+        maximum = min(6, len(reviewer_input["candidates"])) if role == "evidence_reviewer" else 3
+        assert settings["candidate_count"] == {"minimum": 1, "maximum": maximum}
     assert {row["generation_job"]["profile_id"] for row in reviewer_input["candidates"]} == {
         "explorer", "refiner"}
     assert set(second.metadata["review"]["design_ids"]) <= {r["design_id"] for r in reviewer_input["candidates"]}

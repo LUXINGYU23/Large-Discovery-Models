@@ -96,6 +96,8 @@ def worker_socket(worker):
 class AntibodyPiResearch(PiResearchSource):
     """One profile's persistent session, proposal validator, and watermark chain."""
 
+    version = "2"
+
     def __init__(self, client, service, worker, args, *, workspace=None):
         self.worker, self.args = worker, args
         if len(client.config.profiles) != 1:
@@ -143,11 +145,12 @@ class AntibodyPiResearch(PiResearchSource):
 
     def message(self, round_input, header):
         text = super().message(round_input, header)
+        minimum, maximum = self.contract.count
         details = {"antigen": self.args.antigen, "oracle": self.args.oracle, "method": self.args.method,
-                   "role": self.role, "remaining": self.worker.remaining(), "required_candidates": self.required}
+                   "role": self.role, "remaining": self.worker.remaining(),
+                   "candidate_count": {"minimum": minimum, "maximum": maximum}}
         if self.role in PANEL:
             details["role_remaining"] = self.worker.role_remaining(self.role)
-            details["candidate_count"] = {"minimum": 1, "maximum": self.required}
         if self.peer_catalog:
             details["peer_catalog"] = self.peer_catalog
         if self.worker.round == 0:
@@ -193,7 +196,7 @@ class AntibodyPiResearch(PiResearchSource):
             sent = self.service.sent_turn(role, turn_id)
             if sent is not None and self.service.terminal_decision(role, turn_id) is not None:
                 settings = json.loads(sent["message"].rsplit("\n\nTask settings: ", 1)[1])
-                previous = (int(generation) - 1, int(settings["required_candidates"]),
+                previous = (int(generation) - 1, int(settings["candidate_count"]["maximum"]),
                             self._catalog_ids(settings.get("peer_catalog")))
                 break
         if previous is None:
@@ -233,7 +236,7 @@ class RecordingClient:
 class AntibodyResearchPanel:
     """Generate with two lineages, then independently review their submitted designs."""
 
-    version = "1"
+    version = "2"
 
     def __init__(self, sources, worker, args, root):
         self.sources, self.worker, self.args, self.root = sources, worker, args, Path(root)
@@ -343,7 +346,8 @@ def open_agent(args, directory, worker, bridge, campaign_id):
                 budgets.update(design_h3=0, sequence_h3=0)
             config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile(role),),
                 campaign_id=campaign_id, task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed,
-                submission_contract=submission_contract(args.pool_size, review=role == "evidence_reviewer"),
+                submission_contract=submission_contract(args.pool_size if role in PANEL else 1,
+                                                        review=role == "evidence_reviewer"),
                 limits=HarnessLimits(wall_time_seconds=900, tool_call_budgets=budgets),
                 base_url=url.removesuffix("/responses"), model=model,
                 thinking=os.environ.get("LLM_REASONING_EFFORT", "off"), context7_enabled=False,

@@ -53,7 +53,7 @@ def action(request):
     if call["name"] == "submit_designs":
         return None, {}
     result = object_in(last, "candidates")
-    turn = object_in([m for m in messages if m.get("role") == "user"], "required_candidates")
+    turn = object_in([m for m in messages if m.get("role") == "user"], "candidate_count")
     if result is None:
         raise ValueError(f"No generation result after {call['name']}: {str(last)[:320]}")
     excluded = {row["sequence"] for row in turn["measured_history"]}
@@ -62,7 +62,7 @@ def action(request):
         if not row["violations"] and row["sequence"] not in excluded:
             ids.append(row["design_id"])
             excluded.add(row["sequence"])
-    count = turn["required_candidates"]
+    count = turn["candidate_count"]["maximum"]
     if len(ids) < count:
         return "design_h3", {"count": 16, "temperature": 0.5}
     return "submit_designs", {"design_ids": ids[:count]}
