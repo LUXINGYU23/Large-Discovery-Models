@@ -1,0 +1,23 @@
+{
+  "absolut_path": null,
+  "antigen": "1ADQ_A",
+  "backbones_per_round": 2,
+  "cpu_limit": 2,
+  "dry_run": false,
+  "gpu": 0,
+  "guest_cache": null,
+  "initialization_run": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/qwen3-ldm_harness_3",
+  "iterations": 2,
+  "method": "fixed",
+  "mock": false,
+  "oracle": "mock",
+  "out_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/paired-fixed",
+  "pool_size": 2,
+  "root": "/Aidata/shared/ldm/antibody-poc",
+  "samples_per_call": 16,
+  "seed": 42,
+  "sequences_per_round": 32,
+  "share_gpu": false,
+  "sidecar_image": "ldm-pi-harness:latest",
+  "temperature": 0.5
+}

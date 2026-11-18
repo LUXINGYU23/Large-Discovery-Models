@@ -1,0 +1,12 @@
+name: antibody_rfd3_antbo
+task: antibody_rfd3
+algorithm: antbo
+mode: real
+description: Two-round antbo campaign with a deterministic sequence-hash mock oracle.
+args:
+  method: antbo
+  oracle: mock
+  iterations: 2
+  pool-size: 2
+  seed: 42
+  out-dir: runs/antbo

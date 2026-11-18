@@ -1,0 +1,1 @@
+The harness directory contains the Pi guest recipe, proposal profile, cdrh3-design skill and host tool extension. The structure worker reads the 1N8Z configuration from the sibling antibody task. Qualification evidence describes this variant only.

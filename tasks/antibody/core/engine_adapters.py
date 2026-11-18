@@ -426,16 +426,18 @@ class AntibodyEvaluator:
 class AntibodyGPSelector:
     """GP acquisition selection for direct proposals, with warmup ordering."""
 
-    def __init__(self, *, args: Any, method_spec: Mapping[str, Any], rng) -> None:
+    def __init__(self, *, args: Any, method_spec: Mapping[str, Any], rng,
+                 objective_name: str = "absolut_energy") -> None:
         self.args = args
         self.method_spec = dict(method_spec)
+        self.objective_name = objective_name
         self.rng = rng
         self.rows: list[dict[str, Any]] = []
 
     def describe(self) -> AcquisitionSpec:
         return AcquisitionSpec(
             name=str(self.args.acq).lower(),
-            objective_names=("absolut_energy",),
+            objective_names=(self.objective_name,),
             score_direction="maximize",
             selection_rule=(
                 f"{self.method_spec['reduction']} over direct reservoir acquisition scores"

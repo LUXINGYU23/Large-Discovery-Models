@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "task_id": "antibody_rfd3",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/csi-greifflab/Absolut",
+    "source_commit": "beb1821568f3ba5b7861255ab19172bbc65a7480",
+    "task_path": "src"
+  },
+  "proposal_provider": {
+    "kind": "hybrid",
+    "requires_endpoint_preflight": true,
+    "supports_collection": false
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "mock_energy",
+        "direction": "minimize",
+        "description": "Deterministic mock oracle for integration checks."
+      },
+      {
+        "name": "absolut_energy",
+        "direction": "minimize",
+        "description": "Energy from the external Absolut evaluator when selected."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "mock_energy",
+        "direction": "minimize",
+        "description": "Deterministic mock oracle for integration checks."
+      },
+      {
+        "name": "absolut_energy",
+        "direction": "minimize",
+        "description": "Energy from the external Absolut evaluator when selected."
+      }
+    ],
+    "diagnostic": []
+  },
+  "evaluation": {
+    "datasets": [
+      "1N8Z VH B1-120",
+      "1ADQ_A"
+    ],
+    "settings": {
+      "mock": "mock-v1 sequence hash",
+      "absolut": "Absolut repertoire, minimum energy"
+    },
+    "per_candidate_limits": {}
+  },
+  "budget": {
+    "expensive_evaluation_attempts": 2,
+    "initial_evaluations": 1
+  },
+  "profiles": {}
+}

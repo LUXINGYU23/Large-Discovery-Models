@@ -1,0 +1,85 @@
+{
+  "workspace_root": "/Aidata/shared/ldm/antibody-poc",
+  "input_structure": "archive/data/structure_design/1N8Z.pdb",
+  "regions": [
+    {
+      "chain": "B",
+      "start": 1,
+      "end": 120
+    }
+  ],
+  "heavy_chain": "B",
+  "h3_definition": "Kabat HCDR3; PDB author residues B99-B109 (not IMGT).",
+  "h3_residues": [
+    {
+      "chain": "B",
+      "number": 99,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 100,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 101,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 102,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 103,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 104,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 105,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 106,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 107,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 108,
+      "insertion_code": ""
+    },
+    {
+      "chain": "B",
+      "number": 109,
+      "insertion_code": ""
+    }
+  ],
+  "expected_input_h3": "WGGDGFYAMDY",
+  "required_h3_length": 11,
+  "seed": 42,
+  "num_designs": 1,
+  "sequences_per_design": 1,
+  "num_timesteps": 200,
+  "sampling_temperature": 0.1,
+  "extract_h3": false,
+  "fixed_backbone_tolerance_angstrom": 0.1,
+  "fixed_backbone_rmsd_tolerance_angstrom": 0.05,
+  "gpu_wait_seconds": 600,
+  "sources": [
+    "https://www.rcsb.org/structure/1N8Z",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC4794604/"
+  ]
+}

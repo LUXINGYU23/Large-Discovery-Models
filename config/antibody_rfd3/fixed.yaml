@@ -1,0 +1,12 @@
+name: antibody_rfd3_fixed
+task: antibody_rfd3
+algorithm: fixed
+mode: real
+description: Two-round fixed campaign with a deterministic sequence-hash mock oracle.
+args:
+  method: fixed
+  oracle: mock
+  iterations: 2
+  pool-size: 2
+  seed: 42
+  out-dir: runs/fixed
