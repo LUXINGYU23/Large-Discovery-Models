@@ -1,1 +1,1 @@
-{"schemaVersion":1,"imageId":"antibody-rfd3-research","rootfsSize":"2G","installPolicy":"session_overlay","recipeFiles":["Dockerfile","smoke.sh"],"smokeScript":"smoke.sh"}
+{"schemaVersion":1,"imageId":"antibody-rfd3-research","rootfsSize":"2G","installPolicy":"session_overlay","recipeFiles":["Dockerfile","smoke.sh","lock/requirements.lock"],"smokeScript":"smoke.sh"}

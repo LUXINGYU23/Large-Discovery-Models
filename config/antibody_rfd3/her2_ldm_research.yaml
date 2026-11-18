@@ -1,0 +1,24 @@
+name: antibody_rfd3_her2_ldm_research
+task: antibody_rfd3
+algorithm: ldm_harness
+mode: real
+description: Three research generations with a research panel, dynamic policy, and real HER2 scoring.
+args:
+  method: ldm_harness
+  oracle: absolut
+  antigen: 1N8Z_C
+  iterations: 3
+  research-rounds: 3
+  concurrency: 1
+  pool-size: 6
+  backbones-per-round: 2
+  sequences-per-round: 32
+  samples-per-call: 16
+  temperature: 0.5
+  seed: 42
+  gpu: 2
+  share-gpu: true
+  cpu-limit: 2
+  sidecar-image: ldm-copper-pi:antibody-async-20261118
+  guest-cache: /Aidata/shared/ldm/antibody-poc/cache/gondolin
+  out-dir: runs/her2_ldm_research

@@ -17,7 +17,7 @@ from ldm_tts.contracts import ObjectiveSet, ObjectiveSpec
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir
 from ldm_tts.registration.experiment import load_active_experiment_contract
 from .experiments import AntibodyCodec, KIND, history_projection
-from .research import GPSelector, InitializationPacing, NativeResearch
+from .research import InitializationPacing, NativeResearch, PolicyRoundPacing
 from .worker import DesignWorker
 
 REPOSITORY = Path(__file__).resolve().parents[3]
@@ -142,9 +142,10 @@ def _run_locked(args, task_spec, directory):
     metric = "mock_energy" if args.oracle == "mock" else "absolut_energy"
     worker = DesignWorker(directory, args)
     bridge = HistoryBridge(directory / "history", history_projection(metric))
+    dynamic_policy = args.method == "ldm_harness"
     pacing = PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size,
-                                   dispatch_during_research="continue", research_budget=args.iterations,
-                                   research_timeout_seconds=1200)
+                                   dispatch_during_research="continue", research_budget=args.research_rounds,
+                                   research_timeout_seconds=3900 if dynamic_policy else 1200)
     config = CampaignConfig("antibody_rfd3", budget=args.iterations, concurrency=args.concurrency,
                             seed=args.seed, extra=campaign_extra(pacing, task=scientific))
     objectives = ObjectiveSet.from_specs([ObjectiveSpec(metric, "minimize")])
@@ -156,16 +157,24 @@ def _run_locked(args, task_spec, directory):
             research = stack.enter_context(open_agent(args, directory, worker, bridge, config.campaign_id))
         else:
             research = NativeResearch(args, worker)
-        selector = GPSelector(args) if args.method == "ldm_harness" else DedupOnlySelector()
+        policy = None
+        if dynamic_policy:
+            from .policy import make_selector, open_policy
+            selector = make_selector()
+            policy = stack.enter_context(open_policy(args, directory, config.campaign_id, selector))
+        else:
+            selector = DedupOnlySelector()
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
-            codec=AntibodyCodec(args.antigen, args.oracle), client=client, research=research, history=bridge,
-            selector=selector, pacing=InitializationPacing(), objectives=objectives,
+            codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
+            research=research, history=bridge, selector=selector, policy=policy,
+            pacing=PolicyRoundPacing() if dynamic_policy else InitializationPacing(), objectives=objectives,
             options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30)))
         error = None
         try:
             while not ctrl.finished:
-                if process.poll() is not None:
-                    raise RuntimeError(f"Experiment service exited with code {process.returncode}")
+                exit_code = process.poll()
+                if exit_code is not None:
+                    raise RuntimeError(f"Experiment service exited with code {exit_code}")
                 progressed = ctrl.step()
                 view = ctrl.view()
                 if view.lane.state == "blocked":
@@ -201,13 +210,58 @@ def _run_locked(args, task_spec, directory):
                                 "sequences_requested": sum(job["count"] for job in jobs),
                                 "failed_jobs": sum(job["status"] != "succeeded" for job in jobs)}
             harness_usage = {"turns": 0, "provider_calls": 0, "tool_calls": 0}
-            for generation in ctrl.generations():
+            generations = ctrl.generations()
+            for generation in generations:
                 outcome = json.loads(generation.get("outcome_json") or "{}")
                 for session in (outcome.get("metadata", {}).get("sessions") or {}).values():
                     usage = session.get("usage") or {}
                     harness_usage["turns"] += 1
                     harness_usage["provider_calls"] += usage.get("providerCalls", 0)
                     harness_usage["tool_calls"] += sum(usage.get("toolCalls", {}).values())
+            policy_summary = None
+            if policy is not None:
+                rounds = []
+                for generation in generations:
+                    outcome = json.loads(generation.get("outcome_json") or "{}")
+                    record = {"generation": generation["generation"], "state": generation["state"],
+                              **(outcome.get("metadata", {}).get("policy_round") or {})}
+                    path = policy.research_controller.root / "rounds" / f"round_{generation['generation']:03d}" / "result.json"
+                    if path.is_file():
+                        result = json.loads(path.read_text(encoding="utf-8"))
+                        record["harness_turn"] = result.get("harness_turn")
+                        record["validation_errors"] = result.get("validation_errors", [])
+                        record["failed_harness_usage"] = result.get("failed_harness_usage")
+                    rounds.append(record)
+                applications = policy.applications()
+                decisions = ctrl.decisions()
+                by_application = {a["application_id"]: a for a in applications}
+                used_generations = set()
+                decision_records = []
+                for decision in decisions:
+                    snapshot = decision["snapshot"]
+                    app_id = snapshot.get("inputs", {}).get("prior_application_id")
+                    application = by_application.get(app_id)
+                    if application is not None:
+                        used_generations.add(application["generation"])
+                    decision_records.append({"decision_id": decision["decision_id"], "application_id": app_id,
+                                             "generation": application["generation"] if application else None,
+                                             "probability": snapshot.get("probability"),
+                                             "weights": (snapshot.get("record", {}).get("selection", {})
+                                                         .get("parameters", {}))})
+                    problems.extend(f"decision {decision['decision_id']}: {problem}"
+                                    for problem in ctrl.audit(decision["decision_id"]))
+                problems.extend(policy.check())
+                expected = set(range(1, args.research_rounds + 1))
+                if {r["generation"] for r in rounds if r["state"] == "ready" and r.get("status") == "accepted"} != expected:
+                    problems.append("not every requested research generation has an accepted policy turn")
+                if used_generations != expected:
+                    problems.append("not every requested generation's policy application was used by a decision")
+                if any(a["degraded"] for a in applications):
+                    problems.append("one or more policy applications degraded to the default")
+                policy_summary = {"research_budget": args.research_rounds, "evaluation_budget": args.iterations,
+                                  "rounds": rounds, "applications": applications, "decisions": decision_records,
+                                  "accepted_turns": sum(r.get("status") == "accepted" for r in rounds),
+                                  "fallback_turns": sum(r.get("action") == "fallback" for r in rounds)}
             if ctrl.anomalies():
                 problems.append("controller has open anomalies")
             summary = {"task": "antibody_rfd3", "method": args.method, "oracle": args.oracle,
@@ -218,6 +272,7 @@ def _run_locked(args, task_spec, directory):
                        "stop_reason": ctrl.ledger.campaign_row()["stop_reason"],
                        "invariant_problems": problems, "error": error,
                        "generation_usage": generation_usage, "harness_usage": harness_usage,
+                       "policy": policy_summary,
                        "experiment_contract_sha256": contract.digest if contract else "",
                        "experiment_contract_profile": profile}
             atomic_json_write(directory / "budget.json", ctrl.budget().to_dict())

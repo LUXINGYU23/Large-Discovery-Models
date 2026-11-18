@@ -63,10 +63,14 @@ class PolicyResearchController:
         self.contract = adapter.capability_contract()
         self.store = PolicyStore(self.root)
 
-    def resolve(self, round_input: PolicyRoundInput) -> CompiledOptimizationPolicy:
-        round_input = self.adapter.with_feedback(
-            round_input, self.store.predictions_before(round_input.round_index),
-        )
+    def resolve(
+        self,
+        round_input: PolicyRoundInput,
+        feedback: Sequence[Mapping[str, Any]] | None = None,
+    ) -> CompiledOptimizationPolicy:
+        """Use decision-keyed feedback when supplied by an asynchronous controller."""
+        records = self.store.predictions_before(round_input.round_index) if feedback is None else list(feedback)
+        round_input = self.adapter.with_feedback(round_input, records)
         if round_input.history_features.shape[1] != len(self.contract.feature_names):
             raise ValueError("policy round feature width does not match the capability contract")
         round_directory, input_digest = self.store.materialize_round(round_input, self.contract)

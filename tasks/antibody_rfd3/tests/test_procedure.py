@@ -54,7 +54,7 @@ def test_two_round_offline_campaign(tmp_path):
 
 
 def test_backbone_reuse_calls_sequence_only(tmp_path, monkeypatch):
-    args = parse_args(["--root", str(tmp_path)])
+    args = parse_args(["--root", str(tmp_path), "--method", "fixed"])
     worker = DesignWorker(tmp_path / "run", args)
     worker.round = 1
     first = worker.jobs / "job-00000"
@@ -282,8 +282,9 @@ def test_shared_initialization_relocates_backbone_and_checks_h3(tmp_path):
     (out / "backbone.cif").write_text("data_fixture")
     (out / "generation.json").write_text(json.dumps({"status": "success", "structure": str(out / "backbone.cif")}))
     (out / "designs.json").write_text(json.dumps({"status": "success", "candidates": [design]}))
-    row, = replica.execute("design_h3", 1, args.temperature)
+    row, = replica.execute("design_h3", 1, args.temperature, profile_id="explorer")
     assert (row["sequence"], row["backbone_id"]) == (seq, source.name)
+    assert next(replica.records())["profile_id"] == "explorer"
     copied = replica.jobs / source.name / "output"
     assert json.loads((copied / "generation.json").read_text())["structure"] == str(copied / "backbone.cif")
     assert (copied / "backbone.cif").is_file()
@@ -292,7 +293,7 @@ def test_shared_initialization_relocates_backbone_and_checks_h3(tmp_path):
     (out / "config.resolved.json").write_text(json.dumps(config))
     other = DesignWorker(tmp_path / "mismatched", args)
     with pytest.raises(ValueError, match="heavy_chain"):
-        other.execute("design_h3", 1, args.temperature)
+        other.execute("design_h3", 1, args.temperature, profile_id="explorer")
     failed, = other.records()
     assert failed["status"] == "failed" and "candidates" not in failed
 

@@ -1,7 +1,8 @@
 import { request } from "node:http";
+import { basename, dirname } from "node:path";
 
-function generate(action, params, callId) {
-  const body = JSON.stringify({action, ...params, call_id: callId});
+function generate(action, params, callId, profileId) {
+  const body = JSON.stringify({action, ...params, call_id: callId, profile_id: profileId});
   return new Promise((resolve, reject) => {
     const req = request({socketPath: "/worker/design.sock", path: "/", method: "POST",
       headers: {"Content-Length": Buffer.byteLength(body)}}, res => {
@@ -25,6 +26,7 @@ export default function register(pi) {
       ? "Generate a new RFD3 H3 backbone, then sample sequences on it."
       : "Sample ProteinMPNN sequences on a previously generated backbone.",
     parameters: {type: "object", properties, required: Object.keys(properties), additionalProperties: false},
-    execute: (id, params) => generate(name, params, id)});
+    execute: (id, params, _signal, _onUpdate, ctx) =>
+      generate(name, params, id, basename(dirname(ctx.cwd)))});
   }
 }

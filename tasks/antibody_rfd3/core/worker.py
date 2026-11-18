@@ -42,6 +42,29 @@ class DesignWorker:
         return {"backbones": self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
                 "sequences": self.args.sequences_per_round - sum(j["count"] for j in jobs)}
 
+    def role_budget(self, profile_id):
+        """A panel member's share of the same per-generation budget."""
+        if self.args.method != "ldm_harness":
+            return {"backbones": self.args.backbones_per_round, "sequences": self.args.sequences_per_round}
+        if profile_id not in ("explorer", "refiner", "evidence_reviewer"):
+            raise ValueError("Unknown panel role")
+        if self.round == 0:
+            limits = {"backbones": 1, "sequences": self.args.samples_per_call} if profile_id == "explorer" else {
+                "backbones": 0, "sequences": 0}
+        elif profile_id == "evidence_reviewer":
+            limits = {"backbones": 0, "sequences": 0}
+        else:
+            extra = 1 if profile_id == "explorer" else 0
+            limits = {"backbones": (self.args.backbones_per_round + extra) // 2,
+                      "sequences": (self.args.sequences_per_round + extra) // 2}
+        return limits
+
+    def role_remaining(self, profile_id):
+        limits = self.role_budget(profile_id)
+        jobs = [j for j in self.records() if j["round"] == self.round and j.get("profile_id") == profile_id]
+        return {"backbones": limits["backbones"] - sum(j["action"] == "design_h3" for j in jobs),
+                "sequences": limits["sequences"] - sum(j["count"] for j in jobs)}
+
     def eligible(self, rows):
         seen = set(self.evaluated)
         available = []
@@ -51,7 +74,7 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count, temperature, backbone_id=None, call_id=None):
+    def execute(self, action, count, temperature, backbone_id=None, call_id=None, profile_id=None):
         if action not in ("design_h3", "sequence_h3"):
             raise ValueError("Unknown generation action")
         if type(count) is not int or count < 1:
@@ -64,7 +87,7 @@ class DesignWorker:
             raise ValueError("call_id must be a non-empty string")
         jobs = [row for row in self.records() if row["round"] == self.round]
         if call_id is not None:
-            matches = [row for row in jobs if row.get("call_id") == call_id]
+            matches = [row for row in jobs if row.get("call_id") == call_id and row.get("profile_id") == profile_id]
             if len(matches) > 1:
                 raise RuntimeError("Repeated generation call ID in design receipts")
             if matches:
@@ -87,12 +110,15 @@ class DesignWorker:
         remaining = self.remaining()
         if count > remaining["sequences"] or (action == "design_h3" and remaining["backbones"] < 1):
             raise ValueError(f"Generation budget exceeded. Remaining {remaining}")
+        role_remaining = self.role_remaining(profile_id)
+        if count > role_remaining["sequences"] or (action == "design_h3" and role_remaining["backbones"] < 1):
+            raise ValueError(f"Role generation budget exceeded. Remaining {role_remaining}")
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
         job.mkdir()
         backbone = backbone_id or job.name
         seed = self.args.seed + index
-        receipt = dict(round=self.round, action=action, count=count, temperature=temperature,
+        receipt = dict(round=self.round, action=action, count=count, temperature=temperature, profile_id=profile_id,
                        call_id=call_id, requested_backbone_id=backbone_id,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
                        status="started")

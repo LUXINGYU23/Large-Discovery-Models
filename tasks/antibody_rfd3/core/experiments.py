@@ -20,6 +20,7 @@ from ldm_tts.async_runtime import ExperimentRequest, MappedCodec
 
 KIND = "antibody_rfd3.energy"
 VERSION = "1"
+ENERGY_UTILITY = "energy_utility"
 ABSOLUT_TIMEOUT_SECONDS = 1800
 STOP_GRACE_SECONDS = 5
 LOCK_PREFIX = "ldm-absolut-v1"
@@ -35,12 +36,13 @@ def history_projection(metric):
 
 
 class AntibodyCodec(MappedCodec):
-    version = VERSION
+    version = "2"
 
-    def __init__(self, antigen, oracle):
+    def __init__(self, antigen, oracle, *, utility=False):
         self.antigen, self.oracle = antigen, oracle
+        self.utility = utility
         self.metric = "mock_energy" if oracle == "mock" else "absolut_energy"
-        self.name = f"antibody-energy[{antigen}:{oracle}]"
+        self.name = f"antibody-energy[{antigen}:{oracle}:" + ("negative-energy-v1" if utility else "raw") + "]"
 
     def to_request(self, candidate):
         limits = {"max_runtime_seconds": ABSOLUT_TIMEOUT_SECONDS} if self.oracle == "absolut" else {}
@@ -48,7 +50,11 @@ class AntibodyCodec(MappedCodec):
                                                 "antigen": self.antigen, "oracle": self.oracle}, limits)
 
     def metrics(self, candidate, result):
-        return {self.metric: float(result[self.metric])}
+        energy = float(result[self.metric])
+        metrics = {self.metric: energy}
+        if self.utility:
+            metrics[ENERGY_UTILITY] = -energy
+        return metrics
 
 
 def mock_energy(antigen, sequence):

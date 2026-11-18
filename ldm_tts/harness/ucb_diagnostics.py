@@ -151,12 +151,23 @@ def _projection_arrays(selector, history, features) -> dict[str, np.ndarray]:
     return arrays
 
 
-def prediction_feedback(history_ids, history_rounds, utilities, records):
+def prediction_feedback(history_ids, history_rounds, utilities, records, history_decisions=None):
+    """Match synchronous round or asynchronous decision predictions to measurements."""
     measured = {(round_index, candidate_id): float(value) for round_index, candidate_id, value
                 in zip(history_rounds, history_ids, utilities, strict=True)}
+    by_decision = {} if history_decisions is None else {
+        (decision, candidate_id): float(value) for decision, candidate_id, value
+        in zip(history_decisions, history_ids, utilities, strict=True) if decision}
     matched = []
     for record in records:
+        decision = record.get("decision_id")
         for prediction in record["predictions"]:
+            if decision is not None:
+                key = (decision, prediction["candidate_id"])
+                if key in by_decision:
+                    matched.append({"decision_id": decision, "application_id": record.get("application_id"),
+                                    **prediction, "measured_utility": by_decision[key]})
+                continue
             key = (record["round_index"], prediction["candidate_id"])
             if key in measured:
                 matched.append({"round_index": key[0], **prediction, "measured_utility": measured[key]})
@@ -241,10 +252,12 @@ def prediction_records(baseline, active, q0, *, alpha, eta, z_clip):
 def with_feedback(round_input: PolicyRoundInput, records) -> PolicyRoundInput:
     ids = round_input.history_candidate_ids
     rounds = round_input.history_rounds
+    decisions = [row.get("decision_id") for row in round_input.measured_observations]
     context = dict(round_input.execution_context)
     context["weight_context"] = {
         **context["weight_context"],
-        "prediction_feedback": prediction_feedback(ids, rounds, round_input.history_utilities, records),
+        "prediction_feedback": prediction_feedback(ids, rounds, round_input.history_utilities, records,
+                                                   decisions if any(decisions) else None),
         "optimization_progress": optimization_progress(rounds, round_input.history_utilities),
     }
     return replace(round_input, execution_context=context)

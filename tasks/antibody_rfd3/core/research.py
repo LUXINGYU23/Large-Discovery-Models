@@ -1,7 +1,6 @@
 """PoC proposal and selection adapters for the asynchronous research lane."""
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
@@ -11,10 +10,9 @@ import tempfile
 import numpy as np
 
 from ldm_tts.async_runtime import PacingDecision, Proposal, ResearchOutcome, StreamingPacing
-from ldm_tts.async_runtime.selection import Choice
+from ldm_tts.async_runtime.pacing import research_guards
 from ldm_tts.contracts import CandidateRejection, RawProposal
-from ldm_tts.optimization.records import BOObservation
-from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain, AntibodyGPSelector, AntibodySurrogateEncoder
+from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
 
 class InitializationPacing(StreamingPacing):
@@ -25,6 +23,41 @@ class InitializationPacing(StreamingPacing):
     def research(self, view):
         if view.head_ingest_seq == 0 and view.outstanding:
             return PacingDecision("wait", "initial_measurement_pending")
+        return super().research(view)
+
+
+class PolicyRoundPacing(InitializationPacing):
+    """Reserve one evaluation for each unfinished research/policy generation.
+
+    Extra evaluation slots remain streaming and can run while research is in
+    progress. When exactly one slot per generation remains, wait for the new
+    generation's application and for a measurement from every previous round.
+    """
+
+    name = "antibody-policy-rounds"
+
+    @staticmethod
+    def reserved(view):
+        return max(0, view.pacing.research_budget - view.current_generation)
+
+    def decide(self, view):
+        decision = super().decide(view)
+        if decision.action == "dispatch" and view.budget.free <= self.reserved(view):
+            return PacingDecision("wait", "reserved_for_research")
+        return decision
+
+    def research(self, view):
+        reason = research_guards(view)
+        if reason:
+            return PacingDecision("wait", reason)
+        if view.head_ingest_seq == 0 and view.outstanding:
+            return PacingDecision("wait", "initial_measurement_pending")
+        needs_round = (view.current_generation > 0 and view.selected_since_ready > 0
+                       and view.budget.free <= self.reserved(view))
+        if needs_round:
+            if view.head_ingest_seq < view.current_generation:
+                return PacingDecision("wait", "round_measurement_pending")
+            return PacingDecision("research")
         return super().research(view)
 
 
@@ -128,35 +161,3 @@ class NativeResearch:
                 proposals.append(Proposal(candidate, self.args.method))
         return ResearchOutcome(proposals=tuple(proposals), metadata={"history_count": len(measured),
                                "generation_remaining": self.worker.remaining()})
-
-
-class GPSelector:
-    """The existing categorical antibody EI acquisition, with pending keys excluded by the controller."""
-
-    name = "antibody-gp-ei"
-    version = "1"
-
-    def __init__(self, args):
-        settings = argparse.Namespace(acq="ei", acq_beta=1.0, acq_xi=0.001, n_init=1, device="cpu")
-        self.metric = "mock_energy" if args.oracle == "mock" else "absolut_energy"
-        self.gp = AntibodyGPSelector(args=settings, method_spec={"reduction": "max"},
-                                     rng=np.random.default_rng(args.seed), objective_name=self.metric)
-        self.encoder = AntibodySurrogateEncoder(11)
-
-    def describe(self):
-        return {"name": self.name, "version": self.version, "metric": self.metric,
-                "pending_handling": "dedup_only"}
-
-    def choose(self, context):
-        if not context.candidates:
-            return None
-        training = [BOObservation.from_observation(o, objective_names=(self.metric,),
-                    feature=self.encoder.encode(o.candidate)) for o in context.history if o.evaluation.succeeded]
-        self.gp.fit(training)
-        representations = {c.candidate_id: self.encoder.encode(c) for c in context.candidates}
-        selected = self.gp.select(context.candidates, representations, count=context.count,
-                                  round_idx=context.head_ingest_seq)
-        by_id = {candidate.candidate_id: candidate.canonical_key for candidate in context.candidates}
-        keys = tuple(by_id[cid] for cid in selected.selected_candidate_ids)
-        return Choice(keys, tuple(1.0 for _ in keys), {"pending_handling": "dedup_only",
-                      "acquisition": selected.metadata}, {"head_ingest_seq": context.head_ingest_seq})
