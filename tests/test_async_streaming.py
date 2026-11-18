@@ -58,6 +58,23 @@ class TestPolicy(PolicyPrior):
         return result
 
 
+class HeldSupplementExecutor(InlineExecutor):
+    def __init__(self, clock):
+        super().__init__(clock)
+        self.hold_supplement = False
+
+    def submit(self, generation, job, round_input, started_at, *, immediate=False):
+        if generation < 0 and self.hold_supplement:
+            self.jobs[generation] = (job, self.clock.now() + 1000)
+            return started_at
+        return super().submit(generation, job, round_input, started_at, immediate=immediate)
+
+    def release_supplement(self):
+        for generation, (job, _) in self.jobs.items():
+            if generation < 0:
+                self.jobs[generation] = (job, self.clock.now())
+
+
 def config(*, budget=80, research_budget=None):
     pacing = PacingConfig.balanced(concurrency=4, reservoir_size=64, half_life=32,
         theta=0.75, dispatch_during_research="continue", research_budget=research_budget,
@@ -187,6 +204,44 @@ def test_abandoned_timed_out_job_does_not_block_next_generation(tmp_path):
         assert h.drive(until=lambda: len(ctrl.generations()) >= 2 and bool(ctrl.decisions()))
         assert ctrl.generations()[0]["state"] == "abandoned"
         assert ctrl.generations()[1]["state"] == "ready" and source.calls == [(2, 0, ())]
+
+
+def test_late_written_off_result_waits_for_history_coverage(tmp_path):
+    source, policy = Source(), TestPolicy()
+    options = RuntimeOptions(anti_entropy_interval=60, long_poll_seconds=0, max_intents_per_step=1)
+    with Harness(tmp_path, budget=80, concurrency=4, buffer_depth=28, options=options) as h:
+        h.start_es()
+        h.config = config(research_budget=1)
+        executor = HeldSupplementExecutor(h.clock)
+        ctrl = open_stream(h, source, policy=policy, executor=executor)
+        assert h.drive(until=lambda: h.mirror(1) == "RUNNING")
+        first = h.row(1)
+        executor_ref = f"sim:{first['experiment_id']}#1"
+        h.sim.set_unreachable(executor_ref)
+        assert h.drive(until=lambda: h.row(1)["es_condition"] == "unreachable")
+        assert ctrl.write_off(first["experiment_id"], "test", "temporarily unreachable")
+
+        # Replace the old application after the write-off: the orphaned key is no longer in H or Q.
+        previous = policy.current().application_id
+        ctrl.add_proposals([Proposal(toy_candidates(1, 10000)[0], "extra")])
+        assert h.drive(until=lambda: policy.current().application_id != previous, advance=False)
+        application = policy.current()
+        assert not application.covers(first["canonical_key"])
+
+        executor.hold_supplement = True
+        h.sim.set_unreachable(executor_ref, False)
+        assert h.drive(until=lambda: any(o.experiment_id == first["experiment_id"] for o in ctrl.observations())
+                       and policy._supplement is not None)
+        assert policy.missing_history() == (first["canonical_key"],)
+        decisions = len(ctrl.decisions())
+        ctrl.step()
+        assert len(ctrl.decisions()) == decisions and policy.current().application_id == application.application_id
+
+        executor.release_supplement()
+        assert h.drive(until=lambda: policy.current().application_id != application.application_id, advance=False)
+        assert policy.current().covers(first["canonical_key"]) and policy.missing_history() == ()
+        assert h.drive(until=lambda: len(ctrl.decisions()) > decisions, advance=False)
+        assert ctrl.decisions()[-1]["snapshot"]["head_ingest_seq"] == ctrl.view().head_ingest_seq
 
 
 def test_interrupted_supplement_restarts_and_covers_added_candidate(tmp_path):

@@ -18,9 +18,8 @@ controller:
   disabled policy (no epoch) is a *prior-free* application: the plain GP, as the synchronous zero prior.
 * **Use**: ``ReferenceSelector(prior=policy.current)`` refits on ``(head_ingest_seq, application_id)``; each
   decision records the application id and is replayed with that application (``PolicyPrior.application``).
-  Observations without a value in the active table (a late result after a write-off) are booked but stay out of
-  the residual GP until the next application. Reservoir candidates the table does not cover (merged after the
-  application) are excluded from selection and trigger a supplementary application on the next step.
+  A late result missing from the active table blocks selection until a supplementary application covers it.
+  Reservoir candidates the table does not cover are excluded until a supplementary application covers them.
 
 Re-application triggers: generation readiness, uncovered reservoir candidates (``supplement``) and, optionally,
 ``reapply_after_observations`` booked results since the last application (the application lifetime factor).
@@ -163,6 +162,7 @@ class PolicyPrior:
         self.prepare_turn = prepare_turn
         self.controller = None
         self._cache: dict[str, PriorApplication] = {}
+        self._history_coverage: tuple[int, int, tuple[str, ...]] | None = None
         self._preparing_keys: set[str] | None = None
         self._supplement = None
 
@@ -215,12 +215,32 @@ class PolicyPrior:
     def covered(self, candidates) -> tuple[list, tuple[str, ...]]:
         """Split eligible candidates into those the active application covers and the keys it does not."""
         application = self.current()
+        if self.missing_history():
+            return [], tuple(c.canonical_key for c in candidates)
         def covered(candidate):
             key = candidate.canonical_key
             return (application is not None and not application.degraded and application.covers(key)
                     and (self._preparing_keys is None or key in self._preparing_keys))
         kept = [c for c in candidates if covered(c)]
         return kept, tuple(c.canonical_key for c in candidates if not covered(c))
+
+    def missing_history(self) -> tuple[str, ...]:
+        """Successful objective rows absent from the active prior; cached by application and ingest head."""
+        application = self.current()
+        if application is None or application.prior_free:
+            return ()
+        with self.store.lock:
+            db = self.store.db
+            head = results_booked(db)
+            cached = self._history_coverage
+            if cached is not None and cached[:2] == (application.seq, head):
+                return cached[2]
+            rows = db.execute("SELECT canonical_key, observation_json FROM observations WHERE status='succeeded'").fetchall()
+        missing = tuple(r["canonical_key"] for r in rows
+                        if r["canonical_key"] not in application
+                        and self.selector.objective_name in json.loads(r["observation_json"])["evaluation"]["metrics"])
+        self._history_coverage = (application.seq, head, missing)
+        return missing
 
     # ---- policy turn (research job) ---------------------------------------------------------------------
 
@@ -439,7 +459,7 @@ class PolicyPrior:
             dedup = self.ledger.dedup_keys(db)
             live = {o.candidate.canonical_key for _, o in self.keeper.live(db)} - dedup
         uncovered = () if application.prior_free else sorted(k for k in live if k not in application)
-        if uncovered:
+        if uncovered or self.missing_history():
             trigger = "supplement"
         elif self.reapply_after is not None and head - application.head_ingest_seq >= self.reapply_after:
             trigger = "observations"
