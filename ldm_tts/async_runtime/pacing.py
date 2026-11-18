@@ -266,7 +266,7 @@ class BarrierPacing:
     ``selection_batch_size`` in one stepwise selection); R only once that generation's batch is settled."""
 
     name = "barrier"
-    version = "2"
+    version = "3"
 
     def decide(self, view: CampaignView) -> PacingDecision:
         reason = _gate(view)

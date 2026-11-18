@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +11,7 @@ from async_controller_support import CAMPAIGN, Harness, ToyCodec, toy_candidates
 from ldm_tts.async_runtime import (CampaignConfig, CampaignConfigMismatch, CrashPlan, InlineExecutor, PacedController,
     PacingConfig, Proposal, ResearchOutcome, SimulatedCrash, campaign_extra, check_invariants)
 from ldm_tts.async_runtime.selectors import ReferenceSelector
+from ldm_tts.async_runtime.store import get_flag, set_flag
 from tasks.antibody_rfd3.core.workflow import describe_ldm_task, parse_args
 
 
@@ -39,19 +42,70 @@ def batch_config(rounds, *, batch=32, pool=64, concurrency=4):
                           extra=campaign_extra(pacing))
 
 
-def open_batch(h, source, *, selector=None, config=None, faults=None):
+def open_batch(h, source, *, selector=None, config=None, faults=None, policy=None):
     if h.ctrl is not None:
         h.ctrl.close()
     h.config = config or h.config
     h.ctrl = PacedController(h.db, h.config, codec=ToyCodec(), client=h.client(), clock=h.clock,
                              research=source, lane_executor=InlineExecutor(h.clock), selector=selector,
-                             options=h.options, faults=faults)
+                             options=h.options, faults=faults, policy=policy)
     return h.ctrl
 
 
 def reference_selector():
     return ReferenceSelector(featurize=lambda c: (float(c.payload),), objective_name="objective",
                              feature_version="toy-batch-v1")
+
+
+class BatchPolicy:
+    """A deterministic policy lifecycle that exposes persisted readiness to the real barrier."""
+
+    def __init__(self, *, status="accepted", action="use", turn_degraded=False, application_degraded=False,
+                 missing_application=False, wrong_generation=False):
+        self.status, self.action, self.turn_degraded = status, action, turn_degraded
+        self.application_degraded = application_degraded
+        self.missing_application, self.wrong_generation = missing_application, wrong_generation
+
+    def describe(self):
+        return {"name": "batch-test-policy", "version": "1"}
+
+    def wrap(self, source):
+        policy = self
+
+        class Source:
+            name = "batch-test-policy-source"
+            version = "1"
+
+            def research(self, round_input, history):
+                outcome = source.research(round_input, history)
+                return replace(outcome, metadata={**outcome.metadata, "policy_round": {
+                    "status": policy.status, "action": policy.action, "degraded": policy.turn_degraded}})
+
+        return Source()
+
+    def bind(self, controller):
+        self.controller = controller
+        controller.lane.readiness = self
+
+    def prepare(self, generation, outcome):
+        return generation
+
+    def commit(self, db, generation, prepared, now):
+        if not self.missing_application:
+            set_flag(db, "test_policy_application", {
+                "application_id": "test-application", "generation": generation + int(self.wrong_generation),
+                "degraded": self.application_degraded,
+                "error": "application failed" if self.application_degraded else None})
+
+    def current(self):
+        data = get_flag(self.controller.store.db, "test_policy_application")
+        return None if data is None else SimpleNamespace(**data)
+
+    def step(self):
+        return False
+
+    def covered(self, candidates):
+        return list(candidates), ()
 
 
 def test_batch_plan_is_complete_before_dispatch_and_survives_restart(tmp_path):
@@ -158,6 +212,37 @@ def test_failed_or_canceled_evaluation_stops_the_batch(tmp_path, failure):
         assert "batch_evaluation_incomplete" in {a["type"] for a in ctrl.anomalies()}
         assert len(source.calls) == 1 and len(ctrl.generations()) == 1
         assert len(ctrl.plans()) == 1
+
+
+@pytest.mark.parametrize("settings", [
+    {"status": "submission_rejected"}, {"turn_degraded": True}, {"application_degraded": True},
+    {"missing_application": True}, {"wrong_generation": True},
+])
+def test_batch_policy_failure_stops_before_any_plan_and_cannot_be_bypassed_by_resume(tmp_path, settings):
+    source, policy = BatchSource(), BatchPolicy(**settings)
+    with Harness(tmp_path, budget=32, concurrency=4) as h:
+        h.start_es()
+        h.config = batch_config(1)
+        ctrl = open_batch(h, source, selector=reference_selector(), policy=policy)
+        assert h.drive(until=lambda: bool(ctrl.view().paused))
+        assert not ctrl.plans() and not ctrl.decisions() and not h.sim.launches
+        assert "batch_policy_incomplete" in {a["type"] for a in ctrl.anomalies()}
+        assert ctrl.resume("test-operator")
+        ctrl.step()
+        assert ctrl.view().paused and not ctrl.plans() and not ctrl.decisions()
+
+
+@pytest.mark.parametrize("action", ["use", "disable"])
+def test_accepted_batch_policy_allows_cold_start_and_explicit_disable(tmp_path, action):
+    source, policy = BatchSource(), BatchPolicy(action=action)
+    with Harness(tmp_path, budget=32, concurrency=4, sim={"duration": 1}) as h:
+        h.start_es()
+        h.config = batch_config(1)
+        ctrl = open_batch(h, source, selector=reference_selector(), policy=policy)
+        assert h.drive()
+        assert len(ctrl.plans()) == 1 and len(ctrl.observations()) == 32
+        selection = json.loads(ctrl.plans()[0]["record_json"])["selection"]
+        assert not selection["metadata"]["gp_ready"]
 
 
 def test_abort_records_the_unconsumed_plan_as_abandoned(tmp_path):

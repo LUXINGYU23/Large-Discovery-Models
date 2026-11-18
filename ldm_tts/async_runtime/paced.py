@@ -360,7 +360,22 @@ class PacedController(Controller):
                     capacity = self.pacing_config.reservoir_size
                     distinct = db.execute("SELECT COUNT(DISTINCT canonical_key) FROM occurrences WHERE generation=?",
                                           (number,)).fetchone()[0]
-                    if distinct > capacity or view.eligible < required:
+                    policy_round = (json.loads(generation["outcome_json"] or "{}").get("metadata", {})
+                                    .get("policy_round", {}))
+                    application = None if self.policy is None else self.policy.current()
+                    if self.policy is not None and (policy_round.get("status") != "accepted" or
+                                                    policy_round.get("degraded")):
+                        problem = "batch_policy_incomplete"
+                        detail = {"status": policy_round.get("status"), "action": policy_round.get("action"),
+                                  "degraded": bool(policy_round.get("degraded"))}
+                    elif self.policy is not None and (application is None or application.generation != number or
+                                                      application.degraded):
+                        problem = "batch_policy_incomplete"
+                        detail = {"application_id": None if application is None else application.application_id,
+                                  "application_generation": None if application is None else application.generation,
+                                  "degraded": False if application is None else application.degraded,
+                                  "error": None if application is None else application.error}
+                    elif distinct > capacity or view.eligible < required:
                         problem = "batch_candidates_incomplete"
                         detail = {"required": required, "capacity": capacity, "proposals": generation["proposal_count"],
                                   "distinct": distinct, "admitted": generation["admitted"],
@@ -371,7 +386,12 @@ class PacedController(Controller):
         if problem is None:
             return False
         with self.store.tx("batch_check") as db:
-            return self.ledger.anomaly(db, problem, subject, detail, pause=True)
+            if self.ledger.anomaly(db, problem, subject, detail, pause=True):
+                return True
+            if not self.ledger.paused_reasons(db):
+                self.ledger.pause(db, f"anomaly.{problem}:{subject}")
+                return True
+            return False
 
     def _snapshot(self, view: CampaignView, eligible: int) -> dict:
         return {"proposer": "reservoir@1", "selector": plugin_identity(self.reservoir_selector, "selector"),
