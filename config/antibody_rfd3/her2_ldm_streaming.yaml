@@ -22,6 +22,7 @@ args:
   gpu: 0
   share-gpu: true
   cpu-limit: 8
+  input-structure: /Aidata/shared/ldm/cache/streaming-models/1N8Z.pdb
   rfd3-checkpoint: /Aidata/shared/ldm/cache/streaming-models/rfd3.ckpt
   proteinmpnn-checkpoint: /Aidata/shared/ldm/cache/streaming-models/v_48_020.pt
   sidecar-image: ldm-copper-pi:antibody-async-20261118

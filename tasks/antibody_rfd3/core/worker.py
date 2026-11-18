@@ -192,7 +192,7 @@ class DesignWorker:
         root = self.args.root.resolve()
         config = dict(self.template, workspace_root=str(root), seed=seed, num_designs=1,
                       sequences_per_design=count, sampling_temperature=temperature)
-        for name in ("rfd3_checkpoint", "proteinmpnn_checkpoint"):
+        for name in ("input_structure", "rfd3_checkpoint", "proteinmpnn_checkpoint"):
             path = getattr(self.args, name)
             if path is not None:
                 config[name] = str(path.expanduser().resolve())

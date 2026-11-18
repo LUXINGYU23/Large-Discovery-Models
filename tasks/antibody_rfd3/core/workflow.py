@@ -45,6 +45,7 @@ def parse_args(argv=None):
     p.add_argument("--cpu-limit", type=int, default=2)
     p.add_argument("--antigen", default="1ADQ_A")
     p.add_argument("--root", type=Path, default=Path("/Aidata/shared/ldm/antibody-poc"))
+    p.add_argument("--input-structure", type=Path, help="Explicit full input structure for design")
     p.add_argument("--rfd3-checkpoint", type=Path, help="Explicit RFD3 weights and adjacent source record")
     p.add_argument("--proteinmpnn-checkpoint", type=Path, help="Explicit ProteinMPNN weights and adjacent source record")
     p.add_argument("--absolut-path", type=Path, default=os.environ.get("ABSOLUT_PATH"))
