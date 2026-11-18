@@ -42,3 +42,19 @@ PYTHONPATH=. /Aidata/shared/ldm/antibody-poc/env/antibody_campaign/bin/python \
 正式 20 批运行于北京时间 2026-11-18 18:57 启动，源码提交 `8dd9645b`，目录为 `/Aidata/shared/ldm/antibody-poc/runs/her2-batch-20r-8dd9645b`。使用 DeepSeek、low、GPU 1，运行器总时限明确设置为 172800 秒；这个值是上限，不是预计耗时。后台启动进程为 `2484466`，外层日志为 `/Aidata/shared/ldm/antibody-poc/logs/her2-batch-20r-8dd9645b.log`。评分正常结束后自动执行 20/32/64 的批次审计并保存 `audit-batch.json`。
 
 此记录仅确认正式运行已启动，尚未确认完成 640 次评分。以运行目录的 `launch.json`、控制器账本和最终审计为准。未向 Claude 工作区同步任何内容。
+
+## 真正的流式研究闭环
+
+上面的 `her2_ldm_batch.yaml` 是 barrier 同步基线：HTTP 评分虽并发执行，研究之间仍等待整批结算。它不能作为研究与评分交叠的证明。该基线运行保持原提交、目录和进程不动。
+
+独立分支 `antibody-poc-streaming` 的 `her2_ldm_streaming.yaml` 显式选择 streaming。探索和改进角色仍各提交 32 条有效唯一提案；resident pool 容量为 64。最多 32 个已选择但未结算的评估任务，其中 4 个实际执行、最多 28 个排队。每次只做一个 pending-aware BO 选择，返回主循环收取新结果后再补位；不会冻结整批 32 个选择，也不会等所有在途任务结束才开始研究。池子会随选择减少，并通过研究补充，因此 64 是容量，不是每个时刻都必须有 64 条。
+
+研究触发采用已有 streaming 策略，候选信息量半衰期为 32 条结果，补充阈值为池容量的 0.75，研究期间允许继续分发。总评分预算为 640，研究轮数独立设上限 64，不要求完成 20 个同步研究批次。研究启动时排除当时仍在池中的旧序列，并可通过 candidate_catalog 工具刷新已测和 pending 排除集合，避免提交时出现并发碰撞；未测且已离开旧池的序列仍可在以后重新提出。
+
+策略应用输入在控制线程冻结，容器计算在研究执行器后台完成，主线程原子发布。准备期间旧的合法策略继续支持已覆盖候选的选择；新结果仍持续入库。若迟到结果缺少先验覆盖，则先停止新选择、后台补充策略，再恢复；不会静默漏掉该结果。策略失败阻止新应用发布。预算耗尽时保留当前研究的完整收尾，效率统计包含这段尾部等待。
+
+H20 独立工作树为 `/Aidata/shared/ldm/antibody-poc/streaming-code`。真实 96 次评分验收于北京时间 2026-11-18 20:53 启动，源码 `a96c350c`，运行目录 `/Aidata/shared/ldm/antibody-poc/runs/her2-stream-pilot-a96c350c`，后台启动进程 `3881371`。新运行使用 GPU 0、CPU 8–15；本地 Docker sidecar/策略容器显式继承 CPU 集，生成锁按 GPU 编号区分。旧运行仍使用原来的 GPU 1 与配置，共享主机 IO/API 的竞争仍可能影响比较。此处只记录启动，真实交叠验收尚未完成。
+
+验收入口为 `tasks.antibody_rfd3.repro.h20.audit_streaming_ldm <campaign目录> --evaluations 96`。必须证明研究与实际评分区间正交叠，且交叠期间有结果入库、后续 GP/BO 使用更新的历史和在途集合；同时逐个重放决策，检查窗口、候选池、角色提案来源和真实评分回执。正式 640 次完成后以同一审计加 `--baseline /Aidata/shared/ldm/antibody-poc/runs/her2-batch-20r-8dd9645b/campaign` 统计两边效率。
+
+效率报告区分墙钟时间、研究时间、评分工时与工作槽利用率、交叠秒数、评分吞吐量、实际研究代数、原始生成量及 LLM token 用量。流式模式每代实际评估数不固定，两种模式的研究工作量可能不同，所以总耗时比不能解释成纯调度加速。现有生成 receipt 缺少绝对起止时间，报告不声称测得 GPU 模型执行与评分的精确交叠，仅统计可验证的研究 lane 与评分 attempt 交叠。
