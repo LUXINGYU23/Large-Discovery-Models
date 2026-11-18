@@ -160,7 +160,8 @@ def open_agent(args, directory, worker, bridge, campaign_id):
     config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile(),), campaign_id=campaign_id,
         task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed, submission_contract=contract,
         limits=HarnessLimits(wall_time_seconds=900, tool_call_budgets={"web_search": 0, "web_fetch": 0}),
-        base_url=url.removesuffix("/responses"), model=model, context7_enabled=False,
+        base_url=url.removesuffix("/responses"), model=model,
+        thinking=os.environ.get("LLM_REASONING_EFFORT", "off"), context7_enabled=False,
         force_first_tool_call=False, guest_runtime=load_pi_guest_runtime("antibody_rfd3", RESOURCES / "image"),
         tool_extensions=(HarnessToolExtension(Path("/resources") / extension, file_sha256(RESOURCES / extension), TOOLS),),
         history=bridge.service.config)
