@@ -54,7 +54,7 @@ def parse_args():
                         help="New directory under /Aidata/shared/ldm for runs, logs, and summary")
     parser.add_argument("--sidecar-image", required=True,
                         help="New protocol-compatible Pi image; the historical image is not changed")
-    parser.add_argument("--gpu", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--gpu", type=int, choices=(0, 1, 2, 3), default=0)
     parser.add_argument("--startup-timeout", type=int, default=300)
     parser.add_argument("--case-timeout", type=int, default=1800)
     args = parser.parse_args()

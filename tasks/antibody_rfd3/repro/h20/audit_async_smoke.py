@@ -24,6 +24,8 @@ def audit(directory: Path) -> dict:
             "SELECT observation_json FROM observations ORDER BY ingest_seq")]
         decisions = [json.loads(r[0]) for r in db.execute(
             "SELECT snapshot_json FROM decisions ORDER BY decision_id")]
+        generations = [json.loads(r[0]) for r in db.execute(
+            "SELECT outcome_json FROM generations WHERE state='ready' ORDER BY generation")]
         unresolved = db.execute("SELECT COUNT(*) FROM anomalies WHERE resolved_at IS NULL").fetchone()[0]
     with sqlite3.connect(f"file:{directory / 'experiment-service.sqlite3'}?mode=ro", uri=True) as db:
         db.row_factory = sqlite3.Row
@@ -60,6 +62,15 @@ def audit(directory: Path) -> dict:
         require(kinds.get("query", 0) > 0, "Pi did not query history through the host tool")
         require(any(r["kind"] == "decision" and r["decision"] == "accept" for r in history_events),
                 "No accepted history-aware submission")
+    if config["method"] == "ldm_harness" and expected > 1:
+        require(any(d.get("record", {}).get("acquisition", {}).get("mode") == "direct_max"
+                    and d["head_ingest_seq"] > 0 for d in decisions),
+                "No GP/EI selection using a measured observation")
+    if config["method"] == "antbo" and expected > 1:
+        require(bool(list((directory / "antbo_checkpoints").glob("g*.pkl"))),
+                "Missing native AntBO proposal checkpoint")
+        require(any(g.get("metadata", {}).get("history_count", 0) > 0 for g in generations),
+                "AntBO never used measured history")
     edges = [(r["started_at"], 1) for r in attempts] + [(r["ended_at"], -1) for r in attempts if r["ended_at"]]
     active = peak = 0
     for _, change in sorted(edges):
