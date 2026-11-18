@@ -22,6 +22,8 @@ args:
   gpu: 0
   share-gpu: true
   cpu-limit: 8
+  rfd3-checkpoint: /Aidata/shared/ldm/cache/streaming-models/rfd3.ckpt
+  proteinmpnn-checkpoint: /Aidata/shared/ldm/cache/streaming-models/v_48_020.pt
   sidecar-image: ldm-copper-pi:antibody-async-20261118
   guest-cache: /Aidata/shared/ldm/antibody-poc/cache/gondolin
   out-dir: runs/her2_ldm_streaming

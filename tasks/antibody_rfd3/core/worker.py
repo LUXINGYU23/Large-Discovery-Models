@@ -192,6 +192,10 @@ class DesignWorker:
         root = self.args.root.resolve()
         config = dict(self.template, workspace_root=str(root), seed=seed, num_designs=1,
                       sequences_per_design=count, sampling_temperature=temperature)
+        for name in ("rfd3_checkpoint", "proteinmpnn_checkpoint"):
+            path = getattr(self.args, name)
+            if path is not None:
+                config[name] = str(path.expanduser().resolve())
         atomic_json_write(job / "config.json", config)
         cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
         env = dict(os.environ, PYTHONPATH=str(REPO))

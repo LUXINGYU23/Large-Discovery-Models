@@ -45,6 +45,8 @@ def parse_args(argv=None):
     p.add_argument("--cpu-limit", type=int, default=2)
     p.add_argument("--antigen", default="1ADQ_A")
     p.add_argument("--root", type=Path, default=Path("/Aidata/shared/ldm/antibody-poc"))
+    p.add_argument("--rfd3-checkpoint", type=Path, help="Explicit RFD3 weights and adjacent source record")
+    p.add_argument("--proteinmpnn-checkpoint", type=Path, help="Explicit ProteinMPNN weights and adjacent source record")
     p.add_argument("--absolut-path", type=Path, default=os.environ.get("ABSOLUT_PATH"))
     p.add_argument("--sidecar-image", default=os.environ.get("LDM_PI_IMAGE", "ldm-copper-pi:antibody-async-20261118"))
     p.add_argument("--guest-cache", type=Path, default=os.environ.get("LDM_GONDOLIN_CACHE"))

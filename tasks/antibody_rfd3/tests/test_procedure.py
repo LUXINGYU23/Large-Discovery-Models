@@ -54,7 +54,10 @@ def test_two_round_offline_campaign(tmp_path):
 
 
 def test_backbone_reuse_calls_sequence_only(tmp_path, monkeypatch):
-    args = parse_args(["--root", str(tmp_path), "--method", "fixed"])
+    rfd3 = tmp_path / "cache/rfd3.ckpt"
+    proteinmpnn = tmp_path / "cache/v_48_020.pt"
+    args = parse_args(["--root", str(tmp_path), "--method", "fixed", "--rfd3-checkpoint", str(rfd3),
+                       "--proteinmpnn-checkpoint", str(proteinmpnn)])
     worker = DesignWorker(tmp_path / "run", args)
     worker.round = 1
     first = worker.jobs / "job-00000"
@@ -96,6 +99,9 @@ def test_backbone_reuse_calls_sequence_only(tmp_path, monkeypatch):
         rows = worker.execute("sequence_h3", 1, 0.5, first.name)
     assert rows[0]["sequence"] == "SNGDWGSPGTV" and rows[0]["backbone_id"] == first.name
     cmd, = seen
+    config = json.loads((worker.jobs / "job-00001/config.json").read_text())
+    assert config["rfd3_checkpoint"] == str(rfd3)
+    assert config["proteinmpnn_checkpoint"] == str(proteinmpnn)
     assert cmd[cmd.index("-m") + 2] == "sequence"
     assert cmd[cmd.index("--generation") + 1] == str(first / "output/generation.json")
     assert cmd[0] == "taskset"
