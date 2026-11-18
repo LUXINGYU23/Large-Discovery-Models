@@ -84,3 +84,15 @@ H20 独立工作树为 `/Aidata/shared/ldm/antibody-poc/streaming-code`。真实
 正式 640 次流式运行于北京时间 2026-11-18 21:28 启动，提交 `d8808f4d`，工作树 `/Aidata/shared/ldm/antibody-poc/streaming-cache-code`，运行目录 `/Aidata/shared/ldm/antibody-poc/runs/her2-stream-640-d8808f4d`，后台启动 PID `214263`。完成后自动保存全量审计及同为 640 次成功评分的 barrier 效率比较到 `audit-streaming.json`。如果 baseline 未完整成功，比较明确标为 unavailable。此记录不表示 640 次已完成。
 
 旧 barrier 未停止、未修改；正式流式启动时它已完成 420/640 次成功评分。最终比较须另外说明：新运行使用本地缓存，旧运行使用 Ceph 归档，这一存储差异也会影响总耗时，不能把全部差异归因于调度。所有开发、测试和运行未同步到 Claude 工作区。
+
+### 2026-11-18 流式中断恢复
+
+正式运行在第 14 个 policy 回合遇到上游 HTTP 502，策略返回 degraded runtime_fallback，readiness 按设计阻止发布并结束运行。当时控制器已入账 428 条结果，服务持有 432 个成功实验及 32 个在途实验，其中两个计算已经完成但未回收，两个计算在服务关闭时停止。
+
+修复提交 `347869c9`、`d7ff9269`、`a9f7f4a0` 在原工作树部署，原运行目录通过 `tasks.antibody_rfd3.repro.h20.resume_full_ldm` 续跑。恢复前的启动记录及两份 SQLite 在线备份保存在 `recoveries/attempt-001/`。失败 policy 资料归档后复用原 generation、panel 和 Harness turn；有界 provider 重试保留累计用量。评分服务先回收结果，再判断新超时；仅确认停止且允许安全重试的 Absolut 纯计算执行器重试，已有取消或超时语义保持不变。
+
+H20 上恢复与策略测试 22 项、评分服务测试 97 项、审计测试 12 项通过。旧 96 次 pilot 在与原运行一致的 OMP/OpenBLAS/MKL 线程数 2 下重新审计通过；未指定线程数时严格浮点重放会有差异，不能把该环境差异判为有效重放。正式自动审计使用相同线程配置。
+
+续跑验收确认：原有 432 个成功实验的结果摘要和所有 attempt 记录不变，原有 460 条 BO 决策逐行不变；只有实验 433、434 新增第二次 attempt。第 14 回合已 accepted、degraded=false，第 15 回合正在研究，观测数已增长至 442/640。总预算和科学配置不变，两个中断 attempt 单独计入开销。此次记录是恢复验收，不表示 640 次运行已完成；完整审计及 barrier 效率比较仍在结束后自动执行。
+
+旧 barrier 已自然完成 640 个成功评分（2026-11-18 14:26 UTC），未修改或停止。恢复代码和数据未同步至 Claude 工作区。
