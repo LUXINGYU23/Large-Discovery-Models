@@ -139,6 +139,13 @@ class PolicyRoundSource:
     def research(self, round_input, history) -> ResearchOutcome:
         return self.policy.research(self.inner, round_input, history)
 
+    def needs_policy_retry(self, generation: int, input_digest: str, outcome_path: Path) -> bool:
+        return self.policy.needs_policy_retry(generation, input_digest, outcome_path)
+
+    def prepare_policy_retry(self, generation: int, input_digest: str, event_seq: int,
+                             outcome_path: Path) -> None:
+        self.policy.prepare_policy_retry(generation, input_digest, event_seq, outcome_path)
+
 
 class PolicyPrior:
     """Policy turns and frozen prior applications for a ``PacedController`` (``policy=``).
@@ -243,6 +250,61 @@ class PolicyPrior:
         return missing
 
     # ---- policy turn (research job) ---------------------------------------------------------------------
+
+    def needs_policy_retry(self, generation: int, input_digest: str, outcome_path: Path) -> bool:
+        """Only an unfinished failed turn can be continued with the same Harness turn identity."""
+        if not outcome_path.is_file():
+            return False
+        outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+        if outcome.get("input_digest") != input_digest:
+            raise ValueError("saved research outcome input digest mismatch")
+        turn = (outcome.get("outcome", {}).get("metadata") or {}).get("policy_round") or {}
+        if turn.get("status") in ("accepted", "skipped") and not turn.get("degraded"):
+            return False  # an application failure must reuse the successfully completed turn
+        if turn.get("status") != "runtime_fallback" or not turn.get("degraded"):
+            raise ValueError("the failed policy turn is terminal and cannot be resumed")
+        directory = self.research_controller.store.root / "rounds" / f"round_{generation:03d}"
+        result = json.loads((directory / "result.json").read_text(encoding="utf-8"))
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+        if (result.get("round_index") != generation or result.get("status") != "runtime_fallback"
+                or not result.get("degraded") or result.get("harness_turn")):
+            raise ValueError("the failed policy turn is terminal and cannot be resumed")
+        policy_digest = manifest.get("input_sha256")
+        if not isinstance(policy_digest, str) or not policy_digest or manifest.get("round_index") != generation:
+            raise ValueError("persisted policy round manifest is invalid")
+        saved = self.research_controller.store.load_result(directory, policy_digest)
+        if saved is None:
+            raise ValueError("the failed policy result is unavailable")
+        return True
+
+    def prepare_policy_retry(self, generation: int, input_digest: str, event_seq: int,
+                             outcome_path: Path) -> None:
+        """Preserve the failed attempt before clearing its receipts, idempotently across crashes."""
+        directory = self.research_controller.store.root / "rounds" / f"round_{generation:03d}"
+        archive = directory / "retries" / f"event-{event_seq:012d}"
+        marker = archive / "prepared.json"
+        if marker.is_file():
+            return
+        for source, name in ((outcome_path, "outcome.json"), (directory / "result.json", "result.json"),
+                             (directory / "compiled.npz", "compiled.npz")):
+            target = archive / name
+            if not target.is_file():
+                if not source.is_file():
+                    raise ValueError(f"missing failed policy retry evidence: {name}")
+                _write_atomic(target, source.read_bytes())
+            if source.exists():
+                if file_sha256(source) != file_sha256(target):
+                    raise ValueError(f"failed policy retry evidence changed: {name}")
+                source.unlink()
+        outcome = json.loads((archive / "outcome.json").read_text(encoding="utf-8"))
+        policy_digest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))["input_sha256"]
+        if outcome.get("input_digest") != input_digest:
+            raise ValueError("archived research outcome input digest mismatch")
+        self.research_controller.store.load_result(archive, policy_digest)
+        _write_atomic(marker, canonical({"generation": generation, "retry_event_seq": event_seq,
+            "research_input_sha256": input_digest, "policy_input_sha256": policy_digest,
+            "files": {name: file_sha256(archive / name)
+                      for name in ("outcome.json", "result.json", "compiled.npz")}}).encode())
 
     def prediction_records(self, db, head: int) -> list[dict]:
         """Decision-keyed predictions for successful observations through a frozen ingest head."""

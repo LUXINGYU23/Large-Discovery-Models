@@ -20,7 +20,7 @@ from ldm_tts.async_runtime.selectors import decision_choice
 from ldm_tts.contracts import Candidate, EvaluationResult, ObjectiveSet, ObjectiveSpec, Observation
 from ldm_tts.harness import PolicyResearchController
 from ldm_tts.harness.policy_execution import PolicyExecutionResult
-from ldm_tts.harness.protocol import (HarnessSubmissionRequest, HarnessSubmittedArtifact,
+from ldm_tts.harness.protocol import (HarnessError, HarnessSubmissionRequest, HarnessSubmittedArtifact,
                                        HarnessTurnResult, file_sha256)
 from ldm_tts.harness.ucb_diagnostics import prediction_feedback
 from ldm_tts.optimization.pending import PriorTable
@@ -341,3 +341,85 @@ def test_policy_and_application_recover_without_duplicate_turn_or_commit(lifecyc
     assert len(rig.simulator.launches) == len(set(rig.simulator.launches)) == 8
     assert ctrl.policy.check() == []
     assert all(ctrl.audit(d["decision_id"]) == [] for d in ctrl.decisions())
+
+
+@pytest.mark.parametrize("interruption", [None, "transaction", "outcome.json", "result.json", "compiled.npz"])
+def test_failed_policy_turn_resumes_from_persisted_panel_after_retry_interruption(lifecycle, monkeypatch, interruption):
+    from ldm_tts.async_runtime import policy as policy_module
+
+    rig = lifecycle
+    original_turn = PolicyClient.run_turn
+    seen_turns = []
+
+    def fail_once(client, turns, **kwargs):
+        turn, = turns
+        seen_turns.append((turn.round_index, turn.turn_id, turn.input_digest))
+        if turn.round_index == 2 and sum(index == 2 for index, _, _ in seen_turns) == 1:
+            raise HarnessError("provider 502", turn_usage={"policy_architect": {"providerCalls": 1}}, retryable=True)
+        return original_turn(client, turns, **kwargs)
+
+    monkeypatch.setattr(PolicyClient, "run_turn", fail_once)
+    ctrl = rig.open()
+    for _ in range(3000):
+        progressed = ctrl.step()
+        serviced = rig.service.service.run_until_idle()
+        if ctrl.view().lane.state == "blocked":
+            break
+        if not progressed and not serviced:
+            due = [value for value in (rig.service.service.next_event_time(), ctrl.next_due())
+                   if value is not None and value > rig.clock.now()]
+            assert due
+            rig.clock.advance_to(min(due))
+    else:
+        raise AssertionError("policy failure did not block the lane")
+
+    assert ctrl.generations()[-1]["generation"] == 2
+    old_ids = [row["experiment_id"] for row in ctrl.decisions()]
+    assert old_ids and not ctrl.policy.applications()[-1]["generation"] == 2
+    panel_path = rig.root / "controller.sqlite3.policy/panel/g000002.json"
+    panel = panel_path.read_bytes()
+    round_root = rig.root / "policy_harness/rounds/round_002"
+    failed_result = (round_root / "result.json").read_bytes()
+    failed_arrays = (round_root / "compiled.npz").read_bytes()
+    outcome_path = rig.root / "controller.sqlite3.research/g000002.outcome.json"
+    failed_outcome = outcome_path.read_bytes()
+    assert json.loads(failed_result)["status"] == "runtime_fallback"
+
+    if interruption == "transaction":
+        ctrl.store.faults = CrashPlan("lane.after_commit")
+    elif interruption:
+        original_write = policy_module._write_atomic
+        def interrupted_write(path, data):
+            original_write(path, data)
+            if path.name == interruption and "retries" in path.parts:
+                raise SimulatedCrash("policy_retry.archive")
+        monkeypatch.setattr(policy_module, "_write_atomic", interrupted_write)
+    if interruption:
+        with pytest.raises(SimulatedCrash):
+            ctrl.resolve_lane("retry", "test")
+        if interruption != "transaction":
+            monkeypatch.setattr(policy_module, "_write_atomic", original_write)
+        rig.close()
+        ctrl = rig.open()
+    else:
+        assert ctrl.resolve_lane("retry", "test")
+
+    rig.drive()
+    assert ctrl.finished
+    assert Counter(rig.panel.calls)[2] == 1 and panel_path.read_bytes() == panel
+    turns = [turn for turn in seen_turns if turn[0] == 2]
+    assert len(turns) == 2 and turns[0] == turns[1]
+    assert [row["experiment_id"] for row in ctrl.decisions()][:len(old_ids)] == old_ids
+    assert len(rig.simulator.launches) == len(set(rig.simulator.launches)) == 8
+    archives = list((round_root / "retries").glob("event-*"))
+    assert len(archives) == 1
+    archive = archives[0]
+    assert (archive / "outcome.json").read_bytes() == failed_outcome
+    assert (archive / "result.json").read_bytes() == failed_result
+    assert (archive / "compiled.npz").read_bytes() == failed_arrays
+    manifest = json.loads((archive / "prepared.json").read_text())
+    assert manifest["generation"] == 2
+    assert all(file_sha256(archive / name) == sha for name, sha in manifest["files"].items())
+    result = json.loads((round_root / "result.json").read_text())
+    assert result["status"] == "accepted" and not result["degraded"]
+    assert ctrl.policy.check() == []

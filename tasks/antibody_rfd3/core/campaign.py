@@ -185,6 +185,8 @@ def _run_locked(args, task_spec, directory):
                                    max_intents_per_step=16 if batch else 1)))
         error = None
         try:
+            if args.resume_run and ctrl.view().lane.state == "blocked":
+                ctrl.resolve_lane("retry", "resume-run")
             while not ctrl.finished:
                 exit_code = process.poll()
                 if exit_code is not None:

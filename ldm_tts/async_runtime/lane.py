@@ -401,6 +401,13 @@ class ResearchLane:
         except (OSError, ValueError) as exc:
             self.block(generation, f"input: {exc}")
             return
+        # The retry intent is committed before any files are moved.  Completing the
+        # preparation by event sequence makes an interrupted retry safe to resume.
+        retry = self.store.row("""SELECT seq, payload_json FROM events WHERE type='generation.started'
+            AND subject_id=? ORDER BY seq DESC LIMIT 1""", (str(generation),))
+        if retry is not None and json.loads(retry["payload_json"]).get("policy_retry"):
+            self.source.prepare_policy_retry(generation, row["input_digest"], retry["seq"],
+                                             self.outcome_path(generation))
         saved = self.outcome_path(generation)
         if saved.exists():
             data = json.loads(saved.read_text(encoding="utf-8"))
@@ -516,6 +523,11 @@ class ResearchLane:
         if row is None or row["state"] != "blocked":
             return False
         generation = row["generation"]
+        policy_retry = False
+        if action == "retry":
+            inspect_retry = getattr(self.source, "needs_policy_retry", None)
+            if inspect_retry is not None:
+                policy_retry = inspect_retry(generation, row["input_digest"], self.outcome_path(generation))
         with self.store.tx("lane") as db:
             if action == "retry":
                 changed = db.execute("""UPDATE generations SET state='running', started_at=?, deadline_at=?, error=NULL
@@ -531,7 +543,8 @@ class ResearchLane:
             if not changed:
                 return False
             resolve_anomalies(db, now, "lane_blocked", str(generation), by=operator)
-            append_event(db, now, event, str(generation), {"operator": operator, "resolution": action})
+            append_event(db, now, event, str(generation), {"operator": operator, "resolution": action,
+                                                          "policy_retry": policy_retry})
             if action == "abandon":
                 self._preparing = None
                 if self.readiness is not None:

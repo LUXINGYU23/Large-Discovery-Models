@@ -5,6 +5,8 @@ import threading
 import time
 from types import SimpleNamespace
 
+import pytest
+
 from async_controller_support import CAMPAIGN, Harness, ToyCodec, toy_candidates
 from ldm_tts.async_runtime import (CampaignConfig, InlineExecutor, PacedController, PacingConfig, Proposal,
                                    ResearchOutcome, RuntimeOptions, campaign_extra)
@@ -188,6 +190,9 @@ def test_degraded_policy_turn_is_never_applied(tmp_path):
         assert h.drive(until=lambda: ctrl.view().lane.state == "blocked")
         assert "policy turn failed" in ctrl.generations()[0]["error"]
         assert not ctrl.decisions() and policy.current() is None
+        with pytest.raises(ValueError, match="terminal and cannot be resumed"):
+            ctrl.resolve_lane("retry", "test")
+        assert ctrl.view().lane.state == "blocked" and policy.turn_calls == 1
 
 
 def test_abandoned_timed_out_job_does_not_block_next_generation(tmp_path):

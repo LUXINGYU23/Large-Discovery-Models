@@ -149,6 +149,7 @@ def open_policy(args, directory, campaign_id, selector):
                                  mounts=((RESOURCES, "/resources", True),))
     with HarnessClient(command, api_key=key, config=config) as client:
         controller = PolicyResearchController(client=client, adapter=AntibodyPolicyAdapter(),
-            executor=DockerPolicyExecutor(args.sidecar_image, container_user=resolve_container_user(None)), root=root)
+            executor=DockerPolicyExecutor(args.sidecar_image, container_user=resolve_container_user(None)), root=root,
+            recovery_budget=lambda: 2.0 * POLICY_TURN_SECONDS)
         yield AntibodyPolicyPrior(controller,
             prepare_turn=lambda round_input, info: prepare_policy_turn(selector, round_input, info))
