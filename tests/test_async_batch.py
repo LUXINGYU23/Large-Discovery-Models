@@ -87,8 +87,20 @@ class BatchPolicy:
         self.controller = controller
         controller.lane.readiness = self
 
-    def prepare(self, generation, outcome):
+    def snapshot(self, generation, outcome):
         return generation
+
+    def begin_preparation(self, snapshot):
+        pass
+
+    def prepare(self, snapshot):
+        return snapshot
+
+    def coverage_complete(self, prepared):
+        return True
+
+    def end_preparation(self):
+        pass
 
     def commit(self, db, generation, prepared, now):
         if not self.missing_application:

@@ -30,6 +30,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import tempfile
 from bisect import bisect_left
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -45,7 +46,7 @@ from ldm_tts.harness.protocol import file_sha256
 from ldm_tts.optimization.gp import RBFGPSurrogate
 from ldm_tts.optimization.pending import PriorTable
 
-from .lane import ResearchOutcome
+from .lane import ResearchOutcome, ThreadExecutor
 from .ledger import candidate_from_json
 from .proposals import results_booked
 from .selectors import decision_choice
@@ -100,12 +101,16 @@ def arrival_generations(ingest_seqs: Sequence[int], bases: Sequence[int]) -> lis
 
 def _write_atomic(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "wb") as handle:
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
 
 
 def _npz(**arrays) -> bytes:
@@ -158,6 +163,8 @@ class PolicyPrior:
         self.prepare_turn = prepare_turn
         self.controller = None
         self._cache: dict[str, PriorApplication] = {}
+        self._preparing_keys: set[str] | None = None
+        self._supplement = None
 
     def describe(self) -> dict:
         return {"name": self.name, "version": self.version, "contract_sha256": self.contract.sha256,
@@ -183,6 +190,7 @@ class PolicyPrior:
             self.store.db.executescript(PRIOR_SCHEMA)
         if controller.lane is not None:
             controller.lane.readiness = self
+        self.executor = controller.lane.executor if controller.lane is not None else ThreadExecutor(controller.waker.notify)
 
     # ---- reading applications -------------------------------------------------------------------------
 
@@ -207,10 +215,12 @@ class PolicyPrior:
     def covered(self, candidates) -> tuple[list, tuple[str, ...]]:
         """Split eligible candidates into those the active application covers and the keys it does not."""
         application = self.current()
-        if application is None or application.prior_free:
-            return list(candidates), ()
-        kept = [c for c in candidates if c.canonical_key in application]
-        return kept, tuple(c.canonical_key for c in candidates if c.canonical_key not in application)
+        def covered(candidate):
+            key = candidate.canonical_key
+            return (application is not None and not application.degraded and application.covers(key)
+                    and (self._preparing_keys is None or key in self._preparing_keys))
+        kept = [c for c in candidates if covered(c)]
+        return kept, tuple(c.canonical_key for c in candidates if not covered(c))
 
     # ---- policy turn (research job) ---------------------------------------------------------------------
 
@@ -339,9 +349,32 @@ class PolicyPrior:
 
     # ---- application ------------------------------------------------------------------------------------
 
-    def prepare(self, generation: int, outcome: ResearchOutcome) -> dict:
-        """Lane readiness, outside the transaction: apply the turn's epoch to H_A and Q_A (with the proposals)."""
-        return self._prepare("generation", generation, outcome.metadata.get("policy_round") or {}, outcome.proposals)
+    def snapshot(self, generation: int, outcome: ResearchOutcome) -> dict:
+        """Freeze application inputs on the controller thread before starting the worker."""
+        turn = outcome.metadata.get("policy_round") or {}
+        if turn.get("status") not in ("accepted", "skipped") or turn.get("degraded"):
+            raise ValueError(f"policy turn failed: status={turn.get('status')}, degraded={bool(turn.get('degraded'))}")
+        return self._snapshot("generation", generation, turn, outcome.proposals)
+
+    def begin_preparation(self, snapshot: dict) -> None:
+        # While the worker runs, only select keys included in its query. This lets it publish a
+        # complete table even as results arrive or other candidates are added to the reservoir.
+        self._preparing_keys = set(snapshot["query"])
+
+    def end_preparation(self) -> None:
+        self._preparing_keys = None
+
+    def coverage_complete(self, prepared: dict) -> bool:
+        """A later head is fine if every actual history and pending key already has a prior."""
+        if prepared["prior_free"]:
+            return True
+        with self.store.lock:
+            db = self.store.db
+            required = {r[0] for r in db.execute("SELECT canonical_key FROM experiments WHERE pending=1")}
+            for observation in self.ledger.observations():
+                if observation.evaluation.succeeded and self.selector.objective_name in observation.metrics:
+                    required.add(observation.canonical_key)
+        return required.issubset(prepared["values"])
 
     def commit(self, db, generation: int, prepared: dict, now: float) -> str:
         """Inside ``generation_end`` / ``prior_application``: switch the whole table atomically."""
@@ -371,8 +404,34 @@ class PolicyPrior:
         controller = self.controller
         if controller.collect_only or controller.ledger.campaign_row()["status"] != "active":
             return False
+        if self._supplement is not None:
+            job, application, trigger = self._supplement
+            prepared = self.executor.poll(job)
+            if prepared is None:
+                return False
+            self._supplement = None
+            self.end_preparation()
+            if isinstance(prepared, BaseException):
+                return self._application_failed(prepared)
+            if self.current().seq != application.seq:
+                return True  # another application superseded the worker's inputs
+            if not self.coverage_complete(prepared):
+                return self._start_supplement(application, trigger)
+            with self.store.tx("prior_application") as db:
+                if db.execute("SELECT MAX(seq) FROM prior_applications").fetchone()[0] != application.seq:
+                    return True
+                self.commit(db, application.generation, prepared, self.clock.now())
+            return True
+        if self.ledger.paused_reasons():
+            return False
         application = self.current()
         if application is None:
+            return False
+        if application.degraded:
+            return self._application_failed(ValueError(f"active application {application.application_id} is degraded"))
+        # Share the existing single research executor. A supplement and a generation must not
+        # race to publish applications or use the same policy executor concurrently.
+        if (controller.lane is not None and controller.lane.status().state != "idle") or self.executor.busy():
             return False
         with self.store.lock:
             db = self.store.db
@@ -386,16 +445,34 @@ class PolicyPrior:
             trigger = "observations"
         else:
             return False
-        prepared = self._prepare(trigger, application.generation,
-                                 {"epoch_id": application.epoch_id, "artifact_sha256": application.artifact_sha256,
-                                  "degraded": application.degraded})
-        with self.store.tx("prior_application") as db:
-            if db.execute("SELECT MAX(seq) FROM prior_applications").fetchone()[0] != application.seq:
-                return False
-            self.commit(db, application.generation, prepared, self.clock.now())
+        return self._start_supplement(application, trigger)
+
+    def _start_supplement(self, application: PriorApplication, trigger: str) -> bool:
+        try:
+            snapshot = self._snapshot(trigger, application.generation,
+                                      {"epoch_id": application.epoch_id,
+                                       "artifact_sha256": application.artifact_sha256,
+                                       "degraded": application.degraded})
+            self.begin_preparation(snapshot)
+            job = -application.seq
+            self._supplement = (job, application, trigger)
+            self.executor.submit(job, lambda: self.prepare(snapshot), {}, self.clock.now(), immediate=True)
+        except Exception as exc:  # noqa: BLE001 - a failed application must not silently change the policy
+            self._supplement = None
+            self.end_preparation()
+            return self._application_failed(exc)
         return True
 
-    def _prepare(self, trigger: str, generation: int, turn: dict, proposals=()) -> dict:
+    def _application_failed(self, error: BaseException) -> bool:
+        with self.store.tx("prior_application") as db:
+            changed = self.ledger.anomaly(db, "policy_application_failed", "",
+                                          {"error": f"{type(error).__name__}: {error}"[:500]}, pause=True)
+            if not self.ledger.paused_reasons(db):
+                self.ledger.pause(db, "anomaly.policy_application_failed:")
+                changed = True
+            return changed
+
+    def _snapshot(self, trigger: str, generation: int, turn: dict, proposals=()) -> dict:
         with self.store.lock:
             db = self.store.db
             head = results_booked(db)
@@ -412,21 +489,31 @@ class PolicyPrior:
                 "SELECT candidate_json FROM experiments WHERE pending=1 ORDER BY decision_id").fetchall()]
             previous = db.execute("SELECT epoch_id, artifact_sha256, degraded FROM prior_applications "
                                   "ORDER BY seq DESC LIMIT 1").fetchone()
-        rows, keys = self.selector.training_rows(history)
         query: dict[str, Candidate] = {}
         for candidate in [*(o.candidate for _, o in live), *(p.candidate for p in proposals)]:
             if candidate.canonical_key not in dedup:
                 query.setdefault(candidate.canonical_key, candidate)
         for candidate in pending:
             query.setdefault(candidate.canonical_key, candidate)
-        query_keys = sorted(query)
-        location, scale = self.location_scale(rows)
         if "epoch_id" in turn:
             epoch, artifact_sha, degraded = turn["epoch_id"], turn["artifact_sha256"], bool(turn.get("degraded"))
         elif previous is not None:  # a skipped turn keeps the previous application's epoch
             epoch, artifact_sha, degraded = previous["epoch_id"], previous["artifact_sha256"], bool(previous["degraded"])
         else:
             epoch, artifact_sha, degraded = None, None, False
+        return {"trigger": trigger, "generation": generation, "head": head, "history": history,
+                "bases": bases, "feedback": feedback, "occurrence_head": occurrence_head, "query": query,
+                "epoch": epoch, "artifact_sha": artifact_sha, "degraded": degraded}
+
+    def prepare(self, snapshot: dict) -> dict:
+        """Compute an application from a frozen snapshot without accessing the controller store."""
+        trigger, generation = snapshot["trigger"], snapshot["generation"]
+        head, history, bases, feedback = snapshot["head"], snapshot["history"], snapshot["bases"], snapshot["feedback"]
+        query, occurrence_head = snapshot["query"], snapshot["occurrence_head"]
+        epoch, artifact_sha, degraded = snapshot["epoch"], snapshot["artifact_sha"], snapshot["degraded"]
+        rows, keys = self.selector.training_rows(history)
+        query_keys = sorted(query)
+        location, scale = self.location_scale(rows)
         utilities = [r.scalar_score for r in rows]
         context = self.application_context(generation, location, scale, history=history, head_ingest_seq=head,
                                            generation_bases=bases, feedback=feedback)
@@ -456,19 +543,17 @@ class PolicyPrior:
             _write_atomic(inputs / "arrays.npz", _npz(
                 history_features=history_features, history_utilities=np.asarray(utilities, dtype=float),
                 query_features=query_features if len(query_keys) else history_features))
-            result = self.research_controller.executor.execute(artifact, inputs, directory / "output")
+            output = Path(tempfile.mkdtemp(prefix="output-", dir=directory))
+            result = self.research_controller.executor.execute(artifact, inputs, output)
             history_prior = np.asarray(result.history_prior_mean, dtype=float)
             query_prior = np.asarray(result.query_prior_mean, dtype=float)
             if history_prior.shape != (len(rows),) or (query_keys and query_prior.shape != (len(query_keys),)) or \
                     not np.isfinite(history_prior).all() or not np.isfinite(query_prior).all():
                 raise ValueError("policy application must return finite scalar priors aligned with its rows")
         except (PolicyExecutionError, OSError, ValueError, KeyError) as exc:
-            # Like the synchronous fallback: a frozen artifact that fails on the application input degrades to the
-            # default (prior-free) policy; the failure is recorded on the application.
             error = "; ".join(f"{e.code}: {e.message}" for e in exc.errors) if isinstance(exc, PolicyExecutionError) \
                 else f"{type(exc).__name__}: {exc}"
-            prepared.update(source="default", prior_free=True, degraded=True, error=error[:500])
-            return prepared
+            raise ValueError(f"policy application failed: {error[:500]}") from exc
         values = {k: location + scale * float(v) for k, v in zip(keys, history_prior)}
         values.update({k: location + scale * float(v) for k, v in zip(query_keys, query_prior)})
         prepared.update(values=values, alpha=float(result.alpha), eta=float(result.eta), stage=str(result.stage))

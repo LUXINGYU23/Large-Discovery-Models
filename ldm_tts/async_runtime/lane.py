@@ -144,9 +144,10 @@ class InlineExecutor:
         self.jobs: dict[int, tuple[Callable, float]] = {}
         self.done: dict[int, Any] = {}
 
-    def submit(self, generation, job, round_input, started_at):
+    def submit(self, generation, job, round_input, started_at, *, immediate=False):
         """The job keeps its schedule across a restart (a durable job): its effective start is ``started_at``."""
-        self.jobs[generation] = (job, started_at + float(self.duration(round_input)))
+        delay = 0.0 if immediate else float(self.duration(round_input))
+        self.jobs[generation] = (job, started_at + delay)
         return started_at
 
     def preload(self, generation, outcome):
@@ -158,6 +159,13 @@ class InlineExecutor:
 
     def has(self, generation) -> bool:
         return generation in self.jobs or generation in self.done
+
+    def busy(self) -> bool:
+        return bool(self.jobs or self.done)
+
+    def close(self) -> None:
+        self.jobs.clear()
+        self.done.clear()
 
     def poll(self, generation):
         if generation in self.done:
@@ -185,8 +193,9 @@ class ThreadExecutor:
         self.running: set[int] = set()
         self.done: dict[int, Any] = {}
         self._lock = threading.Lock()
+        self._closed = False
 
-    def submit(self, generation, job, round_input, started_at):
+    def submit(self, generation, job, round_input, started_at, *, immediate=False):
         def work():
             result = None
             try:
@@ -198,9 +207,11 @@ class ThreadExecutor:
             finally:  # never leave the executor busy for ever
                 with self._lock:
                     self.running.discard(generation)
-                    self.done[generation] = result
-                if self.on_done is not None:
-                    self.on_done()
+                    if not self._closed:
+                        self.done[generation] = result
+                    notify = self.on_done
+                if notify is not None:
+                    notify()
 
         with self._lock:
             self.running.add(generation)
@@ -232,6 +243,14 @@ class ThreadExecutor:
     def next_due(self):
         return None
 
+    def close(self) -> None:
+        # A running research or artifact process cannot be cancelled here. Its completion must not
+        # wake a controller whose store has already been closed.
+        with self._lock:
+            self._closed = True
+            self.on_done = None
+            self.done.clear()
+
 
 # ---- files ----------------------------------------------------------------------------------------------
 
@@ -256,9 +275,10 @@ class ResearchLane:
     def __init__(self, *, store, ledger, keeper, source, executor, config, directory: Path, clock, extension=None):
         self.store, self.ledger, self.keeper, self.source = store, ledger, keeper, source
         self.executor, self.config, self.directory, self.clock = executor, config, Path(directory), clock
-        # Optional readiness step (policy-prior): ``prepare(generation, outcome)`` outside the transaction, then
-        # ``commit(db, generation, prepared, now)`` inside ``generation_end`` before ``generation.ready``.
+        # Optional readiness step: capture a snapshot on the controller thread, prepare it on the
+        # executor, then commit it inside ``generation_end`` before ``generation.ready``.
         self.readiness = None
+        self._preparing: tuple[int, ResearchOutcome] | None = None
         self.extension = extension
 
     def input_path(self, generation: int) -> Path:
@@ -396,17 +416,36 @@ class ResearchLane:
                 return True
             return False
         if isinstance(result, BaseException):
+            if self._preparing is not None and self._preparing[0] == generation:
+                self._preparing = None
+                self.readiness.end_preparation()
             self.block(generation, f"{type(result).__name__}: {result}")
             return True
-        prepared = None
-        if self.readiness is not None and result.status == "committed":
-            try:
-                prepared = self.readiness.prepare(generation, result)
-            except Exception as exc:  # noqa: BLE001 - a readiness defect blocks the lane (operator retry reuses the outcome)
-                self.block(generation, f"readiness: {type(exc).__name__}: {exc}")
+        if self._preparing is not None and self._preparing[0] == generation:
+            outcome = self._preparing[1]
+            if not self.readiness.coverage_complete(result):
+                self._start_readiness(generation, outcome)
                 return True
-        self.finish(generation, result, prepared)
+            self._preparing = None
+            self.readiness.end_preparation()
+            self.finish(generation, outcome, result)
+        elif self.readiness is not None and result.status == "committed":
+            self._start_readiness(generation, result)
+        else:
+            self.finish(generation, result)
         return True
+
+    def _start_readiness(self, generation: int, outcome: ResearchOutcome) -> None:
+        try:
+            snapshot = self.readiness.snapshot(generation, outcome)
+            self.readiness.begin_preparation(snapshot)
+            self._preparing = (generation, outcome)
+            self.executor.submit(generation, lambda: self.readiness.prepare(snapshot), {}, self.clock.now(),
+                                 immediate=True)
+        except Exception as exc:  # noqa: BLE001 - retry reuses the persisted outcome
+            self._preparing = None
+            self.readiness.end_preparation()
+            self.block(generation, f"readiness: {type(exc).__name__}: {exc}")
 
     def finish(self, generation: int, outcome: ResearchOutcome, prepared=None) -> bool:
         now = self.clock.now()
@@ -482,6 +521,9 @@ class ResearchLane:
             resolve_anomalies(db, now, "lane_blocked", str(generation), by=operator)
             append_event(db, now, event, str(generation), {"operator": operator, "resolution": action})
             if action == "abandon":
+                self._preparing = None
+                if self.readiness is not None:
+                    self.readiness.end_preparation()
                 if self.extension is not None:
                     self.extension.on_abandon(db, generation, now)
                 self.check_stagnation(db, now)

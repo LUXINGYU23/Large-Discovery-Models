@@ -483,11 +483,20 @@ class PacedController(Controller):
         return False
 
     def next_due(self) -> float | None:
-        times = [t for t in (super().next_due(), self.lane.next_due() if self.lane is not None else None) if t is not None]
+        times = [t for t in (super().next_due(), self.lane.next_due() if self.lane is not None else None,
+                             self.policy.executor.next_due() if self.policy is not None and self.lane is None else None)
+                 if t is not None]
         held, until = self.view().hold()
         if held and until is not None:
             times.append(until)
         return min(times) if times else None
+
+    def close(self) -> None:
+        if self.lane is not None:
+            self.lane.executor.close()
+        elif self.policy is not None:
+            self.policy.executor.close()
+        super().close()
 
     # ---- operator and agent-facing API --------------------------------------------------------------
 
