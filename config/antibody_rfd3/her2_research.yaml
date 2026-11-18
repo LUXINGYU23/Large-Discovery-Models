@@ -1,0 +1,23 @@
+name: antibody_rfd3_her2_research
+task: antibody_rfd3
+algorithm: harness
+mode: real
+description: Three model-led research rounds with real generation and HER2 Absolut scoring.
+args:
+  method: harness
+  oracle: absolut
+  antigen: 1N8Z_C
+  iterations: 3
+  concurrency: 1
+  pool-size: 1
+  backbones-per-round: 2
+  sequences-per-round: 32
+  samples-per-call: 16
+  temperature: 0.5
+  seed: 42
+  gpu: 2
+  share-gpu: true
+  cpu-limit: 2
+  sidecar-image: ldm-copper-pi:antibody-async-20261118
+  guest-cache: /Aidata/shared/ldm/antibody-poc/cache/gondolin
+  out-dir: runs/her2_research
