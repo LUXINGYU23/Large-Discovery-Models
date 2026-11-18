@@ -18,6 +18,7 @@
 - 原始 `absolut_energy` 越低越好；选择器使用 `energy_utility = -absolut_energy`，越高越好。两者同时保存，策略输入和预测反馈统一使用 utility。
 - 11 残基序列使用固定氨基酸顺序的 220 维 one-hot 编码，不对氨基酸字符施加任意的整数距离。
 - 策略可提供标准化先验均值及 LDM 的 alpha、eta 权重。GP 在先验残差上拟合，并将查询先验加回；不足两条观测时不会宣称已使用拟合后的残差 GP。
+- 策略应用版本为 2。研究回合与实际应用分别冻结其历史水位、观测进度和按 decision ID 匹配的预测反馈；研究期间返回的结果可进入后续应用，但不得混入该应用冻结之后的结果。实际权重、阶段和输入摘要都按应用快照保存。
 - pending 使用 kriging believer；选择分布结合来源权重与标准化 UCB。策略轮次、不可变产物、应用和实际 decision 有独立关联记录。
 - 研究代数与评估预算分别配置。任务调度为每个研究代预留至少一个评估额度；三代、三次评估时，每代等上一代结果后继续。更大评估预算仍可流式并发，HTTP 隔离与异步控制器保持有效。
 
@@ -26,6 +27,8 @@
 配置为 `config/antibody_rfd3/her2_ldm_research.yaml`：HER2 `1N8Z_C`、三代研究、三次真实评估、并发 1、候选池 6；每代最多两个骨架、32 条序列，调用采样数 16。生成器使用 RFD3/ProteinMPNN，评分使用实际 Absolut。模型从 H20 环境加载，思考强度为 `low`。
 
 在干净且已提交的 H20 PoC 工作树中加载现有凭据，然后运行：
+
+首次使用这版研究容器时，先运行 `harnesses/pi` 的 `build:task-guest` 与 `smoke:task-guest`，指定 `--task antibody_rfd3 --cache-dir /Aidata/shared/ldm/antibody-poc/cache/gondolin`。镜像配方锁定 NumPy 1.26.4，smoke 验证数值数组的保存与读取；构建记录和内容散列进入缓存。
 
 ```sh
 PYTHONPATH=. /Aidata/shared/ldm/antibody-poc/env/antibody_campaign/bin/python \
