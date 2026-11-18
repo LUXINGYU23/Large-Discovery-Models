@@ -31,6 +31,8 @@ def parse_args(argv=None):
     p.add_argument("--method", choices=METHODS)
     p.add_argument("--oracle", choices=("mock", "absolut"), default="mock")
     p.add_argument("--mock", action="store_true", help="Use deterministic generator fixtures for an offline campaign")
+    p.add_argument("--scheduler", choices=("sync", "async"), default="sync")
+    p.add_argument("--concurrency", type=int, default=2, help="Concurrent evaluations for async fixtures")
     p.add_argument("--iterations", type=int, default=2)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--initialization-run", type=Path,
@@ -61,6 +63,17 @@ def parse_args(argv=None):
         p.error("seed and GPU index must be nonnegative and temperature in [0.01,1]")
     if a.mock and (a.method != "fixed" or a.oracle != "mock"):
         p.error("--mock is the offline fixed-method fixture. Use --oracle mock alone for real tools and Pi.")
+    if a.concurrency < 1:
+        p.error("concurrency must be positive")
+    if a.scheduler == "async":
+        if a.iterations > 101:
+            p.error("async fixtures support at most 101 evaluations")
+        from .async_mock import validate
+
+        try:
+            validate(a)
+        except ValueError as exc:
+            p.error(str(exc))
     return a
 
 
@@ -69,6 +82,10 @@ def metric(a):
 
 
 def describe_ldm_task(args):
+    if args.scheduler == "async":
+        from .async_mock import describe
+
+        return describe(args)
     gp = args.method == "ldm_harness"
     actions = ("design_h3", "sequence_h3") if args.method in PI_METHODS else ("design_h3",)
     if args.method == "antbo":
@@ -140,6 +157,10 @@ def run(a):
     if a.dry_run:
         print(json.dumps(describe_ldm_task(a).to_dict(), indent=2))
         return 0
+    if a.scheduler == "async":
+        from .async_mock import run as run_async_mock
+
+        return run_async_mock(a)
     if hasattr(os, "sched_setaffinity"):
         os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[:a.cpu_limit])
     if a.oracle == "mock":

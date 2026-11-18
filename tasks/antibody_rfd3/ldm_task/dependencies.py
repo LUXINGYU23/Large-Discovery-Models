@@ -13,7 +13,15 @@ def check_dependencies(plan, *, include_optional=True):
         checks.append((ok if condition else fail)(task, name, explanation))
 
     if args.get("mock"):
-        check("Offline fixtures", True, "Deterministic generator and mock oracle")
+        if args.get("scheduler") == "async":
+            from ldm_tts.async_release import read_runtime_pin
+
+            archive = Path(read_runtime_pin()["archive"])
+            offline = not args.get("initialization-run") and args.get("oracle", "mock") == "mock"
+            check("Offline fixtures", offline, "Async fixtures require the mock oracle and no initialization run")
+            check("Pinned async runtime", archive.is_file(), f"Runtime archive on H20: {archive}")
+        else:
+            check("Offline fixtures", True, "Deterministic generator and mock oracle")
         return checks
     root = Path(args.get("root", "/Aidata/shared/ldm/antibody-poc"))
     method = args.get("method", "ldm_harness")
