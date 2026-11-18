@@ -84,8 +84,20 @@ def test_pi_sidecar_keeps_runtime_mounts_separate_from_task_resources(tmp_path):
     assert command[-1] == "pi-fixture:1"
 
 
+def test_local_sidecar_uses_the_current_cpu_affinity(tmp_path, monkeypatch):
+    monkeypatch.setattr(container.os, "sched_getaffinity", lambda pid: {9, 5, 13}, raising=False)
+    command = container.pi_sidecar_command(tmp_path / "artifacts", "pi-fixture:1", cache_root=tmp_path / "cache")
+    assert command[command.index("--cpuset-cpus") + 1] == "5,9,13"
+
+
+def test_cpu_affinity_is_not_guessed_without_a_local_affinity_api(monkeypatch):
+    monkeypatch.delattr(container.os, "sched_getaffinity", raising=False)
+    assert container.docker_cpu_args() == ()
+
+
 @pytest.mark.parametrize("user", [None, "2001:2002"])
-def test_pi_sidecar_remote_launch_uses_remote_identity(tmp_path, user):
+def test_pi_sidecar_remote_launch_uses_remote_identity(tmp_path, user, monkeypatch):
+    monkeypatch.setattr(container.os, "sched_getaffinity", lambda pid: {5, 9}, raising=False)
     host = "tcp://docker.example.test:2376"
     command = container.pi_sidecar_command(
         tmp_path / "artifacts", "pi-fixture:1", cache_root=tmp_path / "cache",
@@ -93,6 +105,7 @@ def test_pi_sidecar_remote_launch_uses_remote_identity(tmp_path, user):
     )
     assert command[:6] == ["docker", "--host", host, "run", "--rm", "-i"]
     assert "--group-add" not in command
+    assert "--cpuset-cpus" not in command  # local CPU numbers need not exist on the remote daemon
     assert ("--user" in command) is (user is not None)
     if user is not None:
         assert command[command.index("--user") + 1] == user

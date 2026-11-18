@@ -63,10 +63,20 @@ def test_backbone_reuse_calls_sequence_only(tmp_path, monkeypatch):
         {"design_id": "job-00000/0", "backbone_id": first.name}]}))
     (tmp_path / "tmp").mkdir()
     seen = []
+    fcntl = pytest.importorskip("fcntl")
+    real_flock = fcntl.flock
 
     class Process:
         def __init__(self, cmd, **kwargs):
             seen.append(cmd)
+            # The worker must retain its own GPU lock while the child is running,
+            # while a different GPU remains free for an independent campaign.
+            with (tmp_path / "tmp/antibody-rfd3-worker-gpu0.lock").open("a") as same:
+                with pytest.raises(BlockingIOError):
+                    real_flock(same, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with (tmp_path / "tmp/antibody-rfd3-worker-gpu1.lock").open("a") as other:
+                real_flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                real_flock(other, fcntl.LOCK_UN)
             out = worker.jobs / "job-00001/output"
             out.mkdir()
             mapped = [{"source": {"chain": "B", "number": i+99, "insertion_code": ""},
@@ -78,9 +88,12 @@ def test_backbone_reuse_calls_sequence_only(tmp_path, monkeypatch):
         def wait(self, timeout=None):
             return 0
 
-    pytest.importorskip("fcntl")
     monkeypatch.setattr("tasks.antibody_rfd3.core.worker.subprocess.Popen", Process)
-    rows = worker.execute("sequence_h3", 1, 0.5, first.name)
+    # Keep the old global lock occupied: a new GPU-specific worker must not use it.
+    with (tmp_path / "tmp/antibody-rfd3-worker.lock").open("a") as legacy:
+        real_flock(legacy, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        monkeypatch.setattr(fcntl, "flock", lambda fd, operation: real_flock(fd, operation | fcntl.LOCK_NB))
+        rows = worker.execute("sequence_h3", 1, 0.5, first.name)
     assert rows[0]["sequence"] == "SNGDWGSPGTV" and rows[0]["backbone_id"] == first.name
     cmd, = seen
     assert cmd[cmd.index("-m") + 2] == "sequence"

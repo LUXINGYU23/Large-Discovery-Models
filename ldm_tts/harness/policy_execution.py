@@ -12,6 +12,7 @@ from typing import Protocol
 
 import numpy as np
 
+from ldm_tts.harness.container import docker_cpu_args
 from ldm_tts.harness.protocol import HarnessSubmissionError
 
 
@@ -85,6 +86,7 @@ class DockerPolicyExecutor:
         command = [*docker, "run", "--name", container_name, "--rm", "--network", "none", "--read-only"]
         if self.container_user:
             command.extend(("--user", self.container_user))
+        command.extend(docker_cpu_args(self.docker_host))
         command.extend((
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges=true",

@@ -33,6 +33,14 @@ def docker_identity_args(container_user: str, docker_host: str = "") -> tuple[st
     return tuple(args)
 
 
+def docker_cpu_args(docker_host: str = "") -> tuple[str, ...]:
+    """Pin a local Docker container to this process's CPU affinity, when available."""
+    affinity = getattr(os, "sched_getaffinity", None)
+    if docker_host or affinity is None:
+        return ()
+    return ("--cpuset-cpus", ",".join(str(cpu) for cpu in sorted(affinity(0))))
+
+
 def pi_sidecar_command(
     artifact_root: Path,
     image: str,
@@ -51,6 +59,7 @@ def pi_sidecar_command(
     command.extend(("run", "--rm", "-i"))
     user = resolve_container_user(container_user, docker_host)
     command.extend(docker_identity_args(user, docker_host))
+    command.extend(docker_cpu_args(docker_host))
     command.extend(("--device", "/dev/kvm"))
     runtime_environment = {
         "HOME": "/runtime-home",
@@ -74,4 +83,4 @@ def pi_sidecar_command(
     return command
 
 
-__all__ = ["docker_identity_args", "pi_sidecar_command", "resolve_container_user"]
+__all__ = ["docker_cpu_args", "docker_identity_args", "pi_sidecar_command", "resolve_container_user"]

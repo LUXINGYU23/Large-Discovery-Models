@@ -205,7 +205,8 @@ class DesignWorker:
             cmd.append("--allow-gpu-sharing")
         if backbone_id:
             cmd.extend(["--generation", str(self.jobs / backbone_id / "output/generation.json")])
-        with (root / "tmp/antibody-rfd3-worker.lock").open("a") as lock, (job / "worker.log").open("w") as log:
+        with (root / f"tmp/antibody-rfd3-worker-gpu{self.args.gpu}.lock").open("a") as lock, \
+                (job / "worker.log").open("w") as log:
             fcntl.flock(lock, fcntl.LOCK_EX)
             process = subprocess.Popen(cmd, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT,
                                        start_new_session=True, pass_fds=(lock.fileno(),))

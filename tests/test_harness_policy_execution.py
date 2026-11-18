@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import ldm_tts.harness.container as container
 from ldm_tts.harness.policy_execution import (
     DockerPolicyExecutor,
     PolicyExecutionError,
@@ -59,6 +60,7 @@ def test_docker_policy_executor_uses_hardened_container(monkeypatch, tmp_path: P
         return subprocess.CompletedProcess(command, 0, stdout="{}\n", stderr="")
 
     monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(container.os, "sched_getaffinity", lambda pid: {9, 5, 13}, raising=False)
 
     result = DockerPolicyExecutor("ldm-pi:test", timeout_seconds=10).execute(
         artifact,
@@ -71,6 +73,7 @@ def test_docker_policy_executor_uses_hardened_container(monkeypatch, tmp_path: P
     assert ["--network", "none"] == command[command.index("--network"):command.index("--network") + 2]
     for expected in ("--read-only", "--cap-drop", "--pids-limit", "--memory", "--cpus"):
         assert expected in command
+    assert command[command.index("--cpuset-cpus") + 1] == "5,9,13"
     assert "no-new-privileges=true" in command
     assert "OPENBLAS_NUM_THREADS=1" in command
     assert captured["cleanup"] == ["docker", "rm", "--force", command[command.index("--name") + 1]]
@@ -122,11 +125,13 @@ def test_docker_timeout_removes_container_on_the_configured_daemon(monkeypatch, 
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(container.os, "sched_getaffinity", lambda pid: {5, 9}, raising=False)
     with pytest.raises(PolicyExecutionError) as caught:
         DockerPolicyExecutor("fixture", docker_host="unix:///fixture.sock").execute(
             artifact, round_input, output,
         )
     assert caught.value.errors[0].code == "runner_timeout"
+    assert "--cpuset-cpus" not in commands[0]
     name = commands[0][commands[0].index("--name") + 1]
     assert commands[1] == ["docker", "--host", "unix:///fixture.sock", "rm", "--force", name]
 
