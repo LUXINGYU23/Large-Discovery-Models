@@ -436,6 +436,7 @@ class HarnessClient:
             raise HarnessError(
                 str(message), turn_usage=turn_usage,
                 retryable=isinstance(error, dict) and error.get("code") == "recoverable_turn_error",
+                code=error.get("code") if isinstance(error, dict) else None,
             )
         if response.get("type") != expected_type:
             raise HarnessError(f"expected harness response {expected_type!r}")

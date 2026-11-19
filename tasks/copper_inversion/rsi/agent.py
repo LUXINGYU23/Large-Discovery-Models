@@ -9,6 +9,7 @@ restarted process reopens the same root and the sidecar session store continues 
 """
 
 import hashlib
+import json
 import re
 import subprocess
 import threading
@@ -25,7 +26,7 @@ from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.harness.protocol import canonical_sha256, file_sha256
 from ..core.candidate import MAX_SOURCE_BYTES, validate_source
 from ..v2.research import PublicTrainingExport
-from .controller import _validate_submission, profile_name
+from .controller import _validate_submission, profile_name, NoSubmission
 from .render import write_view
 from .usage import collect
 
@@ -141,6 +142,25 @@ def parse_submission(submission, artifacts, root, count, known, visible):
         used.add(sha)
         result.append(proposal)
     return result
+
+
+EXHAUSTED = "Submission recovery exhausted: no accepted submission after two continuation prompts."
+
+
+def _exhausted_submission(error, turn_dir, profile):
+    """The sidecar exposes a generic code; require its exact durable recovery state too."""
+    if (error.retryable or error.code != "sidecar_error" or str(error) not in (EXHAUSTED, "Error: " + EXHAUSTED)
+            or profile not in error.turn_usage or type(error.turn_usage[profile].get("providerCalls")) is not int):
+        return False
+    state_path = turn_dir / "history-recovery.json"
+    if not state_path.is_file():
+        return False
+    try:
+        state = json.loads(state_path.read_text())
+    except (ValueError, OSError):
+        return False
+    return (isinstance(state, dict) and state.get("continuations") == 2
+            and isinstance(state.get("failure"), dict) and state["failure"].get("message") == EXHAUSTED)
 
 
 class PiAgent:
@@ -266,16 +286,26 @@ class PiAgent:
         try:
             (result,) = client.run_turn((turn,), submission_validator=validate,
                                         recovery_timeout_seconds=2 * harness_seconds)
-        except BaseException:
-            self.release(profile)  # never reuse a sidecar in an unknown state
+        except HarnessError as exc:
+            turn_dir = turn_root / "sessions" / profile / "turns" / turn.turn_id
+            if _exhausted_submission(exc, turn_dir, profile):
+                usage = collect(turn_dir, exc.turn_usage[profile]["providerCalls"])
+                usage.update(turn=str(turn_dir.relative_to(turn_root)), wall_seconds=time.monotonic() - started)
+                raise NoSubmission(usage, cursor_advanced=False) from exc
+            self.release(profile)  # infrastructure failure keeps its pause semantics
             raise
-        if result.submission_status != "accepted":
-            raise HarnessError("researcher did not produce an accepted submission")
-        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, taken(), visible)
+        except BaseException:
+            self.release(profile)
+            raise
         turn_dir = (turn_root / result.artifacts["turn"]).resolve()
         if not turn_dir.is_relative_to(turn_root):
             raise HarnessError("sidecar turn directory escapes the artifact root")
         usage = collect(turn_dir, result.usage.get("providerCalls"))
         usage.update(session_id=result.session_id, turn=result.artifacts["turn"],
                      wall_seconds=time.monotonic() - started)
+        if result.submission_status == "rejected":
+            raise NoSubmission(usage, cursor_advanced=True)
+        if result.submission_status != "accepted":
+            raise HarnessError("unexpected submission status")
+        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, taken(), visible)
         return rows, usage
