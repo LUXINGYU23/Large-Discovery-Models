@@ -94,6 +94,13 @@ def submission_contract(count):
               for i in range(count)), max_validation_attempts=3 * count)
 
 
+class NotNovel(ValueError):
+    """A submitted source is already known; the reply must not say whose (contracts §5)."""
+
+    def __init__(self):
+        super().__init__("source rejected: not novel")
+
+
 def parse_submission(submission, artifacts, root, count, known, visible):
     if not isinstance(submission, dict) or set(submission) != {"candidates"}:
         raise ValueError("invalid submission")
@@ -111,7 +118,8 @@ def parse_submission(submission, artifacts, root, count, known, visible):
             raise ValueError("invalid proposal fields")
         pointer = f"/candidates/{index}/artifact_path"
         if row["artifact_path"] != f"candidates/{index}/solver.py" or pointer not in by_pointer:
-            raise ValueError("invalid snapshot path")
+            raise ValueError(f"candidates[{index}].artifact_path must be candidates/{index}/solver.py "
+                             "(entry i points to directory i, counting from 0 in submission order)")
         artifact = by_pointer[pointer]
         relative = Path(artifact.snapshot_path)
         if (relative.is_absolute() or ".." in relative.parts
@@ -125,7 +133,7 @@ def parse_submission(submission, artifacts, root, count, known, visible):
             raise ValueError("snapshot changed")
         sha = validate_source(body)
         if sha in used:
-            raise ValueError("source rejected: not novel")
+            raise NotNovel()
         if row["parent_sha256"] is not None and row["parent_sha256"] not in visible:
             raise ValueError("parent is not visible to this branch")
         proposal = {**{k: v for k, v in row.items() if k != "artifact_path"}, "source": body.decode("utf-8")}
@@ -234,13 +242,24 @@ class PiAgent:
                 rows = parse_submission(request.submission, request.artifacts, turn_root, count, taken(), visible)
                 if hasattr(known, "claim") and not known.claim(
                         branch, [validate_source(r["source"].encode("utf-8")) for r in rows]):
-                    raise ValueError("source rejected: not novel")  # another branch submitted it this round
+                    raise NotNovel()  # another branch submitted it this round
                 return HarnessSubmissionValidation("accept")
-            except (ValueError, SyntaxError, UnicodeError, OSError):
+            except NotNovel:
                 # Deliberately avoid identifying whether another branch or the
                 # current branch supplied a duplicate.
-                return HarnessSubmissionValidation("retry", (HarnessSubmissionError(
-                    "/candidates", "invalid_solver", "source rejected: not novel or invalid submission"),))
+                reason = "source rejected: not novel"
+            except SyntaxError as exc:
+                reason = f"invalid submission: a solver does not parse (line {exc.lineno}: {exc.msg})"
+            except UnicodeError:
+                reason = "invalid submission: a solver is not UTF-8 text"
+            except OSError:
+                reason = "invalid submission: a submitted artifact could not be read"  # no host paths
+            except ValueError as exc:
+                # A structural defect the researcher can repair; the rehearsal lost a run to a
+                # path/index mismatch hidden behind the uniform novelty reply.
+                reason = "invalid submission: " + str(exc)
+            return HarnessSubmissionValidation("retry", (HarnessSubmissionError(
+                "/candidates", "invalid_solver", reason),))
 
         started = time.monotonic()
         client = self._client(profile, turn_root, config, container_name(turn_root, profile, run, epoch))

@@ -22,7 +22,8 @@ programs. Neither the withheld data nor reference geometry is available to the
 researcher or the solver.
 
 Write the requested complete programs to `candidates/<index>/solver.py` and
-submit them with the prescribed metadata and risk intervals. Public interface
+submit them with the prescribed metadata and risk intervals; the i-th submitted
+entry (counting from 0) must point to `candidates/<i>/solver.py`. Public interface
 checks can be run with `python selfcheck.py /workspace/candidates/0/solver.py`
 from the exported task directory; repeat for every candidate. These checks do
 not evaluate withheld measurements. Do not launch external evaluations.

@@ -101,6 +101,13 @@ class FakeSidecar:
                                **{k: row[k] for k in ("change_summary", "rationale", "predicted_risk",
                                                       "interval80_low", "interval80_high")}})
         submission = {"candidates": candidates}
+        if self.misnumber_first and len(candidates) > 1:
+            # Entry 0 points at directory 1: the researcher must be told what to repair.
+            swapped = [dict(candidates[1]), dict(candidates[0])]
+            wrong = submission_validator(HarnessSubmissionRequest(
+                self.profile, turn.turn_id, 1, {"candidates": swapped + candidates[2:]},
+                (artifacts[1], artifacts[0], *artifacts[2:])))
+            self.log.events.append(("retry", self.profile, wrong.errors[0].message))
         decision = submission_validator(HarnessSubmissionRequest(self.profile, turn.turn_id, 1, submission,
                                                                  tuple(artifacts)))
         assert decision.decision == "accept"
@@ -138,6 +145,9 @@ class FakeExport:
         public = Path(root) / "public"
         public.mkdir(parents=True, exist_ok=True)
         (public / "cases.json").write_text("[]")
+
+
+FakeSidecar.misnumber_first = False
 
 
 class FakePiAgent(PiAgent):
@@ -323,6 +333,18 @@ def test_concurrent_branch_turns_never_share_a_client_or_root(tmp_path):
     agent.close()
     assert len({c.name for c in log.clients}) == len({c.root for c in log.clients}) == 4
     assert len({c.config.campaign_id for c in log.clients}) == 4
+
+
+def test_a_structural_defect_gets_an_actionable_retry_not_the_novelty_reply(tmp_path, monkeypatch):
+    """The rehearsal lost a run: entry i pointed at another directory and every retry said only
+    "not novel or invalid", so the researcher never found the defect."""
+    monkeypatch.setattr(FakeSidecar, "misnumber_first", True)
+    log = Log()
+    with FakePiAgent(log, tmp=tmp_path) as agent:
+        controller(tmp_path / "run", agent, "ldm4geo", 2, 1).run()
+    reasons = [e[2] for e in log.events if e[0] == "retry"]
+    assert reasons and all("candidates[0].artifact_path must be candidates/0/solver.py" in r for r in reasons)
+    assert not any("novel" in r for r in reasons)
 
 
 def test_turn_index_other_than_zero_is_refused(tmp_path):
