@@ -1,6 +1,7 @@
 """Select a reproducible stratified Q1 sample from rehearsal ledgers."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import random
@@ -84,7 +85,7 @@ def release_config(release):
     return release, record
 
 
-def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, tier=None, purpose=None):
+def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, tier=None, purpose=None, policy=None):
     """Submit pinned sources to the v2 training service in the trusted process."""
     root, manifest = Path(service_root).resolve(), Path(manifest).resolve()
     if load_manifest(manifest)["split"] != "train":
@@ -95,19 +96,31 @@ def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, 
         config["tier"] = tier
     if purpose is not None:
         config["purpose"] = purpose
-    service = EvaluatorService(config)
+    if policy is None:
+        service = EvaluatorService(config)
+    else:
+        from tasks.copper_inversion.experiments.v2.parallel_runtime import ParallelService, case_workers
+        service = ParallelService(config)
+        service.evaluator.case_workers = case_workers(policy, tier or "S")
     contract = digest(service.identity)
-    for source, sha in sources:
+    def submit(item):
+        source, sha = item
         body = Path(source).read_bytes()
         if validate_source(body) != sha:
             raise ValueError("selected source changed")
         reply = service.dispatch({"operation": "evaluate", "source": body.decode(), "contract_digest": contract})
         if reply.get("status") != "succeeded" or reply.get("source_sha256") != sha:
             raise ValueError("training evaluation failed or rejected: " + str(reply.get("status")))
+    if policy is None:
+        for item in sources:
+            submit(item)
+    else:
+        with ThreadPoolExecutor(max_workers=policy["batch_workers"]) as pool:
+            list(pool.map(submit, sources))
     return root
 
 
-def evaluate(selection_path, release, output, image):
+def evaluate(selection_path, release, output, image, *, policy=None):
     selection_path = Path(selection_path)
     chosen = json.loads(selection_path.read_text())
     if chosen.get("schema") != "rsi-q1-selection-v1":
@@ -127,8 +140,6 @@ def evaluate(selection_path, release, output, image):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     mapping_path = output / "q1.json"
-    if mapping_path.exists():
-        raise ValueError("Q1 mapping already exists")
     layouts = {
         "short_12x1": (tiers["S"]["train_manifest"], tiers["S"]["solver_seconds"], tiers["S"]["slots"], "S", None, sources),
         "full_24x1": (tiers["F"]["train_manifest"], tiers["F"]["solver_seconds"], tiers["F"]["slots"], "F", None, sources),
@@ -139,34 +150,43 @@ def evaluate(selection_path, release, output, image):
     for name, (manifest, seconds, slots, tier, purpose, entries) in layouts.items():
         if not manifest:
             raise ValueError("release lacks Q1 manifest: " + name)
-        root = evaluate_sources(output / name, release / manifest, seconds, slots, image, entries, tier=tier, purpose=purpose)
+        root_path = output / name
         identity = {"layout": name, "selection_sha256": file_hash(selection_path), "manifest": str((release / manifest).resolve()),
                     "manifest_sha256": file_hash(release / manifest), "seconds": seconds, "tier": tier, "purpose": purpose,
                     "program_ids": sorted(sha for _, sha in entries)}
-        identity_path = root / "q1-layout.json"
+        identity_path = root_path / "q1-layout.json"
         if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
             raise ValueError("Q1 layout identity changed")
-        identity_path.write_text(json.dumps(identity, sort_keys=True, indent=2) + "\n")
+        root_path.mkdir(parents=True, exist_ok=True)
+        from ldm_tts.engine.run_store import atomic_json_write
+        atomic_json_write(identity_path, identity)
+        kwargs = dict(tier=tier, purpose=purpose)
+        if policy is not None:
+            kwargs["policy"] = policy
+        root = evaluate_sources(root_path, release / manifest, seconds, slots, image, entries, **kwargs)
         mapping[name] = str(root)
-    with mapping_path.open("x") as f:
-        json.dump(mapping, f, sort_keys=True, indent=2)
-        f.write("\n")
+    if mapping_path.exists() and json.loads(mapping_path.read_text()) != mapping:
+        raise ValueError("mapping changed")
+    from ldm_tts.engine.run_store import atomic_json_write
+    atomic_json_write(mapping_path, mapping)
     return mapping
 
 
-def build_references(refs_path, release, output, image):
+def build_references(refs_path, release, output, image, *, policy=None):
     refs = references(refs_path)
     release, record = release_config(release)
     tier = record["tiers"]["S"]
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     mapping_path = output / "references.json"
-    if mapping_path.exists():
-        raise ValueError("reference mapping already exists")
+    kwargs = {"tier": "S"}
+    if policy is not None:
+        kwargs["policy"] = policy
     service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
-                               tier["slots"], image, [(r["source"], r["sha256"]) for r in refs.values()], tier="S")
+                               tier["slots"], image, [(r["source"], r["sha256"]) for r in refs.values()], **kwargs)
     mapping = {}
-    for name, ref in refs.items():
+    def validate(item):
+        name, ref = item
         target = output / "selection" / hashlib.sha256(name.encode()).hexdigest()
         if not target.exists():
             selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
@@ -176,14 +196,20 @@ def build_references(refs_path, release, output, image):
         if len(frozen["candidates"]) != 1 or frozen["candidates"][0]["sha256"] != ref["sha256"]:
             raise ValueError("reference selection differs")
         selection.run(target, "validation")
-        mapping[name] = str(target)
-    with mapping_path.open("x") as f:
-        json.dump(mapping, f, sort_keys=True, indent=2)
-        f.write("\n")
+        return name, str(target)
+    if policy is None:
+        mapping = dict(map(validate, refs.items()))
+    else:
+        with ThreadPoolExecutor(max_workers=policy["batch_workers"]) as pool:
+            mapping = dict(pool.map(validate, refs.items()))
+    if mapping_path.exists() and json.loads(mapping_path.read_text()) != mapping:
+        raise ValueError("mapping changed")
+    from ldm_tts.engine.run_store import atomic_json_write
+    atomic_json_write(mapping_path, mapping)
     return mapping
 
 
-def main(argv=None):
+def main(argv=None, *, policy=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     choice = sub.add_parser("select", help="sample evaluated rehearsal programs")
@@ -205,9 +231,9 @@ def main(argv=None):
     if args.command == "select":
         print(select(args.runs, args.output, args.seed))
     elif args.command == "evaluate":
-        print(json.dumps(evaluate(args.selection, args.release, args.output, args.image), sort_keys=True))
+        print(json.dumps(evaluate(args.selection, args.release, args.output, args.image, policy=policy), sort_keys=True))
     else:
-        print(json.dumps(build_references(args.references, args.release, args.output, args.image), sort_keys=True))
+        print(json.dumps(build_references(args.references, args.release, args.output, args.image, policy=policy), sort_keys=True))
     return 0
 
 

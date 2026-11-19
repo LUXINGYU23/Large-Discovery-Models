@@ -154,3 +154,47 @@ def test_reference_build_unseal_and_log_guard(tmp_path, monkeypatch):
         export_outcomes.export_references(root, PID, references=mapping)
     with pytest.raises(ValueError, match="disclose"):
         export_outcomes._guard({"q1": {"programs": [{"risk": .1, "leak": "f" * 64}]}}, {"f" * 64})
+
+
+def test_parallel_sources_equal_serial_and_resume(tmp_path, monkeypatch):
+    import hashlib
+    import threading
+    import time
+    from pathlib import Path
+    from types import SimpleNamespace
+    from tasks.copper_inversion.experiments.v2 import parallel_runtime
+
+    monkeypatch.setattr(q1, 'load_manifest', lambda path: {'split': 'train'})
+    calls = []
+    lock = threading.Lock()
+    class FakeService:
+        def __init__(self, config):
+            self.identity = {'configuration': config}
+            self.root = Path(config['root']); self.root.mkdir(parents=True, exist_ok=True)
+            self.evaluator = SimpleNamespace(case_workers=None)
+        def dispatch(self, request):
+            source = request['source']; sha = hashlib.sha256(source.encode()).hexdigest()
+            receipt = self.root / (sha + '.json')
+            if not receipt.exists():
+                with lock:
+                    calls.append(sha)
+                time.sleep(.001)
+                receipt.write_text(json.dumps({'source_sha256': sha, 'risk': len(source)}))
+            return {'status': 'succeeded', 'source_sha256': sha}
+    monkeypatch.setattr(q1, 'EvaluatorService', FakeService)
+    monkeypatch.setattr(parallel_runtime, 'ParallelService', FakeService)
+    sources = []
+    for i in range(8):
+        body = f'def solve(problem,budget,seed):\n    return {i}\n'.encode()
+        path = tmp_path / f'source{i}.py'; path.write_bytes(body)
+        sources.append((path, hashlib.sha256(body).hexdigest()))
+    manifest = tmp_path / 'manifest'; manifest.write_text('{}')
+    serial, parallel = tmp_path / 'serial', tmp_path / 'parallel'
+    q1.evaluate_sources(serial, manifest, 30, 20, 'image', sources, tier='S')
+    policy = {'batch_workers': 4, 'case_workers': {'S': 3}}
+    q1.evaluate_sources(parallel, manifest, 30, 20, 'image', sources, tier='S', policy=policy)
+    assert {p.name: p.read_bytes() for p in serial.glob('*.json')} == {p.name: p.read_bytes() for p in parallel.glob('*.json')}
+    calls.clear()
+    (parallel / (sources[0][1] + '.json')).unlink()
+    q1.evaluate_sources(parallel, manifest, 30, 20, 'image', sources, tier='S', policy=policy)
+    assert calls == [sources[0][1]]
