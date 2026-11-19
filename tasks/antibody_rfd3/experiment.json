@@ -42,11 +42,20 @@
   "evaluation": {
     "datasets": [
       "1N8Z VH B1-120",
-      "1ADQ_A"
+      "1ADQ_A",
+      "HER2: 1N8Z_C",
+      "PD-1: 5GGR_Y_FuC_5.25"
     ],
     "settings": {
       "mock": "mock-v1 sequence hash",
-      "absolut": "Absolut repertoire, minimum energy"
+      "absolut": "Absolut repertoire, minimum energy",
+      "real_sessions": {
+        "evaluations_per_target": 3,
+        "seed": 42,
+        "initial_evaluations": 1,
+        "provider": "Qwen3-8B",
+        "h3_length": 11
+      }
     },
     "per_candidate_limits": {}
   },

@@ -76,6 +76,34 @@ matplotlib and tqdm there. Run the same command with that interpreter and
 
 ## Evidence and budgets
 
+The real HER2 and PD-1 configurations are
+`config/antibody_rfd3/her2_real.yaml` and `config/antibody_rfd3/pd1_real.yaml`.
+Each runs three evaluations with one persistent Pi session. They use the
+isolated Absolut Oracle and the existing H20 precomputed resources. Additional
+resource directories can be supplied with repeated `--absolut-resources`.
+`--absolut-timeout` defaults to 600 seconds. Preflight requires structures and
+interaction caches. The campaign admits exactly 11 residues, records raw
+Oracle outputs under `oracle/`, and sends successful energies, design IDs,
+backbone IDs and result references to the next research turn.
+
+On H20, start both targets sequentially with the deployed Qwen3-8B model.
+Choose a fresh output directory. This launcher starts and cleans up its own
+model service and the Responses transport adapter, and preserves per-target
+exit codes and logs.
+
+```sh
+/Aidata/shared/ldm/antibody-poc/env/antibody_campaign/bin/python \
+  tasks/antibody_rfd3/repro/h20/run_real_sessions.py \
+  --out-dir /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/my-real-sessions \
+  --gpu 0
+```
+
+The [real-session acceptance record](resources/h20-real-sessions.json) contains
+all six energies, Oracle artifact paths, GP candidate scores, tool usage and
+trace hashes from the 2026-11-19 H20 run. Recheck its original run artifacts with
+the controller Python from the repository root using
+`python -m tasks.antibody_rfd3.repro.h20.verify_real_sessions RUN_ROOT`.
+
 The smoke configs allocate two evaluations, one per round including the
 initialization. Each structural method has the same per-round caps on new
 backbones and sampled sequences. Failed jobs consume their reserved generation

@@ -20,6 +20,8 @@ from ldm_tts.registration.experiment import load_active_experiment_contract
 from tasks.antibody.core.engine_adapters import (AntibodyCandidateDomain, AntibodyEvaluator,
     AntibodyGPSelector, AntibodySurrogateEncoder, SEQUENCE_CONSTRAINTS)
 from tasks.antibody.core.ldm_light.ldm_acq import AbsolutEvaluator
+from tasks.antibody.core.absolut_oracle import TARGETS
+from .evaluator import IsolatedAbsolutEvaluator
 from .worker import DesignWorker
 
 PI_METHODS = ("harness", "ldm_harness")
@@ -46,6 +48,8 @@ def parse_args(argv=None):
     p.add_argument("--antigen", default="1ADQ_A")
     p.add_argument("--root", type=Path, default=Path("/Aidata/shared/ldm/antibody-poc"))
     p.add_argument("--absolut-path", type=Path, default=os.environ.get("ABSOLUT_PATH"))
+    p.add_argument("--absolut-resources", action="append", default=[])
+    p.add_argument("--absolut-timeout", type=int, default=600)
     p.add_argument("--sidecar-image", default=os.environ.get("LDM_PI_IMAGE", "ldm-pi-harness:latest"))
     p.add_argument("--guest-cache", type=Path, default=os.environ.get("LDM_GONDOLIN_CACHE"))
     p.add_argument("--out-dir", type=Path, default=Path("runs/antibody_rfd3"))
@@ -53,6 +57,8 @@ def parse_args(argv=None):
     a = p.parse_args(argv)
     if a.method is None:
         a.method = "fixed" if a.mock else "ldm_harness"
+    if a.absolut_timeout <= 0:
+        p.error("absolut-timeout must be positive")
     if min(a.iterations, a.cpu_limit, a.pool_size, a.samples_per_call, a.backbones_per_round) < 1:
         p.error("iterations, CPU and generation limits must be positive")
     if a.pool_size > a.sequences_per_round or a.samples_per_call > a.sequences_per_round:
@@ -109,6 +115,8 @@ class Expander:
         self.worker.evaluated = {o.candidate.canonical_key for o in request.observations}
         history = [dict(round=o.round_idx, sequence=o.candidate.payload["sequence"],
                         backbone_id=o.candidate.payload.get("backbone_id"),
+                        design_id=o.candidate.payload.get("design_id"),
+                        result_artifacts=dict(o.evaluation.artifacts),
                         energy=o.evaluation.metrics[metric(a)], oracle=a.oracle)
                    for o in request.observations if o.evaluation.succeeded]
         count = a.pool_size if history and a.method == "ldm_harness" else 1
@@ -142,14 +150,18 @@ def run(a):
         return 0
     if hasattr(os, "sched_setaffinity"):
         os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[:a.cpu_limit])
+    directory = unique_run_dir(a.out_dir.resolve())
     if a.oracle == "mock":
         evaluator = MockOracle(a.antigen)
+    elif TARGETS.get(a.antigen, a.antigen) in TARGETS.values():
+        if not a.absolut_path:
+            raise ValueError("Set --absolut-path or ABSOLUT_PATH")
+        evaluator = IsolatedAbsolutEvaluator(a, directory)
     else:
         if not a.absolut_path or not (a.absolut_path / "src/bin/Absolut").is_file():
             raise ValueError("Set --absolut-path or ABSOLUT_PATH to the installation with antigen data")
         evaluator = AntibodyEvaluator(AbsolutEvaluator(dict(antigen=a.antigen, process=1,
             startTask=min(os.sched_getaffinity(0)), path=str(a.absolut_path.resolve())), f"h3-{os.getpid()}"))
-    directory = unique_run_dir(a.out_dir.resolve())
     worker = DesignWorker(directory, a)
     expander = Expander(a, worker)
     selector = encoder = None

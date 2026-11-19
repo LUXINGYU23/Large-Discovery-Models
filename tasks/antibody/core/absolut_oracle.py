@@ -22,15 +22,10 @@ class AbsolutOracle:
             raise ValueError("timeout must be positive and finite")
         self.timeout = timeout
 
-    def evaluate(self, sequences, target):
+    def preflight(self, target, require_cache=False):
         antigen = TARGETS.get(target, target)
         if antigen not in TARGETS.values():
             raise ValueError('Unknown target: ' + target)
-        if isinstance(sequences, (str, bytes)):
-            raise ValueError("sequences must be a collection, not a string")
-        sequences = list(sequences)
-        if not sequences or any(not isinstance(s, str) or len(s) < 11 or len(s) > 40 or set(s) - ALPHABET for s in sequences):
-            raise ValueError('Expected canonical amino-acid sequences of length 11–40')
         if not self.binary.is_file():
             raise FileNotFoundError(self.binary)
         info = subprocess.run([str(self.binary), 'info_filenames', antigen], capture_output=True, text=True, timeout=30, check=True)
@@ -42,15 +37,30 @@ class AbsolutOracle:
         source = next((p / name for p in self.resources if (p / name).is_file()), None)
         if source is None:
             raise FileNotFoundError('Target precomputation not ready: ' + name)
-        self.run_root.mkdir(parents=True, exist_ok=True)
-        run = Path(tempfile.mkdtemp(prefix=antigen + '-', dir=self.run_root))
-        (run / name).symlink_to(source)
         prefix = name.split('-10-11-')[0]
+        caches = {}
         for directory in self.resources:
             for cached in directory.glob(prefix + '+*.txt'):
-                link = run / cached.name
-                if not link.exists():
-                    link.symlink_to(cached)
+                caches.setdefault(cached.name, cached)
+        if require_cache and not any(p.name.endswith('Compact.txt') for p in caches.values()):
+            raise FileNotFoundError('Target interaction cache not ready: ' + antigen)
+        for path in (source, *caches.values()):
+            if not path.is_file() or not os.access(path, os.R_OK) or path.stat().st_size == 0:
+                raise FileNotFoundError('Unreadable or empty resource: ' + str(path))
+        return antigen, source, tuple(caches.values())
+
+    def evaluate(self, sequences, target):
+        if isinstance(sequences, (str, bytes)):
+            raise ValueError("sequences must be a collection, not a string")
+        sequences = list(sequences)
+        if not sequences or any(not isinstance(s, str) or len(s) < 11 or len(s) > 40 or set(s) - ALPHABET for s in sequences):
+            raise ValueError('Expected canonical amino-acid sequences of length 11–40')
+        antigen, source, caches = self.preflight(target)
+        self.run_root.mkdir(parents=True, exist_ok=True)
+        run = Path(tempfile.mkdtemp(prefix=antigen + '-', dir=self.run_root))
+        (run / source.name).symlink_to(source)
+        for cached in caches:
+            (run / cached.name).symlink_to(cached)
         (run / 'input.tsv').write_text(''.join(f'{i}\t{s}\n' for i, s in enumerate(sequences, 1)))
         try:
             return self._run(sequences, antigen, run)

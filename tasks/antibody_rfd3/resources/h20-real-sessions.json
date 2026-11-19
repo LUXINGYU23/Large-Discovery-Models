@@ -1,0 +1,210 @@
+{
+  "run_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02",
+  "oracle": "Absolut",
+  "sessions": [
+    {
+      "target": "her2",
+      "antigen": "1N8Z_C",
+      "run": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2",
+      "model": "Qwen3-8B",
+      "seconds": 257.4769718647003,
+      "observations": [
+        {
+          "round": 0,
+          "sequence": "SNGGDGSPGVV",
+          "energy": -85.2,
+          "backbone_id": "job-00000",
+          "design_id": "job-00000/0",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2/oracle/261f0267e8972e6c/1N8Z_C-o7c3gu87/result.json",
+          "tools": {
+            "read": 1,
+            "design_h3": 1,
+            "submit_designs": 1
+          }
+        },
+        {
+          "round": 1,
+          "sequence": "TSGGPGAPGWH",
+          "energy": -83.62,
+          "backbone_id": "job-00000",
+          "design_id": "job-00002/2",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2/oracle/1c6454defab634d9/1N8Z_C-txkv3p4o/result.json",
+          "tools": {
+            "design_h3": 1,
+            "sequence_h3": 1,
+            "submit_designs": 1
+          },
+          "gp_candidates": [
+            {
+              "acquisition_raw": 0.3378150165081024,
+              "acquisition_score": 0.3378150165081024,
+              "mu": 0,
+              "sequence": "SDGSPGSPGTV",
+              "sigma": 0.8480299711227417,
+              "source": "direct_generation"
+            },
+            {
+              "acquisition_raw": 0.38301607966423035,
+              "acquisition_score": 0.38301607966423035,
+              "mu": 0,
+              "sequence": "TSGGPGAPGWH",
+              "sigma": 0.9613322615623474,
+              "source": "direct_generation"
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "sequence": "STGDYGSSGTV",
+          "energy": -86.83,
+          "backbone_id": "job-00000",
+          "design_id": "job-00003/7",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2/oracle/5f1a59b905dcd297/1N8Z_C-0y5059jn/result.json",
+          "tools": {
+            "sequence_h3": 1,
+            "submit_designs": 1
+          },
+          "gp_candidates": [
+            {
+              "acquisition_raw": 0.07247298955917358,
+              "acquisition_score": 0.07247298955917358,
+              "mu": 0.12442410737276077,
+              "sequence": "TTGEYGAQGYV",
+              "sigma": 1.033455491065979,
+              "source": "direct_generation"
+            },
+            {
+              "acquisition_raw": 0.15816926956176758,
+              "acquisition_score": 0.15816926956176758,
+              "mu": -0.3765096664428711,
+              "sequence": "STGDYGSSGTV",
+              "sigma": 0.9881299138069153,
+              "source": "direct_generation"
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "backbones_requested": 2,
+        "benchmark_jobs": 3,
+        "expensive_evaluation_attempts": 3,
+        "external_evaluations": 3,
+        "harness_provider_calls": 11,
+        "harness_tool_calls": 8,
+        "harness_turns": 3,
+        "outer_iterations": 3,
+        "selected_candidates": 3,
+        "sequences_requested": 64,
+        "successful_evaluations": 3,
+        "valid_search_candidates": 5
+      },
+      "events_sha256": "7754b6c0118af02f4a324ee9cfe0fdbdfdc9e7436a5f5b0b4e19a954394f2034",
+      "trace": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2/harness/sessions/cdrh3_research/pi-session/2026-11-19T04-03-28-855Z_01a1f1f9-49d6-744c-813c-fb18b4661f4f.jsonl",
+      "trace_sha256": "649785ac4da1f7a88baa37574e812caedf933e2f655feb02e4c43f0478fa6ebf"
+    },
+    {
+      "target": "pd1",
+      "antigen": "5GGR_Y_FuC_5.25",
+      "run": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1",
+      "model": "Qwen3-8B",
+      "seconds": 162.25766706466675,
+      "observations": [
+        {
+          "round": 0,
+          "sequence": "TPGPPGSPGVV",
+          "energy": -65.41,
+          "backbone_id": "job-00000",
+          "design_id": "job-00000/3",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1/oracle/7988061644739dfa/5GGR_Y_FuC_5.25-puihcqlu/result.json",
+          "tools": {
+            "read": 1,
+            "design_h3": 1,
+            "submit_designs": 1
+          }
+        },
+        {
+          "round": 1,
+          "sequence": "DPNKDGKTYDN",
+          "energy": -57.41,
+          "backbone_id": "job-00001",
+          "design_id": "job-00001/5",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1/oracle/6006e2884b6e26ad/5GGR_Y_FuC_5.25-rv14b5zh/result.json",
+          "tools": {
+            "design_h3": 1,
+            "submit_designs": 3
+          },
+          "gp_candidates": [
+            {
+              "acquisition_raw": 0.36316168308258057,
+              "acquisition_score": 0.36316168308258057,
+              "mu": 0,
+              "sequence": "TPGVDGAPGTI",
+              "sigma": 0.9115646481513977,
+              "source": "direct_generation"
+            },
+            {
+              "acquisition_raw": 0.42183080315589905,
+              "acquisition_score": 0.42183080315589905,
+              "mu": 0,
+              "sequence": "DPNKDGKTYDN",
+              "sigma": 1.058626413345337,
+              "source": "direct_generation"
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "sequence": "GSGSTISSGRD",
+          "energy": -66.74,
+          "backbone_id": "job-00002",
+          "design_id": "job-00002/1",
+          "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1/oracle/31ec5043bb9908d7/5GGR_Y_FuC_5.25-dqd4j2pa/result.json",
+          "tools": {
+            "design_h3": 1,
+            "submit_designs": 1
+          },
+          "gp_candidates": [
+            {
+              "acquisition_raw": 0.11531096696853638,
+              "acquisition_score": 0.11531096696853638,
+              "mu": -0.07607021182775497,
+              "sequence": "GSGSSISSEAN",
+              "sigma": 1.072403073310852,
+              "source": "direct_generation"
+            },
+            {
+              "acquisition_raw": 0.14324738085269928,
+              "acquisition_score": 0.14324738085269928,
+              "mu": -0.2291364222764969,
+              "sequence": "GSGSTISSGRD",
+              "sigma": 1.0563719272613525,
+              "source": "direct_generation"
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "backbones_requested": 3,
+        "benchmark_jobs": 3,
+        "expensive_evaluation_attempts": 3,
+        "external_evaluations": 3,
+        "harness_provider_calls": 12,
+        "harness_tool_calls": 9,
+        "harness_turns": 3,
+        "outer_iterations": 3,
+        "selected_candidates": 3,
+        "sequences_requested": 48,
+        "successful_evaluations": 3,
+        "valid_search_candidates": 5
+      },
+      "events_sha256": "a6fda850446cb4175b36fb02acf92ae4d3d8a44b0b08fff35710b425659e4883",
+      "trace": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1/harness/sessions/cdrh3_research/pi-session/2026-11-19T04-07-50-584Z_01a1f1fd-4837-7667-a82f-e86d3bd22ad7.jsonl",
+      "trace_sha256": "a1e8cfbd4ca4c61b9f3245883783780ea9b601be5d3b06f86d6dc134f62a8c38"
+    }
+  ],
+  "validation": {
+    "linux_tests_passed": 46,
+    "initial_launch": "real-sessions-20261119-01 stopped in preflight due to a string timeout; fixed before any generation or scoring",
+    "local_test_note": "Initial Windows campaign test encountered WinError 5; subsequent focused run passed all five tests."
+  }
+}

@@ -18,9 +18,9 @@ Repeat `--sequence` for batches. Each invocation preserves `input.tsv`, `evaluat
 
 HER2 validation returned -99.72 for the sequence above in `runs/oracle-validation/1N8Z_C-ztg3aqcr/result.json`.
 
-PD-1 resource generation is still in progress under `runs/absolut-pd1-5GGR-Y`. Once completed, add that directory as `--resources` and use `--target PD-1`. Its structure is a custom lattice of PDB 5GGR author chain Y, resolution 5.25, FuC, with jumps allowed across missing residues and two preserved subchains. This is a computational proxy, not an experimental affinity measurement. PD-1 has not yet passed end-to-end validation.
+PD-1 resources are available under `runs/absolut-pd1-5GGR-Y`. Add that directory as `--resources` and use `--target PD-1`. Its structure is a custom lattice of PDB 5GGR author chain Y, resolution 5.25, FuC, with jumps allowed across missing residues and two preserved subchains. Scores measure this computational proxy.
 
-This module is independently callable; campaign workflows still use their existing evaluator. Integration into a campaign and concurrency/load testing have not yet been validated. Cached resource files are shared read-only via symlinks; evaluation outputs are isolated.
+This module is independently callable. The `antibody_rfd3` real HER2 and PD-1 configurations also call it through a Campaign adapter, enforcing 11 aa H3 admission and preserving Oracle results and their provenance in each observation. Other antigen configurations retain their existing evaluator. Cached resource files are shared through symlinks and evaluation outputs have isolated directories.
 
 ## Additional acceptance checks
 
@@ -32,7 +32,7 @@ Recorded in `/Aidata/shared/ldm/antibody-poc/runs/oracle-validation/acceptance.j
 - Two real HER2 invocations ran concurrently in distinct directories without output collisions.
 - A three-item batch preserved input order and duplicate sequence results: `CAGPSTTVPYYFDYW` = -99.72, `CARAYYSNDYW` = -94.77, repeated first sequence = -99.72. The concurrent single-item invocation also returned -99.72.
 
-Result rows must contain a finite energy and the original CDR3 corresponding to their input index. Failures after creation of the run directory preserve an `error.json`; failures during preflight are raised directly. No automatic retry or score-result cache is currently implemented. Structure caches are reused. This is an independent Oracle interface, not yet a campaign integration or a remote API service.
+Result rows must contain a finite energy and the original CDR3 corresponding to their input index. Failures after creation of the run directory preserve an `error.json`; failures during preflight are raised directly. Structure caches are reused. The Campaign adapter records failed attempts and exposes successful energies and artifact references to subsequent research turns.
 
 ## PD-1 validation completed
 

@@ -25,6 +25,17 @@ def check_dependencies(plan, *, include_optional=True):
     if args.get("oracle") == "absolut":
         base = args.get("absolut-path") or env.get("ABSOLUT_PATH")
         check("Absolut", base and (Path(base) / "src/bin/Absolut").is_file(), "External repertoire executable")
+        from tasks.antibody.core.absolut_oracle import AbsolutOracle, TARGETS
+        target = args.get("antigen", "1ADQ_A")
+        if base and TARGETS.get(target, target) in TARGETS.values():
+            resources = args.get("absolut-resources") or [base]
+            if isinstance(resources, str):
+                resources = [resources]
+            try:
+                AbsolutOracle(base, resources, Path(cwd) / "runs", int(args.get("absolut-timeout", 600))).preflight(target, require_cache=True)
+                check("Antigen resources", True, target)
+            except Exception as exc:
+                check("Antigen resources", False, str(exc))
     if method in ("ldm_harness", "harness"):
         check("Pi endpoint", env.get("LLM_BASE_URL") and env.get("LLM_MODEL_NAME") and
               (env.get("LLM_API_KEY") or env.get("OPENAI_API_KEY")), "Responses endpoint, model and API key")
