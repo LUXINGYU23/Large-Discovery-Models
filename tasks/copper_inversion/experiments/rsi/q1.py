@@ -7,6 +7,12 @@ import random
 from pathlib import Path
 
 from tasks.copper_inversion.rsi.ledger import read
+from tasks.copper_inversion.core.candidate import validate_source
+from tasks.copper_inversion.core.execution import digest
+from tasks.copper_inversion.v2.service import EvaluatorService
+from tasks.copper_inversion.v2.suite import file_hash, load_manifest
+from tasks.copper_inversion.v2 import selection
+
 
 
 def select(runs, output, seed):
@@ -48,6 +54,135 @@ def select(runs, output, seed):
     return hashlib.sha256(data).hexdigest()
 
 
+def references(path):
+    """Load precommitted source files, checking their exact byte hashes."""
+    path = Path(path).resolve()
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not data:
+        raise ValueError("references must be a nonempty name to source mapping")
+    out = {}
+    for name, item in sorted(data.items()):
+        if not isinstance(name, str) or not name or not isinstance(item, dict) or set(item) != {"source", "sha256"}:
+            raise ValueError("invalid reference entry")
+        source = Path(item["source"])
+        if not source.is_absolute():
+            source = path.parent / source
+        source = source.resolve()
+        if file_hash(source) != item["sha256"] or validate_source(source.read_bytes()) != item["sha256"]:
+            raise ValueError("reference source hash differs")
+        out[name] = {"source": str(source), "sha256": item["sha256"]}
+    return out
+
+
+def release_config(release):
+    release = Path(release).resolve()
+    path = next((release / n for n in ("qualification.json", "development-receipt.json")
+                 if (release / n).is_file()), None)
+    if path is None:
+        raise ValueError("release record missing")
+    record = json.loads(path.read_text())
+    return release, record
+
+
+def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, tier=None, purpose=None):
+    """Submit pinned sources to the v2 training service in the trusted process."""
+    root, manifest = Path(service_root).resolve(), Path(manifest).resolve()
+    if load_manifest(manifest)["split"] != "train":
+        raise ValueError("Q1 requires a training manifest")
+    config = {"manifest": str(manifest), "root": str(root), "image": image, "seconds": seconds,
+              "slots": slots, "caller_uid": 0, "socket": str(root / "unused.sock")}
+    if tier is not None:
+        config["tier"] = tier
+    if purpose is not None:
+        config["purpose"] = purpose
+    service = EvaluatorService(config)
+    contract = digest(service.identity)
+    for source, sha in sources:
+        body = Path(source).read_bytes()
+        if validate_source(body) != sha:
+            raise ValueError("selected source changed")
+        reply = service.dispatch({"operation": "evaluate", "source": body.decode(), "contract_digest": contract})
+        if reply.get("status") != "succeeded" or reply.get("source_sha256") != sha:
+            raise ValueError("training evaluation failed or rejected: " + str(reply.get("status")))
+    return root
+
+
+def evaluate(selection_path, release, output, image):
+    selection_path = Path(selection_path)
+    chosen = json.loads(selection_path.read_text())
+    if chosen.get("schema") != "rsi-q1-selection-v1":
+        raise ValueError("invalid Q1 selection")
+    rows = chosen["programs"]
+    ids = [r["program_id"] for r in rows]
+    repeat_ids = chosen["repeat_program_ids"]
+    if len(ids) != 60 or len(set(ids)) != 60 or len(repeat_ids) != 12 or len(set(repeat_ids)) != 12 or not set(repeat_ids) <= set(ids):
+        raise ValueError("invalid Q1 sample sizes")
+    for run, sha in chosen["input_run_hashes"].items():
+        if file_hash(Path(run) / "ledger.jsonl") != sha:
+            raise ValueError("rehearsal ledger changed")
+    sources = [(str(Path(r["source_run"]) / "candidates" / r["program_id"] / "solver.py"), r["program_id"]) for r in rows]
+    repeat = [(source, sha) for source, sha in sources if sha in set(repeat_ids)]
+    release, record = release_config(release)
+    tiers, q = record["tiers"], record["q1"]
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    mapping_path = output / "q1.json"
+    if mapping_path.exists():
+        raise ValueError("Q1 mapping already exists")
+    layouts = {
+        "short_12x1": (tiers["S"]["train_manifest"], tiers["S"]["solver_seconds"], tiers["S"]["slots"], "S", None, sources),
+        "full_24x1": (tiers["F"]["train_manifest"], tiers["F"]["solver_seconds"], tiers["F"]["slots"], "F", None, sources),
+        "short_24x2": (q["both_packs_manifest"], q["solver_seconds"], len(sources), None, "q1", sources),
+        "repeats": (q["execution_seeds_manifest"], q["solver_seconds"], len(repeat), None, "q1", repeat),
+    }
+    mapping = {}
+    for name, (manifest, seconds, slots, tier, purpose, entries) in layouts.items():
+        if not manifest:
+            raise ValueError("release lacks Q1 manifest: " + name)
+        root = evaluate_sources(output / name, release / manifest, seconds, slots, image, entries, tier=tier, purpose=purpose)
+        identity = {"layout": name, "selection_sha256": file_hash(selection_path), "manifest": str((release / manifest).resolve()),
+                    "manifest_sha256": file_hash(release / manifest), "seconds": seconds, "tier": tier, "purpose": purpose,
+                    "program_ids": sorted(sha for _, sha in entries)}
+        identity_path = root / "q1-layout.json"
+        if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
+            raise ValueError("Q1 layout identity changed")
+        identity_path.write_text(json.dumps(identity, sort_keys=True, indent=2) + "\n")
+        mapping[name] = str(root)
+    with mapping_path.open("x") as f:
+        json.dump(mapping, f, sort_keys=True, indent=2)
+        f.write("\n")
+    return mapping
+
+
+def build_references(refs_path, release, output, image):
+    refs = references(refs_path)
+    release, record = release_config(release)
+    tier = record["tiers"]["S"]
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    mapping_path = output / "references.json"
+    if mapping_path.exists():
+        raise ValueError("reference mapping already exists")
+    service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
+                               tier["slots"], image, [(r["source"], r["sha256"]) for r in refs.values()], tier="S")
+    mapping = {}
+    for name, ref in refs.items():
+        target = output / "selection" / hashlib.sha256(name.encode()).hexdigest()
+        if not target.exists():
+            selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
+                             [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
+                             image=image, training_run=service, training_manifest=release / tier["train_manifest"])
+        frozen, _ = selection.verify(target)
+        if len(frozen["candidates"]) != 1 or frozen["candidates"][0]["sha256"] != ref["sha256"]:
+            raise ValueError("reference selection differs")
+        selection.run(target, "validation")
+        mapping[name] = str(target)
+    with mapping_path.open("x") as f:
+        json.dump(mapping, f, sort_keys=True, indent=2)
+        f.write("\n")
+    return mapping
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -55,8 +190,24 @@ def main(argv=None):
     choice.add_argument("--run", action="append", required=True, dest="runs")
     choice.add_argument("--seed", type=int, required=True)
     choice.add_argument("--output", type=Path, required=True)
+    measure = sub.add_parser("evaluate", help="evaluate the Q1 sample on release training suites")
+    measure.add_argument("--selection", type=Path, required=True)
+    for command in (measure,):
+        command.add_argument("--release", type=Path, required=True)
+        command.add_argument("--output", type=Path, required=True)
+        command.add_argument("--image", required=True)
+    ref = sub.add_parser("references", help="train, freeze and validate domain references")
+    ref.add_argument("--references", type=Path, required=True)
+    ref.add_argument("--release", type=Path, required=True)
+    ref.add_argument("--output", type=Path, required=True)
+    ref.add_argument("--image", required=True)
     args = parser.parse_args(argv)
-    print(select(args.runs, args.output, args.seed))
+    if args.command == "select":
+        print(select(args.runs, args.output, args.seed))
+    elif args.command == "evaluate":
+        print(json.dumps(evaluate(args.selection, args.release, args.output, args.image), sort_keys=True))
+    else:
+        print(json.dumps(build_references(args.references, args.release, args.output, args.image), sort_keys=True))
     return 0
 
 

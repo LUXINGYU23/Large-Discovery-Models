@@ -21,6 +21,8 @@ from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import EXPERIMENTS, layout, parse_prefix, run_manifest
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.v2 import selection
+from tasks.copper_inversion.v2.suite import file_hash
+from tasks.copper_inversion.experiments.rsi.q1 import references as load_references
 
 
 REVIEW_FILE = "blind-review-required.json"
@@ -172,10 +174,48 @@ def unseal(root, listing, *, expected_runs=None, operator=None, workers=8, revie
             "frozen_list_sha256": list_sha}
 
 
+def unseal_references(root, protocol_id, refs_path, selections_path, *, operator=None):
+    """Unseal the precommitted domain references once, under the REF log."""
+    paths = layout(root, protocol_id, "Q1")
+    refs = load_references(refs_path)
+    mapping = json.loads(Path(selections_path).read_text())
+    if not isinstance(mapping, dict) or set(mapping) != set(refs):
+        raise ValueError("reference selections do not match precommitted sources")
+    targets, frozen_hashes, selection_hashes = {}, {}, {}
+    for name, ref in refs.items():
+        target = Path(mapping[name]).resolve()
+        frozen, state = selection.verify(target)
+        if (len(frozen["candidates"]) != 1 or frozen["candidates"][0]["sha256"] != ref["sha256"]
+                or state["phase"] != "selected"):
+            raise ValueError("reference must have one matching, validated, untested solver")
+        report = json.loads((target / "selection.json").read_text())
+        if digest(report) != state["selection_sha256"] or report["selected_sha256"] != ref["sha256"]:
+            raise ValueError("reference validation changed")
+        targets[name] = target
+        frozen_hashes[name] = digest(frozen)
+        selection_hashes[name] = state["selection_sha256"]
+    paths["unseal_log"].parent.mkdir(parents=True, exist_ok=True)
+    lockpath = paths["unseal_log"].parent / "REF.lock"
+    with lockpath.open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if any(e.get("experiment") == "REF" for e in _log(paths["unseal_log"])):
+            raise ValueError("REF has already been unsealed or started")
+        common = {"experiment": "REF", "protocol_id": protocol_id, "references_sha256": file_hash(refs_path),
+                  "selection_roots": {n: str(p) for n, p in targets.items()},
+                  "frozen_sha256": frozen_hashes, "selection_sha256": selection_hashes,
+                  "operator": operator or pwd.getpwuid(os.geteuid()).pw_name, "uid": os.geteuid()}
+        _append(paths["unseal_log"], {**common, "mode": "start", "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+        results = {name: selection.run(target, "test") for name, target in targets.items()}
+        entry = {**common, "mode": "completed", "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                 "results_sha256": {n: digest(result) for n, result in results.items()}}
+        _append(paths["unseal_log"], entry)
+    return {"status": "unsealed", "experiment": "REF", "references": len(targets)}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True, help="active area, e.g. /Aidata/shared/xingyulu/rsi4geo")
-    parser.add_argument("--list", type=Path, required=True,
+    parser.add_argument("--list", type=Path,
                         help='{"experiment", "protocol_id", "solvers": [{"run_id", "prefix"}, ...]}')
     parser.add_argument("--expected-runs", type=Path, help="JSON list of run ids the experiment must contain")
     parser.add_argument("--operator")
@@ -183,7 +223,19 @@ def main(argv=None):
     parser.add_argument("--blind-review", type=Path,
                         help='{"schema": "rsi-blind-review-v1", "experiment", "runs": {run_id: '
                              '{"review_sha256", "verdict": "explained", "reviewer", "note"}}}')
+    parser.add_argument("--experiment", choices=("REF",))
+    parser.add_argument("--protocol-id")
+    parser.add_argument("--references", type=Path)
+    parser.add_argument("--selections", type=Path)
     args = parser.parse_args(argv)
+    if args.experiment == "REF":
+        if not all((args.protocol_id, args.references, args.selections)) or args.list:
+            parser.error("REF requires --protocol-id, --references and --selections")
+        print(json.dumps(unseal_references(args.root, args.protocol_id, args.references, args.selections,
+                                           operator=args.operator), sort_keys=True))
+        return 0
+    if args.list is None:
+        parser.error("--list is required for discovery experiments")
     expected = json.loads(args.expected_runs.read_text()) if args.expected_runs else None
     print(json.dumps(unseal(args.root, args.list, expected_runs=expected, operator=args.operator,
                             workers=args.workers, review=args.blind_review), sort_keys=True))

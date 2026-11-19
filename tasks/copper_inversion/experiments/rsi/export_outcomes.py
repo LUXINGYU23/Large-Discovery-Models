@@ -10,7 +10,7 @@ Extra blocks read by the analysis package (analysis/outcomes.py):
                          private parent id, which is never written. A scoped,
                          coordinator-approved exception to AT-31 for the body-paired
                          bootstrap of spec §7; written only after the unseal.
-  q1, references         a separate table with experiment "Q1" and no rows.
+  q1, references         per-program training risks and logged reference outcomes.
 """
 
 import argparse
@@ -24,7 +24,7 @@ import numpy as np
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import layout, parse_prefix, run_manifest
-from tasks.copper_inversion.experiments.rsi.unseal import check, load_list
+from tasks.copper_inversion.experiments.rsi.unseal import check, load_list, _log
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.suite import aggregate, file_hash, load_manifest
 from tasks.copper_inversion.v2.training_receipts import eligible
@@ -217,7 +217,45 @@ def _guard(table, forbidden):
 def _risks(service_root):
     identity = json.loads((Path(service_root) / "identity.json").read_text())
     manifest = identity["configuration"]["manifest"]
-    return {sha: r["metrics"]["loss_total"] for sha, r in eligible(service_root, manifest).items()}, manifest
+    suite = load_manifest(manifest)
+    if suite["split"] != "train" or identity["configuration"].get("objective", "confirmation") != "confirmation":
+        raise ValueError("Q1 requires confirmation-risk training suites")
+    records = eligible(service_root, manifest)
+    for record in records.values():
+        rows = json.loads(Path(record["cases_path"]).read_text())
+        if any(row.get("objective", "confirmation") != "confirmation" for row in rows):
+            raise ValueError("Q1 receipts must use confirmation risk")
+    return {sha: r["metrics"]["loss_total"] for sha, r in records.items()}, manifest
+
+
+def _check_q1_layout(root, name, values, manifest):
+    path = Path(root) / "q1-layout.json"
+    if not path.exists():
+        return  # Compatibility with previously supplied service roots.
+    identity = json.loads(path.read_text())
+    if (identity.get("layout") != name or identity.get("manifest") != str(Path(manifest).resolve())
+            or identity.get("manifest_sha256") != file_hash(manifest)
+            or identity.get("program_ids") != sorted(values)):
+        raise ValueError("Q1 service layout or program receipts differ")
+
+
+def _seed_risks(service_root):
+    identity = json.loads((Path(service_root) / "identity.json").read_text())
+    manifest = identity["configuration"]["manifest"]
+    suite = load_manifest(manifest)
+    if suite["split"] != "train" or identity["configuration"].get("objective", "confirmation") != "confirmation":
+        raise ValueError("Q1 requires confirmation-risk training suites")
+    if len(suite["seeds"]) != 3:
+        raise ValueError("Q1 repeat suite requires exactly three execution seeds")
+    records = eligible(service_root, manifest)
+    risks = {}
+    for sha, record in records.items():
+        rows = json.loads(Path(record["cases_path"]).read_text())
+        if any(row.get("objective", "confirmation") != "confirmation" for row in rows):
+            raise ValueError("Q1 receipts must use confirmation risk")
+        risks[sha] = [aggregate([row for row in rows if row["seed"] == seed])["loss_total"]
+                      for seed in suite["seeds"]]
+    return risks, manifest
 
 
 def export_references(root, protocol_id, *, q1=None, references=None):
@@ -240,18 +278,33 @@ def export_references(root, protocol_id, *, q1=None, references=None):
         risks = {}
         for name in names:
             risks[name], manifest = _risks(q1[name])
+            _check_q1_layout(q1[name], name, risks[name], manifest)
             manifests.add(manifest)
-        repeats = []
-        for service in q1.get("repeats", []):
-            values, manifest = _risks(service)
-            manifests.add(manifest)
-            repeats.append(values)
         common = set.intersection(*(set(v) for v in risks.values()))
+        repeat_input = q1.get("repeats", [])
+        if isinstance(repeat_input, str):
+            repeat_values, manifest = _seed_risks(repeat_input)
+            _check_q1_layout(repeat_input, "repeats", repeat_values, manifest)
+            manifests.add(manifest)
+            repeats = [{"program_id": sha, "risks": repeat_values[sha]}
+                       for sha in sorted(common & set(repeat_values))]
+        else:
+            values = []
+            for service in repeat_input:
+                value, manifest = _risks(service)
+                manifests.add(manifest)
+                values.append(value)
+            repeats = [{"program_id": sha, "risks": [risks["short_12x1"][sha], *[r[sha] for r in values]]}
+                       for sha in sorted(common.intersection(*map(set, values)))] if values else []
         table["q1"] = {"programs": [{"program_id": sha, **{n: risks[n][sha] for n in names}} for sha in sorted(common)],
-                       "repeats": [{"program_id": sha, "risks": [risks["short_12x1"][sha], *[r[sha] for r in repeats]]}
-                                   for sha in sorted(set(risks["short_12x1"]).intersection(*map(set, repeats)))]
-                       if repeats else []}
+                       "repeats": repeats}
     if references:
+        entries = [entry for entry in _log(paths["unseal_log"])
+                   if entry.get("experiment") == "REF" and entry.get("protocol_id") == protocol_id
+                   and entry.get("mode") == "completed"]
+        if len(entries) != 1 or set(entries[0]["selection_roots"]) != set(references):
+            raise ValueError("references require a completed REF unseal log")
+        logged = entries[0]
         table["references"] = {}
         for name, target in sorted(references.items()):
             target = Path(target)
@@ -259,8 +312,12 @@ def export_references(root, protocol_id, *, q1=None, references=None):
             if state["phase"] != "tested" or len(frozen["candidates"]) != 1:
                 raise ValueError("a domain reference needs one tested frozen solver")
             result = json.loads((target / "test-result.json").read_text())
-            if digest(result) != state["test_result_sha256"]:
-                raise ValueError("domain reference result changed")
+            if (str(target.resolve()) != logged["selection_roots"][name]
+                    or digest(frozen) != logged["frozen_sha256"][name]
+                    or state["selection_sha256"] != logged["selection_sha256"][name]
+                    or digest(result) != state["test_result_sha256"]
+                    or digest(result) != logged["results_sha256"][name]):
+                raise ValueError("domain reference differs from REF unseal log")
             table["references"][name] = {r["split"]: r["metrics"]["mean_iou"] for r in result["results"]
                                          if r["split"] in SPLITS}
             targets.append(target)
