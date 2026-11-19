@@ -35,12 +35,16 @@ class NativeAntBO:
 
     def propose(self, history):
         import torch
+        observed = []
         for row in history[self.seen:]:
             self.optimizer.observe(seqs_to_indices([row["sequence"]]), torch.tensor([row["energy"]]))
+            observed.append({"sequence": row["sequence"], "energy": row["energy"]})
         self.seen = len(history)
         evaluated = {row["sequence"] for row in history}
-        for _ in range(32):
+        for attempt in range(32):
             seq, = indices_to_seqs(self.optimizer.suggest(1))
             if seq not in evaluated and not _sequence_violations(seq, 11):
-                return {"sequence": seq}
+                return {"sequence": seq, "antbo_proposal": {
+                    "observed": observed, "history_count": self.seen,
+                    "suggest_calls": attempt + 1, "optimizer": "bo.optimizer.Optimizer"}}
         raise RuntimeError("AntBO could not suggest an admissible new CDRH3 in 32 attempts")

@@ -93,6 +93,8 @@ def main():
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("--method", choices=["harness", "ldm_harness"], default="ldm_harness")
     parser.add_argument("--initialization-run", type=Path)
+    parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--share-gpu", action="store_true")
     args = parser.parse_args()
     if args.out_dir.exists():
         raise SystemExit("Smoke requires a fresh output directory")
@@ -142,7 +144,9 @@ def main():
                        LLM_MODEL_NAME="scripted-pi-fixture", LLM_API_KEY=key,
                        NO_PROXY=f"{gateway},localhost,127.0.0.1", no_proxy=f"{gateway},localhost,127.0.0.1")
             cmd = [sys.executable, "scripts/run_ldm_tts.py", f"config/antibody_rfd3/{args.method}.yaml",
-                   "--set", f"args.out-dir={args.out_dir.resolve()}"]
+                   "--set", f"args.out-dir={args.out_dir.resolve()}", "--set", f"args.gpu={args.gpu}"]
+            if args.share_gpu:
+                cmd.extend(["--set", "args.share-gpu=true"])
             if args.initialization_run:
                 cmd.extend(["--set", f"args.initialization-run={args.initialization_run.resolve()}"])
             subprocess.run(cmd, cwd=ROOT, env=env, check=True)
@@ -150,6 +154,10 @@ def main():
             server.shutdown()
             thread.join()
     assert "read" in actions and "sequence_h3" in actions and actions.count("submit_designs") == 2
+    receipts = [json.loads(p.read_text()) for p in sorted(args.out_dir.glob("design_jobs/*/receipt.json"))]
+    second_round = [r for r in receipts if r["round"] == 1]
+    assert second_round and all(r["action"] == "sequence_h3" for r in second_round)
+    assert all(r["backbone_id"] == receipts[0]["backbone_id"] for r in second_round)
     print(json.dumps({"provider": "scripted-pi-fixture", "actions": actions}))
 
 

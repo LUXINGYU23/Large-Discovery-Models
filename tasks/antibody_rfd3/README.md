@@ -76,6 +76,42 @@ matplotlib and tqdm there. Run the same command with that interpreter and
 
 ## Evidence and budgets
 
+To run the three real baselines against both antigens with the existing LDM
+initialization, use the same H20 launcher with a fresh output directory.
+
+```sh
+/Aidata/shared/ldm/antibody-poc/env/antibody_campaign/bin/python \
+  tasks/antibody_rfd3/repro/h20/run_real_sessions.py \
+  --methods antbo fixed harness \
+  --initialization-root /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02 \
+  --out-dir /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/my-real-baselines \
+  --gpu 0
+```
+
+The launcher uses the dedicated native AntBO interpreter and starts Qwen3-8B
+for the Pi methods. Pure Pi receives the same skill, design_h3 and sequence_h3
+tools as LDM and directly submits one candidate per round. Initial structures
+and sequences are copied with validated mappings. Each campaign independently
+evaluates its first sequence using Absolut. Original initialization generation
+cost and newly executed model cost are reported separately.
+
+Run `python -m tasks.antibody_rfd3.repro.h20.verify_baselines RUN_ROOT
+--initialization-root LDM_RUN_ROOT` with the controller environment to verify
+all eighteen energies, selection behavior and the shared starting points.
+The native AntBO candidate records include observed energies and suggest-call
+counts. A directed Pure Pi transport test is available through
+`python -m tasks.antibody_rfd3.tests.pi_transport_smoke OUTPUT --method harness
+--initialization-run LDM_RUN_ROOT/her2 --gpu 0 --share-gpu`.
+That test uses a scripted provider to exercise real ProteinMPNN backbone reuse.
+
+The [real baseline acceptance record](resources/h20-real-baselines.json) includes
+all eighteen scores from the 2026-11-19 runs, the six corresponding LDM scores,
+model process times, replayed initialization cost and Pi token usage. All six
+baseline campaigns completed three evaluations. Pure Pi used both real design
+tools in its PD-1 campaign. The separate scripted transport fixture also passed
+the directed sequence_h3 reuse check. These runs use one seed and three
+evaluations per case for integration acceptance.
+
 The real HER2 and PD-1 configurations are
 `config/antibody_rfd3/her2_real.yaml` and `config/antibody_rfd3/pd1_real.yaml`.
 Each runs three evaluations with one persistent Pi session. They use the

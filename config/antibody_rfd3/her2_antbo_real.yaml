@@ -1,0 +1,19 @@
+name: antibody_rfd3_her2_antbo_real
+task: antibody_rfd3
+algorithm: antbo
+mode: real
+description: Three real HER2 evaluations with antbo and shared initialization.
+args:
+  method: antbo
+  oracle: absolut
+  antigen: HER2
+  iterations: 3
+  pool-size: 2
+  seed: 42
+  initialization-run: /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/her2
+  absolut-path: /Aidata/shared/ldm/antibody-poc/env/sources/Absolut
+  absolut-resources:
+    - /Aidata/shared/ldm/antibody-poc/env/sources/Absolut
+    - /Aidata/shared/ldm/antibody-poc/runs/absolut-her2-check-fUwLve
+  absolut-timeout: 600
+  out-dir: runs/antibody_rfd3/her2-antbo-real
