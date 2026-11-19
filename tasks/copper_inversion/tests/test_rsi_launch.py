@@ -273,6 +273,20 @@ class FakeHost:
         return FakeProcess(self.next, 0)
 
 
+def test_runtime_hands_the_tier_to_the_controller(tmp_path, monkeypatch):
+    """The runtime parser also defines --tier; on H20 it swallowed the controller's tier."""
+    policy = launch.make_policy({k: v for k, v in VALUES.items()}, tmp_path / "queue", tmp_path / "policy.json")
+    seen = []
+    from tasks.copper_inversion.rsi import workflow
+    monkeypatch.setattr(workflow, "main", lambda argv: seen.append(argv) or 0)
+    monkeypatch.setattr("sys.argv", ["runtime", "--policy", str(tmp_path / "policy.json"), "rsi", "--protocol", "p.json",
+                                     "--tier", "S", "--seed", "8"])
+    with pytest.raises(SystemExit):
+        parallel_runtime.main()
+    (argv,) = seen
+    assert argv[argv.index("--tier") + 1] == "S" and argv.count("--tier") == 1 and policy["global_jobs"] == 8
+
+
 def test_at37_launcher_starts_two_smoke_runs_and_resumes_after_a_pause(tmp_path, monkeypatch):
     from tasks.copper_inversion.rsi import workflow
     monkeypatch.setattr(workflow, "prepare", lambda args: None)

@@ -294,7 +294,8 @@ def main():
         # The controller starts no containers; it may read batch_workers from this policy.
         os.environ['LDM4GEO_SCHEDULING_POLICY']=str(a.policy.resolve())
         from tasks.copper_inversion.rsi import workflow
-        raise SystemExit(workflow.main(rest))
+        # This parser also knows --tier and took it from the controller's arguments; hand it back.
+        raise SystemExit(workflow.main(rest+(['--tier',a.tier] if a.tier is not None else [])))
     install(policy,a.tier)
     if a.mode=='rsi-service':
         q=argparse.ArgumentParser();q.add_argument('--config',type=Path,required=True);b=q.parse_args(rest)
