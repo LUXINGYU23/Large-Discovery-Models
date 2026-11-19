@@ -285,7 +285,7 @@ def tune(run):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--policy',type=Path,required=True)
     p.add_argument('--tier',help='tier whose case concurrency applies (service modes read it from the service)')
-    p.add_argument('mode',choices=['service','ldm','tune','finish','rsi-service','rsi-freeze','rsi']);a,rest=p.parse_known_args()
+    p.add_argument('mode',choices=['service','ldm','tune','finish','rsi-service','rsi-freeze','rsi-q1','rsi']);a,rest=p.parse_known_args()
     policy=json.loads(a.policy.read_text())
     if hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=policy['runtime_sha256']:raise ValueError('scheduling runtime changed')
     expected=execution.digest({k:v for k,v in policy.items() if k!='policy_sha256'})
@@ -297,6 +297,9 @@ def main():
         # This parser also knows --tier and took it from the controller's arguments; hand it back.
         raise SystemExit(workflow.main(rest+(['--tier',a.tier] if a.tier is not None else [])))
     install(policy,a.tier)
+    if a.mode=='rsi-q1':
+        from tasks.copper_inversion.experiments.rsi import q1
+        raise SystemExit(q1.main(rest, policy=policy))
     if a.mode=='rsi-service':
         q=argparse.ArgumentParser();q.add_argument('--config',type=Path,required=True);b=q.parse_args(rest)
         config=json.loads(b.config.read_text());backend=risk_service(config)
