@@ -22,10 +22,15 @@ def test_isolation_evidence_rejects_each_bad_input(tmp_path, monkeypatch):
         'guest': dict(status='passed', own_root_paths_absent=True, sibling_paths_absent=True,
                       private_paths_absent=True, host_credentials_absent=True, http_egress_probe_failed=True,
                       read_tool_escape_denied={str(i): True for i in range(5)}),
-        'audit': dict(uid=991, account='eval', account_can_read=True, research_host_user_direct_read_denied=True),
-        'rpc': dict(status='passed', replay_identical=True, private_mounts_absent=True,
-                    request_path_override_rejected=True, invalid_output_rejected=True, feedback_cap_enforced=True, final_used_slots=2),
-        'positive': dict(status='control_detected', marker_hits=dict(sentinel=1, private_value=1), iou_hits_by_kind=dict(unexplained=1)),
+        'audit': dict(uid=991, account='eval', base=str(tmp_path / 'private'), client='client',
+                      canary=str(tmp_path / 'private/access-canary.txt'), release_file=str(tmp_path / 'private/release'),
+                      account_can_read=True, research_host_user_direct_read_denied=True,
+                      checks={f'{role}_{name}': {'returncode': rc, 'stderr_empty': True}
+                              for role, rc in (('evaluator', 0), ('client', 1)) for name in ('canary', 'release_file')}),
+        'rpc': dict(schema='rsi-rpc-probe-v1', status='passed',
+                    checks={name: True for name in __import__('tasks.copper_inversion.tests.rsi_rpc_probe', fromlist=['CHECKS']).CHECKS},
+                    slots=13, final_used_slots=13),
+        'positive': dict(control='passed', scan_rc=1, error='blind audit: sentinel, private_value', values_echoed=False),
     }
     paths = {}
     for name, value in rows.items():
@@ -42,6 +47,23 @@ def test_isolation_evidence_rejects_each_bad_input(tmp_path, monkeypatch):
     for name in rows:
         paths[name].write_text('{}')
         assert iso.assemble(**args)['status'] == 'failed'
+        paths[name].write_text(json.dumps(rows[name]))
+    import copy
+    bad_rows = []
+    for field, value in [('control', 'failed'), ('scan_rc', 0), ('error', 'sentinel only'), ('values_echoed', True)]:
+        row = copy.deepcopy(rows['positive']); row[field] = value; bad_rows.append(('positive', row))
+    for field, value in [('status', 'failed'), ('slots', 12), ('final_used_slots', 12), ('schema', 'wrong')]:
+        row = copy.deepcopy(rows['rpc']); row[field] = value; bad_rows.append(('rpc', row))
+    for check in rows['rpc']['checks']:
+        row = copy.deepcopy(rows['rpc']); row['checks'][check] = False; bad_rows.append(('rpc', row))
+    for field, value in [('client', 'another'), ('release_file', '/other'), ('account_can_read', False),
+                         ('research_host_user_direct_read_denied', False)]:
+        row = copy.deepcopy(rows['audit']); row[field] = value; bad_rows.append(('audit', row))
+    for check in rows['audit']['checks']:
+        row = copy.deepcopy(rows['audit']); row['checks'][check]['returncode'] = 2; bad_rows.append(('audit', row))
+    for name, row in bad_rows:
+        paths[name].write_text(json.dumps(row))
+        assert iso.assemble(**args)['status'] == 'failed', (name, row)
         paths[name].write_text(json.dumps(rows[name]))
     private.chmod(0o755)
     assert iso.assemble(**args)['status'] == 'failed'

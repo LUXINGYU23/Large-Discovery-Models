@@ -14,6 +14,11 @@ SCOPE = ("Account separation, guest isolation probe, RPC whitelist probe, and bl
          "positive control; does not cover an adversarial guest attack suite.")
 
 
+RPC_CHECKS = ('info_ready', 'missing_digest_rejected', 'wrong_digest_rejected',
+          'request_path_override_rejected', 'unknown_operation_rejected', 'rejected_requests_free',
+          'private_mounts_absent', 'feedback_whitelist', 'replay_identical', 'replay_free',
+          'invalid_output_rejected', 'feedback_cap_enforced')
+
 def assemble(*, guest, audit, rpc, positive, private_roots, release_file, socket_dirs, client, client_group, operator, root):
     if os.geteuid() != 0:
         raise PermissionError("run as root")
@@ -38,14 +43,24 @@ def assemble(*, guest, audit, rpc, positive, private_roots, release_file, socket
         ("own_root_paths_absent", "sibling_paths_absent", "private_paths_absent", "host_credentials_absent", "http_egress_probe_failed"))
         and isinstance(d.get("read_tool_escape_denied"), dict) and len(d["read_tool_escape_denied"]) == 5
         and all(v is True for v in d["read_tool_escape_denied"].values()))
-    evidence("access_audit", audit, lambda d: d.get("uid") == 991 and d.get("account_can_read") is True and
-        d.get("research_host_user_direct_read_denied") is True and d.get("account") == pwd.getpwuid(991).pw_name)
-    evidence("rpc_probe", rpc, lambda d: d.get("status") == "passed" and all(d.get(k) is True for k in
-        ("replay_identical", "private_mounts_absent", "request_path_override_rejected", "invalid_output_rejected", "feedback_cap_enforced"))
-        and d.get("final_used_slots") == 2)
-    evidence("positive_control", positive, lambda d: d.get("status") == "control_detected" and
-        d.get("marker_hits", {}).get("sentinel", 0) > 0 and d.get("marker_hits", {}).get("private_value", 0) > 0 and
-        d.get("iou_hits_by_kind", {}).get("unexplained", 0) > 0)
+    def access_ok(d):
+        checks = d.get("checks", {})
+        return (d.get("uid") == 991 and d.get("account") == pwd.getpwuid(991).pw_name
+                and d.get("base") == str(Path(root).resolve() / "private")
+                and d.get("client") == client and d.get("release_file") == str(Path(release_file).resolve())
+                and d.get("canary") == str(Path(root).resolve() / "private" / "access-canary.txt")
+                and d.get("account_can_read") is True and d.get("research_host_user_direct_read_denied") is True
+                and all(checks.get("evaluator_" + n) == {"returncode": 0, "stderr_empty": True}
+                        and checks.get("client_" + n) == {"returncode": 1, "stderr_empty": True}
+                        for n in ("canary", "release_file")))
+    evidence("access_audit", audit, access_ok)
+    evidence("rpc_probe", rpc, lambda d: d.get("schema") == "rsi-rpc-probe-v1" and d.get("status") == "passed"
+        and isinstance(d.get("checks"), dict) and all(d["checks"].get(k) is True for k in RPC_CHECKS)
+        and type(d.get("slots")) is int and d["slots"] >= 2 and type(d.get("final_used_slots")) is int
+        and d["final_used_slots"] == d["slots"])
+    evidence("positive_control", positive, lambda d: d.get("control") == "passed" and type(d.get("scan_rc")) is int
+        and d["scan_rc"] != 0 and isinstance(d.get("error"), str) and "sentinel" in d["error"]
+        and "private_value" in d["error"] and d.get("values_echoed") is False)
     try:
         evaluator, user = pwd.getpwuid(991), pwd.getpwnam(client)
         record("accounts", user.pw_uid != 991, "client and evaluator must be distinct")
