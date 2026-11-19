@@ -618,6 +618,9 @@ class Launcher:
                 # unseal.py refuses this run until a reviewer signs off this exact hit list.
                 atomic_json_write(paths["service"] / REVIEW_FILE, {
                     "run_id": name, "review_sha256": blind["review_sha256"], "hits": blind["review_required"]})
+                # unseal.py reads it as the evaluator; the launcher writes it as root.
+                uid, gid, _ = self.host.account(self.site["service_user"])
+                self.host.chown(paths["service"] / REVIEW_FILE, uid, gid)
         state["reconciliation"] = reconciliation
         for name, _ in self.runs():
             _readable(self.paths(name)["run"])

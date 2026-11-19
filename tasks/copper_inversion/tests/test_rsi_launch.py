@@ -229,7 +229,7 @@ class FakeHost:
         return {"evaluator": (991, 991, [991]), "client": (1001, 1001, [1001])}[user]
 
     def chown(self, path, uid, gid):
-        pass
+        self.chowned = getattr(self, "chowned", []) + [(Path(path).name, uid)]
 
     def alive(self, pid):
         return pid in self.live
@@ -291,7 +291,8 @@ def test_at37_launcher_starts_two_smoke_runs_and_resumes_after_a_pause(tmp_path,
     from tasks.copper_inversion.rsi import workflow
     monkeypatch.setattr(workflow, "prepare", lambda args: None)
     monkeypatch.setattr(archive, "conditions", lambda run, service: {"engine": "ok", "budget": "ok", "blind": {
-        "review_required": 0, "review_sha256": None}})
+        "review_required": 2 if run.name == "ldm4geo-s7" else 0,
+        "review_sha256": "a" * 64 if run.name == "ldm4geo-s7" else None}})
     reaped = []
     monkeypatch.setattr(launch, "reap", lambda queue: reaped.append(queue) or {"removed": 0, "kept": []})
     root = tmp_path / "active"
@@ -339,6 +340,9 @@ def test_at37_launcher_starts_two_smoke_runs_and_resumes_after_a_pause(tmp_path,
     private_temporary.parent.chmod(0o700)
     state = launch.Launcher(site, batch, host=host).finish()
     assert private_temporary.stat().st_mode & 0o777 == 0o644
+    review = launcher.paths("ldm4geo-s7")["service"] / "blind-review-required.json"
+    assert json.loads(review.read_text())["review_sha256"] == "a" * 64
+    assert ("blind-review-required.json", 991) in host.chowned  # the evaluator must read it at unseal
     assert private_temporary.parent.stat().st_mode & 0o777 == 0o755
     freezes = [a for _, a in host.spawned[5:]]
     assert len(freezes) == 2 and all(u == "evaluator" for u, _ in host.spawned[5:])
