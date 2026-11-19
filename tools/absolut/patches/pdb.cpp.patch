@@ -1,0 +1,34 @@
+--- a/src/Absolut/pdb.cpp
++++ b/src/Absolut/pdb.cpp
+@@ -1,5 +1,8 @@
++#include <cstring>
+ #include "pdb.h"
++#ifndef NOQT
+ #include "ui_pdb.h"
++#endif
+ #include "discretize.h"
+ #include "antigenLib.h" // for testing
+ #include "ymir.h" // for testing
+@@ -339,6 +342,7 @@
+ }
+ 
+ 
++#ifndef NOQT
+ void testDiscretization(){
+ //    //discretization a("5TZ2","C",5.25, "FuC");
+     discretization a("3ULU","A",5.25, "FuC");
+@@ -374,6 +378,8 @@
+ 
+ 
+ 
++#endif
++#ifndef NOQT
+ PDB::PDB(QWidget *parent) :
+     QWidget(parent), discretization(),
+     ui(new Ui::PDB)
+@@ -743,3 +749,5 @@
+ 
+     return fLog.str();
+ }
++
++#endif // NOQT

@@ -1,0 +1,40 @@
+Number of subchains:
+2
+Structure of each subchain:
+	133152	SULURLDRUDUDRLLUDRLDDULDURLDURSDLLSLSDRLRLRLD
+	145759	UDRUDSLLUDRDLLDUDLRDLDUSUDRDURRUSDSLRLSSLSULDLURSDSSSUSUUDSRULSURSDRULR
+AA sequence (concatenated, all subchains):
+SPDRPWNPPTFSPALLVVTEGDNATFTCSFSNTSESFVLNWYRMSPQTDKLAAFPEDRSQPGQDSRFRVTQLPNGRDFHMSVVRARRNDSGTYLCGAISLAPKAQIKESLRAELRVTE
+=> List additional inaccessible positions
+141472	32	34	34
+145568	32	34	35
+149789	29	36	36
+153823	31	35	37
+153887	31	36	37
+157855	31	34	38
+157917	29	35	38
+157982	30	36	38
+157984	32	36	38
+162078	30	36	39
+/n=> Among which the glycans are:
+/n
+
+C++ code to add this structure in the library:
+string agStruct;
+string agSeq;
+int startPos = -1;
+vector<int> blockV;
+
+// This part can be copied into AntigenLib.cpp
+if(codeID == str2int("5GGR_Y_FuC_5.25")){
+	 agStruct = string("SULURLDRUDUDRLLUDRLDDULDURLDURSDLLSLSDRLRLRLD+UDRUDSLLUDRDLLDUDLRDLDUSUDRDURRUSDSLRLSSLSULDLURSDSSSUSUUDSRULSURSDRULR");
+	 agSeq = string("SPDRPWNPPTFSPALLVVTEGDNATFTCSFSNTSESFVLNWYRMSPQTDKLAAFPEDRSQPGQDSRFRVTQLPNGRDFHMSVVRARRNDSGTYLCGAISLAPKAQIKESLRAELRVTE");
+	 startPos = 133152;
+	 blockV = {141472, 145568, 149789, 153823, 153887, 157855, 157917, 157982, 157984, 162078};
+
+}
+
+// This part can be used to run in any C++ code (then remove the 'if(codeID == str2int())' line)
+superProtein* sp = new superProtein(agStruct, startPos);
+sp->setAAs(agSeq);
+std::pair<superProtein*, vector<int> > Antigen(sp, blockV);
