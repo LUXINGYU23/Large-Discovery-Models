@@ -636,6 +636,7 @@ class Launcher:
             state["freeze_exit_codes"] = codes
             self.save_state(state)
             raise RuntimeError("freeze or validation failed; inspect the private freeze.log files")
+        state.pop("freeze_exit_codes", None)  # left by an earlier failed attempt
         state["frozen_list"] = str(self.frozen_list())
         for entry in state["runs"].values():
             self.host.stop(entry["service"]["pid"])
