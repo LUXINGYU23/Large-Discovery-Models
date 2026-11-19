@@ -29,7 +29,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ldm_tts.harness.pi import PiForkSource
 from ldm_tts.harness.research_store import snapshot_fork
 from ..core.candidate import validate_source
-from .controller import SCHEDULING, Config, Start, profile_name, session_round, turn_root
+from .controller import SCHEDULING, Config, Start, actual_session_round, profile_name, session_round, turn_root
 from .ledger import read, validate as validate_record
 
 SCHEMA = "rsi-checkpoint-v1"
@@ -78,20 +78,33 @@ def _sessions(run, config, round_index, target):
     for branch in range(config.policy.branches):
         root = turn_root(run, config, round_index, branch)
         commits = [json.loads(p.read_text()) for p in sorted((root / "turns").glob("*/turn_committed.json"))]
-        if not commits:
+        receipt_path = run / "proposals" / f"round_{round_index:02d}" / f"branch_{branch}.json"
+        receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else {}
+        failed = receipt.get("status") == "no_submission"
+        if not commits and not failed:
             continue
-        last = max(commits, key=lambda c: c["roundIndex"])
-        if len({c["profileId"] for c in commits}) != 1 or _PROFILE.fullmatch(last["profileId"]) is None:
-            raise ValueError("branch turn root holds an unexpected session profile")
-        if last["roundIndex"] != round_index:
-            raise ValueError("branch session is not at the checkpoint round; take checkpoints during the run")
-        cursor = last["historyToSeq"]
-        if cursor != session_round(config, round_index) + 1:
+        if commits:
+            last = max(commits, key=lambda c: c["roundIndex"])
+            if len({c["profileId"] for c in commits}) != 1 or _PROFILE.fullmatch(last["profileId"]) is None:
+                raise ValueError("branch turn root holds an unexpected session profile")
+            if last["roundIndex"] != round_index and not (failed and not receipt["cursor_advanced"]):
+                raise ValueError("branch session is not at the checkpoint round; take checkpoints during the run")
+            cursor, profile = last["historyToSeq"], last["profileId"]
+            session = _inside(root, root / last["artifacts"]["session"])
+        else:
+            # A branch may fail its first turn before the sidecar writes any commit.
+            profile = profile_name(branch)
+            candidates = list((root / "sessions" / profile / "pi-session").glob("*.jsonl"))
+            if len(candidates) != 1:
+                raise ValueError("cannot identify the failed branch's live session")
+            session = _inside(root, candidates[0])
+            cursor = 0
+        expected = actual_session_round(run, config, round_index, branch) + (not failed or receipt["cursor_advanced"])
+        if cursor != expected:
             raise ValueError("branch session history differs from the controller schedule")
-        session = _inside(root, root / last["artifacts"]["session"])
-        workspace = _inside(root, root / "sessions" / last["profileId"] / "workspace")
+        workspace = _inside(root, root / "sessions" / profile / "workspace")
         fork = snapshot_fork(session, workspace, target / profile_name(branch), cursor)
-        found[profile_name(branch)] = {"sidecar_profile": last["profileId"], **fork.to_dict()}
+        found[profile_name(branch)] = {"sidecar_profile": profile, **fork.to_dict()}
     if found and len(found) != config.policy.branches:
         raise ValueError("some branches have no committed session to checkpoint")
     return found
@@ -112,14 +125,19 @@ def take_checkpoint(run, round_index):
     rows = read(run / "ledger.jsonl")
     prefix = [r for r in rows if r["round"] <= round_index]
     lines = (run / "ledger.jsonl").read_bytes().splitlines(keepends=True)[:len(prefix)]
+    selection = json.loads((run / "selection" / f"round_{round_index:02d}.json").read_text())
+    selected = selection["selected"]
+    measured = [r for r in prefix if r["round"] == round_index]
     if (rows[:len(prefix)] != prefix or [json.loads(line) for line in lines] != prefix
-            or sum(r["round"] == round_index for r in prefix) != config.batch):
+            or [r["program_id"] for r in measured] != [p["program_id"] for p in selected]):
         raise ValueError("ledger prefix of the checkpoint round is incomplete")
     staging = final.with_name(final.name + ".staging")
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
     _put(staging / "ledger-prefix.jsonl", b"".join(lines))
+    _put(staging / "selection" / f"round_{round_index:02d}.json",
+         (run / "selection" / f"round_{round_index:02d}.json").read_bytes())
     _put(staging / "candidates.txt", "".join(r["program_id"] + "\n" for r in prefix).encode())
     _put(staging / "source-manifest.json", manifest_body)
     ids = [r["program_id"] for r in prefix]
@@ -190,9 +208,16 @@ def open_checkpoint(path):
     prefix = (path / "ledger-prefix.jsonl").read_bytes()
     records = [validate_record(json.loads(line)) for line in prefix.splitlines()]
     t = snapshot["round"]
-    if (_sha(prefix) != snapshot["ledger_prefix_sha256"] or len(records) != snapshot["records"]
-            or [r["seq"] for r in records] != list(range(len(records))) or records[-1]["round"] != t):
+    if (not records or _sha(prefix) != snapshot["ledger_prefix_sha256"] or len(records) != snapshot["records"]
+            or [r["seq"] for r in records] != list(range(len(records))) or records[-1]["round"] > t):
         raise ValueError("checkpoint ledger prefix differs from its snapshot")
+    selection = path / "selection" / f"round_{t:02d}.json"
+    if selection.is_file():
+        chosen = json.loads(selection.read_text())["selected"]
+        if [r["program_id"] for r in records if r["round"] == t] != [p["program_id"] for p in chosen]:
+            raise ValueError("checkpoint round selection differs from its ledger")
+    elif records[-1]["round"] != t:
+        raise ValueError("checkpoint lacks its completed round selection")
     manifest = (path / "source-manifest.json").read_bytes()
     if _sha(manifest) != snapshot["source_manifest_sha256"]:
         raise ValueError("checkpoint source manifest differs from its snapshot")
@@ -273,8 +298,6 @@ def place_forks(controller, checkpoint):
         expected = PiForkSource(entry["sessionSha256"], entry["workspaceSha256"], entry["historyCursor"])
         if _PROFILE.fullmatch(entry["sidecar_profile"]) is None:
             raise ValueError("invalid sidecar profile in checkpoint")
-        if expected.history_cursor != session_round(config, first, controller.start):
-            raise ValueError("forked session history differs from the continuation schedule")
         source = checkpoint.path / "sessions" / profile_name(branch)
         target = controller.turn_root(first, branch) / "fork-sources" / entry["sidecar_profile"]
         if snapshot_fork(source / "session.jsonl", source / "workspace", target, expected.history_cursor) != expected:

@@ -172,6 +172,16 @@ def _digest(value):
     return hashlib.sha256(_canonical(value).encode()).hexdigest()
 
 
+class NoSubmission(Exception):
+    """A completed branch turn yielded no accepted proposals; preserve its usage."""
+    def __init__(self, usage, *, cursor_advanced=False):
+        if type(cursor_advanced) is not bool:
+            raise ValueError("cursor_advanced must be a boolean")
+        super().__init__("no accepted submission")
+        self.usage = usage
+        self.cursor_advanced = cursor_advanced
+
+
 def _canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
@@ -205,6 +215,29 @@ def session_round(config, round_index, start=None, turn_index=0):
     if start is not None and start.fresh_sessions and round_index >= start.round:
         first = max(first, start.round)
     return (round_index - first) * config.policy.turns_per_round + turn_index
+
+
+def actual_session_round(root, config, round_index, branch, start=None):
+    """Uncommitted no-submission turns do not advance the sidecar's cursor."""
+    nominal = session_round(config, round_index, start)
+    current = turn_root(root, config, round_index, branch)
+    first = round_index - nominal
+    if start is not None and not start.fresh_sessions and round_index >= start.round:
+        fork = current / "fork-sources" / profile_name(branch) / "snapshot.json"
+        if fork.is_file():
+            nominal = json.loads(fork.read_text())["historyCursor"] + round_index - start.round
+            first = start.round
+    for previous in range(max(1, first), round_index):
+        if turn_root(root, config, previous, branch) != current:
+            continue
+        receipt = Path(root) / "proposals" / f"round_{previous:02d}" / f"branch_{branch}.json"
+        if receipt.is_file():
+            value = json.loads(receipt.read_text())
+            if value.get("status") == "no_submission" and not value.get("cursor_advanced", False):
+                nominal -= 1
+    if nominal < 0:
+        raise ValueError("no-submission receipts produce a negative session cursor")
+    return nominal
 
 
 def turn_root(root, config, round_index, branch):
@@ -471,7 +504,7 @@ class Controller:
         values, usage = self.agent.propose(
             branch=branch, profile=profile_name(branch), round_index=round_index, turn_index=0,
             epoch=harness_epoch(self.config, round_index), count=self.config.proposals_per_branch,
-            session_round=session_round(self.config, round_index, self.start),
+            session_round=actual_session_round(self.root, self.config, round_index, branch, self.start),
             message=job["message"], view=list(job["view"]), turn_root=job["turn_root"],
             candidate_root=self.root, known=known, seed=self.config.seed,
             harness_seconds=self.config.harness_seconds)
@@ -528,25 +561,31 @@ class Controller:
             for branch in pending:
                 try:
                     results[branch] = futures[branch].result()
+                except NoSubmission as exc:
+                    results[branch] = (None, exc.usage, exc.cursor_advanced)
                 except Exception as exc:
                     errors[branch] = exc
         for branch in sorted(results):  # admission order is the branch order, never completion order
-            values, usage = results[branch]
+            result = results[branch]
+            values, usage = result[:2]
             try:
-                rows = self._admit(values, branch, jobs[branch]["view"], claimed)
+                rows = [] if values is None else self._admit(values, branch, jobs[branch]["view"], claimed)
                 _validate_usage(usage)
             except (ValueError, SyntaxError, UnicodeError) as exc:
                 errors[branch] = exc
                 continue
             claimed.update(r["program_id"] for r in rows)
             saved[branch] = {"message_sha256": jobs[branch]["sha"], "proposals": rows, "usage": usage}
+            if values is None:
+                saved[branch].update(status="no_submission", cursor_advanced=result[2])
             atomic_json_write(jobs[branch]["receipt"], saved[branch])
         if errors:
             raise errors[min(errors)]
         all_rows, usages, seen = [], {}, set(known)
         for branch in sorted(saved):
             rows, usage = saved[branch]["proposals"], _validate_usage(saved[branch]["usage"])
-            if len(rows) != self.config.proposals_per_branch:
+            status = saved[branch].get("status", "accepted")
+            if status not in ("accepted", "no_submission") or (status == "accepted" and len(rows) != self.config.proposals_per_branch) or (status == "no_submission" and (rows or type(saved[branch].get("cursor_advanced")) is not bool)):
                 raise ValueError("saved proposal batch is incomplete")
             for row in rows:
                 if row["branch"] != branch or row["program_id"] in seen:
@@ -563,14 +602,14 @@ class Controller:
 
     def _selection(self, round_index, pool, prefix, existing):
         path = self.root / "selection" / f"round_{round_index:02d}.json"
-        batch, reserve = self.config.batch, self.config.reserved_per_branch
+        batch, reserve = min(self.config.batch, len(pool)), self.config.reserved_per_branch
         if path.exists():
             chosen = json.loads(path.read_text())
         else:
             if any(r["round"] == round_index for r in existing):
                 raise ValueError("selected batch missing during recovery")
-            scored = self.select(pool, prefix, batch)
-            chosen = {**scored, "selected": reserve_and_rank(scored["predictions"], batch, reserve)}
+            scored = self.select(pool, prefix, batch) if batch else {"predictions": [], "selected": []}
+            chosen = {**scored, "selected": reserve_and_rank(scored["predictions"], batch, reserve) if batch else []}
             atomic_json_write(path, chosen)
         selected = chosen["selected"]
         pool_map = {p["program_id"]: p["branch"] for p in pool}
@@ -582,7 +621,7 @@ class Controller:
                 or any(pool_map.get(p["program_id"]) != p["branch"] for p in selected)
                 or Counter(p["branch"] for p in selected if p["selection"] == "reserved")
                 != Counter({b: min(reserve, n) for b, n in per_branch.items() if min(reserve, n)})
-                or reserve_and_rank(chosen["predictions"], batch, reserve) != selected):
+                or (reserve_and_rank(chosen["predictions"], batch, reserve) if batch else []) != selected):
             raise ValueError("selection receipt is inconsistent with proposal pool")
         return selected
 

@@ -179,6 +179,20 @@ class RunMeasures:
                 row[key] = None if usage is None else sum(u.get(key, 0) for u in usage.values())
             rounds[t] = row
         self.rounds = rounds
+        self.no_submission_by_round = {}
+        for folder in sorted((run.path / "proposals").glob("round_*")):
+            if not folder.is_dir():
+                continue
+            try:
+                number = int(folder.name.removeprefix("round_"))
+            except ValueError:
+                continue
+            count = sum(run._json(path.relative_to(run.path)).get("status") == "no_submission"
+                        for path in sorted(folder.glob("branch_*.json")))
+            self.no_submission_by_round[number] = count
+            if number in self.rounds:
+                self.rounds[number]["no_submission_turns"] = count
+        self.no_submission_turns = sum(self.no_submission_by_round.values())
         self.compactions_by_branch = Counter()
         for usage in run.usage.values():
             for branch, u in usage.items():

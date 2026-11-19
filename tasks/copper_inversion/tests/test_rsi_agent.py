@@ -124,7 +124,8 @@ class FakeSidecar:
         commit.parent.mkdir(parents=True, exist_ok=True)
         commit.write_text(json.dumps({"profileId": self.profile, "roundIndex": turn.round_index,
                                       "historyFromSeq": turn.history_from_seq, "historyToSeq": turn.history_to_seq,
-                                      "usage": {"providerCalls": 2}}))
+                                      "usage": {"providerCalls": 2},
+                                      "artifacts": {"session": str(self.session.relative_to(self.root))}}))
         self.cursor = turn.history_to_seq
         return (HarnessTurnResult(self.profile, self.session_id, turn.turn_id, turn.round_index,
                                   turn.history_from_seq, turn.history_to_seq, turn.history_digest, "0" * 64,
@@ -434,3 +435,158 @@ def test_live_audit_expects_the_manifest_model():
     assert expected_provider(manifest) == ("m", "medium")
     assert expected_provider({"model": {**manifest["model"], "thinking": "off"}}) == ("m", None)
     assert expected_provider(manifest, "high") == ("m", "high")
+
+
+class NonSubmittingSidecar(FakeSidecar):
+    """Simulate the sidecar's per-turn recovery block with saved provider traces."""
+    def run_turn(self, turns, *, submission_validator, recovery_timeout_seconds):
+        (turn,) = turns
+        if (turn.round_index, self.profile) not in self.log.fail_turns:
+            return super().run_turn(turns, submission_validator=submission_validator,
+                                    recovery_timeout_seconds=recovery_timeout_seconds)
+        if turn.history_from_seq != self.cursor:
+            raise HarnessError("history cursor mismatch")
+        self.froms.append(turn.history_from_seq)
+        turn_dir = self.root / "sessions" / self.profile / "turns" / turn.turn_id
+        if (turn_dir / "history-recovery.json").exists():
+            self.log.events.append(("blocked_replay", self.profile, turn.round_index))
+            raise HarnessError("Error: " + agent_module.EXHAUSTED, code="sidecar_error",
+                               turn_usage={self.profile:{"providerCalls":2}})
+        self.log.events.append(("non_submission", self.profile, turn.round_index))
+        provider = turn_dir / "provider"
+        provider.mkdir(parents=True, exist_ok=True)
+        for n, name in enumerate(("research", "compaction"), 1):
+            stem = provider / f"{turn.turn_id}-provider-{n}"
+            Path(f"{stem}.authorized.json").write_text("{}")
+            shutil.copy(FIXTURES / f"{name}.response.bin", f"{stem}.response.bin")
+        (turn_dir / "history-events.jsonl").write_text(json.dumps({"type":"history_blocked"}) + "\n")
+        (turn_dir / "history-recovery.json").write_text(json.dumps({"continuations":2,
+            "failure":{"message":agent_module.EXHAUSTED,"compactionId":None}}))
+        with self.session.open("a") as stream:
+            stream.write(json.dumps({"turn":turn.turn_id,"failed":True}) + "\n")
+        raise HarnessError("Error: " + agent_module.EXHAUSTED, code="sidecar_error",
+                           turn_usage={self.profile:{"providerCalls":2}})
+
+
+class NonSubmittingAgent(FakePiAgent):
+    def _new_client(self, turn_root, config, name):
+        return NonSubmittingSidecar(turn_root, config, name, self.log, self.fail)
+
+
+def test_no_submission_keeps_session_usage_and_replays_after_crash(tmp_path):
+    log = Log(); log.fail_turns = {(2, "researcher_1")}
+    agent = NonSubmittingAgent(log, tmp=tmp_path, arm="accumulated", reset=2)
+    class FailOnce(ScriptedEvaluator):
+        failed = False
+        def evaluate_source(self, path):
+            if not self.failed and (tmp_path / "run/proposals/round_02/branch_1.json").is_file():
+                self.failed = True
+                raise RuntimeError("injected evaluation interruption")
+            return super().evaluate_source(path)
+    run = tmp_path / "run"
+    ctl = controller(run, agent, "accumulated", 2, 3)
+    ctl.evaluator = FailOnce()
+    with pytest.raises(RuntimeError, match="evaluation interruption"):
+        ctl.run()
+    receipt = json.loads((run / "proposals/round_02/branch_1.json").read_text())
+    assert receipt["status"] == "no_submission" and receipt["proposals"] == []
+    assert receipt["usage"]["requests"] == 2 and not receipt["cursor_advanced"]
+    before = sum(e[0] == "non_submission" for e in log.events)
+    result = ctl.run(resume=True)
+    assert result["rounds_completed"] == 3 and result["charged_records"] == 13
+    assert sum(e[0] == "non_submission" for e in log.events) == before == 1
+    client = next(c for c in log.clients if c.profile == "researcher_1")
+    assert client.froms == [0, 1, 1]  # failed turn did not advance its existing session
+    assert len([e for e in log.events if e[0] == "start" and e[1] == "researcher_1"]) == 1
+    assert json.loads((run / "usage/round_02.json").read_text())["by_profile"]["researcher_1"]["requests"] == 2
+    assert verify(run)["status"] == "passed"
+    from tasks.copper_inversion.experiments.rsi.analysis.rundir import Run
+    from tasks.copper_inversion.experiments.rsi.analysis.measures import RunMeasures
+    from tasks.copper_inversion.experiments.rsi.analysis.bundle import Analysis
+    item = Run(run); measures = RunMeasures(item)
+    assert measures.no_submission_turns == 1 and measures.rounds[2]["no_submission_turns"] == 1
+    analysis = Analysis.__new__(Analysis); analysis.measures = {item.run_id: measures}
+    analysis.arm_runs = lambda experiment, arm: [item] if (experiment, arm) == ("M1", "accumulated") else []
+    assert analysis.process()["accumulated"]["no_submission_turns"] == 1
+    agent.close()
+
+
+@pytest.mark.parametrize("failed_branches, expected", [([0,1,2], 2), ([0,1,2,3], 0)])
+def test_small_or_empty_pool_leaves_slots_unspent(tmp_path, failed_branches, expected):
+    log = Log(); log.fail_turns = {(1, f"researcher_{b}") for b in failed_branches}
+    agent = NonSubmittingAgent(log, tmp=tmp_path)
+    run = tmp_path / "run"; ctl = controller(run, agent, "ldm4geo", 2, 2)
+    result = ctl.run()
+    selected = json.loads((run/"selection/round_01.json").read_text())["selected"]
+    assert len(selected) == expected
+    assert result["charged_records"] == 1 + expected + 4
+    assert result["rounds_completed"] == 2
+    for b in failed_branches:
+        assert json.loads((run/f"proposals/round_01/branch_{b}.json").read_text())["status"] == "no_submission"
+    assert verify(run)["status"] == "passed"
+    agent.close()
+
+
+def test_exhaustion_requires_exact_sidecar_code_and_durable_state(tmp_path):
+    turn = tmp_path / "turn"; turn.mkdir()
+    (turn/"history-recovery.json").write_text(json.dumps({"continuations":2,
+        "failure":{"message":agent_module.EXHAUSTED,"compactionId":None}}))
+    usage = {"researcher_0":{"providerCalls":2}}
+    correct = HarnessError("Error: " + agent_module.EXHAUSTED, code="sidecar_error", turn_usage=usage)
+    assert agent_module._exhausted_submission(correct, turn, "researcher_0")
+    assert not agent_module._exhausted_submission(HarnessError(str(correct), code="network_error", turn_usage=usage), turn, "researcher_0")
+    assert not agent_module._exhausted_submission(HarnessError("provider failed", code="sidecar_error", turn_usage=usage), turn, "researcher_0")
+    assert not agent_module._exhausted_submission(HarnessError(str(correct), code="sidecar_error"), turn, "researcher_0")
+
+
+@pytest.mark.parametrize("failed_branches", [[1], [0,1,2,3]])
+def test_checkpoint_and_conversation_fork_after_no_submission(tmp_path, failed_branches):
+    from tasks.copper_inversion.rsi import continuation
+    log = Log(); log.fail_turns = {(1, f"researcher_{b}") for b in failed_branches}
+    agent = NonSubmittingAgent(log, tmp=tmp_path, arm="accumulated", reset=2)
+    run = tmp_path / "source"
+    wrapped = continuation.CheckpointingAgent(agent, run, 1)
+    original = controller(run, wrapped, "accumulated", 2, 2)
+    original.run()
+    checkpoint = continuation.open_checkpoint(run / "checkpoints/round_01")
+    assert len(checkpoint.records) == 1 + (0 if len(failed_branches) == 4 else 4)
+    for branch in range(4):
+        entry = checkpoint.snapshot["sessions"][f"researcher_{branch}"]
+        assert entry["historyCursor"] == (0 if branch in failed_branches else 1)
+    log.fail_turns.clear()
+    fork_agent = NonSubmittingAgent(log, tmp=tmp_path, arm="accumulated", reset=2)
+    start = continuation.continuation_start(checkpoint, "conversation")
+    dest = tmp_path / "fork"
+    config = Config("accumulated", 7, rounds=2, proposals_per_branch=2, batch=4, reset_period=2, token_cap_input=0)
+    fork = Controller(dest, config, fork_agent, ScriptedEvaluator(), scripted_select,
+                      "Fixed task brief.", {"synthetic_test": True}, start=start)
+    result = continuation.run_continuation(fork, checkpoint, "conversation")
+    assert result["rounds_completed"] == 2
+    for branch in range(4):
+        peer = next(c for c in log.clients if c.profile == f"researcher_{branch}" and c.root.is_relative_to(dest))
+        assert peer.froms == [0 if branch in failed_branches else 1]
+    agent.close(); fork_agent.close()
+
+
+def test_resume_after_crash_before_failed_turn_receipt(tmp_path):
+    log = Log(); log.fail_turns = {(2, "researcher_1")}
+    agent = NonSubmittingAgent(log, tmp=tmp_path, arm="accumulated", reset=2)
+    class Interrupt(ScriptedEvaluator):
+        def evaluate_source(self, path):
+            if (tmp_path/"run/proposals/round_02/branch_1.json").is_file():
+                raise RuntimeError("interrupt")
+            return super().evaluate_source(path)
+    run = tmp_path/"run"; first = controller(run, agent, "accumulated", 2, 3); first.evaluator = Interrupt()
+    with pytest.raises(RuntimeError, match="interrupt"): first.run()
+    (run/"proposals/round_02/branch_1.json").unlink()  # crash before the controller could publish this receipt
+    agent.close()
+    resumed_agent = NonSubmittingAgent(log, tmp=tmp_path, arm="accumulated", reset=2)
+    resumed = controller(run, resumed_agent, "accumulated", 2, 3)
+    assert resumed.run(resume=True)["rounds_completed"] == 3
+    assert sum(e[0] == "non_submission" for e in log.events) == 1  # no extra provider request
+    assert sum(e[0] == "blocked_replay" for e in log.events) == 1
+    peers = [c for c in log.clients if c.profile == "researcher_1"]
+    assert len(peers) == 2 and peers[0].session_id == peers[1].session_id
+    assert peers[1].froms == [1, 1]
+    assert verify(run)["status"] == "passed"
+    resumed_agent.close()

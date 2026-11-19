@@ -601,6 +601,8 @@ class Analysis:
                                                        "cached_input_tokens", "output_tokens", "compactions")}
             out[arm]["train_iou_spearman"] = {"mean": _mean([m.train_iou_spearman for m in ms]),
                                               "per_run": [m.train_iou_spearman for m in ms]}
+            out[arm]["no_submission_turns"] = sum(m.no_submission_turns for m in ms)
+            out[arm]["no_submission_turns_per_run"] = [m.no_submission_turns for m in ms]
             out[arm]["compactions_per_run"] = _mean([sum(m.compactions_by_branch.values()) for m in ms])
             out[arm]["free_text_chars_mean"] = _mean([p["free_text_chars"] for m in ms for p in m.programs.values()])
             out[arm]["feature_spaces"] = sorted({m.feature_version for m in ms})
@@ -658,7 +660,7 @@ class Analysis:
         rows = []
         keys = ("best_risk", "dispersion", "active_families", "coverage", "coverage_n", "edit_size", "edit_n",
                 "optimism", "holder_train_iou", "input_tokens", "cached_input_tokens", "output_tokens",
-                "compactions", "requests", "proposals")
+                "compactions", "requests", "proposals", "no_submission_turns")
         for run in sorted(self.runs, key=lambda r: (r.experiment, r.run_id)):
             for t, r in sorted(self.measures[run.run_id].rounds.items()):
                 rows.append({"experiment": run.experiment, "run_id": run.run_id, "round": t,

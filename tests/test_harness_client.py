@@ -346,6 +346,7 @@ def test_protocol_version_matches_sidecar_package_and_lock():
 @pytest.mark.parametrize("failure", ["measured", "unknown", "wrong-turn"])
 def test_failed_turn_preserves_known_usage_and_checks_identity(tmp_path, monkeypatch, failure):
     monkeypatch.setenv("HARNESS_TEST_TURN_FAILURE", failure)
+    monkeypatch.setenv("HARNESS_TEST_ERROR_CODE", "sidecar_error")
     config = HarnessPoolConfig(
         artifact_root=tmp_path,
         profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
@@ -363,6 +364,7 @@ def test_failed_turn_preserves_known_usage_and_checks_identity(tmp_path, monkeyp
         with pytest.raises(HarnessError) as caught:
             client.run_turn((turn,), submission_validator=lambda _: HarnessSubmissionValidation())
     usage = caught.value.turn_usage["research"]
+    assert caught.value.code == (None if failure == "wrong-turn" else "sidecar_error")
     assert usage["validationSubmissions"] == 0
     if failure == "measured":
         assert usage == {"providerCalls": 3, "toolCalls": {"bash": 2}, "artifactBytes": 120, "validationSubmissions": 0}

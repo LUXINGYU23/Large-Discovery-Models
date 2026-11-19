@@ -56,6 +56,8 @@ for line in sys.stdin:
         failure = os.environ.get("HARNESS_TEST_TURN_FAILURE")
         if failure:
             error = {"message": "provider 502"}
+            if os.environ.get("HARNESS_TEST_ERROR_CODE"):
+                error["code"] = os.environ["HARNESS_TEST_ERROR_CODE"]
             if failure != "unknown":
                 error["turnUsage"] = [{
                     "profileId": item["profileId"],
