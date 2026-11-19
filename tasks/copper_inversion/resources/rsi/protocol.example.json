@@ -1,4 +1,119 @@
 {
+  "analysis": {
+    "checkpoint_experiment": "M1",
+    "checkpoint_round": 10,
+    "freeze_prefixes": {
+      "E1": [
+        "full",
+        12,
+        14,
+        15,
+        16,
+        18
+      ],
+      "E2": [
+        "full"
+      ],
+      "E3": [
+        "full"
+      ],
+      "F1": [
+        "full"
+      ],
+      "M1": [
+        "full",
+        5,
+        10
+      ],
+      "X1": [
+        "full"
+      ]
+    },
+    "tagger": {
+      "cluster_reference": null,
+      "mode": "tags",
+      "rules": {
+        "rules": [
+          {
+            "description": "Fast marching, eikonal or travel-time front propagation.",
+            "name": "fast_marching",
+            "patterns": [
+              "fast_?march",
+              "\\bfmm\\b",
+              "skfmm",
+              "eikonal",
+              "travel_?time"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "A temperature-dependent or Metropolis search loop.",
+            "name": "annealing",
+            "patterns": [
+              "anneal",
+              "temperature",
+              "\\btemp\\b",
+              "metropolis"
+            ],
+            "require_loop": true,
+            "top_level": true
+          },
+          {
+            "description": "Random sampling or search performed in a loop.",
+            "name": "random_search",
+            "patterns": [
+              "^(random|rand|randn|uniform|normal|choice|integers|default_rng)$"
+            ],
+            "require_loop": true,
+            "top_level": true
+          },
+          {
+            "description": "Implicit field construction or interpolation.",
+            "name": "implicit_interpolation",
+            "patterns": [
+              "rbf",
+              "griddata",
+              "krig",
+              "\\bidw\\b",
+              "interpolat",
+              "implicit"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "A linear, least-squares or numerical optimization call.",
+            "name": "convex_optimization",
+            "patterns": [
+              "^(linprog|lsq_linear|nnls|lstsq|least_squares|minimize|cvxpy|quadprog)$"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "Signed distance or level-set geometry.",
+            "name": "level_set",
+            "patterns": [
+              "distance_transform",
+              "signed_distance",
+              "level_?set",
+              "\\bsdf\\b"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "Morphological postprocessing of a binary volume.",
+            "name": "morphology",
+            "patterns": [
+              "binary_(closing|opening|dilation|erosion|fill_holes)",
+              "morpholog",
+              "^label$"
+            ],
+            "top_level": false
+          }
+        ],
+        "version": "draft-v0"
+      }
+    }
+  },
   "arms": {
     "accumulated": {
       "boundary_payload": "history",

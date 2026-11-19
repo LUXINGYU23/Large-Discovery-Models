@@ -126,8 +126,10 @@ def check_batch(batch, protocol, policy):
             raise PlanError("judge is not defined by the protocol: " + str(run["judge"]))
         if allowed is not None and run["seed"] not in allowed:
             raise PlanError(f"seed {run['seed']} is not in the protocol seed table for {experiment}")
-    if not protocols.is_development(protocol):
-        check_frozen_prefixes(batch)
+    if experiment not in protocols.DEVELOPMENT_EXPERIMENTS:
+        analysis = protocols.require_analysis(protocol)
+        if not protocols.is_development(protocol):
+            check_frozen_prefixes(batch, analysis)
     names = [run_id(experiment, run) for run in batch["runs"]]
     if len(set(names)) != len(names):
         raise PlanError("a run appears twice in the batch")
@@ -157,17 +159,20 @@ def check_batch(batch, protocol, policy):
             "seeds": sorted({s for s, _ in next(iter(seed_sets.values()))}), "agent_sessions": sessions}
 
 
-def check_frozen_prefixes(batch):
+def check_frozen_prefixes(batch, analysis=None):
     """A formal batch freezes exactly the prefixes the G3-frozen analysis config names for its
     experiment, and only M1 batches take checkpoints (at the config's checkpoint round)."""
     from tasks.copper_inversion.experiments.rsi.analysis.bundle import DEFAULTS
-    expected = DEFAULTS["freeze_prefixes"].get(batch["experiment"])
+    config = analysis if analysis is not None else DEFAULTS
+    expected = config["freeze_prefixes"].get(batch["experiment"])
+    if analysis is not None and expected is None:
+        raise PlanError("experiment lacks frozen prefixes in analysis configuration")
     if expected is not None and sorted(batch.get("prefixes", [FULL]), key=str) != sorted(expected, key=str):
         raise PlanError(f"{batch['experiment']} batches freeze prefixes {expected} (analysis config)")
     ck = batch.get("checkpoint_round")
-    if ck is not None and (batch["experiment"] != DEFAULTS["checkpoint_experiment"] or ck != DEFAULTS["checkpoint_round"]):
-        raise PlanError(f"only {DEFAULTS['checkpoint_experiment']} batches take checkpoints, at round "
-                        f"{DEFAULTS['checkpoint_round']}")
+    if ck is not None and (batch["experiment"] != config["checkpoint_experiment"] or ck != config["checkpoint_round"]):
+        raise PlanError(f"only {config['checkpoint_experiment']} batches take checkpoints, at round "
+                        f"{config['checkpoint_round']}")
 
 
 # Policy ----------------------------------------------------------------------------

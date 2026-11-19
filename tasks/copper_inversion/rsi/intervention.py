@@ -36,20 +36,24 @@ def note_text(target_tag):
     return TEMPLATE.format(design=target_tag.replace("_", " ").replace("-", " "), tag=target_tag)
 
 
-def planted_note(target_tag, round_index, selection_sha256=None):
+def planted_note(target_tag, round_index, selection_sha256=None, *, note_tag=None, tagger_rules_sha256=None):
     """The controller's intervention value for one planted round."""
     value = {"round": round_index, "target_tag": target_tag, "note": note_text(target_tag),
              "selection_rule": SELECTION_RULE}
     if selection_sha256 is not None:
         value["selection_sha256"] = selection_sha256
+    if note_tag is not None:
+        value["note_tag"] = note_tag
+        value["note"] = note_text(note_tag)
+    if tagger_rules_sha256 is not None:
+        value["tagger_rules_sha256"] = tagger_rules_sha256
     return value
 
 
 def validate(value, rounds):
     """A templated note with its selection rule; a rule-less free note is kept only for controller tests."""
     keys = {"round", "target_tag", "note"}
-    if not isinstance(value, dict) or set(value) not in (keys, keys | {"selection_rule"},
-                                                         keys | {"selection_rule", "selection_sha256"}):
+    if not isinstance(value, dict) or not keys <= set(value) or set(value) - (keys | {"selection_rule", "selection_sha256", "note_tag", "tagger_rules_sha256"}):
         raise ValueError("intervention requires round, target_tag and note")
     if type(value["round"]) is not int or not 1 <= value["round"] <= rounds:
         raise ValueError("intervention round is outside the run")
@@ -58,7 +62,7 @@ def validate(value, rounds):
     if not isinstance(value["note"], str) or not 1 <= len(value["note"]) <= 4096:
         raise ValueError("invalid planted note")
     if "selection_rule" in value and (value["selection_rule"] != SELECTION_RULE
-                                      or value["note"] != note_text(value["target_tag"])):
+                                      or value["note"] != note_text(value.get("note_tag", value["target_tag"]))):
         raise ValueError("planted note must be the fixed template for its target tag")
     return dict(value)
 
@@ -66,7 +70,9 @@ def validate(value, rounds):
 def identity(value):
     return {"kind": "planted_note", "round": value["round"], "target_tag": value["target_tag"],
             "note_sha256": hashlib.sha256(value["note"].encode()).hexdigest(),
-            "selection_rule": value.get("selection_rule"), "selection_sha256": value.get("selection_sha256")}
+            "selection_rule": value.get("selection_rule"), "selection_sha256": value.get("selection_sha256"),
+            **({"note_tag": value["note_tag"]} if "note_tag" in value else {}),
+            **({"tagger_rules_sha256": value["tagger_rules_sha256"]} if "tagger_rules_sha256" in value else {})}
 
 
 def choose_target(tag_sets, best_tags, low=SHARE_LOW, high=SHARE_HIGH):
@@ -131,7 +137,48 @@ def select_target(checkpoint, tagger, tagger_identity=None):
     return record
 
 
-def from_checkpoint(checkpoint):
+def select_frozen(checkpoint, protocol):
+    from .continuation import open_checkpoint, SELECTION_FILE
+    from .controller import _best
+    from tasks.copper_inversion.experiments.rsi.analysis.tagger import Tagger, load_cluster_reference, assign_clusters
+    from tasks.copper_inversion.experiments.rsi.analysis.measures import reference_vectors
+    from tasks.copper_inversion.experiments.rsi.analysis.rundir import Run
+    from .render import stripped_source
+    spec = protocol["analysis"]["tagger"]
+    tagger = Tagger(spec["rules"])
+    ck = open_checkpoint(checkpoint) if not hasattr(checkpoint, "snapshot") else checkpoint
+    if ck.source_manifest.get("protocol_id") != __import__("tasks.copper_inversion.rsi.protocol",fromlist=["protocol_id"]).protocol_id(protocol):
+        raise ValueError("checkpoint protocol differs")
+    identity = {"rules_sha256":tagger.sha256, "mode":spec["mode"]}
+    if spec["mode"] == "tags":
+        return select_target(ck, tagger.tags, identity)
+    ref = load_cluster_reference(spec["cluster_reference"], spec["rules"])
+    rounds = list(range(max(1, ck.round-1), ck.round+1))
+    proposals = [json.loads(line) for n in rounds for line in (ck.path / f"proposals/round_{n:02d}.jsonl").read_text().splitlines() if line]
+    best = _best(ck.records)["program_id"]
+    ids = sorted({p["program_id"] for p in proposals} | {best})
+    run = Run(ck.path); vectors, version = reference_vectors(run, ids, ref["feature_version"])
+    assigned = dict(zip(ids, assign_clusters([vectors[p] for p in ids], ref["vectors"], ref["labels"], ref["threshold"])))
+    target = assigned[best]
+    if target == "unassigned" or choose_target([{assigned[p["program_id"]]} for p in proposals], [target]) is None:
+        raise ValueError("no cluster of the best program has a 30-90% share of the last proposals")
+    labels, tags = ref["labels"], ref["tags"]
+    inside = [set(t) for label,t in zip(labels,tags) if label == target]
+    outside = [set(t) for label,t in zip(labels,tags) if label != target]
+    candidates = [r["name"] for r in spec["rules"]["rules"] if any(r["name"] in t for t in inside)]
+    if not candidates or not outside: raise ValueError("cluster has no descriptive tag or comparison cluster")
+    note_tag = min(candidates, key=lambda t: (-(sum(t in x for x in inside)/len(inside)-sum(t in x for x in outside)/len(outside)),t))
+    record = {"selection_rule":SELECTION_RULE, "target_tag":target, "note_tag":note_tag, "planted_round":ck.round+1,
+              "checkpoint_snapshot_sha256":ck.sha256, "proposal_rounds":rounds, "proposals":len(proposals),
+              "best_program":best, "best_tags":[target], "shares":{target:sum(assigned[p["program_id"]] == target for p in proposals)/len(proposals)},
+              "share_bounds":[SHARE_LOW,SHARE_HIGH], "tagger":{**identity,"cluster_reference_sha256":spec["cluster_reference"]["sha256"]}}
+    path = ck.path / SELECTION_FILE
+    if path.exists() and json.loads(path.read_text()) != record: raise ValueError("recorded target selection differs from a fresh selection")
+    if not path.exists(): atomic_json_write(path, record)
+    return record
+
+
+def from_checkpoint(checkpoint, protocol=None):
     """The planted-note intervention for a continuation from this checkpoint."""
     from .continuation import SELECTION_FILE
     path = checkpoint.path / SELECTION_FILE
@@ -144,7 +191,23 @@ def from_checkpoint(checkpoint):
         raise ValueError("target selection belongs to another checkpoint or rule")
     # The selection file sits outside the snapshot hash; its digest in the run manifest shows the
     # target was fixed before the planted runs started.
-    return planted_note(record["target_tag"], checkpoint.round + 1, hashlib.sha256(body).hexdigest())
+    if protocol is not None and "analysis" in protocol:
+        spec = protocol["analysis"]["tagger"]
+        from tasks.copper_inversion.experiments.rsi.analysis.tagger import rules_sha256
+        identity = record.get("tagger") or {}
+        if identity.get("rules_sha256") != rules_sha256(spec["rules"]) or identity.get("mode") != spec["mode"]:
+            raise ValueError("checkpoint target does not match frozen tagger")
+        if spec["mode"] == "clusters":
+            from tasks.copper_inversion.experiments.rsi.analysis.tagger import load_cluster_reference
+            load_cluster_reference(spec["cluster_reference"], spec["rules"])
+            if identity.get("cluster_reference_sha256") != spec["cluster_reference"]["sha256"]:
+                raise ValueError("checkpoint target cluster reference differs")
+        if select_frozen(checkpoint, protocol) != record:
+            raise ValueError("checkpoint target differs from frozen selection")
+    else:
+        identity = record.get("tagger") or {}
+    return planted_note(record["target_tag"], checkpoint.round + 1, hashlib.sha256(body).hexdigest(),
+                        note_tag=record.get("note_tag"), tagger_rules_sha256=identity.get("rules_sha256"))
 
 
 def main(argv=None):
@@ -155,6 +218,20 @@ def main(argv=None):
     select.add_argument("--tagger", default=DEFAULT_TAGGER, help="module:attr (default: %(default)s)")
     select.add_argument("--protocol", type=Path, help="check the tagger against the frozen hashes.tagger")
     args = parser.parse_args(argv)
+    if args.protocol is not None:
+        from . import protocol as protocols
+        protocol = protocols.load(args.protocol)
+        if not protocols.is_development(protocol):
+            protocols.require_analysis(protocol)
+        if "analysis" in protocol:
+            if args.tagger != DEFAULT_TAGGER:
+                raise ValueError("protocol-bound selection does not accept a tagger override")
+            if not protocols.is_development(protocol):
+                protocols.require_frozen(args.protocol, protocol)
+                protocols.verify(protocol, protocols.local_hashes(), skip=protocols.IMAGE_FIELDS + ("embedding_model",))
+            record = select_frozen(args.checkpoint, protocol)
+            print(json.dumps(record, sort_keys=True))
+            return 0
     function, tagger_identity = load_tagger(args.tagger)
     if args.protocol is not None:
         frozen = json.loads(args.protocol.read_text())["hashes"].get("tagger")

@@ -119,7 +119,7 @@ def _continuation(args, protocol, tier):
         raise ValueError("a continuation keeps the source run's seed")
     if mode == "conversation" and source.get("arm") != args.arm:
         raise ValueError("a conversation continuation keeps the source arm")
-    note = interventions.from_checkpoint(checkpoint) if args.planted else None
+    note = interventions.from_checkpoint(checkpoint, protocol if not protocols.is_development(protocol) else None) if args.planted else None
     return {"checkpoint": checkpoint, "mode": mode, "intervention": note,
             "manifest": checkpoint.identity(mode, args.replicate),
             "run_id": continuation_run_id(checkpoint.source_seed, mode, args.replicate, args.planted)}
@@ -187,6 +187,7 @@ def prepare(args):
     if allowed is not None and args.seed not in allowed + protocol["seeds"].get(args.experiment + "_reserve", []):
         raise ValueError("seed is not in the protocol's seed table for this experiment")
     if args.experiment not in protocols.DEVELOPMENT_EXPERIMENTS:
+        protocols.verify_analysis_reference(protocol)
         protocols.require_frozen(args.protocol, protocol)
     current = protocols.local_hashes(resources=RESOURCES, embedding_model_path=args.embedding_model_path)
     # Image digests are checked where they can be resolved: the sidecar below,
