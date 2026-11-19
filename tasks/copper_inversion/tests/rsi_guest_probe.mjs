@@ -20,7 +20,7 @@ const sidecar = {
 if (!Object.values(sidecar).every(Boolean)) throw new Error('sidecar mounts: ' + JSON.stringify(sidecar));
 
 const workspace = '/artifacts/sessions/researcher_0/workspace';
-await mkdir(workspace, {recursive:true});
+await mkdir(workspace + '/.ldm-resources', {recursive:true});  // the guest binds it; PiSession creates it the same way
 await mkdir('/artifacts/sessions/researcher_0/turns/round_001/provider', {recursive:true});
 await writeFile('/artifacts/sessions/researcher_0/turns/round_001/provider/round_001-provider-1.request.bin',
   'own-request-canary');
