@@ -303,6 +303,13 @@ class Host:
 
 # Launcher ----------------------------------------------------------------------------
 
+def _readable(root):
+    """Let the evaluator account read a finished run's public side: the client's writers make 0600 temporaries."""
+    for path in [Path(root), *Path(root).rglob("*")]:
+        if not path.is_symlink():
+            path.chmod(path.stat().st_mode | (0o555 if path.is_dir() else 0o444))
+
+
 class Launcher:
     def __init__(self, site, batch, host=None):
         self.site = json.loads(Path(site).read_text()) if not isinstance(site, dict) else dict(site)
@@ -607,6 +614,8 @@ class Launcher:
                 atomic_json_write(paths["service"] / REVIEW_FILE, {
                     "run_id": name, "review_sha256": blind["review_sha256"], "hits": blind["review_required"]})
         state["reconciliation"] = reconciliation
+        for name, _ in self.runs():
+            _readable(self.paths(name)["run"])
         state["stage"] = "reconciled"
         self.save_state(state)
         prefixes = [str(p) for p in self.batch.get("prefixes", [FULL])]

@@ -151,6 +151,7 @@ def test_freeze_fills_hashes_and_writes_a_timestamped_record(tmp_path, sources):
     assert record["frozen_at"] == later.isoformat(timespec="seconds")
     saved = tmp_path / "protocol.json.freeze-20261115T120500Z.json"
     assert json.loads(saved.read_text()) == record
+    assert {saved.stat().st_mode & 0o777, path.stat().st_mode & 0o777} == {0o644}
     frozen = protocols.load(path)
     assert protocols.require_frozen(path, frozen) == record
     assert record["protocol_id"] == protocols.protocol_id(frozen)

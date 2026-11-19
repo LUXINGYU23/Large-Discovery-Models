@@ -332,7 +332,14 @@ def test_at37_launcher_starts_two_smoke_runs_and_resumes_after_a_pause(tmp_path,
     assert all(entry["status"] == "finished" for entry in state["runs"].values())
     assert host.spawned[-1][1][-1] == "--resume" and len(host.spawned) == 5
     assert state["runs"]["accumulated-s7"]["resumes"] == 1
+    private_temporary = launcher.paths("ldm4geo-s7")["run"] / "notes" / "turn.json"
+    private_temporary.parent.mkdir(parents=True, exist_ok=True)
+    private_temporary.write_text("{}")
+    private_temporary.chmod(0o600)
+    private_temporary.parent.chmod(0o700)
     state = launch.Launcher(site, batch, host=host).finish()
+    assert private_temporary.stat().st_mode & 0o777 == 0o644
+    assert private_temporary.parent.stat().st_mode & 0o777 == 0o755
     freezes = [a for _, a in host.spawned[5:]]
     assert len(freezes) == 2 and all(u == "evaluator" for u, _ in host.spawned[5:])
     assert all("rsi-freeze" in a and a[a.index("--prefix") + 1::2] == ["full", "2"] for a in freezes)

@@ -432,6 +432,8 @@ def freeze(path, *, allow_pending=False, now=None, **sources):
         raise ValueError("a freeze record with this timestamp already exists")
     atomic_json_write(path, frozen)
     atomic_json_write(target, record)
+    for written in (path, target):
+        written.chmod(0o644)  # the evaluator account reads the frozen protocol
     return record
 
 
