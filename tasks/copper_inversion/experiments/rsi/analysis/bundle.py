@@ -15,6 +15,7 @@ import io
 import itertools
 import json
 import math
+import re
 from pathlib import Path
 from statistics import mean
 
@@ -58,11 +59,63 @@ DEFAULTS = {
 }
 
 
-def load_config(path=None):
-    config = copy.deepcopy(DEFAULTS)
-    if path is not None:
-        config.update(json.loads(Path(path).read_text()))
+def load_config(path=None, protocol=None):
+    supplied = json.loads(Path(path).read_text()) if path is not None else {}
+    if protocol is None:
+        config = copy.deepcopy(DEFAULTS)
+        config.update(supplied)
+        return config
+    from ....rsi import protocol as protocols
+    from .tagger import load_cluster_reference
+    p = protocols.load(protocol) if isinstance(protocol, (str, Path)) else protocols.validate(protocol)
+    formal = not protocols.is_development(p)
+    if formal:
+        protocols.require_analysis(p)
+        if isinstance(protocol, (str, Path)):
+            protocols.require_frozen(protocol, p)
+            protocols.verify(p, protocols.local_hashes(), skip=protocols.IMAGE_FIELDS + ("embedding_model",))
+        missing = set(DEFAULTS) - {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger_rules", "family"} - set(supplied)
+        if missing: raise ValueError("formal analysis needs explicit statistical configuration: " + ", ".join(sorted(missing)))
+        bound_keys = {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger_rules", "family"}
+        if set(supplied) - set(DEFAULTS): raise ValueError("unknown formal statistical configuration field")
+        if any(supplied[k] != v for k, v in DEFAULTS.items() if k not in bound_keys):
+            raise ValueError("formal statistical settings differ from frozen analysis code")
+        config = dict(supplied)
+    else:
+        config = copy.deepcopy(DEFAULTS); config.update(supplied)
+    if "analysis" not in p:
+        return config
+    bound = p["analysis"]
+    family = {"mode":"tags", "threshold":None}
+    if bound["tagger"]["mode"] == "clusters":
+        ref = load_cluster_reference(bound["tagger"]["cluster_reference"], bound["tagger"]["rules"])
+        family = {"mode":"cluster", "threshold":ref["threshold"], "reference":ref,
+                  "feature_version":ref["feature_version"]}
+    enforced = {"freeze_prefixes":bound["freeze_prefixes"], "checkpoint_experiment":bound["checkpoint_experiment"],
+                "checkpoint_round":bound["checkpoint_round"], "tagger_rules":bound["tagger"]["rules"], "family":family}
+    for key, value in enforced.items():
+        if key in supplied:
+            actual = _clean(supplied[key], 12) if key == "family" else supplied[key]
+            expected = _clean(value, 12) if key == "family" else value
+            if actual != expected:
+                raise ValueError("analysis configuration differs from frozen protocol: " + key)
+    config.update(enforced)
     return config
+
+
+def verify_protocol_runs(runs, protocol_path=None):
+    """A formal archive must use its own frozen protocol, not a supplied substitute."""
+    ids = {r.manifest.get("protocol_id") for r in runs if r.manifest.get("protocol_id")}
+    if protocol_path is None:
+        if any(re.fullmatch(r"(?!rsi-dev-)[a-z0-9-]+-[0-9a-f]{16}", pid) for pid in ids):
+            raise ValueError("formal analysis requires --protocol")
+        return None
+    from ....rsi import protocol as protocols
+    p = protocols.load(protocol_path)
+    pid = protocols.protocol_id(p)
+    if (not protocols.is_development(p) and any(not r.manifest.get("protocol_id") for r in runs)) or (ids and ids != {pid}):
+        raise ValueError("archive protocol differs from supplied protocol")
+    return pid
 
 
 def package_sha256():
@@ -109,7 +162,7 @@ class Analysis:
         primary = [r for r in self.runs if not r.continuation]
         for run in primary + [r for r in self.runs if r.continuation]:
             fam = dict(family)
-            if family["mode"] == "cluster" and run.continuation:
+            if family["mode"] == "cluster" and run.continuation and "reference" not in fam:
                 fam["reference"] = self._cluster_reference(run.continuation["source_run"])
             self.measures[run.run_id] = RunMeasures(run, outcomes, self.tagger, fam, config["measures"])
         self.by_exp = {}
@@ -699,9 +752,13 @@ def main(argv=None):
     parser.add_argument("--outcomes", type=Path, required=True, help="an outcome table or a directory of tables")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--protocol", type=Path, help="G3-frozen protocol; required for formal analysis")
     parser.add_argument("--code-commit", default="unknown")
     args = parser.parse_args(argv)
-    write(args.out, build(args.archive, args.outcomes, load_config(args.config), args.code_commit))
+    pid = verify_protocol_runs(discover(args.archive), args.protocol)
+    if pid is not None and Outcomes.load(args.outcomes).protocol_id != pid:
+        raise ValueError("outcome protocol differs from supplied protocol")
+    write(args.out, build(args.archive, args.outcomes, load_config(args.config, args.protocol), args.code_commit))
     print(json.dumps({"out": str(args.out)}))
 
 

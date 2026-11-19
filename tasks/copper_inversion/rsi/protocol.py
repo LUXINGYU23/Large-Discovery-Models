@@ -121,6 +121,54 @@ def validate_strategy(config):
     return config
 
 
+def validate_analysis(value):
+    """Validate the complete G3-bound analysis subset without reading external data."""
+    if not isinstance(value, dict) or set(value) != {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger"}:
+        _fail("analysis needs freeze_prefixes, checkpoint_experiment, checkpoint_round and tagger")
+    prefixes = value["freeze_prefixes"]
+    if not isinstance(prefixes, dict) or not {"M1", "E1", "E2"} <= set(prefixes) or set(prefixes) - set(EXPERIMENTS):
+        _fail("analysis.freeze_prefixes must cover M1, E1 and E2")
+    for name, entries in prefixes.items():
+        if (not isinstance(entries, list) or not entries or "full" not in entries
+                or any(x != "full" and (type(x) is not int or x < 1) for x in entries)
+                or len(set(entries)) != len(entries)):
+            _fail("invalid analysis.freeze_prefixes for " + name)
+    if value["checkpoint_experiment"] not in EXPERIMENTS:
+        _fail("invalid analysis.checkpoint_experiment")
+    _int(value["checkpoint_round"], "analysis.checkpoint_round")
+    tagger = value["tagger"]
+    if not isinstance(tagger, dict) or set(tagger) != {"mode", "rules", "cluster_reference"} or tagger["mode"] not in ("tags", "clusters"):
+        _fail("invalid analysis.tagger")
+    from tasks.copper_inversion.experiments.rsi.analysis.tagger import validate_rules
+    try:
+        validate_rules(tagger["rules"])
+    except (ValueError, TypeError, KeyError) as exc:
+        _fail("invalid analysis.tagger.rules: " + str(exc))
+    ref = tagger["cluster_reference"]
+    if tagger["mode"] == "tags" and ref is not None:
+        _fail("tags mode cannot have a cluster reference")
+    if tagger["mode"] == "clusters" and (not isinstance(ref, dict) or set(ref) != {"path", "sha256"}
+            or not isinstance(ref["path"], str) or not ref["path"] or not isinstance(ref["sha256"], str)
+            or _HEX.fullmatch(ref["sha256"]) is None):
+        _fail("clusters mode requires a pinned cluster reference")
+    return value
+
+
+def require_analysis(protocol):
+    if "analysis" not in protocol:
+        raise ValueError("formal experiment requires protocol analysis configuration")
+    return validate_analysis(protocol["analysis"])
+
+
+def verify_analysis_reference(protocol):
+    analysis = require_analysis(protocol)
+    spec = analysis["tagger"]
+    if spec["mode"] == "clusters":
+        from tasks.copper_inversion.experiments.rsi.analysis.tagger import load_cluster_reference
+        load_cluster_reference(spec["cluster_reference"], spec["rules"])
+    return analysis
+
+
 def validate(protocol):
     """Return the protocol unchanged, or raise ValueError naming the first defect.
 
@@ -129,6 +177,8 @@ def validate(protocol):
     """
     if not isinstance(protocol, dict):
         _fail("top level must be an object")
+    if "analysis" in protocol:
+        validate_analysis(protocol["analysis"])
     missing = REQUIRED - set(protocol) - {"tiers"}
     if missing:
         _fail("missing " + ", ".join(sorted(missing)))
@@ -400,6 +450,7 @@ def freeze(path, *, allow_pending=False, now=None, **sources):
         if previous["protocol_sha256"] != protocol_sha256(protocol):
             raise ValueError("protocol changed since its partial freeze")
     if not is_development(protocol):
+        verify_analysis_reference(protocol)
         if protocol["token_cap_input"] == 0:
             raise ValueError("a formal protocol must set token_cap_input before freezing")
         if protocol["release"]["qualification_sha256"] is None:

@@ -9,6 +9,7 @@
 # OUT       new directory for the recomputed bundle (default: a fresh temporary directory)
 #
 # REPO selects the code checkout (default: code/<code_commit> on H20); PYTHON the interpreter.
+# PROTOCOL names the original frozen protocol for formal archives.
 set -eu
 ARCHIVE=${1:?archive directory}
 OUTCOMES=${2:?outcome export}
@@ -18,8 +19,13 @@ PYTHON=${PYTHON:-python3}
 COMMIT=$("$PYTHON" -c 'import json,sys; print(json.load(open(sys.argv[1]))["code_commit"])' "$BUNDLE/provenance.json")
 REPO=${REPO:-/Aidata/shared/xingyulu/rsi4geo/code/$COMMIT}
 cd "$REPO"
+if [ -n "${PROTOCOL:-}" ]; then
+    set -- --protocol "$PROTOCOL"
+else
+    set --
+fi
 "$PYTHON" -B -m tasks.copper_inversion.experiments.rsi.analysis.bundle \
     --archive "$ARCHIVE" --outcomes "$OUTCOMES" --out "$OUT" \
-    --config "$BUNDLE/analysis-config.json" --code-commit "$COMMIT"
+    --config "$BUNDLE/analysis-config.json" --code-commit "$COMMIT" "$@"
 diff -r "$BUNDLE" "$OUT"
 echo "identical: $OUT"

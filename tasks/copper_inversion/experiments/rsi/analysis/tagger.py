@@ -33,18 +33,76 @@ DRAFT_RULES = {
 }
 
 
+_DESCRIPTIONS = {
+    "fast_marching":"Fast marching, eikonal or travel-time front propagation.",
+    "annealing":"A temperature-dependent or Metropolis search loop.",
+    "random_search":"Random sampling or search performed in a loop.",
+    "implicit_interpolation":"Implicit field construction or interpolation.",
+    "convex_optimization":"A linear, least-squares or numerical optimization call.",
+    "level_set":"Signed distance or level-set geometry.",
+    "morphology":"Morphological postprocessing of a binary volume.",
+}
+for _rule in DRAFT_RULES["rules"]:
+    _rule["description"] = _DESCRIPTIONS[_rule["name"]]
+
+
 def rules_sha256(rules):
     return hashlib.sha256(json.dumps(rules, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def load_rules(path=None):
-    if path is None:
-        return DRAFT_RULES
-    rules = json.loads(Path(path).read_text())
-    names = [r["name"] for r in rules["rules"]]
-    if len(set(names)) != len(names) or any(not r.get("patterns") for r in rules["rules"]):
-        raise ValueError("tag rules need unique names and at least one pattern")
+def validate_rules(rules):
+    if (not isinstance(rules, dict) or "rules" not in rules or set(rules) - {"version", "rules"}
+            or ("version" in rules and (not isinstance(rules["version"], str) or not rules["version"]))):
+        raise ValueError("invalid rules object")
+    if not isinstance(rules["rules"], list) or not rules["rules"]:
+        raise ValueError("rules list is empty")
+    names = []
+    for row in rules["rules"]:
+        if not isinstance(row, dict) or set(row) - {"name", "patterns", "top_level", "require_loop", "description"} or not {"name", "patterns"} <= set(row):
+            raise ValueError("invalid tag rule fields")
+        if not isinstance(row["name"], str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", row["name"]) is None:
+            raise ValueError("invalid tag name")
+        if any(type(row[k]) is not bool for k in ("top_level", "require_loop") if k in row):
+            raise ValueError("invalid tag rule boolean")
+        if "description" in row and (not isinstance(row["description"], str) or not row["description"].strip()):
+            raise ValueError("invalid tag description")
+        if not isinstance(row["patterns"], list) or not row["patterns"] or any(not isinstance(p, str) or not p for p in row["patterns"]):
+            raise ValueError("invalid tag patterns")
+        try:
+            for pattern in row["patterns"]: re.compile(pattern)
+        except re.error as exc:
+            raise ValueError("invalid tag pattern") from exc
+        names.append(row["name"])
+    if len(set(names)) != len(names):
+        raise ValueError("duplicate tag names")
     return rules
+
+
+def load_rules(path=None):
+    return validate_rules(DRAFT_RULES if path is None else json.loads(Path(path).read_text()))
+
+
+def load_cluster_reference(spec, rules=None):
+    import numpy as np
+    path = Path(spec["path"])
+    body = path.read_bytes()
+    if hashlib.sha256(body).hexdigest() != spec["sha256"]:
+        raise ValueError("cluster reference hash changed")
+    ref = json.loads(body)
+    if ref.get("schema") != "rsi-cluster-reference-v1" or (rules is not None and ref.get("rules_sha256") != rules_sha256(rules)):
+        raise ValueError("cluster reference rules or schema differ")
+    vectors = np.asarray(ref.get("vectors"), dtype=float)
+    labels, tags, threshold = ref.get("labels"), ref.get("tags"), ref.get("threshold")
+    if (vectors.ndim != 2 or not len(vectors) or not np.isfinite(vectors).all() or np.any(np.linalg.norm(vectors,axis=1) == 0)
+            or not isinstance(labels, list) or len(labels) != len(vectors)
+            or any(not isinstance(x,str) or re.fullmatch(r"c[0-9]+",x) is None for x in labels)
+            or not isinstance(tags, list) or len(tags) != len(vectors) or any(not isinstance(x,list) for x in tags)
+            or type(threshold) not in (int,float) or not np.isfinite(threshold) or not 0 <= threshold <= 2
+            or not isinstance(ref.get("feature_version"), str)):
+        raise ValueError("invalid cluster reference")
+    if rules is not None and any(not set(row) <= {r["name"] for r in rules["rules"]} for row in tags):
+        raise ValueError("cluster reference has unknown tags")
+    return ref
 
 
 def _identifiers(tree):
@@ -80,7 +138,7 @@ def _identifiers(tree):
 
 class Tagger:
     def __init__(self, rules=None):
-        self.rules = rules or DRAFT_RULES
+        self.rules = validate_rules(DRAFT_RULES if rules is None else rules)
         self.sha256 = rules_sha256(self.rules)
         self._compiled = [(r["name"], bool(r.get("top_level", True)), bool(r.get("require_loop")),
                            [re.compile(p, re.IGNORECASE) for p in r["patterns"]])

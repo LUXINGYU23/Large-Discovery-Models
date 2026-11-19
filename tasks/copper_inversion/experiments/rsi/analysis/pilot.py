@@ -16,7 +16,7 @@ from pathlib import Path
 from statistics import mean
 
 from . import stats
-from .bundle import load_config
+from .bundle import load_config, verify_protocol_runs
 from .outcomes import Outcomes
 from .rundir import discover
 
@@ -77,9 +77,14 @@ def main(argv=None):
     group.add_argument("--selection-root")
     group.add_argument("--outcomes")
     parser.add_argument("--config")
+    parser.add_argument("--protocol")
     args = parser.parse_args(argv)
     source = SelectionReports(args.selection_root) if args.selection_root else TableValues(Outcomes.load(args.outcomes))
-    result = pilot(discover(args.archive), source, load_config(args.config))
+    runs = discover(args.archive)
+    pid = verify_protocol_runs(runs, args.protocol)
+    if pid is not None and args.outcomes and Outcomes.load(args.outcomes).protocol_id != pid:
+        raise ValueError("outcome protocol differs from supplied protocol")
+    result = pilot(runs, source, load_config(args.config, args.protocol))
     print(json.dumps(result, sort_keys=True))
 
 

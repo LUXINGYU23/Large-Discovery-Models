@@ -50,6 +50,17 @@ def run_vectors(run, ids):
     return {pid: ast_features(normalized_code(run.source(pid))) for pid in ids}, FEATURE_VERSION + "+recomputed"
 
 
+def reference_vectors(run, ids, version):
+    """Use the frozen feature space, even when a subset has cached encodings."""
+    from ....core.encoding import FEATURE_VERSION, ast_features, normalized_code
+    if version == FEATURE_VERSION + "+recomputed":
+        return {pid: ast_features(normalized_code(run.source(pid))) for pid in ids}, version
+    values, actual = run_vectors(run, ids)
+    if actual != version:
+        raise ValueError("run feature version differs from frozen cluster reference")
+    return values, actual
+
+
 class RunMeasures:
     """All per-run process measures. `family` is {"mode": "tags"|"cluster", "threshold": t}."""
 
@@ -101,7 +112,11 @@ class RunMeasures:
             row.update(evaluated=record is not None, status=record["status"] if record else None,
                        risk=record["risk"] if record else None, train_iou=self._train_iou(pid))
         order = sorted(programs, key=lambda p: (programs[p]["round"], programs[p]["branch"], p))
-        self.vectors, self.feature_version = run_vectors(run, order)
+        expected_version = self.family_config.get("feature_version")
+        if expected_version is None:
+            self.vectors, self.feature_version = run_vectors(run, order)
+        else:
+            self.vectors, self.feature_version = reference_vectors(run, order, expected_version)
         if self.family_config.get("mode") == "cluster":
             reference = self.family_config.get("reference")
             if reference is not None:
