@@ -18,7 +18,7 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetExceededError
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.rsi import exposure
-from tasks.copper_inversion.rsi.audit import reconcile_budget, scan_blind
+from tasks.copper_inversion.rsi.audit import _simple_ratio, reconcile_budget, scan_blind
 from tasks.copper_inversion.rsi.client import RiskClient
 from tasks.copper_inversion.rsi.controller import Config, Controller
 from tasks.copper_inversion.rsi.exposure import FIELDS
@@ -294,7 +294,7 @@ def test_hidden_iou_values_are_markers(tmp_path, train):
     run = tmp_path / "run"
     run_controller(run, LoopbackClient(run, service), rounds=1)
     values = [json.loads(p.read_text())["metrics"]["mean_iou"] for p in service.root.glob("evaluations/*/result.json")]
-    value = next(v for v in values if type(v) is float and len(json.dumps(v)) >= 10)
+    value = next(v for v in values if type(v) is float and len(json.dumps(v)) >= 10 and not _simple_ratio(v))
     planted = run / "harness/epoch_00/branch_0/sessions/workspace/notes.txt"
     planted.parent.mkdir(parents=True)
     planted.write_text(f"score {json.dumps(value)} and a rounded {value:.3f}")
@@ -716,3 +716,16 @@ def test_freeze_refuses_a_judge_that_differs_from_the_training_service(tmp_path)
     run_id = judged_run(tmp_path, release, "oracle", "confirmation")
     with pytest.raises(ValueError, match="judge objective differs"):
         freeze_run(tmp_path / "active", "pid", "E3", run_id, release=release, protocol=PROTOCOL)
+
+
+def test_simple_ratios_are_not_hidden_value_markers(tmp_path):
+    """The M1 pilot (rsi-r1-a4dbd1606448faca) failed its scan on a hidden per-case IoU of 7/24 that
+    also appeared as an agent's own count of ore samples (35 of 120); such ratios are ordinary numbers."""
+    from tasks.copper_inversion.rsi.audit import _private_values
+    evaluation = tmp_path / "evaluations" / "e1"
+    evaluation.mkdir(parents=True)
+    (evaluation / "result.json").write_text(json.dumps({"metrics": {"mean_iou": 0.12345678912}}))
+    (evaluation / "private-case-results.json").write_text(json.dumps(
+        [{"metrics": {"iou": 7 / 24}}, {"metrics": {"iou": 1234 / 5679}}]))
+    assert _simple_ratio(7 / 24) and not _simple_ratio(1234 / 5679)
+    assert _private_values(tmp_path) == sorted([json.dumps(0.12345678912).encode(), json.dumps(1234 / 5679).encode()])

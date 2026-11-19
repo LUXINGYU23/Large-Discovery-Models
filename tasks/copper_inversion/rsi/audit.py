@@ -1,6 +1,7 @@
 """Read-only reconstruction, budget reconciliation and blind-channel checks."""
 
 import argparse
+from fractions import Fraction
 import hashlib
 import json
 import re
@@ -81,16 +82,23 @@ def _significant(text):
     return len(digits)
 
 
+def _simple_ratio(value, max_denominator=1000):
+    """A float that is exactly p/q with a small q (e.g. 7/24 = 0.2916666666666667)."""
+    return float(Fraction(value).limit_denominator(max_denominator)) == value
+
+
 def _private_values(private, min_digits=8):
     """Every hidden IoU the service recorded (per program and per case), written as
-    JSON writes a float. Short values are left out: they collide with ordinary numbers."""
+    JSON writes a float. Short values and exact small-denominator ratios are left out:
+    they collide with ordinary numbers (the M1 pilot under rsi-r1-a4dbd1606448faca hit a
+    hidden per-case IoU of 7/24 in an agent's own count of ore samples, 35 of 120)."""
     values = set()
     for path in sorted((private / "evaluations").glob("*/result.json")):
         values.add(json.loads(path.read_text()).get("metrics", {}).get("mean_iou"))
         cases = path.parent / "private-case-results.json"
         if cases.is_file():
             values.update(row.get("metrics", {}).get("iou") for row in json.loads(cases.read_text()))
-    texts = {json.dumps(v) for v in values if type(v) is float}
+    texts = {json.dumps(v) for v in values if type(v) is float and not _simple_ratio(v)}
     return sorted(t.encode() for t in texts if _significant(t) >= min_digits)
 
 
