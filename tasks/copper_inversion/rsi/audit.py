@@ -118,6 +118,16 @@ def _classify(body, start, phrases):
     while left > 0 and chr(body[left - 1]).isalpha():
         left -= 1
     following = body[start + 3:start + 4]
+    # Random identifiers such as provider tool-call IDs ("call_00_UFFVU367c0srmiOUaqeE4451"): the
+    # alphanumeric token around the match is long and holds a digit.
+    first, last = start, start + 3
+    while first > 0 and chr(body[first - 1]).isalnum():
+        first -= 1
+    while last < len(body) and chr(body[last]).isalnum():
+        last += 1
+    token = body[first:last]
+    if len(token) >= 16 and any(chr(b).isdigit() for b in token):
+        return "identifier"
     # English words such as "previous" or "Various": lowercase "iou" inside a longer word.
     if body[start:start + 3] == b"iou" and following.isalpha() and following.islower() and start > left:
         return "english_word"
@@ -177,7 +187,7 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
               "files_checked": len(paths), "binary_files_marker_only": binary,
               "marker_hits": hits, "iou_hits": iou_hits,
               "iou_hits_by_kind": {kind: sum(h["kind"] == kind for h in iou_hits)
-                                   for kind in ("task_description", "english_word", "unexplained")},
+                                   for kind in ("task_description", "english_word", "identifier", "unexplained")},
               "leaks": len(contaminated), "review_required": len(review),
               "review_sha256": hashlib.sha256(json.dumps(review, sort_keys=True).encode()).hexdigest() if review else None}
     if expect_leak:

@@ -275,10 +275,12 @@ def test_iou_hits_are_listed_and_only_task_wording_and_words_are_explained(tmp_p
     run_controller(run, LoopbackClient(run, service), rounds=1)
     request = next(run.rglob("*.request.bin"))
     task_line = "Hidden scoring is never IoU-based feedback."
-    request.write_bytes(json.dumps({"input": "previous results.\n" + task_line}).encode())
+    request.write_bytes(json.dumps({"input": "previous results.\n" + task_line,
+                                    "id": "call_00_UFFVU367c0srmiOUaqeE4451"}).encode())
     report = scan_blind(run, service.root, allowed_text=[task_line + "\n"])
     kinds = [(hit["path"], hit["kind"]) for hit in report["iou_hits"]]
     assert (str(request.relative_to(run)), "english_word") in kinds
+    assert (str(request.relative_to(run)), "identifier") in kinds
     assert (str(request.relative_to(run)), "task_description") in kinds
     # An unexplained word is listed for sign-off before unsealing, not a scan failure (A3).
     request.write_bytes(b'{"input": "best mean_iou=0.42"}')
