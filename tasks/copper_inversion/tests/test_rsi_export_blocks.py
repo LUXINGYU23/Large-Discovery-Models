@@ -6,7 +6,7 @@ import pytest
 from tasks.copper_inversion.experiments.rsi import export_outcomes
 from tasks.copper_inversion.experiments.rsi.analysis.outcomes import Outcomes
 from tasks.copper_inversion.experiments.rsi.freeze import layout
-from tasks.copper_inversion.experiments.rsi.unseal import unseal
+from tasks.copper_inversion.experiments.rsi.unseal import unseal, unseal_references
 from tasks.copper_inversion.tests.test_rsi_unseal import IMAGE, PID, FakeSuite, fake_evaluator, setup
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.training_receipts import eligible
@@ -79,11 +79,17 @@ def test_q1_and_reference_table(tmp_path):
     selection.freeze(reference, [trained[best]["source_path"]], manifests["validation"],
                      [manifests["test_id"], manifests["test_ood"]], seconds=10, image=IMAGE,
                      training_run=service, training_manifest=manifests["train"])
+    source = trained[best]["source_path"]
+    refs = tmp_path / "source-refs.json"
+    refs.write_text(json.dumps({"Initial solver": {"source": source, "sha256": best}}))
+    refmap = tmp_path / "refmap.json"
+    refmap.write_text(json.dumps({"Initial solver": str(reference)}))
     with fake_evaluator():
-        with pytest.raises(ValueError, match="one tested"):
+        with pytest.raises(ValueError, match="REF unseal"):
             export_outcomes.export_references(root, PID, references={"Initial solver": reference})
         selection.run(reference, "validation")
-        result = selection.run(reference, "test")
+        unseal_references(root, PID, refs, refmap)
+        result = json.loads((reference / "test-result.json").read_text())
     q1 = {"short_12x1": str(service), "full_24x1": str(service), "short_24x2": str(service),
           "repeats": [str(service), str(service)]}
     (tmp_path / "q1.json").write_text(json.dumps(q1))
