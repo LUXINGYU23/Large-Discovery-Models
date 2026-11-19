@@ -24,8 +24,8 @@ import pytest
 from tasks.copper_inversion.core.candidate import validate_source
 from tasks.copper_inversion.core.encoding import encoding_spec
 from tasks.copper_inversion.rsi.arms import ARMS, Arm, policy
-from tasks.copper_inversion.rsi.controller import (Config, Controller, Start, make_message, profile_name,
-                                                   session_round)
+from tasks.copper_inversion.rsi.controller import (Config, Controller, RoundClaims, Start, make_message,
+                                                   profile_name, session_round)
 from tasks.copper_inversion.rsi.audit import scan_blind, verify_briefs
 from tasks.copper_inversion.rsi.exposure import risk_by_case, validate_feedback
 from tasks.copper_inversion.rsi.ledger import read
@@ -209,6 +209,40 @@ def test_interrupted_evaluation_resumes_without_recharging(tmp_path):
         make_controller(interrupted, evaluator=Interrupted()).run()
     make_controller(interrupted).run(resume=True)
     assert (baseline / "ledger.jsonl").read_bytes() == (interrupted / "ledger.jsonl").read_bytes()
+
+
+class DuplicatingAgent(ScriptedAgent):
+    """Every branch first submits the same source, as branches given one brief may; on a
+    refused claim it retries with its own source, as the in-turn validator makes Pi do."""
+
+    def __init__(self):
+        super().__init__()
+        self.retries = []
+
+    def propose(self, *, branch, round_index, count, known, **settings):
+        rows, usage = super().propose(branch=0, round_index=round_index, count=count, **settings)
+        if not known.claim(branch, [validate_source(r["source"].encode()) for r in rows]):
+            self.retries.append((round_index, branch))
+            rows, usage = super().propose(branch=branch, round_index=round_index, count=count, **settings)
+            assert known.claim(branch, [validate_source(r["source"].encode()) for r in rows])
+        return rows, usage
+
+
+def test_round_claims_refuse_known_and_other_branches_sources():
+    claims = RoundClaims({"a"})
+    assert not claims.claim(0, ["a"]) and claims.claim(0, ["b"]) and claims.claim(0, ["b", "c"])
+    assert not claims.claim(1, ["c"]) and claims.claim(1, ["d"])
+    assert claims.excluding(0) == {"a", "d"} and set(claims) == {"a", "b", "c", "d"} and "c" in claims
+
+
+def test_a_source_another_branch_submitted_is_refused_in_the_turn(tmp_path):
+    """The AT-26 history continuation on H20 died at admission on a cross-branch duplicate."""
+    agent = DuplicatingAgent()
+    result = make_controller(tmp_path / "run", agent=agent, rounds=2).run()
+    assert result["status"] == "completed"
+    assert sorted(agent.retries)[:3] == [(1, 1), (1, 2), (1, 3)]  # round 1: one brief, so every branch collides
+    ids = [r["program_id"] for r in read(tmp_path / "run" / "ledger.jsonl")]
+    assert len(ids) == len(set(ids))
 
 
 def test_reserved_selection_then_highest_remaining():

@@ -226,9 +226,15 @@ class PiAgent:
                            session_round, session_round + 1, canonical_sha256([message]), message)
         visible = {r["program_id"] for r in view}
 
+        def taken():
+            return known.excluding(branch) if hasattr(known, "excluding") else known
+
         def validate(request):
             try:
-                parse_submission(request.submission, request.artifacts, turn_root, count, known, visible)
+                rows = parse_submission(request.submission, request.artifacts, turn_root, count, taken(), visible)
+                if hasattr(known, "claim") and not known.claim(
+                        branch, [validate_source(r["source"].encode("utf-8")) for r in rows]):
+                    raise ValueError("source rejected: not novel")  # another branch submitted it this round
                 return HarnessSubmissionValidation("accept")
             except (ValueError, SyntaxError, UnicodeError, OSError):
                 # Deliberately avoid identifying whether another branch or the
@@ -246,7 +252,7 @@ class PiAgent:
             raise
         if result.submission_status != "accepted":
             raise HarnessError("researcher did not produce an accepted submission")
-        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, known, visible)
+        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, taken(), visible)
         turn_dir = (turn_root / result.artifacts["turn"]).resolve()
         if not turn_dir.is_relative_to(turn_root):
             raise HarnessError("sidecar turn directory escapes the artifact root")

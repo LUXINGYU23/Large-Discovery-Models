@@ -10,7 +10,10 @@ Thread-safety contract for ``agent.propose`` (one call per branch, run concurren
   sidecar container names, session ids and temporary paths must be derived from
   the run, ``profile`` and ``turn_root`` so that branches never collide.
 - ``candidate_root`` is read-only for the agent (the controller seals sources),
-  ``view`` is a private list, ``known`` a frozenset; neither may be retained.
+  ``view`` is a private list; neither may be retained. ``known`` is the round's
+  ``RoundClaims``: an agent that validates submissions inside the turn claims its
+  sources there, so a source another branch already submitted is refused in the
+  turn (contracts §5: "not novel") instead of failing admission afterwards.
   Shared agent attributes (key, image, catalog export) must be read-only after
   construction; any shared cache must tolerate concurrent readers and writers.
 - The call returns ``(proposals, usage)`` for its own profile only. A call may be
@@ -23,6 +26,7 @@ import json
 import math
 import os
 import tempfile
+import threading
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -341,6 +345,38 @@ def unsupported(arm):
     return None
 
 
+class RoundClaims:
+    """Sources taken in one round: the known ones plus each branch's accepted submission.
+
+    Thread-safe. ``claim`` succeeds only if no source is known or held by another
+    branch; a branch may re-claim its own. Iteration and ``in`` see every source.
+    """
+
+    def __init__(self, known):
+        self._known, self._owner, self._lock = frozenset(known), {}, threading.Lock()
+
+    def excluding(self, branch):
+        with self._lock:
+            return self._known | {sha for sha, owner in self._owner.items() if owner != branch}
+
+    def claim(self, branch, shas):
+        with self._lock:
+            if any(sha in self._known or self._owner.get(sha, branch) != branch for sha in shas):
+                return False
+            self._owner.update((sha, branch) for sha in shas)
+            return True
+
+    def __contains__(self, sha):
+        with self._lock:
+            return sha in self._known or sha in self._owner
+
+    def __iter__(self):
+        return iter(self.excluding(None))
+
+    def __len__(self):
+        return len(self.excluding(None))
+
+
 class Controller:
     """Run or replay a campaign; each completed step has a durable receipt."""
 
@@ -461,6 +497,7 @@ class Controller:
         return rows
 
     def _proposals(self, round_index, prefix, previous_pool):
+        # Sources already known (prefix and saved receipts) plus those claimed by in-turn validation.
         known = frozenset(r["program_id"] for r in prefix)
         folder = self.root / "proposals" / f"round_{round_index:02d}"
         jobs = {}
@@ -482,11 +519,12 @@ class Controller:
                     raise ValueError("proposal receipt message differs")
                 saved[branch] = value
                 claimed.update(r["program_id"] for r in value["proposals"])
+        claims = RoundClaims(claimed)
         pending = [b for b in jobs if b not in saved]
         results, errors = {}, {}
         if pending:
             with ThreadPoolExecutor(max_workers=len(pending), thread_name_prefix="rsi-branch") as pool:
-                futures = {b: pool.submit(self._turn, round_index, b, jobs[b], known) for b in pending}
+                futures = {b: pool.submit(self._turn, round_index, b, jobs[b], claims) for b in pending}
             for branch in pending:
                 try:
                     results[branch] = futures[branch].result()
