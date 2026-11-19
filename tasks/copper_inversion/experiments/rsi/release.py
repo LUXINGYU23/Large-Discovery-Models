@@ -324,6 +324,8 @@ def main():
     plan.add_argument("--historical", nargs="*", default=[], metavar="LABEL=PATH",
                       help="prior releases or generator archives; rsi-r1 requires legacy_release and rsi_dev")
     plan.add_argument("--no-q1-both-packs", action="store_true")
+    plan.add_argument("--tiers", type=json.loads, metavar="JSON",
+                      help='development only, e.g. a one-round smoke: {"S": {"solver_seconds": 10, "slots": 5}, ...}')
     release = commands.add_parser("release", help="check a generated population and write the release")
     release.add_argument("--dataset", type=Path, required=True)
     release.add_argument("--output", type=Path, required=True)
@@ -334,7 +336,8 @@ def main():
         raise PermissionError("releases require the isolated evaluator account")
     if args.command == "plan":
         historical = dict(item.split("=", 1) for item in args.historical)
-        value = make_generation_plan(args.release, args.master_seed, args.confirmation_policy, historical)
+        value = make_generation_plan(args.release, args.master_seed, args.confirmation_policy, historical,
+                                     tiers=args.tiers)
         value["q1"]["both_packs_manifest"] = not args.no_q1_both_packs
         sha = write_generation_plan(args.root, value)
         print(json.dumps({"generation_plan_sha256": sha, "release": args.release,

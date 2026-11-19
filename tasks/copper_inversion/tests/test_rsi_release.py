@@ -154,6 +154,15 @@ def manifests(out):
     return {str(p.relative_to(out)): json.loads(p.read_text()) for p in out.glob("*/manifest.json")}
 
 
+def test_only_development_plans_seal_their_own_tiers():
+    """A one-round smoke needs a matching tier table; formal releases keep the fixed one."""
+    smoke = {"S": {"solver_seconds": 10, "slots": 5}, "F": {"solver_seconds": 10, "slots": 5}}
+    assert rsiplan.make_generation_plan("rsi-dev", 1, tiers=smoke)["tiers"] == smoke
+    assert rsiplan.make_generation_plan("rsi-dev", 1)["tiers"]["S"] == {"solver_seconds": 30, "slots": 321}
+    with pytest.raises(ValueError, match="development release"):
+        rsiplan.make_generation_plan("rsi-r1", 1, historical={"legacy_release": "/a", "rsi_dev": "/b"}, tiers=smoke)
+
+
 def test_full_plan_fixes_layout_and_short_tier_before_generation():
     """AT-20: the plan file alone determines the short tier and each parent's layout."""
     rsi = rsiplan.make_generation_plan("rsi-r1", 2026, historical={"legacy_release": "/a", "rsi_dev": "/b"})

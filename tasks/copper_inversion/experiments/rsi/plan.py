@@ -60,6 +60,8 @@ def make_generation_plan(release, master_seed, confirmation_policy="resample_unt
     if set(counts) != {"train", "validation", "test_id", "test_ood"} or any(
             type(v) is not int or v < 1 for v in counts.values()):
         raise ValueError("invalid split counts")
+    if tiers is not None and preset["stage"] != "development":
+        raise ValueError("only a development release may seal its own tier table")
     per_family = preset["short_per_family"] if short_per_family == "preset" else short_per_family
     historical = dict(historical or {})
     if set(preset["historical"]) - set(historical):
