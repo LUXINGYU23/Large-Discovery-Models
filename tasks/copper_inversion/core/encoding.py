@@ -19,6 +19,12 @@ FEATURE_VERSION = 'copper-normalized-ast256-v2'
 DIMENSION = AST_DIMENSION
 
 
+# Byte-level BPE gives at most one token per byte, so this keeps every admitted source inside
+# the 32768-token embedding context; the in-turn validator enforces it (a rehearsal run paused on
+# a 58k-token proposal that the selector could not encode).
+MAX_NORMALIZED_BYTES = 32000
+
+
 def normalized_code(source):
     # Keep names, constants, docstrings, and statement order. Do not execute/import.
     return ast.unparse(ast.parse(source.decode('utf-8'))) + '\n'
@@ -79,6 +85,9 @@ class QwenEmbedding:
             raise ValueError(f'normalized code exceeds embedding context: {len(tokens)} tokens; no truncation')
         vector = self.model.encode([code], normalize_embeddings=True, convert_to_numpy=True,
                                    show_progress_bar=False, batch_size=1, prompt='')[0]
+        if self.model.device.type == 'cuda':
+            import torch
+            torch.cuda.empty_cache()  # several controllers share one GPU; do not hold peak activations
         if vector.shape != (QWEN_DIMENSION,):
             raise ValueError('unexpected Qwen embedding dimension')
         return unit(vector), len(tokens)

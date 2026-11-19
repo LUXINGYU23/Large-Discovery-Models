@@ -25,6 +25,7 @@ from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.harness.protocol import canonical_sha256, file_sha256
 from ..core.candidate import MAX_SOURCE_BYTES, validate_source
+from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
 from ..v2.research import PublicTrainingExport
 from .controller import _validate_submission, profile_name, NoSubmission
 from .render import write_view
@@ -133,6 +134,10 @@ def parse_submission(submission, artifacts, root, count, known, visible):
         if len(body) != artifact.size_bytes or hashlib.sha256(body).hexdigest() != artifact.sha256:
             raise ValueError("snapshot changed")
         sha = validate_source(body)
+        size = len(normalized_code(body).encode("utf-8"))
+        if size > MAX_NORMALIZED_BYTES:
+            raise ValueError(f"candidates[{index}] is {size} bytes after normalization (comments removed, code "
+                             f"re-formatted); the limit is {MAX_NORMALIZED_BYTES} bytes")
         if sha in used:
             raise NotNovel()
         if row["parent_sha256"] is not None and row["parent_sha256"] not in visible:

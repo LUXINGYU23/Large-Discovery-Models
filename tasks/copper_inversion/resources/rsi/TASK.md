@@ -23,7 +23,9 @@ researcher or the solver.
 
 Write the requested complete programs to `candidates/<index>/solver.py` and
 submit them with the prescribed metadata and risk intervals; the i-th submitted
-entry (counting from 0) must point to `candidates/<i>/solver.py`. Public interface
+entry (counting from 0) must point to `candidates/<i>/solver.py`. Each solver
+must stay within 32,000 bytes once comments are removed and the code is
+re-formatted. Public interface
 checks can be run with `python selfcheck.py /workspace/candidates/0/solver.py`
 from the exported task directory; repeat for every candidate. These checks do
 not evaluate withheld measurements. Do not launch external evaluations.

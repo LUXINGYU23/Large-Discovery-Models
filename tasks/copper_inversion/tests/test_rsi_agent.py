@@ -348,6 +348,21 @@ def test_a_structural_defect_gets_an_actionable_retry_not_the_novelty_reply(tmp_
     assert not any("novel" in r for r in reasons)
 
 
+def test_a_source_beyond_the_embedding_context_is_refused_in_the_turn(tmp_path):
+    """A rehearsal run paused when the selector met a 58k-token proposal it could not encode."""
+    body = ("def solve(problem, budget, seed):\n    table = [" + ", ".join(str(i) for i in range(9000))
+            + "]\n    return table\n").encode()
+    snapshot = tmp_path / "snap" / "candidates" / "0" / "solver.py"
+    snapshot.parent.mkdir(parents=True)
+    snapshot.write_bytes(body)
+    artifact = HarnessSubmittedArtifact("/candidates/0/artifact_path", "candidates/0/solver.py",
+                                        "snap/candidates/0/solver.py", hashlib.sha256(body).hexdigest(), len(body))
+    row = {"artifact_path": "candidates/0/solver.py", "parent_sha256": None, "change_summary": "c",
+           "rationale": "r", "predicted_risk": .5, "interval80_low": .4, "interval80_high": .6}
+    with pytest.raises(ValueError, match="bytes after normalization.*limit is 32000"):
+        agent_module.parse_submission({"candidates": [row]}, (artifact,), tmp_path, 1, set(), set())
+
+
 def test_turn_index_other_than_zero_is_refused(tmp_path):
     agent = FakePiAgent(Log(), tmp=tmp_path)
     with pytest.raises(ValueError, match="extension arm"):
