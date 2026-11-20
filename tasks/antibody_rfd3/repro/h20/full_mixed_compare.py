@@ -1,4 +1,4 @@
-"""Run the 1,280-score HER2 comparison with a 256-candidate mixed LDM arm."""
+"""Run 20 rounds of 64 online scores for the matched HER2 comparison."""
 from __future__ import annotations
 
 import argparse
@@ -16,9 +16,10 @@ from tasks.antibody_rfd3.core.local_proposals import LOCAL_SEARCH_TIMEOUT_SECOND
 
 
 SEED_BANK = ROOT / "runs/her2-tk-ard-feedback-pilot-20261120-r2/shared-initialization.json"
-TOTAL_SCORES = 1280
 SCORES_PER_GENERATION = 64
 RESEARCH_ROUNDS = 20
+ONLINE_SCORES = RESEARCH_ROUNDS * SCORES_PER_GENERATION
+TOTAL_SCORES = SEED_COUNT + ONLINE_SCORES
 LDM_OVERRIDES = {
     "pool-size": 256, "research-candidates-per-role": 64, "local-proposal-count": 128,
     "research-rounds": RESEARCH_ROUNDS, "scores-per-generation": SCORES_PER_GENERATION,
@@ -96,8 +97,7 @@ def audit_ldm(directory):
             raise RuntimeError(f"LDM generation {index} did not meet the pool or feedback requirement")
     decisions = query(path, f"SELECT snapshot_json FROM decisions WHERE decision_id>{SEED_COUNT} ORDER BY decision_id")
     quotas = Counter(json.loads(d)["pacing_state"]["current_generation"] for d, in decisions)
-    final_quota = TOTAL_SCORES - SEED_COUNT - (RESEARCH_ROUNDS - 1) * SCORES_PER_GENERATION
-    if quotas != {**dict.fromkeys(range(1, RESEARCH_ROUNDS), SCORES_PER_GENERATION), RESEARCH_ROUNDS: final_quota}:
+    if quotas != dict.fromkeys(range(1, RESEARCH_ROUNDS + 1), SCORES_PER_GENERATION):
         raise RuntimeError("LDM did not preserve the per-generation scoring allocation")
     return {"pool_sources": expected, "online_evaluations_per_generation": dict(sorted(quotas.items()))}
 
@@ -116,8 +116,10 @@ def main():
     output = root / "full"
     cases = make_cases(output)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
+    budgets = {"shared_scores": SEED_COUNT, "online_scores": ONLINE_SCORES, "total_scores": TOTAL_SCORES,
+               "comparison_rounds": RESEARCH_ROUNDS, "online_scores_per_round": SCORES_PER_GENERATION}
     if args.plan:
-        print(json.dumps({"commit": commit, "shared_scores": SEED_COUNT, "cases": cases}, indent=2))
+        print(json.dumps({"commit": commit, **budgets, "cases": cases}, indent=2))
         return 0
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=REPO, text=True).strip():
         parser.error("Use the clean scheduled checkout")
@@ -128,13 +130,17 @@ def main():
                no_proxy="localhost,127.0.0.1,172.17.0.1")
     private = private_environment_values(env, env["LLM_API_KEY"])
     output.mkdir()
-    report = {"status": "running", "commit": commit, "started_at": now(), "methods": {}, "errors": {}}
+    report = {"status": "running", "commit": commit, "started_at": now(), **budgets, "methods": {}, "errors": {}}
     report_path = output / "report.json"
     save_summary(report_path, report)
 
     def run(method, case):
         run_case(case, env, 172800, private, lambda: save_summary(output / (method + ".json"), case))
         result = audit({method: case}, bank)[method]
+        result["best_by_online_score_count"] = {
+            count: result["best_so_far"][SEED_COUNT + count - 1]
+            for count in range(SCORES_PER_GENERATION, ONLINE_SCORES + 1, SCORES_PER_GENERATION)
+        }
         if method == "ldm_harness":
             result.update(audit_ldm(Path(case["run_dir"])))
         return result
