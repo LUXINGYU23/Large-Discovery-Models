@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import wraps
 import json
 import math
 import os
@@ -85,6 +86,7 @@ def native_pool(payload):
     visited, eligible = set(), {}
     calls = 0
 
+    @wraps(original)
     def trace(x_center, f, *args, **kwargs):
         def acquisition(x):
             nonlocal calls
