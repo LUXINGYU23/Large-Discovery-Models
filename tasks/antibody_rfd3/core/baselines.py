@@ -40,17 +40,9 @@ class NativeAntBO:
 
     def propose(self, history, pending=()):
         import torch
-        from ldm_tts.optimization.tk_ard import TK_ARD_VERSION
-        from .antbo_gp import install_training_hook
-
         new_observations = history[self.seen:]
-        fits = []
-        with install_training_hook(fits):
-            for row in new_observations:
-                self.optimizer.observe(seqs_to_indices([row["sequence"]]), torch.tensor([row["energy"]]))
-            return self._suggest(history, pending, new_observations, TK_ARD_VERSION, fits)
-
-    def _suggest(self, history, pending, new_observations, kernel, fits):
+        for row in new_observations:
+            self.optimizer.observe(seqs_to_indices([row["sequence"]]), torch.tensor([row["energy"]]))
         self.seen = len(history)
         evaluated = {row["sequence"] for row in history} | set(pending)
         for attempt in range(1, 33):
@@ -58,8 +50,6 @@ class NativeAntBO:
             if seq not in evaluated and not _sequence_violations(seq, 11):
                 return {"sequence": seq, "antbo_proposal": {
                     "optimizer": "bo.optimizer.Optimizer",
-                    "gp_kernel": kernel,
-                    "gp_fits": fits,
                     "history_count": self.seen,
                     "suggest_calls": attempt,
                     "observed": [{"sequence": row["sequence"], "energy": row["energy"]}

@@ -111,10 +111,11 @@ def audit(output, cases, bank):
         elif (directory / "controller.sqlite3").exists():
             raise RuntimeError(f"{method} unexpectedly ran through the asynchronous controller")
         if method == "antbo":
-            for o in rows[SEED_COUNT:]:
-                data = o["candidate"]["payload"]["antbo_proposal"]
-                kernel_records.extend({"kernel": data["gp_kernel"], **fit} for fit in data["gp_fits"])
-        if method in ("ldm_harness", "antbo"):
+            proposals = [o["candidate"]["payload"]["antbo_proposal"] for o in rows[SEED_COUNT:]]
+            if any(p["optimizer"] != "bo.optimizer.Optimizer" or p["history_count"] != i
+                   for i, p in enumerate(proposals, SEED_COUNT)):
+                raise RuntimeError("AntBO did not use its native optimizer with the complete measured history")
+        if method == "ldm_harness":
             if not kernel_records or any(record["kernel"] != TK_ARD_VERSION or
                      len(record["position_weights"]) != 11 or not math.isclose(sum(record["position_weights"]), 1)
                      for record in kernel_records):
