@@ -198,6 +198,10 @@ class AntibodyPiResearch(PiResearchSource):
                    "candidate_count": {"minimum": minimum, "maximum": maximum}}
         if self.role in PANEL:
             details["role_remaining"] = self.worker.role_remaining(self.role)
+        if self.role == "refiner" and self.worker.seed_backbones and self.worker.round == 0:
+            details["seed_backbones"] = (
+                "Initialization history includes reusable backbone IDs. Inspect the measured history and "
+                "try sequence_h3 on a promising measured initialization backbone within your role budget.")
         if self.peer_catalog:
             details["peer_catalog"] = self.peer_catalog
         batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))

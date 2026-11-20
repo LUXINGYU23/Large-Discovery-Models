@@ -123,7 +123,7 @@ def run(args, task_spec):
         return _run_locked(args, task_spec, directory)
 
 
-def pacing_config(args):
+def pacing_config(args, *, initialization_count=0):
     exact_roles = bool(args.research_candidates_per_role)
     if args.pacing_mode == "barrier":
         return PacingConfig.barrier(reservoir_size=args.pool_size, selection_batch_size=args.batch_size,
@@ -131,18 +131,20 @@ def pacing_config(args):
     options = {"dispatch_during_research": "continue", "research_budget": args.research_rounds,
                "research_timeout_seconds": 23400 if exact_roles else 3900 if args.method == "ldm_harness" else 1200}
     if exact_roles:
-        options.update(theta=0.75, half_life=float(args.evaluation_window))
+        options.update(theta=0.75, half_life=float(max(args.evaluation_window, initialization_count)))
     return PacingConfig.balanced(concurrency=args.concurrency, reservoir_size=args.pool_size, **options)
 
 
 def _run_locked(args, task_spec, directory):
-    seeds = load_seed_bank(args)
+    seeds, seed_backbones = load_seed_bank(args)
     if seeds and (args.pacing_mode != "streaming" or not args.research_candidates_per_role
                   or len(seeds) > args.pool_size):
         raise ValueError("Shared initialization requires streaming, a panel and room in the reservoir")
     config_data = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     if seeds:
+        from ldm_tts.harness import file_sha256
         config_data["initial_candidate_keys"] = [c.canonical_key for c in seeds]
+        config_data["seed_bank_sha256"] = file_sha256(args.seed_bank)
     ignored = {"out_dir", "dry_run", "resume_run"}
     scientific = {key: value for key, value in config_data.items() if key not in ignored}
     if args.resume_run:
@@ -159,11 +161,11 @@ def _run_locked(args, task_spec, directory):
     if contract:
         atomic_json_write(directory / "experiment_contract.json", contract.to_dict())
     metric = "mock_energy" if args.oracle == "mock" else "absolut_energy"
-    worker = DesignWorker(directory, args)
+    worker = DesignWorker(directory, args, seed_backbones=seed_backbones)
     bridge = HistoryBridge(directory / "history", history_projection(metric))
     dynamic_policy = args.method == "ldm_harness"
     batch = args.pacing_mode == "barrier"
-    pacing = pacing_config(args)
+    pacing = pacing_config(args, initialization_count=len(seeds))
     config = CampaignConfig("antibody_rfd3", budget=args.iterations, concurrency=args.concurrency,
                             buffer_depth=args.evaluation_window - args.concurrency,
                             seed=args.seed, extra=campaign_extra(pacing, task=scientific))

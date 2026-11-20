@@ -20,10 +20,11 @@ REPO = TEMPLATE.parents[5]
 
 
 class DesignWorker:
-    def __init__(self, run_dir, args):
+    def __init__(self, run_dir, args, *, seed_backbones=None):
         self.jobs = Path(run_dir).resolve() / "design_jobs"
         self.jobs.mkdir(exist_ok=True, parents=True)
         self.args = args
+        self.seed_backbones = dict(seed_backbones or {})
         self.template = json.loads(TEMPLATE.read_text())
         self.round = 0
         self.runtime = None
@@ -110,7 +111,7 @@ class DesignWorker:
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
             raise ValueError(f"Shared initialization uses design_h3, count={self.args.samples_per_call}, temperature={self.args.temperature}")
         known = {r["backbone_id"] for r in self.candidates().values()}
-        if backbone_id and backbone_id not in known:
+        if backbone_id and backbone_id not in known and backbone_id not in self.seed_backbones:
             raise ValueError("Unknown backbone ID in this campaign")
         remaining = self.remaining()
         if count > remaining["sequences"] or (action == "design_h3" and remaining["backbones"] < 1):
@@ -208,7 +209,8 @@ class DesignWorker:
         if self.args.share_gpu:
             cmd.append("--allow-gpu-sharing")
         if backbone_id:
-            cmd.extend(["--generation", str(self.jobs / backbone_id / "output/generation.json")])
+            generation = self.seed_backbones.get(backbone_id, self.jobs / backbone_id / "output/generation.json")
+            cmd.extend(["--generation", str(generation)])
         with (root / f"tmp/antibody-rfd3-worker-gpu{self.args.gpu}.lock").open("a") as lock, \
                 (job / "worker.log").open("w") as log:
             fcntl.flock(lock, fcntl.LOCK_EX)

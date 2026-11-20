@@ -163,8 +163,8 @@ def run(a):
             raise ValueError("Set --absolut-path or ABSOLUT_PATH to the installation with antigen data")
         evaluator = AntibodyEvaluator(AbsolutEvaluator(dict(antigen=a.antigen, process=1,
             startTask=min(os.sched_getaffinity(0)), path=str(a.absolut_path.resolve())), f"h3-{os.getpid()}"))
-    seeds = load_seed_bank(a)
-    worker = DesignWorker(directory, a)
+    seeds, seed_backbones = load_seed_bank(a)
+    worker = DesignWorker(directory, a, seed_backbones=seed_backbones)
     expander = Expander(a, worker, seeds)
     contract, profile = load_active_experiment_contract()
     with ExitStack() as stack:

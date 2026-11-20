@@ -8,11 +8,14 @@ import hashlib
 import json
 import math
 import os
+import shutil
 from pathlib import Path
 import sqlite3
 import subprocess
 
+from ldm_tts.harness import file_sha256
 from ldm_tts.optimization.tk_ard import TK_ARD_VERSION
+from tasks.antibody.tools.structure_design.common import extract_h3
 from tasks.antibody_rfd3.repro.h20.launch_utils import (
     ACTIVE_ROOT, CAMPAIGN_PYTHON, REPO, ROOT, now, private_environment_values, run_case, save_summary,
 )
@@ -33,21 +36,67 @@ def query(path, sql):
         return db.execute(sql).fetchall()
 
 
+def snapshot_backbone(source, dest):
+    document = json.loads(source.read_text())
+    if document["status"] != "success" or len(document["candidates"]) != 1:
+        raise ValueError("Expected a successful, single-backbone source manifest")
+    candidate = document["candidates"][0]
+    dest.mkdir(parents=True, exist_ok=False)
+    copied = {}
+    for field, name in (("backbone_path", "backbone.pdb"), ("structure_path", "structure.cif.gz")):
+        original = Path(candidate[field]).resolve(strict=True)
+        if not original.is_relative_to(ANCHOR.resolve()):
+            raise ValueError("Seed structure is outside its completed source run")
+        target = dest / name
+        shutil.copyfile(original, target)
+        checksum = file_sha256(target)
+        if checksum != file_sha256(original):
+            raise ValueError("Copied seed structure differs from its source")
+        target.chmod(0o444)
+        copied[field] = checksum
+        candidate[field] = str(target)
+    manifest = dest / "generation.json"
+    save_summary(manifest, document)
+    manifest.chmod(0o444)
+    return {"manifest": str(manifest.relative_to(dest.parent.parent)),
+            "manifest_sha256": file_sha256(manifest), "pdb_sha256": copied["backbone_path"],
+            "cif_sha256": copied["structure_path"], "source_generation": str(source),
+            "source_generation_sha256": file_sha256(source)}
+
+
 def seed_bank(path):
     ledger = ANCHOR / "campaign/controller.sqlite3"
     rows = query(ledger, "SELECT observation_json,status FROM observations ORDER BY ingest_seq LIMIT 16")
     if len(rows) != SEED_COUNT or any(status != "succeeded" for _, status in rows):
         raise ValueError("The common initial observations are missing")
     initial = [json.loads(row) for row, _ in rows]
-    bank = {"antigen": ANTIGEN, "oracle": "absolut",
-            "source_ledger": str(ledger),
-            "sequences": [o["candidate"]["canonical_key"] for o in initial],
+    candidates, source_backbones = [], {}
+    for o in initial:
+        payload = o["candidate"]["payload"]
+        seq, backbone_id = o["candidate"]["canonical_key"], payload["backbone_id"]
+        design = (ledger.parent / payload["artifact"]).resolve(strict=True)
+        if not design.is_relative_to(ledger.parent):
+            raise ValueError("Seed design is outside the source campaign")
+        design_rows = json.loads(design.read_text())["candidates"]
+        if extract_h3(design_rows[payload["index"]], 11) != seq:
+            raise ValueError("Seed sequence differs from its archived design")
+        source = (ledger.parent / "design_jobs" / backbone_id / "output/generation.json").resolve(strict=True)
+        if not source.is_relative_to(ledger.parent):
+            raise ValueError("Seed backbone is outside the source campaign")
+        key = "seed-" + backbone_id
+        source_backbones[key] = source
+        candidates.append({"sequence": seq, "backbone_id": key})
+    bank = {"antigen": ANTIGEN, "oracle": "absolut", "source_ledger": str(ledger), "candidates": candidates,
             "expected_scores": [o["evaluation"]["metrics"]["absolut_energy"] for o in initial]}
     if path.is_file():
-        if json.loads(path.read_text()) != bank:
+        existing = json.loads(path.read_text())
+        if {k: v for k, v in existing.items() if k != "backbones"} != bank:
             raise ValueError("The common initialization bank changed")
-    else:
-        save_summary(path, bank)
+        return existing
+    bank["backbones"] = {key: snapshot_backbone(source, path.parent / "seed-backbones" / key)
+                         for key, source in sorted(source_backbones.items())}
+    save_summary(path, bank)
+    path.chmod(0o444)
     return bank
 
 
@@ -61,7 +110,7 @@ def make_case(method, phase, output, seed_path):
               "seed-bank": str(seed_path), "gpu": gpu, "absolut-path": str(ASSETS), "share-gpu": True}
     if method == "ldm_harness":
         if phase == "pilot":
-            common.update({"pool-size": 16, "research-candidates-per-role": 8, "evaluation-window": 8,
+            common.update({"pool-size": 16, "research-candidates-per-role": 8, "evaluation-window": 2, "concurrency": 2,
                            "backbones-per-round": 8, "sequences-per-round": 128, "samples-per-call": 16,
                            "research-rounds": 8})
     else:
@@ -84,18 +133,23 @@ def observations(directory, method):
             if event["event_type"] == "candidate_evaluated"]
 
 
-def audit(output, cases, bank):
-    expected = dict(zip(bank["sequences"], bank["expected_scores"], strict=True))
+def audit(cases, bank):
+    expected = dict(zip((c["sequence"] for c in bank["candidates"]), bank["expected_scores"], strict=True))
+    known_backbones = {c["sequence"]: c["backbone_id"] for c in bank["candidates"]}
     arms = {}
     for method, case in cases.items():
-        directory = output / method
+        reused = bool(case.get("reused_reference"))
+        directory = Path(case["run_dir"])
         rows = observations(directory, method)
         scores = [(o["candidate"]["canonical_key"], o["evaluation"]["metrics"]["absolut_energy"]) for o in rows]
         if (len(rows) != case["effective_args"]["iterations"] or
                 any(o["evaluation"]["status"] != "succeeded" for o in rows) or len(dict(scores)) != len(rows)
                 or dict(scores[:SEED_COUNT]) != expected):
             raise RuntimeError(f"{method} violates the paired score budget or shared initialization")
-        kernel_records = []
+        if not reused and any(o["candidate"]["payload"].get("backbone_id") !=
+                             known_backbones[o["candidate"]["canonical_key"]] for o in rows[:SEED_COUNT]):
+            raise RuntimeError(f"{method} lost shared backbone provenance")
+        kernel_records, replay_notes = [], {}
         if method == "ldm_harness":
             if not (directory / "experiment-service.sqlite3").is_file():
                 raise RuntimeError("Missing independent LDM experiment service")
@@ -106,6 +160,17 @@ def audit(output, cases, bank):
             decisions = [json.loads(row[0]) for row in query(directory / "controller.sqlite3",
                          "SELECT snapshot_json FROM decisions ORDER BY decision_id")]
             kernel_records = [d["record"]["selection"]["metadata"]["surrogate"] for d in decisions[SEED_COUNT:]]
+            adaptive = decisions[SEED_COUNT:]
+            heads = [d["head_ingest_seq"] for d in adaptive]
+            if not heads or max(heads) <= SEED_COUNT:
+                raise RuntimeError("LDM exhausted the online budget before using new feedback")
+            jobs = [json.loads(p.read_text()) for p in (directory / "design_jobs").glob("*/receipt.json")]
+            seed_reuse = [j for j in jobs if j.get("requested_backbone_id") in bank["backbones"]
+                          and j["action"] == "sequence_h3" and j["status"] == "succeeded"]
+            replay_notes = {"online_history_heads": heads,
+                            "online_decisions_with_new_feedback": sum(h > SEED_COUNT for h in heads),
+                            "online_decisions_with_pending": sum(bool(d["inputs"]["pending"]) for d in adaptive),
+                            "successful_seed_backbone_calls": len(seed_reuse)}
             if any("plan" in d for d in decisions):
                 raise RuntimeError("LDM used a barrier plan in the streaming comparison")
         elif (directory / "controller.sqlite3").exists():
@@ -127,7 +192,8 @@ def audit(output, cases, bank):
             curve.append(best)
         arms[method] = {"successful_scores": len(rows), "seed_best": curve[SEED_COUNT - 1],
                         "best_so_far": curve, "new_best": min(score for _, score in scores[SEED_COUNT:]),
-                        "gp_fits_recorded": len(kernel_records), "elapsed_seconds": case["elapsed_seconds"]}
+                        "gp_fits_recorded": len(kernel_records), "elapsed_seconds": case["elapsed_seconds"],
+                        "reused_reference": reused, "run_dir": str(directory), **replay_notes}
     return arms
 
 
@@ -135,6 +201,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--phase", choices=("pilot", "full"), required=True)
+    parser.add_argument("--antbo-reference", type=Path,
+                        help="Use a completed, matched AntBO pilot as a read-only comparison")
     args = parser.parse_args()
     root = args.root.resolve()
     if ACTIVE_ROOT not in root.parents:
@@ -144,8 +212,11 @@ def main():
     seed_path = root / "shared-initialization.json"
     if args.phase == "full":
         acceptance = json.loads((root / "pilot/report.json").read_text())
-        if acceptance["status"] != "passed" or acceptance["commit"] != commit:
+        if (acceptance["status"] != "passed" or acceptance["commit"] != commit or
+                set(acceptance.get("methods", {})) != set(METHODS)):
             parser.error("The pilot must pass on the same code before the full comparison")
+    if args.antbo_reference is not None and args.phase != "pilot":
+        parser.error("A reused AntBO reference is only allowed for the small comparison")
     bank = seed_bank(seed_path)
     output = root / args.phase
     output.mkdir(exist_ok=False)
@@ -155,7 +226,13 @@ def main():
                LLM_REASONING_EFFORT="low", NO_PROXY="localhost,127.0.0.1,172.17.0.1",
                no_proxy="localhost,127.0.0.1,172.17.0.1")
     private = private_environment_values(env, env["LLM_API_KEY"])
-    cases = {method: make_case(method, args.phase, output, seed_path) for method in METHODS}
+    methods = ("ldm_harness",) if args.antbo_reference is not None else METHODS
+    cases = {method: make_case(method, args.phase, output, seed_path) for method in methods}
+    if args.antbo_reference is not None:
+        reference = json.loads((args.antbo_reference / "antbo.json").read_text())
+        if reference["status"] != "completed":
+            parser.error("The AntBO reference must be complete")
+        cases["antbo"] = {**reference, "reused_reference": True}
     report = {"status": "running", "phase": args.phase, "commit": commit, "started_at": now(),
               "seed_bank_sha256": hashlib.sha256(seed_path.read_bytes()).hexdigest(),
               "model": env["LLM_MODEL_NAME"]}
@@ -169,8 +246,8 @@ def main():
 
     try:
         with ThreadPoolExecutor(max_workers=4) as workers:
-            list(workers.map(run, METHODS))
-        report["methods"] = audit(output, cases, bank)
+            list(workers.map(run, methods))
+        report["methods"] = audit(cases, bank)
         report["status"] = "passed"
     except Exception as exc:
         report.update(status="failed", error=str(exc))
