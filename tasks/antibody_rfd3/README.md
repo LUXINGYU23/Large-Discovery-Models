@@ -113,7 +113,8 @@ run on H20. The obsolete synchronous scripted-provider smoke has been removed.
 For each target (`her2` or `pd1`), the configs
 `<target>_fixed_real.yaml`, `<target>_antbo_real.yaml` and
 `<target>_harness_real.yaml` run three evaluations using streaming pacing with
-one evaluation slot. All three reuse the same published initialization job
+one evaluation slot and wait for each measurement before the next research
+generation. All three reuse the same published initialization job
 for the target. Native AntBO records which fresh energies were handed to its
 optimizer and retains its optimizer checkpoint for each generation. The Pi
 baseline can query measured history, generate designs and submit its selection.

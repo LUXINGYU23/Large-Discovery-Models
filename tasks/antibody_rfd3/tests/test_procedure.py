@@ -229,7 +229,8 @@ def test_failed_evaluation_consumes_budget(tmp_path):
             assert ctrl.budget().free == 0
 
 
-def test_initial_measurement_precedes_next_research_while_evaluation_is_delayed(tmp_path):
+@pytest.mark.parametrize("wait_for_feedback", [False, True])
+def test_research_waits_for_required_measurements_while_evaluation_is_delayed(tmp_path, wait_for_feedback):
     from experiment_service import BlockingExecutor
     from experiment_service.testing import running_service
     from ldm_tts.async_runtime import (CampaignConfig, ESClient, PacedController, PacingConfig, RuntimeOptions,
@@ -239,47 +240,57 @@ def test_initial_measurement_precedes_next_research_while_evaluation_is_delayed(
     from tasks.antibody_rfd3.core.experiments import AntibodyCodec, KIND, history_projection, mock_energy
     from tasks.antibody_rfd3.core.research import InitializationPacing, NativeResearch
 
-    started, release = threading.Event(), threading.Event()
+    slots = 1 if wait_for_feedback else 2
+    delayed_count = 2 if wait_for_feedback else 1
+    budget = delayed_count + 1
+    delayed = [(threading.Event(), threading.Event()) for _ in range(delayed_count)]
+    remaining = iter(delayed)
 
     def evaluate(spec):
-        started.set()
-        if not release.wait(15):
-            raise RuntimeError("test did not release the delayed oracle")
+        gate = next(remaining, None)
+        if gate is not None:
+            started, release = gate
+            started.set()
+            if not release.wait(15):
+                raise RuntimeError("test did not release the delayed oracle")
         return {"mock_energy": mock_energy(spec["antigen"], spec["sequence"])}
 
-    args = parse_args(["--method", "fixed", "--mock", "--concurrency", "2"])
+    args = parse_args(["--method", "fixed", "--mock", "--concurrency", str(slots)])
     worker = DesignWorker(tmp_path / "run", args)
-    pacing = PacingConfig.balanced(concurrency=2, reservoir_size=2, dispatch_during_research="continue",
-                                   research_budget=2)
-    config = CampaignConfig("delayed", budget=2, concurrency=2, seed=42, extra=campaign_extra(pacing))
-    executor = BlockingExecutor(KIND, "1", evaluate, workers=2, retry_safe=True)
-    with running_service([executor], pools={"default": 2}, autorun=True) as service:
+    pacing = PacingConfig.balanced(concurrency=slots, reservoir_size=2, dispatch_during_research="continue",
+                                   research_budget=budget)
+    config = CampaignConfig("delayed", budget=budget, concurrency=slots, seed=42, extra=campaign_extra(pacing))
+    executor = BlockingExecutor(KIND, "1", evaluate, workers=slots, retry_safe=True)
+    with running_service([executor], pools={"default": slots}, autorun=True) as service:
         bridge = HistoryBridge(tmp_path / "history", history_projection("mock_energy"))
         with PacedController(tmp_path / "controller.sqlite3", config, codec=AntibodyCodec("1ADQ_A", "mock"),
             client=ESClient(service.base_url), research=NativeResearch(args, worker), history=bridge,
-            pacing=InitializationPacing(), objectives=ObjectiveSet.from_specs([ObjectiveSpec("mock_energy", "minimize")]),
+            pacing=InitializationPacing(wait_for_feedback=wait_for_feedback),
+            objectives=ObjectiveSet.from_specs([ObjectiveSpec("mock_energy", "minimize")]),
             options=RuntimeOptions(poll_interval=0.01, long_poll_seconds=0)) as ctrl:
             try:
-                deadline = time.monotonic() + 15
-                while not started.is_set() and time.monotonic() < deadline:
-                    ctrl.step()
-                    time.sleep(0.01)
-                assert started.is_set()
-                for _ in range(20):
-                    ctrl.step()
-                    time.sleep(0.01)
-                assert len(ctrl.generations()) == 1
-                assert ctrl.view().head_ingest_seq == 0
-                release.set()
+                for index, (started, release) in enumerate(delayed):
+                    deadline = time.monotonic() + 15
+                    while not started.is_set() and time.monotonic() < deadline:
+                        ctrl.step()
+                        time.sleep(0.01)
+                    assert started.is_set()
+                    for _ in range(20):
+                        ctrl.step()
+                        time.sleep(0.01)
+                    assert len(ctrl.generations()) == index + 1
+                    assert ctrl.view().head_ingest_seq == index
+                    release.set()
                 deadline = time.monotonic() + 15
                 while not ctrl.finished and time.monotonic() < deadline:
                     ctrl.step()
                     time.sleep(0.01)
                 assert ctrl.finished
-                assert len(ctrl.observations()) == 2
-                assert ctrl.generations()[1]["base_ingest_seq"] >= 1
+                assert len(ctrl.observations()) == budget
+                assert [row["base_ingest_seq"] for row in ctrl.generations()] == list(range(budget))
             finally:
-                release.set()
+                for _, release in delayed:
+                    release.set()
 
 
 def test_shared_initialization_relocates_backbone_and_checks_h3(tmp_path):

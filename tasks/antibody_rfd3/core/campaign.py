@@ -176,10 +176,12 @@ def _run_locked(args, task_spec, directory):
             policy = stack.enter_context(open_policy(args, directory, config.campaign_id, selector))
         else:
             selector = DedupOnlySelector()
+        research_pacing = None if batch or args.research_candidates_per_role else InitializationPacing(
+            wait_for_feedback=not dynamic_policy and args.evaluation_window == 1)
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
             codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
             research=research, history=bridge, selector=selector, policy=policy,
-            pacing=None if batch or args.research_candidates_per_role else InitializationPacing(),
+            pacing=research_pacing,
             objectives=objectives,
             options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30,
                                    max_intents_per_step=16 if batch else 1)))

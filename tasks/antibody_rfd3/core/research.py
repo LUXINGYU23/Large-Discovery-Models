@@ -15,13 +15,19 @@ from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
 
 class InitializationPacing(StreamingPacing):
-    """Wait for the shared first measurement before a second research generation."""
+    """Wait for shared initialization and for fresh feedback in single-slot baselines."""
 
     name = "antibody-streaming"
 
+    def __init__(self, *, wait_for_feedback=False):
+        self.wait_for_feedback = wait_for_feedback
+
     def research(self, view):
-        if view.head_ingest_seq == 0 and view.outstanding:
-            return PacingDecision("wait", "initial_measurement_pending")
+        if view.outstanding:
+            if view.head_ingest_seq == 0:
+                return PacingDecision("wait", "initial_measurement_pending")
+            if self.wait_for_feedback:
+                return PacingDecision("wait", "baseline_measurement_pending")
         return super().research(view)
 
 
