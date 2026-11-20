@@ -16,6 +16,9 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain, _sequence_violations
 
 
+LOCAL_SEARCH_TIMEOUT_SECONDS = 1800
+
+
 class LocalProposalResearch:
     version = "1"
     name = "her2-antbo-local-proposals"
@@ -50,7 +53,8 @@ class LocalProposalResearch:
             python = self.args.root / "env/antbo_native/bin/python"
             with (root / "search.log").open("ab") as log:
                 subprocess.run([str(python), "-m", __name__, str(input_path), str(result_path)],
-                               env=env, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+                               env=env, stdout=log, stderr=subprocess.STDOUT,
+                               timeout=LOCAL_SEARCH_TIMEOUT_SECONDS, check=True)
         result = json.loads(result_path.read_text())
         candidates = []
         for seq in result["proposed"]:

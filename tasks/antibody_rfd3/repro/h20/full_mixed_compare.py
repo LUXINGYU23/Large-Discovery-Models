@@ -12,6 +12,7 @@ import subprocess
 
 from .launch_utils import ACTIVE_ROOT, REPO, ROOT, now, private_environment_values, run_case, save_summary
 from .paired_compare import METHODS, SEED_COUNT, audit, make_case, query
+from tasks.antibody_rfd3.core.local_proposals import LOCAL_SEARCH_TIMEOUT_SECONDS
 
 
 SEED_BANK = ROOT / "runs/her2-tk-ard-feedback-pilot-20261120-r2/shared-initialization.json"
@@ -70,6 +71,7 @@ def make_cases(output):
         ldm["command"].extend(("--set", f"args.{key}={json.dumps(value)}"))
     ldm["effective_args"].update({k.replace("-", "_"): v for k, v in LDM_OVERRIDES.items()})
     ldm["policy_execution_timeout_seconds"] = 30
+    ldm["local_proposal_timeout_seconds"] = LOCAL_SEARCH_TIMEOUT_SECONDS
     wrap_runner(ldm["command"], "from functools import partial; from tasks.antibody_rfd3.core import policy; "
                 "policy.DockerPolicyExecutor = partial(policy.DockerPolicyExecutor, timeout_seconds=30)")
     antbo = cases["antbo"]
