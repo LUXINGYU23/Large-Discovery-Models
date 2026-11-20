@@ -1,4 +1,4 @@
-"""Run the 640-score HER2 comparison with a 256-candidate mixed LDM arm."""
+"""Run the 1,280-score HER2 comparison with a 256-candidate mixed LDM arm."""
 from __future__ import annotations
 
 import argparse
@@ -11,13 +11,16 @@ from pathlib import Path
 import subprocess
 
 from .launch_utils import ACTIVE_ROOT, REPO, ROOT, now, private_environment_values, run_case, save_summary
-from .paired_compare import METHODS, audit, make_case, query
+from .paired_compare import METHODS, SEED_COUNT, audit, make_case, query
 
 
 SEED_BANK = ROOT / "runs/her2-tk-ard-feedback-pilot-20261120-r2/shared-initialization.json"
+TOTAL_SCORES = 1280
+SCORES_PER_GENERATION = 64
+RESEARCH_ROUNDS = 20
 LDM_OVERRIDES = {
     "pool-size": 256, "research-candidates-per-role": 64, "local-proposal-count": 128,
-    "research-rounds": 20, "scores-per-generation": 32, "backbones-per-round": 32,
+    "research-rounds": RESEARCH_ROUNDS, "scores-per-generation": SCORES_PER_GENERATION, "backbones-per-round": 32,
     "sequences-per-round": 1024,
 }
 
@@ -56,6 +59,11 @@ def wrap_runner(command, setup):
 
 def make_cases(output):
     cases = {method: make_case(method, "full", output, SEED_BANK) for method in METHODS}
+    for case in cases.values():
+        command = case["command"]
+        index = next(i for i, flag in enumerate(command) if flag.startswith("args.iterations="))
+        command[index] = f"args.iterations={TOTAL_SCORES}"
+        case["effective_args"]["iterations"] = TOTAL_SCORES
     ldm = cases["ldm_harness"]
     for key, value in LDM_OVERRIDES.items():
         ldm["command"].extend(("--set", f"args.{key}={json.dumps(value)}"))
@@ -73,18 +81,20 @@ def make_cases(output):
 def audit_ldm(directory):
     path = directory / "controller.sqlite3"
     generations = query(path, "SELECT generation,base_ingest_seq,state,outcome_json FROM generations ORDER BY generation")
-    if len(generations) != 20:
-        raise RuntimeError("LDM did not complete 20 research generations")
+    if len(generations) != RESEARCH_ROUNDS:
+        raise RuntimeError(f"LDM did not complete {RESEARCH_ROUNDS} research generations")
     expected = {"agent": 128, "antbo_local": 128}
     for index, head, state, outcome in generations:
         data = json.loads(outcome)
-        has_feedback = head == 16 if index == 1 else head > 16 + (index - 2) * 32
+        has_feedback = (head == SEED_COUNT if index == 1
+                        else head > SEED_COUNT + (index - 2) * SCORES_PER_GENERATION)
         if (state != "ready" or not has_feedback or data["eligible"] != 256
                 or data["metadata"]["pool_sources"] != expected):
             raise RuntimeError(f"LDM generation {index} did not meet the pool or feedback requirement")
-    decisions = query(path, "SELECT snapshot_json FROM decisions WHERE decision_id>16 ORDER BY decision_id")
+    decisions = query(path, f"SELECT snapshot_json FROM decisions WHERE decision_id>{SEED_COUNT} ORDER BY decision_id")
     quotas = Counter(json.loads(d)["pacing_state"]["current_generation"] for d, in decisions)
-    if quotas != {**dict.fromkeys(range(1, 20), 32), 20: 16}:
+    final_quota = TOTAL_SCORES - SEED_COUNT - (RESEARCH_ROUNDS - 1) * SCORES_PER_GENERATION
+    if quotas != {**dict.fromkeys(range(1, RESEARCH_ROUNDS), SCORES_PER_GENERATION), RESEARCH_ROUNDS: final_quota}:
         raise RuntimeError("LDM did not preserve the per-generation scoring allocation")
     return {"pool_sources": expected, "online_evaluations_per_generation": dict(sorted(quotas.items()))}
 
@@ -98,13 +108,13 @@ def main():
     if ACTIVE_ROOT not in root.parents:
         parser.error("Use a run root beneath the H20 active data directory")
     bank = json.loads(SEED_BANK.read_text())
-    if len(bank["candidates"]) != 16 or len(bank["backbones"]) != 4:
+    if len(bank["candidates"]) != SEED_COUNT or len(bank["backbones"]) != 4:
         parser.error("Expected 16 common starts with the four preserved seed backbones")
     output = root / "full"
     cases = make_cases(output)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
     if args.plan:
-        print(json.dumps({"commit": commit, "shared_scores": 16, "cases": cases}, indent=2))
+        print(json.dumps({"commit": commit, "shared_scores": SEED_COUNT, "cases": cases}, indent=2))
         return 0
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=REPO, text=True).strip():
         parser.error("Use the clean scheduled checkout")

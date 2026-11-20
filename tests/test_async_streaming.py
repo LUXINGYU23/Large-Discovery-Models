@@ -107,11 +107,11 @@ def spin(h, predicate, timeout=10):
     return False
 
 
-@pytest.mark.parametrize(("pool_size", "last_quota"), [(64, 32), (256, 16)])
-def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path, pool_size, last_quota):
+@pytest.mark.parametrize(("pool_size", "quota", "last_quota"), [(64, 32, 32), (256, 64, 48)])
+def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path, pool_size, quota, last_quota):
     from tasks.antibody_rfd3.core.research import GenerationQuotaPacing
 
-    budget = 80 + last_quota
+    budget = 16 + 2 * quota + last_quota
     source = Source(pool_size)
     pacing = PacingConfig.balanced(concurrency=4, reservoir_size=pool_size, half_life=32,
                                   theta=0.75, dispatch_during_research="continue", research_budget=3)
@@ -120,16 +120,16 @@ def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path, poo
         h.start_es()
         h.ctrl = PacedController(h.db, settings, codec=ToyCodec(),
             client=h.client(), clock=h.clock, research=source, lane_executor=InlineExecutor(h.clock),
-            pacing=GenerationQuotaPacing(16, 32), options=h.options)
+            pacing=GenerationQuotaPacing(16, quota), options=h.options)
         h.ctrl.add_proposals(tuple(Proposal(c, "initialization") for c in toy_candidates(16, 10000)),
                              generation=0, watermark=0)
         assert h.drive(until=lambda: h.ctrl.finished)
         decisions = h.ctrl.decisions()
         assert len(decisions) == len(h.ctrl.observations()) == budget
         assert [d["snapshot"]["pacing_state"]["current_generation"] for d in decisions] == (
-            [0] * 16 + [1] * 32 + [2] * 32 + [3] * last_quota)
+            [0] * 16 + [1] * quota + [2] * quota + [3] * last_quota)
         assert source.calls[0][1] == 16
-        assert source.calls[1][1] > 16 and source.calls[2][1] > 48
+        assert source.calls[1][1] > 16 and source.calls[2][1] > 16 + quota
         assert source.calls[1][2] and source.calls[2][2]
 
 
