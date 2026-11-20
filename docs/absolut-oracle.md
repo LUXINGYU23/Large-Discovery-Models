@@ -1,6 +1,6 @@
 # Absolut scoring in the streaming PoC
 
-The `antibody_rfd3` task submits scoring to the HTTP experiment service. Each
+The `ldm_harness` method of `antibody_rfd3` submits scoring to the HTTP experiment service. Each
 attempt runs in its own directory and uses read-only inputs verified by
 `assets.json`. The controller ingests the score and records the experiment
 and attempt identity in SQLite. A failed run does not substitute mock scores.
@@ -20,8 +20,9 @@ matching precomputed structure and the detailed and compact interaction files,
 plus the self-folding inputs from the same cache. The tool verifies the read-only
 bundle before publishing it.
 
-Each real baseline uses the same initial design receipt for its target and
-re-scores the first candidate through the experiment service. See the
+The fixed, Pi and AntBO baselines use the original synchronous Absolut
+adapter with the published initialization receipt for each target. They
+write native evaluation results and logs under their own run directories. See the
 [task instructions](../tasks/antibody_rfd3/README.md) for the run command.
 The historical [research](../tasks/antibody_rfd3/resources/h20-real-sessions.json)
 and [baseline](../tasks/antibody_rfd3/resources/h20-real-baselines.json)

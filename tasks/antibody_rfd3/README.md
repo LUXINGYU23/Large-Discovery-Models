@@ -52,7 +52,7 @@ for the guest cache. On Linux prepare and smoke the task guest with the
 the task resources and a private Unix socket. The model weights stay on the host.
 
 For paired comparisons, run the fixed case once per seed, then give every
-other method its output directory as `args.initialization-run`. The worker
+comparison method its output directory as `args.initialization-run`. The worker
 replays the original initialization batch, including the mapping and backbone
 artifacts, so every method evaluates the same first eligible H3 even if GPU
 kernels yield slightly different sequences on independent launches. It records
@@ -112,12 +112,12 @@ run on H20. The obsolete synchronous scripted-provider smoke has been removed.
 
 For each target (`her2` or `pd1`), the configs
 `<target>_fixed_real.yaml`, `<target>_antbo_real.yaml` and
-`<target>_harness_real.yaml` run three evaluations using streaming pacing with
-one evaluation slot. All three reuse the same published initialization job
-for the target. Native AntBO records which fresh energies were handed to its
-optimizer and retains its optimizer checkpoint for each generation. The Pi
-baseline can query measured history, generate designs and submit its selection.
-All methods use the same HTTP scoring and attempt receipts.
+`<target>_harness_real.yaml` use the original synchronous campaign. The next
+proposal step starts after the previous score is recorded. All three reuse the
+same published initialization job for the target and retain their original
+Absolut evaluator and per-run artifacts. Native AntBO records the measurements
+handed to its optimizer. The single Pi baseline receives measured history in
+its turn input and submits its preferred candidate.
 
 ```sh
 ROOT=/Aidata/shared/ldm/antibody-poc
@@ -136,5 +136,6 @@ barrier configs retain their own budgets and scheduling settings.
 
 The [historical baseline report](resources/h20-real-baselines.json) and
 `repro/h20/verify_baselines.py` document and verify the original branch's
-completed runs. New runs produce controller and experiment-service ledgers
-with isolated scoring attempts.
+completed synchronous runs. The LDM reference uses controller and
+experiment-service ledgers, and its full streaming configuration permits
+research and evaluation to overlap.

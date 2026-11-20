@@ -6,11 +6,14 @@ description: Three real PD-1 evaluations with fixed and shared initialization.
 args:
   method: fixed
   oracle: absolut
-  antigen: 5GGR_Y_FuC_5.25
+  antigen: PD-1
   iterations: 3
   pool-size: 2
   seed: 42
   initialization-run: /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1
-  concurrency: 1
-  absolut-path: /Aidata/shared/ldm/antibody-poc/cache/absolut-async/5GGR_Y_FuC_5.25
+  absolut-path: /Aidata/shared/ldm/antibody-poc/env/sources/Absolut
+  absolut-resources:
+    - /Aidata/shared/ldm/antibody-poc/env/sources/Absolut
+    - /Aidata/shared/ldm/antibody-poc/runs/absolut-pd1-5GGR-Y
+  absolut-timeout: 600
   out-dir: runs/antibody_rfd3/pd1-fixed-real

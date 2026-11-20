@@ -11,7 +11,7 @@ from ldm_tts.harness.history import HistoryLog, HistoryRecord
 from ldm_tts.harness.pi_research import proposal_validator
 from tasks.antibody_rfd3.core.harness import AntibodyPiResearch, profile
 from tasks.antibody_rfd3.core.worker import DesignWorker
-from tasks.antibody_rfd3.core.workflow import parse_args
+from tasks.antibody_rfd3.core.workflow import parse_args, run
 from tasks.antibody_rfd3.ldm_task.procedure import main
 
 
@@ -35,9 +35,22 @@ class FakeNativeAntBO:
                 "torch": float(torch.rand(())), "history_size": len(history), "pending": sorted(pending)}
 
 
+def test_public_baseline_uses_synchronous_campaign(tmp_path):
+    out = tmp_path / "baseline"
+    assert main(["--method", "fixed", "--mock", "--out-dir", str(out)]) == 0
+    summary = json.loads((out / "summary.json").read_text())
+    assert summary["successful_evaluation_count"] == 2
+    assert (out / "checkpoint.json").is_file()
+    assert not (out / "controller.sqlite3").exists()
+
+
+def async_main(argv):
+    return run(parse_args(argv))
+
+
 def test_two_round_offline_campaign(tmp_path):
     out = tmp_path / "fixture"
-    assert main(["--method", "fixed", "--mock", "--out-dir", str(out)]) == 0
+    assert async_main(["--method", "fixed", "--mock", "--out-dir", str(out)]) == 0
     summary = json.loads((out / "summary.json").read_text())
     assert summary["successful_evaluation_count"] == 2
     assert set(summary["incumbent"]["evaluation"]["metrics"]) == {"mock_energy"}
@@ -49,7 +62,7 @@ def test_two_round_offline_campaign(tmp_path):
     assert len(rows) == 2
     assert all(len(json.loads(row[0])["payload"]["sequence"]) == 11 for row in rows)
     before = (out / "history/log.jsonl").read_text()
-    assert main(["--method", "fixed", "--mock", "--out-dir", str(out), "--resume-run", str(out)]) == 0
+    assert async_main(["--method", "fixed", "--mock", "--out-dir", str(out), "--resume-run", str(out)]) == 0
     assert (out / "history/log.jsonl").read_text() == before
 
 
@@ -180,7 +193,7 @@ def test_second_controller_cannot_stop_the_active_experiment_service(tmp_path):
     with experiment_service(directory, args) as (process, url):
         with RunLock(directory / "campaign.lock"):
             with pytest.raises(RunLockHeld):
-                main(["--method", "fixed", "--mock", "--resume-run", str(directory)])
+                async_main(["--method", "fixed", "--mock", "--resume-run", str(directory)])
             assert process.poll() is None
             assert ESClient(url).kind(KIND)
 

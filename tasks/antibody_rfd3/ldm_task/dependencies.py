@@ -1,4 +1,5 @@
 import os
+import subprocess
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -23,8 +24,25 @@ def check_dependencies(plan, *, include_optional=True):
         check("Antibody GP", find_spec("gpytorch") and find_spec("torch"), "Install the task's gp extra")
     if args.get("oracle") == "absolut":
         base = args.get("absolut-path") or env.get("ABSOLUT_PATH")
-        check("Absolut", base and os.access(Path(base) / "src/bin/Absolut", os.X_OK)
-              and (Path(base) / "assets.json").is_file(), "Executable and immutable cache manifest")
+        binary = base and os.access(Path(base) / "src/bin/Absolut", os.X_OK)
+        if method == "ldm_harness":
+            check("Absolut", binary and (Path(base) / "assets.json").is_file(),
+                  "Executable and immutable cache manifest")
+        else:
+            check("Absolut", binary, "External repertoire executable")
+            from tasks.antibody.core.absolut_oracle import AbsolutOracle, TARGETS
+            target = args.get("antigen", "1ADQ_A")
+            if binary and TARGETS.get(target, target) in TARGETS.values():
+                resources = args.get("absolut-resources") or [base]
+                if isinstance(resources, str):
+                    resources = [resources]
+                try:
+                    AbsolutOracle(base, resources, Path(cwd) / "runs",
+                                  int(args.get("absolut-timeout", 600))).preflight(target, require_cache=True)
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                    check("Antigen resources", False, str(exc))
+                else:
+                    check("Antigen resources", True, target)
     if method in ("ldm_harness", "harness"):
         check("Pi endpoint", env.get("LLM_BASE_URL") and env.get("LLM_MODEL_NAME") and
               (env.get("LLM_API_KEY") or env.get("OPENAI_API_KEY")), "Responses endpoint, model and API key")
