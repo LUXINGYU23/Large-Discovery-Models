@@ -16,13 +16,13 @@ python scripts/validate_tasks.py --task antibody_rfd3
 python scripts/run_ldm_tts.py config/antibody_rfd3/mock.yaml
 ```
 
-The four other configs run real proposal methods, with `--oracle mock` as the
-default for integration. `mock_energy` is a deterministic hash of the antigen
-and H3 mapped to [-1, 0]. It has no biological interpretation. To measure
-`absolut_energy`, select `--set args.oracle=absolut` and export `ABSOLUT_PATH`
-to an [immutable Absolut input bundle](../../docs/absolut-oracle.md) containing
-`assets.json` and `src/bin/Absolut`. The shared HTTP evaluator scores only the
-11-residue sequence.
+The four other configs exercise the proposal methods with `--oracle mock`.
+`mock_energy` is a deterministic hash of the antigen and H3 mapped to [-1, 0].
+It has no biological interpretation. The real baseline configs below specify
+the original Absolut installation and resource directories. For real streaming
+LDM scores, set `args.absolut-path` to an
+[immutable Absolut input bundle](../../docs/absolut-oracle.md) containing
+`assets.json` and `src/bin/Absolut`.
 
 | Config | Proposal and selection after the shared initialization |
 |---|---|
@@ -124,7 +124,7 @@ ROOT=/Aidata/shared/ldm/antibody-poc
 export ANTBO_HOME="$ROOT/env/sources/HEBO-77636146/AntBO"
 "$ROOT/env/antbo_native/bin/python" scripts/run_ldm_tts.py \
   config/antibody_rfd3/her2_antbo_real.yaml \
-  --set args.out-dir="$ROOT/runs/antibody_rfd3/her2-antbo-async"
+  --set args.out-dir="$ROOT/runs/antibody_rfd3/her2-antbo-comparison"
 ```
 
 Use the campaign interpreter for fixed and Pi. For Pi, load the configured
