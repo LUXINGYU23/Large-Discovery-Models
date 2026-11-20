@@ -1,0 +1,15 @@
+name: antibody_rfd3_pd1_real
+task: antibody_rfd3
+algorithm: ldm_harness
+mode: real
+description: Three-round Pi research session with real Absolut energy for PD-1.
+args:
+  method: ldm_harness
+  oracle: absolut
+  antigen: 5GGR_Y_FuC_5.25
+  iterations: 3
+  pool-size: 2
+  seed: 42
+  concurrency: 1
+  absolut-path: /Aidata/shared/ldm/antibody-poc/cache/absolut-async/5GGR_Y_FuC_5.25
+  out-dir: runs/antibody_rfd3/pd1-real

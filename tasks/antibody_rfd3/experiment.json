@@ -42,7 +42,9 @@
   "evaluation": {
     "datasets": [
       "1N8Z VH B1-120",
-      "1ADQ_A"
+      "1ADQ_A",
+      "1N8Z_C",
+      "5GGR_Y_FuC_5.25"
     ],
     "settings": {
       "mock": "mock-v1 sequence hash",

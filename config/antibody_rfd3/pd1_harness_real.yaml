@@ -1,0 +1,16 @@
+name: antibody_rfd3_pd1_harness_real
+task: antibody_rfd3
+algorithm: harness
+mode: real
+description: Three real PD-1 evaluations with harness and shared initialization.
+args:
+  method: harness
+  oracle: absolut
+  antigen: 5GGR_Y_FuC_5.25
+  iterations: 3
+  pool-size: 2
+  seed: 42
+  initialization-run: /Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/real-sessions-20261119-02/pd1
+  concurrency: 1
+  absolut-path: /Aidata/shared/ldm/antibody-poc/cache/absolut-async/5GGR_Y_FuC_5.25
+  out-dir: runs/antibody_rfd3/pd1-harness-real

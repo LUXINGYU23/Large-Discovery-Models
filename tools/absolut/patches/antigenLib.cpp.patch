@@ -1,0 +1,16 @@
+--- a/src/Absolut/antigenLib.cpp
++++ b/src/Absolut/antigenLib.cpp
+@@ -1273,6 +1273,13 @@
+     // Now, multi-chains proteins
+     vector<int> startPosChains;
+     vector<string> structChains;
++    if(codeID == str2int("5GGR_Y_FuC_5.25")){
++        startPosChains = {133152, 145759};
++        structChains = {"SULURLDRUDUDRLLUDRLDDULDURLDURSDLLSLSDRLRLRLD", "UDRUDSLLUDRDLLDUDLRDLDUSUDRDURRUSDSLRLSSLSULDLURSDSSSUSUUDSRULSURSDRULR"};
++        agSeq = "SPDRPWNPPTFSPALLVVTEGDNATFTCSFSNTSESFVLNWYRMSPQTDKLAAFPEDRSQPGQDSRFRVTQLPNGRDFHMSVVRARRNDSGTYLCGAISLAPKAQIKESLRAELRVTE";
++        blockV = {141472, 145568, 149789, 153823, 153887, 157855, 157917, 157982, 157984, 162078};
++    }
++
+     // use agSeq with the full list of AAs of all chains
+ 
+     if(codeID == str2int("1CZ8_VW_Jack")){

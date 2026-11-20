@@ -20,14 +20,15 @@ The four other configs run real proposal methods, with `--oracle mock` as the
 default for integration. `mock_energy` is a deterministic hash of the antigen
 and H3 mapped to [-1, 0]. It has no biological interpretation. To measure
 `absolut_energy`, select `--set args.oracle=absolut` and export `ABSOLUT_PATH`
-to the Absolut installation containing the antigen lattice files and
-`src/bin/Absolut`. The shared evaluator scores only the 11-residue sequence.
+to an [immutable Absolut input bundle](../../docs/absolut-oracle.md) containing
+`assets.json` and `src/bin/Absolut`. The shared HTTP evaluator scores only the
+11-residue sequence.
 
 | Config | Proposal and selection after the shared initialization |
 |---|---|
 | `fixed.yaml` | RFD3 and ProteinMPNN at a fixed temperature, then the first eligible new H3 in sampling order |
 | `harness.yaml` | One persistent Pi session uses the tools and submits its preferred eligible design ID |
-| `ldm_harness.yaml` | The same Pi skill and tools produce distinct design IDs. The categorical antibody GP selects one using expected improvement for minimization |
+| `ldm_harness.yaml` | The research panel generates and reviews distinct design IDs. Pending-aware BO selects candidates using the fitted GP and dynamic policy |
 | `antbo.yaml` | Upstream AntBO receives measured H3s through `observe` and proposes through `suggest`, subject to the common campaign admission rules |
 
 Use the deployed independent structure design environments and archived weights
@@ -106,3 +107,34 @@ LLM endpoint, real generation, and HER2 Absolut scoring. See
 and H20 preparation. Role budgets, history replay, pending conditioning and
 policy recovery also have provider-free tests under `tests/`; these tests are
 run on H20. The obsolete synchronous scripted-provider smoke has been removed.
+
+## Paired real baselines on H20
+
+For each target (`her2` or `pd1`), the configs
+`<target>_fixed_real.yaml`, `<target>_antbo_real.yaml` and
+`<target>_harness_real.yaml` run three evaluations using streaming pacing with
+one evaluation slot. All three reuse the same published initialization job
+for the target. Native AntBO records which fresh energies were handed to its
+optimizer and retains its optimizer checkpoint for each generation. The Pi
+baseline can query measured history, generate designs and submit its selection.
+All methods use the same HTTP scoring and attempt receipts.
+
+```sh
+ROOT=/Aidata/shared/ldm/antibody-poc
+export ANTBO_HOME="$ROOT/env/sources/HEBO-77636146/AntBO"
+"$ROOT/env/antbo_native/bin/python" scripts/run_ldm_tts.py \
+  config/antibody_rfd3/her2_antbo_real.yaml \
+  --set args.out-dir="$ROOT/runs/antibody_rfd3/her2-antbo-async"
+```
+
+Use the campaign interpreter for fixed and Pi. For Pi, load the configured
+Responses endpoint and a compatible sidecar before running. The
+`<target>_real.yaml` configurations start a fresh three-evaluation LDM reference
+run. For a fresh paired comparison, pass that completed run directory as
+`args.initialization-run` to each baseline. The existing full streaming and
+barrier configs retain their own budgets and scheduling settings.
+
+The [historical baseline report](resources/h20-real-baselines.json) and
+`repro/h20/verify_baselines.py` document and verify the original branch's
+completed runs. New runs produce controller and experiment-service ledgers
+with isolated scoring attempts.

@@ -182,7 +182,7 @@ def _lock_path(base, antigen):
 
 def _assets(base, antigen):
     """Validate the run's immutable, explicitly listed Absolut inputs once."""
-    if not re.fullmatch(r"[A-Za-z0-9_]+", antigen):
+    if not re.fullmatch(r"[A-Za-z0-9_]+(?:\.[0-9]+)?", antigen):
         raise ValueError("invalid Absolut antigen name")
     manifest_path = base / "assets.json"
     if manifest_path.is_symlink() or not manifest_path.is_file():

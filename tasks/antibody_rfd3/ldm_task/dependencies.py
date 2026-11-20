@@ -23,7 +23,8 @@ def check_dependencies(plan, *, include_optional=True):
         check("Antibody GP", find_spec("gpytorch") and find_spec("torch"), "Install the task's gp extra")
     if args.get("oracle") == "absolut":
         base = args.get("absolut-path") or env.get("ABSOLUT_PATH")
-        check("Absolut", base and (Path(base) / "src/bin/Absolut").is_file(), "External repertoire executable")
+        check("Absolut", base and os.access(Path(base) / "src/bin/Absolut", os.X_OK)
+              and (Path(base) / "assets.json").is_file(), "Executable and immutable cache manifest")
     if method in ("ldm_harness", "harness"):
         check("Pi endpoint", env.get("LLM_BASE_URL") and env.get("LLM_MODEL_NAME") and
               (env.get("LLM_API_KEY") or env.get("OPENAI_API_KEY")), "Responses endpoint, model and API key")

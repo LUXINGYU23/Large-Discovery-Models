@@ -1,0 +1,80 @@
+CXXFLAGS=-O2 -std=c++11 -DNOQT -include ../Absolut/pdb.h -I.. -I../Ymir -I../latFit -pthread
+all: AbsolutHeadless
+obj0.o: ../Ymir/compact.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj1.o: ../Ymir/lattice.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj2.o: ../Ymir/proteins.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj3.o: ../Ymir/receptorligand.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj4.o: ../Ymir/fastaffinity.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj5.o: ../Ymir/plot3d.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj6.o: ../Tools/stopwatch.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj7.o: ../Tools/md5.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj8.o: ../Ymir/zaptrackball.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj9.o: ../Tools/zaprandom.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj10.o: ../Tools/nucleotides.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj11.o: ../Tools/distribution.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj12.o: ../Absolut/antigenLib.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj13.o: ../Absolut/epitope.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj14.o: ../Absolut/fileformats.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj15.o: ../Absolut/html.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj16.o: ../Absolut/importrepertoire.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj17.o: ../Absolut/motifFeatures.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj18.o: ../Absolut/selfEvo.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj19.o: ../Absolut/quality.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj20.o: ../Absolut/poolstructs.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj21.o: ../Absolut/delimain.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj22.o: ../Absolut/topology.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj23.o: ../Absolut/dlab.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj24.o: ../Absolut/discretize.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj25.o: ../Absolut/pdb.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj26.o: ../latFit/kabsch_nogsl.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj27.o: ../latFit/latFit.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj28.o: ../latFit/biu/Rotator3D.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj29.o: ../latFit/biu/SuperPos_Kabsch.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj30.o: ../latFit/biu/LatticeProteinUtil.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj31.o: ../latFit/biu/LatticeDescriptorCKW.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj32.o: ../latFit/biu/LatticeDescriptorCUB.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj33.o: ../latFit/biu/LatticeDescriptorFCC.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj34.o: ../latFit/biu/LatticeDescriptorSQR.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj35.o: ../latFit/biu/LatticeModel.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj36.o: ../latFit/biu/OptionParser.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj37.o: ../latFit/biu/LatticeDescriptor.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+AbsolutHeadless: obj0.o obj1.o obj2.o obj3.o obj4.o obj5.o obj6.o obj7.o obj8.o obj9.o obj10.o obj11.o obj12.o obj13.o obj14.o obj15.o obj16.o obj17.o obj18.o obj19.o obj20.o obj21.o obj22.o obj23.o obj24.o obj25.o obj26.o obj27.o obj28.o obj29.o obj30.o obj31.o obj32.o obj33.o obj34.o obj35.o obj36.o obj37.o
+	$(CXX) -o $@ $^ -pthread

@@ -17,9 +17,11 @@ python3 -u -m tasks.antibody.tools.structure_design.bootstrap \
 The installer creates `env/rfd3/`, `env/proteinmpnn/`, and a pinned original
 ProteinMPNN source under `env/sources/ProteinMPNN/`. It fixes Python 3.12,
 PyTorch 2.6.0 (CUDA 12.4), NumPy 1.26.4, rc-foundry 0.2.0, and AtomWorks 2.1.1.
-Each environment's resolved `requirements.lock.txt` is saved after `pip check`.
-The initial installation resolves transitive versions; use those lock files to
-reproduce the tested deployment. No system driver or AntBO dependency is changed.
+The bundled `requirements/` locks replay the validated transitive versions.
+Each environment also saves its resolved `requirements.lock.txt` after `pip check`;
+the export uses package versions rather than machine-local wheel URLs. If bundled
+locks are absent, the installer resolves dependencies before exporting them.
+No system driver or AntBO dependency is changed.
 `--stage assets` and `--stage env` can also be run separately.
 
 Weights live outside Git on Ceph through the workspace's existing `archive/`
@@ -163,3 +165,21 @@ python -m pytest tasks/antibody/tools/structure_design/tests/test_common.py -q
 Tests cover explicit H3 identities, chain renaming, insertion codes, exact-length
 admission, malformed mappings and structure constraints. The real H20 smoke run
 separately establishes model execution; passing unit tests alone does not.
+
+### Validated H20 smoke run
+
+[Validation record](validation/h20-smoke.json): 1N8Z VH, seed 42, 200 diffusion
+steps, one structure and one MPNN sequence, on shared physical GPU 1 with the
+24 GiB allocator cap. The complete pipeline passed in 53.4 seconds; sampled
+process GPU memory peaks were 2,688 MiB (RFD3) and 414 MiB (ProteinMPNN).
+These are one-case measurements under shared load, not general performance or
+memory guarantees. The final H3 was `SNGDWGSPGTV`; all non-design sequence
+positions remained unchanged. No binding-energy evaluation was performed.
+
+Full artifacts are under the deployment workspace's
+`runs/structure_design/pipeline-gpu-002/`, including a checksum-verified
+`tool-source.tar.gz` snapshot of the runtime sources used for that run. The
+validation record also covers standalone sequence design with extraction off,
+explicit H3 extraction, source/weight hashes and dependency checks. The installer
+lock export was subsequently normalized to portable exact versions; it does not
+change the model runtime or this measured generation result.
