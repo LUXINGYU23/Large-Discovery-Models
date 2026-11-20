@@ -34,6 +34,9 @@ def test_dependency_hook_parses_runner_timeout_and_resources(tmp_path, monkeypat
     def preflight(oracle, target, require_cache=False):
         seen.append((oracle.timeout, oracle.resources, target, require_cache))
     monkeypatch.setattr(AbsolutOracle, "preflight", preflight)
+    binary = tmp_path / "src/bin/Absolut"
+    binary.parent.mkdir(parents=True)
+    binary.touch(mode=0o755)
     plan = {"task": "antibody_rfd3", "cwd": str(tmp_path), "argv": [
         "--method", "fixed", "--oracle", "absolut", "--antigen", "HER2",
         "--absolut-path", str(tmp_path), "--absolut-timeout", "600",

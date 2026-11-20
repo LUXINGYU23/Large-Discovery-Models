@@ -20,7 +20,8 @@ def main():
     root.mkdir(parents=True, exist_ok=False)
     directory = root / "run"
     repo = Path(__file__).resolve().parents[4]
-    command = [sys.executable, "-m", "tasks.antibody_rfd3.ldm_task.procedure", "--mock",
+    command = [sys.executable, "-c", "from tasks.antibody_rfd3.core.workflow import parse_args, run; "
+               "raise SystemExit(run(parse_args()))", "--mock",
                "--method", "fixed", "--iterations", "12", "--concurrency", "2", "--out-dir", str(directory)]
     env = dict(os.environ, PYTHONPATH=str(repo), CUDA_VISIBLE_DEVICES="")
     first = second = None

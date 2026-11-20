@@ -1,5 +1,10 @@
 # PoC 的完整异步任务入口
 
+> 本文归档 2026-11-18 的全异步验收。以下四方法复现命令对应原
+> `antibody-poc-async` 工作树。RSD3 整合分支仅将 `ldm_harness`
+> 接入异步控制器。fixed、Pi 和 AntBO 对照遵循
+> [当前任务说明](../tasks/antibody_rfd3/README.md) 中的同步入口。
+
 `antibody_rfd3` 的四种方法统一使用 `PacedController`、独立 HTTP 实验服务和持久化研究队列。原同步入口与整数 fixture 分支已移除。异步框架、历史查询和 Harness 0.4 来自通用框架提交 `09424112757472c9174c7676f6af0c03a64c206e`，单向引入本 PoC 分支；PoC 内容不回传到 Claude 工作区。
 
 ## 运行链路

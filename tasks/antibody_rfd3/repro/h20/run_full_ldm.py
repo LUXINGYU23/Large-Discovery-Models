@@ -15,7 +15,7 @@ import subprocess
 
 import yaml
 
-from tasks.antibody_rfd3.repro.h20.async_smoke import (
+from tasks.antibody_rfd3.repro.h20.launch_utils import (
     ACTIVE_ROOT, CAMPAIGN_PYTHON, REPO, now, private_environment_values,
     run_case, save_summary,
 )

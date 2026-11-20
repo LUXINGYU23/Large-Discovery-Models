@@ -7,7 +7,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 from tasks.antibody_rfd3.core.experiments import _assets
-from tasks.antibody_rfd3.repro.h20.async_smoke import ACTIVE_ROOT, save_summary
+from tasks.antibody_rfd3.repro.h20.launch_utils import ACTIVE_ROOT, save_summary
 from tasks.antibody_rfd3.repro.h20.run_full_ldm import digest
 
 
