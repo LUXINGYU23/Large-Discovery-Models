@@ -33,6 +33,7 @@ def parse_args(argv=None):
     p.add_argument("--research-candidates-per-role", type=int, default=0,
                    help="Unique new proposals required from each generating role")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed-bank", type=Path, help="Shared candidates evaluated before online selection")
     p.add_argument("--initialization-run", type=Path,
                    help="Replay initial design jobs from a real-generator campaign for paired comparisons")
     p.add_argument("--pool-size", type=int, default=2)

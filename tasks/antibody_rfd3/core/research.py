@@ -19,7 +19,12 @@ class InitializationPacing(StreamingPacing):
 
     name = "antibody-streaming"
 
+    def __init__(self, initial_evaluations=1):
+        self.initial_evaluations = initial_evaluations
+
     def research(self, view):
+        if self.initial_evaluations > 1 and view.head_ingest_seq < self.initial_evaluations:
+            return PacingDecision("wait", "shared_initialization")
         if view.head_ingest_seq == 0 and view.outstanding:
             return PacingDecision("wait", "initial_measurement_pending")
         return super().research(view)

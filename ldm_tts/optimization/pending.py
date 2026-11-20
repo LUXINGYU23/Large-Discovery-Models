@@ -126,6 +126,8 @@ def fit_residual_surrogate(
     # Standardization does not depend on the residual prior; reuse the plain fit's constants.
     values = np.asarray([prior[key] for key in keys if key in prior], dtype=float)
     residual = (values - base.y_mean) / base.y_std
+    if settings.get("tk_ard_group_size") is not None:
+        settings = {**settings, "standardization": base.standardization()}
     return RBFGPSurrogate(rows, residual_prior_mean=residual, **settings), excluded
 
 

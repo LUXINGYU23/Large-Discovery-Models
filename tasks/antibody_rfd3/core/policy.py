@@ -37,13 +37,14 @@ def featurize(candidate):
     return tuple(float(aa == residue) for residue in sequence for aa in AMINO_ACIDS)
 
 
-def make_selector():
+def make_selector(*, tk_ard=False):
     """The reference GP maximizes utility; the codec freezes utility = -energy."""
     return ReferenceSelector(featurize=featurize, objective_name=ENERGY_UTILITY,
         feature_version=FEATURE_VERSION, weights_from_policy=True,
         rule=SelectionRule(alpha=1.0, eta=1.0, beta=1.0, z_clip=3.0,
                            pending_handling="kriging_believer"),
-        lengthscale=3.0, noise=1e-4, feature_scale_floor=1.0, target_scale_floor=0.01)
+        **({"tk_ard_group_size": len(AMINO_ACIDS)} if tk_ard else {}),
+        lengthscale=1.0 if tk_ard else 3.0, noise=1e-4, feature_scale_floor=1.0, target_scale_floor=0.01)
 
 
 class AntibodyPolicyAdapter:
@@ -75,6 +76,13 @@ class AntibodyPolicyPrior(PolicyPrior):
     """Use the same utility and immutable feature contract in turns and applications."""
 
     version = "2"
+
+    def covered(self, candidates):
+        if self.current() is None and self.controller.config.extra.get("task", {}).get("initial_candidate_keys"):
+            keys = set(self.controller.config.extra["task"]["initial_candidate_keys"])
+            return [c for c in candidates if c.canonical_key in keys], tuple(
+                c.canonical_key for c in candidates if c.canonical_key not in keys)
+        return super().covered(candidates)
 
     def context(self, generation, location, scale):
         context = super().context(generation, location, scale)

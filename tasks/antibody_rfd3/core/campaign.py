@@ -11,7 +11,7 @@ import sys
 import time
 
 from ldm_tts.async_runtime import (CampaignConfig, DedupOnlySelector, ESClient, PacedController, PacingConfig,
-                                   RunLock, RuntimeOptions, campaign_extra, check_invariants)
+                                   Proposal, RunLock, RuntimeOptions, campaign_extra, check_invariants)
 from ldm_tts.async_runtime.history_bridge import HistoryBridge
 from ldm_tts.contracts import ObjectiveSet, ObjectiveSpec
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir
@@ -19,6 +19,7 @@ from ldm_tts.registration.experiment import load_active_experiment_contract
 from .experiments import AntibodyCodec, KIND, history_projection
 from .research import InitializationPacing, NativeResearch
 from .worker import DesignWorker
+from .seed_bank import load_seed_bank
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 
@@ -135,7 +136,13 @@ def pacing_config(args):
 
 
 def _run_locked(args, task_spec, directory):
+    seeds = load_seed_bank(args)
+    if seeds and (args.pacing_mode != "streaming" or not args.research_candidates_per_role
+                  or len(seeds) > args.pool_size):
+        raise ValueError("Shared initialization requires streaming, a panel and room in the reservoir")
     config_data = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
+    if seeds:
+        config_data["initial_candidate_keys"] = [c.canonical_key for c in seeds]
     ignored = {"out_dir", "dry_run", "resume_run"}
     scientific = {key: value for key, value in config_data.items() if key not in ignored}
     if args.resume_run:
@@ -172,19 +179,31 @@ def _run_locked(args, task_spec, directory):
         policy = None
         if dynamic_policy:
             from .policy import make_selector, open_policy
-            selector = make_selector()
+            selector = make_selector(tk_ard=True)
             policy = stack.enter_context(open_policy(args, directory, config.campaign_id, selector))
         else:
             selector = DedupOnlySelector()
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
             codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
             research=research, history=bridge, selector=selector, policy=policy,
-            pacing=None if batch or args.research_candidates_per_role else InitializationPacing(),
+            pacing=InitializationPacing(len(seeds)) if seeds else (
+                None if batch or args.research_candidates_per_role else InitializationPacing()),
             objectives=objectives,
             options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30,
                                    max_intents_per_step=16 if batch else 1)))
         error = None
         try:
+            if seeds and not ctrl.store.value("SELECT COUNT(*) FROM occurrences"):
+                ctrl.add_proposals(tuple(Proposal(candidate, "shared_initialization") for candidate in seeds),
+                                   generation=0, watermark=0)
+            while seeds and ctrl.view().head_ingest_seq < len(seeds):
+                if process.poll() is not None:
+                    raise RuntimeError("Experiment service exited during shared initialization")
+                progressed = ctrl.step()
+                if ctrl.view().paused or any(not item.evaluation.succeeded for item in ctrl.observations()):
+                    raise RuntimeError("Shared initialization did not complete successfully")
+                if not progressed:
+                    time.sleep(0.05)
             if args.resume_run and ctrl.view().lane.state == "blocked":
                 ctrl.resolve_lane("retry", "resume-run")
             while not ctrl.finished:

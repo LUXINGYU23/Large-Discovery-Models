@@ -60,6 +60,7 @@ class RBFGPSurrogate:
         feature_scale_floor: float | None = None,
         target_scale_floor: float | None = None,
         standardization: GPStandardization | None = None,
+        tk_ard_group_size: int | None = None,
     ) -> None:
         """``standardization`` freezes the scaling constants instead of recomputing them.
 
@@ -72,6 +73,7 @@ class RBFGPSurrogate:
                 raise ValueError("RBFGPSurrogate requires scalar BO observations")
             if item.feature is None:
                 raise ValueError("RBFGPSurrogate observations require surrogate representations")
+        self.tk_ard_group_size = tk_ard_group_size
         self.lengthscale = max(1.0e-6, float(lengthscale))
         self.noise = max(1.0e-9, float(noise))
         self.prior_mean = float(prior_mean)
@@ -125,8 +127,19 @@ class RBFGPSurrogate:
             self.x_mean = np.asarray(frozen.x_mean, dtype=float)
             self.x_std = np.asarray(frozen.x_std, dtype=float)
             self.y_mean, self.y_std = float(frozen.y_mean), float(frozen.y_std)
-        self.Xz = (self.X - self.x_mean) / self.x_std
         yz = (self.y - self.y_mean) / self.y_std
+        if self.tk_ard_group_size is not None:
+            group_size = self.tk_ard_group_size
+            positions = self.X.reshape(len(self.X), -1, group_size)
+            if not np.array_equal(positions, np.eye(group_size)[positions.argmax(axis=-1)]):
+                raise ValueError("TK-ARD requires position-major one-hot features")
+            if frozen is None:
+                from ldm_tts.optimization.tk_ard import train_tk
+                codes = positions.argmax(axis=-1)
+                weights, _ = train_tk(codes[:, None, :] != codes[None, :, :], yz)
+                self.x_mean = np.zeros(self.X.shape[1])
+                self.x_std = 1 / (self.lengthscale * np.sqrt(np.repeat(weights, group_size)))
+        self.Xz = (self.X - self.x_mean) / self.x_std
         if self.residual_prior_mean is not None:
             yz = yz - self.residual_prior_mean
         kernel = _rbf_kernel(self.Xz, self.Xz, self.lengthscale)
@@ -179,7 +192,8 @@ class RBFGPSurrogate:
             mean=float(mean),
             std=float(std),
             acquisition_score=acquisition_score,
-            metadata={"surrogate": "exact_rbf_gp", "fit_status": self.fit_status},
+            metadata={"surrogate": "exact_rbf_gp" if self.tk_ard_group_size is None else "exact_tk_ard_gp",
+                      "fit_status": self.fit_status},
         )
 
     def posterior_projection(self, vectors) -> dict[str, np.ndarray]:
@@ -253,6 +267,7 @@ class RBFGPSurrogate:
             feature_scale_floor=self.feature_scale_floor,
             target_scale_floor=self.target_scale_floor,
             standardization=self.standardization(),
+            tk_ard_group_size=self.tk_ard_group_size,
         )
         model.fantasy_count = self.fantasy_count + len(fantasies)
         return model
@@ -276,6 +291,11 @@ class RBFGPSurrogate:
             "best_observed": max(scores) if scores else None,
             "mean_observed": float(np.mean(scores)) if scores else None,
         }
+        if self.tk_ard_group_size is not None:
+            from ldm_tts.optimization.tk_ard import TK_ARD_VERSION
+            summary["kernel"] = TK_ARD_VERSION
+            if self.ready:
+                summary["position_weights"] = (1 / (self.lengthscale * self.x_std[::self.tk_ard_group_size]) ** 2).tolist()
         if self.fantasy_count:
             summary["fantasy_count"] = self.fantasy_count
         return summary

@@ -21,6 +21,7 @@ from tasks.antibody.core.ldm_light.ldm_acq import AbsolutEvaluator
 from tasks.antibody.core.absolut_oracle import TARGETS
 from .evaluator import IsolatedAbsolutEvaluator
 from .worker import DesignWorker
+from ..seed_bank import load_seed_bank
 
 METHODS = ("harness", "fixed", "antbo")
 
@@ -32,6 +33,7 @@ def parse_args(argv=None):
     p.add_argument("--mock", action="store_true", help="Use deterministic generator fixtures for an offline campaign")
     p.add_argument("--iterations", type=int, default=2)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed-bank", type=Path, help="Shared candidates evaluated before online selection")
     p.add_argument("--initialization-run", type=Path,
                    help="Replay the initial design jobs from a completed real-generator campaign for paired comparisons")
     p.add_argument("--pool-size", type=int, default=2)
@@ -98,12 +100,19 @@ class MockOracle:
 
 
 class Expander:
-    def __init__(self, args, worker):
+    def __init__(self, args, worker, seeds=()):
         self.args, self.worker = args, worker
         self.agent = self.native = None
+        self.seeds = seeds
 
     def expand(self, request):
         a = self.args
+        if request.round_idx < len(self.seeds):
+            candidate = self.seeds[request.round_idx]
+            return ExpansionResult((RawProposal(candidate.payload, candidate.source),),
+                                   selection_mode="reservoir_order")
+        if any(not o.evaluation.succeeded for o in request.observations[:len(self.seeds)]):
+            raise RuntimeError("A shared initialization evaluation failed")
         self.worker.round = request.round_idx
         self.worker.evaluated = {o.candidate.canonical_key for o in request.observations}
         history = [dict(round=o.round_idx, sequence=o.candidate.payload["sequence"],
@@ -154,8 +163,9 @@ def run(a):
             raise ValueError("Set --absolut-path or ABSOLUT_PATH to the installation with antigen data")
         evaluator = AntibodyEvaluator(AbsolutEvaluator(dict(antigen=a.antigen, process=1,
             startTask=min(os.sched_getaffinity(0)), path=str(a.absolut_path.resolve())), f"h3-{os.getpid()}"))
+    seeds = load_seed_bank(a)
     worker = DesignWorker(directory, a)
-    expander = Expander(a, worker)
+    expander = Expander(a, worker, seeds)
     contract, profile = load_active_experiment_contract()
     with ExitStack() as stack:
         def setup(runtime):
