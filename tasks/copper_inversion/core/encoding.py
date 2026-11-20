@@ -16,6 +16,10 @@ QWEN_DIMENSION = 1024
 MODEL_REVISION = '97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3'
 NORMALIZATION = 'python-ast-unparse-v1'
 FEATURE_VERSION = 'copper-normalized-ast256-v2'
+# The checkpoint is stored in bfloat16 and the model card recommends half precision with memory-efficient
+# attention; float32 added activation precision only, at O(n^2) attention memory that ran 12 concurrent
+# controllers out of GPU memory. Half precision lets SDPA use its memory-efficient kernels.
+QWEN_DTYPE = 'bfloat16'
 DIMENSION = AST_DIMENSION
 
 
@@ -56,7 +60,7 @@ def encoding_spec(mode='ast'):
     dimensions = {'ast': 256, 'qwen': 1024, 'fusion': 1280}
     if mode not in dimensions:
         raise ValueError('unknown encoding')
-    version = FEATURE_VERSION if mode == 'ast' else f'copper-{NORMALIZATION}-{mode}-{MODEL_REVISION}-v1'
+    version = FEATURE_VERSION if mode == 'ast' else f'copper-{NORMALIZATION}-{mode}-{MODEL_REVISION}-{QWEN_DTYPE}-v2'
     return SurrogateSpaceSpec(kind='vector', representation=f'Normalized code; {mode}; block L2; fusion sqrt(0.5) weights',
                               dimension_policy='fixed', dimension=dimensions[mode], version=version)
 
@@ -75,7 +79,7 @@ class QwenEmbedding:
         import torch
         torch.set_num_threads(1)
         self.model = SentenceTransformer(str(path), device=device, local_files_only=True,
-                                         model_kwargs={'dtype': 'float32'})
+                                         model_kwargs={'dtype': QWEN_DTYPE, 'attn_implementation': 'sdpa'})
         self.model.max_seq_length = 32768
         self.model.eval()
 
