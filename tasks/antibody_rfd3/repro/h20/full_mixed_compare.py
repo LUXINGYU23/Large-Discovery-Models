@@ -20,7 +20,8 @@ SCORES_PER_GENERATION = 64
 RESEARCH_ROUNDS = 20
 LDM_OVERRIDES = {
     "pool-size": 256, "research-candidates-per-role": 64, "local-proposal-count": 128,
-    "research-rounds": RESEARCH_ROUNDS, "scores-per-generation": SCORES_PER_GENERATION, "backbones-per-round": 32,
+    "research-rounds": RESEARCH_ROUNDS, "scores-per-generation": SCORES_PER_GENERATION,
+    "evaluation-window": 32, "concurrency": 8, "backbones-per-round": 32,
     "sequences-per-round": 1024,
 }
 

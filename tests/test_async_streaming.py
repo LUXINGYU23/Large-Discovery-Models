@@ -107,16 +107,18 @@ def spin(h, predicate, timeout=10):
     return False
 
 
-@pytest.mark.parametrize(("pool_size", "quota", "last_quota"), [(64, 32, 32), (256, 64, 48)])
-def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path, pool_size, quota, last_quota):
+@pytest.mark.parametrize(("pool_size", "quota", "last_quota", "workers"),
+                         [(64, 32, 32, 4), (256, 64, 48, 8)])
+def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path, pool_size, quota, last_quota, workers):
     from tasks.antibody_rfd3.core.research import GenerationQuotaPacing
 
     budget = 16 + 2 * quota + last_quota
     source = Source(pool_size)
-    pacing = PacingConfig.balanced(concurrency=4, reservoir_size=pool_size, half_life=32,
+    pacing = PacingConfig.balanced(concurrency=workers, reservoir_size=pool_size, half_life=32,
                                   theta=0.75, dispatch_during_research="continue", research_budget=3)
-    settings = CampaignConfig(CAMPAIGN, budget=budget, concurrency=4, buffer_depth=28, extra=campaign_extra(pacing))
-    with Harness(tmp_path, budget=budget, concurrency=4, buffer_depth=28) as h:
+    settings = CampaignConfig(CAMPAIGN, budget=budget, concurrency=workers, buffer_depth=32 - workers,
+                              extra=campaign_extra(pacing))
+    with Harness(tmp_path, budget=budget, concurrency=workers, buffer_depth=32 - workers) as h:
         h.start_es()
         h.ctrl = PacedController(h.db, settings, codec=ToyCodec(),
             client=h.client(), clock=h.clock, research=source, lane_executor=InlineExecutor(h.clock),
