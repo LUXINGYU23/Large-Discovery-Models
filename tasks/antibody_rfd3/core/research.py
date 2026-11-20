@@ -10,6 +10,7 @@ import tempfile
 import numpy as np
 
 from ldm_tts.async_runtime import PacingDecision, Proposal, ResearchOutcome, StreamingPacing
+from ldm_tts.async_runtime.pacing import research_guards
 from ldm_tts.contracts import CandidateRejection, RawProposal
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
@@ -52,6 +53,8 @@ class GenerationQuotaPacing(InitializationPacing):
             previous = dispatched - self.per_generation
             if view.budget.upper < dispatched or view.head_ingest_seq <= previous:
                 return PacingDecision("wait", "generation_feedback")
+            reason = research_guards(view)
+            return PacingDecision("wait", reason) if reason else PacingDecision("research")
         return super().research(view)
 
 

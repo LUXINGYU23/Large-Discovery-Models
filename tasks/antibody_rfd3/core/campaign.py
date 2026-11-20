@@ -142,8 +142,11 @@ def _run_locked(args, task_spec, directory):
     if seeds and (args.pacing_mode != "streaming" or not exact_pool
                   or len(seeds) > args.pool_size):
         raise ValueError("Shared initialization requires streaming, a panel and room in the reservoir")
-    if args.scores_per_generation and args.iterations != len(seeds) + args.research_rounds * args.scores_per_generation:
-        raise ValueError("Generation quotas and initialization must sum to the evaluation budget")
+    online_budget = args.iterations - len(seeds)
+    if args.scores_per_generation:
+        rounds = (online_budget + args.scores_per_generation - 1) // args.scores_per_generation
+        if rounds != args.research_rounds:
+            raise ValueError("Research rounds must cover the online budget with only the last quota allowed to be short")
     config_data = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     if seeds:
         from ldm_tts.harness import file_sha256
@@ -342,7 +345,8 @@ def _run_locked(args, task_spec, directory):
                     for decision in decisions[len(seeds):]:
                         generation = decision["snapshot"]["pacing_state"]["current_generation"]
                         observed[generation] = observed.get(generation, 0) + 1
-                    expected = dict.fromkeys(range(1, args.research_rounds + 1), args.scores_per_generation)
+                    expected = {g: min(args.scores_per_generation, online_budget - (g - 1) * args.scores_per_generation)
+                                for g in range(1, args.research_rounds + 1)}
                     if observed != expected:
                         problems.append("reserved evaluation counts were not met for each research generation")
                 if batch:
