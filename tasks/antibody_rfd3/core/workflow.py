@@ -32,6 +32,10 @@ def parse_args(argv=None):
                    help="Research generation budget (default: evaluation budget)")
     p.add_argument("--research-candidates-per-role", type=int, default=0,
                    help="Unique new proposals required from each generating role")
+    p.add_argument("--local-proposal-count", type=int, default=0,
+                   help="Number of native local-search proposals per HER2 research generation")
+    p.add_argument("--scores-per-generation", type=int, default=0,
+                   help="Reserve this many online evaluations per ready generation")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--seed-bank", type=Path, help="Shared candidates evaluated before online selection")
     p.add_argument("--initialization-run", type=Path,
@@ -71,9 +75,19 @@ def parse_args(argv=None):
         p.error("evaluation-window cannot be smaller than concurrency")
     if a.pool_size > a.sequences_per_round or a.samples_per_call > a.sequences_per_round:
         p.error("pool-size and samples-per-call must fit the sequence budget")
-    if a.research_candidates_per_role:
-        if a.method != "ldm_harness" or a.pool_size != 2 * a.research_candidates_per_role:
-            p.error("exact role proposals require ldm_harness and pool-size twice research-candidates-per-role")
+    if min(a.local_proposal_count, a.scores_per_generation) < 0:
+        p.error("local proposal count and scores per generation must be nonnegative")
+    if a.local_proposal_count and (a.antigen != "1N8Z_C" or a.oracle != "absolut" or a.mock
+                                   or not a.scores_per_generation):
+        p.error("local proposals require the HER2 Absolut comparison with generation score quotas")
+    if a.scores_per_generation and (a.method != "ldm_harness" or a.pacing_mode != "streaming"
+                                    or not a.seed_bank or not (a.research_candidates_per_role or a.local_proposal_count)
+                                    or a.scores_per_generation > a.pool_size):
+        p.error("generation score quotas require streaming LDM, a seed bank and exact proposal counts")
+    if a.research_candidates_per_role or a.local_proposal_count:
+        if (a.method != "ldm_harness"
+                or a.pool_size != 2 * a.research_candidates_per_role + a.local_proposal_count):
+            p.error("the pool must hold both generating roles' quotas and the local proposal quota")
         if a.sequences_per_round < 4 * a.research_candidates_per_role or a.backbones_per_round < 2:
             p.error("exact role proposals need at least twice the requested sequences per role and two backbones")
         if a.initialization_run:
@@ -105,6 +119,11 @@ def describe_ldm_task(args):
               if gp else ["cdrh3-design"] if args.method == "harness" else [])
     roles = (["explorer", "refiner", "evidence_reviewer", "policy_architect"] if gp
              else ["cdrh3_research"] if args.method == "harness" else [])
+    if args.local_proposal_count:
+        actions += ("antbo_local",)
+        if not args.research_candidates_per_role:
+            actions = ("antbo_local",)
+            roles, skills = ["policy_architect"], ["compile-ldm-policy"]
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",
@@ -124,6 +143,8 @@ def describe_ldm_task(args):
                            "pacing_mode": args.pacing_mode, "evaluation_window": args.evaluation_window,
                            "batch_size": args.batch_size,
                            "research_candidates_per_role": args.research_candidates_per_role,
+                           "local_proposal_count": args.local_proposal_count,
+                           "scores_per_generation": args.scores_per_generation,
                            "skill_ids": skills, "roles": roles}),
         metadata={"antigen": args.antigen, "template": "1N8Z B1-120", "h3": "B99-B109"})
 

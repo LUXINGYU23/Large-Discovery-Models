@@ -30,6 +30,31 @@ class InitializationPacing(StreamingPacing):
         return super().research(view)
 
 
+class GenerationQuotaPacing(InitializationPacing):
+    """Reserve online evaluations for each completed research generation."""
+
+    name = "antibody-streaming-quota"
+
+    def __init__(self, initial_evaluations, per_generation):
+        super().__init__(initial_evaluations)
+        self.per_generation = per_generation
+
+    def decide(self, view):
+        limit = self.initial_evaluations + view.current_generation * self.per_generation
+        if view.budget.upper >= limit and view.budget.free:
+            return PacingDecision("wait", "generation_quota")
+        return super().decide(view)
+
+    def research(self, view):
+        generation = view.current_generation
+        if generation:
+            dispatched = self.initial_evaluations + generation * self.per_generation
+            previous = dispatched - self.per_generation
+            if view.budget.upper < dispatched or view.head_ingest_seq <= previous:
+                return PacingDecision("wait", "generation_feedback")
+        return super().research(view)
+
+
 class NativeResearch:
     version = "1"
 

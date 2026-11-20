@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
+from copy import copy
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ from ldm_tts.contracts import ObjectiveSet, ObjectiveSpec
 from ldm_tts.engine.run_store import atomic_json_write, unique_run_dir
 from ldm_tts.registration.experiment import load_active_experiment_contract
 from .experiments import AntibodyCodec, KIND, history_projection
-from .research import InitializationPacing, NativeResearch
+from .research import GenerationQuotaPacing, InitializationPacing, NativeResearch
 from .worker import DesignWorker
 from .seed_bank import load_seed_bank
 
@@ -124,7 +125,7 @@ def run(args, task_spec):
 
 
 def pacing_config(args, *, initialization_count=0):
-    exact_roles = bool(args.research_candidates_per_role)
+    exact_roles = bool(args.research_candidates_per_role or args.local_proposal_count)
     if args.pacing_mode == "barrier":
         return PacingConfig.barrier(reservoir_size=args.pool_size, selection_batch_size=args.batch_size,
                                     research_budget=args.research_rounds, research_timeout_seconds=23400)
@@ -137,9 +138,12 @@ def pacing_config(args, *, initialization_count=0):
 
 def _run_locked(args, task_spec, directory):
     seeds, seed_backbones = load_seed_bank(args)
-    if seeds and (args.pacing_mode != "streaming" or not args.research_candidates_per_role
+    exact_pool = bool(args.research_candidates_per_role or args.local_proposal_count)
+    if seeds and (args.pacing_mode != "streaming" or not exact_pool
                   or len(seeds) > args.pool_size):
         raise ValueError("Shared initialization requires streaming, a panel and room in the reservoir")
+    if args.scores_per_generation and args.iterations != len(seeds) + args.research_rounds * args.scores_per_generation:
+        raise ValueError("Generation quotas and initialization must sum to the evaluation budget")
     config_data = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     if seeds:
         from ldm_tts.harness import file_sha256
@@ -174,8 +178,15 @@ def _run_locked(args, task_spec, directory):
         process, url = stack.enter_context(experiment_service(directory, args))
         client = ESClient(url, timeout=10)
         if args.method in ("harness", "ldm_harness"):
-            from .harness import open_agent
-            research = stack.enter_context(open_agent(args, directory, worker, bridge, config.campaign_id))
+            research = None
+            if not args.local_proposal_count or args.research_candidates_per_role:
+                from .harness import open_agent
+                panel_args = copy(args)
+                panel_args.pool_size -= args.local_proposal_count
+                research = stack.enter_context(open_agent(panel_args, directory, worker, bridge, config.campaign_id))
+            if args.local_proposal_count:
+                from .local_proposals import LocalProposalResearch
+                research = LocalProposalResearch(args, directory, research)
         else:
             research = NativeResearch(args, worker)
         policy = None
@@ -185,11 +196,15 @@ def _run_locked(args, task_spec, directory):
             policy = stack.enter_context(open_policy(args, directory, config.campaign_id, selector))
         else:
             selector = DedupOnlySelector()
+        if args.scores_per_generation:
+            scheduler = GenerationQuotaPacing(len(seeds), args.scores_per_generation)
+        else:
+            scheduler = InitializationPacing(len(seeds)) if seeds else (
+                None if batch or exact_pool else InitializationPacing())
         ctrl = stack.enter_context(PacedController(directory / "controller.sqlite3", config,
             codec=AntibodyCodec(args.antigen, args.oracle, utility=dynamic_policy), client=client,
             research=research, history=bridge, selector=selector, policy=policy,
-            pacing=InitializationPacing(len(seeds)) if seeds else (
-                None if batch or args.research_candidates_per_role else InitializationPacing()),
+            pacing=scheduler,
             objectives=objectives,
             options=RuntimeOptions(poll_interval=0.1, long_poll_seconds=0, anti_entropy_interval=30,
                                    max_intents_per_step=16 if batch else 1)))
@@ -217,6 +232,8 @@ def _run_locked(args, task_spec, directory):
                 if view.lane.state == "blocked":
                     generation = ctrl.generations()[-1]
                     raise RuntimeError(f"Research generation blocked: {generation['error']}")
+                if args.scores_per_generation and view.lane.state == "idle" and view.research_used > view.current_generation:
+                    raise RuntimeError("Research generation rejected before its reserved evaluations")
                 if view.paused:
                     raise RuntimeError(f"Campaign paused: {', '.join(view.paused)}")
                 if not progressed:
@@ -320,6 +337,14 @@ def _run_locked(args, task_spec, directory):
                                     "explorer": args.research_candidates_per_role,
                                     "refiner": args.research_candidates_per_role}:
                                 problems.append(f"generation {generation['generation']}: incorrect role candidate counts")
+                if args.scores_per_generation:
+                    observed = {g["generation"]: 0 for g in generations if g["state"] == "ready"}
+                    for decision in decisions[len(seeds):]:
+                        generation = decision["snapshot"]["pacing_state"]["current_generation"]
+                        observed[generation] = observed.get(generation, 0) + 1
+                    expected = dict.fromkeys(range(1, args.research_rounds + 1), args.scores_per_generation)
+                    if observed != expected:
+                        problems.append("reserved evaluation counts were not met for each research generation")
                 if batch:
                     decisions_by_plan = {}
                     for row in ctrl.store.rows("""SELECT d.snapshot_json, e.es_state, e.disposition

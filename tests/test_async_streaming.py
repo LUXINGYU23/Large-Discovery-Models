@@ -106,6 +106,27 @@ def spin(h, predicate, timeout=10):
     return False
 
 
+def test_generation_quotas_reserve_scores_and_require_new_feedback(tmp_path):
+    from tasks.antibody_rfd3.core.research import GenerationQuotaPacing
+
+    source = Source()
+    with Harness(tmp_path, budget=112, concurrency=4, buffer_depth=28) as h:
+        h.start_es()
+        h.ctrl = PacedController(h.db, config(budget=112, research_budget=3), codec=ToyCodec(),
+            client=h.client(), clock=h.clock, research=source, lane_executor=InlineExecutor(h.clock),
+            pacing=GenerationQuotaPacing(16, 32), options=h.options)
+        h.ctrl.add_proposals(tuple(Proposal(c, "initialization") for c in toy_candidates(16, 10000)),
+                             generation=0, watermark=0)
+        assert h.drive(until=lambda: h.ctrl.finished)
+        decisions = h.ctrl.decisions()
+        assert len(decisions) == len(h.ctrl.observations()) == 112
+        assert [d["snapshot"]["pacing_state"]["current_generation"] for d in decisions] == (
+            [0] * 16 + [1] * 32 + [2] * 32 + [3] * 32)
+        assert source.calls[0][1] == 16
+        assert source.calls[1][1] > 16 and source.calls[2][1] > 48
+        assert source.calls[1][2] and source.calls[2][2]
+
+
 def test_streaming_window_uses_latest_history_and_pending_after_restart(tmp_path):
     source = Source()
     options = RuntimeOptions(anti_entropy_interval=60, long_poll_seconds=0, max_intents_per_step=1)
