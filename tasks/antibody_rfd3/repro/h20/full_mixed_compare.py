@@ -11,7 +11,7 @@ from pathlib import Path
 import subprocess
 
 from .launch_utils import ACTIVE_ROOT, REPO, ROOT, now, private_environment_values, run_case, save_summary
-from .paired_compare import METHODS, SEED_COUNT, audit, make_case, query
+from .paired_compare import ANTIGEN, METHODS, SEED_COUNT, audit, make_case, observations, query
 from tasks.antibody_rfd3.core.local_proposals import LOCAL_SEARCH_TIMEOUT_SECONDS
 
 
@@ -82,24 +82,64 @@ def make_cases(output):
     return cases
 
 
+def audit_absolut_receipts(directory, method):
+    rows = observations(directory, method)
+    if method == "ldm_harness":
+        service = {eid: (state, spec, result) for eid, state, spec, result in query(
+            directory / "experiment-service.sqlite3", "SELECT experiment_id,state,spec,result FROM experiments")}
+        if len(service) != len(rows):
+            raise RuntimeError("Experiment service and observation counts differ")
+        for row in rows:
+            state, spec, result = service[row["experiment_id"]]
+            expected = {"antigen": ANTIGEN, "oracle": "absolut", "sequence": row["candidate"]["canonical_key"]}
+            if (state != "SUCCEEDED" or json.loads(spec) != expected
+                    or json.loads(result)["absolut_energy"] != row["evaluation"]["metrics"]["absolut_energy"]):
+                raise RuntimeError("An LDM score does not match its successful Absolut experiment receipt")
+    else:
+        for row in rows:
+            evaluation = row["evaluation"]
+            artifacts = evaluation["artifacts"]
+            receipt = json.loads(Path(artifacts["result"]).read_text())
+            expected = {"sequence": row["candidate"]["canonical_key"],
+                        "absolut_energy": evaluation["metrics"]["absolut_energy"]}
+            if (receipt["antigen"] != ANTIGEN or receipt["oracle"] != "Absolut"
+                    or receipt["results"] != [expected] or not Path(artifacts["raw"]).is_file()):
+                raise RuntimeError(f"{method} has a score without its matching Absolut receipt")
+    return len(rows)
+
+
 def audit_ldm(directory):
     path = directory / "controller.sqlite3"
     generations = query(path, "SELECT generation,base_ingest_seq,state,outcome_json FROM generations ORDER BY generation")
     if len(generations) != RESEARCH_ROUNDS:
         raise RuntimeError(f"LDM did not complete {RESEARCH_ROUNDS} research generations")
     expected = {"agent": 128, "antbo_local": 128}
+    pools = {}
     for index, head, state, outcome in generations:
         data = json.loads(outcome)
         has_feedback = (head == SEED_COUNT if index == 1
                         else head > SEED_COUNT + (index - 2) * SCORES_PER_GENERATION)
         if (state != "ready" or not has_feedback or data["eligible"] != 256
-                or data["metadata"]["pool_sources"] != expected):
+                or data["metadata"]["pool_sources"] != expected
+                or data["metadata"]["candidate_counts"] != {"explorer": 64, "refiner": 64}):
             raise RuntimeError(f"LDM generation {index} did not meet the pool or feedback requirement")
-    decisions = query(path, f"SELECT snapshot_json FROM decisions WHERE decision_id>{SEED_COUNT} ORDER BY decision_id")
-    quotas = Counter(json.loads(d)["pacing_state"]["current_generation"] for d, in decisions)
+        pools[index] = {p["candidate"]["canonical_key"] for p in data["proposals"]}
+        if len(data["proposals"]) != 256 or len(pools[index]) != 256:
+            raise RuntimeError(f"LDM generation {index} did not submit 256 unique proposals")
+    measured = query(path, f"""SELECT d.snapshot_json, o.status, o.canonical_key
+        FROM decisions d LEFT JOIN observations o ON o.decision_id=d.decision_id AND o.experiment_id=d.experiment_id
+        WHERE d.decision_id>{SEED_COUNT} ORDER BY d.decision_id""")
+    quotas = Counter()
+    selected = set()
+    for snapshot, status, key in measured:
+        index = json.loads(snapshot)["pacing_state"]["current_generation"]
+        if status != "succeeded" or key in selected or key not in pools.get(index, ()):
+            raise RuntimeError(f"LDM generation {index} has a missing, repeated or out-of-pool measurement")
+        quotas[index] += 1
+        selected.add(key)
     if quotas != dict.fromkeys(range(1, RESEARCH_ROUNDS + 1), SCORES_PER_GENERATION):
-        raise RuntimeError("LDM did not preserve the per-generation scoring allocation")
-    return {"pool_sources": expected, "online_evaluations_per_generation": dict(sorted(quotas.items()))}
+        raise RuntimeError("LDM did not complete the exact successful measurement count in each generation")
+    return {"pool_sources": expected, "successful_online_measurements_per_generation": dict(sorted(quotas.items()))}
 
 
 def main():
@@ -137,12 +177,14 @@ def main():
     def run(method, case):
         run_case(case, env, 172800, private, lambda: save_summary(output / (method + ".json"), case))
         result = audit({method: case}, bank)[method]
+        directory = Path(case["run_dir"])
+        result["absolut_receipts_verified"] = audit_absolut_receipts(directory, method)
         result["best_by_online_score_count"] = {
             count: result["best_so_far"][SEED_COUNT + count - 1]
             for count in range(SCORES_PER_GENERATION, ONLINE_SCORES + 1, SCORES_PER_GENERATION)
         }
         if method == "ldm_harness":
-            result.update(audit_ldm(Path(case["run_dir"])))
+            result.update(audit_ldm(directory))
         return result
 
     with ThreadPoolExecutor(max_workers=4) as workers:
