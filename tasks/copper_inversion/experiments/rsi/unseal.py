@@ -107,7 +107,9 @@ def check(root, listing, expected_runs=None):
             if (record.get("protocol_id") != protocol_id or record.get("experiment") != experiment
                     or record.get("run_id") != run_id or record.get("prefix") != prefix
                     or record.get("frozen_sha256") != digest(frozen)
-                    or record.get("ledger_prefix_sha256") != digest(used)):
+                    or record.get("ledger_prefix_sha256") != digest(used)
+                    or record.get("candidate_sha256s", [c["sha256"] for c in frozen["candidates"]])
+                       != [c["sha256"] for c in frozen["candidates"]]):
                 raise ValueError(f"run {run_id} {prefix}: freeze record or protocol differs")
             if state["phase"] not in {"selected", "tested"}:
                 raise ValueError(f"run {run_id} {prefix}: validate before unsealing")

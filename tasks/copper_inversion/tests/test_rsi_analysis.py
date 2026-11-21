@@ -397,3 +397,20 @@ def test_cluster_fallback_builds_a_bundle(fixture, config, tmp_path):
     assert families and all(f.startswith("c") or f == "unassigned" for f in families)
     results = json.loads(files["results.json"])
     assert results["E2"]["runs"]["conversation"] and json.loads(files["provenance.json"])["family_mode"] == "cluster"
+
+
+def test_bundle_accepts_selected_prior_incumbent(fixture, config, tmp_path):
+    outcomes = tmp_path / "outcomes"
+    shutil.copytree(fixture / "outcomes", outcomes)
+    path = outcomes / "M1.json"
+    table = json.loads(path.read_text())
+    earlier = next(r for r in table["rows"] if r["prefix"] == "round_05")
+    final = next(r for r in table["rows"] if r["run_id"] == earlier["run_id"] and r["prefix"] == "full")
+    final["incumbent_sha256s"] = earlier["selected_sha256"]
+    final["finalist_sha256s"] += " " + earlier["selected_sha256"]
+    final["selected_sha256"] = earlier["selected_sha256"]
+    if "incumbent_sha256s" not in table["columns"]:
+        table["columns"].append("incumbent_sha256s")
+    path.write_text(json.dumps(table))
+    files = build(fixture / "archive", outcomes, load_config(config), "fixture-commit")
+    assert json.loads(files["results.json"])["E1"]

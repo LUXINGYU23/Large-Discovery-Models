@@ -141,26 +141,83 @@ def judge_objective(manifest, protocol, configuration):
     return objective
 
 
+def incumbents(root, protocol_id, experiment, manifest, paths, round_index, protocol=None):
+    origins = []
+    directory = paths["run_selection"]
+    if directory.is_dir():
+        for folder in directory.iterdir():
+            if not folder.is_dir():
+                continue
+            prior = parse_prefix(folder.name)
+            if prior is not None and (round_index is None or prior < round_index):
+                origins.append((prior, folder, "prefix " + folder.name))
+    origins.sort(key=lambda item: item[0])
+    cont = manifest.get("continuation")
+    if cont:
+        source_exp = (protocol or {}).get("analysis", {}).get("checkpoint_experiment", "M1")
+        source = layout(root, protocol_id, source_exp, cont["source_run"])["run_selection"] / prefix_name(cont["round"])
+        origins.insert(0, (cont["round"], source,
+                           f"checkpoint {source_exp}/{cont['source_run']}/{source.name}"))
+    entries, sources = [], []
+    for _, folder, origin in origins:
+        if not (folder / "frozen.json").is_file():
+            raise ValueError(f"incumbent {origin} is missing or unvalidated")
+        frozen, state = selection.verify(folder)
+        if state["phase"] not in {"selected", "tested"}:
+            raise ValueError(f"incumbent {origin} is unvalidated")
+        report = json.loads((folder / "selection.json").read_text())
+        sha = report["selected_sha256"]
+        candidate = next(c for c in frozen["candidates"] if c["sha256"] == sha)
+        entries.append({"sha256": sha, "from": origin})
+        sources.append(folder / candidate["source_path"])
+    return entries, sources
+
+
 def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, release, protocol=None):
     paths = layout(root, protocol_id, experiment, run_id)
     manifest = run_manifest(paths["run"], protocol_id, experiment)
     name = prefix_name(round_index)
     chosen = finalists(paths["run"], paths["service"], round_index)
     target = paths["run_selection"] / name
+    if not target.exists() and paths["run_selection"].is_dir():
+        for folder in paths["run_selection"].iterdir():
+            if folder.is_dir():
+                later = parse_prefix(folder.name)
+                if round_index is not None and (later is None or later > round_index):
+                    raise ValueError("freeze prefixes in ascending order")
+    if protocol and "analysis" in protocol:
+        expected = (protocol["analysis"]["freeze_prefixes"].get(experiment) or [])
+        for prior in expected:
+            if type(prior) is int and (round_index is None or prior < round_index):
+                if not (paths["run_selection"] / prefix_name(prior) / "frozen.json").is_file():
+                    raise ValueError(f"earlier prefix {prefix_name(prior)} is missing or unvalidated")
+    entries, incumbent_sources = incumbents(root, protocol_id, experiment, manifest, paths, round_index, protocol)
+    candidate_ids = list(chosen["source_sha256s"])
+    sources = list(chosen["sources"])
+    # Use the validated frozen bytes even if the same solver is also in the top three.
+    for entry, source in zip(entries, incumbent_sources):
+        sha = entry["sha256"]
+        if sha in candidate_ids:
+            sources[candidate_ids.index(sha)] = source
+        else:
+            candidate_ids.append(sha)
+            sources.append(source)
     record = {"schema": "rsi-prefix-freeze-v1", "experiment": experiment, "run_id": run_id,
               "protocol_id": protocol_id, "prefix": name, "round": round_index,
               **{k: chosen[k] for k in ("records", "last_round", "ledger_prefix_sha256", "source_sha256s")}}
+    record["incumbent_sha256s"] = entries
+    record["candidate_sha256s"] = candidate_ids
     if target.exists():
         frozen, _ = selection.verify(target)
-        if [c["sha256"] for c in frozen["candidates"]] != chosen["source_sha256s"]:
+        if [c["sha256"] for c in frozen["candidates"]] != candidate_ids:
             raise ValueError("existing freeze differs from the record prefix")
     else:
         validation, tests = held_out(release, manifest, protocol)
         config = chosen["configuration"]
-        frozen = selection.freeze(target, chosen["sources"], validation, tests, seconds=config["seconds"],
+        frozen = selection.freeze(target, sources, validation, tests, seconds=config["seconds"],
                                   image=config["image"], training_run=paths["service"],
                                   training_manifest=config["manifest"],
-                                  objective=judge_objective(manifest, protocol, config))
+                                  objective=judge_objective(manifest, protocol, config), max_candidates=None)
     record["selection_objective"] = frozen.get("selection_objective", "confirmation")
     record["frozen_sha256"] = digest(frozen)
     path = target / "prefix.json"
@@ -190,7 +247,8 @@ def main(argv=None):
     parser.add_argument("--no-validation", action="store_true")
     args = parser.parse_args(argv)
     protocol = json.loads(args.protocol.read_text()) if args.protocol else None
-    rounds = [None if p == FULL else int(p) for p in (args.prefix or [FULL])]
+    rounds = sorted([None if p == FULL else int(p) for p in (args.prefix or [FULL])],
+                    key=lambda p: (p is None, p or 0))
     for run_id in args.runs:
         for round_index in rounds:
             record = freeze_run(args.root, args.protocol_id, args.experiment, run_id, round_index,

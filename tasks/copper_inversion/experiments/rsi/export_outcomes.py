@@ -34,7 +34,7 @@ MODALITIES = ("drill", "drill_outcrop")
 VALIDATION_ONLY = frozenset({"E1", "E2"})
 MIN_PARENTS = 2
 COLUMNS = ("experiment", "protocol_id", "run_id", "arm", "tier", "judge", "seed", "prefix", "round",
-           "selected_sha256", "finalist_sha256s",
+           "selected_sha256", "finalist_sha256s", "incumbent_sha256s",
            "validation_risk", "validation_iou", "validation_legal_rate", "validation_seconds_per_solve",
            *[f"{split}_{name}" for split in SPLITS for name in (
                "iou", "risk", "legal_rate", "seconds_per_solve", *[f"iou_{m}" for m in MODALITIES],
@@ -110,6 +110,7 @@ def outcome(target, run, prefix, sealed):
            "arm": run.get("arm"), "tier": run.get("tier"), "judge": run.get("judge"), "seed": run.get("seed"),
            "prefix": prefix, "round": parse_prefix(prefix), "selected_sha256": sha,
            "finalist_sha256s": " ".join(c["sha256"] for c in frozen["candidates"]),
+           "incumbent_sha256s": " ".join(i["sha256"] for i in json.loads((target / "prefix.json").read_text()).get("incumbent_sha256s", [])),
            **{f"validation_{k}": validation[k] for k in ("risk", "iou", "legal_rate", "seconds_per_solve")}}
     row.update({column: None for column in COLUMNS if column.startswith(SPLITS)})
     bodies = {}
