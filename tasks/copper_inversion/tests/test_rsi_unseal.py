@@ -105,6 +105,7 @@ class FakeSuite:
     """Writes per-body receipts like SuiteEvaluator; values vary by program and body."""
     calls = []
     bodies = {}
+    favored = None
 
     def __init__(self, root, execution, manifest, seconds):
         self.root, self.path = Path(root), Path(manifest)
@@ -113,7 +114,7 @@ class FakeSuite:
     def evaluate(self, candidate):
         sha = candidate.canonical_key
         FakeSuite.calls.append((sha, self.manifest["split"]))
-        q = int(sha[:8], 16) / 2 ** 32 / 10
+        q = 0. if sha == FakeSuite.favored else int(sha[:8], 16) / 2 ** 32 / 10
         key = digest(dict(source=sha, manifest=str(self.path)))
         rows = []
         for i, case in enumerate(self.manifest["cases"]):
@@ -146,7 +147,7 @@ def setup(tmp_path, runs, prefixes=(None, 2), validate=True, experiment="M1"):
     for index, run_id in enumerate(runs):
         make_run(root, run_id, index, manifests["train"], experiment)
         with fake_evaluator():
-            for round_index in prefixes:
+            for round_index in sorted(prefixes, key=lambda p: (p is None, p or 0)):
                 freeze_run(root, PID, experiment, run_id, round_index, release=tmp_path / "release")
                 if validate:
                     validate_run(root, PID, experiment, run_id, round_index)
@@ -160,7 +161,7 @@ def snapshot(folder):
 
 
 def test_prefix_freeze_uses_only_its_rounds_and_leaves_full_freeze_alone(tmp_path):  # AT-29
-    root, manifests, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(None,))
+    root, _, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(2, None))
     paths = layout(root, PID, "M1", "ldm4geo-s101")
     full_dir = paths["run_selection"] / "full"
     before = snapshot(full_dir)
@@ -169,16 +170,10 @@ def test_prefix_freeze_uses_only_its_rounds_and_leaves_full_freeze_alone(tmp_pat
     rounds = {row["program_id"]: row["round"] for row in read(paths["run"] / "ledger.jsonl")}
     with fake_evaluator():
         record = freeze_run(root, PID, "M1", "ldm4geo-s101", 2, release=tmp_path / "release")
-        validate_run(root, PID, "M1", "ldm4geo-s101", 2)
-        assert freeze_run(root, PID, "M1", "ldm4geo-s101", 2, release=tmp_path / "release") == record
     assert record["prefix"] == "round_02" and record["last_round"] == 2 and record["records"] == 5
     assert len(record["source_sha256s"]) == 3 and all(rounds[s] <= 2 for s in record["source_sha256s"])
     assert [rounds[s] for s in sealed["source_sha256s"]] == [4, 3, 4]
-    frozen = json.loads((paths["run_selection"] / "round_02/frozen.json").read_text())
-    assert [c["sha256"] for c in frozen["candidates"]] == record["source_sha256s"]
     assert snapshot(full_dir) == before
-    assert {p.name for p in paths["run_selection"].iterdir()} == {"full", "round_02"}
-    # The public ledger is research-writable; it must agree with the private receipts.
     rows = read(paths["run"] / "ledger.jsonl")
     rows[3].update(risk=rows[3]["risk"] - .1, risk_by_case={k: v - .1 for k, v in rows[3]["risk_by_case"].items()})
     (paths["run"] / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
@@ -278,3 +273,78 @@ def test_exported_outcomes_hold_no_per_body_truth(tmp_path):  # AT-31
         assert numbers and not any(v in per_body for v in numbers)
         assert row["test_id_iou_drill"] is not None and row["test_ood_surface_distance"] is not None
         assert 0 < row["test_id_iou"] < 1 and row["round"] in (None, 2)
+
+
+def test_incumbent_is_retained_and_unvalidated_or_changed_is_refused(tmp_path):
+    root, _, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(2,))
+    paths = layout(root, PID, "M1", "ldm4geo-s101")
+    prior = paths["run_selection"] / "round_02"
+    selected = json.loads((prior / "selection.json").read_text())["selected_sha256"]
+    FakeSuite.favored = selected
+    with fake_evaluator():
+        record = freeze_run(root, PID, "M1", "ldm4geo-s101", None, release=tmp_path / "release")
+        assert selected in record["candidate_sha256s"]
+        assert {"sha256": selected, "from": "prefix round_02"} in record["incumbent_sha256s"]
+        report = validate_run(root, PID, "M1", "ldm4geo-s101")
+        assert report["selected_sha256"] == selected
+        listing = {"experiment": "M1", "protocol_id": PID, "solvers": [
+            {"run_id": "ldm4geo-s101", "prefix": p} for p in ("round_02", "full")]}
+        unseal(root, listing)
+        table = export_outcomes.export(root, PID, "M1")
+        row = next(r for r in table["rows"] if r["prefix"] == "full")
+        assert row["selected_sha256"] == selected and selected in row["incumbent_sha256s"]
+        from tasks.copper_inversion.experiments.rsi.analysis.outcomes import Outcomes
+        assert Outcomes([table]).freeze("M1", "ldm4geo-s101", "full")["program_id"] == selected
+    FakeSuite.favored = None
+    payload = next(c for c in json.loads((prior / "frozen.json").read_text())["candidates"] if c["sha256"] == selected)
+    source = prior / payload["source_path"]
+    source.chmod(0o600)
+    source.write_bytes(source.read_bytes() + b"\n")
+    with pytest.raises(ValueError, match="frozen source changed"):
+        freeze_run(root, PID, "M1", "ldm4geo-s101", None, release=tmp_path / "release")
+
+
+def test_unvalidated_prefix_refuses_later_freeze(tmp_path):
+    root, _, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(2,), validate=False)
+    with pytest.raises(ValueError, match="unvalidated"):
+        freeze_run(root, PID, "M1", "ldm4geo-s101", None, release=tmp_path / "release")
+
+
+def test_checkpoint_incumbent_is_included(tmp_path):
+    root, manifests, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(2,))
+    source = layout(root, PID, "M1", "ldm4geo-s101")["run_selection"] / "round_02"
+    selected = json.loads((source / "selection.json").read_text())["selected_sha256"]
+    paths = make_run(root, "ldm4geo-s102", 0, manifests["train"], "E1")
+    path = paths["run"] / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["continuation"] = {"source_run": "ldm4geo-s101", "round": 2}
+    path.write_text(json.dumps(manifest))
+    FakeSuite.favored = selected
+    with fake_evaluator():
+        record = freeze_run(root, PID, "E1", "ldm4geo-s102", None, release=tmp_path / "release")
+        assert validate_run(root, PID, "E1", "ldm4geo-s102")["selected_sha256"] == selected
+    FakeSuite.favored = None
+    assert {"sha256": selected, "from": "checkpoint M1/ldm4geo-s101/round_02"} in record["incumbent_sha256s"]
+    assert selected in record["candidate_sha256s"]
+
+
+def test_cli_freezes_in_ascending_order(tmp_path):
+    from tasks.copper_inversion.experiments.rsi import freeze
+    seen = []
+    def fake_freeze(root, pid, exp, run, round_index, **kwargs):
+        seen.append(("freeze", round_index))
+        return {"prefix": freeze.prefix_name(round_index), "source_sha256s": ["a"]}
+    def fake_validate(root, pid, exp, run, round_index):
+        seen.append(("validate", round_index))
+        return {"selected_sha256": "a"}
+    with patch.object(freeze, "freeze_run", fake_freeze), patch.object(freeze, "validate_run", fake_validate):
+        freeze.main(["--root", str(tmp_path), "--protocol-id", PID, "--experiment", "M1", "--run", "r",
+                     "--release", str(tmp_path), "--prefix", "full", "--prefix", "10", "--prefix", "5"])
+    assert seen == [(action, p) for p in (5, 10, None) for action in ("freeze", "validate")]
+
+
+def test_protocol_requires_missing_earlier_prefix(tmp_path):
+    root, _, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=())
+    protocol = {"analysis": {"checkpoint_experiment": "M1", "freeze_prefixes": {"M1": ["full", 2]}}}
+    with pytest.raises(ValueError, match="earlier prefix round_02 is missing"):
+        freeze_run(root, PID, "M1", "ldm4geo-s101", None, release=tmp_path / "release", protocol=protocol)

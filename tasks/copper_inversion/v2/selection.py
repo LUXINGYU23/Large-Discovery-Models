@@ -45,7 +45,7 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
     """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
-    if not 1<=len(sources)<=3:raise ValueError("freeze one to three candidates before validation")
+    if not sources:raise ValueError("freeze at least one candidate before validation")
     if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
     manifests=[Path(validation).resolve(),*[Path(p).resolve() for p in tests]]
     loaded=[load_manifest(p) for p in manifests]
@@ -101,6 +101,14 @@ def verify(root):
     for item in frozen["manifests"]:
         if file_hash(item["path"])!=item["sha256"] or digest(load_manifest(item["path"]))!=item["contents_sha256"]:
             raise ValueError("frozen dataset changed")
+    if state["phase"] in {"selected","tested"}:
+        report=json.loads((root/"selection.json").read_text())
+        if digest(report)!=state["selection_sha256"]:raise ValueError("frozen selection changed")
+        ids=[c["sha256"] for c in frozen["candidates"]]
+        rows=report["candidates"]
+        if (len(rows)!=len(ids) or {r["source_sha256"] for r in rows}!=set(ids)
+                or report["selected_sha256"]!=min(rows,key=ranking)["source_sha256"]):
+            raise ValueError("validation does not cover the frozen candidates")
     return frozen,state
 
 
