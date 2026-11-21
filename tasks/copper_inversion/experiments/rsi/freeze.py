@@ -154,7 +154,7 @@ def incumbents(root, protocol_id, experiment, manifest, paths, round_index, prot
     origins.sort(key=lambda item: item[0])
     cont = manifest.get("continuation")
     if cont:
-        source_exp = protocol["analysis"]["checkpoint_experiment"] if protocol else "M1"
+        source_exp = (protocol or {}).get("analysis", {}).get("checkpoint_experiment", "M1")
         source = layout(root, protocol_id, source_exp, cont["source_run"])["run_selection"] / prefix_name(cont["round"])
         origins.insert(0, (cont["round"], source,
                            f"checkpoint {source_exp}/{cont['source_run']}/{source.name}"))
@@ -185,7 +185,7 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
                 later = parse_prefix(folder.name)
                 if round_index is not None and (later is None or later > round_index):
                     raise ValueError("freeze prefixes in ascending order")
-    if protocol:
+    if protocol and "analysis" in protocol:
         expected = (protocol["analysis"]["freeze_prefixes"].get(experiment) or [])
         for prior in expected:
             if type(prior) is int and (round_index is None or prior < round_index):
@@ -217,7 +217,7 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
         frozen = selection.freeze(target, sources, validation, tests, seconds=config["seconds"],
                                   image=config["image"], training_run=paths["service"],
                                   training_manifest=config["manifest"],
-                                  objective=judge_objective(manifest, protocol, config))
+                                  objective=judge_objective(manifest, protocol, config), max_candidates=None)
     record["selection_objective"] = frozen.get("selection_objective", "confirmation")
     record["frozen_sha256"] = digest(frozen)
     path = target / "prefix.json"

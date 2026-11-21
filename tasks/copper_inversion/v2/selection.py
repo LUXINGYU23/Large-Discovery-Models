@@ -41,11 +41,13 @@ def selection_seconds(training_manifest,training,manifests,loaded):
     return {tiers[name]["solver_seconds"] for name in names}
 
 
-def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation"):
+def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation",
+           max_candidates=3):
     """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
-    if not sources:raise ValueError("freeze at least one candidate before validation")
+    if not sources or (max_candidates is not None and len(sources)>max_candidates):
+        raise ValueError("freeze one to three candidates before validation")
     if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
     manifests=[Path(validation).resolve(),*[Path(p).resolve() for p in tests]]
     loaded=[load_manifest(p) for p in manifests]
