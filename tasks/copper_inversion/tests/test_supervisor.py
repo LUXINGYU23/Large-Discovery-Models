@@ -86,3 +86,14 @@ def test_lifetime_counters_survive_controller_disconnect(tmp_path, monkeypatch):
     assert result["workload_resources"]["workload_complete"]
     if os.getenv("COPPER_REQUIRE_PEAK"):
         assert result["workload_resources"]["peak_memory_bytes"] >= 96*1024*1024
+
+
+def test_transparent_hugepages_are_disabled_for_the_process_tree():
+    """Huge-page faults stalled workers in kernel reclaim past their SIGKILL on the shared host."""
+    import subprocess, sys
+    code = ("from tasks.copper_inversion.core.supervisor import disable_transparent_hugepages as d; d(); "
+            "import subprocess; print(subprocess.run(['grep', 'THP_enabled', '/proc/self/status'], "
+            "capture_output=True, text=True).stdout)")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout
+    if "THP_enabled" in out:  # reported by Linux >= 6.x; the child inherits the setting
+        assert out.split()[-1] == "0"

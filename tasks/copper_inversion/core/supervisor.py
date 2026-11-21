@@ -173,9 +173,26 @@ def batch(seconds, count, module, env, *, cases="/cases", outputs="/output", tmp
     return runs
 
 
+PR_SET_THP_DISABLE = 41
+
+
+def disable_transparent_hugepages():
+    """No transparent huge pages for this process tree (inherited across fork and exec).
+
+    On the shared host a huge-page fault can enter direct compaction and reclaim and stay in
+    the kernel for tens of seconds; a SIGKILL from `timeout` is not delivered until the fault
+    returns, so the worker overran its budget and the controller paused the scheduler. The
+    solve itself is unchanged (same wall time without huge pages)."""
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "PR_SET_THP_DISABLE failed")
+
+
 def main():
     if os.getpid() != 1 or os.getuid() != 0:
         raise RuntimeError("supervisor must be root PID 1 in a private container PID namespace")
+    disable_transparent_hugepages()
     key = os.environ["COPPER_RESOURCE_KEY"]
     env = {k: v for k, v in os.environ.items() if k != "COPPER_RESOURCE_KEY"}
     if sys.argv[1] == "--batch":

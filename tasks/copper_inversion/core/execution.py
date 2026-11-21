@@ -278,6 +278,8 @@ class Execution:
                 "-e",
                 "OMP_NUM_THREADS=1",
                 "-e",
+                "NUMPY_MADVISE_HUGEPAGE=0",
+                "-e",
                 "PYTHONPATH=/code",
                 "-e",
                 "COPPER_RESOURCE_KEY=" + record["resource_key"],
