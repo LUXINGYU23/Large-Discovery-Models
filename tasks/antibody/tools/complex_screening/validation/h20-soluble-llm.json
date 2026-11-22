@@ -1,0 +1,31 @@
+{
+  "model": "Qwen3-8B",
+  "guided_tool_validation": true,
+  "run": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/soluble-llm-001/her2",
+  "observations": [
+    {
+      "round": 0,
+      "sequence": "SNGKDGSPGVY",
+      "energy": -81.87,
+      "action": "design_h3",
+      "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/soluble-llm-001/her2/oracle/c53abf1e864fb2dc/1N8Z_C-d38tydq0/result.json"
+    },
+    {
+      "round": 1,
+      "sequence": "SKGDFGTPGTV",
+      "energy": -92.22,
+      "action": "sequence_h3_soluble",
+      "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/soluble-llm-001/her2/oracle/58d5e85e4784f497/1N8Z_C-_uuc9u11/result.json"
+    },
+    {
+      "round": 2,
+      "sequence": "SDGSPGSPGTV",
+      "energy": -79.06,
+      "action": "sequence_h3_soluble",
+      "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/soluble-llm-001/her2/oracle/f14ddd1055a2b3a5/1N8Z_C-m6yclusq/result.json"
+    }
+  ],
+  "trace_sha256": "a1ca726241eeedd2b07251514941e10efbff1e78cd6a7a9bdd38904b74d683fb",
+  "events_sha256": "009fd0a7538e98b31ef2e0b6fc706e7fccdfb87207a85bab0b426542c804af64",
+  "status": "passed"
+}

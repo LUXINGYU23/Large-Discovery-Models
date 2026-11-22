@@ -34,6 +34,7 @@ def parse_args(argv=None):
     p.add_argument("--oracle", choices=("mock", "absolut"), default="mock")
     p.add_argument("--mock", action="store_true", help="Use deterministic generator fixtures for an offline campaign")
     p.add_argument("--iterations", type=int, default=2)
+    p.add_argument("--research-instructions", default="", help="Additional research guidance, recorded in each Pi turn")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--initialization-run", type=Path,
                    help="Replay the initial design jobs from a completed real-generator campaign for paired comparisons")
@@ -76,7 +77,7 @@ def metric(a):
 
 def describe_ldm_task(args):
     gp = args.method == "ldm_harness"
-    actions = ("design_h3", "sequence_h3") if args.method in PI_METHODS else ("design_h3",)
+    actions = ("design_h3", "sequence_h3", "sequence_h3_soluble") if args.method in PI_METHODS else ("design_h3",)
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",

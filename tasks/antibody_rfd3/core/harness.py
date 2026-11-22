@@ -19,7 +19,7 @@ from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOLS = ("design_h3", "sequence_h3")
+TOOLS = ("design_h3", "sequence_h3", "sequence_h3_soluble", "score_interface")
 SKILL = "skills/cdrh3-design"
 ROLE = "profiles/research/AGENTS.md"
 
@@ -48,6 +48,16 @@ def worker_socket(worker):
                 if self.path != "/" or not 0 < length <= 4096:
                     raise ValueError("Invalid design request")
                 params = json.loads(self.rfile.read(length))
+                if params.get("action") == "score_interface":
+                    from .interface import score_interface
+                    data = score_interface(worker, params.get("artifact_id"))
+                    status = 200
+                    body = json.dumps(data).encode()
+                    self.send_response(status)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 rows = worker.execute(**params)
                 eligible = worker.eligible(rows)
                 data = {"backbone_id": rows[0]["backbone_id"], "candidates": eligible,
@@ -121,6 +131,8 @@ class PiAgent:
                    "Only IDs listed as eligible may be submitted. If a call produces no eligible candidates, "
                    "sample another backbone or resample a previously measured backbone. Earlier eligible, unmeasured "
                    "designs may also be submitted. Allow time to repair rejected submissions."}
+        if getattr(self.worker.args, "research_instructions", ""):
+            message["research_guidance"] = self.worker.args.research_instructions
         if round_idx == 0:
             message["first_turn_steps"] = (
                 "1. First call the Pi read tool with path "

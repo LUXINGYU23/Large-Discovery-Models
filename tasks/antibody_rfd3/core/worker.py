@@ -52,13 +52,13 @@ class DesignWorker:
         return available
 
     def execute(self, action, count, temperature, backbone_id=None):
-        if action not in ("design_h3", "sequence_h3"):
+        if action not in ("design_h3", "sequence_h3", "sequence_h3_soluble"):
             raise ValueError("Unknown generation action")
         if type(count) is not int or count < 1:
             raise ValueError("count must be a positive integer")
         if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
             raise ValueError("temperature must be in [0.01,1]")
-        if (action == "sequence_h3") != bool(backbone_id):
+        if (action in ("sequence_h3", "sequence_h3_soluble")) != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
         if self.round == 0 and (action != "design_h3" or temperature != self.args.temperature or
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
@@ -91,7 +91,7 @@ class DesignWorker:
                 sequences = self.replay_initialization(job, source, receipt)
                 receipt["initialization_source"] = str(source)
             else:
-                sequences = self.run_models(job, backbone_id, count, temperature, seed)
+                sequences = self.run_models(job, backbone_id, count, temperature, seed, soluble=action == "sequence_h3_soluble")
             rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
                          artifact=(job / ("receipt.json" if self.args.mock else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
                          index=i, violations=_sequence_violations(h3, 11))
@@ -136,12 +136,13 @@ class DesignWorker:
             raise ValueError("Initialization receipt differs from mapped full VH sequences")
         return sequences
 
-    def run_models(self, job, backbone_id, count, temperature, seed):
+    def run_models(self, job, backbone_id, count, temperature, seed, soluble=False):
         import fcntl
 
         root = self.args.root.resolve()
         config = dict(self.template, workspace_root=str(root), seed=seed, num_designs=1,
-                      sequences_per_design=count, sampling_temperature=temperature)
+                      sequences_per_design=count, sampling_temperature=temperature,
+                      proteinmpnn_variant="soluble" if soluble else "vanilla")
         atomic_json_write(job / "config.json", config)
         cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
         env = dict(os.environ, PYTHONPATH=str(REPO))

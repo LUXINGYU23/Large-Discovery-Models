@@ -1,0 +1,16 @@
+{
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "samples_per_seed": 16,
+  "temperature": 0.5,
+  "generation": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/soluble-llm-001/her2/design_jobs/job-00000/output/generation.json",
+  "generation_sha256": "0ed13924517b655cba1e111bdb3df89e156caf895ba96ffd15c46ea1097550c7",
+  "targets": [
+    "HER2",
+    "PD-1"
+  ],
+  "note": "Same generated backbone, same 16 attempts per seed per method; report admission and duplicate failures without replacement. One-backbone pilot, not a universal default decision."
+}

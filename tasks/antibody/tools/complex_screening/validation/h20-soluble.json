@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "tool": "SolubleMPNN",
+  "device": "cpu",
+  "elapsed_seconds": 6.986442418012302,
+  "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/soluble-mpnn-attempt-001",
+  "template": "1N8Z VH B1-120",
+  "design_region": "B99-B109",
+  "sequence_count": 1,
+  "source_commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+  "checkpoint": "soluble_model_weights/v_48_020.pt",
+  "checks": {"existing_structure_common_tests_passed": 30, "screening_runner_fixture_tests_passed": 2},
+  "limitations": ["No binding evaluation for this sample", "No Protenix or ipSAE real-model validation", "Not integrated into campaign tool schema"]
+}
