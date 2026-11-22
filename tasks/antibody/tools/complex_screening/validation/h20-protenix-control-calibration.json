@@ -1,0 +1,386 @@
+[
+  {
+    "case": "PD1_nivolumab_positive",
+    "seed": "seed_101",
+    "iptm": 0.7908044457435608,
+    "heavy_directional_min": 0.115505,
+    "light_directional_min": 0.041024,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.873058
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.853073
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.873058
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.165911
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.115505
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.165911
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.138214
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.041024
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.138214
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_nivolumab_positive-seed_101"
+  },
+  {
+    "case": "PD1_nivolumab_positive",
+    "seed": "seed_19",
+    "iptm": 0.7129845023155212,
+    "heavy_directional_min": 0.0,
+    "light_directional_min": 0.0,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.86372
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.847355
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.86372
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.01304
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.01304
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.010603
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.010603
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_nivolumab_positive-seed_19"
+  },
+  {
+    "case": "PD1_nivolumab_positive",
+    "seed": "seed_43",
+    "iptm": 0.707744836807251,
+    "heavy_directional_min": 0.0,
+    "light_directional_min": 0.0,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.8623
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.8356
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.8623
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.015929
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.015929
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.015576
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.015576
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_nivolumab_positive-seed_43"
+  },
+  {
+    "case": "PD1_trastuzumab_mismatch",
+    "seed": "seed_101",
+    "iptm": 0.6746742129325867,
+    "heavy_directional_min": 0.0,
+    "light_directional_min": 0.0,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.823218
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.829314
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.829314
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.010646
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.010646
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.011262
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.011262
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_trastuzumab_mismatch-seed_101"
+  },
+  {
+    "case": "PD1_trastuzumab_mismatch",
+    "seed": "seed_19",
+    "iptm": 0.6796349883079529,
+    "heavy_directional_min": 0.0,
+    "light_directional_min": 0.0,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.820511
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.83115
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.83115
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.0
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_trastuzumab_mismatch-seed_19"
+  },
+  {
+    "case": "PD1_trastuzumab_mismatch",
+    "seed": "seed_43",
+    "iptm": 0.6716640591621399,
+    "heavy_directional_min": 0.0,
+    "light_directional_min": 0.0,
+    "all_scores": [
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.806403
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.817105
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "B",
+        "Type": "max",
+        "ipSAE": 0.817105
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.010495
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "A",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "A",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.010495
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "Y",
+        "Chn2": "B",
+        "Type": "asym",
+        "ipSAE": 0.0
+      },
+      {
+        "Chn1": "B",
+        "Chn2": "Y",
+        "Type": "max",
+        "ipSAE": 0.0
+      }
+    ],
+    "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/score-PD1_trastuzumab_mismatch-seed_43"
+  }
+]

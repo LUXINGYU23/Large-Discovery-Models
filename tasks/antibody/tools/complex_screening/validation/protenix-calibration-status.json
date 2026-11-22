@@ -1,0 +1,18 @@
+{
+  "status": "completed_exploratory_controls_not_production_calibrated",
+  "model": "protenix_base_default_v1.0.0",
+  "seeds": [
+    19,
+    43,
+    101
+  ],
+  "controls": [
+    "PD1_nivolumab_positive",
+    "PD1_trastuzumab_mismatch"
+  ],
+  "negative_label": "computational mismatch, not experimental nonbinder",
+  "msa": "Complete sequences; exact-query-checked unpaired MSA. ColabFold direct API archive downloaded; query-only paired files used for both cases.",
+  "scores": "Heavy directional minimum: positive seed101=0.115505, seeds19/43=0; mismatch all=0. Light positive seed101=0.041024, others=0.",
+  "decision": "No hard rejection threshold established. Treat low confidence as uncertain, not proof of nonbinding. Keep Protenix out of production campaign objective.",
+  "artifacts": "/Aidata/shared/ldm/antibody-poc/runs/protenix-validation/calibration-001/calibration-results.json"
+}

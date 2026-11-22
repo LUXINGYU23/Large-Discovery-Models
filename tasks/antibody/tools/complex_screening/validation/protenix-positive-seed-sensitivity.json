@@ -1,0 +1,38 @@
+{
+  "control": "public PD1-nivolumab known structural positive",
+  "model": "protenix_base_default_v1.0.0",
+  "scope": "descriptive seed sensitivity, not specificity calibration",
+  "rows": [
+    {
+      "seed": "seed_101",
+      "global_iptm": 0.7254140973091125,
+      "heavy_antigen_directional_min": 0.013189,
+      "light_antigen_directional_min": 0.015272
+    },
+    {
+      "seed": "seed_19",
+      "global_iptm": 0.7287769317626953,
+      "heavy_antigen_directional_min": 0.01284,
+      "light_antigen_directional_min": 0.013383
+    },
+    {
+      "seed": "seed_202",
+      "global_iptm": 0.7182022929191589,
+      "heavy_antigen_directional_min": 0.0,
+      "light_antigen_directional_min": 0.016952
+    },
+    {
+      "seed": "seed_43",
+      "global_iptm": 0.7130461931228638,
+      "heavy_antigen_directional_min": 0.0,
+      "light_antigen_directional_min": 0.010672
+    },
+    {
+      "seed": "seed_7",
+      "global_iptm": 0.8686537742614746,
+      "heavy_antigen_directional_min": 0.463055,
+      "light_antigen_directional_min": 0.455733
+    }
+  ],
+  "conclusion": "Strong seed sensitivity; global ipTM can be high while antigen interface confidence is low. Do not interpret one low score as an experimentally supported negative. No production decision threshold established."
+}

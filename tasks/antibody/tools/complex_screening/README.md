@@ -34,4 +34,31 @@ Official AURKA–TPX2 example: A→B ipSAE 0.448952, B→A 0.866498. Both direct
 
 ## Scope
 
-This delivery contains no Protenix predictor, weight mirrors, score thresholds, experimental predictor calibration, or BoltzGen adapter. New tools are optional. Scientific efficacy and large-scale load performance are not established by smoke tests. Large weights, structures and runtime outputs remain on H20; the small validation records here retain paths and hashes for audit.
+New tools are optional. Protenix v1 is an experimental auxiliary predictor only; no rejection threshold or campaign objective is changed. Boltz-2 and BoltzGen work in this branch remains pending real GPU validation; installation and configuration checks alone do not establish readiness. Scientific efficacy and large-scale load performance are not established by smoke tests. Large weights, structures and runtime outputs remain on H20; the small validation records here retain paths and hashes for audit.
+
+
+## Protenix v1 auxiliary prediction
+
+Uses the public `protenix_base_default_v1.0.0` model through an external isolated CLI. The installed package version (`protenix==2.0.0` on H20) is distinct from the model version. V2 is not enabled by this adapter.
+
+```bash
+python -m tasks.antibody.tools.complex_screening --out /absolute/new/prediction \
+  protenix --input /absolute/native-input.json \
+  --executable /isolated/protenix/bin/protenix --gpu 0 \
+  --seeds 19 43 101 --samples 1
+python -m tasks.antibody.tools.complex_screening.protenix_pae \
+  /absolute/native_full_data_sample_0.json /absolute/native_sample_0.cif \
+  /absolute/new/ipsae-confidence.json
+```
+
+Use complete molecular sequences. `pdb_sequences` builds native input from PDB SEQRES, refusing missing or noncanonical chains; it does not silently delete unresolved residues. MSA is enabled by default. Precomputed MSA paths must be absolute and their hashes are recorded. Without precomputed MSA, the upstream CLI may contact its configured remote service. `--no-use-msa` requests single-sequence inference. Full confidence output is required; every complex/seed must produce the requested CIF samples and native confidence files.
+
+The converter accepts canonical protein ATOM records with one ordered CA per residue. It checks atom/token ordering, chain partitions, finite PAE, and native pLDDT scale before converting units. PAE is never synthesized. Feed the converted JSON and matching CIF into the existing `ipsae` command.
+
+H20 calibration used PD-1/nivolumab and PD-1/trastuzumab mismatch, complete sequences, real unpaired MSA, query-only paired MSA, and fixed seeds 19/43/101. Heavy-chain/antigen minimum directional ipSAE was 0/0/0.115505 for the positive and 0/0/0 for mismatch. The mismatch is not an experimentally proven nonbinder. Earlier exploratory seed 7 had a much higher positive interface score; it does not establish a calibrated screening threshold. Global ipTM can be dominated by heavy/light pairing.
+
+Consequently `run.json` marks `hard_filter_eligible: false`. A low score means uncertain prediction and must not reject an antibody. Calibration records are in `validation/h20-protenix-control-calibration.json`, `validation/protenix-calibration-status.json`, and `validation/protenix-positive-seed-sensitivity.json`.
+
+New wrapper validation on H20: real complete-sequence/MSA positive seed 19 prediction succeeded, followed by the strict PAE converter and isolated ipSAE runner. Four Protenix/ipSAE adapter tests passed with predictor dependencies present. Fresh wrapper evidence: `validation/h20-protenix-wrapper-v1.json` and `validation/h20-protenix-wrapper-v1-ipsae.json`. This validates the independent command line route; the predictor is not registered as a new autonomous Pi tool.
+
+Verified H20 dependencies and model SHA256 are recorded in `validation/h20-protenix-environment.json`. Set `PROTENIX_ROOT_DIR` to the model cache root before running; on H20 this is `/Aidata/shared/ldm/antibody-poc/cache/protenix`. Put the isolated Protenix environment `bin/` on PATH so upstream kernel builds can locate ninja.
