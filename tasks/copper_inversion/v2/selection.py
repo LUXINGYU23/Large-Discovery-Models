@@ -91,7 +91,9 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
 def verify(root):
     root=Path(root);frozen=json.loads((root/"frozen.json").read_text())
     state=json.loads((root/"state.json").read_text())
-    if digest(frozen)!=state["frozen_sha256"] or source_identity()!=frozen["implementation_sha256"]:
+    # The frozen record is tamper-evident through its digest; the code commit it was frozen under is
+    # recorded in it (implementation_sha256) but need not equal the current checkout (authors 2026-11-22).
+    if digest(frozen)!=state["frozen_sha256"]:
         raise ValueError("frozen scientific identity changed")
     for c in frozen["candidates"]:
         if file_hash(root/c["source_path"])!=c["sha256"]:raise ValueError("frozen source changed")

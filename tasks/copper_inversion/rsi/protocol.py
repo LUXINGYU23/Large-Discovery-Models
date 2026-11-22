@@ -402,10 +402,20 @@ def mismatches(protocol, current, *, skip=()):
                   if value is not None and name not in skip and current.get(name) != value)
 
 
+# Authors' decision 2026-11-22: code that does not change what the researcher sees or how it is
+# scored may be fixed under the same protocol, so runs can be reused and resumed. Drift in these
+# fields is returned for the record (every run and freeze stores its code commit), not refused.
+# Task brief, renderer, tool, tagger, images, embedding model and every protocol field stay binding.
+RECORDED_ONLY = ("implementation", "analysis")
+
+
 def verify(protocol, current, *, skip=()):
+    """Refuse a binding hash that changed; return the recorded-only fields that drifted."""
     wrong = mismatches(protocol, current, skip=skip)
-    if wrong:
-        raise ValueError("frozen protocol hashes no longer match: " + ", ".join(wrong))
+    binding = [name for name in wrong if name not in RECORDED_ONLY]
+    if binding:
+        raise ValueError("frozen protocol hashes no longer match: " + ", ".join(binding))
+    return [name for name in wrong if name in RECORDED_ONLY]
 
 
 # Freeze records (gate G3) ---------------------------------------------------

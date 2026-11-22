@@ -204,6 +204,11 @@ def test_verify_lists_changed_frozen_components(tmp_path, sources):
         protocols.verify(frozen, current)
     assert protocols.mismatches(frozen, {**current, "analysis": None}) == ["analysis", "task_brief"]
     assert protocols.mismatches(frozen, current, skip=("task_brief",)) == []
+    # Authors 2026-11-22: code and analysis drift is recorded, not refused; agent-facing fields still bind.
+    drifted = {**current, "task_brief": frozen["hashes"]["task_brief"], "implementation": "0" * 64, "analysis": "1" * 64}
+    assert protocols.verify(frozen, drifted) == ["analysis", "implementation"]
+    with pytest.raises(ValueError, match="no longer match: tool$"):
+        protocols.verify(frozen, {**drifted, "tool": "2" * 64})
 
 
 def test_unfrozen_fields_are_not_checked():
