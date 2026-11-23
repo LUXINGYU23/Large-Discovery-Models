@@ -62,7 +62,7 @@ def resolve_tier(configuration,manifest):
 
 class EvaluatorService:
     configuration_keys=frozenset({"manifest","root","image","seconds","slots","caller_uid","socket"})
-    optional_keys=frozenset({"tier","objective","purpose"})
+    optional_keys=frozenset({"tier","objective","purpose","anonymize_cases","canonical_origin"})
 
     def __init__(self,configuration):
         if not isinstance(configuration,dict) or not (
@@ -70,6 +70,10 @@ class EvaluatorService:
             raise ValueError("invalid trusted service configuration")
         self.objective=configuration.get("objective","confirmation")
         if self.objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
+        anonymize_cases=configuration.get("anonymize_cases",False)
+        canonical_origin=configuration.get("canonical_origin",False)
+        if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+            raise ValueError("invalid case isolation flags")
         manifest=load_manifest(configuration["manifest"])
         if manifest["split"]!="train":raise ValueError("service accepts training only")
         if manifest["stage"]=="formal":
@@ -103,7 +107,8 @@ class EvaluatorService:
         self.slots=slots
         self.domain=CheckedDomain(self.root,InterfaceChecks(self.root,execution,slots))
         self.evaluator=SuiteEvaluator(self.root,execution,configuration["manifest"],configuration["seconds"],slots,
-            objective=self.objective,purpose=configuration.get("purpose"))
+            objective=self.objective,purpose=configuration.get("purpose"),
+            anonymize_cases=anonymize_cases,canonical_origin=canonical_origin)
 
     def dispatch(self,request):
         if not isinstance(request,dict):return {"status":"rejected_request"}

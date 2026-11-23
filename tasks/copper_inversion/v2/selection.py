@@ -42,9 +42,11 @@ def selection_seconds(training_manifest,training,manifests,loaded):
 
 
 def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation",
-           max_candidates=3):
+           max_candidates=3,anonymize_cases=False,canonical_origin=False):
     """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
+    if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+        raise ValueError("invalid case isolation flags")
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
     if not sources or (max_candidates is not None and len(sources)>max_candidates):
         raise ValueError("freeze one to three candidates before validation")
@@ -83,6 +85,8 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
         manifests=[dict(path=str(p),sha256=file_hash(p),contents_sha256=digest(m)) for p,m in zip(manifests,loaded)],
         implementation_sha256=source_identity(),image=image,seconds=seconds,selection_objective=objective,
         selection_rule=SELECTION_RULES[objective])
+    if anonymize_cases:frozen["anonymize_cases"]=True
+    if canonical_origin:frozen["canonical_origin"]=True
     atomic_json_write(root/"frozen.json",frozen)
     atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
     return frozen
@@ -160,6 +164,8 @@ def run(root,phase):
                 # standard scoring, whose receipts carry the IoU outcome for every judge.
                 objective=frozen.get("selection_objective","confirmation") if phase=="validation" else "confirmation"
                 options={} if objective=="confirmation" else {"objective":objective}
+                if frozen.get("anonymize_cases"):options["anonymize_cases"]=True
+                if frozen.get("canonical_origin"):options["canonical_origin"]=True
                 evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
                 result=evaluator.evaluate(candidate)
                 rows.append(dict(source_sha256=payload["sha256"],split=split,metrics=dict(result.metrics)))
