@@ -15,6 +15,9 @@ export const HISTORY_POLICY = {
 
 export class HistoryRecoveryError extends Error {}
 
+const TRUNCATED_SUMMARY = /generation hit the token cap and the summary is incomplete/i;
+const CONCISE_SUMMARY = "Write a concise summary of at most 2,000 words. Preserve decisions, relevant evidence, constraints, and unfinished work.";
+
 interface RecoveryState {
 	continuations: number;
 	failure?: { message: string; compactionId: string | null };
@@ -99,14 +102,24 @@ export class HistoryController {
 					tokensBefore: event.preparation.tokensBefore, thinking: HISTORY_POLICY.summaryThinking });
 				try {
 					if (!ctx.model) throw new Error("Compaction requires a model");
-					const result = await compact({ ...event.preparation,
+					const model = { ...ctx.model, baseUrl: `${ctx.model.baseUrl}/compaction` };
+					const signal = AbortSignal.any([event.signal, AbortSignal.timeout(HISTORY_POLICY.summaryTimeoutMs)]);
+					const summarize = (thinking: "high" | "low", instructions?: string) => compact({ ...event.preparation,
 						settings: { ...event.preparation.settings, reserveTokens: HISTORY_POLICY.summaryReserveTokens },
-					}, { ...ctx.model, baseUrl: `${ctx.model.baseUrl}/compaction` }, proxyApiKey, undefined, event.customInstructions,
-					AbortSignal.any([event.signal, AbortSignal.timeout(HISTORY_POLICY.summaryTimeoutMs)]),
-						HISTORY_POLICY.summaryThinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
+					}, model, proxyApiKey, undefined, instructions, signal,
+						thinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
 							onRetryScheduled: (attempt, maxAttempts, delayMs, errorMessage) =>
 								this.record({ type: "compaction_retry", attempt, maxAttempts, delayMs, errorMessage }),
 						});
+					let result: Awaited<ReturnType<typeof compact>>;
+					try {
+						result = await summarize(HISTORY_POLICY.summaryThinking, event.customInstructions);
+					} catch (error) {
+						if (signal.aborted || !TRUNCATED_SUMMARY.test(String(error))) throw error;
+						await this.record({ type: "compaction_retry", reason: "truncated_summary", thinking: "low" });
+						const instructions = [event.customInstructions, CONCISE_SUMMARY].filter(Boolean).join("\n\n");
+						result = await summarize("low", instructions);
+					}
 					await this.record({ type: "compaction_generated", reason: event.reason,
 						durationMs: Date.now() - started, tokensBefore: result.tokensBefore,
 						summaryChars: result.summary.length, usage: result.usage });

@@ -34,7 +34,7 @@ test("continuation allowance and blocked history survive a process restart", asy
 	} finally { await rm(root, { recursive: true, force: true }); }
 });
 
-for (const mode of ["success", "incomplete", "automatic_failure", "transient"] as const) {
+for (const mode of ["success", "incomplete", "automatic_failure", "transient", "truncated_then_repaired"] as const) {
 	const fail = mode === "incomplete" || mode === "automatic_failure";
 	test(`native compaction hook: ${mode}`, async () => {
 		const root = await mkdtemp(join(tmpdir(), "ldm-history-native-"));
@@ -53,13 +53,14 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 			}
 			const item = { type: "message", id: "msg_summary", role: "assistant", status: "completed",
 				content: [{ type: "output_text", text: "Summary of archived evidence.", annotations: [] }] };
+			const incomplete = fail || (mode === "truncated_then_repaired" && requests.length === 1);
 			const events = [
 				{ type: "response.created", response: { id: "resp_summary", status: "in_progress", output: [] } },
 				{ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } },
 				{ type: "response.output_item.done", output_index: 0, item },
-				{ type: fail ? "response.incomplete" : "response.completed", response: {
-					id: "resp_summary", status: fail ? "incomplete" : "completed", output: [item],
-					...(fail ? { incomplete_details: { reason: "max_output_tokens" } } : {}),
+				{ type: incomplete ? "response.incomplete" : "response.completed", response: {
+					id: "resp_summary", status: incomplete ? "incomplete" : "completed", output: [item],
+					...(incomplete ? { incomplete_details: { reason: "max_output_tokens" } } : {}),
 					usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120,
 						input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } },
 				} },
@@ -126,8 +127,12 @@ for (const mode of ["success", "incomplete", "automatic_failure", "transient"] a
 				assert.deepEqual(manager.getBranch().slice(0, oldIds.length).map(e => e.id), oldIds);
 				assert.match(await readFile(join(root, "history-events.jsonl"), "utf8"), /compaction_committed/);
 			}
-			assert.equal(requests.length, mode === "transient" ? 2 : 1, "no fallback or research dispatch on failed compaction");
+			assert.equal(requests.length, mode === "success" ? 1 : 2, "no research dispatch on failed compaction");
 			assert.equal((requests[0]!.reasoning as { effort: string }).effort, "high");
+			if (fail || mode === "truncated_then_repaired") {
+				assert.equal((requests[1]!.reasoning as { effort: string }).effort, "low");
+				assert.match(JSON.stringify(requests[1]), /at most 2,000 words/);
+			}
 			assert.equal(requests[0]!.max_output_tokens, 32768);
 			assert.notEqual(requests[0]!.tool_choice, "required");
 			assert.equal(session.thinkingLevel, "max", "research reasoning must remain unchanged");
