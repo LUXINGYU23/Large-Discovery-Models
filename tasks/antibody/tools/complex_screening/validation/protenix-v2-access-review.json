@@ -1,0 +1,12 @@
+{
+  "review_date": "2026-11-23",
+  "official_readme": "https://github.com/bytedance/Protenix/blob/main/README.md",
+  "official_url_registry": "https://github.com/bytedance/Protenix/blob/main/protenix/web_service/dependency_url.py",
+  "official_weight_url": "https://protenix.tos-cn-beijing.volces.com/checkpoint/protenix-v2.pt",
+  "server_head_status": 403,
+  "downloaded": false,
+  "inference_validated": false,
+  "third_party_weights_used": false,
+  "reason": "Official retrieval still denied. Official README states v2 weights are proprietary and restricts redistribution/transfer without prior written consent. No authorized alternate weight source established.",
+  "next_dependency": "Rights-holder-approved model access or an official service with suitable access terms; public code alone does not resolve model access."
+}
