@@ -15,7 +15,7 @@ from qwen_responses_bridge import start
 
 def run_campaigns(methods, args, root, output, cpus, env, results):
     for method in methods:
-        for target in ("her2", "pd1"):
+        for target in args.targets:
             legacy = args.methods == ["ldm_harness"]
             destination = output / target if legacy else output / method / target
             name = target if legacy else method + "-" + target
@@ -28,9 +28,13 @@ def run_campaigns(methods, args, root, output, cpus, env, results):
             if method != "ldm_harness" or args.initialization_root:
                 initialization = args.initialization_root or root / "runs/antibody_rfd3/real-sessions-20261119-02"
                 command.extend(["--set", "args.initialization-run=" + str(initialization.resolve() / target)])
+            if args.enable_boltzgen:
+                command.extend(["--set", "args.enable-boltzgen=true"])
+            if args.research_instructions:
+                command.extend(["--set", "args.research-instructions=" + args.research_instructions])
             before = time.monotonic()
             with (output / (name + ".log")).open("w") as log:
-                run = subprocess.run(command, cwd=root / "code", env=env,
+                run = subprocess.run(command, cwd=args.code_root or root / "code", env=env,
                                      stdout=log, stderr=subprocess.STDOUT)
             results[name] = {"exit_code": run.returncode, "seconds": time.monotonic() - before,
                              "run": str(destination)}
@@ -46,9 +50,17 @@ def main():
     parser.add_argument("--methods", nargs="+", choices=("antbo", "fixed", "harness", "ldm_harness"),
                         default=["ldm_harness"])
     parser.add_argument("--initialization-root", type=Path)
+    parser.add_argument("--code-root", type=Path, help="Independent source checkout; defaults to ROOT/code")
+    parser.add_argument("--targets", nargs="+", choices=("her2", "pd1"), default=["her2", "pd1"])
+    parser.add_argument("--enable-boltzgen", action="store_true")
+    parser.add_argument("--research-instructions", default="")
     args = parser.parse_args()
     if len(set(args.methods)) != len(args.methods):
         parser.error("methods must be distinct")
+    if len(set(args.targets)) != len(args.targets):
+        parser.error("targets must be distinct")
+    if args.enable_boltzgen and any(m not in ("harness", "ldm_harness") for m in args.methods):
+        parser.error("BoltzGen is available only for Pi methods")
     root = args.root.resolve()
     output = args.out_dir.resolve()
     output.mkdir(parents=True, exist_ok=False)

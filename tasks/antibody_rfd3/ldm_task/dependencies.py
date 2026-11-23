@@ -39,6 +39,14 @@ def check_dependencies(plan, *, include_optional=True):
     if method in ("ldm_harness", "harness"):
         check("Pi endpoint", env.get("LLM_BASE_URL") and env.get("LLM_MODEL_NAME") and
               (env.get("LLM_API_KEY") or env.get("OPENAI_API_KEY")), "Responses endpoint, model and API key")
+    if args.get("enable-boltzgen"):
+        suffix = {"HER2": "HER2", "PD-1": "PD1"}.get(args.get("antigen"))
+        check("BoltzGen antigen", suffix is not None, "Explicit HER2 or PD-1 host configuration")
+        for key in ("BOLTZGEN_PYTHON", "BOLTZGEN_SCAFFOLD", "BOLTZGEN_CHECKPOINT", "BOLTZGEN_INVERSE_FOLD_CHECKPOINT", "BOLTZGEN_MOLDIR",
+                    "BOLTZGEN_SPEC_" + (suffix or "UNCONFIGURED")):
+            path = env.get(key)
+            check(key, path and Path(path).is_file() and (key != "BOLTZGEN_PYTHON" or os.access(path, os.X_OK)),
+                  "Required only when the optional BoltzGen tool is enabled")
     if method == "antbo":
         check("Native AntBO", (Path(env.get("ANTBO_HOME", "")) / "bo/optimizer.py").is_file(),
               "ANTBO_HOME must point to upstream HEBO/AntBO")

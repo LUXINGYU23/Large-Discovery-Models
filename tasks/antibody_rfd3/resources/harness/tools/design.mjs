@@ -1,4 +1,5 @@
 import { request } from "node:http";
+import { existsSync } from "node:fs";
 
 function generate(action, params) {
   const body = JSON.stringify({action, ...params});
@@ -27,6 +28,10 @@ export default function register(pi) {
     parameters: {type: "object", properties, required: Object.keys(properties), additionalProperties: false},
     execute: (_id, params) => generate(name, params)});
   }
+  if (existsSync("/worker/boltzgen.enabled")) pi.registerTool({name: "design_h3_boltzgen", label: "design_h3_boltzgen",
+    description: "Optional host-enabled BoltzGen fixed-framework H3 design for the configured antigen: one backbone, then count native inverse-folded sequences. Consumes one backbone and count sequence slots. Uses native diffusion settings; returned backbones cannot be passed to sequence_h3.",
+    parameters: {type: "object", properties: {count: {type: "integer", minimum: 1}}, required: ["count"], additionalProperties: false},
+    execute: (_id, params) => generate("design_h3_boltzgen", params)});
   pi.registerTool({name: "score_interface", label: "score_interface",
     description: "Compute ipSAE for a host-prepared structure/PAE artifact ID. Does not predict structures or change Absolut scores.",
     parameters: {type: "object", properties: {artifact_id: {type: "string"}}, required: ["artifact_id"], additionalProperties: false},

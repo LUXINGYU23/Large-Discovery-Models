@@ -19,7 +19,7 @@ from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOLS = ("design_h3", "sequence_h3", "sequence_h3_soluble", "score_interface")
+TOOLS = ("design_h3", "sequence_h3", "sequence_h3_soluble", "design_h3_boltzgen", "score_interface")
 SKILL = "skills/cdrh3-design"
 ROLE = "profiles/research/AGENTS.md"
 
@@ -78,6 +78,8 @@ def worker_socket(worker):
             pass
 
     with tempfile.TemporaryDirectory(prefix="h3-") as directory:
+        if getattr(getattr(worker, "args", None), "enable_boltzgen", False):
+            (Path(directory) / "boltzgen.enabled").write_text("enabled\n")
         with UnixStreamServer(str(Path(directory) / "design.sock"), Handler) as server:
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -100,6 +102,7 @@ def open_agent(args, runtime, worker):
     root = runtime.run_dir / "harness"
     root.mkdir(exist_ok=True)
     extension = "tools/design.mjs"
+    active_tools = tuple(name for name in TOOLS if name != "design_h3_boltzgen" or getattr(args, "enable_boltzgen", False))
     config = PiHarnessConfig(
         artifact_root=Path("/artifacts"), profiles=(profile(),), campaign_id=runtime.run_id,
         task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed,
@@ -108,7 +111,7 @@ def open_agent(args, runtime, worker):
         base_url=url.removesuffix("/responses"), model=model, context7_enabled=False,
         force_first_tool_call=False, guest_runtime=load_pi_guest_runtime("antibody_rfd3", RESOURCES / "image"),
         tool_extensions=(HarnessToolExtension(Path("/resources") / extension,
-                                              file_sha256(RESOURCES / extension), TOOLS),))
+                                              file_sha256(RESOURCES / extension), active_tools),))
     with worker_socket(worker) as socket_dir:
         cmd = pi_sidecar_command(root, args.sidecar_image, cache_root=args.guest_cache,
                                  mounts=((RESOURCES, "/resources", True), (socket_dir, "/worker", True)))
@@ -133,6 +136,8 @@ class PiAgent:
                    "designs may also be submitted. Allow time to repair rejected submissions."}
         if getattr(self.worker.args, "research_instructions", ""):
             message["research_guidance"] = self.worker.args.research_instructions
+        if getattr(self.worker.args, "enable_boltzgen", False):
+            message["optional_generation_tool"] = "design_h3_boltzgen(count): enabled for this antigen; one backbone followed by count native inverse-folded sequences, using one backbone and count sequence slots."
         if round_idx == 0:
             message["first_turn_steps"] = (
                 "1. First call the Pi read tool with path "

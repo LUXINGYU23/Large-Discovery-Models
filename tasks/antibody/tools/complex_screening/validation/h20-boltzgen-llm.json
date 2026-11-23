@@ -1,0 +1,824 @@
+{
+  "scope": "Guided real Qwen3-8B LDM + native BoltzGen design/inverse-fold + unchanged domain admission + acquisition selection + real Absolut",
+  "default_enabled": false,
+  "ranking_pipeline_validated": false,
+  "efficacy_comparison": false,
+  "runs": {
+    "pd1": {
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1",
+      "jobs": [
+        {
+          "job": "job-00000",
+          "action": "design_h3",
+          "status": "succeeded",
+          "seed": 42,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 8,
+          "unique_admitted": 8
+        },
+        {
+          "job": "job-00001",
+          "action": "design_h3_boltzgen",
+          "status": "succeeded",
+          "seed": 43,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 13,
+          "unique_admitted": 1,
+          "native_path": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/design_jobs/job-00001/output/run.json",
+          "seconds": 92.50330690597184,
+          "inputs": {
+            "spec": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/h3-pd1.yaml",
+              "sha256": "75235ce7134d606d91967d3a668e87a29458ca6d2bed7f7c68fd6cdcf159db5b"
+            },
+            "scaffold": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/1N8Z.cif",
+              "sha256": "9f22f02b6e514de56dab8a48bc31a16302a51397779e64c398ad3a7f05cb19a2"
+            },
+            "checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_adherence.ckpt",
+              "sha256": "ac7078b3dc13064c68e0c3fd542e5bc538c33558bf6607f65e499eb336ca5e5d"
+            },
+            "inverse_fold_checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_ifold.ckpt",
+              "sha256": "dd4cf108c94471bdc3a326b7b180fa3854dc019110fae780208c30b50bd56578"
+            },
+            "moldir": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/mols.zip",
+              "sha256": "3d4f56ac4262e745bb3d09cfaa19099b1d01be208122d501667b952e45521e53"
+            }
+          },
+          "runtime": {
+            "boltzgen": "0.3.2",
+            "torch": "2.7.1+cu126",
+            "cuda_build": "12.6",
+            "gpu": "NVIDIA H20",
+            "max_gpu_memory_reserved_gib": 5.517578125
+          }
+        },
+        {
+          "job": "job-00002",
+          "action": "design_h3_boltzgen",
+          "status": "succeeded",
+          "seed": 44,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 0,
+          "unique_admitted": 0,
+          "native_path": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/design_jobs/job-00002/output/run.json",
+          "seconds": 85.292512118991,
+          "inputs": {
+            "spec": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/h3-pd1.yaml",
+              "sha256": "75235ce7134d606d91967d3a668e87a29458ca6d2bed7f7c68fd6cdcf159db5b"
+            },
+            "scaffold": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/1N8Z.cif",
+              "sha256": "9f22f02b6e514de56dab8a48bc31a16302a51397779e64c398ad3a7f05cb19a2"
+            },
+            "checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_adherence.ckpt",
+              "sha256": "ac7078b3dc13064c68e0c3fd542e5bc538c33558bf6607f65e499eb336ca5e5d"
+            },
+            "inverse_fold_checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_ifold.ckpt",
+              "sha256": "dd4cf108c94471bdc3a326b7b180fa3854dc019110fae780208c30b50bd56578"
+            },
+            "moldir": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/mols.zip",
+              "sha256": "3d4f56ac4262e745bb3d09cfaa19099b1d01be208122d501667b952e45521e53"
+            }
+          },
+          "runtime": {
+            "boltzgen": "0.3.2",
+            "torch": "2.7.1+cu126",
+            "cuda_build": "12.6",
+            "gpu": "NVIDIA H20",
+            "max_gpu_memory_reserved_gib": 5.517578125
+          }
+        },
+        {
+          "job": "job-00003",
+          "action": "sequence_h3",
+          "status": "succeeded",
+          "seed": 45,
+          "requested": 8,
+          "backbones_requested": 0,
+          "admitted": 4,
+          "unique_admitted": 4
+        }
+      ],
+      "selection_events": [
+        {
+          "iteration": 0,
+          "fallback_reason": null,
+          "metadata": {
+            "mode": "reservoir_order",
+            "selection_source": "expander"
+          }
+        },
+        {
+          "iteration": 1,
+          "fallback_reason": null,
+          "metadata": {
+            "candidates_scored": [
+              {
+                "acquisition_raw": 0.36316168308258057,
+                "acquisition_score": 0.36316168308258057,
+                "mu": 0.0,
+                "sequence": "TPGVDGAPGTI",
+                "sigma": 0.9115646481513977,
+                "source": "direct_generation"
+              },
+              {
+                "acquisition_raw": 0.4302341043949127,
+                "acquisition_score": 0.4302341043949127,
+                "mu": 0.0,
+                "sequence": "SSSSYGGAMDY",
+                "sigma": 1.0796902179718018,
+                "source": "direct_generation"
+              }
+            ],
+            "mode": "direct_max",
+            "reduction": "max",
+            "selected_candidates": [
+              {
+                "acquisition_score": 0.4302341043949127,
+                "mu": 0.0,
+                "sequence": "SSSSYGGAMDY",
+                "sigma": 1.0796902179718018
+              }
+            ],
+            "selected_indices": [
+              1
+            ],
+            "selection_probabilities": [
+              0.0,
+              1.0
+            ],
+            "softmax_eta": 1.0
+          }
+        },
+        {
+          "iteration": 2,
+          "fallback_reason": null,
+          "metadata": {
+            "candidates_scored": [
+              {
+                "acquisition_raw": 0.035581640899181366,
+                "acquisition_score": 0.035581640899181366,
+                "mu": 0.37796932458877563,
+                "sequence": "TNGEPGAPGII",
+                "sigma": 0.9813868999481201,
+                "source": "direct_generation"
+              },
+              {
+                "acquisition_raw": 0.038862280547618866,
+                "acquisition_score": 0.038862280547618866,
+                "mu": 0.31664425134658813,
+                "sequence": "TTGEYGAQGVV",
+                "sigma": 0.9694126844406128,
+                "source": "direct_generation"
+              }
+            ],
+            "mode": "direct_max",
+            "reduction": "max",
+            "selected_candidates": [
+              {
+                "acquisition_score": 0.038862280547618866,
+                "mu": 0.31664425134658813,
+                "sequence": "TTGEYGAQGVV",
+                "sigma": 0.9694126844406128
+              }
+            ],
+            "selected_indices": [
+              1
+            ],
+            "selection_probabilities": [
+              0.0,
+              1.0
+            ],
+            "softmax_eta": 1.0
+          }
+        }
+      ],
+      "observations": [
+        {
+          "candidate": {
+            "candidate_id": "ab-798806164473",
+            "canonical_key": "TPGPPGSPGVV",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00000/output/designs.json",
+              "backbone_id": "job-00000",
+              "design_id": "job-00000/3",
+              "index": 3,
+              "sequence": "TPGPPGSPGVV",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/7988061644739dfa/5GGR_Y_FuC_5.25-6exwwexe/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/7988061644739dfa",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/7988061644739dfa/5GGR_Y_FuC_5.25-6exwwexe/5GGR_Y_FuC_5.25FinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/7988061644739dfa/5GGR_Y_FuC_5.25-6exwwexe/result.json"
+            },
+            "candidate_id": "ab-798806164473",
+            "error": "",
+            "metadata": {
+              "antigen": "5GGR_Y_FuC_5.25",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:0:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/7988061644739dfa/5GGR_Y_FuC_5.25-6exwwexe",
+              "sequence": "TPGPPGSPGVV"
+            },
+            "metrics": {
+              "absolut_energy": -65.41
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 7.0489334660233
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 0,
+          "surrogate": {
+            "metadata": {
+              "sequence": "TPGPPGSPGVV"
+            },
+            "source_id": "ab-798806164473",
+            "values": [
+              16.0,
+              12.0,
+              5.0,
+              12.0,
+              12.0,
+              5.0,
+              15.0,
+              12.0,
+              5.0,
+              17.0,
+              17.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        },
+        {
+          "candidate": {
+            "candidate_id": "ab-197e600fad57",
+            "canonical_key": "SSSSYGGAMDY",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00001/output/candidates.json",
+              "backbone_id": "job-00001/boltzgen",
+              "design_id": "job-00001/0",
+              "index": 0,
+              "sequence": "SSSSYGGAMDY",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/197e600fad573464/5GGR_Y_FuC_5.25-4_bzulpr/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/197e600fad573464",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/197e600fad573464/5GGR_Y_FuC_5.25-4_bzulpr/5GGR_Y_FuC_5.25FinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/197e600fad573464/5GGR_Y_FuC_5.25-4_bzulpr/result.json"
+            },
+            "candidate_id": "ab-197e600fad57",
+            "error": "",
+            "metadata": {
+              "antigen": "5GGR_Y_FuC_5.25",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:1:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/197e600fad573464/5GGR_Y_FuC_5.25-4_bzulpr",
+              "sequence": "SSSSYGGAMDY"
+            },
+            "metrics": {
+              "absolut_energy": -69.01
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 7.222532226005569
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 1,
+          "surrogate": {
+            "metadata": {
+              "sequence": "SSSSYGGAMDY"
+            },
+            "source_id": "ab-197e600fad57",
+            "values": [
+              15.0,
+              15.0,
+              15.0,
+              15.0,
+              19.0,
+              5.0,
+              5.0,
+              0.0,
+              10.0,
+              2.0,
+              19.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        },
+        {
+          "candidate": {
+            "candidate_id": "ab-928aa35a9421",
+            "canonical_key": "TTGEYGAQGVV",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00003/output/designs.json",
+              "backbone_id": "job-00000",
+              "design_id": "job-00003/5",
+              "index": 5,
+              "sequence": "TTGEYGAQGVV",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/928aa35a94217b7c/5GGR_Y_FuC_5.25-yv81sg3m/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/928aa35a94217b7c",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/928aa35a94217b7c/5GGR_Y_FuC_5.25-yv81sg3m/5GGR_Y_FuC_5.25FinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/928aa35a94217b7c/5GGR_Y_FuC_5.25-yv81sg3m/result.json"
+            },
+            "candidate_id": "ab-928aa35a9421",
+            "error": "",
+            "metadata": {
+              "antigen": "5GGR_Y_FuC_5.25",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:2:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/pd1/oracle/928aa35a94217b7c/5GGR_Y_FuC_5.25-yv81sg3m",
+              "sequence": "TTGEYGAQGVV"
+            },
+            "metrics": {
+              "absolut_energy": -72.19
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 6.738263504987117
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 2,
+          "surrogate": {
+            "metadata": {
+              "sequence": "TTGEYGAQGVV"
+            },
+            "source_id": "ab-928aa35a9421",
+            "values": [
+              16.0,
+              16.0,
+              5.0,
+              3.0,
+              19.0,
+              5.0,
+              0.0,
+              13.0,
+              5.0,
+              17.0,
+              17.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        }
+      ]
+    },
+    "her2": {
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2",
+      "jobs": [
+        {
+          "job": "job-00000",
+          "action": "design_h3",
+          "status": "succeeded",
+          "seed": 42,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 9,
+          "unique_admitted": 9
+        },
+        {
+          "job": "job-00001",
+          "action": "design_h3_boltzgen",
+          "status": "succeeded",
+          "seed": 43,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 3,
+          "unique_admitted": 2,
+          "native_path": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/design_jobs/job-00001/output/run.json",
+          "seconds": 161.87180617102422,
+          "inputs": {
+            "spec": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/h3-her2.yaml",
+              "sha256": "41d313f31f7888b4c2edd678456b92f603c83eb8f51b98b4f11bf6b89435f0d5"
+            },
+            "scaffold": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/1N8Z.cif",
+              "sha256": "9f22f02b6e514de56dab8a48bc31a16302a51397779e64c398ad3a7f05cb19a2"
+            },
+            "checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_adherence.ckpt",
+              "sha256": "ac7078b3dc13064c68e0c3fd542e5bc538c33558bf6607f65e499eb336ca5e5d"
+            },
+            "inverse_fold_checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_ifold.ckpt",
+              "sha256": "dd4cf108c94471bdc3a326b7b180fa3854dc019110fae780208c30b50bd56578"
+            },
+            "moldir": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/mols.zip",
+              "sha256": "3d4f56ac4262e745bb3d09cfaa19099b1d01be208122d501667b952e45521e53"
+            }
+          },
+          "runtime": {
+            "boltzgen": "0.3.2",
+            "torch": "2.7.1+cu126",
+            "cuda_build": "12.6",
+            "gpu": "NVIDIA H20",
+            "max_gpu_memory_reserved_gib": 12.916015625
+          }
+        },
+        {
+          "job": "job-00002",
+          "action": "design_h3_boltzgen",
+          "status": "succeeded",
+          "seed": 44,
+          "requested": 16,
+          "backbones_requested": 1,
+          "admitted": 0,
+          "unique_admitted": 0,
+          "native_path": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/design_jobs/job-00002/output/run.json",
+          "seconds": 154.95569817203796,
+          "inputs": {
+            "spec": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/h3-her2.yaml",
+              "sha256": "41d313f31f7888b4c2edd678456b92f603c83eb8f51b98b4f11bf6b89435f0d5"
+            },
+            "scaffold": {
+              "path": "/Aidata/shared/ldm/antibody-poc/runs/boltzgen-validation-001/1N8Z.cif",
+              "sha256": "9f22f02b6e514de56dab8a48bc31a16302a51397779e64c398ad3a7f05cb19a2"
+            },
+            "checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_adherence.ckpt",
+              "sha256": "ac7078b3dc13064c68e0c3fd542e5bc538c33558bf6607f65e499eb336ca5e5d"
+            },
+            "inverse_fold_checkpoint": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/boltzgen1_ifold.ckpt",
+              "sha256": "dd4cf108c94471bdc3a326b7b180fa3854dc019110fae780208c30b50bd56578"
+            },
+            "moldir": {
+              "path": "/Aidata/shared/ldm/antibody-poc/cache/boltzgen-local/mols.zip",
+              "sha256": "3d4f56ac4262e745bb3d09cfaa19099b1d01be208122d501667b952e45521e53"
+            }
+          },
+          "runtime": {
+            "boltzgen": "0.3.2",
+            "torch": "2.7.1+cu126",
+            "cuda_build": "12.6",
+            "gpu": "NVIDIA H20",
+            "max_gpu_memory_reserved_gib": 12.916015625
+          }
+        }
+      ],
+      "selection_events": [
+        {
+          "iteration": 0,
+          "fallback_reason": null,
+          "metadata": {
+            "mode": "reservoir_order",
+            "selection_source": "expander"
+          }
+        },
+        {
+          "iteration": 1,
+          "fallback_reason": null,
+          "metadata": {
+            "candidates_scored": [
+              {
+                "acquisition_raw": 0.42183080315589905,
+                "acquisition_score": 0.42183080315589905,
+                "mu": 0.0,
+                "sequence": "SGSSGYSAMDY",
+                "sigma": 1.058626413345337,
+                "source": "direct_generation"
+              },
+              {
+                "acquisition_raw": 0.42183080315589905,
+                "acquisition_score": 0.42183080315589905,
+                "mu": 0.0,
+                "sequence": "SGSSGWSAMDY",
+                "sigma": 1.058626413345337,
+                "source": "direct_generation"
+              }
+            ],
+            "mode": "direct_max",
+            "reduction": "max",
+            "selected_candidates": [
+              {
+                "acquisition_score": 0.42183080315589905,
+                "mu": 0.0,
+                "sequence": "SGSSGYSAMDY",
+                "sigma": 1.058626413345337
+              }
+            ],
+            "selected_indices": [
+              0
+            ],
+            "selection_probabilities": [
+              1.0,
+              0.0
+            ],
+            "softmax_eta": 1.0
+          }
+        },
+        {
+          "iteration": 2,
+          "fallback_reason": null,
+          "metadata": {
+            "candidates_scored": [
+              {
+                "acquisition_raw": 0.166562020778656,
+                "acquisition_score": 0.166562020778656,
+                "mu": -0.552511990070343,
+                "sequence": "SSGGPGSMGVV",
+                "sigma": 0.8660112023353577,
+                "source": "direct_generation"
+              },
+              {
+                "acquisition_raw": 7.53526110202074e-05,
+                "acquisition_score": 7.53526110202074e-05,
+                "mu": 0.8341131210327148,
+                "sequence": "SGSSGWSAMDY",
+                "sigma": 0.5586768388748169,
+                "source": "direct_generation"
+              }
+            ],
+            "mode": "direct_max",
+            "reduction": "max",
+            "selected_candidates": [
+              {
+                "acquisition_score": 0.166562020778656,
+                "mu": -0.552511990070343,
+                "sequence": "SSGGPGSMGVV",
+                "sigma": 0.8660112023353577
+              }
+            ],
+            "selected_indices": [
+              0
+            ],
+            "selection_probabilities": [
+              1.0,
+              0.0
+            ],
+            "softmax_eta": 1.0
+          }
+        }
+      ],
+      "observations": [
+        {
+          "candidate": {
+            "candidate_id": "ab-261f0267e897",
+            "canonical_key": "SNGGDGSPGVV",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00000/output/designs.json",
+              "backbone_id": "job-00000",
+              "design_id": "job-00000/0",
+              "index": 0,
+              "sequence": "SNGGDGSPGVV",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/261f0267e8972e6c/1N8Z_C-ij7m5uj7/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/261f0267e8972e6c",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/261f0267e8972e6c/1N8Z_C-ij7m5uj7/1N8Z_CFinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/261f0267e8972e6c/1N8Z_C-ij7m5uj7/result.json"
+            },
+            "candidate_id": "ab-261f0267e897",
+            "error": "",
+            "metadata": {
+              "antigen": "1N8Z_C",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:0:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/261f0267e8972e6c/1N8Z_C-ij7m5uj7",
+              "sequence": "SNGGDGSPGVV"
+            },
+            "metrics": {
+              "absolut_energy": -85.2
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 40.43079061899334
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 0,
+          "surrogate": {
+            "metadata": {
+              "sequence": "SNGGDGSPGVV"
+            },
+            "source_id": "ab-261f0267e897",
+            "values": [
+              15.0,
+              11.0,
+              5.0,
+              5.0,
+              2.0,
+              5.0,
+              15.0,
+              12.0,
+              5.0,
+              17.0,
+              17.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        },
+        {
+          "candidate": {
+            "candidate_id": "ab-36e659eb5129",
+            "canonical_key": "SGSSGYSAMDY",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00001/output/candidates.json",
+              "backbone_id": "job-00001/boltzgen",
+              "design_id": "job-00001/7",
+              "index": 7,
+              "sequence": "SGSSGYSAMDY",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/36e659eb512914ed/1N8Z_C-vcuops9r/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/36e659eb512914ed",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/36e659eb512914ed/1N8Z_C-vcuops9r/1N8Z_CFinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/36e659eb512914ed/1N8Z_C-vcuops9r/result.json"
+            },
+            "candidate_id": "ab-36e659eb5129",
+            "error": "",
+            "metadata": {
+              "antigen": "1N8Z_C",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:1:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/36e659eb512914ed/1N8Z_C-vcuops9r",
+              "sequence": "SGSSGYSAMDY"
+            },
+            "metrics": {
+              "absolut_energy": -84.54
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 41.129194243985694
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 1,
+          "surrogate": {
+            "metadata": {
+              "sequence": "SGSSGYSAMDY"
+            },
+            "source_id": "ab-36e659eb5129",
+            "values": [
+              15.0,
+              5.0,
+              15.0,
+              15.0,
+              5.0,
+              19.0,
+              15.0,
+              0.0,
+              10.0,
+              2.0,
+              19.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        },
+        {
+          "candidate": {
+            "candidate_id": "ab-3e0cc890e9cb",
+            "canonical_key": "SSGGPGSMGVV",
+            "metadata": {
+              "acquisition_score": null,
+              "acquisition_used": false,
+              "llm_score": null,
+              "phase": "",
+              "selector_source": "ldm_harness"
+            },
+            "payload": {
+              "artifact": "design_jobs/job-00000/output/designs.json",
+              "backbone_id": "job-00000",
+              "design_id": "job-00000/2",
+              "index": 2,
+              "sequence": "SSGGPGSMGVV",
+              "violations": []
+            },
+            "source": "ldm_harness"
+          },
+          "evaluation": {
+            "artifacts": {
+              "log": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/3e0cc890e9cbd221/1N8Z_C-b3rwr1tz/evaluation.log",
+              "oracle_root": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/3e0cc890e9cbd221",
+              "raw": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/3e0cc890e9cbd221/1N8Z_C-b3rwr1tz/1N8Z_CFinalBindings_Process_1_Of_1.txt",
+              "result": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/3e0cc890e9cbd221/1N8Z_C-b3rwr1tz/result.json"
+            },
+            "candidate_id": "ab-3e0cc890e9cb",
+            "error": "",
+            "metadata": {
+              "antigen": "1N8Z_C",
+              "binary_sha256": "1530560acc747f29b5278dd5ed4249abbb19c18ed30f6d9939f1503620cef8b6",
+              "ldm_evaluation_attempt_receipt": "round:2:slot:0",
+              "oracle": "Absolut",
+              "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/antibody_rfd3/boltzgen-llm-002/her2/oracle/3e0cc890e9cbd221/1N8Z_C-b3rwr1tz",
+              "sequence": "SSGGPGSMGVV"
+            },
+            "metrics": {
+              "absolut_energy": -89.01
+            },
+            "resource_usage": {
+              "benchmark_jobs": 1.0,
+              "wall_time_seconds": 39.325739017978776
+            },
+            "status": "succeeded"
+          },
+          "metadata": {},
+          "round_idx": 2,
+          "surrogate": {
+            "metadata": {
+              "sequence": "SSGGPGSMGVV"
+            },
+            "source_id": "ab-3e0cc890e9cb",
+            "values": [
+              15.0,
+              15.0,
+              5.0,
+              5.0,
+              12.0,
+              5.0,
+              15.0,
+              10.0,
+              5.0,
+              17.0,
+              17.0
+            ],
+            "version": "antbo_categorical_sequence_v1"
+          }
+        }
+      ]
+    }
+  }
+}

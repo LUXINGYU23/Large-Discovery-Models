@@ -26,3 +26,19 @@ def test_interface_rejects_paths(tmp_path):
     inputs=tmp_path/'interface_inputs';inputs.mkdir()
     (inputs/'escape.json').write_text(json.dumps({'pae':'../../secret','structure':'model.cif'}))
     with pytest.raises(ValueError): score_interface(worker,'escape')
+
+
+def test_boltzgen_requires_enablement_and_charges_native_pipeline_budget(tmp_path):
+    args=SimpleNamespace(backbones_per_round=2,sequences_per_round=4,seed=42,mock=True,temperature=.5,samples_per_call=1,initialization_run=None,enable_boltzgen=False)
+    worker=DesignWorker(tmp_path,args)
+    first=worker.execute('design_h3',1,.5)
+    worker.round=1
+    with pytest.raises(ValueError,match='enabled'): worker.execute('design_h3_boltzgen',1)
+    args.enable_boltzgen=True
+    with pytest.raises(ValueError,match='budget'): worker.execute('design_h3_boltzgen',5)
+    rows=worker.execute('design_h3_boltzgen',2)
+    assert worker.remaining()=={'backbones':1,'sequences':2}
+    assert len({r['backbone_id'] for r in rows})==1
+    with pytest.raises(ValueError,match='resequencing'): worker.execute('sequence_h3',1,.5,rows[0]['backbone_id'])
+    assert list(worker.records())[-1]['backbones_requested']==1
+    assert 'design_h3_boltzgen' in TOOLS

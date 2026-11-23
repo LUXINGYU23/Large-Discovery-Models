@@ -39,7 +39,7 @@ class DesignWorker:
 
     def remaining(self):
         jobs = [j for j in self.records() if j["round"] == self.round]
-        return {"backbones": self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
+        return {"backbones": self.args.backbones_per_round - sum(j.get("backbones_requested", int(j["action"] == "design_h3")) for j in jobs),
                 "sequences": self.args.sequences_per_round - sum(j["count"] for j in jobs)}
 
     def eligible(self, rows):
@@ -51,12 +51,17 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count, temperature, backbone_id=None):
-        if action not in ("design_h3", "sequence_h3", "sequence_h3_soluble"):
+    def execute(self, action, count, temperature=None, backbone_id=None):
+        boltzgen = action == "design_h3_boltzgen"
+        if action not in ("design_h3", "sequence_h3", "sequence_h3_soluble", "design_h3_boltzgen"):
             raise ValueError("Unknown generation action")
+        if boltzgen and not getattr(self.args, "enable_boltzgen", False):
+            raise ValueError("BoltzGen is optional and must be enabled by the host")
         if type(count) is not int or count < 1:
             raise ValueError("count must be a positive integer")
-        if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
+        if boltzgen and temperature is not None:
+            raise ValueError("BoltzGen uses its native diffusion settings, not ProteinMPNN temperature")
+        if not boltzgen and (type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1):
             raise ValueError("temperature must be in [0.01,1]")
         if (action in ("sequence_h3", "sequence_h3_soluble")) != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
@@ -66,8 +71,11 @@ class DesignWorker:
         known = {r["backbone_id"] for r in self.candidates().values()}
         if backbone_id and backbone_id not in known:
             raise ValueError("Unknown backbone ID in this campaign")
+        if backbone_id and "/" in backbone_id:
+            raise ValueError("BoltzGen designs cannot be passed to the RFD3 ProteinMPNN resequencing route")
         remaining = self.remaining()
-        if count > remaining["sequences"] or (action == "design_h3" and remaining["backbones"] < 1):
+        backbone_count = int(boltzgen or action == "design_h3")
+        if count > remaining["sequences"] or backbone_count > remaining["backbones"]:
             raise ValueError(f"Generation budget exceeded. Remaining {remaining}")
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
@@ -76,12 +84,13 @@ class DesignWorker:
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
+                       backbones_requested=backbone_count,
                        status="started")
         path = job / "receipt.json"
         atomic_json_write(path, receipt)
         try:
             if self.runtime:
-                self.runtime.consume_many({"backbones_requested": int(action == "design_h3"),
+                self.runtime.consume_many({"backbones_requested": backbone_count,
                                            "sequences_requested": count}, usage_key=job.name)
             if self.args.mock:
                 rng = random.Random(seed)
@@ -90,10 +99,13 @@ class DesignWorker:
                 source = self.args.initialization_run.resolve() / "design_jobs" / job.name
                 sequences = self.replay_initialization(job, source, receipt)
                 receipt["initialization_source"] = str(source)
+            elif boltzgen:
+                sequences = self.run_boltzgen(job, count, seed)
             else:
                 sequences = self.run_models(job, backbone_id, count, temperature, seed, soluble=action == "sequence_h3_soluble")
-            rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
-                         artifact=(job / ("receipt.json" if self.args.mock else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
+            artifact = "receipt.json" if self.args.mock else "output/candidates.json" if boltzgen else "output/designs.json"
+            rows = [dict(design_id=f"{job.name}/{i}", backbone_id=f"{job.name}/boltzgen" if boltzgen else backbone, sequence=h3,
+                         artifact=(job / artifact).relative_to(self.jobs.parent).as_posix(),
                          index=i, violations=_sequence_violations(h3, 11))
                     for i, h3 in enumerate(sequences)]
             receipt.update(status="succeeded", candidates=rows)
@@ -103,6 +115,45 @@ class DesignWorker:
             raise
         finally:
             atomic_json_write(path, receipt)
+
+    def run_boltzgen(self, job, count, seed):
+        import fcntl
+
+        suffix = {"HER2": "HER2", "PD-1": "PD1"}.get(self.args.antigen)
+        if suffix is None:
+            raise ValueError("No BoltzGen antigen configuration")
+        keys = ("BOLTZGEN_PYTHON", "BOLTZGEN_SCAFFOLD", "BOLTZGEN_CHECKPOINT", "BOLTZGEN_INVERSE_FOLD_CHECKPOINT", "BOLTZGEN_MOLDIR", "BOLTZGEN_SPEC_" + suffix)
+        settings = {k: os.environ.get(k) for k in keys}
+        if not all(settings.values()):
+            raise ValueError("BoltzGen host configuration is incomplete: " + ", ".join(k for k, v in settings.items() if not v))
+        python = Path(settings["BOLTZGEN_PYTHON"]).absolute()
+        cmd = [str(python), "-m", "tasks.antibody.tools.complex_screening.boltzgen_design",
+               "--python", str(python), "--spec", settings["BOLTZGEN_SPEC_" + suffix],
+               "--scaffold", settings["BOLTZGEN_SCAFFOLD"], "--checkpoint", settings["BOLTZGEN_CHECKPOINT"],
+               "--inverse-fold-checkpoint", settings["BOLTZGEN_INVERSE_FOLD_CHECKPOINT"],
+               "--moldir", settings["BOLTZGEN_MOLDIR"], "--out", str(job / "output"),
+               "--gpu", str(self.args.gpu), "--seed", str(seed), "--samples", str(count), "--timeout", "850"]
+        cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
+        env = dict(os.environ, PYTHONPATH=str(REPO))
+        for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+            env[name] = str(len(cpus))
+        cmd = ["taskset", "-c", ",".join(map(str, cpus)), *cmd]
+        with (self.args.root / "tmp/antibody-rfd3-worker.lock").open("a") as lock, (job / "worker.log").open("w") as log:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            process = subprocess.Popen(cmd, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT,
+                                       start_new_session=True, pass_fds=(lock.fileno(),))
+            try:
+                if process.wait(timeout=900):
+                    raise RuntimeError(f"BoltzGen failed; see {job.name}/worker.log")
+            except BaseException:
+                if process.poll() is None:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                raise
+        manifest = json.loads((job / "output/run.json").read_text())
+        if manifest["status"] != "succeeded" or len(manifest["candidates"]) != count:
+            raise ValueError("Incomplete BoltzGen result")
+        return [row["h3"] for row in manifest["candidates"]]
 
     def replay_initialization(self, job, source, receipt):
         original = json.loads((source / "receipt.json").read_text())

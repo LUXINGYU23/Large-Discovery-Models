@@ -45,6 +45,7 @@ def parse_args(argv=None):
     p.add_argument("--temperature", type=float, default=0.5)
     p.add_argument("--gpu", type=int, default=0)
     p.add_argument("--share-gpu", action="store_true")
+    p.add_argument("--enable-boltzgen", action="store_true", help="Enable optional host-configured, fixed-framework BoltzGen H3 proposals in Pi rounds")
     p.add_argument("--cpu-limit", type=int, default=2)
     p.add_argument("--antigen", default="1ADQ_A")
     p.add_argument("--root", type=Path, default=Path("/Aidata/shared/ldm/antibody-poc"))
@@ -68,6 +69,8 @@ def parse_args(argv=None):
         p.error("seed and GPU index must be nonnegative and temperature in [0.01,1]")
     if a.mock and (a.method != "fixed" or a.oracle != "mock"):
         p.error("--mock is the offline fixed-method fixture. Use --oracle mock alone for real tools and Pi.")
+    if a.enable_boltzgen and a.method not in PI_METHODS:
+        p.error("BoltzGen is an optional Pi proposal tool; select harness or ldm_harness")
     return a
 
 
@@ -78,6 +81,8 @@ def metric(a):
 def describe_ldm_task(args):
     gp = args.method == "ldm_harness"
     actions = ("design_h3", "sequence_h3", "sequence_h3_soluble") if args.method in PI_METHODS else ("design_h3",)
+    if getattr(args, "enable_boltzgen", False) and args.method in PI_METHODS:
+        actions += ("design_h3_boltzgen",)
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",
