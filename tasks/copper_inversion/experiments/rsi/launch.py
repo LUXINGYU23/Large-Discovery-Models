@@ -33,6 +33,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import multiprocessing
 import os
 import pwd
 import re
@@ -313,6 +314,20 @@ def _readable(root):
     for path in [Path(root), *Path(root).rglob("*")]:
         if not path.is_symlink():
             path.chmod(path.stat().st_mode | (0o555 if path.is_dir() else 0o444))
+
+
+def _conditions(paths):
+    """One run's archive conditions; looked up at call time so a forked worker sees the module as patched."""
+    from tasks.copper_inversion.experiments.rsi import archive
+    return archive.conditions(*paths)
+
+
+def _all_conditions(pairs, workers=8):
+    """The blind scan is CPU-bound and takes minutes per run, so runs are checked in forked workers."""
+    if len(pairs) < 2:
+        return [_conditions(p) for p in pairs]
+    with multiprocessing.get_context("fork").Pool(min(workers, len(pairs))) as pool:
+        return pool.map(_conditions, pairs, chunksize=1)
 
 
 class Launcher:
@@ -606,15 +621,15 @@ class Launcher:
             return self._finish()
 
     def _finish(self):
-        from tasks.copper_inversion.experiments.rsi.archive import conditions
         state = self.load_state()
         unfinished = sorted(n for n, e in state["runs"].items() if e["status"] != "finished")
         if unfinished:
             raise PlanError("unfinished runs: " + ", ".join(unfinished))
-        reconciliation = {}
-        for name, _ in self.runs():
+        names = [name for name, _ in self.runs()]
+        reconciliation = dict(zip(names, _all_conditions(
+            [(self.paths(n)["run"], self.paths(n)["service"]) for n in names])))
+        for name in names:
             paths = self.paths(name)
-            reconciliation[name] = conditions(paths["run"], paths["service"])
             blind = reconciliation[name]["blind"]
             if blind["review_required"]:
                 # unseal.py refuses this run until a reviewer signs off this exact hit list.
