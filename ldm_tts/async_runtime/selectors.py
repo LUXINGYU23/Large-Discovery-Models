@@ -12,6 +12,7 @@ This module needs numpy (via ``ldm_tts.optimization``); the rest of ``async_runt
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
@@ -170,12 +171,25 @@ def decision_choice(store, decision_id: int) -> tuple[dict, dict, int]:
     return json.loads(row["record_json"]), json.loads(row["inputs_json"]), plan["step"]
 
 
+def _replay_equal(left, right):
+    """Compare replay data while allowing small floating-point roundoff."""
+    if isinstance(left, float) and isinstance(right, (int, float)) and not isinstance(right, bool):
+        return math.isfinite(left) and math.isfinite(right) and math.isclose(left, right, rel_tol=1e-9, abs_tol=1e-9)
+    if isinstance(right, float) and isinstance(left, (int, float)) and not isinstance(left, bool):
+        return math.isfinite(left) and math.isfinite(right) and math.isclose(left, right, rel_tol=1e-9, abs_tol=1e-9)
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        return left.keys() == right.keys() and all(_replay_equal(left[key], right[key]) for key in left)
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+        return len(left) == len(right) and all(_replay_equal(a, b) for a, b in zip(left, right))
+    return type(left) is type(right) and left == right
+
+
 def audit_decision(store, ledger, decision_id: int, selector: ReferenceSelector,
                    priors: Callable[[str], Any] | None = None) -> list[str]:
     """Design 6.5 audit of one decision: rebuild its inputs from the store (history up to the recorded head,
     candidates, pending experiments, q0, seed, and the policy application it used), redraw, compare with the
-    record field by field, and check the record's internal consistency with ``audit_selection``. ``priors`` maps
-    an application id to that application (``PolicyPrior.application``). Empty list: reproduced exactly."""
+    record field by field with a floating-point tolerance, and check the record's internal consistency with
+    ``audit_selection``. ``priors`` maps an application id to its frozen policy application."""
     record, inputs, step = decision_choice(store, decision_id)
     if "selection" not in record:
         return ["decision was not made by a pending-aware reference selector"]
@@ -209,10 +223,12 @@ def audit_decision(store, ledger, decision_id: int, selector: ReferenceSelector,
         return problems + ["replay selected nothing"]
     left, right = expected["selection"], record["selection"]
     for name in ("selected_candidate_ids", "parameters", "metadata"):
-        if left[name] != right[name]:
+        if not _replay_equal(left[name], right[name]):
             problems.append(f"replay: {name} differs")
     for index, (a, b) in enumerate(zip(left["steps"], right["steps"])):
-        problems.extend(f"replay: step {index}: {name} differs" for name in a if a[name] != b.get(name))
+        if a.keys() != b.keys():
+            problems.append(f"replay: step {index}: fields differ")
+        problems.extend(f"replay: step {index}: {name} differs" for name in a if not _replay_equal(a[name], b.get(name)))
     if len(left["steps"]) != len(right["steps"]):
         problems.append("replay: step count differs")
     snapshot = json.loads(store.value("SELECT snapshot_json FROM decisions WHERE decision_id=?", (decision_id,)))

@@ -80,3 +80,25 @@ def test_synchronous_pi_reuses_frozen_turn_after_resume(tmp_path):
     assert resumed._turn(18, history, {"remaining": 1}) == interrupted
     with pytest.raises(ValueError, match="does not match the campaign checkpoint"):
         resumed._turn(18, [{"score": 3}, {"score": 2}], {"remaining": 1})
+
+
+def test_synchronous_rejected_turn_restarts_with_correct_history_cursor(tmp_path):
+    runtime = SimpleNamespace(run_dir=tmp_path)
+    root = tmp_path / "harness"
+    previous = root / "turns/design-17/turn_committed.json"
+    previous.parent.mkdir(parents=True)
+    previous.write_text(json.dumps({"historyToSeq": 1, "submissionStatus": "accepted"}))
+    rejected = root / "turns/design-18/turn_committed.json"
+    rejected.parent.mkdir(parents=True)
+    rejected.write_text(json.dumps({"historyFromSeq": 1, "historyToSeq": 2, "submissionStatus": "rejected"}))
+    agent = PiAgent(None, None, runtime)
+    retry = agent._turn(18, [{"score": 1}, {"score": 2}], {"remaining": 1})
+    assert retry.turn_id == "design-18-retry-1"
+    assert (retry.history_from_seq, retry.history_to_seq) == (2, 2)
+    accepted = root / "turns/design-18-retry-1/turn_committed.json"
+    accepted.parent.mkdir(parents=True)
+    accepted.write_text(json.dumps({"historyFromSeq": 2, "historyToSeq": 2, "submissionStatus": "accepted"}))
+    resumed = PiAgent(None, None, runtime)
+    assert resumed._turn(18, [{"score": 1}, {"score": 2}], {"remaining": 1}) == retry
+    following = PiAgent(None, None, runtime)
+    assert following._turn(19, [{"score": 1}, {"score": 2}, {"score": 3}], {}).history_from_seq == 2

@@ -11,7 +11,17 @@ from async_controller_support import CAMPAIGN, Harness, ToyCodec, toy_candidates
 from ldm_tts.async_runtime import (CampaignConfig, InlineExecutor, PacedController, PacingConfig, Proposal,
                                    ResearchOutcome, RuntimeOptions, campaign_extra)
 from ldm_tts.async_runtime.policy import PolicyPrior
-from ldm_tts.async_runtime.selectors import ReferenceSelector
+from ldm_tts.async_runtime.selectors import ReferenceSelector, _replay_equal
+
+
+def test_replay_float_tolerance_preserves_structural_and_identity_checks():
+    original = {"ids": ["candidate-a"], "step": 0, "mean": [1.0, -3.0], "probability": 0.05}
+    assert _replay_equal(original, {**original, "mean": [1.0 + 3e-11, -3.0]})
+    assert not _replay_equal(original, {**original, "mean": [1.01, -3.0]})
+    assert not _replay_equal(original, {**original, "ids": ["candidate-b"]})
+    assert not _replay_equal(original, {**original, "step": True})
+    assert not _replay_equal(original, {**original, "probability": float("nan")})
+    assert not _replay_equal(original, {**original, "extra": 1})
 
 
 class Source:

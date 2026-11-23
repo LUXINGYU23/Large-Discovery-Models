@@ -127,11 +127,33 @@ class PiAgent:
 
     def _turn(self, round_idx, history, message):
         role = "cdrh3_research"
-        turn_id = f"design-{round_idx}"
         root = self.runtime.run_dir / "harness"
+        def commits(index):
+            prefix = f"design-{index}"
+            result = []
+            for path in (root / "turns").glob(prefix + "*/turn_committed.json"):
+                name = path.parent.name
+                suffix = name.removeprefix(prefix)
+                if suffix and (not suffix.startswith("-retry-") or not suffix[7:].isdigit()):
+                    continue
+                result.append((0 if not suffix else int(suffix[7:]), json.loads(path.read_text())))
+            return sorted(result, key=lambda item: item[0])
+
         if self.cursor is None:
-            previous = root / "turns" / f"design-{round_idx - 1}" / "turn_committed.json"
-            self.cursor = json.loads(previous.read_text())["historyToSeq"] if previous.is_file() else 0
+            previous = commits(round_idx - 1)
+            self.cursor = previous[-1][1]["historyToSeq"] if previous else 0
+        current = commits(round_idx)
+        attempt = 0
+        for number, committed in current:
+            if committed["submissionStatus"] == "accepted":
+                attempt = number
+                self.cursor = committed["historyFromSeq"]
+                break
+            if committed["submissionStatus"] != "rejected":
+                raise ValueError("Unexpected committed Pi submission status")
+            self.cursor = committed["historyToSeq"]
+            attempt = number + 1
+        turn_id = f"design-{round_idx}" + (f"-retry-{attempt}" if attempt else "")
         digest = canonical_sha256(history)
         frozen = root / "sessions" / role / "turns" / turn_id / "input.json"
         saved = json.loads(frozen.read_text()) if frozen.is_file() else None
@@ -151,6 +173,11 @@ class PiAgent:
                    "Only IDs listed as eligible may be submitted. If a call produces no eligible candidates, "
                    "sample another backbone or resample a previously measured backbone. Earlier eligible, unmeasured "
                    "designs may also be submitted. Allow time to repair rejected submissions."}
+        eligible = self.worker.eligible(
+            row for job in self.worker.records() if job["round"] == round_idx
+            and job["status"] == "succeeded" for row in job.get("candidates", ()))
+        if len(eligible) >= count:
+            message["eligible_current_round_ids"] = [row["design_id"] for row in eligible]
         if round_idx == 0:
             message["first_turn_steps"] = (
                 "1. First call the Pi read tool with path "
@@ -170,7 +197,7 @@ class PiAgent:
             sequences = {row["sequence"] for row in rows}
             if len(sequences) != count or sequences & seen or any(row["violations"] for row in rows):
                 available = [r["design_id"] for r in self.worker.eligible(catalog.values())
-                             if r["sequence"] not in seen][:16]
+                             if r["sequence"] not in seen]
                 raise ValueError(f"Submitted IDs repeat a measured H3, duplicate a sequence or fail constraints. Eligible unmeasured IDs: {available}")
             return rows
 
@@ -182,11 +209,29 @@ class PiAgent:
                     "/design_ids", "invalid_design_ids", str(exc), "Choose eligible IDs returned by a tool."),))
             return HarnessSubmissionValidation()
 
-        result, = self.client.run_turn((turn,), submission_validator=validate,
-                                       recovery_timeout_seconds=TURN_RECOVERY_SECONDS)
-        if (result.submission_status != "accepted" or result.turn_id != turn.turn_id
-                or result.input_digest != turn.input_digest):
-            raise ValueError("Pi did not commit the requested turn")
+        for attempt in range(3):
+            result, = self.client.run_turn((turn,), submission_validator=validate,
+                                           recovery_timeout_seconds=TURN_RECOVERY_SECONDS)
+            if result.turn_id != turn.turn_id or result.input_digest != turn.input_digest:
+                raise ValueError("Pi committed a different turn")
+            if result.submission_status == "accepted":
+                break
+            if result.submission_status != "rejected":
+                raise ValueError("Pi did not commit the requested turn")
+            self.runtime.consume_many({
+                "harness_turns": 1,
+                "harness_provider_calls": result.usage.get("providerCalls", 0),
+                "harness_tool_calls": sum(result.usage.get("toolCalls", {}).values()),
+            }, usage_key=turn.turn_id)
+            self.runtime.record("pi_design_turn_rejected", {"turn": turn.turn_id, "usage": result.usage})
+            if attempt == 2:
+                raise ValueError("Pi did not commit the requested turn")
+            self.cursor = turn.history_to_seq
+            eligible = self.worker.eligible(
+                row for job in self.worker.records() if job["round"] == round_idx
+                and job["status"] == "succeeded" for row in job.get("candidates", ()))
+            message["eligible_current_round_ids"] = [row["design_id"] for row in eligible]
+            turn = self._turn(round_idx, history, message)
         self.cursor = len(history)
         self.runtime.consume_many({"harness_turns": 1, "harness_provider_calls": result.usage.get("providerCalls", 0),
                                    "harness_tool_calls": sum(result.usage.get("toolCalls", {}).values())},
