@@ -1,0 +1,2707 @@
+{
+  "exploratory": true,
+  "hard_filter_eligible": false,
+  "plan": {
+    "exploratory": true,
+    "trigger": "HER2 Boltz2 seed19 native-like pose with native-contact PAE median near 11.5 A; post-hoc sensitivity analysis, not threshold validation",
+    "distance_cutoff": 10,
+    "cutoffs": [
+      15,
+      20
+    ],
+    "baseline_cutoff": 10,
+    "hard_filter_eligible": false,
+    "jobs": [
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_nivolumab_positive",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "PD1_trastuzumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed19"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed43"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed101"
+      },
+      {
+        "model": "boltz2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_trastuzumab_positive",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 19,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed19"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 43,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed43"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 15,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed101"
+      },
+      {
+        "model": "esmfold2",
+        "case": "HER2_nivolumab_mismatch",
+        "seed": 101,
+        "pae_cutoff": 20,
+        "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed101"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900833
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.893122
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.228914
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.28472
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.220345
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.210482
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.228914,
+      "heavy_antigen_ipsae_max": 0.28472
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900833
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.893122
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.228914
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.28472
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.220345
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.210482
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.228914,
+      "heavy_antigen_ipsae_max": 0.28472
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.876398
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.87177
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.012221
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.005975
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.012221
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.876398
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.87177
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.046122
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.003579
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.042074
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.002992
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.003579,
+      "heavy_antigen_ipsae_max": 0.046122
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.868995
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.867281
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.006807
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0054
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.006807
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_nivolumab_positive-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_nivolumab_positive-fv-single-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.868995
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.867281
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.039731
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.002904
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.037261
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.00287
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.002904,
+      "heavy_antigen_ipsae_max": 0.039731
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.924455
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.923846
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.161111
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.102902
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.182696
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.097813
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.102902,
+      "heavy_antigen_ipsae_max": 0.161111
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.924455
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.923846
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.161439
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.103431
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.183031
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.097813
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.103431,
+      "heavy_antigen_ipsae_max": 0.161439
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.899157
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.897859
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.052347
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.00598
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.055966
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.005365
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.00598,
+      "heavy_antigen_ipsae_max": 0.052347
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.899157
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.897859
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.08358
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.057698
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.08595
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.046217
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.057698,
+      "heavy_antigen_ipsae_max": 0.08358
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.937168
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.93641
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.181897
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.167091
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.178855
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.139052
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.167091,
+      "heavy_antigen_ipsae_max": 0.181897
+    },
+    {
+      "model": "boltz2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-PD1_trastuzumab_mismatch-fv-single-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.937168
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.93641
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.181897
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.167091
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.178855
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.139052
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.167091,
+      "heavy_antigen_ipsae_max": 0.181897
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.914989
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.908533
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.540541
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.883229
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.52532
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.759654
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.540541,
+      "heavy_antigen_ipsae_max": 0.883229
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.914989
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.908533
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.540541
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.883229
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.52532
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.759654
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.540541,
+      "heavy_antigen_ipsae_max": 0.883229
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.91262
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.90573
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.513839
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.872959
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.49981
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.738547
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.513839,
+      "heavy_antigen_ipsae_max": 0.872959
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.91262
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.90573
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.513839
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.872959
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.49981
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.738547
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.513839,
+      "heavy_antigen_ipsae_max": 0.872959
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.914873
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.908258
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.54507
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.887319
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.52871
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.765684
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.54507,
+      "heavy_antigen_ipsae_max": 0.887319
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_nivolumab_positive",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_nivolumab_positive-fv-single-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.914873
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.908258
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.54507
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.887319
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.52871
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.765684
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.54507,
+      "heavy_antigen_ipsae_max": 0.887319
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900318
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.90635
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.006342
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.006514
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.006342
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900318
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.90635
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.013818
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.002876
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.012877
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.002569
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.002876,
+      "heavy_antigen_ipsae_max": 0.013818
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900187
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.909237
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.016377
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.005193
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.019148
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.005193,
+      "heavy_antigen_ipsae_max": 0.016377
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.900187
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.909237
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.048082
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.008544
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.050821
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.003163
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.008544,
+      "heavy_antigen_ipsae_max": 0.048082
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.9023
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.910265
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.006309
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.00644
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.006309
+    },
+    {
+      "model": "esmfold2",
+      "case": "PD1_trastuzumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-construct-calibration-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-PD1_trastuzumab_mismatch-fv-single-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.9023
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.910265
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.028245
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.029302
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.028245
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.808618
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.80875
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.118195
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.103929
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.115348
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.089414
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.103929,
+      "heavy_antigen_ipsae_max": 0.118195
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.808618
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.80875
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.206337
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.103929
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.196617
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.089414
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.103929,
+      "heavy_antigen_ipsae_max": 0.206337
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.831311
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.834669
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.21959
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.153482
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.220861
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.137044
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.153482,
+      "heavy_antigen_ipsae_max": 0.21959
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.831311
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.834669
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.262177
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.153482
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.258928
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.137044
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.153482,
+      "heavy_antigen_ipsae_max": 0.262177
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.768952
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.769119
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.090216
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.086172
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.098879
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.075791
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.086172,
+      "heavy_antigen_ipsae_max": 0.090216
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_trastuzumab_positive-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_trastuzumab_positive-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.768952
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.769119
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.190774
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.087795
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.188187
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.076391
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.087795,
+      "heavy_antigen_ipsae_max": 0.190774
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.537558
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.539957
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.537558
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.539957
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.553253
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.530855
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.553253
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.530855
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.023581
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002625
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.023581
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.56577
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.547035
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "boltz2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/boltz2-HER2_nivolumab_mismatch-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/boltz2-HER2_nivolumab_mismatch-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.56577
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.547035
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.036951
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.002503
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.016206
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.002503,
+      "heavy_antigen_ipsae_max": 0.036951
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.863175
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.870027
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.863175
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.870027
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002759
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002827
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.002759
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.867036
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.877488
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.867036
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.877488
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002515
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.002515
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.873761
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.882236
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_trastuzumab_positive",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_trastuzumab_positive-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_trastuzumab_positive-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.873761
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.882236
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002726
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.002719
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.002726
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed19-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.752697
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.771432
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 19,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed19",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed19-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.752697
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.771432
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.00517
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.005301
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.00517
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed43-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.766807
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.771221
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 43,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed43",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed43-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.766807
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.771221
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 15,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed101-pae15",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.751058
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.764954
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    },
+    {
+      "model": "esmfold2",
+      "case": "HER2_nivolumab_mismatch",
+      "seed": 101,
+      "pae_cutoff": 20,
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/her2-complex-calibration-001/esmfold2-HER2_nivolumab_mismatch-seed101",
+      "status": "succeeded",
+      "score_dir": "/Aidata/shared/ldm/antibody-poc/runs/complex-pae-sensitivity-001/esmfold2-HER2_nivolumab_mismatch-seed101-pae20",
+      "directional_scores": [
+        {
+          "Chn1": "A",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.751058
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.764954
+        },
+        {
+          "Chn1": "A",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "A",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "B",
+          "Chn2": "Y",
+          "Type": "asym",
+          "ipSAE": 0.0
+        },
+        {
+          "Chn1": "Y",
+          "Chn2": "B",
+          "Type": "asym",
+          "ipSAE": 0.0
+        }
+      ],
+      "heavy_antigen_ipsae_min": 0.0,
+      "heavy_antigen_ipsae_max": 0.0
+    }
+  ]
+}

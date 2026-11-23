@@ -123,3 +123,8 @@ Real 80-residue binder generation succeeded for PD-1 and HER2, 200 steps, seed 1
 ## H20 operation and resource isolation
 
 See `docs/protein-tools-expanded.md` for server paths, configuration, reproduction and deployment scope. Large checkpoints, chemical dictionaries and raw results remain outside Git. The primary `/Aidata/shared/ldm/antibody-poc/code` worktree is not changed by these validations. Protenix v2 is excluded: official weights retrieval and authorized sourcing remain unresolved; public repository code alone does not grant access to third-party mirrored weights.
+
+
+## Subsequent construct and cross-antigen calibration
+
+The controlled Fab/Fv and MSA follow-up, native-pose audit, second-antigen HER2 results and exploratory PAE-cutoff sensitivity are documented in [the calibration report](../../../../docs/protein-tools-calibration.md). ESMFold2/Fv recovers the PD-1 positive in all three tested seeds, while HER2/Fv fails in all three. Boltz-2 recovers the HER2 native interface despite low default ipSAE, and remains unstable on PD-1. These observations support auxiliary, target-aware use; they do not establish a universal score threshold or novel-H3 ranking performance. No predictor default or automatic filtering rule changed.

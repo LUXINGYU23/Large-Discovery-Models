@@ -2,6 +2,8 @@
 
 本次以 `codex/validated-protein-tools` 的 `2eff1c71` 为基础，在 `codex/expanded-protein-tools` 开发。主工作树 `/Aidata/shared/ldm/antibody-poc/code` 没有切分支或改代码。所有验证在独立目录运行；提交工具、测试、配置样例和小型证据，不提交权重、运行产物或密钥。
 
+后续 Fab/Fv、MSA 与跨抗原结构校准见 [校准报告](protein-tools-calibration.md)。本页保留首次接入的路径与运行方法。
+
 ## 目前可交付的范围
 
 | 方法 | 实际完成 | 当前用途 |
