@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
+from .case_isolation import LEGACY_CASE_ISOLATION, validate_case_isolation
 
 
 TASK = Path(__file__).resolve().parents[1]
@@ -186,6 +187,11 @@ def validate(protocol):
         _fail("protocol_version must be 1")
     if "research_strategy" in protocol:
         _strategy(protocol["research_strategy"], "research_strategy")
+    if "case_isolation" in protocol:
+        try:
+            validate_case_isolation(protocol["case_isolation"])
+        except ValueError as exc:
+            _fail(str(exc))
     release = protocol["release"]
     if not isinstance(release, dict) or not {"name", "qualification_sha256"} <= set(release):
         _fail("release needs name and qualification_sha256")
@@ -320,6 +326,12 @@ def load(path):
 
 def is_development(protocol):
     return protocol["release"]["name"] == DEVELOPMENT_RELEASE
+
+
+def case_isolation(protocol):
+    if "case_isolation" in protocol:
+        return validate_case_isolation(protocol["case_isolation"])
+    return dict(LEGACY_CASE_ISOLATION)
 
 
 # Component hashes -----------------------------------------------------------

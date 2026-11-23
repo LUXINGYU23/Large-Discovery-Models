@@ -236,6 +236,7 @@ def prepare(args):
         "solver_seconds": solver_seconds, "model": dict(protocol["model"]),
         "token_cap_input": protocol["token_cap_input"],
         "evaluator_image": protocol["hashes"].get("evaluator_image"),
+        "case_isolation": protocols.case_isolation(protocol),
     }
     return {"protocol": protocol, "config": config, "solver_seconds": solver_seconds, "manifest": manifest,
             "agent": agent_settings(protocol), "continuation": continued}
@@ -273,9 +274,11 @@ def main(argv=None):
     client = RiskClient(args.out_dir, args.evaluation_socket, args.evaluation_contract,
                         service_uid=args.evaluation_service_uid)
     continued = plan["continuation"]
+    isolation = plan["manifest"]["case_isolation"]
     # A continuation's service imported exactly this checkpoint's prefix; any other run's was not started by import.
     prefix = continued["checkpoint"].snapshot["ledger_prefix_sha256"] if continued else None
-    info = client.verify_contract(public_digest, solver_seconds, config.slots, import_ledger_prefix_sha256=prefix)
+    info = client.verify_contract(public_digest, solver_seconds, config.slots,
+                                  import_ledger_prefix_sha256=prefix, case_isolation=isolation)
     if continued:
         continuations.check_service(info, continued["checkpoint"], resume=args.resume)
     elif not args.resume and info["used_slots"]:
@@ -300,14 +303,15 @@ def main(argv=None):
         raise ValueError("protected model API key file is empty")
     agent = pi_agent = PiAgent(public_catalog=args.public_catalog, api_key=key, sidecar_image=sidecar_digest,
                                cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
-                               **plan["agent"])
+                               case_isolation=isolation, **plan["agent"])
     encoder = CodeEncoder(args.out_dir, "fusion", args.embedding_model_path, args.embedding_device)
     if args.checkpoint_round is not None:
         agent = continuations.CheckpointingAgent(agent, args.out_dir, args.checkpoint_round)
     start = continuations.continuation_start(continued["checkpoint"], continued["mode"]) if continued else None
     controller = Controller(args.out_dir, config, agent, client,
                             lambda pool, rows, count: select(pool, rows, encoder, count), brief, identity,
-                            intervention=continued["intervention"] if continued else None, start=start)
+                            intervention=continued["intervention"] if continued else None, start=start,
+                            forbidden_case_tokens=pi_agent.forbidden_case_tokens)
     try:
         if continued:
             result = continuations.run_continuation(controller, continued["checkpoint"], continued["mode"],

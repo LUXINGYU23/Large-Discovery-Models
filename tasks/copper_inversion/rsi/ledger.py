@@ -49,11 +49,13 @@ def validate(record):
             or type(record["failed_solves"]) is not int or record["failed_solves"] < 0):
         raise ValueError("invalid numerical feedback")
     cases = record["risk_by_case"]
-    if (not isinstance(cases, dict) or not cases
-            or any(not valid_case_id(k) or not _number(v, 0, 1) for k, v in cases.items())):
+    if not isinstance(cases, dict):
         raise ValueError("invalid public case risks")
-    if not math.isclose(sum(cases.values()) / len(cases), record["risk"], abs_tol=1e-10):
-        raise ValueError("case risks do not reproduce the parent-macro risk")
+    if cases:
+        if any(not valid_case_id(k) or not _number(v, 0, 1) for k, v in cases.items()):
+            raise ValueError("invalid public case risks")
+        if not math.isclose(sum(cases.values()) / len(cases), record["risk"], abs_tol=1e-10):
+            raise ValueError("case risks do not reproduce the parent-macro risk")
     if record["status"] == "rejected" and (record["risk"] != 1 or record["legal_rate"] != 0
                                            or record["message"] != "interface rejected"):
         raise ValueError("invalid interface rejection feedback")

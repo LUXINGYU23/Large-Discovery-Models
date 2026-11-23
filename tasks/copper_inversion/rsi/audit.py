@@ -66,8 +66,16 @@ def _private_markers(private, private_manifest):
     markers = {"sentinel": [audit["sentinel"].encode()],
                "private_parent_id": [value.encode() for value in audit["private_parent_ids"]],
                "truth_hash": []}
-    if private_manifest is None and (private / "identity.json").is_file():
-        private_manifest = json.loads((private / "identity.json").read_text())["configuration"]["manifest"]
+    identity_cfg = {}
+    if (private / "identity.json").is_file():
+        identity_cfg = json.loads((private / "identity.json").read_text()).get("configuration", {})
+    if private_manifest is None and identity_cfg.get("manifest"):
+        private_manifest = identity_cfg["manifest"]
+    isolation = identity_cfg.get("case_isolation")
+    if isinstance(isolation, dict) and isolation.get("anonymize_cases") and isolation.get("case_feedback") != "public":
+        release_ids = [value.encode() for value in audit.get("case_ids", []) if len(value) >= 12]
+        if release_ids:
+            markers["release_case_id"] = release_ids
     if private_manifest is not None:
         manifest = json.loads(Path(private_manifest).read_text())
         markers["truth_hash"] = [value.encode() for row in manifest["cases"]

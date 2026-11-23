@@ -37,6 +37,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ..core.candidate import seal, validate_source
 from ..core.execution import source_identity
 from .arms import Arm, policy
+from .case_isolation import check_source_case_ids
 from .exposure import validate_feedback
 from .ledger import append, read, validate as validate_record
 from .intervention import identity as intervention_identity, validate as validate_intervention
@@ -414,10 +415,11 @@ class Controller:
     """Run or replay a campaign; each completed step has a durable receipt."""
 
     def __init__(self, root, config, agent, evaluator, select, task_brief, identity, intervention=None,
-                 start=None):
+                 start=None, forbidden_case_tokens=()):
         self.root, self.config = Path(root).resolve(), config
         self.agent, self.evaluator, self.select = agent, evaluator, select
         self.task_brief = task_brief
+        self.forbidden_case_tokens = frozenset(forbidden_case_tokens)
         reason = unsupported(config.policy)
         if reason is not None:
             raise ValueError(f"controller does not implement {reason} (extension arm)")
@@ -520,6 +522,7 @@ class Controller:
             _validate_submission(value)
             body = value["source"].encode("utf-8")
             sha = validate_source(body)
+            check_source_case_ids(body, self.forbidden_case_tokens)
             if sha in local:
                 raise ValueError("source rejected: not novel")
             if value["parent_sha256"] is not None and value["parent_sha256"] not in visible:

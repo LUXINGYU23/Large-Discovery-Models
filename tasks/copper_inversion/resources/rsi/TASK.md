@@ -5,8 +5,10 @@ three-dimensional NumPy array matching `problem['shape']`. Positive values are
 the predicted unit. Input observations are physical-coordinate borehole and
 outcrop points with uncertainty, masks, spacing, and public geological priors.
 Missing observations are unknown. Solvers must honor forbidden regions, boundary
-conditions, and all hard priors in the supplied problem. Public case names do
-not encode geological meaning.
+conditions, and all hard priors in the supplied problem. Public case names are
+opaque per-evaluation tokens with no geological meaning, and grid origins are
+canonicalized. Design a general inversion algorithm for unseen geometries rather
+than case-specific dispatch.
 
 Read `cases.json` and load a case with
 `tasks.copper_inversion.v2.data.read_problem`. The public contract, geometry,
@@ -17,9 +19,9 @@ wall time, CPU count, and memory limit are given by `budget`.
 An independent evaluator scores a frozen result against withheld confirmation
 measurements using the same public priors. If its loss is L, risk is L/(1+L),
 averaged within each geology body and then equally across bodies. A failed solve
-counts as risk 1. The controller may provide the per-case risk for measured
-programs. Neither the withheld data nor reference geometry is available to the
-researcher or the solver.
+counts as risk 1. Only the aggregate risk across the evaluation suite is
+reported for measured programs. Neither the withheld data nor reference geometry
+is available to the researcher or the solver.
 
 Write the requested complete programs to `candidates/<index>/solver.py` and
 submit them with the prescribed metadata and risk intervals; the i-th submitted

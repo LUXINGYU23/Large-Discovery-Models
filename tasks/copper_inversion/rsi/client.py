@@ -9,11 +9,12 @@ from ldm_tts.engine.run_store import BudgetExceededError, atomic_json_write
 from ..core.candidate import validate_source
 from ..v2.service_client import ServiceEvaluator
 from . import exposure
+from .case_isolation import validate_case_isolation
 from .exposure import FIELDS, VERSION, validate_feedback
 
 
 INFO = frozenset({"status", "contract_digest", "public_digest", "seconds", "slots", "used_slots",
-                  "exposure_version", "objective", "tier", "import_ledger_prefix_sha256"})
+                  "exposure_version", "objective", "tier", "import_ledger_prefix_sha256", "case_isolation"})
 _ANY = object()
 # Service refusals that are not results; anything else must be exactly allowlisted feedback.
 REFUSALS = frozenset({"paused", "infrastructure_error", "contract_mismatch", "rejected_request",
@@ -41,10 +42,15 @@ def checked_feedback(response, sha):
 
 class RiskClient(ServiceEvaluator):
     def verify_contract(self, public_digest, seconds, slots, *, objective=None, tier=None,
-                        import_ledger_prefix_sha256=_ANY):
+                        import_ledger_prefix_sha256=_ANY, case_isolation=_ANY):
         """import_ledger_prefix_sha256: expected sha256 hex of the imported ledger-prefix
         file bytes, or None to require a service that was not started by import."""
         info = self.request({"operation": "info"})
+        try:
+            service_isolation = validate_case_isolation(info.get("case_isolation"))
+            expected_isolation = None if case_isolation is _ANY else validate_case_isolation(case_isolation)
+        except ValueError as exc:
+            raise EvaluationPaused("risk-only evaluator case_isolation is invalid") from exc
         if (set(info) != INFO
                 or info["status"] != "ready" or info["contract_digest"] != self.contract_digest
                 or info["public_digest"] != public_digest or info["seconds"] != seconds
@@ -56,6 +62,7 @@ class RiskClient(ServiceEvaluator):
                         or re.fullmatch(r"[0-9a-f]{64}", str(info["import_ledger_prefix_sha256"])))
                 or (import_ledger_prefix_sha256 is not _ANY
                     and info["import_ledger_prefix_sha256"] != import_ledger_prefix_sha256)
+                or (expected_isolation is not None and service_isolation != expected_isolation)
                 or type(info["used_slots"]) is not int or not 0 <= info["used_slots"] <= slots):
             raise EvaluationPaused("risk-only evaluator identity or budget differs")
         return info
