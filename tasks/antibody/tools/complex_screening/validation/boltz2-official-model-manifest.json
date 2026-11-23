@@ -1,0 +1,17 @@
+{
+  "boltz_package": "2.2.1",
+  "model_repo": "boltz-community/boltz-2",
+  "revision": "6fdef46d763fee7fbb83ca5501ccceff43b85607",
+  "files": {
+    "boltz2_conf.ckpt": {
+      "size": 2286561469,
+      "sha256": "090e82ac8c92f5e943fa1b39e7410a44027bea7243c0bbb3caa67a77fc1428e1"
+    },
+    "boltz2_aff.ckpt": {
+      "size": 2062139170,
+      "sha256": "dcc5cd3722b1c9eaa34267e4ae32f55cbbf1963f4c19319381ccfa30fdd2ca9e"
+    }
+  },
+  "affinity_head_used": false,
+  "verification": "Downloaded files verified against official LFS SHA256; CCD member-content comparison in boltz2-ccd-provenance.json"
+}

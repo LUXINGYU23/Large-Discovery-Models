@@ -34,7 +34,7 @@ Official AURKA–TPX2 example: A→B ipSAE 0.448952, B→A 0.866498. Both direct
 
 ## Scope
 
-New tools are optional. Protenix v1 is an experimental auxiliary predictor only; no rejection threshold or campaign objective is changed. Boltz-2 and BoltzGen work in this branch remains pending real GPU validation; installation and configuration checks alone do not establish readiness. Scientific efficacy and large-scale load performance are not established by smoke tests. Large weights, structures and runtime outputs remain on H20; the small validation records here retain paths and hashes for audit.
+New tools are optional. Protenix v1 is an experimental auxiliary predictor only; no rejection threshold or campaign objective is changed. Boltz-2, BoltzGen, ESMFold2 and PXDesign now have real GPU smoke evidence, with different scopes described below. None is a validated hard screening rule. Scientific efficacy and large-scale load performance are not established by smoke tests. Large weights, structures and runtime outputs remain on H20; the small validation records here retain paths and hashes for audit.
 
 
 ## Protenix v1 auxiliary prediction
@@ -62,3 +62,64 @@ Consequently `run.json` marks `hard_filter_eligible: false`. A low score means u
 New wrapper validation on H20: real complete-sequence/MSA positive seed 19 prediction succeeded, followed by the strict PAE converter and isolated ipSAE runner. Four Protenix/ipSAE adapter tests passed with predictor dependencies present. Fresh wrapper evidence: `validation/h20-protenix-wrapper-v1.json` and `validation/h20-protenix-wrapper-v1-ipsae.json`. This validates the independent command line route; the predictor is not registered as a new autonomous Pi tool.
 
 Verified H20 dependencies and model SHA256 are recorded in `validation/h20-protenix-environment.json`. Set `PROTENIX_ROOT_DIR` to the model cache root before running; on H20 this is `/Aidata/shared/ldm/antibody-poc/cache/protenix`. Put the isolated Protenix environment `bin/` on PATH so upstream kernel builds can locate ninja.
+
+## Boltz-2 auxiliary complex prediction
+
+`boltz.py` calls the isolated `boltz==2.2.1` native CLI with model `boltz2`, provided native YAML/MSAs, explicit seeds, full PAE, and native PyTorch kernels. It requires every requested CIF plus matching PAE, pLDDT and confidence files; a successful process exit with missing predictions is a failure. It does not invoke the small-molecule affinity head as antibody affinity.
+
+```bash
+python -m tasks.antibody.tools.complex_screening.boltz \
+  --input /absolute/input.yaml --out /absolute/new/boltz \
+  --executable /isolated/boltz2/bin/boltz --cache /absolute/boltz-cache \
+  --gpu 0 --seed 19
+```
+
+Pass native `pae_*.npz` and matching CIF to the existing `ipsae` command. The runner requires and copies the matching `plddt_*.npz`, plus confidence JSON when present. It uses relative isolated aliases to avoid the upstream script accidentally replacing `pae` within an absolute directory name. Symlink companions are rejected.
+
+Real complete-Fab PD-1 controls with provided unpaired MSAs, seeds 19/43/101, one sample each: all six predictions and ipSAE runs succeeded. The positive heavy/antigen minimum directional ipSAE is 0.011141/0.010767/0; mismatch is 0.140091/0.045320/0.013382. This control **fails to establish useful discrimination**. Keep it auxiliary; do not reject on low scores or treat a higher mismatch score as experimental affinity. Evidence: `validation/h20-boltz2-calibration.json`.
+
+## BoltzGen optional H3 proposal tool
+
+Pinned `boltzgen==0.3.2`, with official adherence and inverse-fold checkpoints. `boltzgen_design.py` snapshots the nested native YAML/CIF graph, generates **one backbone**, then **N native inverse-folded sequences** with the upstream antibody C-avoidance restriction. It verifies the complete reference heavy/light framework and exactly 11 mapped H3 residues, rather than trimming arbitrary generated binders.
+
+Native proposal coordinates can have small fixed-framework numerical jitter. We retain raw output, require pre-projection framework CA RMSD ≤0.25 Å, rigidly align to the scaffold, restore matching fixed-framework atoms, and require projected CA RMSD ≤0.05 Å and both H3 boundary C–N distances in [1.0, 1.8] Å. H3 sequence and aligned H3 coordinates remain native. **This projection is exclusively for generated proposals and must never modify predictor CIF/PAE pairs.** Geometry checks do not establish binding.
+
+The host must explicitly enable `--enable-boltzgen` for `harness`/`ldm_harness`. Pi then exposes `design_h3_boltzgen(count)`; otherwise the tool is absent. One call consumes one shared backbone slot and `count` shared sequence slots, including invalid proposals. Existing 11-residue sequence constraints remain unchanged. BoltzGen backbones cannot enter the RFD3 ProteinMPNN resequencing route. Vanilla initialization and defaults remain unchanged.
+
+Guided real Qwen3-8B LDM sessions completed three real Absolut evaluations for each antigen. PD-1 BoltzGen H3 `SSSSYGGAMDY` scored -69.01; HER2 `SGSSGYSAMDY` scored -84.54. Actual acquisition-selection events and measured feedback were audited. Admission varied: PD-1 13/16 then 0/16; HER2 3/16 then 0/16, with duplicate sequences among admitted rows. Later rounds used existing alternatives/fallbacks; these are not all-BoltzGen campaigns or efficacy comparisons. Full ranking/refolding pipeline is not validated. Evidence: `validation/h20-boltzgen-llm.json`.
+
+## ESMFold2 auxiliary complex prediction
+
+Pinned `esm==3.5.0`, official `biohub/ESMFold2` snapshot `69869f737beffec5294845ede23db5fc0b4f509e`. All six model shards and CCD were checked against official LFS SHA256 metadata (`validation/esmfold2-official-model-manifest.json`). Uses local files only, no MSA submission, native model precision, explicit pure-PyTorch backend. No CUDA driver upgrade is required for the tested fallback. Forcing the entire model to BF16 caused an output-head dtype mismatch; the adapter preserves native defaults.
+
+```bash
+python -m tasks.antibody.tools.complex_screening.esmfold2 \
+  --input /absolute/one-complex.json --out /absolute/new/esmfold2 \
+  --model-dir /absolute/esmfold2-snapshot --gpu 0 --seed 19
+python -m tasks.antibody.tools.complex_screening.esmfold2_pae \
+  /absolute/new/esmfold2/native-confidence.npz /absolute/new/esmfold2/model.cif \
+  /absolute/new/esmfold2/ipsae-confidence.json
+```
+
+Input is a list containing one native protein complex, with explicit unique one-character IDs and canonical complete sequences, as in the Protenix controls. Defaults are 20 loops, 200 sampling steps, one diffusion sample. The strict converter validates native token atom ranges, CIF residue/CA order, chain partitions, dimensions, finite PAE, and normalized pLDDT. It broadcasts each native token pLDDT only to that token's native atoms and converts to the 0–100 scale; PAE is unchanged. Run the converted JSON and original CIF through `ipsae`.
+
+Default-parameter complete-Fab PD-1 positive and mismatch predictions and ipSAE completed for seeds 19/43/101 (six runs). Positive heavy/antigen minimum directional ipSAE was 0.446642/0/0.421704; mismatch was 0/0/0. Seed 43 misses the known positive interface, so this remains auxiliary: one control pair and three seeds do not establish a rejection threshold or binding measurement. Seed 19 runtime was ~109 seconds per prediction including model load. Evidence: `validation/h20-esmfold2.json`.
+
+## PXDesign standalone protein binder generation
+
+Pinned official source `f788441313c84c3074fe9596ac2433f96b15c763`, package 0.1.0, PXDesignBench 0.1.2, Protenix `v0.5.0+pxd`, Python 3.11/Torch 2.3.1. The wheel omits the namespace `configs` package; `pxdesign.py` explicitly loads the pinned source checkout rather than inventing configs. The CCD must be the official `components.v20240608` assets, not another Protenix release's CCD.
+
+```bash
+python -m tasks.antibody.tools.complex_screening.pxdesign \
+  --spec /absolute/target.yaml --out /absolute/new/pxdesign \
+  --source-root /absolute/PXDesign --checkpoint-dir /absolute/pxdesign/checkpoint \
+  --ccd-dir /absolute/pxdesign/ccd_cache --gpu 0 --seed 19
+```
+
+Native YAML must specify one target chain and `binder_length`. The wrapper snapshots the target/spec, hashes resources, executes native raw inference, and requires a real predicted CIF with target A0 and requested-length binder B0. The raw API avoids the upstream full-pipeline downloader's three unused evaluation checkpoints; no missing checkpoints are faked. Full AF2/Protenix selection is not claimed.
+
+Real 80-residue binder generation succeeded for PD-1 and HER2, 200 steps, seed 19, ~46/67 seconds including initialization. **These are whole protein binders, not 11-residue CDRH3 proposals.** This tool stays independent of the current antibody campaign, with no Absolut H3 conversion or autonomous Pi registration. Generation does not establish binding or design quality. Evidence: `validation/h20-pxdesign-raw.json`.
+
+## H20 operation and resource isolation
+
+See `docs/protein-tools-expanded.md` for server paths, configuration, reproduction and deployment scope. Large checkpoints, chemical dictionaries and raw results remain outside Git. The primary `/Aidata/shared/ldm/antibody-poc/code` worktree is not changed by these validations. Protenix v2 is excluded: official weights retrieval and authorized sourcing remain unresolved; public repository code alone does not grant access to third-party mirrored weights.

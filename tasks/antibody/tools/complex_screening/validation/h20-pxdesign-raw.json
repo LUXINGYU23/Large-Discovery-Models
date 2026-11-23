@@ -1,0 +1,74 @@
+{
+  "source_commit": "f788441313c84c3074fe9596ac2433f96b15c763",
+  "scope": "Standalone protein-binder raw generation only",
+  "full_selection_pipeline_validated": false,
+  "cdrh3_campaign_compatible": false,
+  "runs": [
+    {
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/pxdesign-validation-001/wrapper-pd1-001",
+      "record": {
+        "tool": "pxdesign_raw",
+        "status": "succeeded",
+        "candidate_kind": "protein_binder",
+        "seed": 19,
+        "binder_length": 80,
+        "samples": 1,
+        "diffusion_steps": 200,
+        "msa": false,
+        "cdrh3_campaign_compatible": false,
+        "full_selection_pipeline_validated": false,
+        "hard_filter_eligible": false,
+        "spec_sha256": "82ca12db0619013b71da77cd004fe4efc9917e18307279c218471042926d2771",
+        "target_sha256": "0a4b89840f1574f4376151f7138e62d3c4bdc73778a649089849c27abddb1690",
+        "source_root": "/Aidata/shared/ldm/antibody-poc/env/sources/PXDesign",
+        "resources": {
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/checkpoint/pxdesign_v0.1.0.pt": "b075867bae942dc0c6487173736922b0e2913308c1ba542d227418b6e176478d",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/components.v20240608.cif": "7240b17369ccfbbcc86e2d02dc8c9db59f46c32e0420f58889c6c121c60bfef0",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/components.v20240608.cif.rdkit_mol.pkl": "2d6caced2d26c62015115a1d0a50f4106755a300e0c2a2d2b5c101c9038dcbcd",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/clusters-by-entity-40.txt": "1ab4af905e75b382eda8dec59917dc3608bee0729e36b9e71baf860bbe86850c"
+        },
+        "structures": [
+          "spec/seed_19/predictions/spec_sample_0.cif"
+        ],
+        "chain_residue_counts": {
+          "A0": 118,
+          "B0": 80
+        },
+        "seconds": 45.950738432002254
+      }
+    },
+    {
+      "run_dir": "/Aidata/shared/ldm/antibody-poc/runs/pxdesign-validation-001/wrapper-her2-001",
+      "record": {
+        "tool": "pxdesign_raw",
+        "status": "succeeded",
+        "candidate_kind": "protein_binder",
+        "seed": 19,
+        "binder_length": 80,
+        "samples": 1,
+        "diffusion_steps": 200,
+        "msa": false,
+        "cdrh3_campaign_compatible": false,
+        "full_selection_pipeline_validated": false,
+        "hard_filter_eligible": false,
+        "spec_sha256": "f6e4c482fbe214e532aa8d62cb6097507aa55a5ab5eb672cd539251c147e7c3f",
+        "target_sha256": "9f22f02b6e514de56dab8a48bc31a16302a51397779e64c398ad3a7f05cb19a2",
+        "source_root": "/Aidata/shared/ldm/antibody-poc/env/sources/PXDesign",
+        "resources": {
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/checkpoint/pxdesign_v0.1.0.pt": "b075867bae942dc0c6487173736922b0e2913308c1ba542d227418b6e176478d",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/components.v20240608.cif": "7240b17369ccfbbcc86e2d02dc8c9db59f46c32e0420f58889c6c121c60bfef0",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/components.v20240608.cif.rdkit_mol.pkl": "2d6caced2d26c62015115a1d0a50f4106755a300e0c2a2d2b5c101c9038dcbcd",
+          "/Aidata/shared/ldm/antibody-poc/cache/pxdesign/ccd_cache/clusters-by-entity-40.txt": "1ab4af905e75b382eda8dec59917dc3608bee0729e36b9e71baf860bbe86850c"
+        },
+        "structures": [
+          "spec/seed_19/predictions/spec_sample_0.cif"
+        ],
+        "chain_residue_counts": {
+          "A0": 581,
+          "B0": 80
+        },
+        "seconds": 66.68905253801495
+      }
+    }
+  ]
+}

@@ -1,0 +1,1051 @@
+{
+  "scope": "PD1 complete Fab positive/mismatched computational control; identical provided MSA, 3 seeds, one sample each",
+  "mismatch_is_experimentally_proven_nonbinder": false,
+  "hard_filter_eligible": false,
+  "runs": [
+    {
+      "case": "PD1_nivolumab_positive-seed101",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_nivolumab_positive.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed101/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "101",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 101,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "5be0142b1fd662de31e342d9104c025f38b64d229cbfec0ed85f035630901ca5",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json"
+          }
+        ],
+        "seconds": 64.1031628070632
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed101/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "4ce0d02a0e95e3f0570133bfb16c49200689404e32933cb7571462381e925c98"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed101/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "sha256": "8ceedd919a9363d5b798e89c40f8a69d5d526dddda7f1cf83cf0d7a1c6575d1c"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed101/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "674f0e51809613518eea4b4377eeab055c74eb94473abebe6d192f62f6a50f08"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed101/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json",
+            "sha256": "ac7beb9ebb524257b864e930eb081c11e2b7e2b3795d01bb05911b4b29e29213"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.868262
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.847416
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.868262
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.0
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.0
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.0
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.0
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.0
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.0
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.2669026689836755
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.868262
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.847416
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.0
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.0
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.0
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.0
+        }
+      ]
+    },
+    {
+      "case": "PD1_nivolumab_positive-seed19",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_nivolumab_positive.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed19/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "19",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 19,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "5be0142b1fd662de31e342d9104c025f38b64d229cbfec0ed85f035630901ca5",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json"
+          }
+        ],
+        "seconds": 63.89288740896154
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed19/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "f9b98a6351aebeea0acc4a055d8dea7c317f630391cad5b46a2377ebe60d9479"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed19/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "sha256": "a7252ed199d4f6ed5d80539224ea74fed47adc61fac7f64a2effd26309a5d620"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed19/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "88c2011df88537f110d653ca2a9796db6d4bb66360dc50d11a376d129e9e8463"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed19/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json",
+            "sha256": "76db2f98c98acf3380ef24b728df43386dec411564d7f383340542a53f74f948"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.87344
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.862745
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.87344
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.060139
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.011141
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.060139
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.057236
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.009955
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.057236
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.1708816689206287
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.87344
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.862745
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.060139
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.011141
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.057236
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.009955
+        }
+      ]
+    },
+    {
+      "case": "PD1_nivolumab_positive-seed43",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_nivolumab_positive.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed43/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "43",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 43,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "5be0142b1fd662de31e342d9104c025f38b64d229cbfec0ed85f035630901ca5",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json"
+          }
+        ],
+        "seconds": 62.21683701896109
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed43/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/pae_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "7093056caefb85391ef40e8ff4444608d8522bf5f549b2dcc6dbce55f15a2df9"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed43/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/PD1_nivolumab_positive_model_0.cif",
+            "sha256": "6af1c965fcb0df60b701054184f089bb1bea17a0f04930eb3b21d4c004fac837"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed43/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/plddt_PD1_nivolumab_positive_model_0.npz",
+            "sha256": "a9718866dd0cbd6f9f014e6029004fbaf33a7e37aaeab9869ad329738bf69ace"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_nivolumab_positive-seed43/prediction/boltz_results_PD1_nivolumab_positive/predictions/PD1_nivolumab_positive/confidence_PD1_nivolumab_positive_model_0.json",
+            "sha256": "c60819b7aeed2883d36acbd5c339ea653c3fd52270deb969ed7bc79b78b9e971"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.856505
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.839212
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.856505
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.043233
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.010767
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.043233
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.038461
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.010299
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.038461
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.1720815839944407
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.856505
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.839212
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.043233
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.010767
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.038461
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.010299
+        }
+      ]
+    },
+    {
+      "case": "PD1_trastuzumab_mismatch-seed101",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_trastuzumab_mismatch.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed101/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "101",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 101,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "9fe70d4566dcdca1ca73254a68443b66b2ce2d9955bf14d9b4eeb55e2b25c68e",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json"
+          }
+        ],
+        "seconds": 66.28809586795978
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed101/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "17723c4e81e35ba6e618f424016bd23ace6c9316163ebff50a28897eb58197f0"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed101/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "sha256": "693f2ae6580263f7becbc7939d4b1ebd3b6204ccc8c4111ce97a552d692e4814"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed101/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "21307ae54b95a53f2edb7826d095b038ef2701b5dbe268966965e15a4f37950f"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed101/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json",
+            "sha256": "e5e8af26a2aceb2422c0f784698622eca9d9b4d732895bf7545660c208f753fa"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.849636
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.824083
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.849636
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.16408
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.013382
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.16408
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.179554
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.019039
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.179554
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.1666446230374277
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.849636
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.824083
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.16408
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.013382
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.179554
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.019039
+        }
+      ]
+    },
+    {
+      "case": "PD1_trastuzumab_mismatch-seed19",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_trastuzumab_mismatch.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed19/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "19",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 19,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "9fe70d4566dcdca1ca73254a68443b66b2ce2d9955bf14d9b4eeb55e2b25c68e",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json"
+          }
+        ],
+        "seconds": 59.379461700096726
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed19/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "79027a826d992b3ba4eeec2aa35ecb1daf119175dee4d4b551315d8b421c0b04"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed19/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "sha256": "de4bea7b906dadc24eeb5f25d3fbe72b818ff090a7d99c435f704c348b48c79f"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed19/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "9123794dcab85fed22a7fc3b9cb56da89335cd21de39c698ccc16dc2f8bed149"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed19/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json",
+            "sha256": "874885ea4113b024f2e2ac6429642c0aa1cf473ef0f3f50372a7a067f011a258"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.833324
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.812657
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.833324
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.140091
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.185075
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.185075
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.136893
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.172581
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.172581
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.1673203099053353
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.833324
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.812657
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.140091
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.185075
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.136893
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.172581
+        }
+      ]
+    },
+    {
+      "case": "PD1_trastuzumab_mismatch-seed43",
+      "prediction": {
+        "tool": "boltz2",
+        "status": "succeeded",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltz2/bin/boltz",
+          "predict",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/inputs/PD1_trastuzumab_mismatch.yaml",
+          "--out_dir",
+          "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed43/prediction",
+          "--cache",
+          "/Aidata/shared/ldm/antibody-poc/cache/boltz",
+          "--model",
+          "boltz2",
+          "--seed",
+          "43",
+          "--diffusion_samples",
+          "1",
+          "--write_full_pae",
+          "--no_kernels",
+          "--num_workers",
+          "0",
+          "--devices",
+          "1"
+        ],
+        "seed": 43,
+        "samples": 1,
+        "validation_scope": "experimental_auxiliary",
+        "hard_filter_eligible": false,
+        "input_sha256": "9fe70d4566dcdca1ca73254a68443b66b2ce2d9955bf14d9b4eeb55e2b25c68e",
+        "predictions": [
+          {
+            "structure": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "pae": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "plddt": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "confidence": "prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json"
+          }
+        ],
+        "seconds": 70.14013414504007
+      },
+      "ipsae": {
+        "tool": "ipsae",
+        "command": [
+          "/Aidata/shared/ldm/antibody-poc/env/boltzgen/bin/python",
+          "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+          "pae_model.npz",
+          "model.cif",
+          "10",
+          "10"
+        ],
+        "status": "succeeded",
+        "inputs": {
+          "script": {
+            "path": "/Aidata/shared/ldm/antibody-poc/env/sources/IPSAE/ipsae.py",
+            "sha256": "10cf9b08c68c91e06cb28526cf2026f47a3980c9048fd3226d13e3304eaf1c27"
+          },
+          "pae": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed43/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/pae_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "ca025910133d24bb568c99bebf81db27f2cdbd85149f9c1258f21a6021ca02d8"
+          },
+          "structure": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed43/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/PD1_trastuzumab_mismatch_model_0.cif",
+            "sha256": "9db8e97b13ef824e5eb146e7adbf01e9e8135dd38caf5132050640d41b366f80"
+          },
+          "plddt": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed43/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/plddt_PD1_trastuzumab_mismatch_model_0.npz",
+            "sha256": "4990821d9f9f0a2b2f913c261f9489e26e4af95c5dcb7f6c9ab8e60568c950b4"
+          },
+          "confidence": {
+            "path": "/Aidata/shared/ldm/antibody-poc/runs/boltz2-validation-001/calibration-001/PD1_trastuzumab_mismatch-seed43/prediction/boltz_results_PD1_trastuzumab_mismatch/predictions/PD1_trastuzumab_mismatch/confidence_PD1_trastuzumab_mismatch_model_0.json",
+            "sha256": "d152642152db3347b65f34a1ca463560be59e2edbaf29926fc02d64de79d8869"
+          }
+        },
+        "chain_pair_scores": [
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.825567
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.802514
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "B",
+            "Type": "max",
+            "ipSAE": 0.825567
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.072452
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "A",
+            "Type": "asym",
+            "ipSAE": 0.04532
+          },
+          {
+            "Chn1": "A",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.072452
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "asym",
+            "ipSAE": 0.076119
+          },
+          {
+            "Chn1": "Y",
+            "Chn2": "B",
+            "Type": "asym",
+            "ipSAE": 0.086341
+          },
+          {
+            "Chn1": "B",
+            "Chn2": "Y",
+            "Type": "max",
+            "ipSAE": 0.086341
+          }
+        ],
+        "artifacts": [
+          "confidence_model.json",
+          "model_10_10_byres.txt",
+          "plddt_model.npz",
+          "model_10_10.pml",
+          "model_10_10.txt",
+          "model.cif",
+          "pae_model.npz"
+        ],
+        "seconds": 1.1672274130396545
+      },
+      "directional_scores": [
+        {
+          "chain1": "A",
+          "chain2": "B",
+          "ipsae": 0.825567
+        },
+        {
+          "chain1": "B",
+          "chain2": "A",
+          "ipsae": 0.802514
+        },
+        {
+          "chain1": "A",
+          "chain2": "Y",
+          "ipsae": 0.072452
+        },
+        {
+          "chain1": "Y",
+          "chain2": "A",
+          "ipsae": 0.04532
+        },
+        {
+          "chain1": "B",
+          "chain2": "Y",
+          "ipsae": 0.076119
+        },
+        {
+          "chain1": "Y",
+          "chain2": "B",
+          "ipsae": 0.086341
+        }
+      ]
+    }
+  ]
+}

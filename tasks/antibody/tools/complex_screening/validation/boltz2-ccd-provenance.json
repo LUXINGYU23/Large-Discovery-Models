@@ -1,0 +1,7 @@
+{
+  "source_zip_sha256": "3d4f56ac4262e745bb3d09cfaa19099b1d01be208122d501667b952e45521e53",
+  "official_boltz_tar_sha256": "39e076d96dbec6b4e86982bbda16f3a53a2a60c9bdc17828d88f6f9a0c7d1fd7",
+  "identical_file_count": 45227,
+  "sorted_content_manifest_sha256": "07f20eddc58f21c37ce66c4a0bf82eda341aec0ee10158df3d5ef0c18a5e1146",
+  "note": "Containers differ; all member file bytes match both official archives. Repacked tar and extracted files are local cache."
+}

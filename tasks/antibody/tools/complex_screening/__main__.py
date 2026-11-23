@@ -67,11 +67,32 @@ def run(args):
                 raise ValueError('Reserved input filename')
         if pae.name == structure.name:
             raise ValueError('PAE and structure filenames must differ')
-        shutil.copyfile(pae, out / pae.name)
-        shutil.copyfile(structure, out / structure.name)
-        command = [args.python, str(script), str(out / pae.name), str(out / structure.name),
-                   str(args.pae_cutoff), str(args.distance_cutoff)]
         inputs = {'script': script, 'pae': pae, 'structure': structure}
+        if pae.suffix == '.npz':
+            if not pae.name.startswith('pae_'):
+                raise ValueError('Boltz PAE filename must use the native pae_ prefix')
+            plddt = pae.with_name('plddt_' + pae.name[4:])
+            if not plddt.is_file() or plddt.is_symlink():
+                raise ValueError('Matching regular native Boltz pLDDT file is required')
+            inputs['plddt'] = plddt
+            shutil.copyfile(pae, out / 'pae_model.npz')
+            shutil.copyfile(plddt, out / 'plddt_model.npz')
+            shutil.copyfile(structure, out / 'model.cif')
+            confidence = pae.with_name('confidence_' + pae.stem[4:] + '.json')
+            if confidence.is_symlink():
+                raise ValueError('Native confidence companion must be a regular file')
+            if confidence.is_file():
+                inputs['confidence'] = confidence
+                shutil.copyfile(confidence, out / 'confidence_model.json')
+            # Upstream replaces every "pae" in the argument to locate pLDDT.
+            # Relative aliases prevent that replacement from changing parent paths.
+            score_pae, score_structure = 'pae_model.npz', 'model.cif'
+        else:
+            shutil.copyfile(pae, out / pae.name)
+            shutil.copyfile(structure, out / structure.name)
+            score_pae, score_structure = str(out / pae.name), str(out / structure.name)
+        command = [args.python, str(script), score_pae, score_structure,
+                   str(args.pae_cutoff), str(args.distance_cutoff)]
     record = {'tool': args.tool, 'command': command, 'status': 'running',
               'inputs': {k: {'path': str(p), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for k,p in inputs.items()}}
     if args.tool == 'protenix':

@@ -8,6 +8,17 @@ from unittest.mock import patch
 from tasks.antibody.tools.complex_screening.__main__ import run
 
 class RunnerTests(unittest.TestCase):
+    def test_boltz_native_confidence_companions_are_kept(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); script=root/'script.py'; pae=root/'pae_case.npz'; structure=root/'case.cif'
+            script.write_text('import pathlib,sys\np=pathlib.Path(sys.argv[1]);assert pathlib.Path(str(p).replace("pae", "plddt")).is_file()\npathlib.Path(sys.argv[2]).with_suffix(".score.txt").write_text("Chn1 Chn2 Type ipSAE\\nA B asym 0.5\\n")\n')
+            pae.write_bytes(b'fixture'); structure.write_text('fixture')
+            a=argparse.Namespace(tool='ipsae',out=root/'pae-score',timeout=10,script=script,pae=pae,structure=structure,python=sys.executable,pae_cutoff=10,distance_cutoff=10)
+            with self.assertRaisesRegex(ValueError, 'pLDDT'): run(a)
+            (root/'plddt_case.npz').write_bytes(b'fixture')
+            record=run(a)
+            self.assertEqual(record['status'],'succeeded')
+            self.assertIn('plddt',record['inputs'])
     def test_protenix_partial_multiseed_is_failed(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
