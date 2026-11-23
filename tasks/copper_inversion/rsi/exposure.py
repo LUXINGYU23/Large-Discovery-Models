@@ -69,11 +69,13 @@ def _validate_exact(value):
             or type(value["failed_solves"]) is not int or value["failed_solves"] < 0):
         raise ValueError("invalid feedback numbers")
     cases = value["risk_by_case"]
-    if (not isinstance(cases, dict) or not cases
-            or any(not valid_case_id(k) or not numeric(v, 0, 1) for k, v in cases.items())):
+    if not isinstance(cases, dict):
         raise ValueError("invalid public case risks")
-    if not math.isclose(sum(cases.values()) / len(cases), value["risk"], abs_tol=1e-10):
-        raise ValueError("feedback parent mean differs")
+    if cases:
+        if any(not valid_case_id(k) or not numeric(v, 0, 1) for k, v in cases.items()):
+            raise ValueError("invalid public case risks")
+        if not math.isclose(sum(cases.values()) / len(cases), value["risk"], abs_tol=1e-10):
+            raise ValueError("feedback parent mean differs")
     if value["status"] == "rejected":
         if value["risk"] != 1 or value["legal_rate"] != 0 or value["message"] != "interface rejected":
             raise ValueError("invalid rejected feedback")
@@ -82,4 +84,12 @@ def _validate_exact(value):
             raise ValueError("invalid failed feedback")
     elif value["message"]:
         raise ValueError("valid feedback cannot contain a reason")
+    return value
+
+
+def validate_case_feedback(value, mode):
+    if mode == "none" and value["risk_by_case"] != {}:
+        raise ValueError("case risks are not permitted in aggregate-only feedback")
+    if mode in ("opaque", "public") and not value["risk_by_case"]:
+        raise ValueError("expected per-case risks in feedback")
     return value

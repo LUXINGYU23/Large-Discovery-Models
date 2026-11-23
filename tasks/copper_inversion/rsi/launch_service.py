@@ -45,8 +45,10 @@ def main():
         raise ValueError("research and evaluator accounts must differ")
     if not args.image.startswith("sha256:") or len(args.image) != 71:
         raise ValueError("pin the evaluator image digest")
+    protocol_data = None
     if args.protocol is not None:
-        frozen = json.loads(args.protocol.read_text()).get("hashes", {}).get("evaluator_image")
+        protocol_data = json.loads(args.protocol.read_text())
+        frozen = protocol_data.get("hashes", {}).get("evaluator_image")
         if frozen is not None and frozen != args.image:
             raise ValueError("evaluator image differs from the frozen protocol digest")
     private, socket_dir = args.private_root.resolve(), args.socket_dir.resolve()
@@ -69,6 +71,9 @@ def main():
                      "objective": args.objective}
     if args.tier is not None:
         configuration["tier"] = args.tier
+    if protocol_data is not None and "case_isolation" in protocol_data:
+        from . import protocol as protocols
+        configuration["case_isolation"] = protocols.case_isolation(protocol_data)
     if args.import_source is not None:
         # The evaluator account reads its own copy of the public prefix, pinned by digest.
         prefix = args.import_ledger.read_bytes()

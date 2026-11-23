@@ -62,7 +62,20 @@ def render(records):
         lines.append(line)
     best = sorted((r for r in rows if r["status"] == "valid"),
                   key=lambda r: (r["risk"], r["program_id"]))[:10]
+    if rows and not any(r["risk_by_case"] for r in rows):
+        return "\n".join(lines) + "\n"
     lines.append("# per-case risk, 10 lowest-risk valid programs")
+    key_sets = {frozenset(r["risk_by_case"]) for r in best}
+    if len(key_sets) > 1:
+        count = max(len(r["risk_by_case"]) for r in best)
+        labels = [f"case_{i + 1:02d}" for i in range(count)]
+        width = max([8] + [len(x) for x in labels])
+        lines.append(("# id" + " " * 12 + " ".join(f"{x:<{width}}" for x in labels)).rstrip())
+        for row in best:
+            ordered = [row["risk_by_case"][k] for k in sorted(row["risk_by_case"])]
+            values = (f"{ordered[i]:<{width}.4f}" if i < len(ordered) else f"{'-':<{width}}" for i in range(count))
+            lines.append((f"{row['program_id'][:12]:12}    " + " ".join(values)).rstrip())
+        return "\n".join(lines) + "\n"
     cases = sorted({c for r in best for c in r["risk_by_case"]})
     labels = _case_labels(cases)
     width = max([8] + [len(x) for x in labels])

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.execution import digest
+from tasks.copper_inversion.rsi.case_isolation import resolve_case_isolation
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.training_receipts import eligible
@@ -214,10 +215,20 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
     else:
         validation, tests = held_out(release, manifest, protocol)
         config = chosen["configuration"]
+        service_isolation = resolve_case_isolation(config.get("case_isolation"))
+        if protocol is not None and "case_isolation" in protocol:
+            protocol_isolation = resolve_case_isolation(protocol["case_isolation"])
+            if "case_isolation" in config and service_isolation != protocol_isolation:
+                raise ValueError("protocol case_isolation differs from training service")
+            isolation = protocol_isolation
+        else:
+            isolation = service_isolation
         frozen = selection.freeze(target, sources, validation, tests, seconds=config["seconds"],
                                   image=config["image"], training_run=paths["service"],
                                   training_manifest=config["manifest"],
-                                  objective=judge_objective(manifest, protocol, config), max_candidates=None)
+                                  objective=judge_objective(manifest, protocol, config), max_candidates=None,
+                                  anonymize_cases=isolation["anonymize_cases"],
+                                  canonical_origin=isolation["canonical_origin"])
     record["selection_objective"] = frozen.get("selection_objective", "confirmation")
     record["frozen_sha256"] = digest(frozen)
     path = target / "prefix.json"

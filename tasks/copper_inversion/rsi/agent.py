@@ -27,6 +27,7 @@ from ldm_tts.harness.protocol import canonical_sha256, file_sha256
 from ..core.candidate import MAX_SOURCE_BYTES, validate_source
 from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
 from ..v2.research import PublicTrainingExport
+from .case_isolation import check_source_case_ids, resolve_case_isolation
 from .controller import _validate_submission, profile_name, NoSubmission
 from .render import write_view
 from .usage import collect
@@ -103,7 +104,7 @@ class NotNovel(ValueError):
         super().__init__("source rejected: not novel")
 
 
-def parse_submission(submission, artifacts, root, count, known, visible):
+def parse_submission(submission, artifacts, root, count, known, visible, *, forbidden_case_tokens=()):
     if not isinstance(submission, dict) or set(submission) != {"candidates"}:
         raise ValueError("invalid submission")
     values = submission["candidates"]
@@ -134,6 +135,7 @@ def parse_submission(submission, artifacts, root, count, known, visible):
         if len(body) != artifact.size_bytes or hashlib.sha256(body).hexdigest() != artifact.sha256:
             raise ValueError("snapshot changed")
         sha = validate_source(body)
+        check_source_case_ids(body, forbidden_case_tokens)
         size = len(normalized_code(body).encode("utf-8"))
         if size > MAX_NORMALIZED_BYTES:
             raise ValueError(f"candidates[{index}] is {size} bytes after normalization (comments removed, code "
@@ -172,12 +174,20 @@ class PiAgent:
     """Real-model researcher; thread-safe per the contract in ``controller.py``."""
 
     def __init__(self, *, public_catalog, api_key, sidecar_image, cache_dir, arm, reset_period,
-                 base_url, model, thinking, bash_calls):
+                 base_url, model, thinking, bash_calls, case_isolation=None):
         if not api_key:
             raise ValueError("protected model API key required")
         if type(bash_calls) is not int or bash_calls < 0:
             raise ValueError("invalid bash call budget")
-        self.export = PublicTrainingExport(public_catalog)
+        self.case_isolation = resolve_case_isolation(case_isolation)
+        try:
+            self.export = PublicTrainingExport(public_catalog,
+                                               anonymize_cases=self.case_isolation["anonymize_cases"],
+                                               canonical_origin=self.case_isolation["canonical_origin"])
+        except TypeError:
+            self.export = PublicTrainingExport(public_catalog)
+        self.forbidden_case_tokens = (getattr(self.export, "forbidden_tokens", frozenset())
+                                      if self.case_isolation["refuse_case_ids"] else frozenset())
         self.key, self.image, self.cache = api_key, sidecar_image, Path(cache_dir)
         self.arm, self.reset_period = arm, reset_period
         self.base_url, self.model, self.thinking, self.bash_calls = base_url, model, thinking, bash_calls
@@ -264,7 +274,8 @@ class PiAgent:
 
         def validate(request):
             try:
-                rows = parse_submission(request.submission, request.artifacts, turn_root, count, taken(), visible)
+                rows = parse_submission(request.submission, request.artifacts, turn_root, count, taken(), visible,
+                                        forbidden_case_tokens=self.forbidden_case_tokens)
                 if hasattr(known, "claim") and not known.claim(
                         branch, [validate_source(r["source"].encode("utf-8")) for r in rows]):
                     raise NotNovel()  # another branch submitted it this round
@@ -312,5 +323,6 @@ class PiAgent:
             raise NoSubmission(usage, cursor_advanced=True)
         if result.submission_status != "accepted":
             raise HarnessError("unexpected submission status")
-        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, taken(), visible)
+        rows = parse_submission(result.submission, result.submitted_artifacts, turn_root, count, taken(), visible,
+                                forbidden_case_tokens=self.forbidden_case_tokens)
         return rows, usage

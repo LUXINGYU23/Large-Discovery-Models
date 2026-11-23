@@ -17,11 +17,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from ldm_tts.engine.run_store import atomic_json_write
-from ..core.candidate import seal
+from ..core.candidate import seal, validate_source
 from ..core.execution import digest
 from ..v2.service import EvaluatorService, Handler
 from ..v2.training_receipts import eligible
-from .exposure import FIELDS, VERSION, project, risk_by_case, valid_case_id
+from .case_isolation import (LEGACY_CASE_ISOLATION, check_source_case_ids, forbidden_case_tokens,
+                             opaque_case_id, resolve_case_isolation)
+from .exposure import FIELDS, VERSION, project, risk_by_case, valid_case_id, validate_case_feedback
 from .integrity import shared_identity
 
 IMPORT_KEYS = frozenset({"source_root", "ledger_prefix", "ledger_prefix_sha256"})
@@ -50,9 +52,11 @@ def _link_tree(source, destination):
 
 
 class RiskOnlyService(EvaluatorService):
-    optional_keys = EvaluatorService.optional_keys | {"import"}
+    optional_keys = EvaluatorService.optional_keys | {"import", "case_isolation"}
     objective = "confirmation"
     tier = None
+    case_isolation = LEGACY_CASE_ISOLATION
+    _forbidden_case_tokens = frozenset()
     # SHA-256 hex of the exact ledger-prefix file bytes this service imported
     # (the launcher's copy of --import-ledger, pinned in import.ledger_prefix_sha256);
     # None when the service was not started by import.
@@ -61,13 +65,24 @@ class RiskOnlyService(EvaluatorService):
     def __init__(self, configuration):
         if isinstance(configuration, dict) and "purpose" in configuration:
             raise ValueError("discovery feedback cannot use a measurement-only suite")
+        isolation = resolve_case_isolation(configuration.get("case_isolation") if isinstance(configuration, dict) else None)
+        if isinstance(configuration, dict) and "case_isolation" in configuration:
+            for flag in ("anonymize_cases", "canonical_origin"):
+                if flag in configuration and configuration[flag] != isolation[flag]:
+                    raise ValueError(f"{flag} differs from case_isolation.{flag}")
+            configuration = {**configuration, "case_isolation": isolation,
+                             "anonymize_cases": isolation["anonymize_cases"],
+                             "canonical_origin": isolation["canonical_origin"]}
         super().__init__(configuration)
+        self.case_isolation = isolation
         path = self.root / "rsi-private-audit.json"
         cases = self.evaluator.manifest["cases"]
         parents = sorted({row["parent_id"] for row in cases})
         case_ids = sorted(row["case_id"] for row in cases)
         if len(parents) != len(cases) or any(not valid_case_id(value) for value in case_ids):
             raise ValueError("risk-only service requires one public case per geology parent")
+        self._forbidden_case_tokens = (forbidden_case_tokens(case_ids, len(case_ids))
+                                       if isolation["refuse_case_ids"] else frozenset())
         if path.exists():
             audit = json.loads(path.read_text())
             if (set(audit) != {"version", "sentinel", "private_parent_ids", "case_ids"}
@@ -199,7 +214,7 @@ class RiskOnlyService(EvaluatorService):
                 or failures < 0 or int(failures) != failures):
             raise ValueError("invalid private failure count")
         if response["status"] == "invalid_interface":
-            case_risks = {name: 1.0 for name in self.audit["case_ids"]}
+            private_case_risks = {name: 1.0 for name in self.audit["case_ids"]}
             status, message = "rejected", "interface rejected"
         else:
             key = self.evaluator.evaluation_attempt_usage_key(SimpleNamespace(canonical_key=sha))
@@ -210,16 +225,24 @@ class RiskOnlyService(EvaluatorService):
             actual = [(row["case_id"], row["seed"], row["parent_id"]) for row in rows]
             if len(actual) != len(expected) or set(actual) != expected:
                 raise ValueError("private receipt does not cover the planned cases")
-            case_risks = risk_by_case(rows, self.audit["case_ids"], self.objective)
+            private_case_risks = risk_by_case(rows, self.audit["case_ids"], self.objective)
             status = "failed" if metrics["legal_rate"] == 0 else "valid"
             message = "all planned solves failed" if status == "failed" else ""
+        mode = self.case_isolation["case_feedback"]
+        if mode == "none":
+            case_risks = {}
+        elif mode == "opaque":
+            eval_key = self.evaluator.evaluation_attempt_usage_key(SimpleNamespace(canonical_key=sha))
+            case_risks = {opaque_case_id(eval_key, name): val for name, val in sorted(private_case_risks.items())}
+        else:
+            case_risks = private_case_risks
         record = {**metrics, "source_sha256": sha, "status": status, "risk": metrics["loss_total"],
                   "risk_by_case": case_risks, "legal_rate": metrics["legal_rate"],
                   "failed_solves": int(failures), "seconds_per_solve": metrics["mean_solver_wall_seconds"],
                   "message": message}
-        feedback = project(record)
+        feedback = validate_case_feedback(project(record), mode)
         private_path = self.root / "rsi-feedback" / (sha + ".json")
-        private = {"feedback": feedback, "private_record": record}
+        private = {"feedback": feedback, "private_record": {**record, "risk_by_case": private_case_risks}}
         if private_path.exists() and json.loads(private_path.read_text()) != private:
             raise ValueError("private feedback receipt changed")
         atomic_json_write(private_path, private)
@@ -233,7 +256,8 @@ class RiskOnlyService(EvaluatorService):
                         used_slots=self.ledger.counters.get("algorithm_feedback_slots", 0),
                         exposure_version=VERSION, objective=self.objective,
                         tier=None if self.tier is None else self.tier["name"],
-                        import_ledger_prefix_sha256=self.import_ledger_prefix_sha256)
+                        import_ledger_prefix_sha256=self.import_ledger_prefix_sha256,
+                        case_isolation=dict(self.case_isolation))
         if not isinstance(request, dict) or request.get("contract_digest") != self.public_contract:
             return {"status": "contract_mismatch"}
         if shared_identity() != self.shared_implementation:
@@ -241,6 +265,30 @@ class RiskOnlyService(EvaluatorService):
         operation = request.get("operation")
         if operation not in {"evaluate", "seal_training"}:
             return {"status": "rejected_request"}
+        if operation == "evaluate" and self._forbidden_case_tokens:
+            if set(request) != {"operation", "source", "contract_digest"} or not isinstance(request["source"], str):
+                return {"status": "rejected_request"}
+            if (self.root / "training-sealed.json").exists():
+                return {"status": "training_sealed"}
+            try:
+                body = request["source"].encode()
+                validate_source(body)
+            except (ValueError, SyntaxError, UnicodeError):
+                return {"status": "invalid_source"}
+            try:
+                check_source_case_ids(body, self._forbidden_case_tokens)
+            except ValueError:
+                from ldm_tts.engine.run_store import BudgetExceededError
+                try:
+                    payload = seal(self.root, body)
+                    self.slots.reserve(payload["sha256"], interface_rejected=True)
+                    return self._project({"status": "invalid_interface", "source_sha256": payload["sha256"],
+                                          "metrics": dict(self.interface_failure_metrics)})
+                except BudgetExceededError:
+                    return {"status": "budget_exhausted"}
+                except Exception:
+                    logging.exception("private static case-id rejection failed")
+                    return {"status": "infrastructure_error"}
         underlying = {**request, "contract_digest": digest(self.identity)}
         response = super().dispatch(underlying)
         if operation == "seal_training":

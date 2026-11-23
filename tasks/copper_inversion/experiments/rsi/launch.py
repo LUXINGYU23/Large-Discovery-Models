@@ -397,6 +397,8 @@ class Launcher:
                       "image": self.site["image"], "seconds": tier["solver_seconds"], "slots": tier["slots"],
                       "caller_uid": client_uid, "socket": str(socket_path),
                       "objective": self.protocol["judges"][run["judge"]]["objective"], "tier": self.tier}
+            if "case_isolation" in self.protocol:
+                config["case_isolation"] = protocols.case_isolation(self.protocol)
             if "continuation" in run:
                 config["import"] = self.import_spec(run, private, uid, gid)
             config_path.write_text(json.dumps(config, sort_keys=True))

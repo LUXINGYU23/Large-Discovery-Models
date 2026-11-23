@@ -172,6 +172,12 @@
       "turns_per_round": 4
     }
   },
+  "case_isolation": {
+    "anonymize_cases": true,
+    "canonical_origin": true,
+    "case_feedback": "none",
+    "refuse_case_ids": true
+  },
   "decisions": {
     "e1_margin": "s0",
     "mde_bound_relative": 0.2,

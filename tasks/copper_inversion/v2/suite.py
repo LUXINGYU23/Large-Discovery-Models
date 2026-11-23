@@ -13,7 +13,8 @@ from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY, Evaluat
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.execution import digest, source_identity, freeze_model
 from ..core.geometry import read_model
-from .data import read_problem, save_problem
+from ..rsi.case_isolation import opaque_case_id
+from .data import canonical_problem, read_problem, save_problem
 
 
 def file_hash(path):
@@ -195,7 +196,10 @@ class SuiteEvaluator:
     # Scheduling only: cases solved at once (scheduling policy case_workers), never in the key.
     case_workers=4
 
-    def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None):
+    def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
+                 *,anonymize_cases=False,canonical_origin=False):
+        if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+            raise ValueError("invalid case isolation flags")
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
@@ -204,6 +208,7 @@ class SuiteEvaluator:
             raise ValueError('independent confirmation measurements required for evaluation')
         if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
         self.seconds=seconds;self.objective=objective
+        self.anonymize_cases=anonymize_cases;self.canonical_origin=canonical_origin
         release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
         if purpose not in (None,"q1"):raise ValueError("unknown evaluation purpose")
         if purpose=="q1":
@@ -219,6 +224,8 @@ class SuiteEvaluator:
         self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),
             image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=AGGREGATIONS[objective])
         if purpose is not None:self.context["purpose"]=purpose
+        if anonymize_cases:self.context["anonymize_cases"]=True
+        if canonical_origin:self.context["canonical_origin"]=True
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
@@ -243,8 +250,17 @@ class SuiteEvaluator:
             row_path=case_root/"receipt.json"
             if row_path.exists():return json.loads(row_path.read_text())
             inputs=case_root/"input"
-            problem=read_problem(self.manifest_path.parent/case["public"])
-            save_problem(problem,inputs)
+            raw_problem=read_problem(self.manifest_path.parent/case["public"])
+            if self.anonymize_cases or self.canonical_origin:
+                cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
+                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin)
+                save_problem(problem,inputs)
+                score_inputs=case_root/"score-input"
+                save_problem(raw_problem,score_inputs)
+            else:
+                problem=raw_problem
+                save_problem(problem,inputs)
+                score_inputs=inputs
             atomic_json_write(inputs/"budget.json",dict(seed=seed,wall_time_seconds=self.seconds,cpu_count=2,memory_mb=4096))
             job,r=self.execution.run(identity,phase="solver",inputs=inputs,source=source.parent,
                 timeout=self.seconds,cpus=2,memory_mb=4096,science_module="v2")
@@ -265,10 +281,10 @@ class SuiteEvaluator:
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
-                    scoring=dict(identity=identity,model=sha,inputs=inputs,model_dir=case_root/"model",
+                    scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
                         truth=self.manifest_path.parent/case["truth"],row_path=row_path)
                     if merged:return row,scoring
-                    score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=inputs,
+                    score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=score_inputs,
                         model=case_root/"model",truth=scoring["truth"],timeout=30,science_module="v2")
                     if s["exit_code"] or s["reason"] or s["oom"]:
                         raise EvaluationPaused("independent scorer infrastructure failure")
