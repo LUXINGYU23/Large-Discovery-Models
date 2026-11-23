@@ -5,9 +5,11 @@ import argparse
 from contextlib import ExitStack
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 
+from ldm_tts.async_runtime.lock import RunLock
 from ldm_tts.campaign import CampaignBudget, CampaignRecipe, CampaignRequest, run_campaign
 from ldm_tts.contracts import (AcquisitionSpec, CandidateDomainSpec, EvaluationResult, LDMTaskSpec,
     ObjectiveSpec, ProposalSearchSpec, RawProposal, ReservoirExpansionSpec, ReservoirSpec,
@@ -37,6 +39,7 @@ def parse_args(argv=None):
     p.add_argument("--initialization-run", type=Path,
                    help="Replay the initial design jobs from a completed real-generator campaign for paired comparisons")
     p.add_argument("--pool-size", type=int, default=2)
+    p.add_argument("--batch-size", type=int, default=1)
     p.add_argument("--backbones-per-round", type=int, default=2)
     p.add_argument("--sequences-per-round", type=int, default=32)
     p.add_argument("--samples-per-call", type=int, default=16)
@@ -52,8 +55,13 @@ def parse_args(argv=None):
     p.add_argument("--sidecar-image", default=os.environ.get("LDM_PI_IMAGE", "ldm-pi-harness:latest"))
     p.add_argument("--guest-cache", type=Path, default=os.environ.get("LDM_GONDOLIN_CACHE"))
     p.add_argument("--out-dir", type=Path, default=Path("runs/antibody_rfd3"))
+    p.add_argument("--resume-run", type=Path, help="Continue an existing Fixed or Pi Harness run")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
+    if a.batch_size < 1 or a.batch_size > a.pool_size:
+        p.error("batch-size must fit the candidate pool")
+    if a.resume_run and a.method == "antbo":
+        p.error("Native AntBO recovery also requires its optimizer state")
     if a.absolut_timeout <= 0:
         p.error("absolut-timeout must be positive")
     if min(a.iterations, a.cpu_limit, a.pool_size, a.samples_per_call, a.backbones_per_round) < 1:
@@ -72,7 +80,7 @@ def metric(a):
 
 
 def describe_ldm_task(args):
-    actions = ("design_h3", "sequence_h3") if args.method == "harness" else ("design_h3",)
+    actions = ("design_h3", "sequence_h3", "mutate_h3", "register_h3") if args.method == "harness" else ("design_h3",)
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",
@@ -122,7 +130,8 @@ class Expander:
                         energy=o.evaluation.metrics[metric(a)], oracle=a.oracle)
                    for o in request.observations if o.evaluation.succeeded]
         if self.agent:
-            rows = self.agent.propose(request.round_idx, history, 1)
+            count = min(a.batch_size, a.iterations - len(request.observations))
+            rows = self.agent.propose(request.round_idx, history, count)
         elif history and a.method == "antbo":
             from ..baselines import NativeAntBO
             if self.native is None:
@@ -151,7 +160,14 @@ def run(a):
         return 0
     if hasattr(os, "sched_setaffinity"):
         os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[:a.cpu_limit])
-    directory = unique_run_dir(a.out_dir.resolve())
+    directory = a.resume_run.resolve() if a.resume_run else unique_run_dir(a.out_dir.resolve())
+    if a.resume_run and not (directory / "checkpoint.json").is_file():
+        raise ValueError("A synchronous campaign checkpoint is required to resume")
+    with RunLock(directory / "campaign.lock"):
+        return _run_locked(a, directory)
+
+
+def _run_locked(a, directory):
     if a.oracle == "mock":
         evaluator = MockOracle(a.antigen)
     elif TARGETS.get(a.antigen, a.antigen) in TARGETS.values():
@@ -164,7 +180,26 @@ def run(a):
         evaluator = AntibodyEvaluator(AbsolutEvaluator(dict(antigen=a.antigen, process=1,
             startTask=min(os.sched_getaffinity(0)), path=str(a.absolut_path.resolve())), f"h3-{os.getpid()}"))
     seeds, seed_backbones = load_seed_bank(a)
-    worker = DesignWorker(directory, a, seed_backbones=seed_backbones)
+    execution_gpu = int(os.environ.get("LDM_RESUME_GPU", a.gpu)) if a.resume_run else a.gpu
+    if execution_gpu < 0:
+        raise ValueError("The execution GPU index must be nonnegative")
+    cached = os.environ.get("LDM_RESUME_MODEL_CACHE") if a.resume_run else None
+    stopped_job = os.environ.get("LDM_RESUME_PRELAUNCH_JOB") if a.resume_run else None
+    prelaunch_retry = None
+    if stopped_job:
+        if Path(stopped_job).name != stopped_job or not stopped_job.startswith("job-"):
+            raise ValueError("A prelaunch retry requires a generation job ID")
+        job = directory / "design_jobs" / stopped_job
+        receipt = json.loads((job / "receipt.json").read_text())
+        checkpoint = json.loads((directory / "checkpoint.json").read_text())["state"]
+        output = job / "output"
+        if (receipt["round"] != checkpoint["next_round"] or receipt["status"] != "failed"
+                or not receipt.get("error", "").endswith("timed out after 900 seconds")
+                or {p.name for p in output.iterdir()} != {"config.resolved.json"}):
+            raise ValueError("A prelaunch retry requires a timed-out job with no model outputs")
+        prelaunch_retry = receipt
+    worker = DesignWorker(directory, a, seed_backbones=seed_backbones, execution_gpu=execution_gpu,
+                          runtime_cache=Path(cached) if cached else None, prelaunch_retry=prelaunch_retry)
     expander = Expander(a, worker, seeds)
     contract, profile = load_active_experiment_contract()
     with ExitStack() as stack:
@@ -177,11 +212,13 @@ def run(a):
                 except Exception as exc:
                     runtime.fail(exc)
                     raise
-        budget = CampaignBudget(a.iterations, a.pool_size, target_observations=a.iterations,
+        rounds = (len(seeds) + math.ceil((a.iterations - len(seeds)) / a.batch_size)
+                  if a.method == "harness" and a.batch_size > 1 else a.iterations)
+        budget = CampaignBudget(rounds, a.pool_size, batch_size=a.batch_size, target_observations=a.iterations,
                                 max_evaluation_attempts=a.iterations, extra_limits={
                                     "backbones_requested": a.iterations * a.backbones_per_round,
                                     "sequences_requested": a.iterations * a.sequences_per_round})
-        request = CampaignRequest(directory, budget,
+        request = CampaignRequest(directory, budget, resume=bool(a.resume_run),
                                   config={k: str(v) if isinstance(v, Path) else v for k, v in vars(a).items()},
                                   runtime_hook=setup, contract_snapshot=contract.to_dict() if contract else None,
                                   contract_sha256=contract.digest if contract else "", contract_profile=profile)

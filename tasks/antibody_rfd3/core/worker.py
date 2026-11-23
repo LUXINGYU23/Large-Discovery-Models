@@ -14,6 +14,7 @@ from pathlib import Path
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.antibody.core.engine_adapters import _sequence_violations
 from tasks.antibody.tools.structure_design.common import extract_h3
+from .sequence_design import mutation_options, mutate_sequences, validate_sequence
 
 TEMPLATE = Path(__file__).resolve().parents[2] / "antibody/tools/structure_design/examples/1n8z_vh.json"
 REPO = TEMPLATE.parents[5]
@@ -79,11 +80,44 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count, temperature, backbone_id=None, call_id=None, profile_id=None):
-        if action not in ("design_h3", "sequence_h3"):
+    def execute(self, action, count=None, temperature=0.5, backbone_id=None, call_id=None, profile_id=None,
+                seed_sequence=None, mutable_positions=None, min_mutations=1, max_mutations=2,
+                allowed_amino_acids=None, sequences=None, rationale=None):
+        if action not in ("design_h3", "sequence_h3", "mutate_h3", "register_h3"):
             raise ValueError("Unknown generation action")
+        directed = action in ("mutate_h3", "register_h3")
+        parameters = None
+        if directed:
+            if backbone_id is not None or not isinstance(rationale, str) or not rationale.strip():
+                raise ValueError("Sequence proposals require a rationale and cannot claim a generated backbone")
+            if action == "register_h3":
+                if mutable_positions is not None or allowed_amino_acids is not None or min_mutations != 1 or max_mutations != 2:
+                    raise ValueError("Mutation constraints apply to mutate_h3")
+                if not isinstance(sequences, list) or not sequences:
+                    raise ValueError("register_h3 requires a nonempty sequences list")
+                for sequence in sequences:
+                    validate_sequence(sequence)
+                if len(set(sequences)) != len(sequences):
+                    raise ValueError("Explicit sequences must be unique")
+                if seed_sequence is not None:
+                    validate_sequence(seed_sequence)
+                if count is not None and (type(count) is not int or count != len(sequences)):
+                    raise ValueError("count must match the explicit sequences list")
+                count = len(sequences)
+            else:
+                if sequences is not None:
+                    raise ValueError("Explicit sequences apply to register_h3")
+                options, groups = mutation_options(seed_sequence, mutable_positions, min_mutations,
+                                                   max_mutations, allowed_amino_acids)
+            parameters = dict(seed_sequence=seed_sequence, mutable_positions=mutable_positions,
+                              min_mutations=min_mutations, max_mutations=max_mutations,
+                              allowed_amino_acids=allowed_amino_acids, sequences=sequences, rationale=rationale)
+        elif any(v is not None for v in (seed_sequence, mutable_positions, allowed_amino_acids, sequences, rationale)):
+            raise ValueError("Sequence design parameters require mutate_h3 or register_h3")
         if type(count) is not int or count < 1:
             raise ValueError("count must be a positive integer")
+        if action == "mutate_h3" and count > sum(size for _, size in groups):
+            raise ValueError("Requested count exceeds the unique sequence capacity of these mutation constraints")
         if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
             raise ValueError("temperature must be in [0.01,1]")
         if (action == "sequence_h3") != bool(backbone_id):
@@ -99,6 +133,8 @@ class DesignWorker:
                 receipt = matches[0]
                 fields = {"action": action, "count": count, "temperature": temperature,
                           "requested_backbone_id": backbone_id}
+                if directed:
+                    fields["sequence_design"] = parameters
                 if any(receipt.get(key) != value for key, value in fields.items()):
                     raise RuntimeError("Generation call ID was reused with different parameters")
                 if receipt["status"] != "succeeded":
@@ -122,31 +158,43 @@ class DesignWorker:
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
         job.mkdir()
-        backbone = backbone_id or job.name
+        backbone = None if directed else backbone_id or job.name
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature, profile_id=profile_id,
                        call_id=call_id, requested_backbone_id=backbone_id,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
                        status="started")
+        if directed:
+            receipt["sequence_design"] = parameters
+            receipt["parent_history"] = [entry.to_dict() for entry in self.history_log.view().results
+                if entry.key == seed_sequence and entry.status == "succeeded"] if self.history_log is not None else []
         path = job / "receipt.json"
         atomic_json_write(path, receipt)
         try:
             if self.runtime:
                 self.runtime.consume_many({"backbones_requested": int(action == "design_h3"),
                                            "sequences_requested": count}, usage_key=job.name)
-            if self.args.mock:
+            if action == "register_h3":
+                proposed = list(sequences)
+            elif action == "mutate_h3":
+                proposed = mutate_sequences(seed_sequence, count, options, groups, seed)
+            elif self.args.mock:
                 rng = random.Random(seed)
-                sequences = ["".join(rng.choices("AGSPDTYN", k=11)) for _ in range(count)]
+                proposed = ["".join(rng.choices("AGSPDTYN", k=11)) for _ in range(count)]
             elif self.round == 0 and self.args.initialization_run:
                 source = self.args.initialization_run.resolve() / "design_jobs" / job.name
-                sequences = self.replay_initialization(job, source, receipt)
+                proposed = self.replay_initialization(job, source, receipt)
                 receipt["initialization_source"] = str(source)
             else:
-                sequences = self.run_models(job, backbone_id, count, temperature, seed)
+                proposed = self.run_models(job, backbone_id, count, temperature, seed)
             rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
-                         artifact=(job / ("receipt.json" if self.args.mock else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
+                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
                          index=i, violations=_sequence_violations(h3, 11))
-                    for i, h3 in enumerate(sequences)]
+                    for i, h3 in enumerate(proposed)]
+            if directed:
+                for row in rows:
+                    row.update(generation_action=action, parent_sequence=seed_sequence, rationale=rationale,
+                               parent_history_seqs=[entry["seq"] for entry in receipt["parent_history"]])
             receipt.update(status="succeeded", candidates=rows)
             return rows
         except Exception as exc:

@@ -114,7 +114,7 @@ def metric(a):
 
 def describe_ldm_task(args):
     gp = args.method == "ldm_harness"
-    actions = ("design_h3", "sequence_h3") if args.method in PI_METHODS else ("design_h3",)
+    actions = ("design_h3", "sequence_h3", "mutate_h3", "register_h3") if args.method in PI_METHODS else ("design_h3",)
     skills = (["cdrh3-design", "cdrh3-experiment-design", "cdrh3-evidence-review", "compile-ldm-policy"]
               if gp else ["cdrh3-design"] if args.method == "harness" else [])
     roles = (["explorer", "refiner", "evidence_reviewer", "policy_architect"] if gp

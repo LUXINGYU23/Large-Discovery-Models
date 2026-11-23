@@ -471,8 +471,14 @@ export class PersistentProfileSession {
 		let providerSummary: ProviderTurnSummary;
 		let policySummary: ToolUsageSnapshot;
 		let failure: Error | undefined;
+		const session = this.session;
+		const recoverTimedOutTurn = process.env.LDM_PI_RECOVER_TIMEOUT_TURN === input.turnId;
+		const workerPreflightRepaired = process.env.LDM_PI_PRELAUNCH_RECOVERY_TURN === input.turnId;
+		const originalTools = recoverTimedOutTurn ? session.getActiveToolNames() : undefined;
 		try {
-			await this.history.begin(turnRoot, this.session.sessionManager);
+			if (originalTools) session.setActiveToolsByName(originalTools.filter((name) => name !== "bash"));
+			await this.history.begin(turnRoot, session.sessionManager, () => session.compact(),
+				recoverTimedOutTurn, workerPreflightRepaired);
 			// Results booked after the frozen base (or notices lost in a crash) reach the agent before its first call.
 			await this.experimentHistory?.deliverAtStart();
 			await this.promptWithTimeout(
@@ -494,6 +500,7 @@ export class PersistentProfileSession {
 		} catch (error) {
 			failure = error instanceof Error ? error : new Error(String(error));
 		} finally {
+			if (originalTools) session.setActiveToolsByName(originalTools);
 			providerSummary = await this.proxy.endTurn(this.profile.profileId);
 			policySummary = this.policy.end();
 			await this.experimentHistory?.end();
@@ -733,7 +740,7 @@ export class PiSessionPool {
 			configuration, guestRuntime: guestIdentity, packages,
 			implementationSha256: await directorySha256(join(APP_ROOT, "dist")),
 			policyRunnerSha256: sha256(await readFile(join(APP_ROOT, "policy_runner.py"))),
-		});
+		}, process.env.LDM_PI_PRIOR_IMPLEMENTATION_SHA256);
 		const profileSetSha256 = canonicalSha256(this.config.profiles.map((profile) => ({
 			agentsSha256: profile.agentsSha256,
 			profileId: profile.profileId,

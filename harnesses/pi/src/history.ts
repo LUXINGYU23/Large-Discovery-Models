@@ -15,6 +15,10 @@ export const HISTORY_POLICY = {
 
 export class HistoryRecoveryError extends Error {}
 
+const TRUNCATED_SUMMARY = /generation hit the token cap and the summary is incomplete/i;
+const WALL_TIME_LIMIT = /^Session wall-time limit reached: \d+s;/;
+const CONCISE_SUMMARY = "Write a concise summary of at most 2,000 words. Preserve decisions, relevant evidence, constraints, and unfinished work.";
+
 interface RecoveryState {
 	continuations: number;
 	failure?: { message: string; compactionId: string | null };
@@ -25,8 +29,12 @@ export class HistoryController {
 	private root: string | undefined;
 	private manager: SessionManager | undefined;
 	private state: RecoveryState = { continuations: 0 };
+	private repairing = false;
 
-	async begin(root: string, manager: SessionManager): Promise<void> {
+	async begin(
+		root: string, manager: SessionManager, repair?: () => Promise<unknown>, recoverTimedOutTurn = false,
+		workerPreflightRepaired = false,
+	): Promise<void> {
 		this.root = root;
 		this.manager = manager;
 		try {
@@ -35,14 +43,39 @@ export class HistoryController {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 			this.state = { continuations: 0 };
 		}
-		// An explicit successful native compaction can repair a blocked session.
-		// Restarting or appending another continuation prompt cannot clear the failure.
+		const failure = this.state.failure;
+		if (workerPreflightRepaired && failure && WALL_TIME_LIMIT.test(failure.message)) {
+			// The host has independently verified the timed-out worker never launched a model.
+			await this.record({ type: "history_repaired", reason: "worker_preflight_repaired",
+				compactionId: this.compactionId(), previousFailure: failure.message });
+			this.state = { continuations: this.state.continuations };
+			await this.save();
+		} else if (repair && failure && failure.compactionId === this.compactionId()
+			&& (TRUNCATED_SUMMARY.test(failure.message)
+				|| (recoverTimedOutTurn && WALL_TIME_LIMIT.test(failure.message)))) {
+			await this.repairHistory(repair);
+		}
+		// A new native compaction is the durable proof that the history was repaired.
 		if (this.state.failure && this.state.failure.compactionId !== this.compactionId()) {
 			this.state = { continuations: 0 };
 			await this.save();
 			await this.record({ type: "history_repaired", compactionId: this.compactionId() });
 		}
 		this.assertReady();
+	}
+
+	private async repairHistory(repair: () => Promise<unknown>): Promise<void> {
+		const blocked = this.state;
+		this.state = { continuations: blocked.continuations };
+		this.repairing = true;
+		try {
+			await repair();
+		} finally {
+			// The on-disk marker remains until a native summary has been committed.
+			this.state = blocked;
+			this.repairing = false;
+			await this.save();
+		}
 	}
 
 	assertReady(): void {
@@ -96,17 +129,32 @@ export class HistoryController {
 				if (this.state.failure) return { cancel: true };
 				const started = Date.now();
 				await this.record({ type: "compaction_started", reason: event.reason,
-					tokensBefore: event.preparation.tokensBefore, thinking: HISTORY_POLICY.summaryThinking });
+					tokensBefore: event.preparation.tokensBefore,
+					thinking: this.repairing ? "low" : HISTORY_POLICY.summaryThinking });
 				try {
 					if (!ctx.model) throw new Error("Compaction requires a model");
-					const result = await compact({ ...event.preparation,
+					const model = { ...ctx.model, baseUrl: `${ctx.model.baseUrl}/compaction` };
+					const summarize = (thinking: "high" | "low", instructions?: string) => compact({ ...event.preparation,
 						settings: { ...event.preparation.settings, reserveTokens: HISTORY_POLICY.summaryReserveTokens },
-					}, { ...ctx.model, baseUrl: `${ctx.model.baseUrl}/compaction` }, proxyApiKey, undefined, event.customInstructions,
+					}, model, proxyApiKey, undefined, instructions,
 					AbortSignal.any([event.signal, AbortSignal.timeout(HISTORY_POLICY.summaryTimeoutMs)]),
-						HISTORY_POLICY.summaryThinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
+						thinking, undefined, undefined, HISTORY_POLICY.summaryRetry, {
 							onRetryScheduled: (attempt, maxAttempts, delayMs, errorMessage) =>
 								this.record({ type: "compaction_retry", attempt, maxAttempts, delayMs, errorMessage }),
 						});
+					const conciseInstructions = [event.customInstructions, CONCISE_SUMMARY].filter(Boolean).join("\n\n");
+					let result;
+					if (this.repairing) {
+						result = await summarize("low", conciseInstructions);
+					} else {
+						try {
+							result = await summarize(HISTORY_POLICY.summaryThinking, event.customInstructions);
+						} catch (error) {
+							if (event.signal.aborted || !TRUNCATED_SUMMARY.test(String(error))) throw error;
+							await this.record({ type: "compaction_retry", reason: "truncated_summary", thinking: "low" });
+							result = await summarize("low", conciseInstructions);
+						}
+					}
 					await this.record({ type: "compaction_generated", reason: event.reason,
 						durationMs: Date.now() - started, tokensBefore: result.tokensBefore,
 						summaryChars: result.summary.length, usage: result.usage });

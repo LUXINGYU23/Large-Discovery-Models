@@ -14,16 +14,22 @@ from pathlib import Path
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.antibody.core.engine_adapters import _sequence_violations
 from tasks.antibody.tools.structure_design.common import extract_h3
+from ..sequence_design import mutation_options, mutate_sequences, validate_sequence
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "antibody/tools/structure_design/examples/1n8z_vh.json"
 REPO = TEMPLATE.parents[5]
+FIXED_MAX_PROPOSAL_BATCHES = 3
 
 
 class DesignWorker:
-    def __init__(self, run_dir, args, *, seed_backbones=None):
+    def __init__(self, run_dir, args, *, seed_backbones=None, execution_gpu=None, runtime_cache=None,
+                 prelaunch_retry=None):
         self.jobs = Path(run_dir).resolve() / "design_jobs"
         self.jobs.mkdir(exist_ok=True, parents=True)
         self.args = args
+        self.execution_gpu = args.gpu if execution_gpu is None else execution_gpu
+        self.runtime_cache = runtime_cache
+        self.prelaunch_retry = prelaunch_retry
         self.seed_backbones = dict(seed_backbones or {})
         self.template = json.loads(TEMPLATE.read_text())
         self.round = 0
@@ -40,8 +46,17 @@ class DesignWorker:
 
     def remaining(self):
         jobs = [j for j in self.records() if j["round"] == self.round]
-        return {"backbones": self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
-                "sequences": self.args.sequences_per_round - sum(j["count"] for j in jobs)}
+        if self.prelaunch_retry and self.prelaunch_retry["round"] == self.round:
+            # The failed preflight left no generated candidates. Keep its original
+            # receipt and aggregate cost, while restoring that call's round allowance.
+            jobs.remove(self.prelaunch_retry)
+        # Fixed can resample after an empty batch. Receipts and the campaign-wide
+        # generation limits still charge every call, including before a resume.
+        batches = FIXED_MAX_PROPOSAL_BATCHES if self.args.method == "fixed" else 1
+        return {
+            "backbones": batches * self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
+            "sequences": batches * self.args.sequences_per_round - sum(j["count"] for j in jobs),
+        }
 
     def eligible(self, rows):
         seen = set(self.evaluated)
@@ -52,16 +67,55 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count, temperature, backbone_id=None):
-        if action not in ("design_h3", "sequence_h3"):
+    def execute(self, action, count=None, temperature=0.5, backbone_id=None, seed_sequence=None,
+                mutable_positions=None, min_mutations=1, max_mutations=2, allowed_amino_acids=None,
+                sequences=None, rationale=None, call_id=None, profile_id=None):
+        if action not in ("design_h3", "sequence_h3", "mutate_h3", "register_h3"):
             raise ValueError("Unknown generation action")
+        directed = action in ("mutate_h3", "register_h3")
+        if directed:
+            if backbone_id is not None or not isinstance(rationale, str) or not rationale.strip():
+                raise ValueError("Sequence proposals require a rationale and cannot claim a generated backbone")
+            if action == "register_h3":
+                if mutable_positions is not None or allowed_amino_acids is not None or min_mutations != 1 or max_mutations != 2:
+                    raise ValueError("Mutation constraints apply to mutate_h3")
+                if not isinstance(sequences, list) or not sequences:
+                    raise ValueError("register_h3 requires a nonempty sequences list")
+                for sequence in sequences:
+                    validate_sequence(sequence)
+                if len(set(sequences)) != len(sequences):
+                    raise ValueError("Explicit sequences must be unique")
+                if seed_sequence is not None:
+                    validate_sequence(seed_sequence)
+                if count is not None and (type(count) is not int or count != len(sequences)):
+                    raise ValueError("count must match the explicit sequences list")
+                count = len(sequences)
+            else:
+                if sequences is not None:
+                    raise ValueError("Explicit sequences apply to register_h3")
+                options, groups = mutation_options(seed_sequence, mutable_positions, min_mutations,
+                                                   max_mutations, allowed_amino_acids)
+        elif any(value is not None for value in (
+                seed_sequence, mutable_positions, allowed_amino_acids, sequences, rationale)):
+            raise ValueError("Sequence design parameters require mutate_h3 or register_h3")
+        params = dict(action=action, count=count, temperature=temperature, backbone_id=backbone_id,
+                      seed_sequence=seed_sequence, mutable_positions=mutable_positions,
+                      min_mutations=min_mutations, max_mutations=max_mutations,
+                      allowed_amino_acids=allowed_amino_acids, sequences=sequences, rationale=rationale)
+        if call_id is not None:
+            matches = [j for j in self.records() if j.get("call_id") == call_id and j["round"] == self.round]
+            if matches:
+                receipt = matches[0]
+                if receipt.get("parameters") != params or receipt["status"] != "succeeded":
+                    raise RuntimeError("Generation call cannot be replayed safely")
+                return receipt["candidates"]
         if type(count) is not int or count < 1:
             raise ValueError("count must be a positive integer")
         if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
             raise ValueError("temperature must be in [0.01,1]")
         if (action == "sequence_h3") != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
-        if self.round == 0 and (action != "design_h3" or temperature != self.args.temperature or
+        if self.round == 0 and not self.args.seed_bank and (action != "design_h3" or temperature != self.args.temperature or
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
             raise ValueError(f"Shared initialization uses design_h3, count={self.args.samples_per_call}, temperature={self.args.temperature}")
         known = {r["backbone_id"] for r in self.candidates().values()}
@@ -73,18 +127,22 @@ class DesignWorker:
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
         job.mkdir()
-        backbone = backbone_id or job.name
+        backbone = None if directed else backbone_id or job.name
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
-                       status="started")
+                       status="started", call_id=call_id, parameters=params)
         path = job / "receipt.json"
         atomic_json_write(path, receipt)
         try:
             if self.runtime:
                 self.runtime.consume_many({"backbones_requested": int(action == "design_h3"),
                                            "sequences_requested": count}, usage_key=job.name)
-            if self.args.mock:
+            if action == "register_h3":
+                sequences = list(sequences)
+            elif action == "mutate_h3":
+                sequences = mutate_sequences(seed_sequence, count, options, groups, seed)
+            elif self.args.mock:
                 rng = random.Random(seed)
                 sequences = ["".join(rng.choices("AGSPDTYN", k=11)) for _ in range(count)]
             elif self.round == 0 and self.args.initialization_run:
@@ -94,8 +152,9 @@ class DesignWorker:
             else:
                 sequences = self.run_models(job, backbone_id, count, temperature, seed)
             rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
-                         artifact=(job / ("receipt.json" if self.args.mock else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
-                         index=i, violations=_sequence_violations(h3, 11))
+                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
+                         index=i, violations=_sequence_violations(h3, 11),
+                         generation_action=action, parent_sequence=seed_sequence, rationale=rationale)
                     for i, h3 in enumerate(sequences)]
             receipt.update(status="succeeded", candidates=rows)
             return rows
@@ -143,6 +202,10 @@ class DesignWorker:
         root = self.args.root.resolve()
         config = dict(self.template, workspace_root=str(root), seed=seed, num_designs=1,
                       sequences_per_design=count, sampling_temperature=temperature)
+        if self.runtime_cache:
+            assets = json.loads((self.runtime_cache / "manifest.json").read_text())
+            for key in ("input_structure", "rfd3_checkpoint", "proteinmpnn_checkpoint"):
+                config[key] = str(self.runtime_cache / assets[key]["file"])
         atomic_json_write(job / "config.json", config)
         cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
         env = dict(os.environ, PYTHONPATH=str(REPO))
@@ -151,7 +214,7 @@ class DesignWorker:
         cmd = ["taskset", "-c", ",".join(map(str, cpus)), sys.executable, "-m",
                "tasks.antibody.tools.structure_design", "sequence" if backbone_id else "pipeline",
                "--config", str(job / "config.json"), "--out-dir", str(job / "output"),
-               "--extract-h3", "--gpu", str(self.args.gpu)]
+               "--extract-h3", "--gpu", str(self.execution_gpu)]
         if self.args.share_gpu:
             cmd.append("--allow-gpu-sharing")
         if backbone_id:
@@ -159,6 +222,7 @@ class DesignWorker:
             cmd.extend(["--generation", str(generation)])
         with (root / "tmp/antibody-rfd3-worker.lock").open("a") as lock, (job / "worker.log").open("w") as log:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            print(f"Starting structure worker on GPU {self.execution_gpu}", file=log, flush=True)
             process = subprocess.Popen(cmd, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT,
                                        start_new_session=True, pass_fds=(lock.fileno(),))
             try:

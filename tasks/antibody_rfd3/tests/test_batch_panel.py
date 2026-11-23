@@ -131,6 +131,8 @@ def test_batch_profile_schema_and_timeouts(tmp_path, monkeypatch):
             if role == "evidence_reviewer":
                 assert schema["minItems"] == 1 and schema["maxItems"] == 64
                 assert client.config.limits.wall_time_seconds == 1800 and client.timeout == 2100
+                assert all(client.config.limits.tool_call_budgets[name] == 0
+                           for name in ("design_h3", "sequence_h3", "mutate_h3", "register_h3"))
             else:
                 # A partial list can report exhaustion, but the host requires exactly 32 to accept.
                 assert schema["minItems"] == 0 and schema["maxItems"] == 32
@@ -141,7 +143,7 @@ def test_first_batch_has_two_exact_lineages_and_reviewer_is_advice_only(tmp_path
     panel, clients, _service = make_batch_panel(tmp_path)
     frozen = round_input(1)
     result = panel.research(frozen, [])
-    assert panel.version == "3" and all(source.version == "3" for source in panel.sources.values())
+    assert panel.version == "4" and all(source.version == "4" for source in panel.sources.values())
     assert result.status == "committed" and not result.metadata["bootstrap"]
     assert result.metadata["candidate_counts"] == {"explorer": 32, "refiner": 32}
     assert len(result.proposals) == len({p.candidate.canonical_key for p in result.proposals}) == 64
@@ -355,3 +357,23 @@ def test_abandoned_batch_settles_each_role_from_its_frozen_catalog(tmp_path, mon
     assert settled["explorer"]["generation"] == settled["refiner"]["generation"] == 2
     assert settled["evidence_reviewer"]["generation"] == 1
     assert all(value["replayed"] for value in settled.values())
+
+
+def test_sequence_only_issuance_is_admitted_with_role_and_generation_checks(tmp_path):
+    args = batch_args()
+    worker = DesignWorker(tmp_path, args)
+    rows = worker.execute("register_h3", sequences=["AGSPDTYNAGS"],
+                          rationale="Test an explicit sequence hypothesis", profile_id="explorer", call_id="direct-1")
+    assert rows[0]["backbone_id"] is None
+    source = object.__new__(AntibodyPiResearch)
+    source.worker, source.args, source.required = worker, args, 1
+    source.role, source.peer_ids = "explorer", None
+    contract = source.make_contract()
+    request = HarnessSubmissionRequest("explorer", "g000001-explorer", 1,
+                                       {"design_ids": [rows[0]["design_id"]]}, history_seq=0)
+    assert proposal_validator(contract, HistoryLog(), generation=1)(request).decision == "accept"
+    source.role = "refiner"
+    assert proposal_validator(source.make_contract(), HistoryLog(), generation=1)(request).decision == "retry"
+    source.role = "explorer"
+    worker.round = 1
+    assert proposal_validator(source.make_contract(), HistoryLog(), generation=2)(request).decision == "retry"

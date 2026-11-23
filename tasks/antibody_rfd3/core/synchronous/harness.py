@@ -19,9 +19,10 @@ from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 
 RESOURCES = Path(__file__).resolve().parents[2] / "resources/baseline_harness"
-TOOLS = ("design_h3", "sequence_h3")
+TOOLS = ("design_h3", "sequence_h3", "mutate_h3", "register_h3", "candidate_catalog")
 SKILL = "skills/cdrh3-design"
 ROLE = "profiles/research/AGENTS.md"
+TURN_RECOVERY_SECONDS = 600
 
 
 def profile():
@@ -33,7 +34,7 @@ def profile():
 def submission_contract():
     return HarnessSubmissionContract("cdrh3_design_ids", "submit_designs", {
         "type": "object", "additionalProperties": False, "required": ["design_ids"],
-        "properties": {"design_ids": {"type": "array", "minItems": 1,
+        "properties": {"design_ids": {"type": "array", "minItems": 1, "uniqueItems": True,
                                       "items": {"type": "string"}}}}, max_validation_attempts=5)
 
 
@@ -45,12 +46,16 @@ def worker_socket(worker):
         def do_POST(self):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if self.path != "/" or not 0 < length <= 4096:
+                if self.path != "/" or not 0 < length <= 65536:
                     raise ValueError("Invalid design request")
                 params = json.loads(self.rfile.read(length))
-                rows = worker.execute(**params)
+                if params["action"] == "candidate_catalog":
+                    rows = [row for job in worker.records() if job["round"] == worker.round
+                            and job["status"] == "succeeded" for row in job.get("candidates", [])]
+                else:
+                    rows = worker.execute(**params)
                 eligible = worker.eligible(rows)
-                data = {"backbone_id": rows[0]["backbone_id"], "candidates": eligible,
+                data = {"backbone_id": rows[0]["backbone_id"] if rows else None, "candidates": eligible,
                         "sampled": len(rows), "eligible_unique_new": len(eligible),
                         "remaining": worker.remaining()}
                 if not eligible:
@@ -100,7 +105,16 @@ def open_agent(args, runtime, worker):
         tool_extensions=(HarnessToolExtension(Path("/resources") / extension,
                                               file_sha256(RESOURCES / extension), TOOLS),))
     with worker_socket(worker) as socket_dir:
-        cmd = pi_sidecar_command(root, args.sidecar_image, cache_root=args.guest_cache,
+        image = os.environ.get("LDM_PI_RESUME_IMAGE") if args.resume_run else None
+        environment = {
+            name: os.environ[name] for name in (
+                "LDM_PI_PRIOR_IMPLEMENTATION_SHA256", "LDM_PI_RECOVER_TIMEOUT_TURN",
+            ) if image and name in os.environ
+        }
+        if image and worker.prelaunch_retry:
+            environment["LDM_PI_PRELAUNCH_RECOVERY_TURN"] = f"design-{worker.prelaunch_retry['round']}"
+        cmd = pi_sidecar_command(root, image or args.sidecar_image, cache_root=args.guest_cache,
+                                 environment=environment,
                                  mounts=((RESOURCES, "/resources", True), (socket_dir, "/worker", True)))
         with HarnessClient(cmd, api_key=key, config=config) as client:
             yield PiAgent(client, worker, runtime)
@@ -109,14 +123,30 @@ def open_agent(args, runtime, worker):
 class PiAgent:
     def __init__(self, client, worker, runtime):
         self.client, self.worker, self.runtime = client, worker, runtime
-        self.cursor = 0
+        self.cursor = None
+
+    def _turn(self, round_idx, history, message):
+        role = "cdrh3_research"
+        turn_id = f"design-{round_idx}"
+        root = self.runtime.run_dir / "harness"
+        if self.cursor is None:
+            previous = root / "turns" / f"design-{round_idx - 1}" / "turn_committed.json"
+            self.cursor = json.loads(previous.read_text())["historyToSeq"] if previous.is_file() else 0
+        digest = canonical_sha256(history)
+        frozen = root / "sessions" / role / "turns" / turn_id / "input.json"
+        saved = json.loads(frozen.read_text()) if frozen.is_file() else None
+        turn = HarnessTurn(role, turn_id, round_idx, self.cursor, len(history), digest,
+                           saved["message"] if saved else json.dumps(message))
+        if saved and turn.input_digest != saved["inputDigest"]:
+            raise ValueError(f"Saved Pi turn does not match the campaign checkpoint: {turn_id}")
+        return turn
 
     def propose(self, round_idx, history, count):
         seen = self.worker.evaluated | {row["sequence"] for row in history}
         message = {"antigen": self.worker.args.antigen, "oracle": self.worker.args.oracle,
                    "method": self.worker.args.method, "measured_history": history,
                    "remaining": self.worker.remaining(), "required_candidates": count,
-                   "instructions": "Read cdrh3-design on your first turn. Call design_h3 or sequence_h3. "
+                   "instructions": "Read cdrh3-design on your first turn. Use the available sequence or structure tools. "
                    "Submit exactly the requested number of distinct eligible design IDs. "
                    "Only IDs listed as eligible may be submitted. If a call produces no eligible candidates, "
                    "sample another backbone or resample a previously measured backbone. Earlier eligible, unmeasured "
@@ -127,8 +157,7 @@ class PiAgent:
                 "/workspace/.ldm-resources/skills/0/cdrh3-design/SKILL.md and read its full instructions. "
                 f"2. Then call design_h3(count={self.worker.args.samples_per_call}, temperature={self.worker.args.temperature}). "
                 "Submit the first eligible returned design ID. Repeat only if all candidates are invalid.")
-        turn = HarnessTurn("cdrh3_research", f"design-{round_idx}", round_idx, self.cursor,
-                           len(history), canonical_sha256(history), json.dumps(message))
+        turn = self._turn(round_idx, history, message)
 
         def resolve(payload):
             ids = payload.get("design_ids")
@@ -136,7 +165,7 @@ class PiAgent:
                 raise ValueError(f"Submit exactly {count} candidate IDs")
             catalog = self.worker.candidates()
             rows = [catalog[key] for key in ids]
-            if round_idx == 0 and rows[0] != next((r for r in catalog.values() if not r["violations"]), None):
+            if round_idx == 0 and not self.worker.args.seed_bank and rows[0] != next((r for r in catalog.values() if not r["violations"]), None):
                 raise ValueError("Select the first eligible design from the shared initialization")
             sequences = {row["sequence"] for row in rows}
             if len(sequences) != count or sequences & seen or any(row["violations"] for row in rows):
@@ -153,7 +182,8 @@ class PiAgent:
                     "/design_ids", "invalid_design_ids", str(exc), "Choose eligible IDs returned by a tool."),))
             return HarnessSubmissionValidation()
 
-        result, = self.client.run_turn((turn,), submission_validator=validate)
+        result, = self.client.run_turn((turn,), submission_validator=validate,
+                                       recovery_timeout_seconds=TURN_RECOVERY_SECONDS)
         if (result.submission_status != "accepted" or result.turn_id != turn.turn_id
                 or result.input_digest != turn.input_digest):
             raise ValueError("Pi did not commit the requested turn")

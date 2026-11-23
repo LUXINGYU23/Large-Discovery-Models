@@ -22,7 +22,7 @@ from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
 RESOURCES = Path(__file__).resolve().parents[1] / "resources/harness"
-TOOLS = ("design_h3", "sequence_h3", "candidate_catalog")
+TOOLS = ("design_h3", "sequence_h3", "mutate_h3", "register_h3", "candidate_catalog")
 PANEL = ("explorer", "refiner", "evidence_reviewer")
 
 
@@ -59,7 +59,7 @@ def worker_socket(worker, *, workspaces):
         def do_POST(self):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if self.path != "/" or not 0 < length <= 4096:
+                if self.path != "/" or not 0 < length <= 65536:
                     raise ValueError("Invalid design request")
                 request = json.loads(self.rfile.read(length))
                 role = request.get("profile_id")
@@ -83,7 +83,9 @@ def worker_socket(worker, *, workspaces):
                     available = worker.eligible(row for job in worker.records()
                         if job["round"] == worker.round and job.get("profile_id") == role
                         and job.get("status") == "succeeded" for row in job.get("candidates", ()))
-                    compact = [{key: row[key] for key in ("design_id", "sequence", "backbone_id")}
+                    compact = [{key: row.get(key) for key in (
+                        "design_id", "sequence", "backbone_id", "generation_action", "parent_sequence",
+                        "parent_history_seqs", "rationale")}
                                for row in available]
                     relative = Path("generated") / f"g{worker.round + 1:06d}.json"
                     atomic_json_write(workspaces[role] / relative,
@@ -128,7 +130,7 @@ def worker_socket(worker, *, workspaces):
 class AntibodyPiResearch(PiResearchSource):
     """One profile's persistent session, proposal validator, and watermark chain."""
 
-    version = "3"
+    version = "4"
 
     def __init__(self, client, service, worker, args, *, workspace=None):
         self.worker, self.args = worker, args
@@ -143,7 +145,9 @@ class AntibodyPiResearch(PiResearchSource):
         worker.history_log = service.log
         super().__init__(client, service, self.make_contract(), name=f"antibody-{args.method}", instructions=(
             "Read the cdrh3-design skill, use experiment_history to inspect measured and pending sequences, "
-            "then submit issued eligible design IDs. Lower energy is better. A proposal is not a measurement."))
+            "choose the next design conditions from that evidence, and submit issued eligible design IDs. "
+            "Use mutate_h3 with the actual measured seed_sequence for local exploration, register_h3 for "
+            "explicit hypothesis-driven sequences, or structure tools for scaffold exploration. Lower energy is better."))
 
     def make_contract(self):
         # Close over the original turn's state: settlement can replay different roles and generations.
@@ -175,7 +179,8 @@ class AntibodyPiResearch(PiResearchSource):
             if batch and role in ("explorer", "refiner") and row["sequence"] in excluded_pool:
                 return None
             if role in ("explorer", "refiner") and not peer_only:
-                if not any(j.get("profile_id") == role and j["backbone_id"] and
+                if not any(j.get("profile_id") == role and
+                           (j.get("backbone_id") or j.get("action") in ("mutate_h3", "register_h3")) and
                            (not batch or j["round"] == generation_round) and
                            any(r["design_id"] == design_id for r in j.get("candidates", ()))
                            for j in jobs if j.get("status") == "succeeded"):
@@ -201,14 +206,18 @@ class AntibodyPiResearch(PiResearchSource):
         if self.role == "refiner" and self.worker.seed_backbones and self.worker.round == 0:
             details["seed_backbones"] = (
                 "Initialization history includes reusable backbone IDs. Inspect the measured history and "
-                "try sequence_h3 on a promising measured initialization backbone within your role budget.")
+                "use its exact sequence with mutate_h3 for local variants, or sequence_h3 to resample "
+                "the associated backbone within your role budget.")
         if self.peer_catalog:
             details["peer_catalog"] = self.peer_catalog
         batch = self.args.method == "ldm_harness" and bool(getattr(self.args, "research_candidates_per_role", 0))
         if batch and self.role in ("explorer", "refiner"):
             details["excluded_live_sequences"] = sorted(self.excluded_pool)
             details["generation_instructions"] = (
-                f"Generate your own candidates, starting with count={self.args.samples_per_call}, "
+                f"Query measured history and choose your design conditions. Generate your own candidates, "
+                f"using count={self.args.samples_per_call} as a starting batch size, "
+                "with mutate_h3 for neighborhoods of measured seed sequences, register_h3 for exact "
+                "sequences you design, or design_h3/sequence_h3 for structural sampling. "
                 "and read the candidate_catalog returned by the tool. It lists eligible unique sequences "
                 "from all your calls this generation, excluding measured, pending, and the live sequences "
                 "listed at the start of this generation, plus explorer's submissions for refiner. Call "
@@ -319,7 +328,7 @@ class RecordingClient:
 class AntibodyResearchPanel:
     """Generate with two lineages, then independently review their submitted designs."""
 
-    version = "3"
+    version = "4"
 
     def __init__(self, sources, worker, args, root):
         self.sources, self.worker, self.args, self.root = sources, worker, args, Path(root)
@@ -334,7 +343,10 @@ class AntibodyResearchPanel:
                 job = next((j for j in self.worker.records() if any(
                     c["design_id"] == design_id for c in j.get("candidates", ()))), {})
                 rows[design_id] = {**payload, "proposed_by": [], "generation_job": {
-                    key: job.get(key) for key in ("profile_id", "round", "action", "count", "temperature", "seed")},
+                    key: job.get(key) for key in ("profile_id", "round", "action", "count", "temperature", "seed",
+                                                 "seed_sequence", "mutable_positions", "min_mutations",
+                                                 "max_mutations", "allowed_amino_acids", "rationale", "sequence_design",
+                                                 "parent_history")},
                     "evidence_status": "proposal, not an energy measurement"}
             rows[design_id]["proposed_by"].append(proposal.lineage)
         document = {"generation": generation, "recipient": role, "base_history_seq": base_seq,
@@ -450,7 +462,7 @@ def open_agent(args, directory, worker, bridge, campaign_id):
             if not batch:
                 budgets["candidate_catalog"] = 0
             if role == "evidence_reviewer":
-                budgets.update(design_h3=0, sequence_h3=0, candidate_catalog=0)
+                budgets.update(design_h3=0, sequence_h3=0, mutate_h3=0, register_h3=0, candidate_catalog=0)
             count = (args.research_candidates_per_role if batch and role != "evidence_reviewer"
                      else args.pool_size if role in PANEL else 1)
             # Allow a shortfall report through the tool schema; the host contract rejects partial batches.

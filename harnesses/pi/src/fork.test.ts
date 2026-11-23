@@ -63,3 +63,26 @@ test("session resume pins configuration and runtime identity without rewriting p
 		await rm(root, { recursive: true, force: true });
 	}
 });
+
+test("an explicit implementation upgrade keeps the pinned scientific configuration", async () => {
+	const root = await mkdtemp(join(tmpdir(), "ldm-initialization-upgrade-"));
+	try {
+		const previous = "a".repeat(64);
+		const identity = { configuration: { model: "fixture", seed: 42 }, implementationSha256: previous };
+		const from = await pinInitialization(root, identity);
+		const upgraded = { ...identity, implementationSha256: "b".repeat(64) };
+		await assert.rejects(pinInitialization(root, upgraded, "c".repeat(64)), /identity changed/);
+		await assert.rejects(
+			pinInitialization(root, { ...upgraded, configuration: { model: "fixture", seed: 43 } }, previous),
+			/identity changed/,
+		);
+		const to = await pinInitialization(root, upgraded, previous);
+		assert.notEqual(to, from);
+		const upgrade = JSON.parse(await readFile(join(root, `implementation-upgrade-${to}.json`), "utf8"));
+		assert.equal(upgrade.fromInitializationSha256, from);
+		assert.equal(upgrade.toInitializationSha256, to);
+		assert.equal(JSON.parse(await readFile(join(root, "manifest.json"), "utf8")).initializationSha256, from);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});

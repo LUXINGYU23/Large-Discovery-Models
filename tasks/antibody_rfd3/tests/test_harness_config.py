@@ -1,5 +1,6 @@
 """Verify the research harness configuration without a provider or sidecar."""
 from contextlib import contextmanager
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from ldm_tts.harness import HarnessHistoryConfig
 from ldm_tts.harness.history import HistoryLog
 from tasks.antibody_rfd3.core import harness
+from tasks.antibody_rfd3.core.synchronous.harness import PiAgent
 
 
 @pytest.mark.parametrize(("effort", "expected"), [("low", "low"), (None, "off")])
@@ -57,3 +59,24 @@ def test_reasoning_effort_reaches_pi_configuration(tmp_path, monkeypatch, effort
         assert agent.client.config.thinking == expected
         assert agent.client.config.initialize_payload()["thinking"] == expected
     assert preflights == [True]
+
+
+def test_synchronous_pi_reuses_frozen_turn_after_resume(tmp_path):
+    runtime = SimpleNamespace(run_dir=tmp_path)
+    agent = PiAgent(None, None, runtime)
+    original = agent._turn(17, [{"score": 1}], {"remaining": 2})
+    root = tmp_path / "harness"
+    prior = root / "turns/design-17/turn_committed.json"
+    prior.parent.mkdir(parents=True)
+    prior.write_text(json.dumps(original.to_dict()))
+    agent.cursor = original.history_to_seq
+    history = [{"score": 1}, {"score": 2}]
+    interrupted = agent._turn(18, history, {"remaining": 2})
+    saved = root / "sessions/cdrh3_research/turns/design-18/input.json"
+    saved.parent.mkdir(parents=True)
+    saved.write_text(json.dumps(interrupted.to_dict()))
+
+    resumed = PiAgent(None, None, runtime)
+    assert resumed._turn(18, history, {"remaining": 1}) == interrupted
+    with pytest.raises(ValueError, match="does not match the campaign checkpoint"):
+        resumed._turn(18, [{"score": 3}, {"score": 2}], {"remaining": 1})

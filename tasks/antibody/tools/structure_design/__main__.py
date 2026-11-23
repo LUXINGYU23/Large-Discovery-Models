@@ -177,12 +177,12 @@ def provenance(config):
     for key in ["rfd3_python", "proteinmpnn_python"]:
         python = config[key]
         query = "import importlib.metadata as m,json; print(json.dumps({k:m.version(k) for k in ['torch','numpy']}))"
-        packages = json.loads(subprocess.check_output([python, "-c", query], text=True))
+        packages = json.loads(subprocess.check_output([python, "-c", query], text=True, timeout=30))
         if not packages["torch"].startswith("2.6.0") or packages["numpy"] != "1.26.4":
             raise ValueError(f"Unexpected runtime versions: {key}: {packages}")
         if key == "rfd3_python":
             packages.update(json.loads(subprocess.check_output([python, "-c",
-                "import importlib.metadata as m,json; print(json.dumps({k:m.version(k) for k in ['rc-foundry','atomworks']}))"], text=True)))
+                "import importlib.metadata as m,json; print(json.dumps({k:m.version(k) for k in ['rc-foundry','atomworks']}))"], text=True, timeout=30)))
             if packages["rc-foundry"] != "0.2.0" or packages["atomworks"] != "2.1.1":
                 raise ValueError(f"Unexpected Foundry/AtomWorks versions: {packages}")
         result[key] = {"executable": python, "packages": packages}
@@ -372,8 +372,10 @@ def main(argv=None):
             save_json(directory / "h3.json", {"status": "success", "candidates": values})
         else:
             env = runtime_env(config)
+            print("Checking input and model provenance", file=sys.stderr, flush=True)
             origin = provenance(config)
             save_json(directory / "provenance.json", origin)
+            print("Input and model provenance verified", file=sys.stderr, flush=True)
             cpu = config["device"] == "cpu"
             with nullcontext(None) if cpu else gpu_slot(config, args.gpu) as gpu:
                 env["CUDA_VISIBLE_DEVICES"] = "" if cpu else str(gpu)

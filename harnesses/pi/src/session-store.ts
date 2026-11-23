@@ -35,13 +35,26 @@ export async function directorySha256(root: string): Promise<string> {
 	return canonicalSha256(files);
 }
 
-export async function pinInitialization(root: string, identity: unknown): Promise<string> {
+export async function pinInitialization(
+	root: string, identity: Record<string, unknown>, priorImplementationSha256?: string,
+): Promise<string> {
 	const digest = canonicalSha256(identity);
 	const manifestPath = join(root, "manifest.json");
 	const previous = await optionalJson<{ initializationSha256?: string }>(manifestPath);
 	if (previous) {
 		if (previous.initializationSha256 !== digest) {
-			throw new Error("Harness initialization identity changed; restore the original configuration and runtime or use a new artifact root");
+			const priorIdentity = { ...identity, implementationSha256: priorImplementationSha256 };
+			if (!priorImplementationSha256 || !/^[0-9a-f]{64}$/.test(priorImplementationSha256)
+				|| canonicalSha256(priorIdentity) !== previous.initializationSha256) {
+				throw new Error("Harness initialization identity changed; restore the original configuration and runtime or use a new artifact root");
+			}
+			// Pin the permitted transition separately. A failed startup leaves the original manifest current.
+			await atomicJson(join(root, `implementation-upgrade-${digest}.json`), {
+				fromInitializationSha256: previous.initializationSha256,
+				toInitializationSha256: digest,
+				fromImplementationSha256: priorImplementationSha256,
+				toImplementationSha256: identity.implementationSha256,
+			});
 		}
 	} else {
 		try {
