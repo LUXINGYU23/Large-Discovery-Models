@@ -314,7 +314,7 @@ def svm_kkt_residual(Q, alpha, upper):
     return float(max(np.max(v_lo, initial=0.0), np.max(v_hi, initial=0.0)))
 
 
-def solve_svm_dual(X_s, y_b, w_b, ell, C):
+def solve_svm_dual(X_s, y_b, w_b, ell, C, *, polish=True):
     """Solve the bias-absorbed RBF SVM dual by L-BFGS-B."""
     y_tilde = 2.0 * np.asarray(y_b, dtype=float) - 1.0
     if not (y_tilde > 0.0).any() or not (y_tilde < 0.0).any():
@@ -333,13 +333,12 @@ def solve_svm_dual(X_s, y_b, w_b, ell, C):
     alpha0 = np.zeros(len(upper), dtype=float)
     res = minimize(
         fun, alpha0, method="L-BFGS-B", jac=True, bounds=bounds,
-        options={"maxiter": 2000, "ftol": 1e-10, "gtol": 1e-7},
+        options={"maxiter": 2000, "ftol": 1e-10},
     )
     alpha = np.asarray(res.x, dtype=float)
     if not np.isfinite(alpha).all():
         raise ValueError("non-finite SVM dual solution")
-    # If large C stopped early on relative ftol with KKT residual > 1e-4, polish tightly.
-    if svm_kkt_residual(Q, alpha, upper) > 1e-4:
+    if polish and svm_kkt_residual(Q, alpha, upper) > 5e-4:
         res2 = minimize(
             fun, alpha, method="L-BFGS-B", jac=True, bounds=bounds,
             options={"maxiter": 2000, "ftol": 1e-14, "gtol": 1e-8},
@@ -349,7 +348,7 @@ def solve_svm_dual(X_s, y_b, w_b, ell, C):
     return alpha, Q, upper, y_tilde
 
 
-def fit_svm_rbf(config, X_b, y_b, w_b, X_c, problem, *, center=None, h_hole=None):
+def fit_svm_rbf(config, X_b, y_b, w_b, X_c, problem, *, center=None, h_hole=None, polish=True):
     shape = np.asarray(problem["shape"], dtype=float)
     origin = np.asarray(problem["origin"], dtype=float)
     spacing = np.asarray(problem["spacing"], dtype=float)
@@ -365,7 +364,7 @@ def fit_svm_rbf(config, X_b, y_b, w_b, X_c, problem, *, center=None, h_hole=None
     ell = max(float(config["ell_mult"]) * h_hole, 1e-9)
     C = float(config["C"])
     X_s = harness.stretch_points(X_b, center, s_z)
-    alpha, _, _, y_tilde = solve_svm_dual(X_s, y_b, w_b, ell, C)
+    alpha, _, _, y_tilde = solve_svm_dual(X_s, y_b, w_b, ell, C, polish=polish)
 
     coef = alpha * y_tilde
     bias = float(np.sum(coef))
@@ -390,7 +389,10 @@ def svm_rbf(problem, budget=None, seed=0, *, decision_rule=None, diagnostics=Non
     center, h_hole = data["center"], data["h_hole"]
 
     def fit(cfg, X_b, y_b, w_b, X_c, prob):
-        return fit_svm_rbf(cfg, X_b, y_b, w_b, X_c, prob, center=center, h_hole=h_hole)
+        return fit_svm_rbf(
+            cfg, X_b, y_b, w_b, X_c, prob,
+            center=center, h_hole=h_hole, polish=(prob is problem),
+        )
 
     return harness.tune_and_solve(
         problem, budget, SVM_RBF_CONFIGS, fit, tau0=0.0,
