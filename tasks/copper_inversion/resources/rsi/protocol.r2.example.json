@@ -255,7 +255,7 @@
   "model": {
     "base_url": "https://api.deepseek.com",
     "name": "deepseek-flash",
-    "thinking": "low"
+    "thinking": "high"
   },
   "objective_version": "objective_v3",
   "protocol_version": 1,
