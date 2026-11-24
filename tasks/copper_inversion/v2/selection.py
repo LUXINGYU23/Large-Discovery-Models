@@ -7,12 +7,15 @@ import fcntl
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 from contextlib import contextmanager
 from ldm_tts.contracts import RawProposal,CandidateRejection
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.candidate import seal,validate_source
-from ..core.execution import Execution,digest,source_identity
+from ..core.execution import Execution,digest,source_identity,freeze_model
+from ..core.geometry import read_model,MAX_MODEL_BYTES
 from .contract import OBJECTIVE_VERSIONS
+from .data import read_problem
 from .suite import SuiteEvaluator,load_manifest,file_hash,release_tiers,manifest_tiers,OBJECTIVES
 from .domain import CheckedDomain
 from .interface_checks import InterfaceChecks
@@ -98,6 +101,137 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
     return frozen
 
 
+def precomputed_manifest(fields_dir):
+    """Canonical digest of a precomputed offline-reference directory (model.npy + optional meta.json)."""
+    base=Path(fields_dir)
+    if base.is_symlink() or not base.is_dir():
+        raise ValueError("precomputed fields directory missing or symlinked")
+    base=base.resolve()
+    files={};model_count=0
+    for item in sorted(base.rglob("*")):
+        if item.is_symlink():
+            raise ValueError("precomputed fields directory contains a symlink")
+        if item.is_dir():
+            continue
+        if item.name not in {"model.npy","meta.json"}:
+            raise ValueError(f"unexpected file in precomputed fields directory: {item.name!r}")
+        if item.name=="model.npy":
+            model_count+=1
+        files[item.relative_to(base).as_posix()]=file_hash(item)
+    if not model_count:
+        raise ValueError("precomputed fields directory contains no model.npy files")
+    manifest=dict(schema="copper-precomputed-fields-v1",files=files)
+    return manifest,digest(manifest)
+
+
+def _evaluate_precomputed_with_evaluator(evaluator,sha,split_models):
+    if hasattr(evaluator,"evaluate_precomputed"):
+        return evaluator.evaluate_precomputed(sha,split_models)
+    return evaluator.evaluate(SimpleNamespace(canonical_key=sha,candidate_id=sha,
+        payload=dict(sha256=sha,kind="precomputed")))
+
+
+def freeze_precomputed(root,fields_dir,validation,tests,*,seconds,image,training_manifest,objective="confirmation"):
+    """Freeze precomputed offline fields (M4/M7/RF) across train, validation and sealed splits for REF."""
+    root=Path(root)
+    if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
+    if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
+    training_path=Path(training_manifest).resolve()
+    manifests=[Path(validation).resolve(),*[Path(p).resolve() for p in tests]]
+    loaded=[load_manifest(p) for p in manifests]
+    training=load_manifest(training_path)
+    if [m["split"] for m in loaded]!=["validation","test_id","test_ood"]:
+        raise ValueError("ordered validation, test-ID and test-OOD manifests required")
+    if len({m["stage"] for m in [training,*loaded]})!=1:raise ValueError("mixed evaluation stages")
+    if training["stage"]=="formal":
+        from .qualification import verify_release
+        for path in [training_path,*manifests]:verify_release(path)
+    allowed=selection_seconds(training_path,training,manifests,loaded)
+    if allowed is not None and seconds not in allowed:
+        raise ValueError("selection solver budget differs from the release tier table")
+    parents=[{c["parent_id"] for c in m["cases"]} for m in [training,*loaded]]
+    if any(parents[i]&parents[j] for i in range(4) for j in range(i)):
+        raise ValueError("held-out suites share geology parents")
+    truth_hashes=[{c["sha256"]["truth.npy"] for c in m["cases"]} for m in [training,*loaded]]
+    if any(truth_hashes[i]&truth_hashes[j] for i in range(4) for j in range(i)):
+        raise ValueError("held-out suites share truth geometry")
+    if not math.isfinite(seconds) or seconds<=0:raise ValueError("positive solver budget required")
+    if not image.startswith("sha256:") or len(image)!=71:raise ValueError("resolved Docker image digest required")
+
+    f_manifest,f_sha=precomputed_manifest(fields_dir)
+    base=Path(fields_dir).resolve()
+    resolved_sources={}
+    for m_path,m in [(training_path,training),*zip(manifests,loaded)]:
+        split=m["split"]
+        resolved_sources[split]={}
+        for case in m["cases"]:
+            pub=read_problem(m_path.parent/case["public"])
+            resolved_sources[split][case["case_id"]]={}
+            for seed in m["seeds"]:
+                per_seed=base/split/case["case_id"]/str(seed)/"model.npy"
+                shared=base/split/case["case_id"]/"model.npy"
+                src=per_seed if per_seed.is_file() else (shared if shared.is_file() else None)
+                if src is None:
+                    raise ValueError(f"missing precomputed model for {split}/{case['case_id']}/{seed}")
+                if src.stat().st_size>MAX_MODEL_BYTES:
+                    raise ValueError("oversized model")
+                read_model(src,pub["shape"])
+                meta_path=src.parent/"meta.json"
+                wall_s=0.
+                if meta_path.is_file():
+                    meta=json.loads(meta_path.read_text())
+                    wall_s=float(meta.get("wall_seconds",0.))
+                    if not math.isfinite(wall_s) or wall_s<0:
+                        raise ValueError("invalid precomputed wall_seconds")
+                resolved_sources[split][case["case_id"]][str(seed)]=(src,pub["shape"],wall_s)
+
+    root.mkdir(parents=True,exist_ok=False)
+    fields_rel=f"candidates/{f_sha}/fields.json"
+    fields_dst=root/fields_rel
+    fields_dst.parent.mkdir(parents=True,exist_ok=True)
+    atomic_json_write(fields_dst,f_manifest)
+    fields_dst.chmod(0o444)
+
+    models={}
+    for split,by_case in sorted(resolved_sources.items()):
+        models[split]={}
+        for cid,by_seed in sorted(by_case.items()):
+            models[split][cid]={}
+            for seed_s,(src,shape,wall_s) in sorted(by_seed.items()):
+                rel_dir=f"models/{split}/{cid}/{seed_s}"
+                m_sha=freeze_model(src,root/rel_dir,shape)
+                models[split][cid][seed_s]=dict(path=f"{rel_dir}/model.npy",sha256=m_sha,wall_seconds=wall_s)
+
+    train_work=root/"training"
+    train_work.mkdir(parents=True,exist_ok=True)
+    execution=Execution(train_work/"jobs",image)
+    if execution.image!=image:raise ValueError("freeze a resolved image digest")
+    opts={} if objective=="confirmation" else {"objective":objective}
+    evaluator=SuiteEvaluator(train_work,execution,training_path,seconds,**opts)
+    train_models={cid:{s:{**e,"path":str(root/e["path"])} for s,e in seeds.items()}
+                  for cid,seeds in models["train"].items()}
+    train_res=_evaluate_precomputed_with_evaluator(evaluator,f_sha,train_models)
+    eval_results=sorted((train_work/"evaluations").glob("*/result.json"))
+    if len(eval_results)!=1:
+        raise ValueError("expected exactly one precomputed training evaluation receipt")
+    res_path=eval_results[0]
+    cases_path=res_path.parent/"private-case-results.json"
+    train_record=dict(fields_path=str(fields_dst.resolve()),metrics=dict(train_res.metrics),
+        result_path=str(res_path.resolve()),result_sha256=file_hash(res_path),
+        cases_path=str(cases_path.resolve()),cases_sha256=file_hash(cases_path))
+
+    candidates=[dict(sha256=f_sha,kind="precomputed",fields_path=fields_rel,models=models)]
+    frozen=dict(schema="copper-selection-v2",stage=training["stage"],candidates=candidates,
+        training=dict(manifest_path=str(training_path),manifest_sha256=file_hash(training_path),
+            run=str(train_work.resolve()),selected_receipts={f_sha:train_record}),
+        manifests=[dict(path=str(p),sha256=file_hash(p),contents_sha256=digest(m)) for p,m in zip(manifests,loaded)],
+        implementation_sha256=source_identity(),image=image,seconds=seconds,selection_objective=objective,
+        selection_rule=SELECTION_RULES[objective])
+    atomic_json_write(root/"frozen.json",frozen)
+    atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
+    return frozen
+
+
 def verify(root):
     root=Path(root);frozen=json.loads((root/"frozen.json").read_text())
     state=json.loads((root/"state.json").read_text())
@@ -106,7 +240,18 @@ def verify(root):
     if digest(frozen)!=state["frozen_sha256"]:
         raise ValueError("frozen scientific identity changed")
     for c in frozen["candidates"]:
-        if file_hash(root/c["source_path"])!=c["sha256"]:raise ValueError("frozen source changed")
+        if c.get("kind")=="precomputed":
+            fields_file=root/c["fields_path"]
+            if fields_file.is_symlink() or not fields_file.is_file() or digest(json.loads(fields_file.read_text()))!=c["sha256"]:
+                raise ValueError("frozen source changed")
+            for by_case in c["models"].values():
+                for by_seed in by_case.values():
+                    for entry in by_seed.values():
+                        mfile=root/entry["path"]
+                        if mfile.is_symlink() or not mfile.is_file() or file_hash(mfile)!=entry["sha256"]:
+                            raise ValueError("frozen source changed")
+        elif file_hash(root/c["source_path"])!=c["sha256"]:
+            raise ValueError("frozen source changed")
     training=frozen["training"]
     if file_hash(training["manifest_path"])!=training["manifest_sha256"]:raise ValueError("training manifest changed")
     for record in training["selected_receipts"].values():
@@ -157,6 +302,18 @@ def run(root,phase):
             for index in ([0] if phase=="validation" else [1,2]):
                 split=("validation","test_id","test_ood")[index]
                 work=root/phase/payload["sha256"]/split
+                if payload.get("kind")=="precomputed":
+                    work.mkdir(parents=True,exist_ok=True)
+                    execution=Execution(work/"jobs",frozen["image"])
+                    if execution.image!=frozen["image"]:raise ValueError("freeze a resolved image digest")
+                    objective=frozen.get("selection_objective","confirmation") if phase=="validation" else "confirmation"
+                    options={} if objective=="confirmation" else {"objective":objective}
+                    evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
+                    split_models={cid:{s:{**e,"path":str(root/e["path"])} for s,e in seeds.items()}
+                                  for cid,seeds in payload["models"][split].items()}
+                    result=_evaluate_precomputed_with_evaluator(evaluator,payload["sha256"],split_models)
+                    rows.append(dict(source_sha256=payload["sha256"],split=split,metrics=dict(result.metrics)))
+                    continue
                 copied=seal(work,(root/payload["source_path"]).read_bytes())
                 execution=Execution(work/"jobs",frozen["image"])
                 # The resolved Docker image digest must match every phase.

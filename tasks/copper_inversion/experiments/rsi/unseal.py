@@ -203,6 +203,7 @@ def unseal_references(root, protocol_id, refs_path, selections_path, *, operator
         if any(e.get("experiment") == "REF" for e in _log(paths["unseal_log"])):
             raise ValueError("REF has already been unsealed or started")
         common = {"experiment": "REF", "protocol_id": protocol_id, "references_sha256": file_hash(refs_path),
+                  "reference_kinds": {n: ("precomputed" if "fields" in r else "source") for n, r in sorted(refs.items())},
                   "selection_roots": {n: str(p) for n, p in targets.items()},
                   "frozen_sha256": frozen_hashes, "selection_sha256": selection_hashes,
                   "operator": operator or pwd.getpwuid(os.geteuid()).pw_name, "uid": os.geteuid()}
