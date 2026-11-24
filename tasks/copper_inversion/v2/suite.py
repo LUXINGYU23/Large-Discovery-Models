@@ -5,6 +5,7 @@ and aggregate training feedback, never this manifest or its truth directories.
 """
 import hashlib
 import json
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
@@ -14,6 +15,7 @@ from ldm_tts.engine.run_store import atomic_json_write
 from ..core.execution import digest, source_identity, freeze_model
 from ..core.geometry import read_model
 from ..rsi.case_isolation import opaque_case_id
+from .contract import LEGACY_OBJECTIVE, OBJECTIVE, OBJECTIVE_VERSIONS
 from .data import canonical_problem, read_problem, save_problem
 
 
@@ -22,11 +24,23 @@ def file_hash(path):
 
 
 OBJECTIVES=("confirmation","oracle_iou")
-AGGREGATIONS={"confirmation":"parent-macro-confirmation-utility-v1","oracle_iou":"parent-macro-oracle-iou-v1"}
+AGGREGATIONS={"confirmation":"parent-macro-line-jaccard-v1","oracle_iou":"parent-macro-oracle-iou-v1"}
+LEGACY_CONFIRMATION_AGGREGATION="parent-macro-confirmation-utility-v1"
 TIER_FIELDS={"solver_seconds","train_manifest","train_bodies","validation_manifest","sealed_manifests","slots"}
 
 
-def aggregate(rows):
+def row_objective_version(row,default=LEGACY_OBJECTIVE):
+    metrics=row.get("metrics") if isinstance(row.get("metrics"),dict) else {}
+    return row.get("objective_version") or metrics.get("confirmation_objective_version") or metrics.get("objective_version") or default
+
+
+def confirmation_utility(loss,objective_version=OBJECTIVE):
+    if objective_version==OBJECTIVE:return float(np.clip(1.-loss,0.,1.))
+    if objective_version==LEGACY_OBJECTIVE:return 1./(1.+loss)
+    raise ValueError("unknown evaluation objective version")
+
+
+def aggregate(rows,*,objective_version=None):
     """One vote per geology parent, including every planned failed solve."""
     if not rows:
         raise ValueError("empty evaluation suite")
@@ -35,6 +49,14 @@ def aggregate(rows):
     if len(objectives)!=1 or not objectives<=set(OBJECTIVES):
         raise ValueError("mixed or unknown evaluation objective")
     objective=objectives.pop()
+    if objective=="confirmation":
+        if objective_version is None:
+            versions={row_objective_version(row) for row in rows}
+            if len(versions)!=1 or not versions<=set(OBJECTIVE_VERSIONS):
+                raise ValueError("mixed or unknown evaluation objective version")
+            objective_version=versions.pop()
+        elif objective_version not in OBJECTIVE_VERSIONS:
+            raise ValueError("unknown evaluation objective version")
     grouped={}
     for row in rows:
         grouped.setdefault(row["parent_id"],[]).append(row)
@@ -46,7 +68,7 @@ def aggregate(rows):
         loss=row['metrics'].get('confirmation_loss_total')
         if not isinstance(loss,(int,float)) or not np.isfinite(loss) or loss<0:
             raise ValueError('independent confirmation objective is missing or invalid')
-        return 1./(1.+loss)
+        return confirmation_utility(loss,objective_version)
     # Bound the loss without dropping failed solves or choosing a numerical
     # penalty scale. Each parent has equal weight. IoU is diagnostic only,
     # except for the deliberately unblinded oracle judge (risk = 1 - IoU).
@@ -143,13 +165,13 @@ def load_manifest(path,packs_per_body=None):
     manifest=json.loads(path.read_text())
     if set(manifest)!={"schema","stage","split","seeds","cases"} or manifest["schema"]!="copper-suite-v2":
         raise ValueError("invalid suite manifest schema")
-    if manifest["stage"] not in {"development","formal"} or manifest["split"] not in {"train","validation","test_id","test_ood"}:
+    if manifest["stage"] not in {"development","formal"} or manifest["split"] not in {"train","calibration","calibration_ood","validation","test_id","test_ood"}:
         raise ValueError("invalid suite scope")
     seeds=manifest["seeds"]
     if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int or s<0 for s in seeds):
         raise ValueError("invalid execution seeds")
     if not manifest["cases"]:raise ValueError("empty suite")
-    seen=set();parents={}; parent_geometry={}
+    seen=set();parents={}; parent_geometry={}; objective_versions=set()
     for row in manifest["cases"]:
         if set(row)!={"case_id","parent_id","modality","public","truth","sha256"}:
             raise ValueError("invalid suite member")
@@ -162,6 +184,10 @@ def load_manifest(path,packs_per_body=None):
         expected={"problem.json","problem.npz","truth.npy"}
         if manifest["stage"]=="formal" or any(k.startswith('confirmation/') for k in row['sha256']):
             expected|={"confirmation/problem.json","confirmation/problem.npz"}
+            for k in row["sha256"]:
+                parts=k.split("/")
+                if len(parts)==3 and parts[0]=="confirmation" and parts[1] and parts[2] in ("problem.json","problem.npz"):
+                    expected|={f"confirmation/{parts[1]}/problem.json",f"confirmation/{parts[1]}/problem.npz"}
         if set(row["sha256"])!=expected:raise ValueError("missing dataset digests")
         for filename in expected:
             folder=row["truth"] if filename=="truth.npy" or filename.startswith("confirmation/") else row["public"]
@@ -169,12 +195,15 @@ def load_manifest(path,packs_per_body=None):
                 raise ValueError("dataset digest mismatch")
         problem=read_problem(path.parent/row["public"])
         if problem["case_id"]!=row["case_id"]:raise ValueError("public request id differs")
+        objective_versions.add(problem["objective_version"])
         geometry=digest(dict(truth=row["sha256"]["truth.npy"],shape=problem["shape"],
             origin=problem["origin"],spacing=problem["spacing"],
             domain=hashlib.sha256(problem["domain_mask"].tobytes()).hexdigest(),
             forbidden=hashlib.sha256(problem["forbidden_mask"].tobytes()).hexdigest()))
         previous=parent_geometry.setdefault(row["parent_id"],geometry)
         if previous!=geometry:raise ValueError("one parent has inconsistent geometry across observation packs")
+    if len(objective_versions)!=1:
+        raise ValueError("mixed objective versions across suite cases")
 
     packs=release_packs(path,manifest["stage"]) if packs_per_body is None else packs_per_body
     if packs==1:
@@ -197,7 +226,7 @@ class SuiteEvaluator:
     case_workers=4
 
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
-                 *,anonymize_cases=False,canonical_origin=False):
+                 *,anonymize_cases=False,canonical_origin=False,objective_version=None):
         if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
             raise ValueError("invalid case isolation flags")
         self.root=Path(root);self.execution=execution
@@ -207,6 +236,14 @@ class SuiteEvaluator:
         if any('confirmation/problem.npz' not in case['sha256'] for case in self.manifest['cases']):
             raise ValueError('independent confirmation measurements required for evaluation')
         if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
+        manifest_objective=read_problem(self.manifest_path.parent/self.manifest["cases"][0]["public"])["objective_version"]
+        if objective_version is None:
+            self.objective_version=manifest_objective
+        elif objective_version not in OBJECTIVE_VERSIONS:
+            raise ValueError("unknown evaluation objective version")
+        else:
+            self.objective_version=objective_version
+        self._explicit_objective_version=objective_version is not None
         self.seconds=seconds;self.objective=objective
         self.anonymize_cases=anonymize_cases;self.canonical_origin=canonical_origin
         release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
@@ -221,8 +258,13 @@ class SuiteEvaluator:
         elif self.manifest["stage"]=="formal" and seconds!=120:
             raise ValueError("formal solver budget is fixed at 120 seconds")
         if seconds<=0:raise ValueError("invalid solver budget")
+        aggregation=(LEGACY_CONFIRMATION_AGGREGATION
+                     if objective=="confirmation" and self.objective_version==LEGACY_OBJECTIVE
+                     else AGGREGATIONS[objective])
         self.context=dict(manifest=digest(self.manifest),implementation=source_identity(),
-            image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=AGGREGATIONS[objective])
+            image=execution.image,seconds=seconds,cpus=2,memory_mb=4096,aggregation=aggregation)
+        if self._explicit_objective_version or self.objective_version!=LEGACY_OBJECTIVE:
+            self.context["objective_version"]=self.objective_version
         if purpose is not None:self.context["purpose"]=purpose
         if anonymize_cases:self.context["anonymize_cases"]=True
         if canonical_origin:self.context["canonical_origin"]=True
@@ -251,12 +293,18 @@ class SuiteEvaluator:
             if row_path.exists():return json.loads(row_path.read_text())
             inputs=case_root/"input"
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
+            scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
+                            else {**raw_problem,"objective_version":self.objective_version})
             if self.anonymize_cases or self.canonical_origin:
                 cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
-                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin)
+                problem=canonical_problem(scored_problem,case_id=cid,canonical_origin=self.canonical_origin)
                 save_problem(problem,inputs)
                 score_inputs=case_root/"score-input"
-                save_problem(raw_problem,score_inputs)
+                save_problem(scored_problem,score_inputs)
+            elif scored_problem is not raw_problem:
+                problem=scored_problem
+                save_problem(problem,inputs)
+                score_inputs=inputs
             else:
                 problem=raw_problem
                 save_problem(problem,inputs)
@@ -268,6 +316,8 @@ class SuiteEvaluator:
                 status="failed",metrics={"iou":0.},solver_wall_seconds=r["wall_seconds"],jobs=1,
                 solver_resources=r.get("workload_resources"),error="solver failed")
             if self.objective!="confirmation":row["objective"]=self.objective
+            if self._explicit_objective_version or self.objective_version!=LEGACY_OBJECTIVE:
+                row["objective_version"]=self.objective_version
             if r["reason"]=="timeout":row["status"]="timed_out"
             if not (r["exit_code"] or r["reason"] or r["oom"]):
                 try:
@@ -281,8 +331,18 @@ class SuiteEvaluator:
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
+                    truth_dir=self.manifest_path.parent/case["truth"]
+                    if raw_problem["objective_version"]!=self.objective_version:
+                        score_truth=case_root/"score-truth";score_truth.mkdir(parents=True,exist_ok=True)
+                        if (truth_dir/"truth.npy").exists():
+                            shutil.copy2(truth_dir/"truth.npy",score_truth/"truth.npy")
+                        conf=read_problem(truth_dir/"confirmation")
+                        save_problem({**conf,"objective_version":self.objective_version},score_truth/"confirmation")
+                        for p in [score_truth,*score_truth.rglob("*")]:
+                            p.chmod(0o755 if p.is_dir() else 0o644)
+                        truth_dir=score_truth
                     scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
-                        truth=self.manifest_path.parent/case["truth"],row_path=row_path)
+                        truth=truth_dir,row_path=row_path)
                     if merged:return row,scoring
                     score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=score_inputs,
                         model=case_root/"model",truth=scoring["truth"],timeout=30,science_module="v2")
@@ -323,12 +383,15 @@ class SuiteEvaluator:
                 rows[index]=row
         jobs=sum(row["jobs"] for row in rows)
         wall=sum(row["solver_wall_seconds"] for row in rows)
-        metrics=aggregate(rows)
+        metrics=aggregate(rows,objective_version=self.objective_version if self.objective=="confirmation" else None)
         # Individual solver failures are scored zero within a successfully
         # completed suite. They must not disappear from BO's observed dataset.
+        meta={EVALUATION_ATTEMPT_RECEIPT_KEY:key,"suite_digest":self.context["manifest"]}
+        if self._explicit_objective_version or self.objective_version!=LEGACY_OBJECTIVE:
+            meta["objective_version"]=self.objective_version
         result=EvaluationResult(candidate.candidate_id,"succeeded",metrics=metrics,
             resource_usage=dict(benchmark_jobs=jobs,solver_wall_seconds=wall,suite_evaluations=1),
-            artifacts={},metadata={EVALUATION_ATTEMPT_RECEIPT_KEY:key,"suite_digest":self.context["manifest"]})
+            artifacts={},metadata=meta)
         atomic_json_write(root/"private-case-results.json",rows)
         atomic_json_write(result_path,result.to_dict())
         return result

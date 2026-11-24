@@ -17,11 +17,14 @@ NumPy, SciPy, scikit-fmm, and discretize are available to solvers. The per-solve
 wall time, CPU count, and memory limit are given by `budget`.
 
 An independent evaluator scores a frozen result against withheld confirmation
-measurements using the same public priors. If its loss is L, risk is L/(1+L),
-averaged within each geology body and then equally across bodies. A failed solve
-counts as risk 1. Only the aggregate risk across the evaluation suite is
-reported for measured programs. Neither the withheld data nor reference geometry
-is available to the researcher or the solver.
+measurements using the same public priors and `objective.score`: noise-corrected
+line-Jaccard loss `1 - (TP + 1) / (TP + FP + FN + 1)` on binary samples outside
+the observed-contact tolerance band, weighted by modality, plus any active prior
+penalties. Risk is that loss averaged within each geology body and then equally
+across bodies; a failed or illegal solve counts as risk 1. Only the aggregate
+risk across the evaluation suite is reported for measured programs. Neither the
+withheld data nor reference geometry is available to the researcher or the
+solver.
 
 Write the requested complete programs to `candidates/<index>/solver.py` and
 submit them with the prescribed metadata and risk intervals; the i-th submitted

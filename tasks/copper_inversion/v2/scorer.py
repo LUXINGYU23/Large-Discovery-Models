@@ -14,7 +14,11 @@ from .metrics import compare
 from ..core.geometry import read_model
 
 
-def score_case(inputs, model, truth_root):
+CONFIRMATION_KEYS = {"loss_binary", "loss_contact", "loss_jaccard", "tp", "fp", "fn", "loss_total", "objective_version"}
+CONFIRMATION_SUFFIXES = ("_label_error", "_contact_rmse", "_tp", "_fp", "_fn", "_kept_samples")
+
+
+def score_case(inputs, model, truth_root, *, objective_version=None):
     """One case; bad trusted data raises (infrastructure), a bad model is invalid."""
     problem = read_problem(inputs)
     # Bad trusted data is an infrastructure failure, never a candidate penalty.
@@ -28,6 +32,8 @@ def score_case(inputs, model, truth_root):
     confirmation_path=Path(truth_root) / "confirmation"
     confirmation=read_problem(confirmation_path) if confirmation_path.exists() else None
     if confirmation is not None:
+        if confirmation["objective_version"] != problem["objective_version"]:
+            raise ValueError("confirmation objective version differs")
         if confirmation['priors']!=problem['priors']:
             raise ValueError('confirmation geological priors differ')
         if any(confirmation[key]!=problem[key] for key in ("shape","spacing","origin")):
@@ -36,13 +42,13 @@ def score_case(inputs, model, truth_root):
             if not np.array_equal(confirmation[key],problem[key]):raise ValueError("confirmation masks differ")
     try:
         field = read_model(Path(model) / "model.npy", problem["shape"])
-        metrics = score(problem, field)
+        metrics = score(problem, field, objective_version=objective_version)
         if truth is not None:
             metrics.update(compare(problem, field, truth))
         if confirmation is not None:
-            hidden=score(confirmation,field)
+            hidden=score(confirmation,field,objective_version=objective_version)
             metrics.update({"confirmation_"+key:value for key,value in hidden.items()
-                            if key in {"loss_binary","loss_contact","loss_total"} or key.endswith(("_label_error","_contact_rmse"))})
+                            if key in CONFIRMATION_KEYS or key.endswith(CONFIRMATION_SUFFIXES)})
         return dict(status="succeeded", metrics=metrics)
     except ValueError as exc:
         return dict(status="invalid", error=str(exc), metrics={"iou": 0.} if truth is not None else {})

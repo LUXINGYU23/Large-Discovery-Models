@@ -1,9 +1,9 @@
 """Fixed public interface inputs; no benchmark parent, truth, or held-out data."""
 import numpy as np
-from .contract import validate
+from .contract import OBJECTIVE, validate
 from .geological_policy import public_priors
 
-FIXTURE_VERSION = "copper-v2-interface-2"
+FIXTURE_VERSION = "copper-v2-interface-3"
 
 
 def fixtures():
@@ -31,15 +31,21 @@ def fixtures():
             points.append([2 + j % (shape[0] - 4), 3, 3])
             labels.append(.5)
             groups.append(j % 3)
+        observations = [dict(name="drill", points=origin + (np.asarray(points) + .5) * spacing,
+            labels=np.asarray(labels), groups=np.asarray(groups), weight=1.,
+            transition_scale=scale, contact_sigma=scale, label_error=0.)]
+        if index == 3:
+            observations.append(dict(name="outcrop",
+                points=origin + (np.asarray([[1, 1, shape[2] - 2], [4, 4, shape[2] - 2]]) + .5) * spacing,
+                labels=np.asarray([0., 1.]), groups=np.asarray([0, 1]), weight=.25,
+                transition_scale=scale, contact_sigma=scale, label_error=.02))
         problem = dict(
             schema_version="problem_schema_v2", geometry_version="occupancy_v2",
-            objective_version="objective_v2", case_id=f"public-interface-{index}",
+            objective_version=OBJECTIVE, case_id=f"public-interface-{index}",
             shape=shape, origin=origin.tolist(), spacing=spacing.tolist(),
             domain_mask=np.ones(shape, dtype=bool), forbidden_mask=forbidden,
             open_boundary_faces=faces,
-            observations=[dict(name="drill", points=origin + (np.asarray(points) + .5) * spacing,
-                labels=np.asarray(labels), groups=np.asarray(groups), weight=1.,
-                transition_scale=scale, contact_sigma=scale, label_error=0.)],
+            observations=observations,
             priors=dict(area_weight=.02, volume_weight=0., volume_bounds=None,
                 fragment_weight=0., fragment_volume=0., hard_volume_bounds=None, max_components=None),
         )

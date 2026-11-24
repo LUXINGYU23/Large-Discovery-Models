@@ -50,7 +50,7 @@
     ],
     "settings": {
       "problem_schema": "problem_schema_v2",
-      "objective_version": "objective_v2",
+      "objective_version": "objective_v3",
       "outer_objective": "1 - parent macro IoU; failures count zero",
       "encoding": "AST/Qwen equal-weight fusion only",
       "stage": "development or independently qualified synthetic formal release"

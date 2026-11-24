@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import numpy as np
 from .geology import model_from_metadata, query_ore, terrain_height
+from tasks.copper_inversion.v2.contract import OBJECTIVE
 from tasks.copper_inversion.v2.data import save_problem
 from .measurement_policy import scales
 from tasks.copper_inversion.v2.geological_policy import public_priors,POLICY_VERSION
@@ -91,7 +92,7 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
     normalized=(xyz[:,:2]-origin[:2])/(np.asarray(shape[:2])*spacing[:2])
     spatial_groups=(normalized[:,0]*4).astype(int)*4+(normalized[:,1]*4).astype(int)
     outcrop=dict(name="outcrop",points=xyz,labels=surface_labels,groups=spatial_groups,
-        weight=1.,transition_scale=effective_scale,contact_sigma=effective_scale,label_error=noise_rate)
+        weight=.25,transition_scale=effective_scale,contact_sigma=effective_scale,label_error=noise_rate)
     output.mkdir(parents=True,exist_ok=False)
     truth_dir=output/"private";truth_dir.mkdir();np.save(truth_dir/"truth.npy",truth)
     manifest=dict(stage="development-only",parent_digest=meta["geometry_sha256"],observation_seed=seed,
@@ -99,7 +100,7 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
         scale_policy=scale_policy,area_prior_enabled=False,geological_policy=POLICY_VERSION,cases=[])
     for name,observations in (("drill",[observation]),("drill_outcrop",[observation,outcrop])):
         identifier=hashlib.sha256((meta["geometry_sha256"]+name+str(seed)+manifest["observation_recipe"]+manifest["noise"]+coverage+POLICY_VERSION).encode()).hexdigest()[:20]
-        problem=dict(schema_version="problem_schema_v2",geometry_version="occupancy_v2",objective_version="objective_v2",
+        problem=dict(schema_version="problem_schema_v2",geometry_version="occupancy_v2",objective_version=OBJECTIVE,
             case_id=identifier,shape=list(shape),origin=origin.tolist(),spacing=spacing.tolist(),
             domain_mask=np.ones(shape,bool),forbidden_mask=forbidden,
             open_boundary_faces=["x-","x+","y-","y+","z-","z+"],observations=observations,

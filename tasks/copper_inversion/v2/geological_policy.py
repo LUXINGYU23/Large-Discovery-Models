@@ -10,6 +10,10 @@ import numpy as np
 POLICY_VERSION = 'synthetic-volume-connectivity-1'
 MAX_COMPONENTS = 4
 VOLUME_FRACTIONS = (.02, .65)
+# Registered fallback only if calibration validity fails C2: area_weight=0.05
+# with hinge at 1.1 * max calibration regularizer_area. All weights stay 0.
+FALLBACK_AREA_WEIGHT = .05
+FALLBACK_AREA_HINGE_SCALE = 1.1
 
 
 def public_priors(feasible, spacing):
