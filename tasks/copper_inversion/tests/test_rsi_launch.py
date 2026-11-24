@@ -222,8 +222,20 @@ class FakeProcess:
 class FakeHost:
     """Scripted services and controllers; records every spawn."""
 
-    def __init__(self, root, outcomes):
+    def __init__(self, root, outcomes, *, free_disk_bytes=500 * 1024 ** 3, probe_error=None):
         self.root, self.outcomes, self.spawned, self.live, self.next = Path(root), outcomes, [], set(), 100
+        self.free_disk_bytes = free_disk_bytes
+        self.probe_error = probe_error
+        self.probed = []
+
+    def free_bytes(self, path):
+        return self.free_disk_bytes
+
+    def probe_provider(self, base_url, model, api_key_file):
+        self.probed.append((base_url, model, str(api_key_file)))
+        if self.probe_error is not None:
+            raise launch.PlanError(self.probe_error)
+        return {"status": 200, "url": base_url.rstrip("/") + "/responses", "model": model}
 
     def account(self, user):
         return {"evaluator": (991, 991, [991]), "client": (1001, 1001, [1001])}[user]
@@ -446,3 +458,251 @@ def test_archive_refuses_unfinished_or_unreconciled_runs(tmp_path):
     with pytest.raises(ValueError, match="frozen"):
         archive.create(root, tmp_path / "archive", pid, exp, name)
     assert not (tmp_path / "archive" / pid / exp / name / "archive-manifest.json").exists()
+
+
+# G1 provider pause and launcher pre-flight -----------------------------------------
+
+def _mock_provider(responses_list):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    received = []
+    remaining = list(responses_list)
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+            received.append({"path": self.path, "body": json.loads(raw.decode("utf-8")) if raw else None})
+            status, body = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+            encoded = json.dumps(body).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, f"http://127.0.0.1:{server.server_port}", received
+
+
+def test_workflow_402_writes_pause_file_and_launcher_classifies_as_paused(tmp_path, monkeypatch, capsys):
+    from ldm_tts.harness.protocol import HarnessError
+    from tasks.copper_inversion.rsi import workflow
+
+    policy = launch.make_policy(VALUES, tmp_path / "queue", tmp_path / "policy.json")
+    queue = Path(policy["queue_root"])
+    monkeypatch.setenv("LDM4GEO_SCHEDULING_POLICY", str(tmp_path / "policy.json"))
+
+    # Part 1: real workflow.main() catches HTTP 402 HarnessError, pauses the scheduler using JobQueue.pause,
+    # writes run-status.json with reason="provider_balance", closes sidecars, and returns exit code 75 cleanly.
+    out_dir = tmp_path / "run-402"
+    out_dir.mkdir()
+    key_file = tmp_path / "api.key"
+    key_file.write_text("fixture-key\n")
+    model_dir = tmp_path / "emb"
+    model_dir.mkdir()
+    (model_dir / "provenance.json").write_text("{}")
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps({"stage": "development", "cases": []}))
+
+    closed = []
+
+    class FakeRiskClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def verify_contract(self, *args, **kwargs):
+            return {"used_slots": 0}
+
+    class FakePiAgent:
+        forbidden_case_tokens = frozenset()
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def close(self):
+            closed.append(True)
+
+    class FakeController:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, resume=False):
+            raise HarnessError(
+                'Error: provider response failed: OpenAI API error (402): '
+                '{"message":"Insufficient Balance","type":"insufficient_balance_error"}',
+                retryable=False,
+                provider_error="provider_balance",
+            )
+
+    monkeypatch.setattr(workflow, "prepare", lambda args: {
+        "protocol": {"hashes": {}, "tiers": {"S": {"train_bodies": 1}}, "layout": {"packs_per_body": 1}},
+        "config": Config("ldm4geo", 7, rounds=1, proposals_per_branch=1, batch=4, reset_period=1, token_cap_input=0),
+        "solver_seconds": 10,
+        "manifest": {"tier": "S", "case_isolation": {}},
+        "agent": {"base_url": "http://127.0.0.1:1", "model": "deepseek-flash", "thinking": "low", "bash_calls": 1},
+        "continuation": None,
+    })
+    monkeypatch.setattr(workflow, "load_catalog", lambda path: {"stage": "development", "cases": []})
+    monkeypatch.setattr(workflow, "catalog_digest", lambda path: "b" * 64)
+    monkeypatch.setattr(workflow, "RiskClient", FakeRiskClient)
+    monkeypatch.setattr(workflow, "PiAgent", FakePiAgent)
+    monkeypatch.setattr(workflow, "CodeEncoder", lambda *args, **kwargs: object())
+    monkeypatch.setattr(workflow, "Controller", FakeController)
+    monkeypatch.setattr(workflow, "docker", lambda *args, **kwargs: SimpleNamespace(stdout="sha256:" + "a" * 64))
+    monkeypatch.setattr(workflow, "_shared_implementation", lambda: "c" * 64)
+
+    rc = workflow.main([
+        "--protocol", str(EXAMPLE), "--experiment", "smoke", "--arm", "ldm4geo", "--tier", "S", "--seed", "7",
+        "--out-dir", str(out_dir), "--public-catalog", str(catalog), "--evaluation-socket", str(tmp_path / "e.sock"),
+        "--evaluation-contract", "0" * 64, "--evaluation-service-uid", str(999999),
+        "--embedding-model-path", str(model_dir), "--sidecar-image", "sidecar:test",
+        "--harness-cache-dir", str(tmp_path / "cache"), "--api-key-file", str(key_file),
+    ])
+    assert rc == workflow.PROVIDER_PAUSE_EXIT_CODE
+    assert closed == [True]
+    paused_file = queue / "PAUSED.json"
+    assert paused_file.is_file()
+    paused_data = json.loads(paused_file.read_text())
+    assert "provider_balance" in paused_data["error"]
+    assert "402" in paused_data["error"]
+    fault_files = list(queue.glob("fault-*.json"))
+    assert len(fault_files) == 1
+    assert fault_files[0].stat().st_ino == paused_file.stat().st_ino
+    run_status = json.loads((out_dir / "run-status.json").read_text())
+    assert run_status == {"status": "paused", "reason": "provider_balance", "error_type": "HarnessError"}
+    stderr_payload = json.loads(capsys.readouterr().err.strip())
+    assert stderr_payload["status"] == "paused" and stderr_payload["reason"] == "provider_balance"
+    assert launch.unpause(queue)["status"] == "unpaused"
+
+    # Part 2: Launcher classifies exit code 75 + PAUSED.json + run-status.json as an infrastructure pause.
+    root = tmp_path / "active"
+    site = {"root": str(root), "release": str(tmp_path / "release"), "source": str(tmp_path), "service_python": "py-e",
+            "client_python": "py-c", "service_user": "evaluator", "client_user": "client", "image": IMAGE,
+            "sidecar_image": "sidecar@sha256", "embedding_model_path": "/models/e", "harness_cache_dir": "/cache",
+            "api_key_file": str(key_file), "policy": str(tmp_path / "policy.json"),
+            "public_catalogs": {"S": "/catalogs/S.json"}}
+    batch = tmp_path / "batch.json"
+    batch.write_text(json.dumps(plan([("ldm4geo", "standard", 7), ("accumulated", "standard", 7)], experiment="smoke")))
+
+    class Pause402Host(FakeHost):
+        def spawn(self, user, argv, *, env, log, cwd):
+            mode = next(m for m in argv[argv.index(launch.RUNTIME_MODULE) + 1:]
+                        if m in ("rsi-service", "rsi", "rsi-freeze"))
+            if mode == "rsi":
+                self.next += 1
+                self.spawned.append((user, argv))
+                run = Path(argv[argv.index("--out-dir") + 1])
+                outcome = self.outcomes[run.name].pop(0)
+                run.mkdir(parents=True, exist_ok=True)
+                if outcome == "402":
+                    parallel_runtime.JobQueue(self.queue, 1, 1).pause(
+                        "provider_balance: OpenAI API error (402): Insufficient Balance"
+                    )
+                    (run / "run-status.json").write_text(json.dumps({
+                        "status": "paused", "reason": "provider_balance", "error_type": "HarnessError",
+                    }))
+                    return FakeProcess(self.next, workflow.PROVIDER_PAUSE_EXIT_CODE)
+                (run / "run-status.json").write_text(json.dumps({"status": "completed", "stop_reason": "completed"}))
+                return FakeProcess(self.next, 0)
+            return super().spawn(user, argv, env=env, log=log, cwd=cwd)
+
+    host = Pause402Host(root, {"ldm4geo-s7": ["402", "ok"], "accumulated-s7": ["ok"]})
+    host.queue = policy["queue_root"]
+    launcher = launch.Launcher(site, batch, host=host)
+    with pytest.raises(RuntimeError, match="ldm4geo-s7"):
+        launcher.start()
+    state = launcher.status()
+    assert state["paused"] is True
+    assert state["stage"] == "needs_reconciliation"
+    assert state["runs"]["ldm4geo-s7"]["status"] == "needs_reconciliation"
+    assert state["runs"]["ldm4geo-s7"]["exit_code"] == workflow.PROVIDER_PAUSE_EXIT_CODE
+    assert state["runs"]["ldm4geo-s7"]["run_status"]["status"] == "paused"
+    assert state["runs"]["ldm4geo-s7"]["run_status"]["reason"] == "provider_balance"
+    with pytest.raises(launch.PlanError, match="paused"):
+        launcher.resume()
+    launch.unpause(policy["queue_root"])
+    resumed = launch.Launcher(site, batch, host=host).resume()
+    assert all(entry["status"] == "finished" for entry in resumed["runs"].values())
+
+
+def test_launcher_check_and_resume_preflight_refuses_failed_probe_and_low_disk(tmp_path, monkeypatch):
+    from tasks.copper_inversion.rsi import workflow
+
+    monkeypatch.setattr(workflow, "prepare", lambda args: None)
+    server, base_url, received = _mock_provider([
+        (402, {"message": "Insufficient Balance", "type": "insufficient_balance_error"}),
+        (200, {"id": "resp_ok", "status": "completed"}),
+        (503, {"message": "service unavailable"}),
+        (200, {"id": "resp_resume", "status": "completed"}),
+    ])
+    try:
+        proto_data = protocol()
+        proto_data["model"]["base_url"] = base_url
+        proto_path = tmp_path / "protocol.json"
+        proto_path.write_text(json.dumps(proto_data))
+
+        root = tmp_path / "active"
+        root.mkdir()
+        policy = launch.make_policy(VALUES, tmp_path / "queue", tmp_path / "policy.json")
+        key_file = tmp_path / "provider.key"
+        key_file.write_text("sk-test-preflight\n")
+        site = {"root": str(root), "release": str(tmp_path / "release"), "source": str(tmp_path),
+                "service_python": "py-e", "client_python": "py-c", "service_user": "evaluator",
+                "client_user": "client", "image": IMAGE, "sidecar_image": "sidecar@sha256",
+                "embedding_model_path": "/models/e", "harness_cache_dir": "/cache",
+                "api_key_file": str(key_file), "policy": str(tmp_path / "policy.json"),
+                "public_catalogs": {"S": "/catalogs/S.json"}}
+        batch_data = plan([("ldm4geo", "standard", 7)], experiment="smoke")
+        batch_data["protocol"] = str(proto_path)
+        batch = tmp_path / "batch.json"
+        batch.write_text(json.dumps(batch_data))
+
+        real_host = launch.Host()
+        # 1. Low disk (< 150 GiB) refuses check() before hitting provider.
+        monkeypatch.setattr(shutil, "disk_usage", lambda p: SimpleNamespace(
+            total=500 * 1024 ** 3, used=400 * 1024 ** 3, free=100 * 1024 ** 3))
+        launcher = launch.Launcher(site, batch, host=real_host)
+        with pytest.raises(launch.PlanError, match="insufficient free disk space"):
+            launcher.check()
+        assert received == []
+
+        # 2. Enough disk (>= 150 GiB), but provider probe returns 402 -> check() refuses.
+        monkeypatch.setattr(shutil, "disk_usage", lambda p: SimpleNamespace(
+            total=500 * 1024 ** 3, used=200 * 1024 ** 3, free=200 * 1024 ** 3))
+        with pytest.raises(launch.PlanError, match="provider pre-flight probe failed"):
+            launcher.check()
+        assert len(received) == 1 and received[0]["body"]["max_output_tokens"] == 1
+
+        # 3. Provider probe returns 200 and disk >= 150 GiB -> check() succeeds.
+        summary = launcher.check()
+        assert summary["preflight"]["free_gib"] == 200.0
+        assert summary["preflight"]["provider_probe"]["status"] == 200
+        assert len(received) == 2
+
+        # 4. resume() refuses on failed provider probe (503) and on low disk.
+        with pytest.raises(launch.PlanError, match="provider pre-flight probe failed"):
+            launcher.resume()
+        assert len(received) == 3
+
+        monkeypatch.setattr(shutil, "disk_usage", lambda p: SimpleNamespace(
+            total=500 * 1024 ** 3, used=450 * 1024 ** 3, free=50 * 1024 ** 3))
+        with pytest.raises(launch.PlanError, match="insufficient free disk space"):
+            launcher.resume()
+        assert len(received) == 3
+
+        # 5. Once disk is healthy and probe returns 200, resume() passes preflight (and calls _resume).
+        monkeypatch.setattr(shutil, "disk_usage", lambda p: SimpleNamespace(
+            total=500 * 1024 ** 3, used=200 * 1024 ** 3, free=200 * 1024 ** 3))
+        resumed = []
+        monkeypatch.setattr(launcher, "_resume", lambda: resumed.append(True) or {"status": "ok"})
+        assert launcher.resume() == {"status": "ok"}
+        assert resumed == [True] and len(received) == 4
+    finally:
+        server.shutdown()
+        server.server_close()

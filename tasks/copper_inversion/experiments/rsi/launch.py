@@ -37,6 +37,7 @@ import multiprocessing
 import os
 import pwd
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -46,6 +47,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.harness.client import probe_provider as _probe_provider
+from ldm_tts.harness.protocol import HarnessError
 from tasks.copper_inversion.core import execution
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import FULL, layout
@@ -64,6 +67,7 @@ POLICY_REQUIRED = ("queue_root", "global_jobs", "interface_slots", "startup_slot
 RUNTIME = Path(__file__).resolve().parents[1] / "v2" / "parallel_runtime.py"
 RUNTIME_MODULE = "tasks.copper_inversion.experiments.v2.parallel_runtime"
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+MIN_FREE_DISK_BYTES = 150 * 1024 ** 3
 
 
 class PlanError(ValueError):
@@ -306,6 +310,24 @@ class Host:
     def sleep(self, seconds):
         time.sleep(seconds)
 
+    def free_bytes(self, path):
+        target = Path(path).resolve()
+        while not target.exists() and target != target.parent:
+            target = target.parent
+        return shutil.disk_usage(target).free
+
+    def probe_provider(self, base_url, model, api_key_file):
+        key_path = Path(api_key_file)
+        if not key_path.is_file():
+            raise PlanError(f"protected model API key file not found: {key_path}")
+        key = key_path.read_text(encoding="utf-8").strip()
+        if not key:
+            raise PlanError("protected model API key file is empty")
+        try:
+            return _probe_provider(base_url, model, key)
+        except HarnessError as exc:
+            raise PlanError(f"provider pre-flight probe failed: {exc}") from exc
+
 
 # Launcher ----------------------------------------------------------------------------
 
@@ -357,6 +379,18 @@ class Launcher:
         paths["socket_dir"] = self.root / "rpc" / digest([self.pid, self.experiment, name])[:12]
         return paths
 
+    def preflight(self):
+        """Require >= 150 GiB free on the active filesystem and a 1-token provider probe."""
+        free = self.host.free_bytes(self.root)
+        if free < MIN_FREE_DISK_BYTES:
+            raise PlanError(
+                f"insufficient free disk space on {self.root}: "
+                f"{free / (1024 ** 3):.1f} GiB free, require >= {MIN_FREE_DISK_BYTES // (1024 ** 3)} GiB"
+            )
+        model = self.protocol["model"]
+        probe = self.host.probe_provider(model["base_url"], model["name"], self.site["api_key_file"])
+        return {"free_gib": round(free / (1024 ** 3), 1), "provider_probe": probe}
+
     def check(self):
         summary = check_batch(self.batch, self.protocol, self.policy)
         summary["load_qualification"] = check_qualification(self.site, self.policy, self.experiment)
@@ -373,6 +407,7 @@ class Launcher:
             # The entry point's own refusals (seed table, freeze, hashes, run name) before any start.
             workflow.prepare(workflow.parse_args(self.controller_argv(name, run, {"socket": "unused",
                              "contract_digest": "0" * 64, "service_uid": 0}, resume=False)[6:]))
+        summary["preflight"] = self.preflight()
         return summary
 
     def manifest_path(self, run):
@@ -566,6 +601,7 @@ class Launcher:
         """After `unpause`: restart dead services and every unfinished controller with --resume."""
         if (Path(self.policy["queue_root"]) / "PAUSED.json").exists():
             raise PlanError("the scheduler is paused; reconcile, then unpause before resume")
+        self.preflight()
         with self.machine():
             return self._resume()
 
