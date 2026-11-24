@@ -8,17 +8,25 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 
+from tasks.copper_inversion.experiments.v2.measurement_policy import DENSITIES, parse_cli_holes, parse_holes
+
 FAMILIES = ("folded", "lens", "multiple", "faulted")
 MODALITIES = ("drill", "drill_outcrop")
 ASSIGNMENT_RULE = "alternate-within-family-v1"
+ASSIGNMENT_RULE_V2 = "alternate-within-family-noise-balanced-v2"
 SHORT_TIER_RULE = "first-n-per-family-by-plan-index-noise-mixed-v1"
 THINNING_RULE = "whole-drill-holes-and-outcrop-spatial-cells-quarter-v1"
-# Author decision (2026-11-15): redraw each body's confirmation from its 16
+ID_SPLITS = ("train", "calibration", "validation", "test_id")
+# Author decision (2026-11-15): redraw each body's confirmation from its
 # presampled streams until the whole-hole audit passes. Failing the release on
 # any overlap (the original plan) remains available as the alternative.
 CONFIRMATION_POLICIES = {
     "fail_release": "first presampled stream only; any overlapping whole hole fails the release",
     "resample_until_separated": "first of 16 presampled streams with no overlapping whole holes",
+}
+CONFIRMATION_POLICIES_MULTI = {
+    "fail_release": "first k presampled streams only; any overlapping or undiscovered pack fails the release",
+    "resample_until_separated": "first k presampled streams separated from public holes and prior packs",
 }
 
 
@@ -29,30 +37,94 @@ def confirmation_mode(plan):
         raise ValueError("confirmation policy was not fixed in the generation plan")
     # Prototype plans carried only the resampling rule string.
     mode = policy.get("mode", "resample_until_separated")
-    if CONFIRMATION_POLICIES.get(mode) != policy.get("rule"):
+    packs = policy.get("packs", 1)
+    expected = CONFIRMATION_POLICIES_MULTI if packs > 1 else CONFIRMATION_POLICIES
+    if expected.get(mode) != policy.get("rule") and CONFIRMATION_POLICIES.get(mode) != policy.get("rule"):
         raise ValueError("unknown confirmation policy")
     return mode
 
 
-def confirmation_streams(entry, mode):
+def confirmation_pack_count(plan):
+    policy = plan.get("confirmation_policy")
+    if not isinstance(policy, dict):
+        return 1
+    packs = policy.get("packs", 1)
+    if type(packs) is not int or packs < 1:
+        raise ValueError("invalid confirmation pack count")
+    return packs
+
+
+def public_min_ore_holes(plan, split):
+    disc = plan.get("discoverability_policy")
+    if not isinstance(disc, dict) or split not in disc.get("id_splits", ID_SPLITS):
+        return 0
+    return int(disc.get("min_public_ore_holes", 0))
+
+
+def confirmation_min_ore_holes(plan, split):
+    disc = plan.get("discoverability_policy")
+    if not isinstance(disc, dict) or split not in disc.get("id_splits", ID_SPLITS):
+        return 0
+    return int(disc.get("min_confirmation_ore_holes", 0))
+
+
+def confirmation_streams(entry, mode, packs=1):
     """Presampled confirmation seeds that a policy may try, in order."""
     seeds = entry["confirmation_seeds"]
-    if len(seeds) != 16 or len(set(seeds)) != 16:
+    if len(seeds) < max(16, packs) or len(set(seeds)) != len(seeds):
         raise ValueError("invalid presampled confirmation streams")
-    return seeds[:1] if mode == "fail_release" else list(seeds)
+    return list(seeds[:packs]) if mode == "fail_release" else list(seeds)
 
 
-def check_confirmation_attempts(receipt, entry, mode, hidden_seed):
-    """A confirmation receipt must follow the plan's policy exactly."""
+def ore_hole_count(problem, manifest=None):
+    """Number of drill boreholes intersecting ore (uses true-ore manifest count when available)."""
+    if isinstance(manifest, dict) and type(manifest.get("ore_holes")) is int:
+        return manifest["ore_holes"]
+    found = [o for o in problem["observations"] if o["name"] == "drill"]
+    if len(found) != 1:
+        raise ValueError("each problem requires one drill observation")
+    drill = found[0]
+    labels = np.asarray(drill["labels"])
+    groups = np.asarray(drill["groups"])
+    binary = labels != .5
+    return int(sum(bool((labels[binary & (groups == g)] == 1).any()) for g in np.unique(groups)))
+
+
+def check_discoverability_attempts(receipt, seeds, min_ore_holes, selected_seed):
+    """A public discoverability receipt must try presampled observation seeds in order."""
+    attempts = receipt.get("attempts", [])
+    tried = [row["seed"] for row in attempts]
+    if not attempts or tried != list(seeds[:len(attempts)]) or selected_seed != tried[-1]:
+        raise ValueError("public observations do not match the preassigned seed stream")
+    if attempts[-1]["status"] != "passed" or attempts[-1].get("ore_holes", 0) < min_ore_holes:
+        raise ValueError("selected public observation pack failed discoverability")
+    if any(row["status"] != "failed" or row.get("ore_holes", 0) >= min_ore_holes for row in attempts[:-1]):
+        raise ValueError("public observation redraw violated discoverability policy")
+
+
+def check_confirmation_attempts(receipt, entry, mode, hidden_seeds, packs=1, min_ore_holes=0):
+    """A confirmation receipt must follow the plan's separation and discoverability policy."""
+    expected = [hidden_seeds] if isinstance(hidden_seeds, int) else list(hidden_seeds)
+    if len(expected) != packs:
+        raise ValueError("confirmation pack count differs from the plan")
     attempts = receipt["attempts"]
     seeds = [row["seed"] for row in attempts]
-    if mode == "fail_release" and len(attempts) > 1:
+    if mode == "fail_release" and len(attempts) > packs:
         raise ValueError("confirmation was redrawn under the fail-release policy")
-    if not attempts or seeds != confirmation_streams(entry, mode)[:len(attempts)] or hidden_seed != seeds[-1]:
+    allowed = confirmation_streams(entry, mode, packs)
+    if not attempts or seeds != allowed[:len(attempts)]:
         raise ValueError("confirmation does not match the preassigned stream policy")
-    if mode == "resample_until_separated" and (attempts[-1]["status"] != "passed"
-                                              or any(row["status"] != "failed" for row in attempts[:-1])):
+    if mode == "fail_release":
+        if seeds != expected:
+            raise ValueError("confirmation does not match the preassigned stream policy")
+        return
+    passed = [row["seed"] for row in attempts if row["status"] == "passed"]
+    if (passed != expected or attempts[-1]["status"] != "passed"
+            or any(row["status"] not in ("passed", "failed") for row in attempts)):
         raise ValueError("confirmation does not match the preassigned separation policy")
+    if min_ore_holes > 0 and any(
+            row.get("ore_holes", min_ore_holes) < min_ore_holes for row in attempts if row["status"] == "passed"):
+        raise ValueError("confirmation pack failed discoverability policy")
 
 
 def spatial_groups(problem, points, grid):
@@ -150,6 +222,56 @@ def audit_holes(public, confirmation):
             "nearest_hole_distance_median": float(np.median(minima))}
 
 
+def audit_pack_pair(first, second):
+    """Symmetric whole-hole separation between two confirmation packs of the same body."""
+    ab, ba = audit_holes(first, second), audit_holes(second, first)
+    overlapping = ab["overlapping_holes"] + ba["overlapping_holes"]
+    distances = ab["nearest_hole_distances"] + ba["nearest_hole_distances"]
+    return {"status": "failed" if overlapping else "passed",
+            "overlapping_holes": overlapping,
+            "forward_overlapping_holes": ab["overlapping_holes"],
+            "reverse_overlapping_holes": ba["overlapping_holes"],
+            "transition_scale": ab["transition_scale"],
+            "nearest_hole_distances": distances,
+            "nearest_hole_distance_min": min(distances),
+            "nearest_hole_distance_median": float(np.median(distances))}
+
+
+def merge_confirmations(problems):
+    """Combine disjoint confirmation packs into one validated problem (for judge X4)."""
+    if not problems:
+        raise ValueError("cannot merge empty confirmation pack list")
+    base = copy.deepcopy(problems[0])
+    for other in problems[1:]:
+        if [o["name"] for o in other["observations"]] != [o["name"] for o in base["observations"]]:
+            raise ValueError("confirmation packs have different observation modalities")
+        for key in ("shape", "origin", "spacing"):
+            if other[key] != base[key]:
+                raise ValueError("confirmation pack geometry differs")
+    for idx, obs in enumerate(base["observations"]):
+        pts, lbls, grps = [], [], []
+        offset = 0
+        for pack in problems:
+            item = pack["observations"][idx]
+            p = np.asarray(item["points"], dtype=float)
+            l = np.asarray(item["labels"], dtype=float)
+            g = np.asarray(item["groups"], dtype=int)
+            pts.append(p)
+            lbls.append(l)
+            if obs["name"] == "drill":
+                unique = np.unique(g)
+                remap = {int(old): offset + k for k, old in enumerate(unique)}
+                grps.append(np.asarray([remap[int(v)] for v in g], dtype=int))
+                offset += len(unique)
+            else:
+                grps.append(g.copy())
+        obs["points"] = np.concatenate(pts, axis=0)
+        obs["labels"] = np.concatenate(lbls, axis=0)
+        obs["groups"] = np.concatenate(grps, axis=0)
+    from tasks.copper_inversion.v2.contract import validate
+    return validate(base)
+
+
 def hole_distance_summary(audits):
     """Distribution of each confirmation hole's closest approach to any public hole."""
     distances = np.asarray([d for row in audits for d in row["nearest_hole_distances"]], float)
@@ -181,10 +303,63 @@ def preselect_short_train(plan, per_family=3, families=FAMILIES):
              "noisy": row["noisy"], "lineage_id": row["lineage_id"]} for row in result]
 
 
-def assign_modalities(plan, seed):
+def _assign_modalities_v2(plan, seed):
+    by_split_family = {}
+    for row in plan["parents"]:
+        by_split_family.setdefault((row["split"], row["family"]), []).append(row)
+    for split in sorted({k[0] for k in by_split_family}):
+        families = sorted(fam for sp, fam in by_split_family if sp == split)
+        both_odd = []
+        single_odd = {False: [], True: []}
+        for family in families:
+            rows = by_split_family[split, family]
+            clean = sorted((r for r in rows if not r["noisy"]), key=lambda r: r["index"])
+            noisy = sorted((r for r in rows if r["noisy"]), key=lambda r: r["index"])
+            if len(clean) % 2 == 0 and len(noisy) % 2 == 0:
+                for flag, sub in ((0, clean), (1, noisy)):
+                    start = hashlib.sha256(f"{seed}:{split}:{family}:{flag}".encode()).digest()[0] % 2
+                    for offset, row in enumerate(sub):
+                        row["selected_modality"] = MODALITIES[(start + offset) % 2]
+            elif len(clean) % 2 == 1 and len(noisy) % 2 == 1:
+                both_odd.append((family, clean, noisy))
+            else:
+                for flag, sub in ((False, clean), (True, noisy)):
+                    if len(sub) % 2 == 0:
+                        start = hashlib.sha256(f"{seed}:{split}:{family}:{int(flag)}".encode()).digest()[0] % 2
+                        for offset, row in enumerate(sub):
+                            row["selected_modality"] = MODALITIES[(start + offset) % 2]
+                    else:
+                        single_odd[flag].append((family, sub))
+        both_odd.sort(key=lambda item: hashlib.sha256(f"{seed}:{split}:{item[0]}".encode()).digest())
+        base_start = hashlib.sha256(f"{seed}:{split}:both_odd".encode()).digest()[0] % 2
+        for idx, (family, clean, noisy) in enumerate(both_odd):
+            m0 = (base_start + idx) % 2
+            for offset, row in enumerate(clean):
+                row["selected_modality"] = MODALITIES[(m0 + offset) % 2]
+            for offset, row in enumerate(noisy):
+                row["selected_modality"] = MODALITIES[(1 - m0 + offset) % 2]
+        odd_start = hashlib.sha256(f"{seed}:{split}:odd".encode()).digest()[0] % 2
+        ordered_single = []
+        for flag in (False, True):
+            ordered_single.extend(sorted(
+                single_odd[flag],
+                key=lambda item: hashlib.sha256(f"{seed}:{split}:{item[0]}:{int(flag)}:odd".encode()).digest()))
+        for idx, (_, sub) in enumerate(ordered_single):
+            m0 = (odd_start + idx) % 2
+            for offset, row in enumerate(sub):
+                row["selected_modality"] = MODALITIES[(m0 + offset) % 2]
+    plan["modality_allocation"] = {"seed": seed, "rule": ASSIGNMENT_RULE_V2}
+    return plan
+
+
+def assign_modalities(plan, seed, rule=ASSIGNMENT_RULE):
     """Fix one observation layout per parent, before generating the parents."""
     if type(seed) is not int or seed < 0:
         raise ValueError("a nonnegative allocation seed is required")
+    if rule == ASSIGNMENT_RULE_V2:
+        return _assign_modalities_v2(plan, seed)
+    if rule != ASSIGNMENT_RULE:
+        raise ValueError("unknown modality assignment rule: " + str(rule))
     groups = {}
     for row in plan["parents"]:
         groups.setdefault((row["split"], row["family"]), []).append(row)
