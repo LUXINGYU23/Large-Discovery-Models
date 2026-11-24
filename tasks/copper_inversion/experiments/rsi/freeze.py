@@ -228,7 +228,8 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
                                   training_manifest=config["manifest"],
                                   objective=judge_objective(manifest, protocol, config), max_candidates=None,
                                   anonymize_cases=isolation["anonymize_cases"],
-                                  canonical_origin=isolation["canonical_origin"])
+                                  canonical_origin=isolation["canonical_origin"],
+                                  randomize_orientation=isolation["randomize_orientation"])
     record["selection_objective"] = frozen.get("selection_objective", "confirmation")
     record["frozen_sha256"] = digest(frozen)
     path = target / "prefix.json"

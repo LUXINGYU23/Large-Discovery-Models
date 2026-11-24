@@ -19,8 +19,9 @@ from tasks.copper_inversion.rsi import continuation as continuations, protocol a
 from tasks.copper_inversion.rsi.agent import parse_submission
 from tasks.copper_inversion.rsi.audit import reconcile_budget, scan_blind, verify_briefs
 from tasks.copper_inversion.rsi.case_isolation import (DEFAULT_CASE_ISOLATION, LEGACY_CASE_ISOLATION,
-                                                       check_source_case_ids, forbidden_case_tokens,
-                                                       opaque_case_id, validate_case_isolation)
+                                                       case_orientation, check_source_case_ids,
+                                                       forbidden_case_tokens, opaque_case_id,
+                                                       validate_case_isolation)
 from tasks.copper_inversion.rsi.controller import Config, Controller
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.rsi.render import render
@@ -33,7 +34,8 @@ from tasks.copper_inversion.tests.test_rsi_service import (FAILING, FIXED, IMAGE
 from tasks.copper_inversion.tests.test_v2_science import fixture
 from tasks.copper_inversion.v2.baselines import initialize
 from tasks.copper_inversion.v2.contract import validate
-from tasks.copper_inversion.v2.data import canonical_problem, read_problem, save_problem
+from tasks.copper_inversion.v2.data import (ORIENTATION_COUNT, apply_orientation, canonical_problem,
+                                            invert_orientation, read_problem, save_problem)
 from tasks.copper_inversion.v2.metrics import compare
 from tasks.copper_inversion.v2.objective import score
 from tasks.copper_inversion.v2.research import PublicTrainingExport
@@ -450,9 +452,243 @@ def test_protocol_schema_and_example_enable_recommended_case_isolation():
         {"anonymize_cases": False, "canonical_origin": True, "case_feedback": "opaque", "refuse_case_ids": True},
         {"anonymize_cases": True, "canonical_origin": True, "case_feedback": "unknown", "refuse_case_ids": True},
         {"anonymize_cases": "yes", "canonical_origin": True, "case_feedback": "none", "refuse_case_ids": True},
+        {"anonymize_cases": True, "canonical_origin": True, "case_feedback": "none", "refuse_case_ids": True,
+         "randomize_orientation": "yes"},
+        {"anonymize_cases": True, "canonical_origin": True, "case_feedback": "none", "refuse_case_ids": True,
+         "unknown": False},
         {"anonymize_cases": True},
     ):
         with pytest.raises(ValueError):
             validate_case_isolation(bad)
         with pytest.raises(ValueError, match="invalid protocol"):
             protocols.validate({**example, "case_isolation": bad})
+
+    # Old 4-key case_isolation defaults randomize_orientation to False; new protocols may enable it.
+    four_key = {"anonymize_cases": True, "canonical_origin": True, "case_feedback": "none", "refuse_case_ids": True}
+    assert validate_case_isolation(four_key) == {**four_key, "randomize_orientation": False}
+    oriented = {**four_key, "randomize_orientation": True}
+    assert protocols.case_isolation(protocols.validate({**example, "case_isolation": oriented})) == oriented
+
+
+def test_canonical_problem_horizontal_orientations_and_exact_inverse():
+    raw = fixture()
+    origin = np.array([-142.375, 88.125, -112.5])
+    spacing = np.array([1.5, 2.25, 1.25])
+    shape = tuple(raw["shape"])  # (9, 8, 7) — asymmetric nx != ny, dx != dy
+    forbidden = raw["forbidden_mask"].copy()
+    forbidden[0, :, :] = True   # close x- face
+    forbidden[:, -1, :] = True  # close y+ face
+    raw["origin"] = origin.tolist()
+    raw["spacing"] = spacing.tolist()
+    raw["forbidden_mask"] = forbidden
+    raw["open_boundary_faces"] = ["x+", "y-", "z-"]
+    pts = np.array([[2.5, 2.5, 2.5], [6.5, 2.5, 2.5], [4.5, 2.5, 2.5]]) * spacing + origin
+    raw["observations"][0]["points"] = pts
+    outcrop_pts = np.array([[3.5, 4.5, 5.5], [5.5, 1.5, 5.5]]) * spacing + origin
+    raw["observations"].append({
+        "name": "outcrop", "points": outcrop_pts, "labels": np.array([1., 0.]), "groups": np.array([0, 1]),
+        "weight": 0.25, "transition_scale": 1., "contact_sigma": 1., "label_error": 0.02,
+    })
+    validate(raw)
+    field_raw = initialize(raw)
+    score_raw = score(raw, field_raw)
+    truth = np.zeros(shape, bool)
+    truth[1:5, 1:5, :4] = True
+    compare_raw = compare(raw, field_raw, truth)
+
+    for canonical_origin in (True, False):
+        for o in range(ORIENTATION_COUNT):
+            canon = canonical_problem(raw, case_id=f"case-{o:016x}", canonical_origin=canonical_origin, orientation=o)
+            expected_shape = [shape[1], shape[0], shape[2]] if o % 4 in (1, 3) else list(shape)
+            expected_spacing = [spacing[1], spacing[0], spacing[2]] if o % 4 in (1, 3) else spacing.tolist()
+            assert canon["shape"] == expected_shape
+            assert canon["spacing"] == expected_spacing
+            np.testing.assert_array_equal(invert_orientation(apply_orientation(field_raw, o), o), field_raw)
+
+            field_canon = initialize(canon)
+            restored = invert_orientation(field_canon, o)
+            np.testing.assert_array_equal(restored, field_raw)
+            assert score(raw, restored) == score_raw
+            assert compare(raw, restored, truth) == compare_raw
+            # Pure geometric diagnostics match closely; skfmm 2nd-order upwind has slight axis-reversal asymmetry,
+            # which is why SuiteEvaluator applies invert_orientation before scoring on raw_problem.
+            sc_canon = score(canon, field_canon)
+            assert sc_canon["positive_volume"] == pytest.approx(score_raw["positive_volume"], abs=1e-12)
+            assert sc_canon["internal_area"] == pytest.approx(score_raw["internal_area"], abs=1e-12)
+            assert sc_canon["component_count"] == score_raw["component_count"]
+            assert sc_canon["loss_total"] == pytest.approx(score_raw["loss_total"], abs=1e-3)
+
+    for bad in (-1, 8, True, 1.5, "0"):
+        with pytest.raises(ValueError, match="orientation"):
+            canonical_problem(raw, orientation=bad)
+        with pytest.raises(ValueError, match="orientation"):
+            invert_orientation(field_raw, bad)
+
+
+def test_orientation_replay_invariance_and_fingerprinting_defeat(tmp_path):
+    """C2 replay test: equivariant solver scores are unchanged while case-fingerprinting solvers no longer match."""
+    release = tmp_path / "release"
+    # Give every body a unique spacing so un-rotated fingerprints never collide across the 8 bodies.
+    train_root = release / "train"
+    train_rows = []
+    for index in range(8):
+        parent = hashlib.sha256(f"private-parent-c2-{index}".encode()).hexdigest()
+        cid = hashlib.sha256(f"public-case-c2-{index}".encode()).hexdigest()[:20]
+        origin = np.array([-140.25 + 37.5 * index, 85.125 - 19.25 * index, -115.5 + 4.75 * index])
+        spacing = np.array([1.5 + 0.13 * index, 2.1 + 0.17 * index, 1.25])
+        base = fixture()
+        points = np.asarray(base["observations"][0]["points"], float) * spacing / np.array([1., 2., 3.]) + origin
+        truth_dir = train_root / "private" / f"body{index}"
+        truth_dir.mkdir(parents=True)
+        np.save(truth_dir / "truth.npy", truth_for(index))
+        confirm = copy.deepcopy(base)
+        confirm.update(case_id=f"confirm-{index}", origin=origin.tolist(), spacing=spacing.tolist())
+        confirm["observations"][0].update(points=points + np.array([0.05, 0.0, 0.0]))
+        save_problem(confirm, truth_dir / "confirmation")
+        prob = copy.deepcopy(base)
+        prob.update(case_id=cid, origin=origin.tolist(), spacing=spacing.tolist())
+        prob["observations"][0].update(points=points)
+        pub_dir = train_root / "public" / cid
+        save_problem(prob, pub_dir)
+        files = ("problem.json", "problem.npz", "truth.npy", "confirmation/problem.json", "confirmation/problem.npz")
+        train_rows.append({
+            "case_id": cid, "parent_id": parent, "modality": "drill",
+            "public": str(pub_dir.relative_to(train_root)), "truth": str(truth_dir.relative_to(train_root)),
+            "sha256": {n: file_hash((truth_dir if n == "truth.npy" or n.startswith("confirmation/") else pub_dir) / n)
+                       for n in files},
+        })
+    train = train_root / "manifest.json"
+    train.write_text(json.dumps({"schema": "copper-suite-v2", "stage": "development", "split": "train",
+                                 "seeds": [47], "cases": train_rows}, sort_keys=True))
+    val = write_hex_suite(release, "validation", bodies=4, split="validation", offset=10)
+    tid = write_hex_suite(release, "test_id", bodies=4, split="test_id", offset=20)
+    tood = write_hex_suite(release, "test_ood", bodies=4, split="test_ood", offset=30)
+
+    train_cases = json.loads(train.read_text())["cases"]
+    # Record exact un-rotated fingerprints and truths (representing a solver that memorized public cases).
+    fp_table = {}
+    invariant_table = {}
+    for case in train_cases:
+        prob = canonical_problem(read_problem(train.parent / case["public"]), canonical_origin=True)
+        truth = np.load(train.parent / case["truth"] / "truth.npy")
+        p0 = tuple(np.round(prob["observations"][0]["points"][0], 4).tolist())
+        fp_table[(tuple(prob["shape"]), p0)] = truth.tolist()
+        # Orientation-invariant key: first observation z-coordinate and spacing_z/min-xy signature.
+        inv_key = (round(float(prob["spacing"][0] * prob["spacing"][1]), 6),
+                   round(float(prob["observations"][0]["points"][0, 2]), 4))
+        invariant_table[inv_key] = truth.tolist()
+
+    seen_solver_inputs = []
+
+    class CapturingExecution(InProcessExecution):
+        def run(self, identity, *, phase, inputs, **kw):
+            if phase == "solver":
+                p = read_problem(inputs)
+                seen_solver_inputs.append((identity["case"], tuple(p["shape"]),
+                                           tuple(np.round(p["observations"][0]["points"][0], 6).tolist())))
+            return super().run(identity, phase=phase, inputs=inputs, **kw)
+
+    iso_off = {**DEFAULT_CASE_ISOLATION, "randomize_orientation": False}
+    iso_on = {**DEFAULT_CASE_ISOLATION, "randomize_orientation": True}
+
+    # 1. Equivariant solver gets identical scores (training, validation, sealed) with and without orientation randomization.
+    with patch("tasks.copper_inversion.v2.service.Execution", CapturingExecution):
+        svc_off = RiskOnlyService_with_checks(tmp_path, train, "svc-off", iso_off, slots=20)
+        svc_on = RiskOnlyService_with_checks(tmp_path, train, "svc-on", iso_on, slots=20)
+        reply_off = evaluate(svc_off, VALID)
+        seen_solver_inputs.clear()
+        reply_on = evaluate(svc_on, VALID)
+        first_seen = list(seen_solver_inputs)
+        # Replay of the exact same source hits the cached receipt deterministically with identical risk.
+        replay_on = evaluate(svc_on, VALID)
+        assert replay_on == reply_on
+        assert reply_on["risk"] == pytest.approx(reply_off["risk"], abs=1e-12)
+
+        # Verify distinct orientations were applied across cases and differ for a second candidate program.
+        eval_key_1 = svc_on.evaluator.evaluation_attempt_usage_key(
+            type("C", (), {"canonical_key": reply_on["source_sha256"]})())
+        seen_solver_inputs.clear()
+        reply_on_2 = evaluate(svc_on, VALID + "# second program\n")
+        eval_key_2 = svc_on.evaluator.evaluation_attempt_usage_key(
+            type("C", (), {"canonical_key": reply_on_2["source_sha256"]})())
+        o1 = [case_orientation(eval_key_1, c["case_id"]) for c in train_cases]
+        o2 = [case_orientation(eval_key_2, c["case_id"]) for c in train_cases]
+        assert any(o != 0 for o in o1) and o1 != o2
+        assert first_seen != seen_solver_inputs
+
+    # Same equivariant solver through frozen validation + sealed evaluation keeps exact scores.
+    from tasks.copper_inversion.v2 import selection
+    solver_file = tmp_path / "equivariant.py"
+    solver_file.write_text(VALID)
+    svc_off.seal_training()
+    svc_on.seal_training()
+    val_and_test = {}
+    for label, svc, flag in (("off", svc_off, False), ("on", svc_on, True)):
+        with patch("tasks.copper_inversion.v2.selection.Execution", CapturingExecution), \
+                patch("tasks.copper_inversion.v2.selection.InterfaceChecks", lambda root, ex: lambda p: True):
+            sel = tmp_path / f"sel-{label}"
+            selection.freeze(sel, [solver_file], val, [tid, tood], seconds=10, image=IMAGE,
+                             training_run=svc.root, training_manifest=train,
+                             anonymize_cases=True, canonical_origin=True, randomize_orientation=flag)
+            v_rep = selection.run(sel, "validation")
+            t_rep = selection.run(sel, "test")
+            val_and_test[label] = (v_rep["candidates"][0]["metrics"], [r["metrics"] for r in t_rep["results"]])
+    assert val_and_test["on"][0]["loss_total"] == pytest.approx(val_and_test["off"][0]["loss_total"], abs=1e-12)
+    assert val_and_test["on"][0]["mean_iou"] == pytest.approx(val_and_test["off"][0]["mean_iou"], abs=1e-12)
+    for m_on, m_off in zip(val_and_test["on"][1], val_and_test["off"][1]):
+        assert m_on["mean_iou"] == pytest.approx(m_off["mean_iou"], abs=1e-12)
+        assert m_on["loss_total"] == pytest.approx(m_off["loss_total"], abs=1e-12)
+
+    # 2. Case-fingerprinting solver matches every case under randomize_orientation=False, but fails under True.
+    fp_solver = (
+        "import numpy as np\n"
+        f"TABLE = {fp_table!r}\n"
+        "def solve(problem, budget, seed):\n"
+        "    key = (tuple(problem['shape']), tuple(np.round(problem['observations'][0]['points'][0], 4).tolist()))\n"
+        "    if key in TABLE:\n"
+        "        return np.where(np.asarray(TABLE[key], dtype=bool), 1.0, -1.0)\n"
+        "    field = np.full(problem['shape'], -1.0)\n"
+        "    field[0, 0, 0] = 1.0\n"
+        "    return field\n"
+    )
+    # Also test a memorizer using an orientation-invariant key that returns an un-rotated memorized mask.
+    inv_solver = (
+        "import numpy as np\n"
+        f"TABLE = {invariant_table!r}\n"
+        "def solve(problem, budget, seed):\n"
+        "    sp = problem['spacing']\n"
+        "    key = (round(float(sp[0] * sp[1]), 6), round(float(problem['observations'][0]['points'][0, 2]), 4))\n"
+        "    return np.where(np.asarray(TABLE[key], dtype=bool), 1.0, -1.0)\n"
+    )
+    with patch("tasks.copper_inversion.v2.service.Execution", CapturingExecution):
+        svc_fp_off = RiskOnlyService_with_checks(tmp_path, train, "svc-fp-off", iso_off, slots=20)
+        svc_fp_on = RiskOnlyService_with_checks(tmp_path, train, "svc-fp-on", iso_on, slots=20)
+        r_fp_off = evaluate(svc_fp_off, fp_solver)
+        r_fp_on = evaluate(svc_fp_on, fp_solver)
+        r_inv_off = evaluate(svc_fp_off, inv_solver)
+        r_inv_on = evaluate(svc_fp_on, inv_solver)
+
+    def mean_iou(svc, reply):
+        k = svc.evaluator.evaluation_attempt_usage_key(type("C", (), {"canonical_key": reply["source_sha256"]})())
+        return json.loads((svc.root / "evaluations" / k / "result.json").read_text())["metrics"]["mean_iou"]
+
+    assert mean_iou(svc_fp_off, r_fp_off) == pytest.approx(1.0, abs=1e-12)
+    assert mean_iou(svc_fp_on, r_fp_on) < 0.5
+    assert r_fp_on["risk"] > r_fp_off["risk"] + 0.05
+
+    assert mean_iou(svc_fp_off, r_inv_off) == pytest.approx(1.0, abs=1e-12)
+    assert mean_iou(svc_fp_on, r_inv_on) < 0.5
+    assert r_inv_on["legal_rate"] < 1.0  # odd-k rotations reject mismatched memorized shape
+
+    # 3. Resuming an existing 4-key service without randomize_orientation keeps its identity.json intact.
+    four_key_cfg = {"manifest": str(train), "root": str(tmp_path / "svc-resume"), "image": IMAGE,
+                    "seconds": 10, "slots": 10, "caller_uid": 0, "socket": str(tmp_path / "resume.sock"),
+                    "case_isolation": {"anonymize_cases": True, "canonical_origin": True,
+                                       "case_feedback": "none", "refuse_case_ids": True}}
+    from tasks.copper_inversion.rsi.service import RiskOnlyService
+    with patch("tasks.copper_inversion.v2.service.Execution", CapturingExecution):
+        first_svc = RiskOnlyService(four_key_cfg)
+        assert "randomize_orientation" not in first_svc.identity["configuration"]["case_isolation"]
+        assert first_svc.case_isolation["randomize_orientation"] is False
+        reopened = RiskOnlyService(four_key_cfg)
+        assert reopened.public_contract == first_svc.public_contract

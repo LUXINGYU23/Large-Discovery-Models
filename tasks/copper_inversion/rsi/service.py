@@ -65,14 +65,20 @@ class RiskOnlyService(EvaluatorService):
     def __init__(self, configuration):
         if isinstance(configuration, dict) and "purpose" in configuration:
             raise ValueError("discovery feedback cannot use a measurement-only suite")
-        isolation = resolve_case_isolation(configuration.get("case_isolation") if isinstance(configuration, dict) else None)
+        raw_iso = configuration.get("case_isolation") if isinstance(configuration, dict) else None
+        isolation = resolve_case_isolation(raw_iso)
         if isinstance(configuration, dict) and "case_isolation" in configuration:
-            for flag in ("anonymize_cases", "canonical_origin"):
+            for flag in ("anonymize_cases", "canonical_origin", "randomize_orientation"):
                 if flag in configuration and configuration[flag] != isolation[flag]:
                     raise ValueError(f"{flag} differs from case_isolation.{flag}")
-            configuration = {**configuration, "case_isolation": isolation,
+            stored_iso = dict(isolation)
+            if isinstance(raw_iso, dict) and "randomize_orientation" not in raw_iso and not isolation["randomize_orientation"]:
+                stored_iso.pop("randomize_orientation")
+            extra = {"randomize_orientation": isolation["randomize_orientation"]} if (
+                isolation["randomize_orientation"] or "randomize_orientation" in configuration) else {}
+            configuration = {**configuration, "case_isolation": stored_iso,
                              "anonymize_cases": isolation["anonymize_cases"],
-                             "canonical_origin": isolation["canonical_origin"]}
+                             "canonical_origin": isolation["canonical_origin"], **extra}
         super().__init__(configuration)
         self.case_isolation = isolation
         path = self.root / "rsi-private-audit.json"

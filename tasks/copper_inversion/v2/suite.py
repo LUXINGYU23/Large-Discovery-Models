@@ -13,8 +13,8 @@ from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY, Evaluat
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.execution import digest, source_identity, freeze_model
 from ..core.geometry import read_model
-from ..rsi.case_isolation import opaque_case_id
-from .data import canonical_problem, read_problem, save_problem
+from ..rsi.case_isolation import case_orientation, opaque_case_id
+from .data import canonical_problem, invert_orientation, read_problem, save_problem
 
 
 def file_hash(path):
@@ -197,8 +197,8 @@ class SuiteEvaluator:
     case_workers=4
 
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
-                 *,anonymize_cases=False,canonical_origin=False):
-        if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+                 *,anonymize_cases=False,canonical_origin=False,randomize_orientation=False):
+        if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
             raise ValueError("invalid case isolation flags")
         self.root=Path(root);self.execution=execution
         self.slots=slots
@@ -209,6 +209,7 @@ class SuiteEvaluator:
         if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
         self.seconds=seconds;self.objective=objective
         self.anonymize_cases=anonymize_cases;self.canonical_origin=canonical_origin
+        self.randomize_orientation=randomize_orientation
         release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
         if purpose not in (None,"q1"):raise ValueError("unknown evaluation purpose")
         if purpose=="q1":
@@ -226,6 +227,7 @@ class SuiteEvaluator:
         if purpose is not None:self.context["purpose"]=purpose
         if anonymize_cases:self.context["anonymize_cases"]=True
         if canonical_origin:self.context["canonical_origin"]=True
+        if randomize_orientation:self.context["randomize_orientation"]=True
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
@@ -251,9 +253,11 @@ class SuiteEvaluator:
             if row_path.exists():return json.loads(row_path.read_text())
             inputs=case_root/"input"
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
-            if self.anonymize_cases or self.canonical_origin:
+            orientation=case_orientation(key,case["case_id"]) if self.randomize_orientation else 0
+            if self.anonymize_cases or self.canonical_origin or orientation:
                 cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
-                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin)
+                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin,
+                                          orientation=orientation)
                 save_problem(problem,inputs)
                 score_inputs=case_root/"score-input"
                 save_problem(raw_problem,score_inputs)
@@ -272,10 +276,18 @@ class SuiteEvaluator:
             if not (r["exit_code"] or r["reason"] or r["oom"]):
                 try:
                     try:
-                        read_model(job/"output/model.npy",problem["shape"])
+                        field=read_model(job/"output/model.npy",problem["shape"])
                     except (FileNotFoundError,PermissionError) as exc:
                         raise ValueError("candidate did not produce a readable model") from exc
-                    sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
+                    if orientation:
+                        restored_path=case_root/"restored-model.npy"
+                        np.save(restored_path,invert_orientation(field,orientation))
+                        try:
+                            sha=freeze_model(restored_path,case_root/"model",raw_problem["shape"])
+                        finally:
+                            restored_path.unlink(missing_ok=True)
+                    else:
+                        sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
                 except OSError as exc:
                     raise EvaluationPaused("model freeze infrastructure I/O failed") from exc
                 except ValueError as exc:
