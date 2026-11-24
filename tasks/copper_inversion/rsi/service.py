@@ -187,7 +187,7 @@ class RiskOnlyService(EvaluatorService):
         return receipt
 
     def seal_training(self):
-        """Freeze the three lowest-risk eligible sources with at least one legal solve."""
+        """Freeze the lowest-risk eligible sources with at least one legal solve (ranked by full judge when resampled)."""
         path = self.root / "training-sealed.json"
         if path.exists():
             record = json.loads(path.read_text())
@@ -198,9 +198,11 @@ class RiskOnlyService(EvaluatorService):
                        if row["metrics"]["legal_rate"] > 0}
             if not records:
                 raise ValueError("no valid training candidate can be frozen")
-            ordered = sorted(records, key=lambda sha: (records[sha]["metrics"]["loss_total"],
+            count = getattr(self, "finalists", 3)
+            ordered = sorted(records, key=lambda sha: (
+                             records[sha]["metrics"].get("full_loss_total", records[sha]["metrics"]["loss_total"]),
                              -records[sha]["metrics"]["legal_rate"],
-                             records[sha]["metrics"]["mean_solver_wall_seconds"], sha))[:3]
+                             records[sha]["metrics"]["mean_solver_wall_seconds"], sha))[:count]
             record = {"contract_digest": digest(self.identity),
                       "used_slots": self.ledger.counters.get("algorithm_feedback_slots", 0),
                       "source_sha256s": ordered, "selected_receipts": {sha: records[sha] for sha in ordered}}

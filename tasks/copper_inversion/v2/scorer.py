@@ -14,6 +14,20 @@ from .metrics import compare
 from ..core.geometry import read_model
 
 
+def _load_checked_confirmation(problem, path):
+    if not path.exists():
+        return None
+    confirmation = read_problem(path)
+    if confirmation['priors'] != problem['priors']:
+        raise ValueError('confirmation geological priors differ')
+    if any(confirmation[key] != problem[key] for key in ("shape", "spacing", "origin")):
+        raise ValueError("confirmation geometry differs")
+    for key in ("domain_mask", "forbidden_mask"):
+        if not np.array_equal(confirmation[key], problem[key]):
+            raise ValueError("confirmation masks differ")
+    return confirmation
+
+
 def score_case(inputs, model, truth_root):
     """One case; bad trusted data raises (infrastructure), a bad model is invalid."""
     problem = read_problem(inputs)
@@ -25,24 +39,21 @@ def score_case(inputs, model, truth_root):
             raise ValueError("invalid sealed truth")
         if np.any(truth & (~problem["domain_mask"] | problem["forbidden_mask"])):
             raise ValueError("sealed truth outside feasible region")
-    confirmation_path=Path(truth_root) / "confirmation"
-    confirmation=read_problem(confirmation_path) if confirmation_path.exists() else None
-    if confirmation is not None:
-        if confirmation['priors']!=problem['priors']:
-            raise ValueError('confirmation geological priors differ')
-        if any(confirmation[key]!=problem[key] for key in ("shape","spacing","origin")):
-            raise ValueError("confirmation geometry differs")
-        for key in ("domain_mask","forbidden_mask"):
-            if not np.array_equal(confirmation[key],problem[key]):raise ValueError("confirmation masks differ")
+    confirmation = _load_checked_confirmation(problem, Path(truth_root) / "confirmation")
+    full_confirmation = _load_checked_confirmation(problem, Path(truth_root) / "full_confirmation")
     try:
         field = read_model(Path(model) / "model.npy", problem["shape"])
         metrics = score(problem, field)
         if truth is not None:
             metrics.update(compare(problem, field, truth))
         if confirmation is not None:
-            hidden=score(confirmation,field)
-            metrics.update({"confirmation_"+key:value for key,value in hidden.items()
-                            if key in {"loss_binary","loss_contact","loss_total"} or key.endswith(("_label_error","_contact_rmse"))})
+            hidden = score(confirmation, field)
+            metrics.update({"confirmation_" + key: value for key, value in hidden.items()
+                            if key in {"loss_binary", "loss_contact", "loss_total"} or key.endswith(("_label_error", "_contact_rmse"))})
+        if full_confirmation is not None:
+            full_hidden = score(full_confirmation, field)
+            metrics.update({"full_confirmation_" + key: value for key, value in full_hidden.items()
+                            if key in {"loss_binary", "loss_contact", "loss_total"}})
         return dict(status="succeeded", metrics=metrics)
     except ValueError as exc:
         return dict(status="invalid", error=str(exc), metrics={"iou": 0.} if truth is not None else {})

@@ -14,12 +14,13 @@ from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.execution import digest
+from tasks.copper_inversion.rsi import protocol as protocols
 from tasks.copper_inversion.rsi.case_isolation import resolve_case_isolation
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.training_receipts import eligible
 
-EXPERIMENTS = frozenset({"smoke", "rehearsal", "Q1", "M1", "E1", "E2", "E3", "X1", "F1"})
+EXPERIMENTS = frozenset(protocols.EXPERIMENTS)
 FULL = "full"
 FINALISTS = 3
 
@@ -72,10 +73,11 @@ def run_manifest(run_dir, protocol_id, experiment):
 
 
 def _key(sha, metrics):
-    return (metrics["loss_total"], -metrics["legal_rate"], metrics["mean_solver_wall_seconds"], sha)
+    return (metrics.get("full_loss_total", metrics["loss_total"]),
+            -metrics["legal_rate"], metrics["mean_solver_wall_seconds"], sha)
 
 
-def finalists(run_dir, service_root, round_index=None, count=FINALISTS):
+def finalists(run_dir, service_root, round_index=None, count=None):
     """Pick the lowest-training-risk valid programs among records of rounds <= round_index."""
     prefix_name(round_index)
     run_dir, service_root = Path(run_dir), Path(service_root)
@@ -83,6 +85,8 @@ def finalists(run_dir, service_root, round_index=None, count=FINALISTS):
     if not rows or any(a["round"] > b["round"] for a, b in zip(rows, rows[1:])):
         raise ValueError("ledger is empty or out of round order")
     identity = json.loads((service_root / "identity.json").read_text())
+    if count is None:
+        count = identity["configuration"].get("finalists", FINALISTS)
     sealed_path = service_root / "training-sealed.json"
     if not sealed_path.is_file():
         raise ValueError("seal the training service before freezing")
@@ -120,25 +124,35 @@ def finalists(run_dir, service_root, round_index=None, count=FINALISTS):
 
 
 def held_out(release, manifest=None, protocol=None):
-    """Validation and sealed manifests of the run's tier and judge (contracts §2.1)."""
+    """Validation and sealed manifests of the run's tier and judge (contracts §2.1).
+
+    When protocol validation_judge is 'standard' (rsi-r2 default), validation is
+    always fixed to the standard validation manifest across every judge cell.
+    """
     release = Path(release)
     if protocol is None:
         return (release / "validation/manifest.json",
                 [release / "test_id/manifest.json", release / "test_ood/manifest.json"])
     tier = protocol["tiers"][manifest["tier"]]
-    judge = protocol["judges"][manifest["judge"]]
-    return (release / judge.get("validation_manifest", tier["validation_manifest"]),
-            [release / path for path in tier["sealed_manifests"]])
+    if protocols.validation_judge(protocol) == "standard":
+        standard = protocol["judges"]["standard"]
+        val_manifest = standard.get("validation_manifest", tier["validation_manifest"])
+    else:
+        judge = protocol["judges"][manifest["judge"]]
+        val_manifest = judge.get("validation_manifest", tier["validation_manifest"])
+    return (release / val_manifest, [release / path for path in tier["sealed_manifests"]])
 
 
 def judge_objective(manifest, protocol, configuration):
-    """spec §3.3: the judge also scores validation; it must match the training service."""
+    """Validation scoring objective; always checks the training service matches its judge."""
     service = configuration.get("objective", "confirmation")
     if protocol is None:
         return service
     objective = protocol["judges"][manifest["judge"]].get("objective", "confirmation")
     if objective != service:
         raise ValueError("run judge objective differs from its training service")
+    if protocols.validation_judge(protocol) == "standard":
+        return protocol["judges"]["standard"].get("objective", "confirmation")
     return objective
 
 
@@ -178,7 +192,10 @@ def freeze_run(root, protocol_id, experiment, run_id, round_index=None, *, relea
     paths = layout(root, protocol_id, experiment, run_id)
     manifest = run_manifest(paths["run"], protocol_id, experiment)
     name = prefix_name(round_index)
-    chosen = finalists(paths["run"], paths["service"], round_index)
+    count = (protocol["loop"]["finalists"]
+             if protocol is not None and isinstance(protocol.get("loop"), dict) and "finalists" in protocol["loop"]
+             else None)
+    chosen = finalists(paths["run"], paths["service"], round_index, count=count)
     target = paths["run_selection"] / name
     if not target.exists() and paths["run_selection"].is_dir():
         for folder in paths["run_selection"].iterdir():

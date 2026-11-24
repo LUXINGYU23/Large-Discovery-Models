@@ -540,7 +540,10 @@ def test_orientation_replay_invariance_and_fingerprinting_defeat(tmp_path):
         points = np.asarray(base["observations"][0]["points"], float) * spacing / np.array([1., 2., 3.]) + origin
         truth_dir = train_root / "private" / f"body{index}"
         truth_dir.mkdir(parents=True)
-        np.save(truth_dir / "truth.npy", truth_for(index))
+        # Corner-asymmetric truth (strictly in one x<3, y<3 quadrant) so no non-identity D4 symmetry overlaps it.
+        asym_truth = np.zeros(base["shape"], bool)
+        asym_truth[:3, :3, :3 + (index % 3)] = True
+        np.save(truth_dir / "truth.npy", asym_truth)
         confirm = copy.deepcopy(base)
         confirm.update(case_id=f"confirm-{index}", origin=origin.tolist(), spacing=spacing.tolist())
         confirm["observations"][0].update(points=points + np.array([0.05, 0.0, 0.0]))
@@ -676,9 +679,14 @@ def test_orientation_replay_invariance_and_fingerprinting_defeat(tmp_path):
     assert mean_iou(svc_fp_on, r_fp_on) < 0.5
     assert r_fp_on["risk"] > r_fp_off["risk"] + 0.05
 
+    inv_key_on = svc_fp_on.evaluator.evaluation_attempt_usage_key(
+        type("C", (), {"canonical_key": r_inv_on["source_sha256"]})())
+    inv_orients = [case_orientation(inv_key_on, c["case_id"]) for c in train_cases]
+    assert any(o != 0 for o in inv_orients)
     assert mean_iou(svc_fp_off, r_inv_off) == pytest.approx(1.0, abs=1e-12)
-    assert mean_iou(svc_fp_on, r_inv_on) < 0.5
-    assert r_inv_on["legal_rate"] < 1.0  # odd-k rotations reject mismatched memorized shape
+    # Every non-identity D4 orientation maps the corner truth to a disjoint quadrant or invalid shape (IoU = 0).
+    assert mean_iou(svc_fp_on, r_inv_on) == pytest.approx(sum(o == 0 for o in inv_orients) / len(inv_orients), abs=1e-12)
+    assert mean_iou(svc_fp_on, r_inv_on) < 1.0
 
     # 3. Resuming an existing 4-key service without randomize_orientation keeps its identity.json intact.
     four_key_cfg = {"manifest": str(train), "root": str(tmp_path / "svc-resume"), "image": IMAGE,
