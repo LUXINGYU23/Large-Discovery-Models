@@ -88,12 +88,12 @@ def main():
                 pack_overlap=sum(pa['overlapping_holes'] for pa in pack_audits)
                 passed=(audit['status']=='passed') and (pack_overlap==0) and (ore_holes>=min_ore)
                 if packs_required==1 and min_ore==0:
-                    attempts.append(dict(seed=seed,**audit))
+                    attempts.append({"seed":seed,**audit})
                 else:
                     reason=('passed' if passed else 'public_overlap' if audit['status']!='passed'
                             else 'pack_overlap' if pack_overlap else 'undiscovered')
-                    attempts.append(dict(seed=seed,**audit,status='passed' if passed else 'failed',
-                                         reason=reason,pack_overlapping_holes=pack_overlap,ore_holes=ore_holes))
+                    attempts.append({"seed":seed,**audit,"status":'passed' if passed else 'failed',
+                                     "reason":reason,"pack_overlapping_holes":pack_overlap,"ore_holes":ore_holes})
                 if not passed and mode=='resample_until_separated':continue
                 selected.append((seed,candidate,cand_drill,hidden_manifest))
                 if len(selected)<packs_required:continue

@@ -506,3 +506,39 @@ def test_gempy_multiple_recipe_and_observations_holes_determinism(tmp_path):
         assert np.array_equal(obs1["labels"], obs2["labels"])
         assert np.array_equal(obs1["groups"], obs2["groups"])
 
+
+def test_generate_confirmation_four_packs_cli_with_prepopulated_candidates(tmp_path, monkeypatch):
+    """Exercise generate_confirmation.main end-to-end on a 4-pack rsi-r2 dataset."""
+    import sys
+    from tasks.copper_inversion.experiments.v2 import generate_confirmation
+    hist = _historical(tmp_path / "hist")
+    ds = tmp_path / "ds"
+    _build_r2_dataset(ds, master_seed=31, hist=hist, open_only=True, holes_bounds=(8, 8))
+    # Move one parent's confirmation into confirmation-candidates and re-run generate_confirmation.main.
+    import shutil
+    part_dir = ds / "id"
+    plan = json.loads((part_dir / "plan.json").read_text())
+    entry = next(e for e in plan["parents"] if e["split"] == "train" and e["index"] == 0)
+    name = "train-00"
+    shutil.rmtree(part_dir / "confirmation" / name)
+    (part_dir / "confirmation-audits" / f"{name}.json").unlink()
+    (ds / "confirmation-complete.json").unlink()
+    digest = json.loads((part_dir / "packs" / name / "private-manifest.json").read_text())["parent_digest"]
+    mask = np.load(part_dir / "packs" / name / "private" / "truth.npy", allow_pickle=False)
+    # Seed 0 fails discoverability (0 ore holes); seeds 1..4 pass and are separated.
+    _write_pack(part_dir / "confirmation-candidates" / f"{name}-00", digest, entry["confirmation_seeds"][0],
+                CONF_PACK_HOLES[0], mask, ore_holes=0, holes_bounds=(3, 12))
+    for k in range(4):
+        _write_pack(part_dir / "confirmation-candidates" / f"{name}-{k + 1:02}", digest,
+                    entry["confirmation_seeds"][k + 1], CONF_PACK_HOLES[k], mask, ore_holes=1, holes_bounds=(3, 12))
+    # Seed 5 is also pre-written so batching of 6 finds all candidates without invoking gempy.
+    _write_pack(part_dir / "confirmation-candidates" / f"{name}-05", digest,
+                entry["confirmation_seeds"][5], [(5.5, 2.5), (5.5, 7.5)], mask, ore_holes=1, holes_bounds=(3, 12))
+    monkeypatch.setattr(sys, "argv", ["generate_confirmation", "--root", str(ds), "--python", sys.executable, "--workers", "2"])
+    generate_confirmation.main()
+    receipt = json.loads((part_dir / "confirmation-audits" / f"{name}.json").read_text())
+    assert receipt["status"] == "passed" and receipt["packs"] == 4
+    assert [a["status"] for a in receipt["attempts"]] == ["failed", "passed", "passed", "passed", "passed"]
+    assert receipt["attempts"][0]["reason"] == "undiscovered"
+    build(ds, tmp_path / "rel", open_only=True)
+
