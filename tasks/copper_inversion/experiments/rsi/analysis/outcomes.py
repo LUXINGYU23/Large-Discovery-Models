@@ -26,7 +26,8 @@ from pathlib import Path
 
 SCHEMA = "rsi-outcomes-v1"
 TABLE = {"schema", "experiment", "protocol_id", "sealed", "frozen_list_sha256", "unseal_log_sha256",
-         "columns", "rows", "body_scores", "programs", "validations", "references", "q1"}
+         "columns", "rows", "body_scores", "programs", "validations", "diagnostics", "strata_slices",
+         "references", "q1"}
 FORBIDDEN = re.compile(r"case_id|parent_id|truth|geometry|body_id", re.IGNORECASE)
 SPLITS = ("test_id", "test_ood")
 LAYOUTS = ("drill", "drill_outcrop")
@@ -73,6 +74,7 @@ class Outcomes:
     def __init__(self, tables):
         self.tables = tables
         self.freezes, self.bodies, self.train_iou, self.validation = {}, {}, {}, {}
+        self.diagnostics, self.strata_slices = {}, {}
         self.references, self.q1, self.protocol_ids, self.unseal_logs = {}, None, set(), {}
         for table in tables:
             if table.get("schema") != SCHEMA or set(table) - TABLE:
@@ -96,6 +98,11 @@ class Outcomes:
                 self.train_iou[(exp, row["run_id"], row["program_id"])] = row["train_iou"]
             for row in table.get("validations", []):
                 self.validation[(exp, row["run_id"], row["program_id"])] = row
+            for row in table.get("diagnostics", []):
+                self.diagnostics[(exp, row["run_id"])] = row
+            for row in table.get("strata_slices", []):
+                self.strata_slices[(exp, row["run_id"], prefix_round(row["prefix"]), row["split"])] = {
+                    k: row[k] for k in ("family", "modality", "noise") if k in row}
             self.references.update(table.get("references", {}))
             if table.get("q1"):
                 self.q1 = table["q1"]
